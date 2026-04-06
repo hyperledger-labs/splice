@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -9,14 +9,14 @@ import cats.syntax.functorFilter.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton
+import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{KeepAliveClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.health.HealthListener
+import com.digitalasset.canton.health.{HealthListener, HealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle, PromiseUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.SequencerConnectionPoolMetrics
@@ -32,20 +32,25 @@ import com.digitalasset.canton.sequencing.SequencerConnectionXPool.{
   SequencerConnectionXPoolHealth,
 }
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
-import com.digitalasset.canton.time.{Clock, WallClock}
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.collection.SeqUtil
-import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, LoggerUtil, SingleUseCell}
+import com.digitalasset.canton.util.{
+  ErrorUtil,
+  FutureUnlessShutdownUtil,
+  LoggerUtil,
+  Mutex,
+  SingleUseCell,
+}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{checked, config as cantonConfig}
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.collection.{immutable, mutable}
-import scala.compat.java8.DurationConverters.DurationOps
-import scala.concurrent.{ExecutionContextExecutor, blocking}
+import scala.concurrent.ExecutionContextExecutor
+import scala.math.Ordering.Implicits.infixOrderingOps
 import scala.util.Random
 
 class SequencerConnectionXPoolImpl private[sequencing] (
@@ -92,7 +97,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
   /** Used to synchronize access to the mutable structures [[pool]] and [[trackedConnections]]
     */
-  private val lock = new Object()
+  private val lock = new Mutex()
 
   /** Promise that is satisfied when the pool completes initialization, or the
     * [[com.digitalasset.canton.config.ProcessingTimeout.sequencerInfo]] timeout value has elapsed
@@ -114,12 +119,16 @@ class SequencerConnectionXPoolImpl private[sequencing] (
     logger = logger,
   )
 
+  override def getConnectionsHealthStatus: Seq[HealthQuasiComponent] =
+    lock.exclusive {
+      trackedConnections.toSeq.map { case (connection, _) => connection.health }
+    }
+
   @VisibleForTesting
-  override def contents: Map[SequencerId, Set[SequencerConnectionX]] = blocking {
-    lock.synchronized {
+  override def contents: Map[SequencerId, Set[SequencerConnectionX]] =
+    lock.exclusive {
       pool.view.mapValues(_.toSet).toMap
     }
-  }
 
   override def physicalSynchronizerIdO: Option[PhysicalSynchronizerId] =
     bootstrapCell.get.map(_.synchronizerId)
@@ -139,7 +148,11 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       logger.debug(s"Starting connection pool")
       setupInitializationTimeout()
 
-      updateTrackedConnections(toBeAdded = config.connections, toBeRemoved = Set.empty)
+      updateTrackedConnections(
+        toBeAdded = config.connections,
+        toBeRemoved = Set.empty,
+        isInitialUpdate = true,
+      )
     }
 
     EitherT(initializedP.futureUS)
@@ -167,14 +180,12 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       threshold: PositiveInt,
       ignored: Set[ConnectionXConfig],
       extraUndecided: NonNegativeInt,
-  )(implicit traceContext: TraceContext): Boolean = blocking {
-    lock.synchronized {
+  )(implicit traceContext: TraceContext): Boolean =
+    lock.exclusive {
       // Grab all attributes only once to prevent a race condition if a connection is validated between the next calls
       val nonFatalAttributes = trackedConnections.toSeq.collect {
         case (connection, _validated)
-            if connection.health.getState != SequencerConnectionXState.Fatal && !ignored.contains(
-              connection.config
-            ) =>
+            if !connection.health.getState.isFatal && !ignored.contains(connection.config) =>
           connection.attributes
       }
 
@@ -198,13 +209,13 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
       isReachable
     }
-  }
 
   private def updateTrackedConnections(
       toBeAdded: immutable.Iterable[ConnectionXConfig],
       toBeRemoved: Set[ConnectionXConfig],
-  )(implicit traceContext: TraceContext): Unit = blocking {
-    lock.synchronized {
+      isInitialUpdate: Boolean,
+  )(implicit traceContext: TraceContext): Unit =
+    lock.exclusive {
       val removedConnections =
         trackedConnections.keySet.filter(connection => toBeRemoved.contains(connection.config))
       val newConnections = toBeAdded.map(connectionFactory.create)
@@ -226,12 +237,17 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       removedConnections.foreach { connection =>
         connection.fatal("removed from config")
       }
+      if (isInitialUpdate) {
+        metrics.removeMetricsForAllConnections()
+      } else {
+        metrics.removeMetricsForConnection(toBeRemoved.map(_.name))
+      }
+
       // If start() or updateConfig() is called after the pool has been closed, we don't want to start new connections
       if (!isClosing) {
         newConnections.map(new ConnectionHandler(_)).foreach(_.startConnection())
       }
     }
-  }
 
   private class ConnectionHandler(connection: InternalSequencerConnectionX) extends NamedLogging {
     protected override val loggerFactory: NamedLoggerFactory =
@@ -246,7 +262,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       */
     private case class RestartData(
         scheduled: Boolean,
-        delay: cantonConfig.NonNegativeFiniteDuration,
+        delay: NonNegativeFiniteDuration,
         initialStartTimeO: Option[CantonTimestamp],
     )
 
@@ -272,16 +288,16 @@ class SequencerConnectionXPoolImpl private[sequencing] (
             current.copy(
               scheduled = true,
               // Exponentially backoff the restart delay, bounded by the max
-              delay = canton.config.NonNegativeFiniteDuration.tryFromDuration(
-                (delay.duration * 2).min(config.maxRestartConnectionDelay.duration)
-              ),
+              delay = (delay * NonNegativeInt.two).min(config.maxRestartConnectionDelay),
             )
           case other => other
         }
 
       initialStartTimeO.foreach { initialStartTime =>
-        val durationSinceInitialStart = (wallClock.now - initialStartTime).toScala
-        if (durationSinceInitialStart > config.warnConnectionValidationDelay.duration) {
+        val durationSinceInitialStart = wallClock.now - initialStartTime
+        if (
+          durationSinceInitialStart.compareTo(config.warnConnectionValidationDelay.duration) > 0
+        ) {
           logger.warn(
             s"Connection has failed validation since $initialStartTime" +
               s" (${LoggerUtil.roundDurationForHumans(durationSinceInitialStart)} ago)." +
@@ -297,7 +313,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
           s"Scheduling restart after ${LoggerUtil.roundDurationForHumans(delay.duration)}"
         )
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-          wallClock.scheduleAfter(_ => restart(), delay.asJava),
+          wallClock.scheduleAfter(_ => restart(), delay.duration),
           s"restart-connection-${connection.name}",
         )
       }
@@ -341,15 +357,15 @@ class SequencerConnectionXPoolImpl private[sequencing] (
             state match {
               case SequencerConnectionXState.Validated => processValidatedConnection(connection)
 
-              case SequencerConnectionXState.Stopped =>
+              case SequencerConnectionXState.Stopped(_) =>
                 removeConnectionFromPool(connection, actionIfPresent = resetRestartDelay())
                 if (!isClosing) scheduleRestart()
 
               // For any other state, ensure the connection is not in the pool
-              case SequencerConnectionXState.Fatal |
-                  SequencerConnectionXState.Initial | SequencerConnectionXState.Starting |
-                  SequencerConnectionXState.Started | SequencerConnectionXState.Stopping =>
-                if (state == SequencerConnectionXState.Fatal)
+              case SequencerConnectionXState.Fatal(_) | SequencerConnectionXState.Initial |
+                  SequencerConnectionXState.Starting | SequencerConnectionXState.Started |
+                  SequencerConnectionXState.Stopping(_) =>
+                if (state.isFatal)
                   checkIfThresholdIsStillReachable(config.trustThreshold)
                 removeConnectionFromPool(connection, actionIfPresent = resetRestartDelay())
             }
@@ -365,79 +381,78 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   )(implicit
       traceContext: TraceContext
   ): Either[SequencerConnectionXPoolError, Unit] =
-    blocking {
-      lock.synchronized {
-        val currentConfig = config
-        val newThreshold = newConfig.trustThreshold
-        val poolNotInitialized = bootstrapCell.get.isEmpty
+    lock.exclusive {
+      val currentConfig = config
+      val newThreshold = newConfig.trustThreshold
+      val poolNotInitialized = bootstrapCell.get.isEmpty
 
-        for {
-          _ <- newConfig.validate
-          _ <- Either.cond(
-            newConfig.expectedPSIdO == currentConfig.expectedPSIdO,
+      for {
+        _ <- newConfig.validate
+        _ <- Either.cond(
+          newConfig.expectedPsidO == currentConfig.expectedPsidO,
+          (),
+          SequencerConnectionXPoolError.InvalidConfigurationError(
+            "The expected physical synchronizer ID can only be changed during a node restart."
+          ),
+        )
+
+        changedConnections = currentConfig.changedConnections(newConfig)
+
+        // Check whether the trust threshold is reachable with the new configuration
+        _ <-
+          Either.cond(
+            isThresholdStillReachable(
+              newThreshold,
+              // The removed connections don't count
+              ignored = changedConnections.removed,
+              // The added connections are so far undecided
+              extraUndecided = NonNegativeInt.tryCreate(changedConnections.added.size),
+            ),
             (),
             SequencerConnectionXPoolError.InvalidConfigurationError(
-              "The expected physical synchronizer ID can only be changed during a node restart."
+              s"Trust threshold $newThreshold cannot be reached"
             ),
           )
 
-          changedConnections = currentConfig.changedConnections(newConfig)
-
-          // Check whether the trust threshold is reachable with the new configuration
-          _ <-
-            Either.cond(
-              isThresholdStillReachable(
-                newThreshold,
-                // The removed connections don't count
-                ignored = changedConnections.removed,
-                // The added connections are so far undecided
-                extraUndecided = NonNegativeInt.tryCreate(changedConnections.added.size),
-              ),
-              (),
-              SequencerConnectionXPoolError.InvalidConfigurationError(
-                s"Trust threshold $newThreshold cannot be reached"
-              ),
+        // Check whether the new threshold is now reached, which can only happen if it was lowered
+        bootstrapIfThresholdReachedO <-
+          if (poolNotInitialized && newThreshold < currentConfig.trustThreshold) {
+            getBootstrapIfThresholdReached(
+              newThreshold,
+              // Removed connections must not be counted.
+              // We don't remove them yet from the tracked connections in case many bootstraps reach the
+              // threshold and the config gets rejected.
+              ignored = changedConnections.removed,
             )
+              .leftMap(SequencerConnectionXPoolError.InvalidConfigurationError.apply)
+          } else {
+            Right(None)
+          }
+      } yield {
+        configRef.set(newConfig)
+        logger.info(s"Configuration updated to: $newConfig")
 
-          // Check whether the new threshold is now reached, which can only happen if it was lowered
-          bootstrapIfThresholdReachedO <-
-            if (poolNotInitialized && newThreshold < currentConfig.trustThreshold) {
-              getBootstrapIfThresholdReached(
-                newThreshold,
-                // Removed connections must not be counted.
-                // We don't remove them yet from the tracked connections in case many bootstraps reach the
-                // threshold and the config gets rejected.
-                ignored = changedConnections.removed,
-              )
-                .leftMap(SequencerConnectionXPoolError.InvalidConfigurationError.apply)
-            } else {
-              Right(None)
-            }
-        } yield {
-          configRef.set(newConfig)
-          logger.info(s"Configuration updated to: $newConfig")
+        metrics.trustThreshold.updateValue(config.trustThreshold.value)
 
-          metrics.trustThreshold.updateValue(config.trustThreshold.value)
+        // If the trust threshold is now reached, process it
+        bootstrapIfThresholdReachedO.foreach(initializePool)
 
-          // If the trust threshold is now reached, process it
-          bootstrapIfThresholdReachedO.foreach(initializePool)
-
-          logger.debug(
-            s"Configuration update triggers the following connection changes: $changedConnections"
-          )
-          updateTrackedConnections(
-            toBeAdded = changedConnections.added,
-            toBeRemoved = changedConnections.removed,
-          )
-        }
+        logger.debug(
+          s"Configuration update triggers the following connection changes: $changedConnections"
+        )
+        updateTrackedConnections(
+          toBeAdded = changedConnections.added,
+          toBeRemoved = changedConnections.removed,
+          isInitialUpdate = false,
+        )
       }
     }
 
   private def markValidated(
       connection: InternalSequencerConnectionX
   )(implicit traceContext: TraceContext): Unit = {
-    blocking {
-      lock.synchronized {
+    {
+      lock.exclusive {
         require(trackedConnections.contains(connection))
         trackedConnections.update(connection, true)
       }
@@ -449,8 +464,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       threshold: PositiveInt
   )(implicit traceContext: TraceContext): Unit =
     if (!isClosing && !isThresholdStillReachable(threshold)) {
-      val message =
-        s"Trust threshold of ${config.trustThreshold} is no longer reachable"
+      val message = s"Trust threshold of ${config.trustThreshold} is no longer reachable"
       logger.info(message)
       if (
         initializedP
@@ -529,16 +543,14 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       case _ => ErrorUtil.invalidState("The pool has already been initialized")
     }
 
-  override def nbSequencers: NonNegativeInt = blocking {
-    lock.synchronized(NonNegativeInt.tryCreate(pool.size))
-  }
+  override def nbSequencers: NonNegativeInt =
+    lock.exclusive(NonNegativeInt.tryCreate(pool.size))
 
-  override def nbConnections: NonNegativeInt = blocking {
-    lock.synchronized(NonNegativeInt.tryCreate(pool.values.flatten.size))
-  }
+  override def nbConnections: NonNegativeInt =
+    lock.exclusive(NonNegativeInt.tryCreate(pool.values.flatten.size))
 
   override def onClosed(): Unit = {
-    val instances = blocking(lock.synchronized(trackedConnections.keySet.toSeq))
+    val instances = (lock.exclusive(trackedConnections.keySet.toSeq))
 
     initializedP.shutdown_()
     // We close the connections outside the critical section to avoid shutdown problems in case
@@ -549,8 +561,8 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
   private def processValidatedConnection(connection: InternalSequencerConnectionX)(implicit
       traceContext: TraceContext
-  ): Unit = blocking {
-    lock.synchronized {
+  ): Unit =
+    lock.exclusive {
       if (isClosing) connection.fatal("closing due to shutdown")
       else {
         val currentConfig = config
@@ -561,7 +573,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
         bootstrapCell.get match {
           case None =>
-            if (currentConfig.expectedPSIdO.forall(_ == attributes.physicalSynchronizerId)) {
+            if (currentConfig.expectedPsidO.forall(_ == attributes.physicalSynchronizerId)) {
               markValidated(connection)
               getBootstrapIfThresholdReached(currentConfig.trustThreshold)
                 .valueOr(ErrorUtil.invalidState(_)) // We cannot reach the threshold multiple times
@@ -573,7 +585,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
             } else {
               logger.warn(
                 s"Connection ${connection.name} is not on expected synchronizer:" +
-                  s" expected ${currentConfig.expectedPSIdO}," +
+                  s" expected ${currentConfig.expectedPsidO}," +
                   s" got ${attributes.physicalSynchronizerId}. Closing connection."
               )
               connection.fatal(reason = "invalid synchronizer")
@@ -587,7 +599,6 @@ class SequencerConnectionXPoolImpl private[sequencing] (
         }
       }
     }
-  }
 
   private def invalidBootstrap(
       connection: InternalSequencerConnectionX,
@@ -606,8 +617,8 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       connection: InternalSequencerConnectionX,
       sequencerId: SequencerId,
       staticParameters: StaticSynchronizerParameters,
-  )(implicit traceContext: TraceContext): Unit = blocking {
-    lock.synchronized {
+  )(implicit traceContext: TraceContext): Unit =
+    lock.exclusive {
       logger.debug(s"Adding ${connection.name} to the pool")
 
       val synchronizerCrypto = SynchronizerCrypto(crypto, staticParameters)
@@ -641,7 +652,6 @@ class SequencerConnectionXPoolImpl private[sequencing] (
           logger.debug(s"Failed to attach authentication to connection ${connection.name}: $error")
         }
     }
-  }
 
   /** @param actionIfPresent
     *   An action to perform if the connection is effectively present in the pool (which is not
@@ -650,8 +660,8 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   private def removeConnectionFromPool(
       connection: InternalSequencerConnectionX,
       actionIfPresent: => Unit = (),
-  )(implicit traceContext: TraceContext): Unit = blocking {
-    lock.synchronized {
+  )(implicit traceContext: TraceContext): Unit =
+    lock.exclusive {
       connection.attributes match {
         case Some(attributes) =>
           val sequencerId = attributes.sequencerId
@@ -676,7 +686,6 @@ class SequencerConnectionXPoolImpl private[sequencing] (
         // The connection has never been validated, and therefore cannot be in the pool
       }
     }
-  }
 
   private def updateHealth()(implicit traceContext: TraceContext): Unit = {
     val trustThreshold = config.trustThreshold
@@ -696,36 +705,34 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       exclusions: Set[SequencerId],
   )(implicit traceContext: TraceContext): Set[SequencerConnectionX] =
     // Always return connections randomly for now
-    blocking {
-      lock.synchronized {
-        logger.debug(
-          s"[$requester] requesting $requestedNumber connection(s) excluding ${exclusions.map(_.uid.identifier)}"
-        )
+    lock.exclusive {
+      logger.debug(
+        s"[$requester] requesting $requestedNumber connection(s) excluding ${exclusions.map(_.uid.identifier)}"
+      )
 
-        // Pick up to `requestedNumber` non-excluded sequencer IDs from the pool
-        val randomSeqIds = SeqUtil.randomSubsetShuffle(
-          pool.keySet.diff(exclusions).toIndexedSeq,
-          requestedNumber.unwrap,
-          random,
-        )
+      // Pick up to `requestedNumber` non-excluded sequencer IDs from the pool
+      val randomSeqIds = SeqUtil.randomSubsetShuffle(
+        pool.keySet.diff(exclusions).toIndexedSeq,
+        requestedNumber.unwrap,
+        random,
+      )
 
-        val pickedConnections = randomSeqIds.map { seqId =>
-          val connections = pool(seqId) // seqIDs were picked from the pool so this cannot fail
+      val pickedConnections = randomSeqIds.map { seqId =>
+        val connections = pool(seqId) // seqIDs were picked from the pool so this cannot fail
 
-          // Cheap round-robin: return the head connection and move it to the end
-          val head = connections.head1
-          val newList = NonEmpty.from(connections.tail1) match {
-            case None => NonEmpty.mk(Seq, head)
-            case Some(nonEmptyTail) => nonEmptyTail :+ head
-          }
-          pool.update(seqId, newList)
+        // Cheap round-robin: return the head connection and move it to the end
+        val head = connections.head1
+        val newList = NonEmpty.from(connections.tail1) match {
+          case None => NonEmpty.mk(Seq, head)
+          case Some(nonEmptyTail) => nonEmptyTail :+ head
+        }
+        pool.update(seqId, newList)
 
-          head
-        }.toSet
+        head
+      }.toSet
 
-        logger.debug(s"[$requester] returning ${pickedConnections.map(_.name)}")
-        pickedConnections
-      }
+      logger.debug(s"[$requester] returning ${pickedConnections.map(_.name)}")
+      pickedConnections
     }
 
   override def getOneConnectionPerSequencer(requester: String)(implicit
@@ -740,7 +747,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   }
 
   override def getAllConnections()(implicit traceContext: TraceContext): Seq[SequencerConnectionX] =
-    blocking(lock.synchronized(pool.values.flatten.toSeq))
+    (lock.exclusive(pool.values.flatten.toSeq))
 }
 
 object SequencerConnectionXPoolImpl {
@@ -759,6 +766,7 @@ class GrpcSequencerConnectionXPoolFactory(
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
     authConfig: AuthenticationTokenManagerConfig,
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     member: Member,
     clock: Clock,
     crypto: Crypto,
@@ -785,6 +793,7 @@ class GrpcSequencerConnectionXPoolFactory(
     val connectionFactory = new GrpcInternalSequencerConnectionXFactory(
       clientProtocolVersions,
       minimumProtocolVersion,
+      keepAliveClientConfigO,
       metrics,
       metricsContext,
       futureSupervisor,
@@ -814,7 +823,7 @@ class GrpcSequencerConnectionXPoolFactory(
 
   override def createFromOldConfig(
       sequencerConnections: SequencerConnections,
-      expectedPSIdO: Option[PhysicalSynchronizerId],
+      expectedPsidO: Option[PhysicalSynchronizerId],
       tracingConfig: TracingConfig,
       name: String,
   )(implicit
@@ -826,7 +835,7 @@ class GrpcSequencerConnectionXPoolFactory(
     val poolConfig = SequencerConnectionXPoolConfig.fromSequencerConnections(
       sequencerConnections,
       tracingConfig,
-      expectedPSIdO,
+      expectedPsidO,
     )
     logger.debug(s"poolConfig = $poolConfig")
 

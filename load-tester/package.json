@@ -16,18 +16,19 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@trivago/prettier-plugin-sort-imports": "^4.3.0",
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/k6": "^1.2.0",
     "@types/node": "^25.2.3",
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
     "esbuild": "^0.27.3",
-    "eslint": "^8.53.0",
     "prettier": "^3.1.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "bignumber.js": "^9.1.1",
+    "bignumber.js": "^10.0.2",
     "zod": "^4.3.6"
   }
 }

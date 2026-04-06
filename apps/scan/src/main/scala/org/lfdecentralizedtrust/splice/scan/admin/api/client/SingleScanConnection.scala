@@ -55,9 +55,10 @@ import org.lfdecentralizedtrust.tokenstandard.{
   transferinstruction,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -324,6 +325,16 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListDsoSequencers(),
+    )
+  }
+
+  override def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[ParticipantId]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId),
     )
   }
 
@@ -744,6 +755,15 @@ class SingleScanConnection private[client] (
       tc: TraceContext,
   ): Future[allocationinstruction.v1.definitions.FactoryWithChoiceContext] =
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactoryRaw(arg))
+
+  override def getActivePhysicalSynchronizerSerial()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[NonNegativeInt] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetActivePhysicalSynchronizerSerial(),
+    )
 }
 
 object SingleScanConnection {

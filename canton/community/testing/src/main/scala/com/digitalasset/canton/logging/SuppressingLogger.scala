@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -230,8 +230,8 @@ class SuppressingLogger private[logging] (
     for {
       _ <- assertLogs(
         within.transform {
-          case Success(_) =>
-            fail(s"An exception of type $c was expected, but no exception was thrown.")
+          case Success(x) =>
+            fail(s"An exception of type $c was expected, but instead a value was returned: $x")
           case Failure(c(t)) => Success(UnlessShutdown.Outcome(assertion(t)))
           case Failure(t) => fail(s"Exception has wrong type. Expected type: $c.", t)
         }(directExecutionContext),
@@ -541,22 +541,22 @@ class SuppressingLogger private[logging] (
 
   def fetchRecordedLogEntries: Seq[LogEntry] = recordedLogEntries.asScala.toSeq
 
-  /** Use this only in very early stages of development. Try to use [[assertLogs]] instead which
-    * lets you specify the specific messages that you expected to suppress. This avoids the risk of
-    * hiding unrelated warnings and errors.
+  /** Use this only in very early stages of development. Try to use [[assertLogs[A](within:=>A*]]
+    * instead which lets you specify the specific messages that you expected to suppress. This
+    * avoids the risk of hiding unrelated warnings and errors.
     */
   def suppressWarnings[A](within: => A): A = suppress(SuppressionRule.Level(WARN))(within)
 
-  /** Use this only in very early stages of development. Try to use [[assertLogs]] instead which
-    * lets you specify the specific messages that you expected to suppress. This avoids the risk of
-    * hiding unrelated warnings and errors.
+  /** Use this only in very early stages of development. Try to use [[assertLogs[A](within:=>A*]]
+    * instead which lets you specify the specific messages that you expected to suppress. This
+    * avoids the risk of hiding unrelated warnings and errors.
     */
   def suppressWarningsAndErrors[A](within: => A): A =
     suppress(SuppressionRule.LevelAndAbove(WARN))(within)
 
-  /** Use this only in very early stages of development. Try to use [[assertLogs]] instead which
-    * lets you specify the specific messages that you expected to suppress. This avoids the risk of
-    * hiding unrelated warnings and errors.
+  /** Use this only in very early stages of development. Try to use [[assertLogs[A](within:=>A*]]
+    * instead which lets you specify the specific messages that you expected to suppress. This
+    * avoids the risk of hiding unrelated warnings and errors.
     */
   def suppressErrors[A](within: => A): A = suppress(SuppressionRule.Level(ERROR))(within)
 

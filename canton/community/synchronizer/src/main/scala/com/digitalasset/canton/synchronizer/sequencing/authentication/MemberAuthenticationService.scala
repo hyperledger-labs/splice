@@ -1,31 +1,30 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.authentication
 
 import cats.data.EitherT
-import cats.instances.future.*
 import cats.syntax.bifunctor.*
-import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.*
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.sequencing.authentication.{AuthenticationToken, MemberAuthentication}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.*
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -55,11 +54,12 @@ class MemberAuthenticationService(
     store: MemberAuthenticationStore,
     clock: Clock,
     nonceExpirationInterval: Duration,
-    maxTokenExpirationInterval: Duration,
+    val maxTokenExpirationInterval: Duration,
     useExponentialRandomTokenExpiration: Boolean,
     invalidateMemberCallback: Traced[Member] => Unit,
     isTopologyInitialized: FutureUnlessShutdown[Unit],
     override val timeouts: ProcessingTimeout,
+    batchingConfig: BatchingConfig,
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
@@ -74,7 +74,7 @@ class MemberAuthenticationService(
   ): EitherT[FutureUnlessShutdown, AuthenticationError, (Nonce, NonEmpty[Seq[Fingerprint]])] =
     for {
       _ <- EitherT.right(waitForInitialized)
-      snapshot = cryptoApi.ips.currentSnapshotApproximation
+      snapshot <- EitherT.liftF(cryptoApi.ips.currentSnapshotApproximation)
       _ <- isActive(member)
       fingerprints <- EitherT(
         snapshot
@@ -118,16 +118,26 @@ class MemberAuthenticationService(
     for {
       _ <- EitherT.right(waitForInitialized)
       _ <- isActive(member)
-      value <- EitherT
-        .fromEither(
-          ignoreExpired(store.fetchAndRemoveNonce(member, providedNonce))
+
+      storedNonce <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          store
+            .fetchAndRemoveNonce(member, providedNonce)
             .toRight(MissingNonce(member): AuthenticationError)
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
-      StoredNonce(_, nonce, generatedAt, _expireAt) = value
+      StoredNonce(_, nonce, generatedAt, expireAt) = storedNonce
+
+      _ <- {
+        val now = clock.now
+        EitherTUtil.condUnitET[FutureUnlessShutdown](
+          expireAt > now,
+          ExpiredNonce(member, expireAt, now, generatedAt),
+        )
+      }
+
       authentication <- EitherT.fromEither[FutureUnlessShutdown](MemberAuthentication(member))
       hash = authentication.hashSynchronizerNonce(nonce, synchronizerId, cryptoApi.pureCrypto)
-      snapshot = cryptoApi.currentSnapshotApproximation
+      snapshot <- EitherT.liftF(cryptoApi.currentSnapshotApproximation)
 
       _ <- snapshot
         .verifySignature(
@@ -162,6 +172,24 @@ class MemberAuthenticationService(
       AuthenticationTokenWithExpiry(token, tokenExpiry)
     }
 
+  /** Generates a token for test purposes for the given member. This token does NOT need to be
+    * signed by the member. This should ONLY be used for testing and troubleshooting purposes.
+    */
+  def generateAuthenticationToken(member: Member, expiresIn: Option[NonNegativeFiniteDuration])(
+      implicit traceContext: TraceContext
+  ): StoredAuthenticationToken = {
+    val tokenDuration = expiresIn
+      .map(_.duration)
+      .filter(_.toMillis <= maxTokenExpirationInterval.toMillis)
+      .getOrElse(maxTokenExpirationInterval)
+    val tokenExpiry = clock.now.add(tokenDuration)
+    logger.info(s"Generating authentication token for member $member expiring at $tokenExpiry")
+    val token = AuthenticationToken.generate(cryptoApi.pureCrypto)
+    val storedToken = StoredAuthenticationToken(member, tokenExpiry, token)
+    store.saveToken(storedToken)
+    storedToken
+  }
+
   /** synchronizer checks if the token given by the participant is the one previously assigned to it
     * for authentication. The participant also provides the synchronizer id for which they think
     * they are connecting to. If this id does not match this synchronizer's id, it means the
@@ -175,7 +203,7 @@ class MemberAuthenticationService(
   ): Either[AuthenticationError, StoredAuthenticationToken] =
     for {
       _ <- correctSynchronizer(member, intendedSynchronizerId)
-      validTokenO = store.fetchTokens(member).filter(_.expireAt > clock.now).find(_.token == token)
+      validTokenO = store.tokenForMemberAt(member, token, clock.now)
       validToken <- validTokenO.toRight(MissingToken(member)).leftWiden[AuthenticationError]
     } yield validToken
 
@@ -186,19 +214,16 @@ class MemberAuthenticationService(
   ): FutureUnlessShutdown[Either[LogoutTokenDoesNotExist.type, Unit]] =
     for {
       _ <- waitForInitialized
-      storedTokenO = store.fetchToken(token)
-      res <- storedTokenO match {
+      memberO = store.fetchMemberOfTokenForInvalidation(token)
+      res <- memberO match {
         case None => FutureUnlessShutdown.pure(Left(LogoutTokenDoesNotExist))
-        case Some(storedToken) =>
+        case Some(member) =>
           // Force invalidation, whether the member is actually active or not
           invalidateAndExpire(isActiveCheck = (_: Member) => FutureUnlessShutdown.pure(false))(
-            storedToken.member
+            member
           ).map(Right(_))
       }
     } yield res
-
-  private def ignoreExpired[A <: HasExpiry](itemO: Option[A]): Option[A] =
-    itemO.filter(_.expireAt > clock.now)
 
   private def scheduleExpirations(
       timestamp: CantonTimestamp
@@ -231,6 +256,13 @@ class MemberAuthenticationService(
         })
     }
 
+  // public wrapper method around isActive for use by the GrpcSequencerService
+  // to check active state immediately next to creation of subscription
+  def isMemberCurrentlyActive(member: Member)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Boolean] =
+    isActive(member).isRight
+
   private def correctSynchronizer(
       member: Member,
       intendedSynchronizerId: PhysicalSynchronizerId,
@@ -245,9 +277,14 @@ class MemberAuthenticationService(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
     // we are a bit more conservative here. a member needs to be active NOW and the head state (i.e. effective in the future)
-    Seq(cryptoApi.headSnapshot, cryptoApi.currentSnapshotApproximation)
-      .map(_.ipsSnapshot)
-      .parTraverse(check(_))
+    MonadUtil
+      .parTraverseWithLimit(batchingConfig.parallelism)(
+        Seq(
+          FutureUnlessShutdown.pure(cryptoApi.headSnapshot),
+          cryptoApi.currentSnapshotApproximation,
+        )
+          .map(_.map(_.ipsSnapshot))
+      )(_.flatMap(check(_)))
       .map(_.forall(identity))
 
   protected def isParticipantActive(participant: ParticipantId)(implicit
@@ -269,7 +306,7 @@ class MemberAuthenticationService(
   )(memberId: T)(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     isActiveCheck(memberId).map { isActive =>
       if (!isActive) {
-        logger.debug(s"Expiring all auth-tokens of $memberId")
+        logger.info(s"Expiring all auth-tokens of $memberId")
         // first, remove all auth tokens
         store.invalidateMember(memberId)
         // second, ensure the sequencer client gets disconnected
@@ -310,6 +347,7 @@ class MemberAuthenticationServiceImpl(
     invalidateMemberCallback: Traced[Member] => Unit,
     isTopologyInitialized: FutureUnlessShutdown[Unit],
     timeouts: ProcessingTimeout,
+    batchingConfig: BatchingConfig,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends MemberAuthenticationService(
@@ -323,9 +361,33 @@ class MemberAuthenticationServiceImpl(
       invalidateMemberCallback,
       isTopologyInitialized,
       timeouts,
+      batchingConfig,
       loggerFactory,
     )
     with TopologyTransactionProcessingSubscriber {
+
+  // ensure the authentication service receives topology transactions last
+  override val executionOrder: Int = Int.MaxValue
+
+  private def safelyRevokeLeavers[T <: Member](
+      leavers: Set[T],
+      isActiveCheck: T => FutureUnlessShutdown[Boolean],
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    if (leavers.isEmpty) FutureUnlessShutdown.unit
+    else {
+      val memberType = leavers.headOption
+        .map(_.getClass.getSimpleName.stripSuffix("$").stripSuffix("Id"))
+        .getOrElse("Member")
+      logger.info(s"Calling invalidateAndExpire for all $memberType members in $leavers")
+      MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(leavers.toList) { leaver =>
+        // use .recover to ensure that a failure in revoking one member
+        // does not abort the parallel processing of other leavers.
+        invalidateAndExpire(isActiveCheck)(leaver).recover { case ex =>
+          logger.error(s"Failed to revoke tokens for $memberType $leaver", ex)
+          UnlessShutdown.unit
+        }
+      }
+    }
 
   /** synchronizer topology client subscriber used to remove member tokens if they get disabled */
   override def observed(
@@ -336,26 +398,43 @@ class MemberAuthenticationServiceImpl(
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     synchronizeWithClosing(functionFullName) {
       FutureUnlessShutdown.sequence(transactions.map(_.transaction).map {
+
+        // case 1: a SynchronizerTrustCertificate topology mapping (for a participant) was removed or replaced
         case TopologyTransaction(
-              TopologyChangeOp.Remove,
+              operation,
               _serial,
               cert: SynchronizerTrustCertificate,
             ) =>
           val participant = cert.participantId
-          logger.info(
-            s"Synchronizer trust certificate of $participant was removed, forcefully disconnecting the participant."
-          )
-          invalidateAndExpire(isParticipantActive)(participant)
+          //  if the certificate is removed, check the snapshot to confirm not active, revoke tokens. otherwise do nothing
+          operation match {
+            case TopologyChangeOp.Remove =>
+              logger.info(
+                s"Received topology transaction for removal of SynchronizerTrustCertificate for Participant $participant. Calling invalidateAndExpire"
+              )
+              invalidateAndExpire(isParticipantActive)(participant)
+            case TopologyChangeOp.Replace =>
+              FutureUnlessShutdown.unit
+          }
+
+        // case 2: a ParticipantSynchronizerPermission topology mapping was replaced (loginAfter may be in the future)
         case TopologyTransaction(
               TopologyChangeOp.Replace,
               _serial,
               cert: ParticipantSynchronizerPermission,
-            ) if cert.loginAfter.exists(_ > clock.now) =>
+            ) =>
           val participant = cert.participantId
-          logger.info(
-            s"$participant is disabled until ${cert.loginAfter}. Removing any token and booting the participant"
-          )
-          invalidateAndExpire(isParticipantActive)(participant)
+          // if the loginAfter is in the future, check the snapshot to confirm not active, revoke tokens. otherwise do nothing
+          if (cert.loginAfter.exists(_ > clock.now)) {
+            logger.info(
+              s"Received topology transaction shifting loginAfter for Participant $participant to the future. Calling invalidateAndExpire"
+            )
+            invalidateAndExpire(isParticipantActive)(participant)
+          } else {
+            FutureUnlessShutdown.unit
+          }
+
+        // case 3: a ParticipantSynchronizerPermission topology mapping was removed (participant removed)
         case TopologyTransaction(
               TopologyChangeOp.Remove,
               _serial,
@@ -363,11 +442,101 @@ class MemberAuthenticationServiceImpl(
             ) =>
           val participant = cert.participantId
           logger.info(
-            s"$participant's access has been revoked by the synchronizer. Removing any token and booting the participant"
+            s"Received topology transaction for revoking $participant's access. Calling invalidateAndExpire."
           )
           invalidateAndExpire(isParticipantActive)(participant)
 
-        case _ => FutureUnlessShutdown.unit
+        // case 4: a SequencerSynchronizerState removal topology transaction is received (a sequencer group removed)
+        case TopologyTransaction(
+              TopologyChangeOp.Remove,
+              _serial,
+              newState: SequencerSynchronizerState, // state being removed
+            ) =>
+          val allRemovedSequencers = newState.allSequencers.toSet
+          logger.info(
+            s"Received topology transaction for removing sequencer group on ${newState.synchronizerId}."
+          )
+          safelyRevokeLeavers(allRemovedSequencers, isSequencerActive)
+
+        // case 5: a MediatorSynchronizerState removal topology transaction is received (a mediator group removed)
+        case TopologyTransaction(
+              TopologyChangeOp.Remove,
+              _serial,
+              newState: MediatorSynchronizerState, // state being removed
+            ) =>
+          val allRemovedMediators = newState.allMediatorsInGroup.toSet
+          logger.info(
+            s"Received topology transaction for removing mediator group ${newState.group}."
+          )
+          safelyRevokeLeavers(allRemovedMediators, isMediatorActive)
+
+        // case 6: a replace SequencerSynchronizerState topology mapping was replaced (subset of sequencers removed)
+        // we obtain the topology state at the previous timestamp and compare
+        case TopologyTransaction(
+              TopologyChangeOp.Replace,
+              _serial,
+              newState: SequencerSynchronizerState,
+            ) =>
+          val newSequencerSet = newState.allSequencers.toSet
+
+          // we want to capture the timestamp at the previous state, but we do not use .immediatePredecessor here
+          // because the state changes at time T are captured only at T+1
+          val measuredTimestampPreviousState = effectiveTimestamp.value
+
+          for {
+            snapshot <- cryptoApi.ipsSnapshot(
+              measuredTimestampPreviousState
+            ) // get the snapshot at the previous timestamp
+            group <- snapshot.sequencerGroup() // get the modified group
+            oldSequencerSet = group
+              .map(g => (g.active ++ g.passive).toSet)
+              .getOrElse(Set.empty[SequencerId]) // get the set of all sequencers in the group
+            leavers = oldSequencerSet.diff(newSequencerSet)
+            _ = logger.info(
+              s"Received topology transaction for removing some sequencers on ${newState.synchronizerId}."
+            )
+            _ <- safelyRevokeLeavers(leavers, isSequencerActive)
+          } yield ()
+
+        // case 7: a replace MediatorSynchronizerState topology transaction is received (mediator group replaced, subset of mediators removed)
+        case TopologyTransaction(
+              TopologyChangeOp.Replace,
+              _serial,
+              newState: MediatorSynchronizerState, // state being replaced
+            ) =>
+          val modifiedMediatorIndex = newState.group // group index
+          val newMediatorSet: Set[MediatorId] = newState.allMediatorsInGroup.toSet
+          val measuredTimestampPreviousState = effectiveTimestamp.value
+          for {
+            snapshot <- cryptoApi
+              .ipsSnapshot(measuredTimestampPreviousState)
+            groups <- snapshot.mediatorGroups() // get all the groups in the previous state
+            changedGroupInOld = groups.find(
+              _.index == modifiedMediatorIndex
+            ) // filter for the modified group index
+            oldMediatorSet = changedGroupInOld
+              .map(group => (group.active ++ group.passive).toSet)
+              .getOrElse(Set.empty[MediatorId])
+            leavers = oldMediatorSet.diff(newMediatorSet)
+            _ = logger.info(
+              s"Received topology transaction for removing some mediators from group $modifiedMediatorIndex."
+            )
+            _ <- safelyRevokeLeavers(leavers, isMediatorActive)
+          } yield ()
+
+        // All other transactions: do nothing
+        case TopologyTransaction(
+              TopologyChangeOp.Replace | TopologyChangeOp.Remove, // operation
+              _, // serial
+              (
+                _: NamespaceDelegation | // mapping
+                _: DecentralizedNamespaceDefinition | _: OwnerToKeyMapping | _: PartyToKeyMapping |
+                _: PartyToParticipant | _: VettedPackages | _: PartyHostingLimits |
+                _: SynchronizerParametersState | _: DynamicSequencingParametersState |
+                _: LsuAnnouncement | _: LsuSequencerConnectionSuccessor
+              ),
+            ) =>
+          FutureUnlessShutdown.unit
       })
     }.map(_ => ())
 }
@@ -390,6 +559,7 @@ object MemberAuthenticationServiceFactory {
       maxTokenExpirationInterval: Duration,
       useExponentialRandomTokenExpiration: Boolean,
       timeouts: ProcessingTimeout,
+      batchingConfig: BatchingConfig,
       loggerFactory: NamedLoggerFactory,
       topologyTransactionProcessor: TopologyTransactionProcessor,
   ): MemberAuthenticationServiceFactory =
@@ -411,6 +581,7 @@ object MemberAuthenticationServiceFactory {
           invalidateMemberCallback,
           isTopologyInitialized,
           timeouts,
+          batchingConfig,
           loggerFactory,
         )
         topologyTransactionProcessor.subscribe(service)

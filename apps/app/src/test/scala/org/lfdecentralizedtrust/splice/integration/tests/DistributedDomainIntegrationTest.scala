@@ -1,25 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.{time, SynchronizerAlias}
+import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnection,
-  SubmissionRequestAmplification,
-}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.util.FutureInstances.*
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
@@ -74,15 +70,13 @@ class DistributedDomainIntegrationTest
               .value
             synchronizerConfig.timeTracker.observationLatency shouldBe observationLatency
             val sequencerConnections = synchronizerConfig.sequencerConnections
-            val connections: Seq[SequencerConnection] = sequencerConnections.connections.forgetNE
-            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+            val connections = sequencerConnections.connections.forgetNE
+            sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
               PositiveInt.tryCreate(2),
-              NonNegativeFiniteDuration.ofSeconds(10),
+              time.NonNegativeFiniteDuration.tryOfSeconds(10),
             )
             val endpoints = connections.map { s =>
-              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
-                endpoint
-              }
+              inside(s) { case connection: data.GrpcSequencerConnection => connection.endpoints }
             }
             endpoints.toSet shouldBe Seq(5108, 5208, 5308, 5408)
               .map(port =>
@@ -170,21 +164,29 @@ class DistributedDomainIntegrationTest
         clue(
           s"un-pause decentralized synchronizer to not crash other tests"
         ) {
-          Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-            Future {
-              sv.unpauseDecentralizedSynchronizer()
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+              Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+            ) { sv =>
+              Future {
+                sv.unpauseDecentralizedSynchronizer()
+              }
             }
-          }.futureValue
+            .futureValue
         }
       },
     ) {
       actAndCheck(
         "SVs can pause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-          Future {
-            sv.pauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.pauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is paused",
         _ =>
@@ -200,11 +202,15 @@ class DistributedDomainIntegrationTest
 
       actAndCheck(
         "SVs can unpause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-          Future {
-            sv.unpauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.unpauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is un-paused",
         _ =>

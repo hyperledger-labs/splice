@@ -1,13 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
 
 import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -22,12 +21,52 @@ import java.util.UUID
 trait PartyManagementIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S1M1.withSetup { implicit env =>
-      import env.*
+    EnvironmentDefinition.P2_S1M1
 
-      participant1.synchronizers.connect_local(sequencer1, alias = daName)
-      participant2.synchronizers.connect_local(sequencer1, alias = daName)
-    }
+  "check that parties in the onboarding snapshot are observed " in { implicit env =>
+    import env.*
+
+    participant1.synchronizers.connect_local(sequencer1, alias = daName)
+
+    participant1.parties.enable("IsInOnboardingSnapshot")
+
+    participant2.synchronizers.connect_local(sequencer1, alias = daName)
+  }
+
+  "admin parties exist and can be used" in { implicit env =>
+    import env.*
+
+    participant1.parties.hosted(filterParty =
+      participant1.adminParty.filterString
+    ) should have length (1)
+
+    participant1.parties.list(filterParty =
+      participant2.adminParty.filterString
+    ) should have length (1)
+
+    participant2.parties.list(filterParty =
+      participant1.adminParty.filterString
+    ) should have length (1)
+
+    participant2.parties.list(filterParty = "IsInOnboardingSnapshot") should have length (1)
+
+    participant1.ledger_api.parties.list().map(_.party) should contain(participant1.adminParty)
+    participant2.ledger_api.parties.list().map(_.party) should contain(participant1.adminParty)
+    participant2.ledger_api.parties.list().map(_.party.uid.identifier.str) should contain(
+      "IsInOnboardingSnapshot"
+    )
+    participant1.ledger_api.parties
+      .list(filterParty = participant2.adminParty.filterString) should have length (1)
+
+    participant1.ledger_api.users
+      .create(id = "testUser", primaryParty = Some(participant1.adminParty))
+
+    participant1.ledger_api.users
+      .create(id = "testUser2")
+
+    participant1.ledger_api.users.rights.grant("testUser2", actAs = Set(participant1.adminParty))
+
+  }
 
   "parties group" when {
     "adding parties" should {
@@ -290,5 +329,5 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
 
 class PartyManagementIntegrationTestPostgres extends PartyManagementIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

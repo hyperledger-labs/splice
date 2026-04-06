@@ -16,7 +16,7 @@ if [[ ! " ${*} " =~ " --console " ]]; then
     ARGS+=( daemon --no-tty )
 fi
 
-ARGS+=( --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off --log-immediate-flush="${LOG_IMMEDIATE_FLUSH:-false}" --log-last-errors=false)
+ARGS+=( --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off --log-immediate-flush="${LOG_IMMEDIATE_FLUSH:-false}")
 
 if [ -f /app/logback.xml ]; then
    export JAVA_TOOL_OPTIONS="-Dlogback.configurationFile=/app/logback.xml ${JAVA_TOOL_OPTIONS:-}"

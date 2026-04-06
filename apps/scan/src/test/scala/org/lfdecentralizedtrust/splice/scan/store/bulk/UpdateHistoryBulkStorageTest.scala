@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import cats.data.OptionT
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
@@ -16,6 +17,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Keep
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
@@ -31,11 +33,12 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.slf4j.event.Level
 
 import java.time.{Instant, LocalDate, ZoneOffset}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
 import scala.util.Using
+import io.circe.Decoder
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -50,6 +53,7 @@ class UpdateHistoryBulkStorageTest
     bulkDbReadChunkSize = 500,
     bulkZstdFrameSize = 10000L,
     maxFileSize,
+    zstdCompressionLevel = 3,
   )
   val appConfig = BulkStorageConfig(
     updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
@@ -129,7 +133,7 @@ class UpdateHistoryBulkStorageTest
               update.update.update.recordTime <= toTimestamp
           )
         } yield {
-          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          val objectKeys = s3Objects.contents.asScala.map(_.key()).sorted
           objectKeys should have length 2
           s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
           val allUpdatesFromS3 = objectKeys.flatMap(
@@ -297,6 +301,235 @@ class UpdateHistoryBulkStorageTest
         }
       }
     }
+
+    "list objects correctly" in {
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val mockKvStore = mock[KeyValueStore]
+      when(
+        mockKvStore.readValueAndLogOnDecodingFailure[UpdatesSegment](
+          eqTo("latest_updates_segment_in_bulk_storage")
+        )(
+          any[Decoder[UpdatesSegment]],
+          any[TraceContext],
+          any[ExecutionContext],
+        )
+      ).thenReturn(
+        OptionT[Future, UpdatesSegment](
+          Future(
+            Some(
+              UpdatesSegment(
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+                  1L,
+                ),
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
+                  1L,
+                ),
+              )
+            )
+          )
+        )
+      )
+      val mockKvProvider = new ScanKeyValueProvider(mockKvStore, loggerFactory)
+      val svc = new UpdateHistoryBulkStorage(
+        bulkStorageTestConfig,
+        appConfig,
+        mock[UpdateHistory],
+        mockKvProvider,
+        0L,
+        bucketConnection,
+        new HistoryMetrics(new InMemoryMetricsFactory)(MetricsContext.Empty),
+        loggerFactory,
+      )
+
+      val d20u0 = "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/updates_0.zstd"
+      val d20u1 = "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/updates_1.zstd"
+      val d21u0 = "2015-10-21T00:00:00Z-Migration-1-2015-10-22T00:00:00Z/updates_0.zstd"
+      val d21u1 = "2015-10-21T00:00:00Z-Migration-1-2015-10-22T00:00:00Z/updates_1.zstd"
+      val d22u0 = "2015-10-22T00:00:00Z-Migration-1-2015-10-23T00:00:00Z/updates_0.zstd"
+      val d22u1 = "2015-10-22T00:00:00Z-Migration-1-2015-10-23T00:00:00Z/updates_1.zstd"
+      val d23u0 = "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_0.zstd"
+      val d23u1 = "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_1.zstd"
+      val d24u0 = "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_0.zstd"
+      val d24u1 = "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_1.zstd"
+      val allObjs = Seq(
+        d20u0,
+        d20u1,
+        d21u0,
+        d21u1,
+        d22u0,
+        d22u1,
+        d23u0,
+        d23u1,
+        d24u0,
+        d24u1,
+      )
+      Future
+        .sequence(allObjs.map {
+          bucketConnection.createObject(_)
+        })
+        .futureValue
+
+      // A wider range than the data
+      val res1 = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-10T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-30T00:00:00Z")),
+          PageLimit.tryCreate(10),
+          None,
+        )
+        .futureValue
+      res1.objects.map(_.key) should contain theSameElementsInOrderAs Seq(
+        d20u0,
+        d20u1,
+        d21u0,
+        d21u1,
+        d22u0,
+        d22u1,
+        d23u0,
+        d23u1,
+      )
+      res1.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
+      val res1b = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-10T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-30T00:00:00Z")),
+          PageLimit.tryCreate(10),
+          res1.nextPageTokenO,
+        )
+        .futureValue
+      res1b.objects.map(_.key) shouldBe empty
+      res1b.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
+
+      // A smaller range within the data
+      val res2 = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T16:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T16:00:05Z")),
+          PageLimit.tryCreate(10),
+          None,
+        )
+        .futureValue
+      res2.objects.map(_.key) should contain theSameElementsInOrderAs Seq(d21u0, d21u1)
+      res2.nextPageTokenO shouldBe None
+
+      // pagination
+      val res3 = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-01T12:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T16:00:05Z")),
+          PageLimit.tryCreate(
+            3
+          ), // on purpose 3 even though we expect only 2 back (since the response is always full days of updates)
+          None,
+        )
+        .futureValue
+      res3.objects.map(_.key) should contain theSameElementsInOrderAs Seq(d20u0, d20u1)
+      res3.nextPageTokenO shouldBe Some("2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/")
+      val res3b = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-01T12:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T16:00:05Z")),
+          PageLimit.tryCreate(3),
+          res3.nextPageTokenO,
+        )
+        .futureValue
+      res3b.objects.map(_.key) should contain theSameElementsInOrderAs Seq(d21u0, d21u1)
+      res3b.nextPageTokenO shouldBe None
+
+      // exact match with start and end of segments
+      val res4 = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+          PageLimit.tryCreate(4),
+          None,
+        )
+        .futureValue
+      res4.objects
+        .map(_.key) should contain theSameElementsInOrderAs Seq(d21u0, d21u1, d22u0, d22u1)
+      res4.nextPageTokenO shouldBe None
+
+      // limit too low for first folder
+      val ex = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+          PageLimit.tryCreate(1),
+          None,
+        )
+        .failed
+        .futureValue
+      ex shouldBe a[StatusRuntimeException]
+      ex.asInstanceOf[StatusRuntimeException]
+        .getStatus
+        .getCode shouldBe io.grpc.Status.Code.INVALID_ARGUMENT
+
+      // Test handling an empty segment: Simulate no updates in 2015-10-25 to 2015-10-26
+      val d26u0 = "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_0.zstd"
+      val d26u1 = "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_1.zstd"
+      val moreObjs = Seq(
+        "2015-10-25T00:00:00Z-Migration-1-2015-10-26T00:00:00Z/ACS_0.zstd",
+        d26u0,
+        d26u1,
+      )
+      Future
+        .sequence(moreObjs.map {
+          bucketConnection.createObject(_)
+        })
+        .futureValue
+      // Update the kvStore mock to report that up to 10-27 everything was dumped
+      when(
+        mockKvStore.readValueAndLogOnDecodingFailure[UpdatesSegment](
+          eqTo("latest_updates_segment_in_bulk_storage")
+        )(
+          any[Decoder[UpdatesSegment]],
+          any[TraceContext],
+          any[ExecutionContext],
+        )
+      ).thenReturn(
+        OptionT[Future, UpdatesSegment](
+          Future(
+            Some(
+              UpdatesSegment(
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-26T00:00:00Z")),
+                  1L,
+                ),
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-27T00:00:00Z")),
+                  1L,
+                ),
+              )
+            )
+          )
+        )
+      )
+      // Query up to the middle of the empty segment
+      val res5 = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-20T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-25T12:00:00Z")),
+          PageLimit.tryCreate(20),
+          None,
+        )
+        .futureValue
+      // First response contains all data, but with a next page token
+      res5.objects.map(_.key) should contain theSameElementsInOrderAs allObjs
+      res5.nextPageTokenO shouldBe Some("2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/")
+      val res5b = svc
+        .getUpdatesBetweenDates(
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T00:00:00Z")),
+          CantonTimestamp.tryFromInstant(Instant.parse("2015-10-25T12:00:00Z")),
+          PageLimit.tryCreate(20),
+          res5.nextPageTokenO,
+        )
+        .futureValue
+      // Second page should be empty, with no nextPageToken
+      res5b.objects.map(_.key) shouldBe empty
+      res5b.nextPageTokenO shouldBe None
+    }
   }
 
   class MockUpdateHistoryStore(
@@ -371,7 +604,7 @@ class UpdateHistoryBulkStorageTest
         contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
       )
       val tx = mkCreateTx(
-        1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
+        1, // not used in updates v2
         Seq(contract),
         idxToTimestamp(idx),
         Seq(alicePartyId, bobPartyId),

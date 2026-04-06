@@ -16,8 +16,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.ErrorUtil
-import io.grpc.{Status, StatusRuntimeException}
+import com.digitalasset.canton.util.{ErrorUtil, Mutex}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -27,7 +26,6 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_operator as v0}
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource as r0
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
-import TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.{
   HttpClient,
   HttpFeatureSupportHandler,
@@ -46,16 +44,15 @@ import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 
 import java.util.Optional
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 
 class HttpSvOperatorHandler(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     config: SvAppBackendConfig,
     clock: Clock,
-    localSynchronizerNode: Option[LocalSynchronizerNode],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
-    cometBftClient: Option[CometBftClient],
     override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -80,6 +77,7 @@ class HttpSvOperatorHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
+  private val mutex = Mutex()
   override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val validatorLicensesStore: AppStore = dsoStore
 
@@ -100,7 +98,7 @@ class HttpSvOperatorHandler(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var scanConnectionV: Option[Future[ScanConnection]] = None
   private def scanConnectionF: Future[ScanConnection] = blocking {
-    this.synchronized {
+    mutex.exclusive {
       scanConnectionV match {
         case Some(f) => f
         case None =>
@@ -392,7 +390,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound)(
+      withSequencerConnection(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -405,7 +403,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
-      withMediatorConnectionOrNotFound(respond.NotFound)(
+      withMediatorConnection(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -418,55 +416,26 @@ class HttpSvOperatorHandler(
   ): Future[r0.GetPartyToParticipantResponse] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
-        for {
-          party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
-            case Right(party) => Future.successful(party)
-            case Left(error) =>
-              Future.failed(
-                HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
-              )
-          }
-          dsoRules <- dsoStore.getDsoRules()
-          partyToParticipant <- sequencerConnection
-            .getPartyToParticipant(
-              dsoRules.domain,
-              party,
-              topologySnapshot =
-                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+      for {
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
-          _ <- {
-            if (partyToParticipant.mapping.partyId == party) {
-              Future.unit
-            } else {
-              Future.failed(
-                HttpErrorHandler.notFound(s"Party not found: $partyId")
-              )
-            }
-          }
-          participantId <- partyToParticipant.mapping.participants match {
-            case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
-            case Seq() =>
-              Future.failed(
-                HttpErrorHandler.notFound(s"No participant id found hosting party: $partyId")
-              )
-            case _ =>
-              Future.failed(
-                HttpErrorHandler.internalServerError(
-                  s"Party $partyId is hosted on multiple participants, which is not currently supported"
-                )
-              )
-          }
-        } yield {
-          r0.GetPartyToParticipantResponse.OK(
-            definitions.GetPartyToParticipantResponse(participantId)
-          )
         }
-      }.recoverWith {
-        case e: StatusRuntimeException if e.getStatus.getCode == Status.NOT_FOUND.getCode =>
-          Future.successful(
-            respond.NotFound(definitions.ErrorResponse(s"Party not found: $partyId"))
+        dsoRules <- dsoStore.getDsoRules()
+        scanConnection <- scanConnectionF
+        participantIds <- scanConnection.getPartyToParticipant(
+          dsoRules.domain,
+          party,
+        )
+      } yield {
+        r0.GetPartyToParticipantResponse.OK(
+          definitions.GetPartyToParticipantResponseV1(
+            participantIds.map(_.toProtoPrimitive).toVector
           )
+        )
       }
     }
   }
@@ -508,34 +477,33 @@ class HttpSvOperatorHandler(
 
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: CometBftClient => Future[T]) = cometBftClient
-    .fold {
-      notFound(definitions.ErrorResponse("CometBFT is not configured."))
-        .pure[Future]
-    } {
-      call
+  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
+    synchronizerNodeService.activeSynchronizerNode().flatMap { node =>
+      node.cometbftNode.map(_.cometBftClient) match {
+        case None =>
+          notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
+        case Some(client) => call(client)
+      }
     }
 
-  private def withSequencerConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T]) = localSynchronizerNode
-    .map(_.sequencerAdminConnection)
-    .fold {
-      notFound(definitions.ErrorResponse("Sequencer is not configured."))
-        .pure[Future]
-    } { call }
+  private def withSequencerConnection[T](
+      call: SequencerAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.sequencerAdminConnection))
+  }
 
-  private def withMediatorConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T]) = localSynchronizerNode
-    .map(_.mediatorAdminConnection)
-    .fold {
-      notFound(definitions.ErrorResponse("Mediator is not configured."))
-        .pure[Future]
-    } { call }
+  private def withMediatorConnection[T](
+      call: MediatorAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.mediatorAdminConnection))
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
-    this.synchronized {
+    mutex.exclusive {
       Seq[AsyncOrSyncCloseable](
         AsyncCloseable(
           "scanConnection",

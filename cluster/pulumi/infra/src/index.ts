@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
@@ -22,12 +22,15 @@ import {
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
   installLoggedSecretsAlerts,
+  installGcpQuotaAlerts,
+  installCloudSqlTxIdUtilizationAlert,
 } from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
 import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
+import { configureReloader } from './reloader';
 import { configureStorage } from './storage';
 
 const network = configureNetwork(clusterBasename, clusterBaseDomain);
@@ -82,11 +85,15 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     if (monitoringConfig.alerting.loggedSecretsFilter) {
       installLoggedSecretsAlerts(notificationChannel);
     }
+    installGcpQuotaAlerts(notificationChannel);
+    installCloudSqlTxIdUtilizationAlert(notificationChannel);
   }
 }
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
+
+configureReloader();
 
 installExtraCustomResources();
 

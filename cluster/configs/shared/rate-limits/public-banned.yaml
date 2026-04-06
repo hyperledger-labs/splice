@@ -1,56 +1,40 @@
-rateLimits: !append
+rateLimits:
   # banned because deprecated
-  - actions:
-      - name: v1-updates
-        pathPrefix: /api/scan/v1/updates
-    limits:
-      type: banned
+  /api/scan/v1/updates:
+    name: v1-updates
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: aggregated-rounds
-        pathPrefix: /api/scan/v0/aggregated-rounds
-    limits:
-      type: banned
+  /api/scan/v0/aggregated-rounds:
+    name: aggregated-rounds
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: round-totals
-        pathPrefix: /api/scan/v0/round-totals
-    limits:
-      type: banned
+  /api/scan/v0/round-totals:
+    name: round-totals
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: round-party-totals
-        pathPrefix: /api/scan/v0/round-party-totals
-    limits:
-      type: banned
+  /api/scan/v0/round-party-totals:
+    name: round-party-totals
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: amulet-config-for-round
-        pathPrefix: /api/scan/v0/amulet-config-for-round
-    limits:
-      type: banned
+  /api/scan/v0/amulet-config-for-round:
+    name: amulet-config-for-round
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: round-of-latest-data
-        pathPrefix: /api/scan/v0/round-of-latest-data
-    limits:
-      type: banned
+  /api/scan/v0/round-of-latest-data:
+    name: round-of-latest-data
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: rewards-collected
-        pathPrefix: /api/scan/v0/rewards-collected
-    limits:
-      type: banned
+  /api/scan/v0/rewards-collected:
+    name: rewards-collected
+    type: banned
 
   # banned because deprecated
-  - actions:
-      - name: top-providers
-        pathPrefix: /api/scan/v0/top-providers-by-app-rewards
-    limits:
-      type: banned
+  /api/scan/v0/top-providers-by-app-rewards:
+    name: top-providers
+    type: banned

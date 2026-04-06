@@ -80,6 +80,11 @@ const Auth0ConfigSchema = z
     clientId: z.string().optional(),
   })
   .strict();
+const AppsPgConfigSchema = z
+  .object({
+    cloudSql: CloudSqlWithOverrideConfigSchema,
+  })
+  .strict();
 const SvAppConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
@@ -90,6 +95,8 @@ const SvAppConfigSchema = z
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
     permissionedSynchronizer: z.boolean().optional(),
+    // Map of package name -> list of versions to explicitly unvet
+    additionalPackagesToUnvet: z.record(z.string(), z.array(z.string())).optional(),
     resources: K8sResourceSchema,
   })
   .strict();
@@ -121,6 +128,8 @@ const SvValidatorAppConfigSchema = z
       })
       .optional(),
     auth0: Auth0ConfigSchema.optional(),
+    // Map of package name -> list of versions to explicitly unvet
+    additionalPackagesToUnvet: z.record(z.string(), z.array(z.string())).optional(),
     resources: K8sResourceSchema,
   })
   .and(ValidatorAppConfigSchema);
@@ -135,6 +144,7 @@ const SingleSvConfigSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     mediator: SvMediatorConfigSchema.optional(),
+    appsPg: AppsPgConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
     validatorApp: SvValidatorAppConfigSchema.optional(),

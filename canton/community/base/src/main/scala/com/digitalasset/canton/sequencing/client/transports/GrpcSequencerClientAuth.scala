@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports
@@ -33,8 +33,7 @@ import io.grpc.{ManagedChannel, Status}
 
 import scala.concurrent.ExecutionContext
 
-/** Auth helpers for the [[GrpcSequencerClientTransport]] when dealing with our custom
-  * authentication tokens.
+/** Auth helpers when dealing with our custom authentication tokens.
   */
 class GrpcSequencerClientAuth(
     synchronizerId: PhysicalSynchronizerId,

@@ -18,6 +18,138 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.18
+
+    - SV App
+
+        - A new optional configuration map `additionalPackagesToUnvet` to unvet additional supported packages was added in the SV app configuration.
+          This is only aimed as a security measure to add the ability to downgrade to previous versions in case of major issues or to prevent
+          corrupted and unsecured packages from being used. More information about this new configuration can be found in the :ref:`Unvet insecure package versions <sv-unvet_insecure_package_versions>` guide.
+
+    - Deployment
+
+        - We've added support for the `Stakater Reloader <https://github.com/stakater/Reloader>`_ annotation,
+          which performs a rolling restart of pods when their referenced Secrets or ConfigMaps change.
+          The annotation is included by default in all Splice Helm charts.
+          You can disable it by setting ``enableReloader`` to ``false`` in your Helm values file.
+          Reloader must be installed separately; if it is not present, the annotation is harmless and will be ignored.
+          See also the new deployment tips in the :ref:`Validator <helm-validator-install>` and :ref:`SV <helm-sv-install>` Helm guides.
+
+    - Scan
+
+        - The following tabs and features have been removed from Scan UI.
+          Their corresponding API endpoints are still available, yet deprecated, and will be removed soon.
+          Users are strongly advised to migrate to non-deprecated API endpoints as soon as possible.
+
+            - Canton Coin Activity
+                - Recent activity list, and all leaderboards
+                - Total app & validator rewards
+                - The round as-of which the content has been computed (no round-based data is listed any more)
+                - The tab has been renamed "Canton Coin Configuration"
+            - Governance
+                - Completely removed
+            - Validators
+                - Completely removed
+
+        - Improve CPU usage of update and event history.
+
+        - Scan now ingests and serves app activity records for traffic-based rewards,
+          which delivers Increments 2 and 3 from the
+          `CIP-104 incremental roll-out plan <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`_.
+
+          The responses from the ``/v0/events`` and ``/v0/events/{update_id}``
+          `endpoints <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`_
+          now include the
+          ``traffic_summary`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`_) and
+          ``app_activity_records`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`_)
+          fields.
+
+          .. note::
+
+             These new fields enable the Canton Network community to start
+             validating the traffic-based rewards model and to prepare for the full
+             roll-out of CIP-104 in the future.
+
+             **Network explorer operators**: consider ingesting traffic summaries and
+             app activity records in your network explorer apps together with the mediator verdicts
+             and use them to provide both per-transaction and per-round previews of the expected
+             traffic-based app rewards when CIP-104 goes live.
+
+             **App developers**: review the app activity records for your app to
+             understand the impact of traffic-based app rewards on your app.
+             Keep in mind that the rewards depend on the exact transaction structure of your app,
+             which might change when you stop creating ``FeaturedAppActivityMarker`` contracts in your transactions.
+             Traffic-based app rewards also depend on the featured app status of counter-parties in your transactions.
+             Expected rewards can therefore differ between DevNet, TestNet and MainNet
+             because different apps are featured.
+
+             The new fields are marked as experimental in the API specification, as the validation might
+             show that changes are required. Most likely that will though not be the case.
+
+    - Canton
+
+        - A cause of frequent ``SEQUENCER_SUBMISSION_REQUEST_REFUSED`` errors when using BFT sequencer connections and request amplification has been addressed.
+          Set ``canton.sequencers.sequencer.sequencer-client.amplify-on-max-sequencing-time-too-far`` to ``false`` to restore previous behavior.
+
+            - The ``SequencerService.sendAsync`` gRPC service will now return ``SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR``
+              instead of ``SEQUENCER_SUBMISSION_REQUEST_REFUSED`` for transactions with a ``maxSequencingTime`` too far in the future
+              from the sequencer view (usually when sequencer is catching up and is behind on processing).
+              This is a breaking API change.
+
+        - The Ledger JSON API ``v2/package-vetting`` endpoint has been deprecated in favor of two new endpoints: ``v2/package-vetting/list`` and ``v2/package-vetting/update``.
+          These new endpoints are equivalent in functionality, but more compliant with HTTP specifications and tools.
+
+.. release-notes:: 0.5.17
+
+    - SVs
+
+      .. important::
+
+        - BFT sequencer connections are recommended again with this upgrade. To enable them, remove the config flags to disable them from the SV and validator configuration
+          used to :ref:`disable them <helm-sv-bft-sequencer-connections>`.
+
+    - SV and Validator app
+
+        - Going forward unusable splice DARs will be automatically unvetted by the super validators.
+          This will be used for DARs that can already not be used,
+          e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
+
+          The minimum supported versions are:
+
+             ================== =======
+             name               version
+             ================== =======
+             amulet             0.1.14
+             amuletNameService  0.1.14
+             dsoGovernance      0.1.19
+             validatorLifecycle 0.1.5
+             wallet             0.1.14
+             walletPayments     0.1.14
+             ================== =======
+
+    - Scan
+
+       - Added a new ``/v1/domains/{domain_id}/parties/{party_id}/participant-id`` endpoint that returns all participant IDs hosting a given party,
+         supporting parties hosted on multiple participants. The previous ``/v0`` endpoint only supported single-participant hosting.
+
+       - Added an optional ``external_transaction_hash`` field to the response of ``GET /v1/updates/{update-id}``, ``GET /v2/updates/{update-id}``,  GET ``/v1/updates``, and GET ``/v2/updates`` endpoints. While currently not set, this field will eventually include the transaction hashes signed by external parties.
+
+       - **Experimental**: Added an optional ``app_activity_records`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints. This is currently never set but will eventually include traffic summaries and app activity records are included alongside verdicts in event history items.
+         This is part of the CIP-104 preview and is subject to change.
+         App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
+         once the SVs have successfully concluded their performance testing.
+
+    - SV UI
+
+       - Fixed the SV UI to correctly handle parties hosted on multiple participants (e.g., the DSO party).
+
+    - LocalNet
+
+       - LocalNet now supports running multiple synchronizers side by side for testing multi-synchronizer scenarios. By default, only the ``global``
+         synchronizer is active. To enable the second synchronizer called ``app-synchronizer``, start LocalNet with the ``multi-sync`` Docker
+         Compose profile (``--profile multi-sync``). The ``app-provider`` and ``app-user`` participant nodes are cross-connected to both
+         synchronizers. See :ref:`multi-sync-localnet` for details.
+
 .. release-notes:: 0.5.16
 
   - Daml
@@ -3835,7 +3967,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * The Canton Coin Scan app is now being deployed as part of the SV node in our runbook.
     See instructions for deploying the ``cn-scan`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
     and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-    Section :ref:`Using the Canton Coin Scan UI <helm-scan-web-ui>` explains the UI.
+    Section "Using the Canton Coin Scan UI" explains the UI.
     Note that not all fields in the Scan UI are hooked up to fetch data in the backend yet.
     Ones that should work at this point are the as-of round in the top-right corner, and the Validator and App leaderboards.
 

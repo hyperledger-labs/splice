@@ -1,7 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
-import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
@@ -56,7 +57,11 @@ class SvTimeBasedOnboardingIntegrationTest
         val sv2and3OnboardingRequestTriggers =
           Seq(sv2Backend, sv3Backend).map(_.dsoAutomation.trigger[SvOnboardingRequestTrigger])
 
-        sv2and3OnboardingRequestTriggers.parTraverse_(_.pause()).futureValue
+        MonadUtil
+          .parTraverseWithLimit_(PositiveInt.tryCreate(2))(sv2and3OnboardingRequestTriggers)(
+            _.pause()
+          )
+          .futureValue
         // We now need 2 confirmations to execute an action, but only sv1 will confirm to onboard sv4.
         clue("SV4 starts") {
           sv4ValidatorBackend.start()
@@ -194,6 +199,12 @@ class SvTimeBasedOnboardingIntegrationTest
               sv1Backend.getDsoInfo().dsoRules.payload.config.decentralizedSynchronizer,
               sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteCooldownTime,
+              sv1Backend
+                .getDsoInfo()
+                .dsoRules
+                .payload
+                .config
+                .nextScheduledLogicalSynchronizerUpgrade,
             )
 
             val action: ActionRequiringConfirmation =

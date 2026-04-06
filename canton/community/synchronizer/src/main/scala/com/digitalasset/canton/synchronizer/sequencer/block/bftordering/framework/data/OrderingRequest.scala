@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data
 
 import com.digitalasset.canton.crypto.HashBuilder
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.SupportedVersions
@@ -27,6 +28,7 @@ import java.time.Instant
 
 final case class OrderingRequest(
     tag: String,
+    messageId: String,
     payload: ByteString,
     orderingStartInstant: Option[Instant] =
       None, // Used for metrics support only, unset in unit and simulation tests
@@ -37,10 +39,13 @@ final case class OrderingRequest(
 
   def addToHashBuilder(hashBuilder: HashBuilder): Unit =
     hashBuilder
-      .add(payload)
-      .add(tag)
-      .add(orderingStartInstant.toString)
+      .addByteString(payload)
+      .addString(tag)
+      .addString(orderingStartInstant.toString)
       .discard
+
+  def headerString: String =
+    s"(tag=$tag, messageId=$messageId, payloadSize=${payload.size()}, orderingStartInstant=$orderingStartInstant)"
 }
 
 object OrderingRequest {
@@ -48,7 +53,14 @@ object OrderingRequest {
     Set(BlockFormat.AcknowledgeTag, BlockFormat.SendTag)
 }
 
-final case class OrderingRequestBatchStats(requests: Int, bytes: Int)
+final case class OrderingRequestBatchStats(requests: Int, bytes: Int) extends PrettyPrinting {
+
+  override protected def pretty: Pretty[OrderingRequestBatchStats.this.type] =
+    prettyOfClass(
+      param("requests", _.requests),
+      param("bytes", _.bytes),
+    )
+}
 object OrderingRequestBatchStats {
   val ForTesting: OrderingRequestBatchStats = OrderingRequestBatchStats(0, 0)
 }
@@ -63,10 +75,10 @@ final case class OrderingRequestBatch private (
 ) extends HasProtocolVersionedWrapper[OrderingRequestBatch] {
 
   def addToHashBuilder(hashBuilder: HashBuilder): Unit = {
-    hashBuilder.add(epochNumber)
+    hashBuilder.addLong(epochNumber)
     requests.foreach { request =>
-      hashBuilder.add(representativeProtocolVersion.representative.toProtoPrimitive)
-      hashBuilder.add(request.traceContext.toString)
+      hashBuilder.addInt(representativeProtocolVersion.representative.toProtoPrimitive)
+      hashBuilder.addString(request.traceContext.toString)
       request.value.addToHashBuilder(hashBuilder)
     }
   }
@@ -83,6 +95,7 @@ final case class OrderingRequestBatch private (
   ): v30.OrderingRequest = v30.OrderingRequest(
     traceContext = traceContext.getOrElse(""),
     orderingRequest.tag,
+    orderingRequest.messageId,
     orderingRequest.payload,
     orderingRequest.orderingStartInstant.map(i =>
       com.google.protobuf.timestamp.Timestamp(i.getEpochSecond, i.getNano)
@@ -132,6 +145,7 @@ object OrderingRequestBatch extends VersioningCompanion[OrderingRequestBatch] {
           (
             OrderingRequest(
               protoOrderingRequest.tag,
+              protoOrderingRequest.messageId,
               protoOrderingRequest.payload,
               protoOrderingRequest.orderingStartInstant.map(_.asJavaInstant),
             ),
@@ -142,7 +156,7 @@ object OrderingRequestBatch extends VersioningCompanion[OrderingRequestBatch] {
       EpochNumber(batch.epochNumber),
     )(rpv)
 
-  override def versioningTable: framework.data.OrderingRequestBatch.VersioningTable =
+  override val versioningTable: framework.data.OrderingRequestBatch.VersioningTable =
     VersioningTable(
       SupportedVersions.ProtoData ->
         VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.Batch)(

@@ -14,6 +14,8 @@ import com.digitalasset.base.error.ErrorCategory.{
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.LockedContracts
+import com.digitalasset.canton.protocol.LocalRejectErrorCode
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
@@ -43,6 +45,10 @@ class SpliceCircuitBreaker(
     InvalidGivenCurrentSystemStateResourceExists,
     InvalidGivenCurrentSystemStateResourceMissing,
     InvalidGivenCurrentSystemStateSeekAfterEnd,
+  )
+
+  private val errorCodesToIgnore: Set[LocalRejectErrorCode] = Set(
+    LockedContracts
   )
 
   val underlying = new CircuitBreaker(
@@ -109,14 +115,17 @@ class SpliceCircuitBreaker(
         ErrorDetails
           .from(ex)
           .collect {
-            case ErrorDetails.ErrorInfoDetail(_, metadata) if metadata.contains("category") =>
-              metadata
+            case ErrorDetails.ErrorInfoDetail(errorCodeId, metadata)
+                if metadata.contains("category") =>
+              val categoryIgnored = metadata
                 .get("category")
                 .flatMap(_.toIntOption)
                 .flatMap(ErrorCategory.fromInt)
+                .exists(failureCategory => errorCategoriesToIgnore.contains(failureCategory))
+              val codeIgnored = errorCodesToIgnore.exists(_.id == errorCodeId)
+              categoryIgnored || codeIgnored
           }
-          .flatten
-          .exists(failureCategory => errorCategoriesToIgnore.contains(failureCategory))
+          .exists(identity)
       case _ => false
     }
   }

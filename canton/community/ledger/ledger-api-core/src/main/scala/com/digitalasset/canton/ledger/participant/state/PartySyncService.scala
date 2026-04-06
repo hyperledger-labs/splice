@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -8,10 +8,11 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
   ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref
 
 /** An interface for on-boarding parties via a participant. */
@@ -28,9 +29,9 @@ trait PartySyncService {
     *   - Use the given hint as is, and reject the call if such a party already exists
     *
     * Successful party allocations will result in a
-    * [[com.digitalasset.canton.ledger.participant.state.Update.PartyAddedToParticipant]] message.
-    * See the comments on [[com.digitalasset.canton.ledger.participant.state.Update]] for further
-    * details.
+    * [[com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective]]
+    * message. See the comments on [[com.digitalasset.canton.ledger.participant.state.Update]] for
+    * further details.
     *
     * @param hint
     *   A party identifier suggestion
@@ -45,7 +46,7 @@ trait PartySyncService {
     *   an async result of a SubmissionResult
     */
   def allocateParty(
-      hint: Ref.Party,
+      partyId: PartyId,
       submissionId: Ref.SubmissionId,
       synchronizerIdO: Option[SynchronizerId],
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
@@ -53,9 +54,11 @@ trait PartySyncService {
       traceContext: TraceContext
   ): FutureUnlessShutdown[SubmissionResult]
 
-  /** Return the protocol version for a synchronizer ID if the node is connected to it.
+  /** Return the physical synchronizer ID for a synchronizer ID if the node is connected to it.
     */
-  def protocolVersionForSynchronizerId(synchronizerId: SynchronizerId): Option[ProtocolVersion]
+  def physicalSynchronizerIdForSynchronizerId(
+      synchronizerId: SynchronizerId
+  ): Option[PhysicalSynchronizerId]
 
   /** The participant id */
   def participantId: ParticipantId

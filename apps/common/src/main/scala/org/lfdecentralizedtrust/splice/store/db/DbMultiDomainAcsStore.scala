@@ -77,11 +77,11 @@ import java.lang
 import java.time.Instant
 
 final class DbMultiDomainAcsStore[TXE](
-    storage: DbStorage,
-    acsTableName: String,
+    private[db] val storage: DbStorage,
+    private[db] val acsTableName: String,
     txLogTableNameOpt: Option[String],
     interfaceViewsTableNameOpt: Option[String],
-    acsStoreDescriptor: StoreDescriptor,
+    private[db] val acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[
@@ -138,9 +138,6 @@ final class DbMultiDomainAcsStore[TXE](
   }
 
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
-
-  private[db] def tcsStorage: DbStorage = storage
-  private[db] def tcsAcsTableName: String = acsTableName
 
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
@@ -397,7 +394,7 @@ final class DbMultiDomainAcsStore[TXE](
           domainMigrationId,
           companion,
           additionalWhere = sql"""and assigned_domain = $domain""",
-          orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
         "listContractsOnDomain",
       )
@@ -1227,17 +1224,27 @@ final class DbMultiDomainAcsStore[TXE](
       } else {
         // Filter out all contracts we are not interested in
         val todoAcs = acs
-          .filter(contract => contractFilter.contains(contract.createdEvent))
+          .filter(contract =>
+            contractFilter.contains(contract.createdEvent, contract.synchronizerId)
+          )
         todoAcs.foreach { contract =>
           contractFilter.ensureStakeholderOf(contract.createdEvent)
         }
         val todoIncompleteOut = incompleteOut
-          .filter(event => contractFilter.contains(event.createdEvent))
+          .filter(event =>
+            contractFilter
+              .contains(event.createdEvent, event.reassignmentEvent.source)
+          )
         todoIncompleteOut.foreach { event =>
           contractFilter.ensureStakeholderOf(event.createdEvent)
         }
         val todoIncompleteIn = incompleteIn
-          .filter(event => contractFilter.contains(event.reassignmentEvent.createdEvent))
+          .filter(event =>
+            contractFilter.contains(
+              event.reassignmentEvent.createdEvent,
+              event.reassignmentEvent.target,
+            )
+          )
         todoIncompleteIn.foreach { event =>
           contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
         }
@@ -1453,7 +1460,7 @@ final class DbMultiDomainAcsStore[TXE](
           .seq(
             reassignment.event match {
               case assign: ReassignmentEvent.Assign
-                  if !contractFilter.contains(assign.createdEvent) =>
+                  if !contractFilter.contains(assign.createdEvent, assign.target) =>
                 summary.numFilteredAssignEvents += 1
                 DBIO.successful(())
               case assign: ReassignmentEvent.Assign =>
@@ -1570,7 +1577,7 @@ final class DbMultiDomainAcsStore[TXE](
               VectorMap.empty[String, OperationToDo],
             )(
               onCreate = (st, ev, _) => {
-                if (contractFilter.contains(ev)) {
+                if (contractFilter.contains(ev, tree.synchronizerId)) {
                   contractFilter.ensureStakeholderOf(ev)
                   st + (ev.getContractId -> Insert(
                     ev,

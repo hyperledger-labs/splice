@@ -3,7 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import cats.syntax.option.*
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -22,6 +23,7 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -39,7 +41,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 class SvOnboardingPromoteParticipantToSubmitterTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
     withPromotionDelay: Boolean,
 )(implicit
     ec: ExecutionContext,
@@ -47,7 +49,8 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
       SvOnboardingPromoteParticipantToSubmitterTrigger.Task
-    ] {
+    ]
+    with SyncConnectionStalenessCheck {
 
   private val dsoParty = dsoStore.key.dsoParty
 
@@ -167,8 +170,8 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       .asScala
       .map(PartyId.tryFromProtoPrimitive)
       .toSeq
-    svs
-      .parTraverse { svParty =>
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(16))(svs) { svParty =>
         participantAdminConnection
           .getPartyToParticipant(
             dsoRules.domain,
@@ -211,9 +214,12 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
           topologySnapshot = TopologySnapshot.Sequenced,
         )
         .map(_.mapping.participants)
+      notConnected <- isNotConnectedToSync()
     } yield {
       dsoHostingParticipants
-        .contains(HostingParticipant(task.participantId, ParticipantPermission.Submission))
+        .contains(
+          HostingParticipant(task.participantId, ParticipantPermission.Submission)
+        ) || notConnected
     }
   }
 

@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String3, String300}
-import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref.HexString
@@ -186,6 +186,11 @@ trait AcsJdbcTypes {
   protected implicit lazy val longSeqSetParameter: SetParameter[Seq[Long]] =
     (longs: Seq[Long], pp: PositionedParameters) => longArraySetParameter(longs.toArray, pp)
 
+  protected implicit lazy val cantonTimestampArraySetParameter
+      : SetParameter[Array[CantonTimestamp]] =
+    (timestamps: Array[CantonTimestamp], pp: PositionedParameters) =>
+      longArraySetParameter(timestamps.map(_.toMicros), pp)
+
   protected implicit lazy val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
       pp.setObject(
@@ -356,6 +361,12 @@ trait AcsJdbcTypes {
         case Some(jsonString) => jsonStringSetParameter(jsonString, pp)
         case None => pp.setNull(java.sql.Types.OTHER)
       }
+
+  implicit val setParameterSynchronizerId: SetParameter[SynchronizerId] =
+    (d: SynchronizerId, pp: PositionedParameters) => pp >> d.toLengthLimitedString
+
+  implicit val setParameterSynchronizerIdO: SetParameter[Option[SynchronizerId]] =
+    (d: Option[SynchronizerId], pp: PositionedParameters) => pp >> d.map(_.toLengthLimitedString)
 
   protected def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]

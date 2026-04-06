@@ -1,14 +1,15 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.metrics.ExecutorServiceMetrics
 import com.daml.metrics.api.MetricsContext
-import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -116,8 +117,9 @@ import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 
 import java.security.SecureRandom
 import java.time.Instant
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import scala.util.Random
 
 final class BftBlockOrderer(
@@ -135,9 +137,11 @@ final class BftBlockOrderer(
     sequencerSnapshotInfo: Option[SequencerSnapshot.ImplementationSpecificInfo],
     exitOnFatalFailures: Boolean,
     metrics: BftOrderingMetrics,
+    executorServiceMetrics: ExecutorServiceMetrics,
     override val loggerFactory: NamedLoggerFactory,
     queryCostMonitoring: Option[QueryCostMonitoringConfig],
-)(implicit executionContext: ExecutionContext, materializer: Materializer, tracer: Tracer)
+    executionContext: ExecutionContextExecutor,
+)(implicit materializer: Materializer, tracer: Tracer)
     extends BlockOrderer
     with NamedLogging
     with FlagCloseableAsync
@@ -145,10 +149,24 @@ final class BftBlockOrderer(
 
   import BftBlockOrderer.*
 
+  implicit val ec: ExecutionContextExecutor =
+    config.dedicatedExecutionContextDivisor.fold(executionContext) { divisor =>
+      Threading.newExecutionContext(
+        "bft-orderer-dedicated-ec",
+        noTracingLogger,
+        PositiveInt.tryCreate(
+          Threading.detectNumberOfThreads(noTracingLogger).value / divisor
+        ),
+        executorServiceMetrics,
+      )
+    }
+
   require(
     sequencerSubscriptionInitialHeight >= BlockNumber.First,
     s"The sequencer subscription initial height must be non-negative, but was $sequencerSubscriptionInitialHeight",
   )
+
+  private val longRunningExecutor = Executors.newCachedThreadPool()
 
   private val psId: PhysicalSynchronizerId = cryptoApi.psid
 
@@ -197,6 +215,7 @@ final class BftBlockOrderer(
     Threading.newExecutionContext(
       loggerFactory.threadName + "-dp2p-server-grpc-executor-context",
       noTracingLogger,
+      executorServiceMetrics = executorServiceMetrics,
     )
 
   // Standalone mode doesn't support authentication
@@ -257,7 +276,14 @@ final class BftBlockOrderer(
 
   private val p2pEndpointsStore = setupP2PEndpointsStore(localStorage)
   private val availabilityStore =
-    AvailabilityStore(config.batchAggregator, localStorage, timeouts, loggerFactory)
+    AvailabilityStore(
+      config.batchAggregator,
+      nodeParameters.cachingConfigs,
+      metrics,
+      localStorage,
+      timeouts,
+      loggerFactory,
+    )
   private val epochStore = EpochStore(config.batchAggregator, localStorage, timeouts, loggerFactory)
   private val outputStore = OutputMetadataStore(localStorage, timeouts, loggerFactory)
   private val pruningSchedulerStore =
@@ -319,6 +345,8 @@ final class BftBlockOrderer(
       BlockNumber(sequencerSubscriptionInitialHeight),
       timeouts,
       loggerFactory,
+      config.outputEnqueueMaxRetries,
+      config.outputEnqueueMaxRetryDelay,
     )(
       abort = sys.error
     )
@@ -331,7 +359,7 @@ final class BftBlockOrderer(
           .subscription()
           .map(b =>
             // The server is started earlier if standalone mode is enabled
-            standaloneServiceRef.get.foreach(_.push(b))
+            standaloneServiceRef.get.foreach(_.push(b.value))
           )
           .toMat(Sink.ignore)(Keep.both),
         errorLogMessagePrefix = "Failed to handle state changes",
@@ -388,10 +416,16 @@ final class BftBlockOrderer(
       )
     val topologyProvider =
       config.standalone.fold[OrderingTopologyProvider[PekkoEnv]](
-        new CantonOrderingTopologyProvider(cryptoApi, loggerFactory, metrics)
+        new CantonOrderingTopologyProvider(
+          cryptoApi,
+          EpochLength(config.epochLength), // TODO(#24184) make this dynamic sequencing parameter
+          loggerFactory,
+          metrics,
+        )
       ) { standaloneConfig =>
         new FixedFileBasedOrderingTopologyProvider(
           standaloneConfig,
+          EpochLength(config.epochLength),
           cryptoApi.pureCrypto,
           metrics,
         )
@@ -401,9 +435,6 @@ final class BftBlockOrderer(
       thisNode,
       config,
       BlockNumber(sequencerSubscriptionInitialHeight),
-      // TODO(#18910) test with multiple epoch lengths >= 1 (incl. 1)
-      // TODO(#19289) support dynamically configurable epoch length
-      EpochLength(config.epochLength),
       stores,
       topologyProvider,
       blockSubscription,
@@ -470,6 +501,7 @@ final class BftBlockOrderer(
       p2pConnectionEventListener,
       p2pNetworkIn,
       metrics,
+      longRunningExecutor,
       timeouts,
       loggerFactory,
     )
@@ -478,10 +510,10 @@ final class BftBlockOrderer(
   // Called by the Scala gRPC service binding when we receive a request to establish the P2P gRPC streaming channel;
   //  it either returns a new receiver for the gRPC stream or throws, which fails the stream establishment and
   //  is propagated to the peer as an error.
-  private def tryCreatePeerReceiverForIncomingConnection(
+  private def createPeerReceiverForIncomingConnection(
       peerSender: StreamObserver[BftOrderingMessage]
-  )(implicit traceContext: TraceContext): P2PGrpcStreamingReceiver =
-    p2pNetworkManager.connectionManager.tryCreateServerSidePeerReceiver(
+  )(implicit traceContext: TraceContext): UnlessShutdown[StreamObserver[BftOrderingMessage]] =
+    p2pNetworkManager.connectionManager.createServerSidePeerReceiver(
       p2pNetworkInModuleRef,
       peerSender,
     )
@@ -496,19 +528,17 @@ final class BftBlockOrderer(
         CantonServerBuilder
           .forConfig(
             config = serverConfig,
-            adminTokenDispenser = None,
             executor = p2pServerGrpcExecutor,
             loggerFactory = loggerFactory,
             apiLoggingConfig = nodeParameters.loggingConfig.api,
             tracing = nodeParameters.tracing,
             grpcMetrics = metrics.grpcMetrics,
-            NoOpTelemetry,
           )
           .addService(
             ServerInterceptors.intercept(
               BftOrderingServiceGrpc.bindService(
                 new P2PGrpcBftOrderingService(
-                  tryCreatePeerReceiverForIncomingConnection,
+                  createPeerReceiverForIncomingConnection,
                   loggerFactory,
                 ),
                 executionContext,
@@ -517,7 +547,8 @@ final class BftBlockOrderer(
                 maybeServerAuthenticatingFilter,
                 maybeAuthenticationServices.map(_.authenticationServerInterceptor),
               ).flatten.asJava,
-            )
+            ),
+            withLogging = false,
           )
       config.standalone.foreach { _ =>
         val standaloneService =
@@ -528,7 +559,8 @@ final class BftBlockOrderer(
             StandaloneBftOrderingServiceGrpc.bindService(
               standaloneService,
               executionContext,
-            )
+            ),
+            withLogging = false,
           )
           .discard
       }
@@ -558,12 +590,13 @@ final class BftBlockOrderer(
     config.standalone.fold {
       logger.debug(
         "sending submission " +
-          s"with message ID ${signedSubmissionRequest.content.sender} " +
+          s"with message ID ${signedSubmissionRequest.content.messageId} " +
           s"from ${signedSubmissionRequest.content.sender} " +
           s"to ${signedSubmissionRequest.content.batch.allRecipients} "
       )
       sendToMempool(
         SendTag,
+        signedSubmissionRequest.content.messageId.unwrap,
         signedSubmissionRequest.content.sender,
         signedSubmissionRequest.toByteString,
       )
@@ -584,6 +617,7 @@ final class BftBlockOrderer(
     logger.debug(s"member ${request.member} acknowledging timestamp ${request.timestamp}")
     sendToMempool(
       AcknowledgeTag,
+      "ACK-" + request.timestamp,
       signedAcknowledgeRequest.content.member,
       signedAcknowledgeRequest.toByteString,
     ).value.map(_ => ())
@@ -608,13 +642,15 @@ final class BftBlockOrderer(
   }
 
   override def subscribe(
-  )(implicit traceContext: TraceContext): Source[RawLedgerBlock, KillSwitch] =
+  )(implicit traceContext: TraceContext): Source[Traced[RawLedgerBlock], KillSwitch] =
     config.standalone.fold(
-      blockSubscription.subscription().map(BlockFormat.blockOrdererBlockToRawLedgerBlock(logger))
+      blockSubscription
+        .subscription()
+        .map(tracedBlock => tracedBlock.map(BlockFormat.blockOrdererBlockToRawLedgerBlock(logger)))
     ) { _ =>
-      logger.warn("BFT standalone mode enabled: not subscribing to any blocks")
+      logger.info("BFT standalone mode enabled: not subscribing to any blocks")
       Source
-        .empty[RawLedgerBlock]
+        .empty[Traced[RawLedgerBlock]]
         .viaMat(KillSwitches.single)(
           Keep.right
         ) // In non-standalone mode, the block subscription is not used
@@ -629,53 +665,61 @@ final class BftBlockOrderer(
     logger.debug("Beginning async BFT block orderer shutdown")(TraceContext.empty)
 
     // Shutdown the P2P network client portion and module system
-    Seq[AsyncOrSyncCloseable](
-      SyncCloseable(
-        "p2pNetworkManager.close()",
-        p2pNetworkManager.close(),
-      ),
-      SyncCloseable("blockSubscription.close()", blockSubscription.close()),
-      SyncCloseable("epochStore.close()", epochStore.close()),
-      SyncCloseable("outputStore.close()", outputStore.close()),
-      SyncCloseable("availabilityStore.close()", availabilityStore.close()),
-      SyncCloseable("p2pEndpointsStore.close()", p2pEndpointsStore.close()),
-      SyncCloseable("pruningScheduler.close()", pruningScheduler.close()),
-      SyncCloseable("pruningSchedulerStore.close()", pruningSchedulerStore.close()),
-      SyncCloseable("shutdownPekkoActorSystem()", shutdownPekkoActorSystem()),
-    ) ++
-      // Shutdown the dedicated local storage if present
-      Option
-        .when(localStorage != sharedLocalStorage)(
-          SyncCloseable("dedicatedLocalStorage.close()", localStorage.close())
-        )
-        .toList ++
-      // Shutdown the P2P server + connection manager and associated executor
-      Seq[AsyncOrSyncCloseable](
-        SyncCloseable(
-          "p2pGrpcServerManager.close()",
-          p2pGrpcServerManager.close(),
-        ),
-        SyncCloseable("p2pServerGrpcExecutor.shutdown()", p2pServerGrpcExecutor.shutdown()),
-      ) ++
-      // The kill switch ensures that we don't process the remaining contents of the queue buffer
-      standaloneSubscriptionKillSwitchF
-        .map(ks =>
-          SyncCloseable(
-            "standaloneSubscriptionKillSwitch.shutdown()",
-            ks._1.shutdown(),
+    SyncCloseable(
+      "p2pNetworkManager.close()",
+      p2pNetworkManager.close(),
+    ) +:
+      // Shutdown the server-authenticating server-side filter early (as it's also a client of the auth service),
+      //  if authentication is enabled.
+      (maybeServerAuthenticatingFilter.map(_.closeAsync()).getOrElse(Seq.empty) ++
+        blockSubscription.closeAsync() ++
+        Seq[AsyncOrSyncCloseable](
+          SyncCloseable("epochStore.close()", epochStore.close()),
+          SyncCloseable("outputStore.close()", outputStore.close()),
+          SyncCloseable("availabilityStore.close()", availabilityStore.close()),
+          SyncCloseable("p2pEndpointsStore.close()", p2pEndpointsStore.close()),
+          SyncCloseable("pruningScheduler.close()", pruningScheduler.close()),
+          SyncCloseable("pruningSchedulerStore.close()", pruningSchedulerStore.close()),
+          SyncCloseable("shutdownPekkoActorSystem()", shutdownPekkoActorSystem()),
+        ) ++
+        // Shutdown the dedicated local storage if present
+        Option
+          .when(localStorage != sharedLocalStorage)(
+            SyncCloseable("dedicatedLocalStorage.close()", localStorage.close())
           )
-        )
-        .toList ++
-      // Shutdown the reused Canton member authentication services, if authentication is enabled
-      maybeServerAuthenticatingFilter.map(_.closeAsync()).getOrElse(Seq.empty) ++
-      standaloneServiceRef.get.toList
-        .map(s => SyncCloseable("standaloneServiceRef.close()", s.close()))
+          .toList ++
+        // Shutdown the P2P server + connection manager and associated executor
+        Seq[AsyncOrSyncCloseable](
+          SyncCloseable(
+            "p2pGrpcServerManager.close()",
+            p2pGrpcServerManager.close(),
+          ),
+          SyncCloseable("p2pServerGrpcExecutor.shutdown()", p2pServerGrpcExecutor.shutdown()),
+        ) ++
+        // The kill switch ensures that we don't process the remaining contents of the queue buffer
+        standaloneSubscriptionKillSwitchF
+          .map(ks =>
+            SyncCloseable(
+              "standaloneSubscriptionKillSwitch.shutdown()",
+              ks._1.shutdown(),
+            )
+          )
+          .toList ++
+        standaloneServiceRef.get.toList
+          .map(s => SyncCloseable("standaloneServiceRef.close()", s.close())) ++
+        Seq(
+          SyncCloseable(
+            "longRunningExecutor.shutdown()",
+            longRunningExecutor.shutdown(),
+          )
+        ))
   }
 
   override def adminServices: Seq[ServerServiceDefinition] =
     Seq(
       v30.SequencerBftAdministrationServiceGrpc.bindService(
         new BftOrderingSequencerAdminService(
+          mempoolRef,
           p2pNetworkOutAdminModuleRef,
           consensusAdminModuleRef,
           loggerFactory,
@@ -733,19 +777,21 @@ final class BftBlockOrderer(
 
   private def sendToMempool(
       tag: String,
+      messageId: String,
       sender: Member,
       payload: ByteString,
   )(implicit traceContext: TraceContext): EitherT[Future, SequencerDeliverError, Unit] =
-    sendToMempoolGeneric(tag, payload, Some(sender))
+    sendToMempoolGeneric(tag, messageId, payload, Some(sender))
 
   private def orderSendRequest(
       request: SendRequest
   )(implicit traceContext: TraceContext): Future[SendResponse] =
-    sendToMempoolGeneric(request.tag, request.payload)
+    sendToMempoolGeneric(request.tag, "standalone", request.payload)
       .fold(e => SendResponse(Some(e.cause)), _ => SendResponse(None))
 
   private def sendToMempoolGeneric(
       tag: String,
+      messageId: String,
       payload: ByteString,
       sender: Option[Member] = None,
   )(implicit traceContext: TraceContext): EitherT[Future, SequencerDeliverError, Unit] = {
@@ -762,6 +808,7 @@ final class BftBlockOrderer(
         Traced(
           OrderingRequest(
             tag,
+            messageId,
             payload,
             orderingStartInstant = Some(Instant.now),
           )

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive.codec
@@ -23,11 +23,12 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.PreparedTransactionCodec.*
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.Synchronizer
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 import com.digitalasset.daml.lf.transaction.{
   CreationTime,
   GlobalKey,
@@ -117,7 +118,7 @@ final class PreparedTransactionEncoder(
 
   private implicit val timestampTransformer: Transformer[lf.data.Time.Timestamp, Long] = _.micros
 
-  private implicit val synchronizerIdTransformer: Transformer[SynchronizerId, String] =
+  private implicit val synchronizerTransformer: Transformer[Synchronizer, String] =
     _.toProtoPrimitive
 
   private implicit val nodeIdHashTransformer: Transformer[
@@ -254,13 +255,13 @@ final class PreparedTransactionEncoder(
 
   // Transformer for global key mappings
   private implicit val commandExecutionResultGlobalKeyMappingTransformer
-      : PartialTransformer[Map[GlobalKey, Option[Value.ContractId]], Seq[
+      : PartialTransformer[Map[GlobalKey, Vector[Value.ContractId]], Seq[
         Metadata.GlobalKeyMappingEntry
       ]] = PartialTransformer {
     _.toList.traverse { case (key, maybeContractId) =>
       for {
         convertedKey <- key.transformIntoPartial[iscd.GlobalKey]
-        convertedValue <- maybeContractId
+        convertedValue <- maybeContractId.asCidOption
           .map[lf.value.Value](lf.value.Value.ValueContractId.apply)
           .traverse(_.transformIntoPartial[lapiValue.Value])
       } yield iss.Metadata.GlobalKeyMappingEntry(
@@ -306,7 +307,7 @@ final class PreparedTransactionEncoder(
 
   // Transformer for the transaction metadata
   private def resultToMetadataTransformer(
-      synchronizerId: SynchronizerId,
+      synchronizer: Synchronizer,
       transactionUUID: UUID,
       mediatorGroup: Int,
       inputContracts: Seq[ExternalInputContract],
@@ -332,7 +333,7 @@ final class PreparedTransactionEncoder(
         _.globalKeyMapping,
         _.globalKeyMapping.transformIntoPartial[Seq[iss.Metadata.GlobalKeyMappingEntry]],
       )
-      .withFieldConst(_.synchronizerId, synchronizerId.transformInto[String])
+      .withFieldConst(_.synchronizerId, synchronizer.transformInto[String])
       .withFieldConst(_.transactionUuid, transactionUUID.toString)
       .withFieldConst(_.mediatorGroup, mediatorGroup)
       .withFieldComputed(
@@ -379,7 +380,7 @@ final class PreparedTransactionEncoder(
     implicit val traceContext: TraceContext = loggingContext.traceContext
     implicit val metadataTransformer: PartialTransformer[PrepareTransactionData, Metadata] =
       resultToMetadataTransformer(
-        prepareTransactionData.synchronizerId,
+        prepareTransactionData.synchronizer,
         transactionUUID,
         mediatorGroup,
         prepareTransactionData.inputContracts.values.toSeq,

@@ -20,7 +20,7 @@ jobs:
       parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
-      skip_if_regex: "\\[bft\\]"
+      skip_if_commit_tag: "bft"
       commit_sha: ""
       daml_base_version: ""
       # This is the Postgres 14 image we built for testing. From 17 onwards, we use the official image.

@@ -4,10 +4,13 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
@@ -27,7 +30,8 @@ import scala.jdk.FutureConverters.*
 class S3BucketConnection(
     s3Config: S3Config,
     val loggerFactory: NamedLoggerFactory,
-) extends NamedLogging {
+) extends NamedLogging
+    with LimitHelpers {
 
   val s3Client = S3AsyncClient
     .builder()
@@ -51,6 +55,90 @@ class S3BucketConnection(
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  /*
+    Iterates through all pages of an S3 listObjectsV2 request, applying the provided function to
+    extract the relevant names from each page (e.g. object keys, or folder prefixes), and returns the
+    top `limit` names sorted alphabetically. The function is used for both listing objects and listing folders.
+    It is safe to use on long lists, memory-wise, as it always keeps in memory only the top `limit` names seen so far.
+   */
+  private def firstNamesFromS3List(
+      listRequest: ListObjectsV2Request,
+      namesFromPage: ListObjectsV2Response => Iterable[String],
+      limit: Limit,
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] = {
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .fold(Seq.empty[String])((acc, page) => {
+        val content = namesFromPage(page)
+        applyLimit(
+          "listObjects",
+          limit,
+          (acc ++ content).sorted,
+        )
+      })
+      .mapConcat(_.toList)
+      .runWith(Sink.seq[String])
+  }
+
+  def listObjects(
+      prefix: String,
+      keyFilter: String => Boolean,
+      limit: Limit,
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
+    firstNamesFromS3List(
+      ListObjectsV2Request
+        .builder()
+        .bucket(bucketName)
+        .prefix(prefix)
+        .maxKeys(limit.limit)
+        .build(),
+      _.contents().asScala.map(_.key()).filter(keyFilter),
+      limit,
+    )
+
+  def listFolders(
+      folderFilter: String => Boolean,
+      limit: Limit,
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
+    firstNamesFromS3List(
+      ListObjectsV2Request
+        .builder()
+        .bucket(bucketName)
+        .delimiter("/")
+        .maxKeys(limit.limit)
+        .build(),
+      _.commonPrefixes().asScala.map(_.prefix()).filter(folderFilter),
+      limit,
+    )
+
+  def getChecksums(
+      objectKeys: Seq[String]
+  )(implicit ec: ExecutionContext, as: ActorSystem): Future[Seq[ObjectKeyAndChecksum]] = {
+    Source(objectKeys.toList)
+      .mapAsync(4) { key => // TODO(#3429): make this parallelism configurable
+        readChecksum(key)
+          .map(checksum => ObjectKeyAndChecksum(key, checksum))
+      }
+      .runWith(Sink.seq[ObjectKeyAndChecksum])
+  }
+
+  private def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+    val headRequest = HeadObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build()
+    for {
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
+        .asScala
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
+    } yield checksum
+  }
 
   def readObject(
       key: String
@@ -190,4 +278,10 @@ object S3BucketConnection {
       loggerFactory,
     )
   }
+
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
 }

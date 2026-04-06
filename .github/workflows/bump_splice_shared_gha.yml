@@ -1,0 +1,35 @@
+name: Bump splice-shared-gha version
+on:
+  schedule:
+    - cron: '30 1 * * *'  # Runs at 1.30 everyday
+  workflow_dispatch:
+
+jobs:
+  bump_splice_shared_gha_version:
+    name: Bump splice-shared-gha version
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for GCP Workload Identity for failure notifications
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: '${{ secrets.GH_CREATE_PRS_TOKEN }}' # need to checkout with a stronger token to be able to push later
+      
+      - name: Check for the latest version and create a PR to splice
+        run: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            ./scripts/bump-splice-shared-gha.sh
+        env:
+          GH_TOKEN: '${{ secrets.GH_CREATE_PRS_TOKEN }}' # need a stronger token to create a PR
+
+      - name: Report Failures on Slack & Github
+        if: failure() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'

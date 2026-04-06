@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -6,6 +6,7 @@ package com.digitalasset.canton.metrics
 import cats.Eval
 import com.daml.metrics.api.*
 import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory}
+import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
 
@@ -81,7 +82,9 @@ class SequencerConnectionPoolMetrics(
 
   // TODO(i28571): Factor this pattern into a helper class
   // Gauges don't support metrics context per update. So instead create a map with a gauge per context.
-  private val connectionHealthMetrics: TrieMap[MetricsContext, Eval[Gauge[Int]]] = TrieMap.empty
+  @VisibleForTesting
+  private[canton] val connectionHealthMetrics: TrieMap[MetricsContext, Eval[Gauge[Int]]] =
+    TrieMap.empty
   def connectionHealth(mc: MetricsContext): Gauge[Int] = {
     def createConnectionHealthGauge: Gauge[Int] = metricsFactory.gauge(
       MetricInfo(
@@ -89,7 +92,7 @@ class SequencerConnectionPoolMetrics(
         summary = "Health of a connection",
         description = """Health of a connection (0: fatal, 1: failed, 2: validated)
             |A failed connection is periodically retried for availability.
-            |A fatal subscription is considered invalid and will never be retried.""".stripMargin,
+            |A fatal connection is considered invalid and will never be retried.""".stripMargin,
         qualification = MetricQualification.Saturation,
       ),
       0,
@@ -100,6 +103,26 @@ class SequencerConnectionPoolMetrics(
     // Eval.later ensures that we actually create only one instance of the gauge in such a case by delaying the creation
     // until the getOrElseUpdate call has finished.
     connectionHealthMetrics.getOrElseUpdate(mc, Eval.later(createConnectionHealthGauge)).value
+  }
+
+  def removeMetricsForAllConnections(): Unit = {
+    connectionHealthMetrics.values.foreach(_.value.close)
+    connectionHealthMetrics.clear()
+
+    subscriptionHealthMetrics.values.foreach(_.value.close)
+    subscriptionHealthMetrics.clear()
+  }
+
+  def removeMetricsForConnection(toRemove: Set[String]): Unit = {
+    // remove from map
+    val connsToRemove = connectionHealthMetrics.keys
+      .filter(_.labels.get("connection").exists(toRemove(_)))
+    connsToRemove.foreach(mc => connectionHealthMetrics.remove(mc).foreach(_.value.close()))
+
+    val subsToRemove = subscriptionHealthMetrics.keys
+      .filter(_.labels.get("connection").exists(toRemove(_)))
+    subsToRemove
+      .foreach(mc => subscriptionHealthMetrics.remove(mc).foreach(_.value.close))
   }
 
   // Gauges don't support metrics context per update. So instead create a map with a gauge per context.

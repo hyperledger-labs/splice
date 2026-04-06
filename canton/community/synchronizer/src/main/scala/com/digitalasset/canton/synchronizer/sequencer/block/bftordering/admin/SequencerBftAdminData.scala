@@ -1,11 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin
 
 import cats.implicits.*
+import com.daml.tls.{TlsClientCertificate, TlsClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
-import com.digitalasset.canton.config.{PemFile, PemString, TlsClientCertificate, TlsClientConfig}
+import com.digitalasset.canton.config.{PemFile, PemString}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyNameOnlyCase, PrettyPrinting}
 import com.digitalasset.canton.sequencer.admin.v30.PeerEndpoint.Security
 import com.digitalasset.canton.sequencer.admin.v30.PeerEndpoint.Security.Empty
@@ -13,6 +14,7 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   Authenticated as ProtoAuthenticated,
   GetOrderingTopologyResponse,
   GetPeerNetworkStatusResponse,
+  GetWriteReadinessResponse,
   PeerConnectionStatus as ProtoPeerConnectionStatus,
   PeerEndpoint as ProtoPeerEndpoint,
   PeerEndpointHealth as ProtoPeerEndpointHealth,
@@ -263,10 +265,6 @@ object SequencerBftAdminData {
                     ) =>
                   Right(PeerEndpointHealthStatus.Unauthenticated)
                 case ProtoPeerEndpointHealthStatus(
-                      ProtoPeerEndpointHealthStatus.Status.Disconnected(_)
-                    ) =>
-                  Right(PeerEndpointHealthStatus.Disconnected)
-                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.Authenticated(
                         ProtoAuthenticated(sequencerIdString)
                       )
@@ -275,8 +273,12 @@ object SequencerBftAdminData {
                     .fromProtoPrimitive(sequencerIdString, "sequencerId")
                     .leftMap(_.toString)
                     .map(PeerEndpointHealthStatus.Authenticated(_))
-                case value =>
-                  Left(s"Health status is empty $value")
+                case ProtoPeerEndpointHealthStatus(
+                      ProtoPeerEndpointHealthStatus.Status.Disconnected(_)
+                    ) =>
+                  Right(PeerEndpointHealthStatus.Disconnected)
+                case _ =>
+                  Left("Health status is empty")
               }
             } yield PeerConnectionStatus.PeerEndpointStatus(
               endpointId,
@@ -293,6 +295,67 @@ object SequencerBftAdminData {
         }
         .sequence
         .map(PeerNetworkStatus(_))
+  }
+
+  sealed trait WriteReadiness extends Product with Serializable {
+
+    def p2p: WriteReadiness.P2P
+
+    def toProto: GetWriteReadinessResponse =
+      this match {
+        case ready: WriteReadiness.Ready =>
+          GetWriteReadinessResponse(
+            GetWriteReadinessResponse.Readiness.Ready(
+              GetWriteReadinessResponse.Ready(
+                Some(ready.p2p.toProto)
+              )
+            )
+          )
+        case notReady: WriteReadiness.P2PNotReady =>
+          GetWriteReadinessResponse(
+            GetWriteReadinessResponse.Readiness.P2PNotReady(
+              GetWriteReadinessResponse.P2PNotReady(
+                Some(notReady.p2p.toProto)
+              )
+            )
+          )
+      }
+  }
+
+  object WriteReadiness {
+
+    final case class P2P(authenticatedPeersCount: Int, requiredQuorum: Int) {
+
+      def toProto: GetWriteReadinessResponse.P2P =
+        GetWriteReadinessResponse.P2P(
+          authenticatedPeersCount,
+          requiredQuorum,
+        )
+    }
+
+    object P2P {
+      def fromProto(p2p: GetWriteReadinessResponse.P2P): P2P =
+        P2P(
+          p2p.authenticatedPeersCount,
+          p2p.requiredQuorum,
+        )
+    }
+
+    final case class Ready(override val p2p: P2P) extends WriteReadiness
+    final case class P2PNotReady(override val p2p: P2P) extends WriteReadiness
+
+    def fromProto(response: GetWriteReadinessResponse): Either[String, WriteReadiness] =
+      response.readiness match {
+        case GetWriteReadinessResponse.Readiness.Empty => Left("Readiness is empty")
+        case GetWriteReadinessResponse.Readiness.Ready(ready) =>
+          for {
+            p2p <- ready.p2P.toRight("P2P info is missing")
+          } yield WriteReadiness.Ready(WriteReadiness.P2P.fromProto(p2p))
+        case GetWriteReadinessResponse.Readiness.P2PNotReady(notReady) =>
+          for {
+            p2p <- notReady.p2P.toRight("P2P info is missing")
+          } yield WriteReadiness.P2PNotReady(WriteReadiness.P2P.fromProto(p2p))
+      }
   }
 
   final case class OrderingTopology(currentEpoch: Long, sequencerIds: Seq[SequencerId]) {

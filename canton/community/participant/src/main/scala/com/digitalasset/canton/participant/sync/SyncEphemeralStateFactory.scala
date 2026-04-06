@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
 
 import cats.Eval
-import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, SessionEncryptionKeyCacheConfig}
@@ -13,6 +12,7 @@ import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
@@ -23,6 +23,7 @@ import com.digitalasset.canton.participant.store.{
   RequestJournalStore,
   SyncPersistentState,
 }
+import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.PerformLsuHandler
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.store.SequencedEventStore.ByTimestamp
@@ -47,7 +48,10 @@ trait SyncEphemeralStateFactory {
       promiseUSFactory: PromiseUnlessShutdownFactory,
       metrics: ConnectedSynchronizerMetrics,
       sessionKeyCacheConfig: SessionEncryptionKeyCacheConfig,
+      onboardingClearanceScheduler: OnboardingClearanceScheduler,
       participantId: ParticipantId,
+      synchronizerLoggerFactory: NamedLoggerFactory,
+      performLsu: PerformLsuHandler,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SyncEphemeralState]
@@ -74,7 +78,10 @@ class SyncEphemeralStateFactoryImpl(
       promiseUSFactory: PromiseUnlessShutdownFactory,
       metrics: ConnectedSynchronizerMetrics,
       sessionKeyCacheConfig: SessionEncryptionKeyCacheConfig,
+      onboardingClearanceScheduler: OnboardingClearanceScheduler,
       participantId: ParticipantId,
+      synchronizerLoggerFactory: NamedLoggerFactory,
+      performLsu: PerformLsuHandler,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SyncEphemeralState] =
@@ -84,6 +91,9 @@ class SyncEphemeralStateFactoryImpl(
       )
       synchronizerIndex <- ledgerApiIndexer.value.ledgerApiStore.value
         .cleanSynchronizerIndex(persistentState.synchronizerIdx.synchronizerId)
+      _ = logger.info(
+        s"Computing starting points for ${persistentState.psid} with $synchronizerIndex"
+      )
       startingPoints <- SyncEphemeralStateFactory.startingPoints(
         persistentState.requestJournalStore,
         persistentState.sequencedEventStore,
@@ -98,8 +108,8 @@ class SyncEphemeralStateFactoryImpl(
       point in time and re-process the synchronizer announcement. This will update the record order publisher with the value
       of the successor a second time.
        */
-      synchronizerSuccessorO <- synchronizerCrypto.ips.currentSnapshotApproximation
-        .synchronizerUpgradeOngoing()
+      approximateSnapshot <- synchronizerCrypto.ips.currentSnapshotApproximation
+      synchronizerSuccessorO <- approximateSnapshot.announcedLsu()
 
       recordOrderPublisher = RecordOrderPublisher(
         persistentState.psid,
@@ -110,9 +120,10 @@ class SyncEphemeralStateFactoryImpl(
         metrics.recordOrderPublisher,
         exitOnFatalFailures = exitOnFatalFailures,
         timeouts,
-        loggerFactory,
+        synchronizerLoggerFactory,
         futureSupervisor,
         clock,
+        performLsu,
       )
 
       // the time tracker, note, must be shutdown in synchronizer as it is using the sequencer client to
@@ -134,6 +145,7 @@ class SyncEphemeralStateFactoryImpl(
         recordOrderPublisher,
         timeTracker,
         inFlightSubmissionSynchronizerTracker,
+        onboardingClearanceScheduler,
         persistentState,
         ledgerApiIndexer.value,
         contractStore.value,
@@ -143,7 +155,7 @@ class SyncEphemeralStateFactoryImpl(
         exitOnFatalFailures = exitOnFatalFailures,
         sessionKeyCacheConfig,
         timeouts,
-        loggerFactory.append("psid", persistentState.psid.toString),
+        synchronizerLoggerFactory,
         futureSupervisor,
         clock,
       )
@@ -186,39 +198,90 @@ object SyncEphemeralStateFactory {
   )(implicit
       ec: ExecutionContext,
       loggingContext: ErrorLoggingContext,
-  ): FutureUnlessShutdown[ProcessingStartingPoints] = {
-    implicit val traceContext: TraceContext = loggingContext.traceContext
-    for {
-      isSequencedEventStoreEmpty <- sequencedEventStore.sequencedEvents(Some(1)).map(_.isEmpty)
+  ): FutureUnlessShutdown[ProcessingStartingPoints] =
+    (synchronizerPredecessor, synchronizerIndexO) match {
+      case (Some(synchronizerPredecessor), Some(synchronizerIndex)) =>
+        if (synchronizerIndex.recordTime > synchronizerPredecessor.upgradeTime) {
+          loggingContext.info(
+            s"Computing starting points with synchronizer index after upgrade time"
+          )
+          startingPointsInternal(requestJournalStore, sequencedEventStore, synchronizerIndexO)
 
-      isAcrossUpgrade = (synchronizerIndexO, synchronizerPredecessor).tupled.exists {
-        case (synchronizerIndex, synchronizerPredecessor) =>
-          isSequencedEventStoreEmpty && synchronizerIndex.recordTime == synchronizerPredecessor.upgradeTime
-      }
-
-      messageProcessingStartingPoint <-
-        if (isAcrossUpgrade) {
-          FutureUnlessShutdown.pure(MessageProcessingStartingPoint.default)
         } else {
-          for {
-            tocO <- synchronizerIndexO
-              .flatTraverse(si =>
-                requestJournalStore.lastRequestTimeWithRequestTimestampBeforeOrAt(si.recordTime)
-              )
-            sequencerCounterO <- sequencerCounterFromSynchronizerIndex(
-              sequencedEventStore,
-              synchronizerIndexO,
-            )
-          } yield MessageProcessingStartingPoint(
-            nextRequestCounter = tocO.map(_.rc + 1).getOrElse(RequestCounter.Genesis),
-            nextSequencerCounter = sequencerCounterO
-              .map(_ + 1)
-              .getOrElse(SequencerCounter.Genesis),
-            lastSequencerTimestamp = lastSequencerTimestamp(synchronizerIndexO),
-            currentRecordTime = currentRecordTime(synchronizerIndexO),
+          /*
+         The goal of this comment is to explain what we don't have clean replay.
+
+          A clean replay would mean that the interleaving would have happened as follows:
+
+          ┌──────────────────────────────────────────────────────────────────────┐
+          │                                                                      │
+          │                                                                      ▼
+        request                synchronizer          request                  verdict
+         rc=0                      idx                rc=1                     sc=30
+         sc=10                                        sc=20
+       ──────────────────────────────────────────────────────────────────────────────►
+
+          Since in this branch of the conditional we have synchronizerIndex <= upgradeTime,
+          it would mean that request time of request with rc=0 would be <= upgradeTime, which is
+          impossible (all sequencing time on the synchronizer are strictly bigger than upgrade time.
+           */
+
+          loggingContext.info("Using LSU genesis starting points")
+          val messageProcessingStartingPoint = MessageProcessingStartingPoint(
+            nextRequestCounter = RequestCounter.Genesis,
+            nextSequencerCounter = SequencerCounter.Genesis,
+            lastSequencerTimestamp = synchronizerPredecessor.upgradeTime,
+            currentRecordTime = synchronizerPredecessor.upgradeTime,
             nextRepairCounter = nextRepairCounter(synchronizerIndexO),
           )
+
+          val noCleanReplay = messageProcessingStartingPoint.toMessageCleanReplayStartingPoint
+
+          val startingPoints = ProcessingStartingPoints.tryCreate(
+            noCleanReplay,
+            messageProcessingStartingPoint,
+          )
+
+          FutureUnlessShutdown.pure(startingPoints)
         }
+
+      case _ =>
+        startingPointsInternal(requestJournalStore, sequencedEventStore, synchronizerIndexO)
+    }
+
+  /** See scaladoc of [[startingPoints]] above for the generic documentation and invariants. Should
+    * be used only when this is not a "genesis startup post LSU".
+    */
+  private def startingPointsInternal(
+      requestJournalStore: RequestJournalStore,
+      sequencedEventStore: SequencedEventStore,
+      synchronizerIndexO: Option[SynchronizerIndex],
+  )(implicit
+      ec: ExecutionContext,
+      loggingContext: ErrorLoggingContext,
+  ): FutureUnlessShutdown[ProcessingStartingPoints] = {
+    implicit val traceContext: TraceContext = loggingContext.traceContext
+
+    for {
+      requestCounterO <- synchronizerIndexO
+        .flatTraverse(si =>
+          requestJournalStore.lastRequestTimeWithRequestTimestampBeforeOrAt(si.recordTime)
+        )
+
+      sequencerCounterO <- sequencerCounterFromSynchronizerIndex(
+        sequencedEventStore,
+        synchronizerIndexO,
+      )
+
+      messageProcessingStartingPoint = MessageProcessingStartingPoint(
+        nextRequestCounter = requestCounterO.map(_.rc + 1).getOrElse(RequestCounter.Genesis),
+        nextSequencerCounter = sequencerCounterO
+          .map(_ + 1)
+          .getOrElse(SequencerCounter.Genesis),
+        lastSequencerTimestamp = lastSequencerTimestamp(synchronizerIndexO),
+        currentRecordTime = currentRecordTime(synchronizerIndexO),
+        nextRepairCounter = nextRepairCounter(synchronizerIndexO),
+      )
 
       replayOpt <- requestJournalStore
         .firstRequestWithCommitTimeAfter(
@@ -278,12 +341,12 @@ object SyncEphemeralStateFactory {
       .flatMap(_.sequencerIndex)
       .traverse(sequencerIndex =>
         sequencedEventStore
-          .find(ByTimestamp(sequencerIndex.sequencerTimestamp))
+          .find(ByTimestamp(sequencerIndex))
           .value
           .map(
             _.getOrElse(
               ErrorUtil.invalidState(
-                s"SequencerIndex with timestamp ${sequencerIndex.sequencerTimestamp} is not found in sequenced event store"
+                s"SequencerIndex with timestamp $sequencerIndex is not found in sequenced event store"
               )
             ).counter
           )
@@ -295,7 +358,6 @@ object SyncEphemeralStateFactory {
   ): Option[CantonTimestamp] =
     synchronizerIndexO
       .flatMap(_.sequencerIndex)
-      .map(_.sequencerTimestamp)
 
   def lastSequencerTimestamp(synchronizerIndexO: Option[SynchronizerIndex]): CantonTimestamp =
     lastSequencerTimestampO(synchronizerIndexO)

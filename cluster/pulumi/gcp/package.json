@@ -6,7 +6,7 @@
     "@kubernetes/client-node": "^1.4.0",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@types/auth0": "^3.3.11",
-    "auth0": "^4.28.0"
+    "auth0": "^5.5.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -19,7 +19,7 @@
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   },
   "devDependencies": {
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
+    "@types/sinon": "^21.0.0",
+    "sinon": "^21.0.3"
   }
 }

@@ -3,13 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import com.daml.metrics.CacheMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.CacheMetrics
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -103,9 +103,6 @@ class PackageVettingLookupService(
       .mapValues(_.grouped(batchSize).toSeq)
       .toMap
 
-  override def onClosed() = {
-    metrics.closeAcquired()
-  }
 }
 
 object PackageVettingLookupService {

@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{blocking, Future, Promise}
 import scala.util.{Failure, Success}
 
 /** A trigger that regularly executes work.
@@ -55,7 +55,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       traceContext: TraceContext
   ): Future[Boolean] =
     blocking {
-      synchronized {
+      mutex.exclusive {
         if (pausedVar) {
           // If the trigger is paused, wait until the next polling interval
           logger.trace("Skipping work, trigger is paused")
@@ -70,7 +70,11 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           val latencyTimer = metrics.latency.startAsync()
           metrics.iterations.mark()
           waitForReadyToWork()
-            .flatMap(_ => performWorkIfAvailable())
+            .flatMap(_ =>
+              withSpan(s"${getClass.getSimpleName}-work") { implicit tc => _ =>
+                performWorkIfAvailable()(tc)
+              }
+            )
             .transform { performedWork =>
               val performedWorkMetricsString = performedWork match {
                 case Success(value) => s"Success($value)"
@@ -239,7 +243,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.debug("Pausing trigger.")
       blocking {
-        synchronized {
+        mutex.exclusive {
           pausedVar = true
           runningTaskFinishedVar.fold(Future.unit)(_.future.map { _ =>
             logger.debug("Trigger completely paused.")
@@ -250,7 +254,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   }
 
   override def resume(): Unit = blocking {
-    synchronized {
+    mutex.exclusive {
       logger.debug("Resuming trigger.")(TraceContext.empty)
       pausedVar = false
     }
@@ -264,7 +268,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     */
   def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {
     blocking {
-      synchronized {
+      mutex.exclusive {
         assert(
           pausedVar,
           "The trigger must be paused, otherwise there might be concurrent invocations of performWorkIfAvailable",

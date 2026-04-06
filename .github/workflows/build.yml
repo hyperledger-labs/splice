@@ -83,6 +83,7 @@ jobs:
     with:
       commit_sha: ${{ inputs.commit_sha }}
       self_hosted: true
+      oss_only: ${{ inputs.oss_only }}
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml
@@ -161,6 +162,32 @@ jobs:
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
+  scala_test_logical_sync_upgrade:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
+      test_names_file: 'test-full-class-names-lsu.log'
+      start_canton_options: -w
+      parallelism: 1
+      test_name: logical-sync-upgrade
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
+  scala_test_roll_forward_lsu:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
+      test_names_file: 'test-full-class-names-roll-forward-lsu.log'
+      start_canton_options: -w
+      parallelism: 1
+      test_name: roll-forward-lsu
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_with_cometbft:
     uses: ./.github/workflows/build.scala_test_with_cometbft.yml
     if: ${{ ! inputs.oss_only }}
@@ -197,7 +224,7 @@ jobs:
       parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
-      skip_if_regex: "\\[bft\\]"
+      skip_if_commit_tag: "bft"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}
@@ -299,7 +326,7 @@ jobs:
       parallelism: 1
       test_name: app-upgrade
       pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-      skip_if_regex: "\\[breaking\\]"
+      skip_if_commit_tag: "breaking"
       skip_if_files_changed: "nix/canton-sources.json"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
@@ -362,6 +389,8 @@ jobs:
     - scala_test_resource_intensive
     - scala_test_record_time_tolerance
     - scala_test_disaster_recovery
+    - scala_test_logical_sync_upgrade
+    - scala_test_roll_forward_lsu
     - scala_test_with_cometbft
     - scala_test_signatures
     - scala_test_wall_clock_time

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
@@ -24,6 +24,12 @@ trait KmsMetadataStore {
   def get(fingerprint: Fingerprint)(implicit
       tc: TraceContext
   ): FutureUnlessShutdown[Option[KmsMetadata]]
+
+  /** Get multiple KMS key metadata from store
+    */
+  def getAll(fingerprints: Seq[Fingerprint])(implicit
+      tc: TraceContext
+  ): FutureUnlessShutdown[Map[Fingerprint, Option[KmsMetadata]]]
 
   /** Store KMS metadata in the store
     */

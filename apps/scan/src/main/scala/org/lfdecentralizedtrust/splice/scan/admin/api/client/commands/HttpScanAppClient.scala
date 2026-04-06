@@ -8,7 +8,9 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
-import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
+import com.daml.tls.TlsClientConfig
+import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
@@ -42,6 +44,8 @@ import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
+  ListBulkAcsSnapshotObjectsResponse,
+  ListBulkUpdateHistoryObjectsResponse,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
@@ -812,6 +816,31 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetPartyToParticipantV1(synchronizerId: SynchronizerId, partyId: PartyId)
+      extends ExternalBaseCommand[
+        http.GetPartyToParticipantV1Response,
+        Seq[ParticipantId],
+      ] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetPartyToParticipantV1Response] =
+      client.getPartyToParticipantV1(
+        synchronizerId.toProtoPrimitive,
+        partyId.toProtoPrimitive,
+        headers,
+      )
+
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetPartyToParticipantV1Response.OK(response) =>
+        response.participantIds.traverse(Codec.decode(Codec.Participant)(_))
+    }
+  }
+
   case class ListDsoSequencers()
       extends InternalBaseCommand[
         http.ListDsoSequencersResponse,
@@ -837,6 +866,7 @@ object HttpScanAppClient {
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
                   DsoSequencer(
                     s.migrationId,
+                    s.synchronizerSerial,
                     sequencerId,
                     s.url,
                     s.svName,
@@ -856,13 +886,14 @@ object HttpScanAppClient {
 
   final case class DsoSequencer(
       migrationId: Long,
+      serial: Option[Long],
       id: SequencerId,
       url: String,
       svName: String,
       availableAfter: Instant,
   )
   final case class BftSequencer(
-      migrationId: Long,
+      serialId: Long,
       id: SequencerId,
       url: String,
   ) {
@@ -2410,7 +2441,7 @@ object HttpScanAppClient {
         response.bftSequencers.traverse { sequencer =>
           Codec.decode(Codec.Sequencer)(sequencer.id).map { sequencerId =>
             BftSequencer(
-              sequencer.migrationId,
+              sequencer.serialId,
               sequencerId,
               sequencer.p2pUrl,
             )
@@ -2485,6 +2516,73 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetBulkAcsSnapshot(
+      atOrBeforeTimestamp: CantonTimestamp
+  ) extends InternalBaseCommand[
+        http.ListBulkAcsSnapshotObjectsResponse,
+        definitions.ListBulkAcsSnapshotObjectsResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkAcsSnapshotObjectsResponse] =
+      client.listBulkAcsSnapshotObjects(
+        atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ListBulkAcsSnapshotObjectsResponse, Either[
+      String,
+      definitions.ListBulkAcsSnapshotObjectsResponse,
+    ]] = {
+      case http.ListBulkAcsSnapshotObjectsResponse.OK(response) =>
+        Right(response)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotFound(err) =>
+        Left(err.error)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotImplemented(err) =>
+        Left(err.error)
+
+    }
+  }
+
+  case class GetBulkUpdateHistory(
+      startRecordTime: CantonTimestamp,
+      endRecordTime: CantonTimestamp,
+      nextPageToken: Option[String],
+      limit: Int,
+  ) extends InternalBaseCommand[
+        http.ListBulkUpdateHistoryObjectsResponse,
+        definitions.ListBulkUpdateHistoryObjectsResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkUpdateHistoryObjectsResponse] =
+      client.listBulkUpdateHistoryObjects(
+        definitions.ListBulkUpdateHistoryObjectsRequest(
+          startRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          endRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          nextPageToken,
+          limit,
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ListBulkUpdateHistoryObjectsResponse, Either[
+      String,
+      definitions.ListBulkUpdateHistoryObjectsResponse,
+    ]] = {
+      case http.ListBulkUpdateHistoryObjectsResponse.OK(response) => Right(response)
+      case http.ListBulkUpdateHistoryObjectsResponse.NotFound(err) => Left(err.error)
+      case http.ListBulkUpdateHistoryObjectsResponse.BadRequest(err) => Left(err.error)
+      case http.ListBulkUpdateHistoryObjectsResponse.NotImplemented(err) => Left(err.error)
+    }
+  }
+
   case class BulkStorageDownload(
       objectKey: String
   ) extends ScanStreamBaseCommand[
@@ -2506,5 +2604,31 @@ object HttpScanAppClient {
     ]] = { case BulkStorageDownloadResponse.OK(response) =>
       Right(response.dataBytes)
     }
+  }
+
+  case class GetActivePhysicalSynchronizerSerial()
+      extends InternalBaseCommand[
+        http.GetActivePhysicalSynchronizerSerialResponse,
+        NonNegativeInt,
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetActivePhysicalSynchronizerSerialResponse] =
+      client.getActivePhysicalSynchronizerSerial(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.GetActivePhysicalSynchronizerSerialResponse.OK(response) =>
+        NonNegativeInt.create(response.serial.toInt).leftMap(_.message)
+      case http.GetActivePhysicalSynchronizerSerialResponse.NotFound(_) =>
+        Left("No active synchronizer serial found")
+    }
+
   }
 }

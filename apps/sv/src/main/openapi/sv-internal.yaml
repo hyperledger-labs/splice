@@ -190,6 +190,17 @@ paths:
         "200":
           description: ok
 
+  /v0/admin/synchronizer/lsu/cancel:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "cancelLogicalSynchronizerUpgrade"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/domain/migration-dump:
     get:
       tags: [ sv ]
@@ -603,11 +614,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Party is hosted on a participant
+          description: Party is hosted on one or more participants
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetPartyToParticipantResponse"
+                $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetPartyToParticipantResponseV1"
         "404":
           description: Party not found
           content:
@@ -1185,10 +1196,3 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
-    GetPartyToParticipantResponse:
-      type: object
-      required:
-        - participant_id
-      properties:
-        participant_id:
-          type: string

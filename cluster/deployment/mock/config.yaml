@@ -37,6 +37,8 @@ splitwell:
     maxDuration: "5m"
     retention: "30d"
 synchronizerMigration:
+  lsuEnabled: true
+  frozenMigrationId: 2
   archived:
     - id: 1
       version: 0.3.18
@@ -71,6 +73,9 @@ synchronizerMigration:
   upgrade:
     id: 4
     version: 0.3.21
+    enableLogicalSynchronizerDeploymentMode: true
+    sequencer:
+      enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
       repoUrl: https://github.com/hyperledger-labs/splice
@@ -85,6 +90,9 @@ pulumiProjectConfig:
     interAppsDependencies: false
     isExternalCluster: true
     hasPublicInfo: true
+    cloudSql:
+      enabled: true
+  sv-runbook:
     cloudSql:
       enabled: true
 monitoring:
@@ -129,6 +137,10 @@ loadTester:
     windowDurationMinutes: 150
 svs:
   default:
+    appsPg:
+      cloudSql:
+        enabled: true
+        tier: "apps-pg-override-tier"
     pruning:
       cometbft:
         retainBlocks: 5040000
@@ -156,6 +168,9 @@ svs:
         limits:
           memory: '2048Mi'
     svApp:
+      additionalPackagesToUnvet:
+        splice-wallet-payments: [ "0.1.15", "0.1.16" ]
+        splice-amulet: [ "0.1.15" ]
       permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -205,6 +220,9 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    appsPg:
+      cloudSql:
+        tier: "apps-pg-override-tier-sv-1"
     periodicSnapshots:
       topology:
         backupInterval: '12h'

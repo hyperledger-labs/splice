@@ -7,6 +7,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
@@ -16,9 +17,13 @@ import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
   HistoryMetrics,
+  Limit,
   S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
@@ -172,4 +177,58 @@ class AcsSnapshotBulkStorage(
       )
     }
   }
+
+  def getAcsSnapshotAtOrBefore(
+      atOrBeforeTimestamp: CantonTimestamp
+  )(implicit tc: TraceContext): Future[AcsSnapshotObjects] = {
+
+    for {
+      snapshotTs <- kvProvider
+        .getLatestAcsSnapshotInBulkStorage()
+        .value
+        .map {
+          case None =>
+            throw Status.NOT_FOUND
+              .withDescription("no snapshot in bulk storage yet")
+              .asRuntimeException()
+          case Some(ts) if ts.timestamp < atOrBeforeTimestamp =>
+            logger.trace(
+              s"Latest snapshot in bulk storage is at ${ts.timestamp}, which is before the requested timestamp ${atOrBeforeTimestamp}, returning that one"
+            )
+            ts.timestamp
+          case Some(ts) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+        }
+      prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTs)
+      objects <- s3Connection
+        // A single object currently holds ~700K contracts, we apply a Limit just for safety,
+        // but we don't expect to get anywhere near 1000 such objects in the foreseeable future
+        // (hence the HardLimit, just as a safety precaution).
+        .listObjects(
+          prefix,
+          _.matches(".*ACS_\\d+\\.zstd"),
+          HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+        )
+      objectsWithChecksums <- s3Connection.getChecksums(objects)
+    } yield {
+      if (objects.isEmpty) {
+        throw Status.NOT_FOUND
+          .withDescription(
+            s"No snapshot objects found in bulk storage at expected timestamp at or before $atOrBeforeTimestamp, this may be because the timestamp is before network genesis"
+          )
+          .asRuntimeException()
+      }
+      logger.trace(
+        s"Found snapshot in bulk storage at timestamp $snapshotTs, with objects: ${objects.mkString(", ")}"
+      )
+      AcsSnapshotObjects(snapshotTs, objectsWithChecksums)
+    }
+  }
+
+}
+
+object AcsSnapshotBulkStorage {
+  case class AcsSnapshotObjects(
+      timestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
+  )
 }

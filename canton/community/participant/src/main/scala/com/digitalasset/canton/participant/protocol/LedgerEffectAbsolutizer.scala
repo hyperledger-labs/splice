@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -46,7 +46,7 @@ class LedgerEffectAbsolutizer(absolutizer: ContractIdAbsolutizer) {
           absolutizedKey <- gkey.key.traverseCid(absolutizer.absolutizeContractId)
           absolutizedResolution <- absolutizeKeyResolution(resolution.unversioned)
         } yield (
-          LfGlobalKey.assertBuild(gkey.templateId, absolutizedKey, gkey.packageName),
+          LfGlobalKey.assertBuild(gkey.templateId, gkey.packageName, absolutizedKey, gkey.hash),
           resolution.copy(unversioned = absolutizedResolution),
         )
       }

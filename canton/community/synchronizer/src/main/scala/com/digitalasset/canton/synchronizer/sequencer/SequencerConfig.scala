@@ -1,22 +1,21 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.syntax.option.*
-import com.digitalasset.canton.config.RequireTypes.{PositiveDouble, PositiveInt}
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveDouble, PositiveInt}
 import com.digitalasset.canton.config.{
-  CantonConfigValidator,
-  CantonConfigValidatorInstances,
   DbLockedConnectionPoolConfig,
-  EnterpriseOnlyCantonConfigValidation,
   NonNegativeFiniteDuration,
   PositiveDurationSeconds,
   PositiveFiniteDuration,
   StorageConfig,
-  UniformCantonConfigValidation,
 }
+import com.digitalasset.canton.sequencer.admin.v30 as adminProto
+import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.{
   CircuitBreakerConfig,
   ThroughputCapConfig,
@@ -32,22 +31,14 @@ import com.digitalasset.canton.synchronizer.sequencing.sequencer.reference.{
   ReferenceSequencerDriverFactory,
 }
 import com.digitalasset.canton.time.Clock
-import pureconfig.ConfigCursor
+import pureconfig.generic.semiauto.{deriveReader, deriveWriter}
+import pureconfig.{ConfigCursor, ConfigReader, ConfigWriter}
 
 import scala.concurrent.ExecutionContext
 
-sealed trait SequencerConfig {
-  def supportsReplicas: Boolean
-}
+sealed trait SequencerConfig
 
 object SequencerConfig {
-
-  implicit val sequencerConfigCantonConfigValidator: CantonConfigValidator[SequencerConfig] = {
-    implicit val testingInterceptorCantonConfigValidator
-        : CantonConfigValidator[TestingInterceptor] =
-      CantonConfigValidator.validateAll
-    CantonConfigValidatorDerivation[SequencerConfig]
-  }
 
   final case class Database(
       writer: SequencerWriterConfig = SequencerWriterConfig.LowLatency(),
@@ -56,11 +47,8 @@ object SequencerConfig {
       testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor] = None,
       pruning: SequencerPruningConfig = SequencerPruningConfig(),
   ) extends SequencerConfig
-      with DatabaseSequencerConfig
-      with UniformCantonConfigValidation {
+      with DatabaseSequencerConfig {
     override def highAvailabilityEnabled: Boolean = highAvailability.exists(_.isEnabled)
-
-    override def supportsReplicas: Boolean = highAvailabilityEnabled
   }
 
   final case class External(
@@ -68,16 +56,6 @@ object SequencerConfig {
       block: BlockSequencerConfig,
       config: ConfigCursor,
   ) extends SequencerConfig
-      with UniformCantonConfigValidation {
-    override def supportsReplicas: Boolean = false
-  }
-  object External {
-    implicit val externalCantonConfigValidator: CantonConfigValidator[External] = {
-      implicit val configCursorCantonConfigValidator: CantonConfigValidator[ConfigCursor] =
-        CantonConfigValidator.validateAll // do not look into external configurations
-      CantonConfigValidatorDerivation[External]
-    }
-  }
 
   final case class BftSequencer(
       // To avoid having to include an empty "block" node if defaults are fine
@@ -85,13 +63,6 @@ object SequencerConfig {
       // To avoid having to include an empty "config" node if defaults are fine
       config: BftBlockOrdererConfig = BftBlockOrdererConfig(),
   ) extends SequencerConfig
-      with UniformCantonConfigValidation {
-    override def supportsReplicas: Boolean = false
-  }
-  object BftSequencer {
-    implicit val bftSequencerCantonConfigValidator: CantonConfigValidator[BftSequencer] =
-      CantonConfigValidatorDerivation[BftSequencer]
-  }
 
   def default: SequencerConfig = {
     val driverFactory = new ReferenceSequencerDriverFactory
@@ -135,18 +106,10 @@ object SequencerConfig {
       connectionPool: DbLockedConnectionPoolConfig = DbLockedConnectionPoolConfig(),
       exclusiveStorage: DatabaseSequencerExclusiveStorageConfig =
         DatabaseSequencerExclusiveStorageConfig(),
-  ) extends EnterpriseOnlyCantonConfigValidation {
+  ) {
     lazy val isEnabled: Boolean = enabled.contains(true)
     def toOnlineSequencerCheckConfig: OnlineSequencerCheckConfig =
       OnlineSequencerCheckConfig(onlineCheckInterval, offlineDuration)
-  }
-
-  object SequencerHighAvailabilityConfig {
-    implicit val sequencerHighAvailabilityConfigCantonConfigValidator
-        : CantonConfigValidator[SequencerHighAvailabilityConfig] = {
-      import CantonConfigValidatorInstances.*
-      CantonConfigValidatorDerivation[SequencerHighAvailabilityConfig]
-    }
   }
 
   /** Configuration for exclusive database sequencer storage
@@ -163,15 +126,7 @@ object SequencerConfig {
         ),
       // by default provide one connection each for reads and writes to keep exclusive storage light-weight.
       maxConnections: PositiveInt = PositiveInt.tryCreate(2),
-  ) extends EnterpriseOnlyCantonConfigValidation
-
-  object DatabaseSequencerExclusiveStorageConfig {
-    implicit val databaseSequencerExclusiveStorageConfigCantonConfigValidator
-        : CantonConfigValidator[DatabaseSequencerExclusiveStorageConfig] = {
-      import CantonConfigValidatorInstances.*
-      CantonConfigValidatorDerivation[DatabaseSequencerExclusiveStorageConfig]
-    }
-  }
+  )
 
 }
 
@@ -214,30 +169,17 @@ object DatabaseSequencerConfig {
       pruningMetricUpdateInterval: Option[PositiveDurationSeconds] =
         PositiveDurationSeconds.ofHours(1L).some,
       trafficPurchasedRetention: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
-  ) extends UniformCantonConfigValidation
+  )
 
-  object SequencerPruningConfig {
-    implicit val sequencerPruningConfigCantonConfigValidator
-        : CantonConfigValidator[SequencerPruningConfig] = {
-      import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
-      CantonConfigValidatorDerivation[SequencerPruningConfig]
-    }
-  }
 }
 
 final case class BlockSequencerStreamInstrumentationConfig(
     isEnabled: Boolean = false,
     bufferSize: PositiveInt = DefaultBufferSize,
-) extends UniformCantonConfigValidation
+)
 
 object BlockSequencerStreamInstrumentationConfig {
   val DefaultBufferSize = PositiveInt.tryCreate(128)
-
-  implicit val blockSequencerStreamInstrumentationConfigValidator
-      : CantonConfigValidator[BlockSequencerStreamInstrumentationConfig] = {
-    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[BlockSequencerStreamInstrumentationConfig]
-  }
 }
 
 final case class BlockSequencerConfig(
@@ -248,7 +190,7 @@ final case class BlockSequencerConfig(
     throughputCap: ThroughputCapConfig = ThroughputCapConfig(),
     streamInstrumentation: BlockSequencerStreamInstrumentationConfig =
       BlockSequencerStreamInstrumentationConfig(),
-) extends UniformCantonConfigValidation { self =>
+) { self =>
   def toDatabaseSequencerConfig: DatabaseSequencerConfig = new DatabaseSequencerConfig {
     override val writer: SequencerWriterConfig = self.writer
     override val reader: SequencerReaderConfig = self.reader
@@ -261,24 +203,27 @@ final case class BlockSequencerConfig(
 }
 
 object BlockSequencerConfig {
-  implicit val blockSequencerConfigCantonConfigValidator
-      : CantonConfigValidator[BlockSequencerConfig] = {
-    implicit val testingInterceptorCantonConfigValidator
-        : CantonConfigValidator[TestingInterceptor] =
-      CantonConfigValidator.validateAll
-    CantonConfigValidatorDerivation[BlockSequencerConfig]
-  }
 
+  /** Control throughput caps
+    *
+    * Strict mode means that if we reach the cap, we'll allocate the same bandwidth to everyone. If
+    * false, then we sort by usage descending and compute the usage cap for the highest spenders at
+    * which their spend will fall below the threshold
+    *
+    * @param strict
+    *   how should the per member rate cap be computed
+    * @param updateEveryMs
+    *   how often should the new caps be computed (only used in non-strict mode)
+    */
   final case class ThroughputCapConfig(
       enabled: Boolean = false,
       observationPeriodSeconds: Int = 60,
       clockTickInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(100),
       messages: ThroughputCapByMessageTypeConfig = ThroughputCapByMessageTypeConfig(),
-  ) extends UniformCantonConfigValidation
-  object ThroughputCapConfig {
-    implicit val throughputCapConfigValidator: CantonConfigValidator[ThroughputCapConfig] =
-      CantonConfigValidatorDerivation[ThroughputCapConfig]
-  }
+      strict: Boolean = true,
+      thresholds: NonEmpty[Seq[PositiveDouble]] = NonEmpty.mk(Seq, PositiveDouble.tryCreate(0.9)),
+      updateEveryMs: NonNegativeInt = NonNegativeInt.tryCreate(100),
+  )
 
   final case class ThroughputCapByMessageTypeConfig(
       confirmationRequest: IndividualThroughputCapConfig = IndividualThroughputCapConfig(),
@@ -286,35 +231,69 @@ object BlockSequencerConfig {
         globalTpsCap = PositiveDouble.tryCreate(2.0),
         perClientTpsCap = PositiveDouble.tryCreate(1.0),
       ),
-  ) extends UniformCantonConfigValidation
-  object ThroughputCapByMessageTypeConfig {
-    implicit val throughputCapConfigValidator
-        : CantonConfigValidator[ThroughputCapByMessageTypeConfig] =
-      CantonConfigValidatorDerivation[ThroughputCapByMessageTypeConfig]
-  }
+  )
 
+  /** configure an individual cap */
   final case class IndividualThroughputCapConfig(
       globalTpsCap: PositiveDouble = PositiveDouble.tryCreate(10.0),
       globalKbpsCap: PositiveDouble = PositiveDouble.tryCreate(2000.0),
       perClientTpsCap: PositiveDouble = PositiveDouble.tryCreate(4.0),
       perClientKbpsCap: PositiveDouble = PositiveDouble.tryCreate(1000.0),
-  ) extends UniformCantonConfigValidation
+  ) {
+
+    def toAdminProto: adminProto.IndividualThroughputCapConfig =
+      adminProto.IndividualThroughputCapConfig(
+        globalTpsCap = globalTpsCap.value,
+        globalKbpsCap = globalKbpsCap.value,
+        perClientTpsCap = perClientTpsCap.value,
+        perClientKbpsCap = perClientKbpsCap.value,
+      )
+
+  }
+
   object IndividualThroughputCapConfig {
-    implicit val throughputCapConfigValidator
-        : CantonConfigValidator[IndividualThroughputCapConfig] = {
-      import CantonConfigValidatorInstances.*
-      CantonConfigValidatorDerivation[IndividualThroughputCapConfig]
+
+    object ConfigImplicits {
+      final implicit val individualCapConfigReader: ConfigReader[IndividualThroughputCapConfig] =
+        deriveReader[IndividualThroughputCapConfig]
+      final implicit val individualCapConfigWriter: ConfigWriter[IndividualThroughputCapConfig] =
+        deriveWriter[IndividualThroughputCapConfig]
     }
+
+    def fromAdminProto(
+        value: adminProto.IndividualThroughputCapConfig
+    ): ParsingResult[IndividualThroughputCapConfig] = {
+      val adminProto.IndividualThroughputCapConfig(
+        globalTpsCapP,
+        globalKbpsCapP,
+        perClientTpsCapP,
+        perClientKbpsCapP,
+      ) = value
+      for {
+        globalTpsCap <- ProtoConverter.parsePositiveDouble("global_tps_cap", globalTpsCapP)
+        globalKbpsCap <- ProtoConverter.parsePositiveDouble("global_kbps_cap", globalKbpsCapP)
+        perClientTpsCap <- ProtoConverter.parsePositiveDouble(
+          "per_client_tps_cap",
+          perClientTpsCapP,
+        )
+        perClientKbpsCap <- ProtoConverter.parsePositiveDouble(
+          "per_client_kbps_cap",
+          perClientKbpsCapP,
+        )
+      } yield IndividualThroughputCapConfig(
+        globalTpsCap = globalTpsCap,
+        globalKbpsCap = globalKbpsCap,
+        perClientTpsCap = perClientTpsCap,
+        perClientKbpsCap = perClientKbpsCap,
+      )
+    }
+
   }
 
   final case class CircuitBreakerConfig(
       enabled: Boolean = true,
       messages: CircuitBreakerByMessageTypeConfig = CircuitBreakerByMessageTypeConfig(),
-  ) extends UniformCantonConfigValidation
-  object CircuitBreakerConfig {
-    implicit val circuitBreakerConfigValidator: CantonConfigValidator[CircuitBreakerConfig] =
-      CantonConfigValidatorDerivation[CircuitBreakerConfig]
-  }
+  )
 
   private val default1 = IndividualCircuitBreakerConfig(maxFailures = 10)
   private val default2 = IndividualCircuitBreakerConfig(maxFailures = 30)
@@ -329,13 +308,9 @@ object BlockSequencerConfig {
       confirmationResponse: IndividualCircuitBreakerConfig = default3,
       verdict: IndividualCircuitBreakerConfig = default3,
       acknowledgement: IndividualCircuitBreakerConfig = default1,
+      lsuSequencingTest: IndividualCircuitBreakerConfig = default1,
       unexpected: IndividualCircuitBreakerConfig = default1,
-  ) extends UniformCantonConfigValidation
-  object CircuitBreakerByMessageTypeConfig {
-    implicit val circuitBreakerByMessageTypeConfigValidator
-        : CantonConfigValidator[CircuitBreakerByMessageTypeConfig] =
-      CantonConfigValidatorDerivation[CircuitBreakerByMessageTypeConfig]
-  }
+  )
 
   final case class IndividualCircuitBreakerConfig(
       allowedBlockDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(90),
@@ -343,12 +318,7 @@ object BlockSequencerConfig {
       resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
       exponentialBackoffFactor: Double = 1.0,
       maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(36500),
-  ) extends UniformCantonConfigValidation
-  object IndividualCircuitBreakerConfig {
-    implicit val individualCircuitBreakerConfigValidator
-        : CantonConfigValidator[IndividualCircuitBreakerConfig] =
-      CantonConfigValidatorDerivation[IndividualCircuitBreakerConfig]
-  }
+  )
 }
 
 /** Health check related sequencer config
@@ -357,10 +327,4 @@ object BlockSequencerConfig {
   */
 final case class SequencerHealthConfig(
     backendCheckPeriod: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5)
-) extends UniformCantonConfigValidation
-
-object SequencerHealthConfig {
-  implicit val sequencerHealthConfigCantonConfigValidator
-      : CantonConfigValidator[SequencerHealthConfig] =
-    CantonConfigValidatorDerivation[SequencerHealthConfig]
-}
+)

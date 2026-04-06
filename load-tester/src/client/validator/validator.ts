@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-
 /* @ts-expect-error typings unavailable */
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
@@ -24,6 +23,12 @@ export class ValidatorClient {
   private validatorBaseUrl: string;
 
   private token: string;
+  /** Expected featured app status
+   * true: this party should be featured
+   * false: this party should not be featured
+   * undefined: do not attempt to modify the featured app status of this party
+   */
+  public featured: boolean | undefined;
   private _partyId: string | undefined;
 
   private headers = (): Record<string, string> => ({
@@ -31,9 +36,10 @@ export class ValidatorClient {
     Authorization: `Bearer ${this.token}`,
   });
 
-  constructor(validatorBaseUrl: string, token: string) {
+  constructor(validatorBaseUrl: string, token: string, featured: boolean | undefined) {
     this.validatorBaseUrl = validatorBaseUrl;
     this.token = token;
+    this.featured = featured;
 
     this.http = new HttpClient();
   }
@@ -146,6 +152,20 @@ export class ValidatorClient {
             headers: this.headers(),
           })
           .then(resp => jsonStringDecoder(userStatusResponse, resp.body));
+      },
+      selfGrantFeatureAppRight: (): void => {
+        this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/self-grant-feature-app-right`,
+          null,
+          { retry: false, headers: this.headers() },
+        );
+      },
+      cancelFeaturedAppRights: (): void => {
+        this.http.delete.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/cancel-featured-app-rights`,
+          null,
+          { retry: false, headers: this.headers() },
+        );
       },
     },
   };

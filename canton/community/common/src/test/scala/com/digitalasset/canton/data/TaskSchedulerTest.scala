@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -35,10 +35,6 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
   private lazy val metrics = new MockTaskSchedulerMetrics()
 
   private lazy val clock: SimClock = new SimClock(loggerFactory = loggerFactory)
-
-  private val alertAfter: JDuration = JDuration.ofSeconds(10)
-
-  private val alertEvery: JDuration = JDuration.ofSeconds(2)
 
   private def mkTaskScheduler(
       initSc: SequencerCounter = SequencerCounter(0),
@@ -345,52 +341,22 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
       )
       val queue = mutable.Queue.empty[Int]
 
-      taskScheduler.scheduleTaskIfLater(
-        ofEpochMilli(1),
-        _ => fail(),
-      ) shouldBe Left(ofEpochMilli(2))
-      taskScheduler.scheduleTaskIfLater(
-        ofEpochMilli(2),
-        _ => fail(),
-      ) shouldBe Left(ofEpochMilli(2))
-      val task1 = taskScheduler
-        .scheduleTaskIfLater(
-          ofEpochMilli(3),
-          TestTask(
-            _,
-            SequencerCounter(10),
-            queue,
-            1,
-          ),
-        )
-        .value
-      task1.timestamp shouldBe ofEpochMilli(3)
+      val dummyTask = TestTask(ofEpochMilli(0), SequencerCounter(0), queue, 0)
 
-      val task2 = taskScheduler
-        .scheduleTaskIfLater(
-          ofEpochMilli(7),
-          TestTask(
-            _,
-            SequencerCounter(10),
-            queue,
-            2,
-          ),
-        )
-        .value
-      task2.timestamp shouldBe ofEpochMilli(7)
+      taskScheduler.scheduleTaskIfLater(ofEpochMilli(1), dummyTask) shouldBe Some(ofEpochMilli(2))
+      taskScheduler.scheduleTaskIfLater(ofEpochMilli(2), dummyTask) shouldBe Some(ofEpochMilli(2))
 
-      val task3 = taskScheduler
-        .scheduleTaskIfLater(
-          ofEpochMilli(15),
-          TestTask(
-            _,
-            SequencerCounter(10),
-            queue,
-            3,
-          ),
-        )
-        .value
-      task3.timestamp shouldBe ofEpochMilli(15)
+      val ts3 = ofEpochMilli(3)
+      val task1 = TestTask(ts3, SequencerCounter(10), queue, 1)
+      taskScheduler.scheduleTaskIfLater(ts3, task1) shouldBe None
+
+      val ts7 = ofEpochMilli(7)
+      val task2 = TestTask(ts7, SequencerCounter(10), queue, 2)
+      taskScheduler.scheduleTaskIfLater(ts7, task2) shouldBe None
+
+      val ts15 = ofEpochMilli(15)
+      val task3 = TestTask(ts15, SequencerCounter(10), queue, 3)
+      taskScheduler.scheduleTaskIfLater(ts15, task3) shouldBe None
 
       queue.toList shouldBe Nil
       taskScheduler.addTick(SequencerCounter(11), ofEpochMilli(10))
@@ -411,33 +377,14 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
       )
       val queue = mutable.Queue.empty[Int]
 
-      val task1 = taskScheduler
-        .scheduleTaskIfLater(
-          ofEpochMilli(3),
-          TestTask(
-            _,
-            SequencerCounter(10),
-            queue,
-            2,
-          ),
-        )
-        .value
-      task1.timestamp shouldBe ofEpochMilli(3)
+      val ts3 = ofEpochMilli(3)
+      val task1 = TestTask(ts3, SequencerCounter(10), queue, 2)
+      taskScheduler.scheduleTaskIfLater(ts3, task1) shouldBe None
 
       val task2Waiting = Promise[Unit]()
-      val task2 = taskScheduler
-        .scheduleTaskIfLater(
-          ofEpochMilli(7),
-          TestTask(
-            _,
-            SequencerCounter(10),
-            queue,
-            3,
-            waitFor = task2Waiting.future,
-          ),
-        )
-        .value
-      task2.timestamp shouldBe ofEpochMilli(7)
+      val ts7 = ofEpochMilli(7)
+      val task2 = TestTask(ts7, SequencerCounter(10), queue, 3, waitFor = task2Waiting.future)
+      taskScheduler.scheduleTaskIfLater(ts7, task2) shouldBe None
 
       val immediate1Executed = Promise[Unit]()
       taskScheduler.scheduleTaskImmediately(
@@ -445,7 +392,7 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
           queue.enqueue(1)
           immediate1Executed.trySuccess(())
           ts shouldBe ofEpochMilli(2)
-          FutureUnlessShutdown.pure(())
+          FutureUnlessShutdown.unit
         },
         implicitly,
       ) shouldBe ofEpochMilli(2)
@@ -462,7 +409,7 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
               queue.enqueue(4)
               immediate2Executed.trySuccess(())
               ts shouldBe ofEpochMilli(10)
-              FutureUnlessShutdown.pure(())
+              FutureUnlessShutdown.unit
             },
             implicitly,
           ) shouldBe ofEpochMilli(10)
@@ -552,6 +499,10 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
 }
 
 object TaskSchedulerTest {
+
+  private val alertAfter: JDuration = JDuration.ofSeconds(10)
+
+  private val alertEvery: JDuration = JDuration.ofSeconds(2)
 
   class MockTaskSchedulerMetrics extends TaskSchedulerMetrics {
     val prefix: MetricName = MetricName("test")

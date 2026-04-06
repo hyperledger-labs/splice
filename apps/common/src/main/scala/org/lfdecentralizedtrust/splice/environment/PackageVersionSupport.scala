@@ -105,6 +105,12 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
+  // Synonym for supports24hSubmissionDelay as both features were introduced in amulet_0_1_17
+
+  def supportsExpireTransferInstructions(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = supports24hSubmissionDelay(parties, now)
+
   def supports24hSubmissionDelayDsoGovernance(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
@@ -114,6 +120,19 @@ trait PackageVersionSupport extends NamedLogging {
       now,
       DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_23,
+    )
+  }
+
+  // TODO(#564) - ensure the right version is used
+  def supportsPhysicalSynchronizers(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance,
+      DarResources.dsoGovernance_0_1_24,
     )
   }
 

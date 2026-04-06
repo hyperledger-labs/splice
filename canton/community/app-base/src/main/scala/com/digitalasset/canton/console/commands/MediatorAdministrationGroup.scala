@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -12,6 +12,10 @@ import com.digitalasset.canton.admin.api.client.commands.{
   MediatorInspectionCommands,
   PruningSchedulerCommands,
   SynchronizerTimeCommands,
+}
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionValidation,
+  SequencerConnections,
 }
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -27,9 +31,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.mediator.admin.v30
-import com.digitalasset.canton.mediator.admin.v30.Verdict
 import com.digitalasset.canton.networking.grpc.RecordingStreamObserver
-import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.NoTracing
@@ -92,9 +94,12 @@ class MediatorPruningAdministrationGroup(
     "Prune the mediator of unnecessary data while keeping data for the default retention period"
   )
   @Help.Description(
-    """Removes unnecessary data from the Mediator that is earlier than the default retention period.
-          |The default retention period is set in the configuration of the canton node running this
-          |command under `parameters.retention-period-defaults.mediator`."""
+    """Removes unnecessary data from the Mediator that is earlier than the default retention
+      |period.
+      |
+      |The default retention period is set in the configuration of the canton node running this
+      |command under `parameters.retention-period-defaults.mediator`.
+      """
   )
   def prune(): Unit = {
     val defaultRetention =
@@ -120,8 +125,10 @@ class MediatorPruningAdministrationGroup(
   @Help.Description(
     """This command provides insight into the current state of mediator pruning when called with
       |the default value of `index` 1.
-      |When pruning the mediator manually via `prune_at` and with the intent to prune in batches, specify
-      |a value such as 1000 to obtain a pruning timestamp that corresponds to the "end" of the batch."""
+      |When pruning the mediator manually via `prune_at` and with the intent to prune in
+      |batches, specify a value such as 1000 to obtain a pruning timestamp that corresponds to
+      |the "end" of the batch.
+      """
   )
   def find_pruning_timestamp(
       index: PositiveInt = PositiveInt.tryCreate(1)
@@ -147,13 +154,12 @@ class MediatorSetupGroup(node: MediatorReference) extends ConsoleCommandGroup.Im
       runner.adminCommand(
         Initialize(
           synchronizerId,
-          sequencerConnections,
-          sequencerConnectionValidation,
+          sequencerConnections.toInternal,
+          sequencerConnectionValidation.toInternal,
         )
       )
     }
   }
-
 }
 
 class MediatorInspectionGroup(
@@ -164,12 +170,25 @@ class MediatorInspectionGroup(
 ) extends NoTracing
     with NamedLogging
     with StreamingCommandHelper {
-  def verdicts(
+
+  @Help.Summary("Stream verdicts, in record time order")
+  @Help.Description(
+    """Returns verdicts whose record time is greater than `fromRecordTimeOfRequestExclusive`
+      |until any of the following occur:
+      | * `maxItems` responses have been returned, or
+      | * it has been at least `timeout` since we issued the call, or
+      | * the mediator determines that a logical synchronizer upgrade has anointed a successor,
+      |   at which point any pending requests will be finalized as rejected and returned as
+      |   Verdict messages, followed by a Complete message and the stream will be closed.
+      """
+  )
+  def verdicts_until_complete(
       fromRecordTimeOfRequestExclusive: CantonTimestamp,
       maxItems: PositiveInt,
       timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded,
-  ): Seq[Verdict] = {
-    val observer = new RecordingStreamObserver[v30.Verdict](completeAfter = maxItems)
+  ): Seq[v30.VerdictsResponse.Payload] = {
+    val observer =
+      new RecordingStreamObserver[v30.VerdictsResponse.Payload](completeAfter = maxItems)
     val cmd = MediatorInspectionCommands.MediatorVerdicts(
       mostRecentlyReceivedRecordTimeOfRequest = Some(fromRecordTimeOfRequestExclusive),
       observer,
@@ -181,4 +200,13 @@ class MediatorInspectionGroup(
       timeout,
     )
   }
+
+  @deprecated("Use verdicts_until_complete instead", since = "3.5.0")
+  @Help.Summary("Deprecated form of get_verdicts that only returns Verdicts, without Complete")
+  def verdicts(
+      fromRecordTimeOfRequestExclusive: CantonTimestamp,
+      maxItems: PositiveInt,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded,
+  ): Seq[v30.Verdict] =
+    verdicts_until_complete(fromRecordTimeOfRequestExclusive, maxItems, timeout).flatMap(_.verdict)
 }

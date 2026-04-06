@@ -1,3 +1,4 @@
+org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
@@ -12,6 +13,7 @@ org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
 org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigTest
+org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputationTest
 org.lfdecentralizedtrust.splice.scan.store.DbAppActivityRecordStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProviderTest
@@ -51,3 +53,4 @@ org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobufTest
 org.lfdecentralizedtrust.splice.validator.store.DbValidatorConfigProviderTest
 org.lfdecentralizedtrust.splice.validator.store.DbValidatorStoreTest
 org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParametersTest
+org.lfdecentralizedtrust.splice.wart.ParTraverseTest

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.services
@@ -33,9 +33,7 @@ trait SubmitDummyPreparedSubmission extends SubmitDummyCommand {
       userId = userId,
       commandId = UUID.randomUUID().toString,
       commands = List(
-        createWithOperator(templateIds.dummy, party),
-        createWithOperator(templateIds.dummyWithParam, party),
-        createWithOperator(templateIds.dummyFactory, party),
+        createWithOperator(templateIds.dummy, party)
       ),
       minLedgerTime = None,
       actAs = Seq(party),
@@ -47,6 +45,8 @@ trait SubmitDummyPreparedSubmission extends SubmitDummyCommand {
       prefetchContractKeys = Seq.empty,
       maxRecordTime = Option.empty,
       estimateTrafficCost = None,
+      tapsMaxPasses = None,
+      hashingSchemeVersion = None,
     )
 
   protected def dummyExecuteSubmissionRequest(

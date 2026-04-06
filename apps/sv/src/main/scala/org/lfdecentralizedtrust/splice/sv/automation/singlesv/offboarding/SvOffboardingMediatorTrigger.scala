@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.MemberIdUtil
 
@@ -35,12 +36,13 @@ import scala.jdk.OptionConverters.RichOptional
 class SvOffboardingMediatorTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[MediatorId] {
+) extends PollingParallelTaskExecutionTrigger[MediatorId]
+    with SyncConnectionStalenessCheck {
 
   // TODO(tech-debt): this is an almost exact copy of SvOffboardingSequencerTrigger => share the code to avoid missed bugfixes
 
@@ -95,7 +97,7 @@ class SvOffboardingMediatorTrigger(
 
   override protected def isStaleTask(task: MediatorId)(implicit
       tc: TraceContext
-  ): Future[Boolean] = Future.successful(false)
+  ): Future[Boolean] = isNotConnectedToSync()
 
   private def getMediatorIds(
       members: Iterable[SynchronizerNodeConfig]

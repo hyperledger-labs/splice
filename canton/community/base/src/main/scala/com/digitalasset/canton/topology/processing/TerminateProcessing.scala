@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -28,10 +28,11 @@ trait TerminateProcessing {
   ): FutureUnlessShutdown[Unit]
 
   def notifyUpgradeAnnouncement(successor: SynchronizerSuccessor)(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      executionContext: ExecutionContext,
   ): Unit
 
-  def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit
+  def notifyUpgradeCancellation()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 }
 
 object TerminateProcessing {
@@ -53,9 +54,12 @@ object TerminateProcessing {
       FutureUnlessShutdown.unit
 
     override def notifyUpgradeAnnouncement(successor: SynchronizerSuccessor)(implicit
-        traceContext: TraceContext
+        traceContext: TraceContext,
+        executionContext: ExecutionContext,
     ): Unit = ()
 
-    override def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit = ()
+    override def notifyUpgradeCancellation()(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Unit] = FutureUnlessShutdown.unit
   }
 }
