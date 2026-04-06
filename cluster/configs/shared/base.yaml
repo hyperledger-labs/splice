@@ -137,7 +137,8 @@ monitoring:
         tolerance: 1.5
       gcpQuotas:
         # Quota metric names to exclude from GCP quota alerts.
-        # Each entry is matched as a regex alternative against the quota_metric label.
+        # Each entry is matched as a substring against the quota_metric label
+        # (regex not-match in threshold filters, !~ in PromQL).
         # Example: "hsm_asymmetric_usage" excludes HSM asymmetric signing quotas.
         excludedMetrics: []
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)

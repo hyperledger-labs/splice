@@ -309,12 +309,10 @@ export function installGcpQuotaAlerts(
   const excludedMetrics = gcpQuotasConfig.excludedMetrics;
 
   // Build exclusion fragments for threshold filters and PromQL queries
+  const exclusionRegex = excludedMetrics.length > 0 ? excludedMetrics.join('|') : null;
   const thresholdExclusion =
-    excludedMetrics.length > 0
-      ? excludedMetrics.map(m => ` AND metric.label.quota_metric != "${m}"`).join('')
-      : '';
-  const promqlExclusion =
-    excludedMetrics.length > 0 ? `, quota_metric!~"${excludedMetrics.join('|')}"` : '';
+    exclusionRegex !== null ? ` AND metric.label.quota_metric !~ "${exclusionRegex}"` : '';
+  const promqlExclusion = exclusionRegex !== null ? `, quota_metric!~"${exclusionRegex}"` : '';
 
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,
