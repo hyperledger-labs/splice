@@ -737,6 +737,120 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    "computeRewardHashes — 3 levels: 9 parties, batchSize=2" in {
+      for {
+        (store, historyId) <- newStore()
+        // 9 parties: seq_nums 0-8
+        // batchSize=2 → level 0: [0,1], [2,3], [4,5], [6,7], [8] = 5 batches
+        //             → level 1: [[0,1],[2,3]], [[4,5],[6,7]], [[8]] = 3 batches
+        //             → level 2: [[[0,1],[2,3]],[[4,5],[6,7]]], [[[8]]] = 2 batches
+        _ <- store.insertAppActivityPartyTotals(
+          (0 to 8).map(i =>
+            AppActivityPartyTotalT(
+              historyId,
+              roundNumber,
+              1000000L * (i + 1),
+              i,
+              s"party$i::provider",
+            )
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          (0 to 8).map(i =>
+            AppRewardPartyTotalT(historyId, roundNumber, i, BigDecimal(s"${i + 1}.0"))
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+      } yield {
+        val level0 = batchHashes.filter(_.batchLevel == 0)
+        val level1 = batchHashes.filter(_.batchLevel == 1)
+        val level2 = batchHashes.filter(_.batchLevel == 2)
+        level0 should have size 5
+        level1 should have size 3
+        level2 should have size 2
+
+        // Level 2 seq_num ranges span their children
+        level2(0).partySeqNumBeginIncl shouldBe 0
+        level2(0).partySeqNumEndExcl shouldBe 8
+        level2(1).partySeqNumBeginIncl shouldBe 8
+        level2(1).partySeqNumEndExcl shouldBe 9
+
+        // All hashes are 32 bytes
+        all(batchHashes.map(_.batchHash.size)) shouldBe 32
+      }
+    }
+
+    "computeRewardHashes — exact boundary: 4 parties, batchSize=2" in {
+      for {
+        (store, historyId) <- newStore()
+        // 4 parties: seq_nums 0-3
+        // batchSize=2 → level 0: [0,1], [2,3] = 2 batches
+        //             → level 1: [[0,1],[2,3]] = 1 batch (aggregation stops)
+        _ <- store.insertAppActivityPartyTotals(
+          (0 to 3).map(i =>
+            AppActivityPartyTotalT(
+              historyId,
+              roundNumber,
+              1000000L * (i + 1),
+              i,
+              s"party$i::provider",
+            )
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          (0 to 3).map(i =>
+            AppRewardPartyTotalT(historyId, roundNumber, i, BigDecimal(s"${i + 1}.0"))
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+      } yield {
+        val level0 = batchHashes.filter(_.batchLevel == 0)
+        val level1 = batchHashes.filter(_.batchLevel == 1)
+        level0 should have size 2
+        level1 should have size 1
+
+        // Single level-1 batch spans all parties
+        level1.head.partySeqNumBeginIncl shouldBe 0
+        level1.head.partySeqNumEndExcl shouldBe 4
+        level1.head.batchHash.size shouldBe 32
+      }
+    }
+
+    "computeRewardHashes — all parties fit in one batch, no aggregation" in {
+      for {
+        (store, historyId) <- newStore()
+        // 3 parties: seq_nums 0-2, batchSize=100
+        // level 0: [0,1,2] = 1 batch → aggregateToRoot is a no-op
+        _ <- store.insertAppActivityPartyTotals(
+          (0 to 2).map(i =>
+            AppActivityPartyTotalT(
+              historyId,
+              roundNumber,
+              1000000L * (i + 1),
+              i,
+              s"party$i::provider",
+            )
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          (0 to 2).map(i =>
+            AppRewardPartyTotalT(historyId, roundNumber, i, BigDecimal(s"${i + 1}.0"))
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+      } yield {
+        // Only level 0, no higher levels
+        batchHashes should have size 1
+        batchHashes.head.batchLevel shouldBe 0
+        batchHashes.head.partySeqNumBeginIncl shouldBe 0
+        batchHashes.head.partySeqNumEndExcl shouldBe 3
+        batchHashes.head.batchHash.size shouldBe 32
+      }
+    }
+
   }
 
   private val verdictCounter = new java.util.concurrent.atomic.AtomicLong(1)

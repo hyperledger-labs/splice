@@ -700,6 +700,7 @@ class DbScanAppRewardsStore(
       _ = logger.debug(
         s"Inserted $leafCount leaf batches for round $roundNumber."
       )
+      _ <- aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
     } yield ()
 
     runUpdate(
@@ -747,6 +748,50 @@ class DbScanAppRewardsStore(
               and a.round_number = r.round_number
               and a.app_provider_party_seq_num = r.app_provider_party_seq_num
             where a.history_id = $historyId and a.round_number = $roundNumber
+          ) sub
+          group by batch_num
+    """.asUpdate
+
+  /** Aggregate batches at the current level into parent batches at level+1.
+    * Recurses until only one batch remains.
+    */
+  private def aggregateToRoot(
+      roundNumber: Long,
+      batchSize: Int,
+      level: Int,
+      batchCount: Int,
+  ): DBIOAction[Unit, NoStream, Effect.All] =
+    if (batchCount <= 1) DBIO.successful(())
+    else
+      for {
+        nextCount <- insertNextLevel(roundNumber, batchSize, level)
+        _ <- aggregateToRoot(roundNumber, batchSize, level + 1, nextCount)
+      } yield ()
+
+  /** Insert level+1 batches by grouping level batches into chunks of batchSize,
+    * hashing each chunk as BatchOfBatches.
+    */
+  private def insertNextLevel(
+      roundNumber: Long,
+      batchSize: Int,
+      currentLevel: Int,
+  ) =
+    sql"""insert into #${Tables.appRewardBatchHashes}(
+            history_id, round_number, batch_level,
+            party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+          select
+            $historyId, $roundNumber, ${currentLevel + 1},
+            min(party_seq_num_begin_incl), max(party_seq_num_end_excl),
+            decode(hash_batch_of_batches(
+              array_agg(encode(batch_hash, 'hex') order by party_seq_num_begin_incl)
+            ), 'hex')
+          from (
+            select
+              party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash,
+              (row_number() over (order by party_seq_num_begin_incl) - 1) / $batchSize as batch_num
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId and round_number = $roundNumber
+              and batch_level = $currentLevel
           ) sub
           group by batch_num
     """.asUpdate
