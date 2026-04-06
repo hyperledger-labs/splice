@@ -11,28 +11,5 @@
 
     - Deployment
 
-        - We've added support for `reloader annotation <https://github.com/stakater/reloader>`, which performs a rolling
-          restart of our apps on secret/configmap change. The integration is enabled by
-          default. You can disable it by setting enableReloader to false in your values.yaml file.
-          Please note that reloader needs to be installed separately for the integration to work.
-          If you don't have reloader installed this annotation will be ignored.
-
-   - Scan UI
-
-     - The following tabs and features have been removed from Scan UI.
-       Their corresponding API endpoints are still available, yet deprecated, and will be removed soon.
-       Users are strongly advised to migrate to non-deprecated API endpoints as soon as possible.
-
-      - Canton Coin Activity
-         - Recent activity list, and all leaderboards
-         - Total app & validator rewards
-         - The round as-of which the content has been computed (no round-based data is listed any more)
-         - The tab has been renamed "Canton Coin Configuration"
-      - Governance
-         - Completely removed
-      - Validators
-         - Completely removed
-
-   - Scan
-
-        - Improve CPU usage of update and event history.
+        - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
+          from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.
