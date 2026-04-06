@@ -2436,6 +2436,40 @@ class HttpScanHandler(
       }
     }
   }
+
+  def getRewardAccountingRootHash(
+      respond: ScanResource.GetRewardAccountingRootHashResponse.type
+  )(roundNumber: Long)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingRootHashResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingRootHash") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingRootHashResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          appRewardsStore.getAppRewardRootHashByRound(roundNumber).map {
+            case None =>
+              ScanResource.GetRewardAccountingRootHashResponse.NotFound(
+                ErrorResponse(
+                  s"Root hash not (yet) computed for round $roundNumber"
+                )
+              )
+            case Some(rootHash) =>
+              ScanResource.GetRewardAccountingRootHashResponse.OK(
+                definitions.GetRewardAccountingRootHashResponse(
+                  roundNumber = rootHash.roundNumber,
+                  rootHash = rootHash.rootHash.toByteArray.map("%02x".format(_)).mkString,
+                )
+              )
+          }
+      }
+    }
+  }
 }
 
 object HttpScanHandler {

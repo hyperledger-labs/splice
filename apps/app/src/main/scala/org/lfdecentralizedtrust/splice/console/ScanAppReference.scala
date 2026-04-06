@@ -369,6 +369,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetRewardAccountingActivityTotals(roundNumber))
     }
 
+  @Help.Summary("Get CIP-0104 root hash for a specific round")
+  def getRewardAccountingRootHash(
+      roundNumber: Long
+  ): Option[definitions.GetRewardAccountingRootHashResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingRootHash(roundNumber))
+    }
+
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 

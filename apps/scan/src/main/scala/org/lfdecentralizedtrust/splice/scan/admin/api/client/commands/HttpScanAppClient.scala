@@ -2583,4 +2583,26 @@ object HttpScanAppClient {
         Right(None)
     }
   }
+
+  case class GetRewardAccountingRootHash(roundNumber: Long)
+      extends InternalBaseCommand[
+        http.GetRewardAccountingRootHashResponse,
+        Option[definitions.GetRewardAccountingRootHashResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingRootHashResponse] =
+      client.getRewardAccountingRootHash(roundNumber, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingRootHashResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetRewardAccountingRootHashResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
 }

@@ -1665,6 +1665,31 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/reward-accounting-process/rounds/{round_number}/root-hash:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingRootHash"
+      description: |
+        SV node internal API (CIP-0104, subject to change).
+        Returns the root hash computed for the specified round.
+      parameters:
+        - name: "round_number"
+          in: "path"
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingRootHashResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/history/bulk/acs:
     get:
       tags: [ pre-alpha, scan ]
@@ -4061,3 +4086,16 @@ components:
         activity_records_count:
           type: integer
           format: int64
+
+    GetRewardAccountingRootHashResponse:
+      type: object
+      required:
+        - round_number
+        - root_hash
+      properties:
+        round_number:
+          type: integer
+          format: int64
+        root_hash:
+          type: string
+          description: Hex-encoded root hash
