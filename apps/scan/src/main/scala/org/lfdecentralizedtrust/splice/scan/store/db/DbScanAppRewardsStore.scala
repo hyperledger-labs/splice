@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.scan.rewards.RewardIssuanceParams
+import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -294,6 +294,13 @@ class DbScanAppRewardsStore(
     )
   }
 
+  /** DBIO action to read the total activity weight for a round. */
+  private def getAppActivityRoundTotalWeightAction(roundNumber: Long) =
+    sql"""select total_round_app_activity_weight
+          from #${Tables.appActivityRoundTotals}
+          where history_id = $historyId and round_number = $roundNumber
+    """.as[Long].head
+
   // -- app_reward_party_totals ----------------------------------------------
 
   private def batchInsertAppRewardPartyTotals(
@@ -505,20 +512,38 @@ class DbScanAppRewardsStore(
     )
   }
 
-  /** Runs the full reward computation pipeline for a single round.
+  /** Runs the full reward computation pipeline for a single round in a single
+    * transaction: aggregation, CC conversion, and Merkle tree hashing.
     *
-    * TODO(#4382): Update argument list to accept RewardIssuanceParams (for
-    * computeRewardTotals) and batchSize (for computeRewardHashes).
+    * The precondition check (assertCompleteActivity) runs outside the transaction.
+    * All DB writes are atomic — if any step fails, the entire transaction rolls back.
     */
   def computeAndStoreRewards(
-      roundNumber: Long
-  )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] =
+      roundNumber: Long,
+      batchSize: Int,
+      inputs: RewardComputationInputs,
+  )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] = {
+    import profile.api.jdbcActionExtensionMethods
+
     for {
-      _ <- aggregateActivityTotals(roundNumber)
-      // TODO(#4382): call computeRewardTotals(roundNumber, params) here
-      // TODO(#4382): call computeRewardHashes(roundNumber, batchSize) here
+      _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
+      _ <- runUpdate(
+        (for {
+          _ <- aggregateActivityTotalsAction(roundNumber)
+          totalWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
+          params = inputs.deriveIssuanceParams(totalWeight)
+          _ <- computeRewardTotalsAction(roundNumber, params)
+          leafCount <- insertLeafBatches(roundNumber, batchSize)
+          _ <- aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+          _ <- insertRootHash(roundNumber)
+        } yield ())
+          .map(_ => logger.debug(s"Computed and stored rewards for round $roundNumber."))
+          .transactionally,
+        "appRewards.computeAndStoreRewards",
+      )
       summary <- readComputationSummary(roundNumber)
     } yield summary
+  }
 
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
@@ -532,17 +557,17 @@ class DbScanAppRewardsStore(
     for {
       _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
       _ <- runUpdate(
-        (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
-          ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
-          ++ insertRoundTotals(historyId, roundNumber)).asUpdate
-          .map(_ =>
-            logger.debug(
-              s"Aggregated activity totals for round $roundNumber."
-            )
-          ),
+        aggregateActivityTotalsAction(roundNumber)
+          .map(_ => logger.debug(s"Aggregated activity totals for round $roundNumber.")),
         "appRewards.aggregateActivityTotals",
       )
     } yield ()
+
+  /** DBIO action for aggregating activity totals (no precondition check). */
+  private def aggregateActivityTotalsAction(roundNumber: Long) =
+    (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
+      ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
+      ++ insertRoundTotals(historyId, roundNumber)).asUpdate
 
   /** Unnest per-verdict activity arrays and aggregate weights by party. */
   private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
@@ -609,50 +634,51 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
+    // TODO(#4747): assert totalAppRewardAmount <= totalIssuance (with small tolerance)
+    //              and prevent writes if the assertion fails.
+    runUpdate(
+      computeRewardTotalsAction(roundNumber, params)
+        .map(_ => logger.debug(s"Computed reward totals for round $roundNumber."))
+        .transactionally,
+      "appRewards.computeRewardTotals",
+    )
+  }
+
+  /** DBIO action for computing reward totals. */
+  private def computeRewardTotalsAction(
+      roundNumber: Long,
+      params: RewardIssuanceParams,
+  ) = {
     val issuance = params.issuancePerFeaturedAppTraffic_CCperMB
     val threshold = params.threshold_CC
     val totalIssuance = params.totalIssuanceForFeaturedAppRewards
     val unclaimed = params.unclaimedAppRewardAmount
 
-    val insertRewardTotals =
-      (sql"""with computed as (
-               select history_id, round_number, app_provider_party_seq_num,
-                      (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
-                        * $issuance as total_app_reward_amount
-               from #${Tables.appActivityPartyTotals}
-               where history_id = $historyId and round_number = $roundNumber
-             ),
-             inserted_parties as (
-               insert into #${Tables.appRewardPartyTotals}
-                 (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
-               select history_id, round_number, app_provider_party_seq_num, total_app_reward_amount
-               from computed
-               where total_app_reward_amount >= $threshold
-               returning total_app_reward_amount
-             )
-             insert into #${Tables.appRewardRoundTotals}
-               (history_id, round_number, total_app_reward_minting_allowance,
-                total_app_reward_thresholded, total_app_reward_unclaimed,
-                rewarded_app_provider_parties_count)
-             select $historyId, $roundNumber,
-               coalesce(sum(total_app_reward_amount), 0),
-               $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
-               $unclaimed,
-               count(*)
-             from inserted_parties""").asUpdate
-
-    // TODO(#4747): assert totalAppRewardAmount <= totalIssuance (with small tolerance)
-    //              and prevent writes if the assertion fails.
-    runUpdate(
-      insertRewardTotals
-        .map(_ =>
-          logger.debug(
-            s"Computed reward totals for round $roundNumber."
-          )
-        )
-        .transactionally,
-      "appRewards.computeRewardTotals",
-    )
+    (sql"""with computed as (
+             select history_id, round_number, app_provider_party_seq_num,
+                    (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
+                      * $issuance as total_app_reward_amount
+             from #${Tables.appActivityPartyTotals}
+             where history_id = $historyId and round_number = $roundNumber
+           ),
+           inserted_parties as (
+             insert into #${Tables.appRewardPartyTotals}
+               (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
+             select history_id, round_number, app_provider_party_seq_num, total_app_reward_amount
+             from computed
+             where total_app_reward_amount >= $threshold
+             returning total_app_reward_amount
+           )
+           insert into #${Tables.appRewardRoundTotals}
+             (history_id, round_number, total_app_reward_minting_allowance,
+              total_app_reward_thresholded, total_app_reward_unclaimed,
+              rewarded_app_provider_parties_count)
+           select $historyId, $roundNumber,
+             coalesce(sum(total_app_reward_amount), 0),
+             $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
+             $unclaimed,
+             count(*)
+           from inserted_parties""").asUpdate
   }
 
   // -- Computation summary ----------------------------------------------------

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.scan.rewards.RewardComputationInputs
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.RewardComputationSummary
 
 import scala.concurrent.Future
@@ -24,11 +25,10 @@ trait ScanAppRewardsStore {
     * aggregation, CC conversion, and Merkle tree hashing.
     * MUST only be called on rounds for which all app activity records have
     * been ingested and for which the reward information has not yet been computed.
-    *
-    * TODO(#4382): Accept RewardIssuanceParams (for computeRewardTotals) and
-    * batchSize (for computeRewardHashest).
     */
-  def computeAndStoreRewards(roundNumber: Long)(implicit
-      tc: TraceContext
-  ): Future[RewardComputationSummary]
+  def computeAndStoreRewards(
+      roundNumber: Long,
+      batchSize: Int,
+      inputs: RewardComputationInputs,
+  )(implicit tc: TraceContext): Future[RewardComputationSummary]
 }
