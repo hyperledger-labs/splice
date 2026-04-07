@@ -28,6 +28,7 @@ export TEST_PORT
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
+CANTON_PROTOCOL_VERSION=""
 
 function usage() {
     echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-P <protocol_version>]"
@@ -70,8 +71,7 @@ while [[ $# -gt 0 ]]; do
                 usage
                 exit 1
             fi
-            PROTOCOL_VERSION=$1
-            export PROTOCOL_VERSION
+            CANTON_PROTOCOL_VERSION=$1
             ;;
         *)
             echo "Unknown option: $1"
@@ -81,6 +81,8 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+export CANTON_PROTOCOL_VERSION
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"
