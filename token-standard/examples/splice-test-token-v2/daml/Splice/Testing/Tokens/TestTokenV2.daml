@@ -17,6 +17,7 @@ import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.EventsV2 as EventsV2
 import Splice.TokenStandard.Utils
 
 
@@ -206,6 +207,16 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
+
+    interface instance EventsV2.EventFactory for TokenRules where
+      view = EventsV2.EventFactoryView with
+        admin = admin
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl admin
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl admin
+
+
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
         admin
@@ -218,7 +229,7 @@ template TokenRules with
                 (\account -> [account.owner])
                 arg
         in
-          settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
+          settlementFactoryV2_settleBatchDefaultImpl (coerceContractId self) createReceiptAllocation this self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
       settlementFactory_settleBatchExtraObservers _arg = []
