@@ -83,6 +83,12 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
   Mint,
   Transfer,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  AbortTransferInstruction,
+  DevnetTap,
+  Mint,
+  Transfer,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
@@ -110,12 +116,12 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   PageLimit,
   SortOrder,
+  UpdateHistory,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
-
 import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.util.{
