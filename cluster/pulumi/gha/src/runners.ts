@@ -8,6 +8,8 @@ import {
   HELM_MAX_HISTORY_SIZE,
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
+  K8sResourceSchema,
+  SingleResourceSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/dockerConfig';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -20,19 +22,6 @@ import yaml from 'js-yaml';
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
 import { createCloudSQLInstanceForPerformanceTests, PerformanceTestDb } from './performanceTests';
-
-type ResourcesSpec = {
-  requests?: {
-    cpu?: string;
-    memory?: string;
-    ephemeralStorage?: string;
-  };
-  limits?: {
-    cpu?: string;
-    memory?: string;
-    ephemeralStorage?: string;
-  };
-};
 
 const localnetHostAliases = [
   {
@@ -50,6 +39,21 @@ const localnetHostAliases = [
   },
 ];
 
+function resourcesSpecFromConfig(resources: K8sResourceSchema) {
+  return resources ? {
+    limits: resources.limits ? {
+      cpu: resources.limits.cpu,
+      memory: resources.limits.memory,
+      'ephemeral-storage': resources.limits.ephemeralStorage,
+    } : undefined,
+    requests: resources.requests ? {
+      cpu: resources.requests.cpu,
+      memory: resources.requests.memory,
+      'ephemeral-storage': resources.requests.ephemeralStorage,
+    } : undefined,
+  } : undefined;
+}
+
 function installDockerRunnerScaleSet(
   name: string,
   runnersNamespace: Namespace,
@@ -57,7 +61,7 @@ function installDockerRunnerScaleSet(
   cachePvc: PersistentVolumeClaim,
   configMap: ConfigMap,
   dockerConfigSecret: Secret,
-  resources: ResourcesSpec,
+  resources: K8sResourceSchema,
   serviceAccountName: string,
   dependsOn: Resource[]
 ): k8s.helm.v3.Release {
@@ -109,7 +113,7 @@ function installDockerRunnerScaleSet(
                     value: '120',
                   },
                 ],
-                resources,
+                resources: resourcesSpecFromConfig(resources),
                 // required to mount the nix store inside the container from the NFS
                 securityContext: {
                   privileged: true,
