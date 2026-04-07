@@ -313,7 +313,7 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => ContractId EventsV2.EventLog
+  => ContractId EventsV2.EventFactory
      -- ^ Event log to use for registering the transfer events
   -> (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
      -- ^ How to create the allocation of a missing receipt leg.
@@ -348,16 +348,15 @@ settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocati
 
   -- create transfer events for all transfer legs
   forA_ transferLegs $ \leg ->
-    exercise eventFactoryCid EventsV2.EventLog_Transfer with
-      scope = EventsV2.Scope with
-        reporter = admin
-        observers = accountParties leg.sender <> accountParties leg.receiver
+    exercise eventFactoryCid EventsV2.EventFactory_LogTransfer with
+      observers = accountParties leg.sender <> accountParties leg.receiver
       sender = leg.sender
       receiver = leg.receiver
       amount = leg.amount
       instrumentId = leg.instrumentId
-      meta = leg.meta
-      -- FIXME/QUESTION: should transfer events carry a 'Reference' so that we could store the `settlementRef` in there for easier correlation?
+      extraArgs = ExtraArgs with
+        meta = leg.meta
+        context = emptyChoiceContext
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with

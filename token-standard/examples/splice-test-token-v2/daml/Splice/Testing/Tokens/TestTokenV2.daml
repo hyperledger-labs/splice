@@ -208,13 +208,14 @@ template TokenRules with
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
 
-    interface instance EventsV2.EventLog for TokenRules where
-      view = EventsV2.EventLogView with
+    interface instance EventsV2.EventFactory for TokenRules where
+      view = EventsV2.EventFactoryView with
         admin = admin
         meta = emptyMetadata
 
-      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl admin
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl admin
+      eventFactory_logWorkflowCompletedImpl = eventFactory_logWorkflowCompletedDefaultImpl admin
+      eventFactory_logTransferImpl = eventFactory_logTransferDefaultImpl admin
+      eventFactory_publicFetchImpl = publicFetchDefaultImpl this
 
 
     interface instance V2.SettlementFactory for TokenRules where

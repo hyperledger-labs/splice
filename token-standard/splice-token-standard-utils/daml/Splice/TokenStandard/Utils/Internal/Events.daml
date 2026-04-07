@@ -5,9 +5,12 @@
 --
 -- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
 module Splice.TokenStandard.Utils.Internal.Events (
-  eventFactory_workflowCompletedDefaultImpl,
-  eventFactory_transferDefaultImpl,
 
+  -- * Default implementation
+  eventFactory_logWorkflowCompletedDefaultImpl,
+  eventFactory_logTransferDefaultImpl,
+
+  -- * Utilities to log mint and burn events
   logMint,
   logBurn,
 ) where
@@ -21,17 +24,24 @@ import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
 
 
+-- default implementations
+--------------------------
 
-eventFactory_workflowCompletedDefaultImpl : Party -> ContractId V2.EventLog -> V2.EventLog_WorkflowCompleted -> Update V2.EventLog_WorkflowCompletedResult
-eventFactory_workflowCompletedDefaultImpl admin _self arg = do
-  require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
-  pure V2.EventLog_WorkflowCompletedResult
+eventFactory_logWorkflowCompletedDefaultImpl
+  : Party -> ContractId V2.EventFactory -> V2.EventFactory_LogWorkflowCompleted -> Update V2.EventFactory_WorkflowCompletedResult
+eventFactory_logWorkflowCompletedDefaultImpl admin _self arg = do
+  require' ("provider", arg.provider) isEqualR ("admin", admin )
+  pure V2.EventFactory_WorkflowCompletedResult
 
-eventFactory_transferDefaultImpl : Party -> ContractId V2.EventLog -> V2.EventLog_Transfer -> Update V2.EventLog_TransferResult
-eventFactory_transferDefaultImpl admin _self arg = do
-  require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
-  pure V2.EventLog_TransferResult
+eventFactory_logTransferDefaultImpl
+  : Party -> ContractId V2.EventFactory -> V2.EventFactory_LogTransfer -> Update V2.EventFactory_TransferResult
+eventFactory_logTransferDefaultImpl admin _self arg = do
+  require' ("instrumentId.admin", arg.instrumentId.admin) isEqualR ("admin", admin )
+  pure V2.EventFactory_TransferResult
 
+
+-- utilities to log mint and burn events
+----------------------------------------
 
 mintAccountId : Text
 mintAccountId = v2Namespace <> "mint"
@@ -39,32 +49,28 @@ mintAccountId = v2Namespace <> "mint"
 burnAccountId : Text
 burnAccountId = v2Namespace <> "burn"
 
-logMint : ContractId V2.EventLog -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventLog_TransferResult
-logMint factoryCid admin receiver amount instrumentId meta = do
-  exercise factoryCid V2.EventLog_Transfer with
-    scope = V2.Scope with
-      reporter = admin
-      observers = accountParties receiver
+logMint : ContractId V2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logMint factoryCid receiver amount instrumentId meta = do
+  exercise factoryCid V2.EventFactory_LogTransfer with
     sender = V2.Account with
-      owner = admin
+      owner = instrumentId.admin
       provider = None
       id = Some mintAccountId
     receiver
     instrumentId
     amount
-    meta
+    observers = accountParties receiver
+    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
 
-logBurn : ContractId V2.EventLog -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventLog_TransferResult
-logBurn factoryCid admin sender amount instrumentId meta = do
-  exercise factoryCid V2.EventLog_Transfer with
-    scope = V2.Scope with
-      reporter = admin
-      observers = accountParties sender
-    sender
+logBurn : ContractId V2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logBurn factoryCid sender amount instrumentId meta = do
+  exercise factoryCid V2.EventFactory_LogTransfer with
     receiver = V2.Account with
-      owner = admin
+      owner = instrumentId.admin
       provider = None
       id = Some burnAccountId
     instrumentId
     amount
-    meta
+    sender
+    observers = accountParties sender
+    extraArgs = ExtraArgs with meta; context = emptyChoiceContext

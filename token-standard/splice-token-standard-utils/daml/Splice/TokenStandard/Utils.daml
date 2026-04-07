@@ -67,8 +67,8 @@ module Splice.TokenStandard.Utils (
   ForwardCompatible(..),
 
   -- * Events
-  eventFactory_workflowCompletedDefaultImpl,
-  eventFactory_transferDefaultImpl,
+  eventFactory_logWorkflowCompletedDefaultImpl,
+  eventFactory_logTransferDefaultImpl,
 
   logMint,
   logBurn,

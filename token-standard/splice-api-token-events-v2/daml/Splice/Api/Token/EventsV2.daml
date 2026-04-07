@@ -1,62 +1,86 @@
 -- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Interface to log token events: mints, burns, transfers.
+-- | Interface to log events related to token standard transfers.
+-- FIXME: rename to TransferEvents incl factory and package to make space for other kinds of events
 module Splice.Api.Token.EventsV2 where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
--- | Scope within which an event is reported.
-data Scope = Scope with
-    reporter : Party
-      -- ^ Party reports the event.
-    observers : [Party]
-      -- ^ Parties that are notified about the event.
-  deriving (Eq, Show)
 
 -- | An interface for templates that can be used to report token standard v2 events.
-interface EventLog where
-  viewtype EventLogView
+--
+-- The non-consuming choices of this interface are used by the `reporter` to signal events.
+-- Make sure to only check events from reporters that are trustworthy, e.g., by only transfer
+-- events from a token's instrument admin should be considered as relevant events for a token.
+interface EventFactory where
+  viewtype EventFactoryView
 
-  eventFactory_workflowCompletedImpl : ContractId EventLog -> EventLog_WorkflowCompleted -> Update EventLog_WorkflowCompletedResult
-  eventFactory_transferImpl : ContractId EventLog -> EventLog_Transfer -> Update EventLog_TransferResult
+  eventFactory_logWorkflowCompletedImpl : ContractId EventFactory -> EventFactory_LogWorkflowCompleted -> Update EventFactory_WorkflowCompletedResult
+  eventFactory_logTransferImpl : ContractId EventFactory -> EventFactory_LogTransfer -> Update EventFactory_TransferResult
+  eventFactory_publicFetchImpl : ContractId EventFactory -> EventFactory_PublicFetch -> Update EventFactoryView
 
-
-  nonconsuming choice EventLog_WorkflowCompleted : EventLog_WorkflowCompletedResult
-    -- ^ Signal that a workflow completed, e.g., a transfer instruction,
+  nonconsuming choice EventFactory_LogWorkflowCompleted : EventFactory_WorkflowCompletedResult
+    -- ^ Signal that a transfer-related workflow completed, e.g., a transfer instruction,
     -- allocation instruction, allocation request, or an allocation.
     with
-      scope : Scope
-        -- ^ Scope of the event.
+      provider : Party
+        -- ^ App provider party of the workflow that completed. That is the
+        -- instrument admin for transfer instructions, allocation instructions,
+        -- and allocations; and the app provider party for allocation requests.
       workflowId : AnyContractId
-        -- ^ Workflow whose completion is being reported.
+        -- ^ Contract-id of the workflow whose completion is being reported.
       success : Bool
         -- ^ Whether the workflow completed successfully or not.
         -- The failure reason can be included in the metadata.
+      observers : [Party]
+        -- ^ Parties that should be notified about the completion of the workflow.
       extraArgs : ExtraArgs
         -- ^ Arguments storing both metadata and additional context information about the event.
         --
         -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
         -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
-    observer scope.observers
-    controller scope.reporter
-    do eventFactory_workflowCompletedImpl this self arg
+    observer observers
+    controller provider
+    do eventFactory_logWorkflowCompletedImpl this self arg
 
-  nonconsuming choice EventLog_Transfer : EventLog_TransferResult
+  nonconsuming choice EventFactory_LogTransfer : EventFactory_TransferResult
     -- ^ Signal that a transfer happened.
+    --
+    -- Asset admins MUST ensure that all changes to the holding balance of
+    -- an account are explained *exactly* by the transfer events within the same
+    -- transaction visible to the account parties. There must be neither too
+    -- many nor too few transfer events.
+    --
+    -- Asset admins MAY emit multiple transfer events for the same transfer, if
+    -- they need to report the transfers to different sets of observers that should
+    -- not learn about each other. They MUST ensure that the sets of observers are
+    -- disjoint to avoid double-counting of events by observers.
+    --
+    -- Changes to the locked balance of an account are not explained by transfer events,
+    -- as the locks themselves carry context about why the balance is locked.
     with
-      scope : Scope
       sender : Account
+        -- ^ Account from which the transfer was sent.
       receiver : Account
+        -- ^ Account to which the transfer was sent.
       instrumentId : InstrumentId
+        -- ^ Instrument of the transfer.
       amount : Decimal
+        -- ^ Amount transferred.
+      observers : [Party]
+        -- ^ Parties that should be notified about the transfer.
       extraArgs : ExtraArgs
-    observer scope.observers
-    controller scope.reporter
-    do eventFactory_transferImpl this self arg
+        -- ^ Arguments storing both metadata and additional context information about the event.
+        --
+        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
+        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
+    observer observers
+    controller instrumentId.admin
+    do eventFactory_logTransferImpl this self arg
 
-  nonconsuming choice EventLog_PublicFetch : EventLogView
+  nonconsuming choice EventFactory_PublicFetch : EventFactoryView
     with
       actors : [Party]
         -- ^ Parties executing the fetch.
@@ -64,14 +88,17 @@ interface EventLog where
     do eventFactory_publicFetchImpl this self arg
 
 
--- | View on an event log contract.
-data EventLogView = EventLogView with
+-- | View on an event factory contract.
+data EventFactoryView = EventFactoryView with
     admin : Party
     meta : Metadata
   deriving (Eq, Show)
 
+-- | Result of logging a workflow completion event. Provided for extensibility
+-- in a future where interfaces are upgradeable.
+data EventFactory_WorkflowCompletedResult = EventFactory_WorkflowCompletedResult {}
 
-data EventLog_WorkflowCompletedResult = EventLog_WorkflowCompletedResult {}
-
-data EventLog_TransferResult = EventLog_TransferResult {}
+-- | Result of logging a transfer event. Provided for extensibility
+-- in a future where interfaces are upgradeable.
+data EventFactory_TransferResult = EventFactory_TransferResult {}
 

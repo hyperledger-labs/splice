@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Event log for Amulet.
-module Splice.Amulet.EventLog where
+module Splice.Amulet.EventFactory where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.EventsV2 as EventsV2
@@ -10,17 +10,18 @@ import Splice.Api.Token.EventsV2 as EventsV2
 import Splice.TokenStandard.Utils
 
 -- FIXME: consider moving to the top level
-template AmuletEventLog
+template AmuletEventFactory
   with
     dso : Party
   where
     signatory dso
 
-    interface instance EventsV2.EventLog for AmuletEventLog where
-      view = EventsV2.EventLogView with
+    interface instance EventsV2.EventFactory for AmuletEventFactory where
+      view = EventsV2.EventFactoryView with
         admin = dso
         meta = emptyMetadata
 
-      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+      eventFactory_logWorkflowCompletedImpl = eventFactory_logWorkflowCompletedDefaultImpl dso
+      eventFactory_logTransferImpl = eventFactory_logTransferDefaultImpl dso
+      eventFactory_publicFetchImpl = publicFetchDefaultImpl this
 

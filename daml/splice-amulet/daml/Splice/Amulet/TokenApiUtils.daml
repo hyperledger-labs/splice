@@ -20,7 +20,7 @@ import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
 import Splice.Api.Token.EventsV2 qualified as V2
 import Splice.Api.Token.HoldingV2 qualified as V2
 
-import Splice.Amulet.EventLog
+import Splice.Amulet.EventFactory
 import Splice.TokenStandard.Utils (logBurn, logMint, basicAccount)
 
 
@@ -264,16 +264,15 @@ getFromContextU context k = either fail pure $ getFromContext context k
 -- V2 Events
 ------------
 
--- FIXME: type class constraint for event factory
-logAmuletMint : Party -> ContractId V2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletMint : Party -> ContractId V2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
 logAmuletMint dso factoryCid receiver amount meta = do
   let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
-  void $ logMint factoryCid dso (basicAccount receiver) amount instrumentId meta
+  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta
 
-logAmuletBurn : Party -> ContractId V2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletBurn : Party -> ContractId V2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
 logAmuletBurn dso factoryCid sender amount meta = do
   let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
-  void $ logBurn factoryCid dso (basicAccount sender) amount instrumentId meta
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
 
 logWorkflowSuccess : Party -> [Party] -> ContractId t -> Update ()
 logWorkflowSuccess dso observers workflowId =
@@ -285,14 +284,14 @@ logWorkflowFailed dso observers workflowId reason =
 
 logWorkflowCompleted : Party -> [Party] -> ContractId t -> Bool -> Metadata -> Update ()
 logWorkflowCompleted dso observers workflowId success meta = do
-  let scope = V2.Scope with reporter = dso; observers
   -- FIXME: use contract key lookup to find the one event factory; instead of creating a new one for each event.
-  factoryCid <- create AmuletEventLog with dso
-  void $ exercise (toInterfaceContractId @V2.EventLog factoryCid) V2.EventLog_WorkflowCompleted with
-    scope
+  factoryCid <- create AmuletEventFactory with dso
+  void $ exercise (toInterfaceContractId @V2.EventFactory factoryCid) V2.EventFactory_LogWorkflowCompleted with
+    provider = dso
     workflowId = coerceContractId workflowId
     success
-    meta
+    observers
+    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
   archive factoryCid
 
 
