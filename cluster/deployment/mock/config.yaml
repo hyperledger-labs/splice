@@ -183,7 +183,7 @@ svs:
         limits:
           memory: '2Gi'
     participant:
-      additionalEnvVars:
+      additionalEnvVars: !append
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomParticipantJvmFlag"
