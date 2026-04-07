@@ -41,7 +41,7 @@ final case class StoreIngestionPerfMetrics(
   /** Ratio of process CPU time to wall-clock time.
     * Some thresholds we can use for rough classification:
     * > 0.7 : CPU-bound
-    * 0.25 - 0.7: balanced
+    * 0.7 ~ 0.25: balanced
     * < 0.25 : I/O-bound
     */
   def cpuToWallClockRatio: BigDecimal =

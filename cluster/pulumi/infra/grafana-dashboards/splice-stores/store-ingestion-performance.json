@@ -195,7 +195,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "splice_perf_ingestion_cpu_to_wall_clock_ratio{test=\"${test}\"}",
-          "legendFormat": "CPU/Wall-clock Ratio (>1=CPU-bound, <1=I/O-bound)",
+          "legendFormat": "CPU/Wall-clock Ratio (>0.7: CPU-bound, 0.7~0.25: balanced, <0.25:I/O-bound)",
           "range": true, "refId": "A"
         }
       ]
