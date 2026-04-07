@@ -1716,7 +1716,6 @@ template DsoRules with
         currentRound : Round
       controller dso
       do
-        info <- getSvInfo sv this
         existing <- fetch existingDeclarationCid
         require "Only the declaring SV can update" (existing.info.svParty == sv)
         require "New locked amount must be positive" (newLockedAmount > 0.0)
