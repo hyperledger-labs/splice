@@ -81,6 +81,7 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
       clue("Verify activity totals for the aggregated round") {
         val totals = sv1ScanBackend.getRewardAccountingActivityTotals(earliest)
         totals.value.roundNumber shouldBe earliest
+        totals.value.numActivityRecordsInRound should be > 0L
       }
 
       clue("Verify 404 for non-existent round") {
