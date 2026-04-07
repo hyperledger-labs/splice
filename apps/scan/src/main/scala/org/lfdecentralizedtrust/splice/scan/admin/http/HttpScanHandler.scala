@@ -73,7 +73,9 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItem,
+  UpdateHistoryItemV2WithHash,
   UpdateHistoryRequestV2,
+  UpdateHistoryTransactionV2WithHash,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
@@ -108,11 +110,13 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   PageLimit,
   SortOrder,
-  UpdateHistory,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import java.lang.IllegalStateException
+import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -1153,6 +1157,30 @@ class HttpScanHandler(
     }
   }
 
+  private def toUpdateV2WithHash(update: UpdateHistoryItem): UpdateHistoryItemV2WithHash =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryItemV2WithHash.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryTransactionV2WithHash(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash.getOrElse(
+              throw new IllegalStateException("externalTransactionHash must not be empty")
+            ),
+          )
+        )
+    }
+
   private def confirmBackfillingIsCompleteThen[T](
       updateHistory: UpdateHistory
   )(body: => Future[T])(implicit tc: TraceContext): Future[T] = {
@@ -2037,6 +2065,53 @@ class HttpScanHandler(
             ScanResource.GetUpdateByIdV2Response.NotFound(error)
           case Right(update) =>
             ScanResource.GetUpdateByIdV2Response.OK(updateV1ToUpdateV2(update))
+        }
+    }
+  }
+
+  def getUpdateByHash(
+      hash: String,
+      encoding: DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      tx <- updateHistory.getUpdateByHash(hash)
+    } yield {
+      tx.fold[Either[ErrorResponse, UpdateHistoryItem]](
+        Left(
+          ErrorResponse(s"Transaction with hash $hash not found")
+        )
+      )(txWithMigration =>
+        Right(
+          ScanHttpEncodings.encodeUpdate(
+            txWithMigration,
+            encoding = encoding,
+            version = ScanHttpEncodings.V1,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
+            None,
+          )
+        )
+      )
+    }
+  }
+
+  override def getUpdateByHash(respond: ScanResource.GetUpdateByHashResponse.type)(
+      hash: String,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByHash") { _ => _ =>
+      getUpdateByHash(
+        hash = hash,
+        encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByHashResponse.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByHashResponse.OK(toUpdateV2WithHash(update))
         }
     }
   }

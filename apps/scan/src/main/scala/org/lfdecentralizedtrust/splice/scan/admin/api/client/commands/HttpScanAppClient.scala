@@ -1476,6 +1476,35 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetUpdateByHash(
+      extTxnHash: String,
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[
+        http.GetUpdateByHashResponse,
+        definitions.UpdateHistoryItemV2WithHash,
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateByHashResponse] = {
+      client.getUpdateByHash(
+        hash = extTxnHash,
+        damlValueEncoding = Some(damlValueEncoding),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateByHashResponse.OK(response) =>
+        Right(response)
+      case http.GetUpdateByHashResponse.NotFound(_) =>
+        Left(s"Update with extTxnHash $extTxnHash not found")
+    }
+  }
+
   case class GetEventHistory(
       count: Int,
       after: Option[(Long, String)],

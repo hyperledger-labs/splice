@@ -477,6 +477,44 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v2/updates/hash/{hash}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByHash"
+      description: |
+        Returns the update associated with the given hash of the prepared transaction.
+
+        This endpoint is not always BFT safe.
+        For transactions committed before a scan instance started indexing hashes, the instance will return a 404 error.
+        For transactions committed around the time different scans started indexing hashes,
+        some scan instances might return a 404 error while others return the matching update.
+
+        This is in contrast to the `v2/updates` and `v2/updates/{update_id}` endpoints, which are guaranteed to be always BFT safe.
+      parameters:
+        - name: "hash"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItemV2WithHash"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/state/acs/snapshot-timestamp:
     get:
       tags: [external, scan]
@@ -2400,6 +2438,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItemV2WithHash:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransactionV2WithHash"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItemV2:
       type: object
       description: |
@@ -2591,10 +2636,10 @@ components:
             $ref: "#/components/schemas/TreeEvent"
         external_transaction_hash:
           description: |
-            For transaction externally signed, contains the external transaction hash
+            For an externally signed transaction, contains the external transaction hash
             signed by the external party. Can be used to correlate an external submission with a committed transaction.
           type: string
-    UpdateHistoryTransactionV2:
+    BaseUpdateHistoryTransaction:
       type: object
       required:
         - update_id
@@ -2652,11 +2697,28 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
-        external_transaction_hash:
-          description: |
-            For transaction externally signed, contains the external transaction hash
-            signed by the external party. Can be used to correlate an external submission with a committed transaction.
-          type: string
+    UpdateHistoryTransactionV2:
+      allOf:
+        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
+        - type: object
+          properties:
+            external_transaction_hash:
+              description: |
+                For an externally signed transaction, contains the external transaction hash
+                signed by the external party. Can be used to correlate an external submission with a committed transaction.
+              type: string
+    UpdateHistoryTransactionV2WithHash:
+      allOf:
+        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
+        - type: object
+          required:
+            - external_transaction_hash
+          properties:
+            external_transaction_hash:
+              description: |
+                For an externally signed transaction, contains the external transaction hash
+                signed by the external party. Can be used to correlate an external submission with a committed transaction.
+              type: string
     TreeEvent:
       type: object
       description: |
