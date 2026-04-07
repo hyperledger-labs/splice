@@ -1159,8 +1159,14 @@ object SynchronizerTrustCertificate extends TopologyMappingCompanion {
         v30.Enums.ParticipantFeatureFlag.PARTICIPANT_FEATURE_FLAG_PV33_EXTERNAL_SIGNING_LOCAL_CONTRACT_IN_SUBVIEW.value
       )(Some("ExternalSigningLocalContractsInSubview"))
 
+    val EnableUnsafeMultiSynchronizer: ParticipantTopologyFeatureFlag =
+      ParticipantTopologyFeatureFlag(
+        v30.Enums.ParticipantFeatureFlag.PARTICIPANT_FEATURE_FLAG_ENABLE_UNSAFE_MULTI_SYNCHRONIZER.value
+      )(Some("EnableUnsafeMultiSynchronizer"))
+
     val knownTopologyFeatureFlags: Seq[ParticipantTopologyFeatureFlag] = Seq(
-      ExternalSigningLocalContractsInSubview
+      ExternalSigningLocalContractsInSubview,
+      EnableUnsafeMultiSynchronizer,
     )
 
     def fromProtoV30(

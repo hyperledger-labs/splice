@@ -79,7 +79,8 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
         prometheusRw,
         config: JSON.stringify({
           isDevNet,
-          usersPerValidator: 10,
+          usersPerValidator: loadTesterConfig.usersPerValidator,
+          featuredUsersPerValidator: loadTesterConfig.featuredUsersPerValidator,
           validators,
           test: {
             duration: `365d`,

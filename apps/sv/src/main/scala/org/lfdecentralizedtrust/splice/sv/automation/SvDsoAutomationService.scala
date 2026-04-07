@@ -393,7 +393,8 @@ class SvDsoAutomationService(
         triggerContext,
         config.maxVettingDelay,
         config.latestPackagesOnly,
-        enabledFeatures.enableUnsupportedDarsUnvetting,
+        config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
+        config.additionalPackagesToUnvet,
       )
     )
 
@@ -452,6 +453,17 @@ class SvDsoAutomationService(
           dsoStore,
           connection(SpliceLedgerConnectionPriority.Low),
           c,
+        )
+      )
+    }
+
+    config.copyVotesFrom.foreach { svName =>
+      registerTrigger(
+        new CopyVotesTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+          svName,
         )
       )
     }
@@ -578,6 +590,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
+      aTrigger[CopyVotesTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[CreateBootstrapExternalPartyConfigStateInstructionTrigger],
       aTrigger[LogicalSynchronizerUpgradeTrigger],

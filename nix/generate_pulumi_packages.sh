@@ -14,9 +14,9 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 declare -a plugins
 plugins=(
   # currently used
-  "pulumi/command=1.2.0"
-  "pulumi/gcp=9.13.0"
-  "pulumi/kubernetes=4.26.0"
+  "pulumi/command=1.2.1"
+  "pulumi/gcp=9.15.0"
+  "pulumi/kubernetes=4.28.0"
   "pulumi/random=4.19.1"
   "pulumi/std=2.3.2"
   "pulumi/auth0=3.38.0"
@@ -32,6 +32,9 @@ plugins=(
   "pulumi/command=1.1.0"
   "pulumi/gcp=8.32.1"
   # Post upgrade
+  "pulumi/command=1.2.0"
+  "pulumi/gcp=9.13.0"
+  "pulumi/kubernetes=4.26.0"
   "pulumi/command=1.1.3"
   "pulumi/gcp=9.10.0"
   "pulumi/kubernetes=4.25.0"

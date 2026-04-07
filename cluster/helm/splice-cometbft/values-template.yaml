@@ -74,10 +74,10 @@ db:
 
 resources:
   limits:
-    memory: 6Gi
+    memory: 8Gi
   requests:
     cpu: 2
-    memory: 3Gi
+    memory: 5Gi
 
 metrics:
   enable: false
@@ -106,3 +106,7 @@ mempool:
   deduplicationCacheSize: 200000
   # max number of seconds that a transaction will be kept in the mempool without being included in a block before being discarded
   ttlSeconds: 300
+
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
+enableReloader: true
+

@@ -56,9 +56,14 @@ class UpdateHistorySegmentBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
+  case class UpdatesChunk(
+      updateBytes: ByteString,
+      numUpdates: Int,
+  )
+
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
-  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, ByteString)]] = {
+  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, UpdatesChunk)]] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
@@ -88,7 +93,7 @@ class UpdateHistorySegmentBulkStorage(
               Some(
                 (
                   TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
-                  updatesBytes,
+                  UpdatesChunk(updatesBytes, updatesInSegment.length),
                 )
               )
             )
@@ -108,7 +113,7 @@ class UpdateHistorySegmentBulkStorage(
             appConfig.updatesPollingInterval.underlying,
             actorSystem.scheduler,
           ) {
-            Future.successful(Some((afterTs, ByteString.empty)))
+            Future.successful(Some((afterTs, UpdatesChunk(ByteString.empty, 0))))
           }
         }
     } yield {
@@ -118,13 +123,17 @@ class UpdateHistorySegmentBulkStorage(
 
   private def encodeUpdates(updates: Seq[TreeUpdateWithMigrationId]) = {
     val encoded = updates.map(update =>
-      ScanHttpEncodings.encodeUpdate(
+      ScanHttpEncodings.encodeUpdateV2(
         update,
         definitions.DamlValueEncoding.CompactJson,
         ScanHttpEncodings.V1,
       )
     )
-    val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
+    /* When we add new fields, we make them optional, and they will be None until a coordinated switching point.
+     * We therefore want to drop null values from the JSON, to avoid emitting a lot of "fieldX: null" in the dumps until the switching point,
+     * otherwise we'll break BFT guarantees when SVs adopt a version with the optional field asynchronously.
+     */
+    val updatesStr = encoded.map(_.asJson.dropNullValues.noSpacesSortKeys).mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
       s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption
@@ -138,6 +147,10 @@ class UpdateHistorySegmentBulkStorage(
   ): Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
+      .map(chunk => {
+        historyMetrics.BulkStorage.incUpdatesCount(chunk.numUpdates)
+        chunk.updateBytes
+      })
       .via(
         // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
         // since it assumes that it gets at least one chunk to write.

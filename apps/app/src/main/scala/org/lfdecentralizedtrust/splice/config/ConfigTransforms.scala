@@ -740,16 +740,29 @@ object ConfigTransforms {
   private def withBftSequencersFor(
       svTransform: SvAppBackendConfig => SvAppBackendConfig,
       scanTransform: (String, ScanAppBackendConfig) => ScanAppBackendConfig,
+      namePredicate: String => Boolean,
   ): ConfigTransform =
-    updateAllSvAppConfigs_(svTransform) compose {
-      updateAllScanAppConfigs(scanTransform)
+    updateAllSvAppConfigs { case (name, c) =>
+      if (namePredicate(name)) {
+        svTransform(c)
+      } else {
+        c
+      }
+    } compose {
+      updateAllScanAppConfigs { case (name, c) =>
+        if (namePredicate(name)) {
+          scanTransform(name, c)
+        } else {
+          c
+        }
+      }
     }
 
-  def withBftSequencers(): ConfigTransform =
-    withBftSequencersFor(withBftSequencer, withBftSequencer(_, _))
+  def withBftSequencers(namePredicate: String => Boolean = _ => true): ConfigTransform =
+    withBftSequencersFor(withBftSequencer, withBftSequencer(_, _), namePredicate)
 
-  def withBftSequencersSuccessor(): ConfigTransform =
-    withBftSequencersFor(withBftSequencerSuccessor, withBftSequencerSuccessor(_, _))
+  def withBftSequencersSuccessor(namePredicate: String => Boolean = _ => true): ConfigTransform =
+    withBftSequencersFor(withBftSequencerSuccessor, withBftSequencerSuccessor(_, _), namePredicate)
 
   def withNoVoteCooldown: ConfigTransform = {
     updateAllSvAppFoundDsoConfigs_ { c =>

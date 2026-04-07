@@ -7278,7 +7278,6 @@ object DarResources {
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,
-      DarResources.walletPayments,
     )
 
   lazy val pkgIdToDarResource: Map[String, DarResource] =

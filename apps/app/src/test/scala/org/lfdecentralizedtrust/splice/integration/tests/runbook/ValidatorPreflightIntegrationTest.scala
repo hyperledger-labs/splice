@@ -627,7 +627,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
   override def checkValidatorIsConnectedToSvRunbook() = "Validator is connected to SV runbook" in {
     implicit env =>
       val sv = sv_client("sv")
-      eventually() {
+      eventually(2.minutes) {
         val dsoInfo = sv.getDsoInfo()
         val nodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
         val synchronizerNodeConfig =
