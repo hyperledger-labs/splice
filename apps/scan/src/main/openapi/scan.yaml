@@ -836,6 +836,49 @@ paths:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
 
+  /v0/featured-apps/by-provider/{provider_party_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listFeaturedAppRightsByProvider"
+      description: |
+        List all `FeaturedAppRight` contracts for the given provider.
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
+
+  /v0/featured-apps/by-contract-id/{contract_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupFeaturedAppRightByContractId"
+      description: |
+        Look up a `FeaturedAppRight` contract by its contract ID.
+        Returns `featured_app_right` if found, empty otherwise.
+      parameters:
+        - name: "contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
+
   /v0/top-validators-by-validator-faucets:
     get:
       tags: [internal, scan]

@@ -126,6 +126,24 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
+  def lookupFeaturedAppRightByContractId(contractId: String)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
+  def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
   def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]]

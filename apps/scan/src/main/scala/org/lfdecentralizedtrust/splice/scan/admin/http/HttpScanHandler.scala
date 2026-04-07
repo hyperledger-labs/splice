@@ -454,6 +454,42 @@ class HttpScanHandler(
     }
   }
 
+  def listFeaturedAppRightsByProvider(
+      response: v0.ScanResource.ListFeaturedAppRightsByProviderResponse.type
+  )(providerPartyId: String)(extracted: TraceContext): Future[
+    v0.ScanResource.ListFeaturedAppRightsByProviderResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listFeaturedAppRightsByProvider") { _ => _ =>
+      for {
+        rights <- store.listFeaturedAppRightsByProvider(
+          PartyId.tryFromProtoPrimitive(providerPartyId)
+        )
+      } yield {
+        definitions.ListFeaturedAppRightsResponse(
+          rights.toVector.map(_.contract.toHttp)
+        )
+      }
+    }
+  }
+
+  def lookupFeaturedAppRightByContractId(
+      response: v0.ScanResource.LookupFeaturedAppRightByContractIdResponse.type
+  )(contractId: String)(extracted: TraceContext): Future[
+    v0.ScanResource.LookupFeaturedAppRightByContractIdResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupFeaturedAppRightByContractId") { _ => _ =>
+      for {
+        right <- store.multiDomainAcsStore.lookupContractById(
+          amulet.FeaturedAppRight.COMPANION
+        )(new amulet.FeaturedAppRight.ContractId(contractId))
+      } yield {
+        definitions.LookupFeaturedAppRightResponse(right.map(_.contract.toHttp))
+      }
+    }
+  }
+
   def getAmuletConfigForRound(
       response: v0.ScanResource.GetAmuletConfigForRoundResponse.type
   )(
