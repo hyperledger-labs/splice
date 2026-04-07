@@ -9,7 +9,7 @@ import {
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
   K8sResourceSchema,
-  SingleResourceSchema,
+  SingleK8sResourceSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/dockerConfig';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -39,19 +39,23 @@ const localnetHostAliases = [
   },
 ];
 
+function singleResourcesSpecFromConfig(resources: SingleK8sResourceSchema) {
+  return resources
+    ? {
+        cpu: resources.cpu,
+        memory: resources.memory,
+        'ephemeral-storage': resources.ephemeralStorage,
+      }
+    : undefined;
+}
+
 function resourcesSpecFromConfig(resources: K8sResourceSchema) {
-  return resources ? {
-    limits: resources.limits ? {
-      cpu: resources.limits.cpu,
-      memory: resources.limits.memory,
-      'ephemeral-storage': resources.limits.ephemeralStorage,
-    } : undefined,
-    requests: resources.requests ? {
-      cpu: resources.requests.cpu,
-      memory: resources.requests.memory,
-      'ephemeral-storage': resources.requests.ephemeralStorage,
-    } : undefined,
-  } : undefined;
+  return resources
+    ? {
+        limits: singleResourcesSpecFromConfig(resources.limits),
+        requests: singleResourcesSpecFromConfig(resources.requests),
+      }
+    : undefined;
 }
 
 function installDockerRunnerScaleSet(
@@ -316,7 +320,7 @@ function installK8sRunnerScaleSet(
   name: string,
   tokenSecret: Secret,
   cachePvcName: string,
-  resources: ResourcesSpec,
+  resources: K8sResourceSchema,
   serviceAccountName: string,
   dependsOn: Resource[],
   performanceTestsDb: PerformanceTestDb
@@ -370,8 +374,9 @@ function installK8sRunnerScaleSet(
                     // using the limits as the requests values.
                     cpu: '1m',
                     memory: '1m',
+                    'ephemeral-storage': '1',
                   },
-                  limits: resources?.limits,
+                  limits: resources ? singleResourcesSpecFromConfig(resources.limits) : undefined,
                 },
                 ports: [
                   {
@@ -485,10 +490,11 @@ function installK8sRunnerScaleSet(
                   // See note above on resource requests and limits on why we set the requests
                   // on the runner pod.
                   requests: resources
-                    ? resources.requests
+                    ? singleResourcesSpecFromConfig(resources.requests)
                     : {
                         cpu: '0.1',
                         memory: '2Gi',
+                        'ephemeral-storage': '1Gi',
                       },
                 },
               },
