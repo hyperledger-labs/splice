@@ -315,7 +315,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Lag behind the timestamp the commitment checkpoint was created and the timestamp of the checkpoint",
+      "description": "Lag behind the timestamp the commitment checkpoint was created and the timestamp of the checkpoint; periodic lag spikes around during commitment computation are expected",
       "fieldConfig": {
         "defaults": {
           "color": {
