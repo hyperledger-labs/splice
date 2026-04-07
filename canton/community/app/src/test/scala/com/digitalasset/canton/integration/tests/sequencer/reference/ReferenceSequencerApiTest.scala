@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer.reference
@@ -16,8 +16,8 @@ import com.digitalasset.canton.synchronizer.block.{AsyncWriterParameters, Sequen
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
 import com.digitalasset.canton.synchronizer.sequencer.config.{
-  SequencerNodeParameterConfig,
   SequencerNodeParameters,
+  TimeAdvancingTopologyConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
@@ -45,6 +45,7 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
         SequencerDriver.DriverApiVersion,
         ReferenceSequencerDriver.Config(StorageConfig.Memory()),
         BlockSequencerConfig(),
+        producePostOrderingTopologyTicks = false,
         health = None,
         storage,
         testedProtocolVersion,
@@ -61,8 +62,7 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
         crypto,
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        sequencingTimeLowerBoundExclusive =
-          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
+        lsuSequencingBounds = None,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS
@@ -87,6 +87,7 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
       asyncWriter = AsyncWriterParameters(),
+      timeAdvancingTopology = TimeAdvancingTopologyConfig(),
     )
 
   "Reference sequencer" when runSequencerApiTests()

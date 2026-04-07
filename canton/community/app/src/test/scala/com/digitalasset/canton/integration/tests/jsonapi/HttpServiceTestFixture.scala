@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
@@ -13,24 +13,20 @@ import com.daml.jwt.{
   StandardJWTPayload,
   StandardJWTTokenFormat,
 }
+import com.daml.tls.{TlsClientCertificate, TlsClientConfig, TlsServerConfig}
+import com.digitalasset.canton.config.PemFile
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
-import com.digitalasset.canton.config.{
-  PemFile,
-  TlsClientCertificate,
-  TlsClientConfig,
-  TlsServerConfig,
-}
 import com.digitalasset.canton.http.UserId
 import com.digitalasset.canton.http.util.NewBoolean
-import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.logging.{NamedLoggerFactory, SuppressingLogger}
 import com.digitalasset.canton.util.JarResourceUtils
 import com.digitalasset.daml.lf.data.Ref
+import io.circe.syntax.*
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
 import scalaz.syntax.tag.*
-import spray.json.*
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,12 +34,12 @@ import scala.concurrent.{ExecutionContext, Future}
 @nowarn("msg=match may not be exhaustive")
 object HttpServiceTestFixture {
 
-  val loggerFactory = SuppressingLogger(getClass)
+  val loggerFactory: NamedLoggerFactory = SuppressingLogger(getClass)
   val logger = loggerFactory.getLogger(getClass)
 
   lazy val staticPkgIdAccount: Ref.PackageRef = {
     import com.digitalasset.daml.lf.{archive, typesig}
-    val darFile = JarResourceUtils.resourceFile("Account-3.4.0.dar")
+    val darFile = JarResourceUtils.resourceFile("Account-1.0.0.dar")
     val dar = archive.UniversalArchiveReader.assertReadFile(darFile)
     Ref.PackageRef.assertFromString(typesig.PackageSignature.read(dar.main)._2.packageId)
   }
@@ -77,29 +73,29 @@ object HttpServiceTestFixture {
   def jwtForUser(
       user: Option[String]
   ): Jwt = {
-    val payload: JsValue = {
-      val standardJwtPayload: AuthServiceJWTPayload =
-        StandardJWTPayload(
-          issuer = None,
-          userId = user.getOrElse(userId.unwrap),
-          participantId = None,
-          exp = None,
-          format = StandardJWTTokenFormat.Scope,
-          audiences = List.empty,
-          scope = Some(AuthServiceJWTCodec.scopeLedgerApiFull),
-        )
-      standardJwtPayload.toJson
-    }
+    val standardJwtPayload: AuthServiceJWTPayload =
+      StandardJWTPayload(
+        issuer = None,
+        userId = user.getOrElse(userId.unwrap),
+        participantId = None,
+        exp = None,
+        format = StandardJWTTokenFormat.Scope,
+        audiences = List.empty,
+        scope = Some(AuthServiceJWTCodec.scopeLedgerApiFull),
+      )
+
+    val payloadString: String = standardJwtPayload.asJson.noSpaces
+
     JwtSigner.HMAC256
       .sign(
         DecodedJwt(
           """{"alg": "HS256", "typ": "JWT"}""",
-          payload.prettyPrint,
+          payloadString,
         ),
         "secret",
       )
       .fold(
-        e => throw new IllegalArgumentException(s"cannot sign a JWT: ${e.prettyPrint}"),
+        e => throw new IllegalArgumentException(s"cannot sign a JWT: ${e.toString}"),
         identity,
       )
   }

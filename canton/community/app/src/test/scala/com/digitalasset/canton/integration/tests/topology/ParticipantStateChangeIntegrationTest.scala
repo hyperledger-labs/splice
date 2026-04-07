@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -8,12 +8,13 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.FuncTest
 import com.daml.test.evidence.tag.Security.SecurityTest.Property
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.admin.api.client.data.SynchronizerConnectionConfig
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.console.{CommandFailure, LocalInstanceReference}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.NoSynchronizerOnWhichAllSubmittersCanSubmit
 import com.digitalasset.canton.examples.java.iou.Iou
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -27,7 +28,6 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.{
   SyncServiceSynchronizerDisabledUs,
   SyncServiceSynchronizerDisconnect,
 }
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.MemberAccessDisabled
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.*
@@ -48,22 +48,23 @@ trait ParticipantStateChangeIntegrationTest
     EnvironmentDefinition.P3_S1M1
 
   private def rollSigningKey(
-      node: LocalInstanceReference
+      envNodes: Seq[LocalInstanceReference],
+      node: LocalInstanceReference,
   ): Unit = {
 
-    def keys() = node.topology.owner_to_key_mappings
+    def keys(envNode: LocalInstanceReference) = envNode.topology.owner_to_key_mappings
       .list(
         filterKeyOwnerUid = node.id.member.filterString,
         filterKeyOwnerType = Some(node.id.member.code),
       )
       .flatMap(_.item.keys.forgetNE)
       .toSet
-    val before = keys()
+    val before = keys(node)
     node.keys.secret.rotate_node_keys()
     clue(s"${node.name} keys are distinct after rolling") {
       eventually() {
-        forAll(before) { k =>
-          keys() should not contain (k)
+        forAll(envNodes) { envNode =>
+          keys(envNode).intersect(before).shouldBe(empty)
         }
       }
     }
@@ -121,12 +122,12 @@ trait ParticipantStateChangeIntegrationTest
 
     // roll sequencer key
     clue("we can roll the sequencer key") {
-      rollSigningKey(sequencer1)
+      rollSigningKey(env.nodes.local, sequencer1)
       assertPingSucceeds(participant1, participant1)
     }
 
     clue("we can roll the mediator key") {
-      rollSigningKey(mediator1)
+      rollSigningKey(env.nodes.local, mediator1)
       assertPingSucceeds(participant1, participant1)
 
     }
@@ -182,10 +183,11 @@ trait ParticipantStateChangeIntegrationTest
     // queued while the participant was offline
     (0 to 2).foreach { idx =>
       logger.info(s"rollSigningKey iteration #$idx")
-      rollSigningKey(sequencer1)
-      rollSigningKey(mediator1)
-      rollSigningKey(sequencer1)
-      rollSigningKey(mediator1)
+      val activeNodes = env.nodes.local.filterNot(_ == participant1)
+      rollSigningKey(activeNodes, sequencer1)
+      rollSigningKey(activeNodes, mediator1)
+      rollSigningKey(activeNodes, sequencer1)
+      rollSigningKey(activeNodes, mediator1)
     }
 
     clue("re-enable participant") {
@@ -319,7 +321,8 @@ trait ParticipantStateChangeIntegrationTest
   }
 }
 
+@UnstableTest // TODO(#30006)
 class ParticipantStateChangeIntegrationTestPostgres extends ParticipantStateChangeIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

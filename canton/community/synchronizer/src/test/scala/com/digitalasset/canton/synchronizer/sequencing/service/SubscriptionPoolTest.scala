@@ -1,22 +1,27 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
 
 import cats.implicits.*
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.sequencing.client.transports.ServerSubscriptionCloseReason
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{Member, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
+import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.Future
 
+@UnstableTest // TODO(#30535)
 class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   def pid(s: String): Member = {
     val id = UniqueIdentifier.fromProtoPrimitive_(s"$s::default").map(ParticipantId(_)).value
@@ -34,6 +39,7 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
       val pool = new SubscriptionPool[MockSubscription](
         clock,
         SequencerTestMetrics,
+        maxSubscriptionsPerMember = PositiveInt.three,
         timeouts,
         loggerFactory,
       )
@@ -65,14 +71,21 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
     override def toString: String = s"Subscription($name)"
 
     override def isCancelled: Boolean = isRequestCancelled
+
+    override def transientClose(reason: ServerSubscriptionCloseReason.TransientCloseReason): Unit =
+      ()
   }
 
   def createSubscription(name: String): FutureUnlessShutdown[MockSubscription] =
     FutureUnlessShutdown.pure(new MockSubscription(name))
 
+  private def assertNum(expected: Int): Assertion =
+    SequencerTestMetrics.publicApi.subscriptionsGauge.getValue shouldBe expected
+
   "SubscriptionPool" should {
     "only close subscriptions that have not already been closed" in {
       val Env(_, manager) = Env()
+      assertNum(0)
 
       // create all in order
       val subscription1 =
@@ -83,23 +96,44 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
         manager.create(() => createSubscription("subscription3"), pid("p3")).futureValue
 
       manager.activeSubscriptions() should contain.only(subscription1, subscription2, subscription3)
-
+      assertNum(3)
       // subscription for p2 is going to close itself (perhaps downstream closed their connection)
       subscription2.close()
 
       eventually() {
         manager.activeSubscriptions() should contain.only(subscription1, subscription3)
       }
+      assertNum(2)
 
       // now we'll close the manager
       manager.close()
 
       manager.activeSubscriptions() shouldBe empty
+      assertNum(0)
 
-      // all should have only been closed once
-      subscription1.closeCount shouldEqual 1
-      subscription2.closeCount shouldEqual 1
-      subscription3.closeCount shouldEqual 1
+      eventually() {
+        // all should have only been closed once
+        subscription1.closeCount shouldEqual 1
+        subscription2.closeCount shouldEqual 1
+        subscription3.closeCount shouldEqual 1
+      }
+    }
+
+    "drop excess connections" in {
+      val Env(_, manager) = Env()
+      val subOther =
+        manager.create(() => createSubscription(s"subscriptionOther"), pid(s"other")).futureValue
+      assertNum(1)
+
+      val subs = (1 to 4).map { idx =>
+        manager.create(() => createSubscription(s"subscription$idx"), pid(s"tooMany")).futureValue
+      }
+      manager.activeSubscriptions() should contain.only(subOther, subs(1), subs(2), subs(3))
+      assertNum(2)
+
+      manager.close()
+      assertNum(0)
+
     }
 
     "close subscription by member" in {
@@ -110,10 +144,13 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
         manager.create(() => createSubscription("subscription2"), pid("p2")).futureValue
 
       manager.activeSubscriptions() should contain.only(subscription1, subscription2)
+      assertNum(2)
 
       manager.closeSubscriptions(pid("p2"))
 
       manager.activeSubscriptions() should contain only subscription1
+      assertNum(1)
+
     }
 
     "closes expired subscriptions" in {
@@ -138,12 +175,16 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
         .futureValue
 
       manager.activeSubscriptions() should contain.only(subscription1, subscription2)
+      assertNum(1)
 
       clock.advanceTo(ts1)
       manager.activeSubscriptions() should contain only subscription2
+      assertNum(1)
 
       clock.advanceTo(ts2)
       manager.activeSubscriptions() shouldBe empty
+      assertNum(0)
+
     }
 
     "return error if already shutdown" in {
@@ -169,6 +210,8 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
         .futureValue
 
       manager.activeSubscriptions() shouldBe empty
+      assertNum(0)
+
     }
 
     "cancelled request doesn't add connection to pool and doesn't return response" in {
@@ -190,6 +233,8 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
       subscriptionWithCancelledRequest.closeCount shouldEqual 1
 
       manager.activeSubscriptions() shouldBe empty
+      assertNum(0)
+
     }
 
     "close subscriptions for member closes all of their subscriptions" in {
@@ -204,10 +249,12 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
           manager.create(() => FutureUnlessShutdown.pure(sub1), participant1),
           manager.create(() => FutureUnlessShutdown.pure(sub2), participant1),
         ).sequence.value.futureValue
-        _ = manager.closeSubscriptions(participant1, waitForClosed = true)
+        _ = manager.closeSubscriptions(participant1)
       } yield {
-        sub1.isClosing shouldBe true
-        sub2.isClosing shouldBe true
+        eventually() {
+          sub1.isClosing shouldBe true
+          sub2.isClosing shouldBe true
+        }
       }
     }
 

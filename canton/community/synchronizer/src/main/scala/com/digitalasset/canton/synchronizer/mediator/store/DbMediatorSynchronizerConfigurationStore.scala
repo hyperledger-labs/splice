@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -29,8 +29,8 @@ class DbMediatorSynchronizerConfigurationStore(
     with DbStore {
 
   private type SerializedRow = (String300, ByteString, ByteString)
-  import DbStorage.Implicits.*
   import storage.api.*
+  import storage.converters.*
 
   // sentinel value used to ensure the table can only have a single row
   // see create table sql for more details

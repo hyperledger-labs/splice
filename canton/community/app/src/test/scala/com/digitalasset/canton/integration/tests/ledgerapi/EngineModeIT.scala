@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
@@ -8,14 +8,15 @@ import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand}
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
 import com.daml.ledger.resources.ResourceContext
 import com.daml.ports.Port
-import com.digitalasset.canton.ProtocolVersionChecksFixtureAnyWordSpec
+import com.digitalasset.canton.TestPredicateFiltersFixtureAnyWordSpec
+import com.digitalasset.canton.annotations.{NuckTest, RollbackTest}
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
-import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.integration.ConfigTransforms.{
   enableAlphaVersionSupport,
   setBetaSupport,
 }
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.CantonFixtureIsolated
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentSetupPlugin}
 import com.digitalasset.canton.ledger.api.grpc.GrpcClientResource
@@ -26,24 +27,23 @@ import com.digitalasset.canton.ledger.client.configuration.{
   LedgerClientConfiguration,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.testing.utils.TestModels
-import com.digitalasset.canton.util.JarResourceUtils
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.daml.lf.language.{LanguageMajorVersion, LanguageVersion}
+import com.digitalasset.daml.lf.language.LanguageVersion
 import com.google.protobuf
 import monocle.macros.syntax.lens.*
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
     extends CantonFixtureIsolated
-    with ProtocolVersionChecksFixtureAnyWordSpec {
+    with TestPredicateFiltersFixtureAnyWordSpec {
 
   registerPlugin(EngineModePlugin(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   private[this] val userId = UserId("EngineModeIT")
 
@@ -120,19 +120,17 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
     def load(langVersion: LanguageVersion, serverPort: Port)(implicit
         ec: ExecutionContext,
         esf: ExecutionSequencerFactory,
-    ) =
-      run(
-        JarResourceUtils
-          .resourceFile(TestModels.daml_lf_encoder_test_dar(langVersion.pretty))
-          .toPath,
-        serverPort,
-      )
+    ) = {
+      val darPath =
+        Paths.get(getClass.getClassLoader.getResource(s"test-${langVersion.pretty}.dar").toURI)
+      run(darPath, serverPort)
+    }
 
     def accept(langVersion: LanguageVersion, version: String, mode: String) = {
       val protocolVersion =
-        if (LanguageVersion.StableVersions(LanguageMajorVersion.V2).contains(langVersion))
+        if (LanguageVersion.stableLfVersions.contains(langVersion))
           ProtocolVersion.latest
-        else if (LanguageVersion.EarlyAccessVersions(LanguageMajorVersion.V2).contains(langVersion))
+        else if (LanguageVersion.earlyAccessLfVersionsRange.contains(langVersion))
           ProtocolVersion.beta.lastOption.getOrElse(ProtocolVersion.dev)
         else if (supportDevLanguageVersions) ProtocolVersion.dev
         else fail(s"Unsupported language version: $langVersion")
@@ -160,17 +158,14 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
 
     inside(
       List(
-        LanguageVersion.StableVersions(LanguageVersion.Major.V2).max,
-        LanguageVersion.EarlyAccessVersions(LanguageVersion.Major.V2).max,
+        LanguageVersion.stableLfVersionsRange.max,
+        LanguageVersion.earlyAccessLfVersionsRange.max,
         LanguageVersion.v2_dev,
       )
     ) { case List(maxStableVersion, betaVersion, devVersion) =>
       if (!supportDevLanguageVersions) {
         accept(maxStableVersion, "stable", "stable")
-        if (
-          LanguageVersion.EarlyAccessVersions(LanguageVersion.Major.V2) == LanguageVersion
-            .StableVersions(LanguageVersion.Major.V2)
-        )
+        if (LanguageVersion.earlyAccessLfVersionsRange == LanguageVersion.stableLfVersionsRange)
           accept(betaVersion, "beta", "beta")
         else
           reject(betaVersion, "beta", "stable")
@@ -206,4 +201,6 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
 
 class StableEngineModeIT extends BaseEngineModeIT(supportDevLanguageVersions = false)
 
+@NuckTest
+@RollbackTest
 class DevEngineModeIT extends BaseEngineModeIT(supportDevLanguageVersions = true)

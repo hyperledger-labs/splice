@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.traffic
 
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
@@ -39,11 +40,12 @@ trait RateLimitManagerTesting { this: BaseTest with HasExecutionContext =>
       .forOwnerAndSynchronizer(DefaultTestIdentities.participant1)
 
   def defaultRateLimiterWithEventCostCalculator(eventCostCalculator: EventCostCalculator) =
-    new EnterpriseSequencerRateLimitManager(
+    new SequencerRateLimitManagerImpl(
       defaultTrafficPurchasedManager,
       trafficConsumedStore,
       loggerFactory,
       timeouts,
+      BatchingConfig(),
       SequencerMetrics.noop("sequencer-rate-limit-manager-test"),
       cryptoClient,
       testedProtocolVersion,
@@ -52,11 +54,12 @@ trait RateLimitManagerTesting { this: BaseTest with HasExecutionContext =>
     )
 
   def mkRateLimiter(store: TrafficPurchasedStore) =
-    new EnterpriseSequencerRateLimitManager(
+    new SequencerRateLimitManagerImpl(
       mkTrafficPurchasedManager(store),
       trafficConsumedStore,
       loggerFactory,
       timeouts,
+      BatchingConfig(),
       SequencerMetrics.noop("sequencer-rate-limit-manager-test"),
       cryptoClient,
       testedProtocolVersion,
@@ -69,11 +72,12 @@ trait RateLimitManagerTesting { this: BaseTest with HasExecutionContext =>
       trafficConsumedStore: TrafficConsumedStore = trafficConsumedStore,
       eventCostCalculator: EventCostCalculator = new EventCostCalculator(loggerFactory),
   ) =
-    new EnterpriseSequencerRateLimitManager(
+    new SequencerRateLimitManagerImpl(
       manager,
       trafficConsumedStore,
       loggerFactory,
       timeouts,
+      BatchingConfig(),
       SequencerMetrics.noop("sequencer-rate-limit-manager-test"),
       cryptoClient,
       testedProtocolVersion,

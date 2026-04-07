@@ -1,22 +1,24 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
 
 import cats.data.NonEmptyVector
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
+import com.digitalasset.canton.ledger.participant.state.Update.ContractInfo
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.Added
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.{
   AuthorizationEvent,
   AuthorizationLevel,
   TopologyEvent,
 }
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.SameAsContractPackageId
 import com.digitalasset.canton.ledger.participant.state.{
   CompletionInfo,
   Reassignment,
@@ -32,8 +34,10 @@ import com.digitalasset.canton.platform.apiserver.services.admin.PartyAllocation
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.index.InMemoryStateUpdater.PrepareResult
 import com.digitalasset.canton.platform.index.InMemoryStateUpdaterSpec.*
+import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.Batch
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.cache.{
+  AchsStateCache,
   ContractStateCaches,
   InMemoryFanoutBuffer,
   MutableLedgerEndCache,
@@ -528,6 +532,54 @@ class InMemoryStateUpdaterSpec
 
   }
 
+  "updateCaches" should "not update cachesUpdatedUpto if contractStateCaches.push throws" in new Scope {
+
+    private val ledgerEnd41 = lastLedgerEnd.copy(lastOffset = Offset.tryFromLong(41L))
+    private val ledgerEnd42 = lastLedgerEnd.copy(lastOffset = Offset.tryFromLong(42L))
+
+    // check initial state
+    inMemoryState.cachesUpdatedUpto.get() shouldBe None
+
+    doNothing.when(inMemoryFanoutBuffer).push(any[TransactionLogUpdate])
+    // updateCaches with transactions up to 41
+    InMemoryStateUpdater.updateCaches(
+      inMemoryState,
+      updates,
+      ledgerEnd41,
+      traceContext,
+    )
+
+    inMemoryState.cachesUpdatedUpto.get() shouldBe Some(Offset.tryFromLong(41L))
+
+    // try updateCaches with transactions with 42 offset, which will throw
+    doThrow(new RuntimeException("Exception thrown from inMemoryFanoutBuffer.push"))
+      .when(inMemoryFanoutBuffer)
+      .push(any[TransactionLogUpdate])
+
+    an[RuntimeException] should be thrownBy {
+      InMemoryStateUpdater.updateCaches(
+        inMemoryState,
+        updates,
+        ledgerEnd42,
+        traceContext,
+      )
+    }
+
+    inMemoryState.cachesUpdatedUpto.get() shouldBe None
+
+    // updateCaches with transactions with 42 offset successfully
+    doNothing.when(inMemoryFanoutBuffer).push(any[TransactionLogUpdate])
+    InMemoryStateUpdater.updateCaches(
+      inMemoryState,
+      updates,
+      ledgerEnd42,
+      traceContext,
+    )
+
+    inMemoryState.cachesUpdatedUpto.get() shouldBe Some(Offset.tryFromLong(42L))
+
+  }
+
 }
 
 object InMemoryStateUpdaterSpec {
@@ -605,6 +657,7 @@ object InMemoryStateUpdaterSpec {
             contractAuthenticationData = someContractMetadataBytes,
             reassignmentCounter = 15L,
             nodeId = 0,
+            internalContractId = 1,
           )
         ),
         synchronizerId = synchronizerId2.toProtoPrimitive,
@@ -655,6 +708,7 @@ object InMemoryStateUpdaterSpec {
       )(emptyTraceContext)
 
     val ledgerEndCache: MutableLedgerEndCache = mock[MutableLedgerEndCache]
+    val achsStateCache: AchsStateCache = mock[AchsStateCache]
     val contractStateCaches: ContractStateCaches = mock[ContractStateCaches]
     val offsetCheckpointCache: OffsetCheckpointCache = mock[OffsetCheckpointCache]
     val inMemoryFanoutBuffer: InMemoryFanoutBuffer = mock[InMemoryFanoutBuffer]
@@ -682,6 +736,7 @@ object InMemoryStateUpdaterSpec {
     val inMemoryState = new InMemoryState(
       participantId = participantId,
       ledgerEndCache = ledgerEndCache,
+      achsStateCache = achsStateCache,
       contractStateCaches = contractStateCaches,
       offsetCheckpointCache = offsetCheckpointCache,
       inMemoryFanoutBuffer = inMemoryFanoutBuffer,
@@ -864,7 +919,18 @@ object InMemoryStateUpdaterSpec {
     def runFlow(
         input: Seq[(Vector[(Offset, Update)], LedgerEnd, TraceContext)]
     )(implicit mat: Materializer): Done =
-      Source(input)
+      Source(input.map { case (updates, ledgerEnd, tc) =>
+        Batch(
+          ledgerEnd = ledgerEnd,
+          batch = (),
+          batchSize = updates.size,
+          offsetsUpdates = updates,
+          missingDeactivatedActivations = Map.empty,
+          eventCount = 0L,
+          batchTraceContext = tc,
+          distinctRawStrings = Nil,
+        ): Batch[?]
+      })
         .via(inMemoryStateUpdater(false))
         .runWith(Sink.ignore)
         .futureValue
@@ -912,7 +978,6 @@ object InMemoryStateUpdaterSpec {
       createSignatories = createdNode.signatories,
       createObservers = createdNode.stakeholders.diff(createdNode.signatories),
       createKeyHash = createdNode.keyOpt.map(_.globalKey.hash),
-      createKey = createdNode.keyOpt.map(_.globalKey),
       createKeyMaintainers = createdNode.keyOpt.map(_.maintainers),
       authenticationData = someContractMetadataBytes,
       representativePackageId = representativePackageId,
@@ -958,13 +1023,13 @@ object InMemoryStateUpdaterSpec {
     Update.SequencedTransactionAccepted(
       completionInfoO = None,
       transactionMeta = someTransactionMeta,
-      transaction = CommittedTransaction(TransactionBuilder.Empty),
+      transactionInfo =
+        Update.TransactionAccepted.TransactionInfo(CommittedTransaction(TransactionBuilder.Empty)),
       updateId = txId2,
-      contractAuthenticationData = Map.empty,
       synchronizerId = SynchronizerId.tryFromString("da::default"),
       recordTime = CantonTimestamp.MinValue,
       acsChangeFactory = TestAcsChangeFactory(),
-      internalContractIds = Map.empty,
+      contractInfos = Map.empty,
     )
 
   private val update4 = offset(14L) ->
@@ -1086,7 +1151,18 @@ object InMemoryStateUpdaterSpec {
     var checkpoints: Seq[OffsetCheckpoint] = Seq.empty
 
     val output = sourceSomes
-      .map((_, someLedgerEnd, emptyTraceContext))
+      .map(updates =>
+        Batch(
+          ledgerEnd = someLedgerEnd,
+          batch = (),
+          batchSize = updates.size,
+          offsetsUpdates = updates,
+          missingDeactivatedActivations = Map.empty,
+          eventCount = 0L,
+          batchTraceContext = emptyTraceContext,
+          distinctRawStrings = Nil,
+        )
+      )
       .via(
         InMemoryStateUpdaterFlow
           .updateOffsetCheckpointCacheFlowWithTickingSource(
@@ -1097,7 +1173,7 @@ object InMemoryStateUpdaterSpec {
             tick = sourceNones,
           )
       )
-      .map(_._1)
+      .map(_.offsetsUpdates)
       .alsoTo(Sink.foreach(_ => offerNext()))
       .runWith(Sink.seq)
 
@@ -1116,14 +1192,19 @@ object InMemoryStateUpdaterSpec {
     Update.SequencedTransactionAccepted(
       completionInfoO = None,
       transactionMeta = someTransactionMeta,
-      transaction = transaction,
+      transactionInfo = Update.TransactionAccepted.TransactionInfo(transaction),
       updateId = txId1,
-      contractAuthenticationData = contractAuthenticationData,
       synchronizerId = synchronizerId,
       recordTime = CantonTimestamp(Timestamp(t)),
       externalTransactionHash = externalTransactionHash,
       acsChangeFactory = TestAcsChangeFactory(contractActivenessChanged),
-      internalContractIds = Map.empty,
+      contractInfos = contractAuthenticationData.zipWithIndex.map { case ((cid, bytes), idx) =>
+        cid -> ContractInfo(
+          internalContractId = idx.toLong,
+          contractAuthenticationData = bytes,
+          representativePackageId = SameAsContractPackageId,
+        )
+      }.toMap,
     )
 
   private def assignmentAccepted(
@@ -1149,12 +1230,12 @@ object InMemoryStateUpdaterSpec {
           contractAuthenticationData = someContractMetadataBytes,
           reassignmentCounter = 15L,
           nodeId = 0,
+          internalContractId = 1,
         )
       ),
       recordTime = CantonTimestamp(Timestamp(t)),
       synchronizerId = target,
       acsChangeFactory = TestAcsChangeFactory(),
-      internalContractIds = Map.empty,
     )
 
   private def unassignmentAccepted(
@@ -1187,7 +1268,6 @@ object InMemoryStateUpdaterSpec {
       recordTime = CantonTimestamp(Timestamp(t)),
       synchronizerId = source,
       acsChangeFactory = TestAcsChangeFactory(),
-      internalContractIds = Map.empty,
     )
 
   private def commandRejected(t: Long, synchronizerId: SynchronizerId): Update.CommandRejected =
@@ -1202,6 +1282,7 @@ object InMemoryStateUpdaterSpec {
       reasonTemplate = FinalReason(new Status()),
       synchronizerId = synchronizerId,
       recordTime = CantonTimestamp.assertFromLong(t),
+      isTransaction = true,
     )
 
   private def sequencerIndexMoved(

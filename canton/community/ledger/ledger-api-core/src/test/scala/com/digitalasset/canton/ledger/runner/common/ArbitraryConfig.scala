@@ -1,14 +1,15 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.runner.common
 
 import com.daml.jwt.JwtTimestampLeeway
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, Port}
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
-import com.digitalasset.canton.platform.config.{IdentityProviderManagementConfig, *}
+import com.digitalasset.canton.platform.config.*
 import com.digitalasset.canton.platform.indexer.IndexerConfig
+import com.digitalasset.canton.platform.indexer.IndexerConfig.AchsConfig
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.DbSupport.DataSourceProperties
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
@@ -16,7 +17,7 @@ import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSou
 import com.digitalasset.daml.lf.VersionRange
 import com.digitalasset.daml.lf.interpretation.Limits
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine as ContractStateMachine
 import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth
 import org.scalacheck.Gen
 
@@ -28,6 +29,9 @@ object ArbitraryConfig {
 
   val nonNegativeIntGen: Gen[NonNegativeInt] =
     Gen.chooseNum(0, Int.MaxValue).map(NonNegativeInt.tryCreate)
+
+  val nonNegativeLongGen: Gen[NonNegativeLong] =
+    Gen.chooseNum(0, Long.MaxValue).map(NonNegativeLong.tryCreate)
 
   val duration: Gen[Duration] = for {
     value <- Gen.chooseNum(0, Int.MaxValue)
@@ -45,9 +49,9 @@ object ArbitraryConfig {
     duration.map(NonNegativeFiniteDuration.tryFromJavaDuration)
 
   val versionRange: Gen[VersionRange[LanguageVersion]] = for {
-    min <- Gen.oneOf(LanguageVersion.AllV2)
-    max <- Gen.oneOf(LanguageVersion.AllV2)
-    if LanguageVersion.Ordering.compare(max, min) >= 0
+    min <- Gen.oneOf(LanguageVersion.allLfVersions)
+    max <- Gen.oneOf(LanguageVersion.allLfVersions)
+    if max >= min
   } yield VersionRange[LanguageVersion](min, max)
 
   val limits: Gen[Limits] = for {
@@ -66,8 +70,11 @@ object ArbitraryConfig {
     transactionInputContracts,
   )
 
-  val contractKeyUniquenessMode: Gen[ContractKeyUniquenessMode] =
-    Gen.oneOf(ContractKeyUniquenessMode.Strict, ContractKeyUniquenessMode.Off)
+  val contractKeyUniquenessMode: Gen[ContractStateMachine.Mode] =
+    Gen.oneOf(
+      ContractStateMachine.Mode.NoKey,
+      ContractStateMachine.Mode.NUCK,
+    )
 
   val inetSocketAddress = for {
     host <- Gen.alphaStr
@@ -127,14 +134,27 @@ object ArbitraryConfig {
 
   val postgresDataSourceConfig = for {
     synchronousCommit <- Gen.option(Gen.oneOf(SynchronousCommitValue.All))
-    tcpKeepalivesIdle <- Gen.chooseNum(0, Int.MaxValue)
-    tcpKeepalivesInterval <- Gen.chooseNum(0, Int.MaxValue)
-    tcpKeepalivesCount <- Gen.chooseNum(0, Int.MaxValue)
+    nonNegativeInt = Gen.chooseNum(0, Int.MaxValue)
+    tcpKeepalivesIdle <- nonNegativeInt
+    tcpKeepalivesInterval <- nonNegativeInt
+    tcpKeepalivesCount <- nonNegativeInt
+    clientConnectionCheckInterval <- nonNegativeFiniteDurationGen
+    networkTimeout <- nonNegativeFiniteDurationGen
   } yield PostgresDataSourceConfig(
-    synchronousCommit,
-    Some(tcpKeepalivesIdle),
-    Some(tcpKeepalivesInterval),
-    Some(tcpKeepalivesCount),
+    synchronousCommit = synchronousCommit,
+    tcpKeepalivesIdle = Some(tcpKeepalivesIdle),
+    tcpKeepalivesInterval = Some(tcpKeepalivesInterval),
+    tcpKeepalivesCount = Some(tcpKeepalivesCount),
+    clientConnectionCheckInterval = Some(clientConnectionCheckInterval),
+    networkTimeout = Some(networkTimeout),
+  )
+
+  val achsConfig: Gen[AchsConfig] = for {
+    validAtDistanceTarget <- nonNegativeLongGen
+    lastPopulatedDistanceTarget <- nonNegativeLongGen
+  } yield AchsConfig(
+    validAtDistanceTarget = validAtDistanceTarget,
+    lastPopulatedDistanceTarget = lastPopulatedDistanceTarget,
   )
 
   val dataSourceProperties = for {
@@ -164,6 +184,7 @@ object ArbitraryConfig {
     maxInputBufferSize <- nonNegativeIntGen
     restartDelay <- nonNegativeFiniteDurationGen
     submissionBatchSize <- Gen.long
+    achsConfig <- Gen.option(achsConfig)
   } yield IndexerConfig(
     batchingParallelism = batchingParallelism,
     enableCompression = enableCompression,
@@ -172,6 +193,7 @@ object ArbitraryConfig {
     maxInputBufferSize = maxInputBufferSize,
     restartDelay = restartDelay,
     submissionBatchSize = submissionBatchSize,
+    achsConfig = achsConfig,
   )
 
   def genActiveContractsServiceStreamConfig: Gen[ActiveContractsServiceStreamsConfig] =

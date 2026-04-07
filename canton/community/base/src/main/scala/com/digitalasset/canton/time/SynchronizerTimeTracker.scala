@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -39,7 +39,7 @@ import org.apache.pekko.stream.scaladsl.Flow
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** Provides a variety of methods for tracking time on the synchronizer.
   *   - fetchTime and fetchTimeProof allows for proactively asking for a recent time or time proof.
@@ -88,15 +88,15 @@ class SynchronizerTimeTracker(
     )
 
   /** Ensures that changes to [[timestampRef]] and [[pendingTicks]] happen atomically */
-  private val lock: AnyRef = new Object
+  private val lock = new Mutex()
 
   private def withLock[A](fn: => A): A =
-    blocking {
-      lock.synchronized(fn)
-    }
+    lock.exclusive(fn)
 
   // the maximum timestamp we can support waiting for without causing an overflow
-  private val maxPendingTick = CantonTimestamp.MaxValue.minus(config.observationLatency.asJava)
+  private val maxPendingTick =
+    if (clock.isSimClock) CantonTimestamp.MaxValue
+    else CantonTimestamp.MaxValue.minus(config.observationLatency.asJava)
 
   private val timestampRef: AtomicReference[LatestAndNext[CantonTimestamp]] =
     new AtomicReference[LatestAndNext[CantonTimestamp]](LatestAndNext.empty)
@@ -244,12 +244,13 @@ class SynchronizerTimeTracker(
     */
   def subscriptionResumesAfter(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Unit =
+  )(implicit traceContext: TraceContext): Unit = {
+    logger.debug(s"Initializing synchronizer time tracker for resubscription at $timestamp")
     withLock {
-      logger.debug(s"Initializing synchronizer time tracker for resubscription at $timestamp")
       updateTimestampRef(timestamp)
       removeTicks(timestamp)
     }
+  }
 
   @VisibleForTesting
   private[time] def update(events: Seq[OrdinarySequencedEvent[Envelope[?]]])(implicit
@@ -338,7 +339,10 @@ class SynchronizerTimeTracker(
   @VisibleForTesting
   private[time] def earliestExpectedObservationTime(): Option[(Traced[CantonTimestamp], String)] =
     firstUncancelledTick().map(tick =>
-      Traced(tick.desiredTimestamp.add(config.observationLatency.asJava))(
+      Traced(
+        if (clock.isSimClock) tick.desiredTimestamp
+        else tick.desiredTimestamp.add(config.observationLatency.asJava)
+      )(
         tick.traceContext
       ) -> tick.creationStackTrace
     )

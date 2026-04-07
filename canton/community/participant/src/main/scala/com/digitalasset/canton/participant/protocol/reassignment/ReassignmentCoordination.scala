@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -51,7 +51,7 @@ trait GetTopologyAtTimestamp {
     * which case it'll return None.
     */
   def maybeAwaitTopologySnapshot(
-      targetPSId: Target[PhysicalSynchronizerId],
+      targetPsid: Target[PhysicalSynchronizerId],
       requestedTimestamp: Target[CantonTimestamp],
   )(implicit
       traceContext: TraceContext
@@ -64,7 +64,7 @@ trait GetTopologyAtTimestamp {
    * TODO(i27585): After cleaning up the waiting routines, refactor to something like
    *
    *    def getTopologySnapshot(
-   *      targetPSId: PhysicalSynchronizerId,
+   *      targetPsid: PhysicalSynchronizerId,
    *      requestedTimestamp: CantonTimestamp,
    *    ): Either[UnknownPhysicalSynchronizer, TopologySnapshotResult]
    *
@@ -93,25 +93,25 @@ class ReassignmentCoordination(
 
   def addPendingUnassignment(
       reassignmentId: ReassignmentId,
-      sourcePSId: Source[SynchronizerId],
+      sourcePsid: Source[SynchronizerId],
   ): Unit =
-    pendingUnassignments(sourcePSId)
+    pendingUnassignments(sourcePsid)
       .foreach(_.add(reassignmentId))
 
   def completeUnassignment(
       reassignmentId: ReassignmentId,
-      sourcePSId: Source[PhysicalSynchronizerId],
+      sourcePsid: Source[PhysicalSynchronizerId],
   ): Unit =
-    pendingUnassignments(sourcePSId.map(_.logical))
+    pendingUnassignments(sourcePsid.map(_.logical))
       .foreach(_.completePhase7(reassignmentId))
 
   // Todo(i25029): Add the ability to interrupt the wait for unassignment completion in specific cases
   def waitForStartedUnassignmentToCompletePhase7(
       reassignmentId: ReassignmentId,
-      sourcePSId: Source[PhysicalSynchronizerId],
+      sourcePsid: Source[PhysicalSynchronizerId],
   ): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.outcomeF(
-      pendingUnassignments(sourcePSId.map(_.logical))
+      pendingUnassignments(sourcePsid.map(_.logical))
         .flatMap(_.find(reassignmentId))
         .getOrElse(Future.successful(()))
     )
@@ -279,19 +279,30 @@ class ReassignmentCoordination(
       )
     } yield snapshot
 
+  import cats.implicits.*
+
   private def getRecentTopologyTimestamp[T[X] <: ReassignmentTag[
     X
   ]: SameReassignmentType: SingletonTraverse](
       psid: T[PhysicalSynchronizerId]
   )(implicit
       traceContext: TraceContext
-  ): Either[UnknownPhysicalSynchronizer, T[CantonTimestamp]] = for {
-    staticSynchronizerParameters <- getStaticSynchronizerParameter(psid)
-    topoClient <- getTopologyClient(psid, staticSynchronizerParameters)
-  } yield topoClient.map(_.currentSnapshotApproximation.ipsSnapshot.timestamp)
+  ): EitherT[FutureUnlessShutdown, UnknownPhysicalSynchronizer, T[CantonTimestamp]] = for {
+    staticSynchronizerParameters <- EitherT.fromEither[FutureUnlessShutdown](
+      getStaticSynchronizerParameter(psid)
+    )
+    topoClient <- EitherT.fromEither[FutureUnlessShutdown](
+      getTopologyClient(psid, staticSynchronizerParameters)
+    )
+    snapshot <- topoClient.traverseSingleton { case (_, client) =>
+      EitherT.right[UnknownPhysicalSynchronizer](
+        client.currentSnapshotApproximation.map(_.ipsSnapshot.timestamp)
+      )
+    }
+  } yield snapshot
 
   override def maybeAwaitTopologySnapshot(
-      targetPSId: Target[PhysicalSynchronizerId],
+      targetPsid: Target[PhysicalSynchronizerId],
       requestedTimestamp: Target[CantonTimestamp],
   )(implicit
       traceContext: TraceContext
@@ -301,17 +312,16 @@ class ReassignmentCoordination(
     Option[Target[TopologySnapshot]],
   ] = for {
     staticSynchronizerParameters <- EitherT.fromEither[FutureUnlessShutdown](
-      getStaticSynchronizerParameter(targetPSId)
+      getStaticSynchronizerParameter(targetPsid)
     )
 
-    recentTimestamp <- EitherT.fromEither[FutureUnlessShutdown](
-      getRecentTopologyTimestamp(targetPSId)
-    )
+    recentTimestamp <- getRecentTopologyTimestamp(targetPsid)
+
     timestampUpperBound = recentTimestamp.map(_ + targetTimestampForwardTolerance)
     topology <-
       if (requestedTimestamp <= timestampUpperBound) {
         awaitTimestampAndGetTaggedCryptoSnapshot(
-          targetPSId,
+          targetPsid,
           staticSynchronizerParameters,
           requestedTimestamp,
         ).map(_.map(_.ipsSnapshot)).map(Some(_))
@@ -346,9 +356,7 @@ class ReassignmentCoordination(
     Target[TopologySnapshot],
   ] =
     for {
-      timestamp <- EitherT.fromEither[FutureUnlessShutdown](
-        getRecentTopologyTimestamp(targetSynchronizerId)
-      )
+      timestamp <- getRecentTopologyTimestamp(targetSynchronizerId)
       // Since events are stored before they are processed, we wait just to be sure.
       targetCrypto <- awaitTimestampAndGetTaggedCryptoSnapshot(
         targetSynchronizerId,
@@ -365,7 +373,7 @@ class ReassignmentCoordination(
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit] =
     for {
       reassignmentStore <- EitherT.fromEither[FutureUnlessShutdown](
-        reassignmentStoreFor(unassignmentData.targetPSId.map(_.logical))
+        reassignmentStoreFor(unassignmentData.targetPsid.map(_.logical))
       )
       _ <- reassignmentStore
         .addUnassignmentData(unassignmentData)

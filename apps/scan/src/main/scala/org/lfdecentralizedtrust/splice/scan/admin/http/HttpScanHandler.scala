@@ -89,6 +89,12 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
   Mint,
   Transfer,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  AbortTransferInstruction,
+  DevnetTap,
+  Mint,
+  Transfer,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2

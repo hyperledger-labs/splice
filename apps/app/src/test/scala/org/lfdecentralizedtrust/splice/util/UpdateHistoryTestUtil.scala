@@ -66,6 +66,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         transaction_filter.EventFormat(
           filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
           filtersForAnyParty = None,
+          verbose = false,
         )
       ),
       transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -126,6 +126,8 @@ final case class TransactionSubmissionTrackingData(
       synchronizerId.logical,
       recordTime,
       messageUuid,
+      // TODO(i15875): Submission tracking is only enabled for transactions
+      isTransaction = true,
     )
   }
 

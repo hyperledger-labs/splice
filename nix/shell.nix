@@ -147,6 +147,7 @@ in pkgs.mkShell {
   CANTON_SEQUENCER_IMAGE_SHA256 = "${sources.canton_sequencer_image_sha256}";
   CANTON_MEDIATOR_IMAGE_SHA256 = "${sources.canton_mediator_image_sha256}";
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
+  DAML_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";

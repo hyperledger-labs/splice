@@ -59,13 +59,13 @@ export async function transfer(
         filtersByParty: filtersByParty(sender, [HoldingInterface], false),
       },
       verbose: false,
-      activeAtOffset: ledgerEndOffset.offset,
+      activeAtOffset: ledgerEndOffset.offset!,
     });
     if (senderHoldings.length === 0) {
       throw new Error("Sender has no holdings, so transfer can't be executed.");
     }
     const holdings = senderHoldings.map(
-      (h) => h["contractEntry"]["JsActiveContract"],
+      (h) => h["contractEntry"]!["JsActiveContract"],
     );
     const inputHoldingCids = holdings.map(
       (h) => h["createdEvent"]["contractId"],

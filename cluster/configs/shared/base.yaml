@@ -71,6 +71,13 @@ pulumiStacks:
 validator1:
   logging:
     level: DEBUG
+  participant:
+    additionalEnvVars:
+      - !include(./participant_pruning.yaml)
+splitwell:
+  participant:
+    additionalEnvVars:
+      - !include(./participant_pruning.yaml)
 # initial round used only on fresh initialization or resets
 # first SV bootstraps the network with it, other SVs learn it via their sponsors
 initialRound: 0
@@ -124,6 +131,10 @@ monitoring:
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5
+      walletSweep:
+        # Multiplier applied to a wallet sweep's configured maxBalance to set the alert threshold.
+        # 1.5 means the alert fires if the balance is 50% higher than expected.
+        tolerance: 1.5
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
@@ -199,9 +210,7 @@ svs:
         limits:
           memory: '18Gi'
       additionalEnvVars:
-        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
-          value: |
-            canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
+        - !include(./participant_pruning.yaml)
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.data.db
@@ -16,13 +16,10 @@ import com.digitalasset.canton.synchronizer.block.data.{
   BlockInfo,
   SequencerBlockStore,
 }
+import com.digitalasset.canton.synchronizer.sequencer.SequencerInitialState
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.BlockNotFound
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
-import com.digitalasset.canton.synchronizer.sequencer.{
-  InFlightAggregationUpdates,
-  SequencerInitialState,
-}
 import com.digitalasset.canton.synchronizer.sequencing.integrations.state.DbSequencerStateManagerStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
@@ -45,7 +42,7 @@ class DbSequencerBlockStore(
 
   private val topRow = storage.limitSql(1)
 
-  private val stateManagerStore = new DbSequencerStateManagerStore(
+  protected override val stateManagerStore = new DbSequencerStateManagerStore(
     storage,
     protocolVersion,
     timeouts,
@@ -53,10 +50,9 @@ class DbSequencerBlockStore(
     batchingConfig,
     sequencerStore,
   )
-
-  override def readHead(implicit
+  override def readHeadBlockInfo()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[BlockEphemeralState]] =
+  ): FutureUnlessShutdown[Option[BlockInfo]] =
     storage.query(
       for {
         watermark <- safeWaterMarkDBIO
@@ -64,12 +60,7 @@ class DbSequencerBlockStore(
           case Some(watermark) => findBlockForCrashRecoveryForWatermark(watermark)
           case None => DBIO.successful(None)
         }
-        state <- blockInfoO match {
-          case None => DBIO.successful(None)
-          case Some(blockInfo) =>
-            readAtBlock(blockInfo, maxSequencingTimeBound = CantonTimestamp.MaxValue).map(Some(_))
-        }
-      } yield state,
+      } yield blockInfoO,
       functionFullName,
     )
 
@@ -91,27 +82,23 @@ class DbSequencerBlockStore(
   private def findBlockForCrashRecoveryForWatermark(
       beforeInclusive: CantonTimestamp
   ): DBIOAction[Option[BlockInfo], NoStream, Effect.Read] =
-    (sql"""select height, latest_event_ts, latest_sequencer_event_ts from seq_block_height where latest_event_ts <= $beforeInclusive order by height desc """ ++ topRow)
+    (sql"""select height, latest_event_ts, latest_sequencer_event_ts, latest_pending_topology_ts from seq_block_height where latest_event_ts <= $beforeInclusive order by height desc """ ++ topRow)
       .as[BlockInfo]
       .headOption
 
   private def findBlockContainingTimestampDBIO(
       timestamp: CantonTimestamp
   ): DBIOAction[Option[BlockInfo], NoStream, Effect.Read] =
-    (sql"""select height, latest_event_ts, latest_sequencer_event_ts from seq_block_height where latest_event_ts >= $timestamp order by height """ ++ topRow)
+    (sql"""select height, latest_event_ts, latest_sequencer_event_ts, latest_pending_topology_ts from seq_block_height where latest_event_ts >= $timestamp order by height """ ++ topRow)
       .as[BlockInfo]
       .headOption
 
   override def findBlockContainingTimestamp(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SequencerError, BlockInfo] =
-    EitherT(
-      storage
-        .query(findBlockContainingTimestampDBIO(timestamp), functionFullName)
-        .map {
-          case Some(block) => Right(block)
-          case None => Left(BlockNotFound.InvalidTimestamp(timestamp))
-        }
+    EitherT.fromOptionF(
+      storage.query(findBlockContainingTimestampDBIO(timestamp), functionFullName),
+      BlockNotFound.InvalidTimestamp(timestamp),
     )
 
   override def readStateForBlockContainingTimestamp(
@@ -120,34 +107,10 @@ class DbSequencerBlockStore(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, BlockEphemeralState] =
-    EitherT(
-      storage.query(
-        for {
-          heightAndTimestamp <- findBlockContainingTimestampDBIO(timestamp)
-          state <- heightAndTimestamp match {
-            case None => DBIO.successful(Left(BlockNotFound.InvalidTimestamp(timestamp)))
-            case Some(block) => readAtBlock(block, maxSequencingTimeBound).map(Right.apply)
-          }
-        } yield state,
-        functionFullName,
-      )
-    )
-
-  private def readAtBlock(
-      block: BlockInfo,
-      maxSequencingTimeBound: CantonTimestamp,
-  ): DBIOAction[BlockEphemeralState, NoStream, Effect.Read with Effect.Transactional] =
-    stateManagerStore
-      .readInFlightAggregationsDBIO(
-        block.lastTs,
-        maxSequencingTimeBound,
-      )
-      .map(inFlightAggregations => BlockEphemeralState(block, inFlightAggregations))
-
-  override def storeInflightAggregations(
-      inFlightAggregationUpdates: InFlightAggregationUpdates
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    stateManagerStore.addInFlightAggregationUpdates(inFlightAggregationUpdates)
+    for {
+      block <- findBlockContainingTimestamp(timestamp)
+      state <- EitherT.right(readStateAtBlock(block, maxSequencingTimeBound))
+    } yield state
 
   override def finalizeBlockUpdates(blocks: Seq[BlockInfo])(implicit
       traceContext: TraceContext
@@ -169,12 +132,13 @@ class DbSequencerBlockStore(
 
   private def updateBlockHeightDBIO(blocks: Seq[BlockInfo])(implicit traceContext: TraceContext) = {
     val insertSql =
-      """insert into seq_block_height (height, latest_event_ts, latest_sequencer_event_ts)
-            values (?,?,?) on conflict do nothing"""
+      """insert into seq_block_height (height, latest_event_ts, latest_sequencer_event_ts, latest_pending_topology_ts)
+            values (?,?,?,?) on conflict do nothing"""
     DbStorage.bulkOperation_(insertSql, blocks, storage.profile) { pp => block =>
       pp >> block.height
       pp >> block.lastTs
       pp >> block.latestSequencerEventTimestamp
+      pp >> block.latestPendingTopologyTransactionTimestamp
     }
 
   }

@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.logging
 
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -57,7 +56,7 @@ abstract class TraceIdIntegrationTest extends CommunityIntegrationTest with Shar
 
           val lapiLogs: Seq[(String, LogEntry)] = tracedLogs
             .filter(_._2.loggerName contains lapiService)
-            .filter(_._2.message contains "Submitting commands for interpretation")
+            .filter(_._2.message.matches(".*Submitting \\d+ command\\(s\\) for interpretation.*"))
           val lapiTids: Seq[String] = lapiLogs
             .map(_._1)
 
@@ -80,5 +79,6 @@ abstract class TraceIdIntegrationTest extends CommunityIntegrationTest with Shar
 }
 
 class TraceIdIntegrationTestDefault extends TraceIdIntegrationTest {
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders
@@ -57,7 +57,6 @@ object LeaderSelectionInitializer {
       case blacklistLeaderSelectionPolicyConfig: BftBlockOrdererConfig.LeaderSelectionPolicyConfig.Blacklisting =>
         new BlacklistLeaderSelectionInitializer(
           thisNode,
-          config,
           blacklistLeaderSelectionPolicyConfig,
           protocolVersion,
           store,

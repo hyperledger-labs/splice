@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import cats.Monoid
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric.SubtractionResult
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -88,6 +87,7 @@ object RequireTypes {
 
     def map[U](f: T => U)(implicit num: Numeric[U]) = NonNegativeNumeric.tryCreate(f(value))
     def increment: PositiveNumeric[T] = PositiveNumeric.tryCreate(value + num.one)
+    def toPositiveNumeric: Option[PositiveNumeric[T]] = PositiveNumeric.create(value).toOption
 
     def +(other: NonNegativeNumeric[T]): NonNegativeNumeric[T] =
       NonNegativeNumeric.tryCreate(value + other.value)
@@ -146,6 +146,10 @@ object RequireTypes {
 
     implicit val readNonNegativeIntOption: GetResult[Option[NonNegativeInt]] = GetResult { r =>
       r.nextIntOption().map(NonNegativeInt.tryCreate)
+    }
+
+    implicit val readNonNegativeLongOption: GetResult[Option[NonNegativeLong]] = GetResult { r =>
+      r.nextLongOption().map(NonNegativeLong.tryCreate)
     }
 
     implicit def writeNonNegativeNumeric[T](implicit
@@ -263,11 +267,11 @@ object RequireTypes {
   object PositiveInt {
     def create(n: Int): Either[InvariantViolation, PositiveInt] = PositiveNumeric.create(n)
     def tryCreate(n: Int): PositiveInt = PositiveNumeric.tryCreate(n)
-    def size[T](collection: NonEmpty[Iterable[T]]): PositiveInt = tryCreate(collection.size)
 
     lazy val one: PositiveInt = PositiveInt.tryCreate(1)
     lazy val two: PositiveInt = PositiveInt.tryCreate(2)
     lazy val three: PositiveInt = PositiveInt.tryCreate(3)
+    lazy val four: PositiveInt = PositiveInt.tryCreate(4)
     lazy val MaxValue: PositiveInt = PositiveInt.tryCreate(Int.MaxValue)
   }
 
@@ -276,7 +280,6 @@ object RequireTypes {
   object PositiveLong {
     def create(n: Long): Either[InvariantViolation, PositiveLong] = PositiveNumeric.create(n)
     def tryCreate(n: Long): PositiveLong = PositiveNumeric.tryCreate(n)
-    def size[T](collection: NonEmpty[Iterable[T]]): PositiveLong = tryCreate(collection.size.toLong)
 
     lazy val one: PositiveLong = PositiveLong.tryCreate(1)
     lazy val MaxValue: PositiveLong = PositiveLong.tryCreate(Long.MaxValue)

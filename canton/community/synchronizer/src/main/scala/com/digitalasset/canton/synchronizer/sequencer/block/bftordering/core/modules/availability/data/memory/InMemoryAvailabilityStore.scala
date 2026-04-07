@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory
@@ -28,10 +28,10 @@ abstract class GenericInMemoryAvailabilityStore[E <: Env[E]](
 
   override def addBatch(batchId: BatchId, batch: OrderingRequestBatch)(implicit
       traceContext: TraceContext
-  ): E#FutureUnlessShutdownT[Unit] =
+  ): E#FutureUnlessShutdownT[Boolean] =
     createFuture(addBatchActionName(batchId)) { () =>
       Try {
-        allKnownBatchesById.putIfAbsent(batchId, batch).discard
+        allKnownBatchesById.putIfAbsent(batchId, batch).isEmpty
       }
     }
 
@@ -66,11 +66,13 @@ abstract class GenericInMemoryAvailabilityStore[E <: Env[E]](
   private[data] def isEmpty: Boolean = allKnownBatchesById.isEmpty
 
   @VisibleForTesting
+  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   private[data] def size: Int = allKnownBatchesById.size
 
   @VisibleForTesting
   private[data] def keys: Iterable[BatchId] = allKnownBatchesById.keys
 
+  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   override def loadNumberOfRecords(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[AvailabilityStore.NumberOfRecords] =

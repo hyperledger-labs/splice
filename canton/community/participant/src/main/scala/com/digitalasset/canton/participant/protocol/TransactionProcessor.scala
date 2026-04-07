@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -44,16 +44,17 @@ import com.digitalasset.canton.participant.protocol.validation.{
 }
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ContractValidator
+import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.ShowUtil.*
 import org.slf4j.event.Level
 
@@ -73,6 +74,7 @@ class TransactionProcessor(
     ephemeral: SyncEphemeralState,
     commandProgressTracker: CommandProgressTracker,
     metrics: TransactionProcessingMetrics,
+    clock: Clock,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -108,6 +110,7 @@ class TransactionProcessor(
         staticSynchronizerParameters,
         crypto,
         metrics,
+        clock,
         damle.enrichTransaction,
         damle.enrichContract,
         new AuthorizationValidator(participantId),
@@ -118,11 +121,13 @@ class TransactionProcessor(
         loggerFactory,
         futureSupervisor,
         messagePayloadLoggingEnabled,
+        ephemeral.ledgerApiIndexer.onlyForTestingTransactionInMemoryStore,
       ),
       inFlightSubmissionSynchronizerTracker,
       ephemeral,
       crypto,
       sequencerClient,
+      clock,
       loggerFactory,
       futureSupervisor,
       promiseFactory,
@@ -150,16 +155,41 @@ class TransactionProcessor(
     TransactionProcessor.TransactionSubmissionError,
     FutureUnlessShutdown[TransactionSubmissionResult],
   ] =
-    this.submit(
-      TransactionProcessingSteps.SubmissionParam(
-        submitterInfo,
-        transactionMeta,
-        keyResolver,
-        transaction,
-        disclosedContracts,
-      ),
-      topologySnapshot,
-    )
+    this
+      .submit(
+        TransactionProcessingSteps.SubmissionParam(
+          submitterInfo,
+          transactionMeta,
+          keyResolver,
+          transaction,
+          disclosedContracts,
+        ),
+        topologySnapshot,
+      )
+      .map { futRes =>
+        val _ = futRes.map {
+          case TransactionProcessor.TransactionSubmitted =>
+            commandProgressTracker
+              .findHandle(
+                submitterInfo.commandId,
+                submitterInfo.userId,
+                submitterInfo.actAs,
+                submitterInfo.submissionId,
+              )
+              .transactionSequenced()
+          case _ => ()
+        }
+        futRes
+      }
+
+  override protected def phase3validationStarts(rootHash: RootHash): Unit =
+    commandProgressTracker.validationStarts(rootHash)
+  override protected def phase3validationCompleted(rootHash: RootHash): Unit =
+    commandProgressTracker.validationCompleted(rootHash)
+  override protected def phase4responseCompleted(rootHash: RootHash): Unit =
+    commandProgressTracker.validationResponseCompleted(rootHash)
+  override protected def phase7startsWithVerdict(rootHash: RootHash): Unit =
+    commandProgressTracker.validationVerdict(rootHash)
 }
 
 object TransactionProcessor {
@@ -191,7 +221,12 @@ object TransactionProcessor {
 
       // TODO(i5990) properly set `definiteAnswer` where appropriate when sub-categories are created
       final case class Error(message: String, reason: TransactionConfirmationRequestCreationError)
-          extends TransactionErrorImpl(cause = "Malformed request")
+          extends TransactionErrorImpl(cause = "Malformed request") {
+//        remy.log("")
+//        remy.log(message)
+//        remy.log(reason)
+//        remy.log(reason.show)
+      }
     }
 
     @Explanation(
@@ -289,9 +324,26 @@ object TransactionProcessor {
         with TransactionSubmissionError
 
     @Explanation(
-      """This error occurs when the sequencer refuses to accept a command due to backpressure."""
+      """This error occurs when the sequencer refuses to accept a command due to backpressure.
+        |Backpressure means that downstream components have signalled that they are unable to
+        |handle the incoming load and therefore request to reduce the rate. This is usually
+        |the case if the network starts to be congested.
+        |
+        |Backpressure can be the result of many different reasons. A sequencer that was just
+        |restarted and is catching up will backpressure until it has caught up with others.
+        |Similarly, a sequencer that is unable to keep up with the rate of incoming messages
+        |will start to backpressure.
+        |Finally, a synchronizer operator may also throttle submissions based on configuration
+        |settings in order to proactively limit the throughput for everyone and also enforce
+        |individual per-node limits.
+        |"""
     )
-    @Resolution("Wait a bit and retry, preferably with some backoff factor.")
+    @Resolution(
+      "Generally, backpressure should only happen in congested networks. Therefore, you " +
+        "should wait a bit and retry your submission, preferably with some backoff factor. If " +
+        "you are affected by individual per-node caps, you should speak to the synchronizer operators " +
+        "about increasing the individually enforced caps."
+    )
     object SequencerBackpressure
         extends ErrorCode(
           id = "SEQUENCER_BACKPRESSURE",

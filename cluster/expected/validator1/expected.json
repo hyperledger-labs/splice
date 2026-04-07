@@ -480,7 +480,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "3"
+            "activeMigrationId": "2"
           },
           "splitwell": true
         },
@@ -571,7 +571,7 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-3",
+      "name": "participant-2",
       "namespace": "validator1",
       "timeout": 600,
       "values": {
@@ -579,6 +579,10 @@
           {
             "name": "GOOGLE_APPLICATION_CREDENTIALS",
             "value": "/app/gcp-credentials.json"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -645,7 +649,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 3
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -656,7 +660,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -679,7 +683,7 @@
       },
       "version": "0.3.20"
     },
-    "name": "validator1-participant-3",
+    "name": "validator1-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -957,7 +961,7 @@
           "enable": true
         },
         "migration": {
-          "id": 3,
+          "id": 2,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -968,7 +972,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

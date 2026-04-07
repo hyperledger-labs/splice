@@ -28,7 +28,7 @@ trait PostgresAroundEach extends BeforeAndAfterEach {
 
   private val cantonUser = "canton"
 
-  override protected def beforeEach(): Unit = {
+  override def beforeEach(): Unit = {
     logger.debug(s"Using postgres on ${hostName}:${port}")
     dropAll()
     usesDbs.foreach(createDb(_))

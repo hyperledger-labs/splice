@@ -19,6 +19,7 @@ import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
+import monocle.macros.syntax.lens.*
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
@@ -36,9 +37,9 @@ class ScanEventHistoryIntegrationTest
               restartDelay = NonNegativeFiniteDuration.ofMillis(500)
             ),
             // Route mediator admin client via toxiproxy
-            mediatorAdminClient = scanConfig.mediatorAdminClient.copy(
-              port = Port.tryCreate(scanConfig.mediatorAdminClient.port.unwrap + 20000)
-            ),
+            synchronizerNodes = scanConfig.synchronizerNodes
+              .focus(_.current.mediator.port)
+              .modify(p => Port.tryCreate(p.unwrap + 20000)),
           )
         )(config)
       )
@@ -109,14 +110,6 @@ class ScanEventHistoryIntegrationTest
 
     withClue("Mismatch between CompactJson and ProtobufJson update ids") {
       txIdsProtobuf shouldBe txIdsCompact
-    }
-
-    withClue(
-      "Traffic summaries should not be served when serveAppActivityRecordsAndTraffic is disabled"
-    ) {
-      eventHistory.foreach { item =>
-        item.trafficSummary shouldBe None
-      }
     }
   }
 

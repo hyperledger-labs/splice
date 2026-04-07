@@ -1,11 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.authentication
 
 import cats.data.EitherT
 import cats.implicits.*
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{BatchingConfig, DefaultProcessingTimeouts}
 import com.digitalasset.canton.crypto.Nonce
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication
@@ -16,7 +17,7 @@ import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.{
   NonMatchingSynchronizerId,
 }
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
-import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
@@ -42,7 +43,8 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest with F
       nonceDuration: JDuration = JDuration.ofMinutes(1),
       tokenDuration: JDuration = JDuration.ofHours(1),
       invalidateMemberCallback: Member => Unit = _ => (),
-      store: MemberAuthenticationStore = new MemberAuthenticationStore(),
+      store: MemberAuthenticationStore =
+        new MemberAuthenticationStore(PositiveInt.tryCreate(10), loggerFactory),
   ): MemberAuthenticationService =
     new MemberAuthenticationService(
       physicalSynchronizerId,
@@ -55,6 +57,7 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest with F
       memberT => invalidateMemberCallback(memberT.value),
       FutureUnlessShutdown.unit,
       DefaultProcessingTimeouts.testing,
+      BatchingConfig(),
       loggerFactory,
     ) {
       override def isParticipantActive(participant: ParticipantId)(implicit
@@ -82,6 +85,31 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest with F
         members: Seq[Member],
     ): Map[Member, Seq[StoredAuthenticationToken]] =
       members.flatMap(store.fetchTokens).groupBy(_.member)
+
+    "generate a test token with default expiration" in {
+      val sut = service(participantIsActive = true)
+      val testToken = sut.generateAuthenticationToken(p1, None)
+      for {
+        _ <- EitherT.fromEither[FutureUnlessShutdown](
+          sut.validateToken(physicalSynchronizerId, p1, testToken.token)
+        )
+      } yield {
+        testToken.expireAt should be(clock.now.plus(sut.maxTokenExpirationInterval))
+      }
+    }
+
+    "generate a test token with explicit expiration" in {
+      val sut = service(participantIsActive = true)
+      val testToken =
+        sut.generateAuthenticationToken(p1, Some(NonNegativeFiniteDuration.tryOfSeconds(5)))
+      for {
+        _ <- EitherT.fromEither[FutureUnlessShutdown](
+          sut.validateToken(physicalSynchronizerId, p1, testToken.token)
+        )
+      } yield {
+        testToken.expireAt should be(clock.now.plus(JDuration.ofSeconds(5)))
+      }
+    }
 
     "generate nonce, verify signature, generate token, verify token, and verify expiry" in {
       val sut = service(participantIsActive = true)
@@ -151,7 +179,7 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest with F
     }
 
     "invalidate all tokens from a member when logging out" in {
-      val store = new MemberAuthenticationStore()
+      val store = new MemberAuthenticationStore(PositiveInt.tryCreate(10), loggerFactory)
       val sut = service(participantIsActive = true, store = store)
 
       for {

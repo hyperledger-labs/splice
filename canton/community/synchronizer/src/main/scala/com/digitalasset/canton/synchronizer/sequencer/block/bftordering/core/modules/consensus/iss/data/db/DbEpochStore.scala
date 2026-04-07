@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.db
@@ -11,7 +11,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.DbStorage.Implicits.setParameterByteString
 import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -30,7 +29,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
   EpochStore,
   EpochStoreReader,
-  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -53,6 +51,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PbftViewChangeMessage,
   PrePrepare,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.updateBulk
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.ConsensusMessage as ProtoConsensusMessage
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
@@ -61,6 +60,7 @@ import com.digitalasset.canton.{ProtoDeserializationError, RichGeneratedMessage}
 import com.google.protobuf.ByteString
 import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
@@ -77,6 +77,7 @@ class DbEpochStore(
     with DbStore {
 
   import storage.api.*
+  import storage.converters.*
 
   private val profile = storage.profile
 
@@ -110,9 +111,6 @@ class DbEpochStore(
     parseSignedMessage(_ => Commit.fromProtoConsensusMessage(actualSender = None, _))
   }
 
-  // TODO(#28200): introduce `BatchAggregator#runTogether` that avoids splitting items into different batches
-  //  and use it in `addPrepares` and `addOrderedBlock`
-
   private val insertInProgressPbftMessagesBatchAggregator =
     BatchAggregator(
       new InsertBatchAggregatorProcessor(
@@ -121,6 +119,19 @@ class DbEpochStore(
           runInsertInProgressPbftMessages(seq)
         },
         "In-progress consensus block network message insert",
+        logger,
+      ),
+      batchAggregatorConfig,
+    )
+
+  private val insertFinalPbftMessagesBatchAggregator =
+    BatchAggregator(
+      new InsertBatchAggregatorProcessor(
+        { (seq, traceContext) =>
+          implicit val tc: TraceContext = traceContext
+          runInsertFinalPbftMessages(seq)
+        },
+        "Completed consensus block network message insert",
         logger,
       ),
       batchAggregatorConfig,
@@ -209,7 +220,7 @@ class DbEpochStore(
 
   override def latestEpoch(includeInProgress: Boolean)(implicit
       traceContext: TraceContext
-  ): PekkoFutureUnlessShutdown[Epoch] =
+  ): PekkoFutureUnlessShutdown[Option[Epoch]] =
     createFuture(latestEpochActionName, orderingStage = functionFullName) {
       storage
         .query(
@@ -228,16 +239,24 @@ class DbEpochStore(
                     order by epoch_number desc
                     limit 1
                  """.as[EpochInfo]
-            epoch = epochInfo.lastOption.getOrElse(Genesis.GenesisEpochInfo)
-            lastBlockCommitMessages <-
-              sql"""select message
+            epochO = epochInfo.lastOption
+          } yield epochO,
+          functionFullName,
+        )
+        .flatMap {
+          _.fold(FutureUnlessShutdown.pure(Option.empty[Epoch])) { epoch =>
+            storage
+              .query(
+                sql"""select message
                   from ord_pbft_messages_completed pbft_message
                   where pbft_message.block_number = ${epoch.lastBlockNumber} and pbft_message.discriminator = $CommitMessageDiscriminator
                   order by pbft_message.from_sequencer_id
-               """.as[SignedMessage[Commit]]
-          } yield Epoch(epoch, lastBlockCommitMessages),
-          functionFullName,
-        )
+               """.as[SignedMessage[Commit]],
+                functionFullName,
+              )
+              .map(commitMessages => Some(Epoch(epoch, commitMessages)))
+          }
+        }
     }
 
   override def addPrePrepare(prePrepare: SignedMessage[ConsensusMessage.PrePrepare])(implicit
@@ -248,12 +267,21 @@ class DbEpochStore(
     }
 
   override def addPreparesAtomically(
-      prepares: Seq[SignedMessage[ConsensusMessage.Prepare]]
+      prepares: NonEmpty[Seq[Traced[SignedMessage[ConsensusMessage.Prepare]]]]
   )(implicit traceContext: TraceContext): PekkoFutureUnlessShutdown[Unit] =
     createFuture(addPreparesActionName, orderingStage = functionFullName) {
-      // Cannot use the batch aggregator here as we need to make sure for CFT that all messages end up
-      //  in the same transaction.
-      runInsertInProgressPbftMessages(prepares)
+      insertInProgressPbftMessagesBatchAggregator
+        .runInSameBatch(prepares)
+        .fold(
+          maximumBatchSize => {
+            logger.warn(
+              s"Cannot add ${prepares.size} prepares atomically via the batch aggregator " +
+                s"because the maximum batch size is $maximumBatchSize, performing an immediate insert"
+            )
+            runInsertInProgressPbftMessages(prepares.map(_.value))
+          },
+          _.map(_ => ()),
+        )
     }
 
   override def addViewChangeMessage[M <: PbftViewChangeMessage](
@@ -270,21 +298,33 @@ class DbEpochStore(
 
   override def addOrderedBlockAtomically(
       prePrepare: SignedMessage[PrePrepare],
-      commitMessages: Seq[SignedMessage[Commit]],
+      commitMessages: Seq[Traced[SignedMessage[Commit]]],
   )(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[Unit] = {
-    val epochNumber = prePrepare.message.blockMetadata.epochNumber
-    val blockNumber = prePrepare.message.blockMetadata.blockNumber
+    val blockMetadata = prePrepare.message.blockMetadata
+    val epochNumber = blockMetadata.epochNumber
+    val blockNumber = blockMetadata.blockNumber
     createFuture(
       addOrderedBlockActionName(epochNumber, blockNumber),
       orderingStage = functionFullName,
     ) {
-      val messages: Seq[SignedMessage[PbftNormalCaseMessage]] =
-        commitMessages :++ Seq[SignedMessage[PbftNormalCaseMessage]](prePrepare)
-      // Cannot use the batch aggregator here as we need to make sure for CFT that all messages end up
-      //  in the same transaction.
-      runInsertFinalPbftMessages(messages)
+      val messages: NonEmpty[Seq[Traced[SignedMessage[PbftNormalCaseMessage]]]] =
+        NonEmpty[Seq.type, Traced[SignedMessage[PbftNormalCaseMessage]], Seq[
+          Traced[SignedMessage[PbftNormalCaseMessage]]
+        ]](Seq, Traced(prePrepare), commitMessages*)
+      insertFinalPbftMessagesBatchAggregator
+        .runInSameBatch(messages)
+        .fold(
+          maximumBatchSize => {
+            logger.warn(
+              s"Cannot add ordered block (epoch: $epochNumber, block: $blockNumber) atomically via the batch aggregator " +
+                s"because the maximum batch size is $maximumBatchSize, performing an immediate insert"
+            )
+            runInsertFinalPbftMessages(messages.map(_.value))
+          },
+          _.map(_ => ()),
+        )
     }
   }
 
@@ -312,23 +352,21 @@ class DbEpochStore(
                 """
       }
 
-    storage
-      .runWrite(
-        // Sorting should prevent deadlocks in Postgres when using concurrent clashing batched inserts
-        //  with idempotency "on conflict do nothing" clauses.
-        DbStorage
-          .bulkOperation_(insertSql, messages.sortBy(key), storage.profile) { pp => msg =>
-            pp >> msg.message.blockMetadata.blockNumber
-            pp >> msg.message.blockMetadata.epochNumber
-            pp >> msg.message.viewNumber
-            pp >> msg
-            pp >> getDiscriminator(msg.message)
-            pp >> msg.from
-          },
-        functionFullName,
-        maxRetries = 1,
-      )
-      .map(_ => ())
+    updateBulk(
+      storage,
+      // Sorting should prevent deadlocks in Postgres when using concurrent clashing batched inserts
+      //  with idempotency "on conflict do nothing" clauses.
+      DbStorage
+        .bulkOperation_(insertSql, messages.sortBy(key), storage.profile) { pp => msg =>
+          pp >> msg.message.blockMetadata.blockNumber
+          pp >> msg.message.blockMetadata.epochNumber
+          pp >> msg.message.viewNumber
+          pp >> msg
+          pp >> getDiscriminator(msg.message)
+          pp >> msg.from
+        },
+      functionFullName,
+    ).map(_ => ())
   }
 
   private def runInsertFinalPbftMessages[M <: PbftNetworkMessage](
@@ -356,22 +394,20 @@ class DbEpochStore(
                    values (?1, ?2, ?3, ?4, ?5)
               """
       }
-    storage
-      .runWrite(
-        // Sorting should prevent deadlocks in Postgres when using concurrent clashing batched inserts
-        //  with idempotency "on conflict do nothing" clauses.
-        DbStorage
-          .bulkOperation_(insertSql, messages.sortBy(key), storage.profile) { pp => msg =>
-            pp >> msg.message.blockMetadata.blockNumber
-            pp >> msg.message.blockMetadata.epochNumber
-            pp >> msg
-            pp >> getDiscriminator(msg.message)
-            pp >> msg.from
-          },
-        functionFullName,
-        maxRetries = 1,
-      )
-      .map(_ => ())
+    updateBulk(
+      storage,
+      // Sorting should prevent deadlocks in Postgres when using concurrent clashing batched inserts
+      //  with idempotency "on conflict do nothing" clauses.
+      DbStorage
+        .bulkOperation_(insertSql, messages.sortBy(key), storage.profile) { pp => msg =>
+          pp >> msg.message.blockMetadata.blockNumber
+          pp >> msg.message.blockMetadata.epochNumber
+          pp >> msg
+          pp >> getDiscriminator(msg.message)
+          pp >> msg.from
+        },
+      functionFullName,
+    ).map(_ => ())
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -591,7 +627,7 @@ object DbEpochStore {
     )(implicit
         traceContext: TraceContext,
         callerCloseContext: CloseContext,
-    ): FutureUnlessShutdown[Iterable[Unit]] =
+    ): FutureUnlessShutdown[immutable.Iterable[Unit]] =
       exec(items.map(_.value), traceContext)
         .map(_ => Seq.fill(items.size)(()))
 

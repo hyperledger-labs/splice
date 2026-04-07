@@ -1,0 +1,63 @@
+# -*- shell-script -*-
+
+subcommand_whitelist[enable_logical_synchronizer_deployment]='Enable logical synchronizer deployment mode'
+
+function subcmd_enable_logical_synchronizer_deployment() {
+  local migration_type="${1:-active}"
+  if [ "$#" -gt 1 ]; then
+    _error "Usage: $SCRIPTNAME enable_logical_synchronizer_deployment [migration_type (Default: active)]"
+  fi
+  _update_cluster_config 'true' "synchronizerMigration.$migration_type.enableLogicalSynchronizerDeploymentMode"
+}
+
+subcommand_whitelist[freeze_migration]='Freeze migration with the given ID and enable LSU'
+
+function subcmd_freeze_migration() {
+  local migration_id="${1:-0}"
+  if [ "$#" -gt 1 ]; then
+    _error "Usage: $SCRIPTNAME freeze_migration [migration_id (Default: 0)]"
+  fi
+  _update_cluster_config 'true' 'synchronizerMigration.lsuEnabled'
+  _update_cluster_config "$migration_id" 'synchronizerMigration.frozenMigrationId'
+}
+
+subcommand_whitelist[vote_for_lsu]='Vote for logical synchronizer upgrade'
+
+function subcmd_vote_for_lsu() {
+  local topology_freeze_offset_seconds="${1-}"
+  local upgrade_offset_seconds="${2-}"
+  local next_physical_synchronizer_serial="${3-}"
+  local new_protocol_version="${4-}"
+
+  if [ "$#" -ne 4 ]; then
+    _error "Usage: $SCRIPTNAME vote_for_lsu <topology_freeze_offset_seconds> <upgrade_offset_seconds> <next_physical_synchronizer_serial> <new_protocol_version>"
+  fi
+
+  local now_epoch="$(date +%s)"
+  local topology_freeze_epoch="$((now_epoch + topology_freeze_offset_seconds))"
+  local upgrade_epoch="$((now_epoch + upgrade_offset_seconds))"
+  # Format as ISO8601 UTC datetimes
+  local datetime_format="+%Y-%m-%dT%H:%M:%SZ"
+  local topology_freeze_time="$(date --utc --date "@${topology_freeze_epoch}" "$datetime_format")"
+  local upgrade_time="$(date --utc --date "@${upgrade_epoch}" "$datetime_format")"
+
+  "${SPLICE_ROOT}/cluster/scripts/vote-for-lsu.sh" \
+    "${topology_freeze_time}" "${upgrade_time}" \
+    "${next_physical_synchronizer_serial}" \
+    "${new_protocol_version}"
+}
+
+subcommand_whitelist[retire_old_physical_synchronizer]='Update the cluster config.yaml to retire the old physical synchronizer'
+
+function subcmd_retire_old_physical_synchronizer() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
+  yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
+}
