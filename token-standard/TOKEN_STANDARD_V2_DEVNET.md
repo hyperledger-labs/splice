@@ -1,6 +1,6 @@
 # Token Standard V2 DevNet
 
-Splice version: `0.6.0-snapshot.20260331.2327.0.vfd47ba4e`
+Splice version: `0.6.0-snapshot.20260407.2423.0.v98974cc3`
 
 Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev`
 
