@@ -37,7 +37,7 @@ monitoring:
     alerts:
       acsCommitments:
         checkpointDelay:
-          seconds: 600
+          seconds: 1200
         completedDelay:
           seconds: 3600
       cloudSql:
