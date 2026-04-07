@@ -59,7 +59,6 @@ object SynchronizerNodeIdentities {
 }
 
 case class LsuState(
-    upgradesAt: Instant,
     nodeIdentities: SynchronizerNodeIdentities,
     synchronizerStatePath: Path,
 )

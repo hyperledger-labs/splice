@@ -42,26 +42,36 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
-  updateAutomationConfig,
   updateAllScanAppConfigs_,
+  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
   SpliceTestConsoleEnvironment,
+  IntegrationTest,
 }
-import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitConfig, TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletTransferInstructionTrigger
+import org.lfdecentralizedtrust.splice.util.{
+  SpliceRateLimitConfig,
+  TimeTestUtil,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
 
 import java.nio.file.{Files, Paths}
+import java.time.Duration
 import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -76,7 +86,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with WalletTestUtil
     with HasActorSystem
     with TimeTestUtil
-    with HasExecutionContext {
+    with HasExecutionContext
+    with TriggerTestUtil {
 
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
@@ -107,6 +118,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          _.withPausedTrigger[ExpiredAmuletTransferInstructionTrigger]
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -933,6 +949,81 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
       )
     }
+  }
+
+  "expire amulet transfer instructions handling both locked and already unlocked amulets" in {
+    implicit env =>
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+      aliceWalletClient.tap(100.0)
+
+      aliceWalletClient.list().amulets should have length 1
+
+      val transfer_1 = aliceWalletClient.createTokenStandardTransfer(
+        receiver = bobParty,
+        amount = BigDecimal(10.0),
+        description = "Transfer 1",
+        expiresAt = getLedgerTime.plus(Duration.ofMinutes(5)),
+        trackingId = "tracking-id-1",
+      )
+
+      aliceWalletClient.createTokenStandardTransfer(
+        receiver = bobParty,
+        amount = BigDecimal(10.0),
+        description = "Transfer 2",
+        expiresAt = getLedgerTime.plus(Duration.ofMinutes(5)),
+        trackingId = "tracking-id-2",
+      )
+
+      aliceWalletClient.list().lockedAmulets should have length 2
+
+      advanceTime(Duration.ofMinutes(10))
+
+      val instructionCid = transfer_1.output match {
+        case members.TransferInstructionPending(value) =>
+          new TransferInstruction.ContractId(value.transferInstructionCid)
+        case other => fail(s"Expected TransferInstructionPending, but got $other")
+      }
+
+      val instructionContract =
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(AmuletTransferInstruction.COMPANION)(
+            aliceParty,
+            _.id.contractId == instructionCid.contractId,
+          )
+          .headOption
+          .valueOrFail(s"Transfer instruction ${instructionCid.contractId} not found")
+
+      actAndCheck(
+        "Alice manually expires the lock for Transfer 1",
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitJava(
+            Seq(aliceParty),
+            instructionContract.data.lockedAmulet
+              .exerciseLockedAmulet_OwnerExpireLockV2()
+              .commands()
+              .asScala
+              .toSeq,
+          ),
+      )(
+        "One lock is gone",
+        _ => aliceWalletClient.list().lockedAmulets should have length 1,
+      )
+
+      aliceWalletClient.listTokenStandardTransfers() should have length 2
+
+      sv1Backend.dsoDelegateBasedAutomation
+        .trigger[ExpiredAmuletTransferInstructionTrigger]
+        .resume()
+
+      advanceTime(Duration.ofDays(1))
+
+      eventually() {
+        aliceWalletClient.listTokenStandardTransfers() shouldBe empty
+        aliceWalletClient.list().lockedAmulets shouldBe empty
+        aliceWalletClient.list().amulets.length shouldBe 3
+      }
   }
 
   private val jsonApiPort = 16501

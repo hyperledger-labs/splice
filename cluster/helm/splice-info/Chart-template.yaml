@@ -7,3 +7,8 @@ version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
 description: "A simple web server that serves JSON files with deployment and runtime information."
+
+dependencies:
+- name: splice-util-lib
+  version: 0.3.0
+  repository: file://../splice-util-lib

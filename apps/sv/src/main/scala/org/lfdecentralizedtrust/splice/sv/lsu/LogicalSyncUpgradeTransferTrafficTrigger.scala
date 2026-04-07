@@ -63,7 +63,7 @@ class LogicalSyncUpgradeTransferTrafficTrigger(
   ): Future[TaskOutcome] = {
     for {
       trafficState <-
-        currentSynchronizerNode.sequencerAdminConnection.getLsuTrafficControlState()
+        currentSynchronizerNode.sequencerAdminConnection.getLsuTrafficControlState(ts = None)
       _ = logger.info(
         "Transferring LSU traffic control state from current to successor sequencer"
       )

@@ -71,6 +71,8 @@ monitoring:
         kilobytes: 1
         overMinutes: 5
         quantile: 0.95
+      walletSweep:
+        tolerance: 1.5
     enableNoDataAlerts: false
     loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
 multiValidator:
@@ -134,6 +136,11 @@ pulumiStacks:
     resources:
       requests:
         memory: '6Gi'
+splitwell:
+  participant:
+    additionalEnvVars:
+      - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
 sv:
   scan:
     externalRateLimits:
@@ -222,7 +229,10 @@ sv:
           name: 'featured-apps'
           type: 'unlimited'
         /api/scan/v0/history/bulk/acs:
-          name: 'getBulkAcsSnapshot'
+          name: 'listBulkAcsSnapshotObjects'
+          type: 'unlimited'
+        /api/scan/v0/history/bulk/updates:
+          name: 'listBulkUpdateHistoryObjects'
           type: 'unlimited'
         /api/scan/v0/holdings:
           name: 'holdings'
@@ -338,8 +348,8 @@ svs:
           memory: '2Gi'
     participant:
       additionalEnvVars:
-        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
-          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+        - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -373,9 +383,6 @@ svs:
           cpu: '1'
           memory: '2Gi'
     svApp:
-      additionalEnvVars:
-        - name: 'ADDITIONAL_CONFIG_PAUSED_LSU_HEALTH_TRIGGER'
-          value: "canton.sv-apps.sv.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeIntegrationTest\"\n"
       resources:
         limits:
           cpu: '3'
@@ -422,6 +429,10 @@ validator1:
   deduplicationDuration: '30m'
   logging:
     level: 'DEBUG'
+  participant:
+    additionalEnvVars:
+      - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
   participantPruningSchedule:
     cron: '0 /10 * * * ?'
     maxDuration: '5m'

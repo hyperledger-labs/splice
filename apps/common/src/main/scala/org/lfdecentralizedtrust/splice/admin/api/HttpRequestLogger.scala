@@ -4,13 +4,8 @@
 package org.lfdecentralizedtrust.splice.admin.api
 
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
-import org.apache.pekko.http.scaladsl.server.{
-  AuthorizationFailedRejection,
-  Directive0,
-  RequestContext,
-}
+import org.apache.pekko.http.scaladsl.server.{Directive0, RequestContext}
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.RouteResult.{Complete, Rejected}
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -81,36 +76,26 @@ final class HttpRequestLogger(
           logger.debug(msg(s"query string: ${ctx.request.uri.queryString()}"))
         }
         logger.trace(msg(s"headers: ${ctx.request.headers.toString.limit(maxMetadataSize)}"))
-        mapRouteResult { result =>
-          result match {
-            case Complete(response) =>
-              logger.debug(msg(s"Responding with status code: ${response.status}"))
-              if (messagePayloads) {
-                response.entity match {
-                  // Only logging strict messages which are already in memory, not attempting to log streams
-                  case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                    logger.debug(
-                      msg(
-                        s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
-                      )
-                    )
-                  case _ => logger.debug(msg(s"omitting logging of response entity data."))
-                }
-              }
-              logger.trace(
-                msg(
-                  s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
+        mapResponse { response =>
+          logger.debug(msg(s"Responding with status code: ${response.status}"))
+          if (messagePayloads) {
+            response.entity match {
+              // Only logging strict messages which are already in memory, not attempting to log streams
+              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+                logger.debug(
+                  msg(
+                    s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
+                  )
                 )
-              )
-
-            case Rejected(rejections) =>
-              if (rejections.contains(AuthorizationFailedRejection)) {
-                logger.debug(msg("Rejected: Unauthorized."))
-              } else {
-                logger.debug(msg(s"""Rejected: ${rejections.mkString(",")}"""))
-              }
+              case _ => logger.debug(msg(s"omitting logging of response entity data."))
+            }
           }
-          result
+          logger.trace(
+            msg(
+              s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
+            )
+          )
+          response
         }
       }
     }

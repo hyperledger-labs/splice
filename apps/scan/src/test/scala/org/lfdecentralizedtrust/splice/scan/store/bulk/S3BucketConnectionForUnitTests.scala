@@ -5,12 +5,17 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.lfdecentralizedtrust.splice.store.S3BucketConnectionForTests
-import software.amazon.awssdk.core.async.AsyncResponseTransformer
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
+import software.amazon.awssdk.core.async.{AsyncResponseTransformer, AsyncRequestBody}
+import software.amazon.awssdk.services.s3.model.{
+  GetObjectRequest,
+  GetObjectResponse,
+  PutObjectRequest,
+}
 
 import java.io.DataInputStream
 import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.{Try, Using}
 
@@ -46,6 +51,18 @@ class S3BucketConnectionForUnitTests(
           ByteString.fromByteBuffer(concatenate(allBytes))
         }
     }
+  }
+
+  def createObject(key: String)(implicit ec: ExecutionContext): Future[Unit] = {
+    val request = PutObjectRequest.builder
+      .bucket(bucketName)
+      .key(key)
+      .metadata(Map("splice-checksum" -> "fake").asJava)
+      .build
+    s3Client
+      .putObject(request, AsyncRequestBody.fromBytes(Array.emptyByteArray))
+      .asScala
+      .map(_ => ())
   }
 
   override def newAppendWriteObject(key: String)(implicit ec: ExecutionContext): AppendWriteObject =
