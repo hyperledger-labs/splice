@@ -21,12 +21,12 @@ export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 const GcpQuotasConfigSchema = z.object({
   // so existing overrides don't break
   enabled: z.literal(true).optional(),
-  excludedMetrics: z
-    .array(z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters'))
-    .default([]),
-  excludedApproachingMetrics: z
-    .array(z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters'))
-    .default([]),
+  excludedMetrics: z.array(
+    z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters')
+  ),
+  excludedApproachingMetrics: z.array(
+    z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters')
+  ),
 });
 
 const MonitoringConfigSchema = z
@@ -90,7 +90,7 @@ const MonitoringConfigSchema = z
         walletSweep: z.object({
           tolerance: z.number(),
         }),
-        gcpQuotas: GcpQuotasConfigSchema.default({ excludedMetrics: [] }),
+        gcpQuotas: GcpQuotasConfigSchema,
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
