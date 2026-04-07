@@ -15,10 +15,13 @@ import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, LedgerApiCommands}
 import org.apache.pekko.stream.scaladsl.FileIO
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand, ExerciseByKeyCommand}
+import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.networking.grpc.RecordingStreamObserver
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -199,7 +202,7 @@ class LocalNetFrontendIntegrationTest
       val filePath = Paths.get("apps/app/src/test/resources/nuck-example-main-0.0.1.dar")
       val entity = HttpEntity(
         ContentTypes.`application/octet-stream`,
-        FileIO.fromPath(filePath)
+        FileIO.fromPath(filePath),
       )
       val response =
         Http()
@@ -215,123 +218,193 @@ class LocalNetFrontendIntegrationTest
       val channel = io.grpc.ManagedChannelBuilder.forAddress(grpcHost, port).usePlaintext().build()
 
       def runGrpcCommand[Req, Res, Result](command: GrpcAdminCommand[Req, Res, Result]): Result = {
-        val service = command.createServiceInternal(channel)
+        val service = command
+          .createServiceInternal(channel)
           .withCallCredentials(new AuthCallCredentials(token))
         val request = command.createRequestInternal().value
         val response = command.submitRequestInternal(service, request).futureValue
         command.handleResponseInternal(response).value
       }
+      def listContracts(party: String) = {
+        val ledgerEnd = runGrpcCommand(LedgerApiCommands.StateService.LedgerEnd())
 
-      runGrpcCommand(LedgerApiCommands.PackageManagementService.UploadDarFile(
-        darPath = filePath.toAbsolutePath.toString,
-        synchronizerId = None,
-      ))
+        val observer = new RecordingStreamObserver[GetActiveContractsResponse](
+          PositiveInt.tryCreate(100),
+          _.contractEntry.isDefined,
+        )
+        runGrpcCommand(
+          LedgerApiCommands.StateService.GetActiveContracts(
+            observer = observer,
+            parties = Set(LfPartyId.fromString(party).value),
+            limit = PositiveInt.tryCreate(100),
+            templateFilter = Seq.empty,
+            interfaceFilter = Seq.empty,
+            activeAtOffset = ledgerEnd,
+            verbose = true,
+            timeout = 30.seconds,
+          )
+        )
+        observer.completion.futureValue
+        observer.responses
+      }
 
-      val alice = runGrpcCommand(LedgerApiCommands.PartyManagementService.AllocateParty(
-        partyIdHint = "alice",
-        annotations = Map.empty,
-        identityProviderId = "",
-        synchronizerId = None,
-        userId = "ledger-api-user",
-      )).party
+      runGrpcCommand(
+        LedgerApiCommands.PackageManagementService.UploadDarFile(
+          darPath = filePath.toAbsolutePath.toString,
+          synchronizerId = None,
+        )
+      )
 
-      val bob = runGrpcCommand(LedgerApiCommands.PartyManagementService.AllocateParty(
-        partyIdHint = "bob",
-        annotations = Map.empty,
-        identityProviderId = "",
-        synchronizerId = None,
-        userId = "ledger-api-user",
-      )).party
-      println(s"bob party ID: $bob")
+      val alice = runGrpcCommand(
+        LedgerApiCommands.PartyManagementService.AllocateParty(
+          partyIdHint = "alice",
+          annotations = Map.empty,
+          identityProviderId = "",
+          synchronizerId = None,
+          userId = "ledger-api-user",
+        )
+      ).party
+
+      val bob = runGrpcCommand(
+        LedgerApiCommands.PartyManagementService.AllocateParty(
+          partyIdHint = "bob",
+          annotations = Map.empty,
+          identityProviderId = "",
+          synchronizerId = None,
+          userId = "ledger-api-user",
+        )
+      ).party
 
       val createCommand = Command.of(
         Command.Command.Create(
           CreateCommand(
-            templateId = Some(Identifier(
-              packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
-              moduleName = "Main",
-              entityName = "Asset",
-            )),
-            createArguments = Some(Record(
-              recordId = Some(Identifier(
+            templateId = Some(
+              Identifier(
                 packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
                 moduleName = "Main",
                 entityName = "Asset",
-              )),
-              fields = Seq(
-                RecordField("issuer", Some(Value(Value.Sum.Party(alice)))),
-                RecordField("owner", Some(Value(Value.Sum.Party(alice)))),
-                RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
-              ),
-            )),
+              )
+            ),
+            createArguments = Some(
+              Record(
+                recordId = Some(
+                  Identifier(
+                    packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+                    moduleName = "Main",
+                    entityName = "Asset",
+                  )
+                ),
+                fields = Seq(
+                  RecordField("issuer", Some(Value(Value.Sum.Party(alice)))),
+                  RecordField("owner", Some(Value(Value.Sum.Party(alice)))),
+                  RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
+                ),
+              )
+            ),
           )
         )
       )
-      runGrpcCommand(LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
-        actAs = Seq(LfPartyId.fromString(alice).value),
-        readAs = Seq.empty,
-        commands = Seq(createCommand),
-        workflowId = "",
-        commandId = "",
-        deduplicationPeriod = None,
-        submissionId = "",
-        minLedgerTimeAbs = None,
-        disclosedContracts = Seq.empty,
-        synchronizerId = None,
-        userId = "ledger-api-user",
-        packageIdSelectionPreference = Seq.empty,
-        transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-        includeCreatedEventBlob = false,
-        tapsMaxPasses = None,
-        optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
-      ))
+      runGrpcCommand(
+        LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
+          actAs = Seq(LfPartyId.fromString(alice).value),
+          readAs = Seq.empty,
+          commands = Seq(createCommand),
+          workflowId = "",
+          commandId = "",
+          deduplicationPeriod = None,
+          submissionId = "",
+          minLedgerTimeAbs = None,
+          disclosedContracts = Seq.empty,
+          synchronizerId = None,
+          userId = "ledger-api-user",
+          packageIdSelectionPreference = Seq.empty,
+          transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+          includeCreatedEventBlob = false,
+          tapsMaxPasses = None,
+          optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
+        )
+      )
 
-      //   bobTVId <- submit alice do
-      //    exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
+      // bobTVId <- submit alice do
+      //     exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
       val newOwnerCmd = Command.of(
         Command.Command.ExerciseByKey(
           ExerciseByKeyCommand(
-            templateId = Some(Identifier(
-              packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
-              moduleName = "Main",
-              entityName = "Asset",
-            )),
-            contractKey = Some(Value(Value.Sum.List(com.daml.ledger.api.v2.value.List(Seq(
-              Value(Value.Sum.Party(alice)),
-              Value(Value.Sum.Text("Sofa")),
-            ))))),
-            choice = "Give",
-            choiceArgument = Some(Value(Value.Sum.Record(Record(
-              recordId = Some(Identifier(
+            templateId = Some(
+              Identifier(
                 packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
                 moduleName = "Main",
-                entityName = "Give",
-              )),
-              fields = Seq(
-                RecordField("newOwner", Some(Value(Value.Sum.Party(bob)))),
-              ),
-            )))),
+                entityName = "Asset",
+              )
+            ),
+            contractKey = Some(
+              Value(
+                Value.Sum.Record(
+                  Record(
+                    recordId = None,
+                    fields = Seq(
+                      RecordField("_1", Some(Value(Value.Sum.Party(alice)))),
+                      RecordField("_2", Some(Value(Value.Sum.Text("Sofa")))),
+                    ),
+                  )
+                )
+              )
+            ),
+            choice = "Give",
+            choiceArgument = Some(
+              Value(
+                Value.Sum.Record(
+                  Record(
+                    recordId = Some(
+                      Identifier(
+                        packageId =
+                          "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+                        moduleName = "Main",
+                        entityName = "Give",
+                      )
+                    ),
+                    fields = Seq(
+                      RecordField("newOwner", Some(Value(Value.Sum.Party(bob))))
+                    ),
+                  )
+                )
+              )
+            ),
           )
-        ))
-      runGrpcCommand(LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
-        actAs = Seq(LfPartyId.fromString(alice).value),
-        readAs = Seq.empty,
-        commands = Seq(newOwnerCmd),
-        workflowId = "",
-        commandId = "",
-        deduplicationPeriod = None,
-        submissionId = "",
-        minLedgerTimeAbs = None,
-        disclosedContracts = Seq.empty,
-        synchronizerId = None,
-        userId = "ledger-api-user",
-        packageIdSelectionPreference = Seq.empty,
-        transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-        includeCreatedEventBlob = false,
-        tapsMaxPasses = None,
-        optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
-      ))
+        )
+      )
+      runGrpcCommand(
+        LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
+          actAs = Seq(LfPartyId.fromString(alice).value),
+          readAs = Seq.empty,
+          commands = Seq(newOwnerCmd),
+          workflowId = "",
+          commandId = "",
+          deduplicationPeriod = None,
+          submissionId = "",
+          minLedgerTimeAbs = None,
+          disclosedContracts = Seq.empty,
+          synchronizerId = None,
+          userId = "ledger-api-user",
+          packageIdSelectionPreference = Seq.empty,
+          transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+          includeCreatedEventBlob = false,
+          tapsMaxPasses = None,
+          optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
+        )
+      )
 
+      val aliceContracts = listContracts(alice)
+      val bobContracts = listContracts(bob)
+      aliceContracts should have size 1
+      bobContracts should have size 1
+      Seq(aliceContracts.head, bobContracts.head).foreach(
+        _.contractEntry.activeContract.value.createdEvent.value.createArguments.value
+          .fields(1)
+          .value
+          .value
+          .getParty shouldBe bob withClue "bob owns the asset after the exerciseByKey command"
+      )
     }
   }
 }
