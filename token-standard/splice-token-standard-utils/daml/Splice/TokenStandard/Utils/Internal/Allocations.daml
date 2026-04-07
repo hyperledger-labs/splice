@@ -313,7 +313,7 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => ContractId EventsV2.EventFactory
+  => ContractId EventsV2.EventLog
      -- ^ Event log to use for registering the transfer events
   -> (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
      -- ^ How to create the allocation of a missing receipt leg.
@@ -348,7 +348,7 @@ settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocati
 
   -- create transfer events for all transfer legs
   forA_ transferLegs $ \leg ->
-    exercise eventFactoryCid EventsV2.EventFactory_Transfer with
+    exercise eventFactoryCid EventsV2.EventLog_Transfer with
       scope = EventsV2.Scope with
         reporter = admin
         observers = accountParties leg.sender <> accountParties leg.receiver

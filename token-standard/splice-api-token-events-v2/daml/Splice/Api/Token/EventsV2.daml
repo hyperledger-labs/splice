@@ -7,62 +7,71 @@ module Splice.Api.Token.EventsV2 where
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
-
+-- | Scope within which an event is reported.
 data Scope = Scope with
     reporter : Party
-      -- ^ Party that reported the event.
+      -- ^ Party reports the event.
     observers : [Party]
-      -- ^ Parties to be notified about the event.
+      -- ^ Parties that are notified about the event.
   deriving (Eq, Show)
 
+-- | An interface for templates that can be used to report token standard v2 events.
+interface EventLog where
+  viewtype EventLogView
 
--- FIXME: rename to EventLog
-interface EventFactory where
-  viewtype EventFactoryView
+  eventFactory_workflowCompletedImpl : ContractId EventLog -> EventLog_WorkflowCompleted -> Update EventLog_WorkflowCompletedResult
+  eventFactory_transferImpl : ContractId EventLog -> EventLog_Transfer -> Update EventLog_TransferResult
 
-  eventFactory_workflowCompletedImpl : ContractId EventFactory -> EventFactory_WorkflowCompleted -> Update EventFactory_WorkflowCompletedResult
-  eventFactory_transferImpl : ContractId EventFactory -> EventFactory_Transfer -> Update EventFactory_TransferResult
 
-  nonconsuming choice EventFactory_WorkflowCompleted : EventFactory_WorkflowCompletedResult
+  nonconsuming choice EventLog_WorkflowCompleted : EventLog_WorkflowCompletedResult
+    -- ^ Signal that a workflow completed, e.g., a transfer instruction,
+    -- allocation instruction, allocation request, or an allocation.
     with
       scope : Scope
         -- ^ Scope of the event.
       workflowId : AnyContractId
-        -- ^ Workflow whose completion is being reported; e.g., the contract-id
-        -- of an allocation instruction, transfer instruction, or an allocation.
-
-      -- FIXME: consider enabling OpenTracing style spans, and spans
-
+        -- ^ Workflow whose completion is being reported.
       success : Bool
         -- ^ Whether the workflow completed successfully or not.
         -- The failure reason can be included in the metadata.
-      meta : Metadata
-      -- FIXME: use extraArgs to make space for contract-id storage
+      extraArgs : ExtraArgs
+        -- ^ Arguments storing both metadata and additional context information about the event.
+        --
+        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
+        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
     observer scope.observers
     controller scope.reporter
     do eventFactory_workflowCompletedImpl this self arg
 
-  nonconsuming choice EventFactory_Transfer : EventFactory_TransferResult
+  nonconsuming choice EventLog_Transfer : EventLog_TransferResult
+    -- ^ Signal that a transfer happened.
     with
       scope : Scope
       sender : Account
       receiver : Account
       instrumentId : InstrumentId
       amount : Decimal
-      meta : Metadata
+      extraArgs : ExtraArgs
     observer scope.observers
     controller scope.reporter
     do eventFactory_transferImpl this self arg
 
+  nonconsuming choice EventLog_PublicFetch : EventLogView
+    with
+      actors : [Party]
+        -- ^ Parties executing the fetch.
+    controller actors
+    do eventFactory_publicFetchImpl this self arg
 
 
-data EventFactoryView = EventFactoryView with
+-- | View on an event log contract.
+data EventLogView = EventLogView with
     admin : Party
     meta : Metadata
   deriving (Eq, Show)
 
 
-data EventFactory_WorkflowCompletedResult = EventFactory_WorkflowCompletedResult {}
+data EventLog_WorkflowCompletedResult = EventLog_WorkflowCompletedResult {}
 
-data EventFactory_TransferResult = EventFactory_TransferResult {}
+data EventLog_TransferResult = EventLog_TransferResult {}
 

@@ -22,15 +22,15 @@ import Splice.TokenStandard.Utils.Internal.Choices
 
 
 
-eventFactory_workflowCompletedDefaultImpl : Party -> ContractId V2.EventFactory -> V2.EventFactory_WorkflowCompleted -> Update V2.EventFactory_WorkflowCompletedResult
+eventFactory_workflowCompletedDefaultImpl : Party -> ContractId V2.EventLog -> V2.EventLog_WorkflowCompleted -> Update V2.EventLog_WorkflowCompletedResult
 eventFactory_workflowCompletedDefaultImpl admin _self arg = do
   require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
-  pure V2.EventFactory_WorkflowCompletedResult
+  pure V2.EventLog_WorkflowCompletedResult
 
-eventFactory_transferDefaultImpl : Party -> ContractId V2.EventFactory -> V2.EventFactory_Transfer -> Update V2.EventFactory_TransferResult
+eventFactory_transferDefaultImpl : Party -> ContractId V2.EventLog -> V2.EventLog_Transfer -> Update V2.EventLog_TransferResult
 eventFactory_transferDefaultImpl admin _self arg = do
   require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
-  pure V2.EventFactory_TransferResult
+  pure V2.EventLog_TransferResult
 
 
 mintAccountId : Text
@@ -39,9 +39,9 @@ mintAccountId = v2Namespace <> "mint"
 burnAccountId : Text
 burnAccountId = v2Namespace <> "burn"
 
-logMint : ContractId V2.EventFactory -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logMint : ContractId V2.EventLog -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventLog_TransferResult
 logMint factoryCid admin receiver amount instrumentId meta = do
-  exercise factoryCid V2.EventFactory_Transfer with
+  exercise factoryCid V2.EventLog_Transfer with
     scope = V2.Scope with
       reporter = admin
       observers = accountParties receiver
@@ -54,9 +54,9 @@ logMint factoryCid admin receiver amount instrumentId meta = do
     amount
     meta
 
-logBurn : ContractId V2.EventFactory -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logBurn : ContractId V2.EventLog -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventLog_TransferResult
 logBurn factoryCid admin sender amount instrumentId meta = do
-  exercise factoryCid V2.EventFactory_Transfer with
+  exercise factoryCid V2.EventLog_Transfer with
     scope = V2.Scope with
       reporter = admin
       observers = accountParties sender
