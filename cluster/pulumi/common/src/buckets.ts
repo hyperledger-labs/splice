@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export type GcpBucket = {
   projectId: string;
   bucketName: string;
   secretName: string;
-  jsonCredentials: string;
+  jsonCredentials: pulumi.Output<string>;
 };
 
 export type BucketLocation = {
@@ -35,7 +36,7 @@ export async function bootstrapBucket(
     projectId,
     bucketName,
     secretName: `cn-gcp-bucket-${projectId}-${bucketName}`,
-    jsonCredentials: cred.secretData,
+    jsonCredentials: pulumi.secret(cred.secretData),
   };
 }
 
@@ -49,7 +50,9 @@ export function installBucketSecret(xns: ExactNamespace, bucket: GcpBucket): k8s
       },
       type: 'Opaque',
       data: {
-        'json-credentials': Buffer.from(bucket.jsonCredentials, 'utf-8').toString('base64'),
+        'json-credentials': bucket.jsonCredentials.apply(creds =>
+          Buffer.from(creds, 'utf-8').toString('base64')
+        ),
       },
     },
     {

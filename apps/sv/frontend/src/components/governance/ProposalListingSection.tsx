@@ -93,7 +93,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
             <TableHead>
               <TableRow sx={{ display: 'grid', gridTemplateColumns: gridTemplate }}>
                 <TableCell>ACTION</TableCell>
-                <TableCell>CONTRACT ID</TableCell>
+                <TableCell>VOTE PROPOSAL CONTRACT ID</TableCell>
                 {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
                 <TableCell>EFFECTIVE AT</TableCell>
                 {showStatus && <TableCell>STATUS</TableCell>}

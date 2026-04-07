@@ -23,29 +23,33 @@ import {
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
+import { Option } from '../form-components/SelectField';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
 
 interface ExtraFormField {
-  idValue: ProviderId | FeaturedAppRightId;
+  idValue: ProviderId;
+  partyId: ProviderId;
+  rightCid: FeaturedAppRightId;
 }
 
 export type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
 
 const GRANT_REVOKE_FEATURED_APP_CONFIG = {
   SRARC_GrantFeaturedAppRight: {
-    idValueFieldTitle: 'Provider',
+    providerFieldTitle: 'Provider Party ID',
     testIdPrefix: 'grant-featured-app',
     reviewFormKey: 'grant-right' as const,
   },
   SRARC_RevokeFeaturedAppRight: {
-    idValueFieldTitle: 'Featured Application Right Contract Id',
+    providerFieldTitle: 'Provider Party ID',
+    rightCidFieldTitle: 'Featured Application Contract ID',
     testIdPrefix: 'revoke-featured-app',
     reviewFormKey: 'revoke-right' as const,
   },
@@ -64,22 +68,22 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [revokeRightOptions, setRevokeRightOptions] = useState<Option[]>([]);
   const mutation = useProposalMutation();
 
   // TODO(#1819): use either search params or props and not both.
   const formAction: GrantRevokeFeaturedAppActions =
     (useSearchParams()[0]?.get('action') as GrantRevokeFeaturedAppActions) || selectedAction;
 
-  const { idValueFieldTitle, testIdPrefix, reviewFormKey } =
+  const { providerFieldTitle, testIdPrefix, reviewFormKey } =
     GRANT_REVOKE_FEATURED_APP_CONFIG[formAction];
+  const rightCidFieldTitle =
+    formAction === 'SRARC_RevokeFeaturedAppRight'
+      ? GRANT_REVOKE_FEATURED_APP_CONFIG.SRARC_RevokeFeaturedAppRight.rightCidFieldTitle
+      : undefined;
   const createProposalAction = createProposalActions.find(a => a.value === formAction);
 
-  const validateIdValue = (value: string) =>
-    formAction === 'SRARC_GrantFeaturedAppRight'
-      ? validatePartyId(value)
-      : validateRevokeFeaturedAppRight(value);
-
-  const validateProviderExists = async (value: string) => {
+  const validateGrantProviderExists = async (value: string) => {
     if (formAction !== 'SRARC_GrantFeaturedAppRight') return undefined;
     if (validatePartyId(value)) return undefined;
 
@@ -89,6 +93,32 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     } catch {
       return 'Provider party not found on ledger';
     }
+  };
+
+  const loadFeaturedAppRightsAndValidate = async (value: string) => {
+    if (validatePartyId(value)) return undefined;
+
+    try {
+      const response = await svAdminClient.listFeaturedAppRightsByProvider(value);
+      const options = response.featured_app_rights.map((contract: { contract_id: string }) => ({
+        key: contract.contract_id,
+        value: contract.contract_id,
+      }));
+      setRevokeRightOptions(options);
+      return undefined;
+    } catch {
+      setRevokeRightOptions([]);
+      return 'Could not load featured app rights for this provider';
+    }
+  };
+
+  const validateRevokeRightSelection = (value: string): string | false => {
+    const requiredError = validateRevokeFeaturedAppRight(value);
+    if (requiredError) return requiredError;
+
+    return revokeRightOptions.some(option => option.value === value)
+      ? false
+      : 'Select a valid contract id';
   };
 
   const defaultValues: GrantRevokeFeaturedAppFormData = {
@@ -101,6 +131,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     url: '',
     summary: '',
     idValue: '',
+    partyId: '',
+    rightCid: '',
   };
 
   const form = useAppForm({
@@ -109,29 +141,29 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     onSubmit: async ({ value }) => {
       const actionMap: Record<
         GrantRevokeFeaturedAppActions,
-        (idValue: string) => ActionRequiringConfirmation
+        (formValues: GrantRevokeFeaturedAppFormData) => ActionRequiringConfirmation
       > = {
-        SRARC_GrantFeaturedAppRight: (idValue: string) => ({
+        SRARC_GrantFeaturedAppRight: formValues => ({
           tag: 'ARC_DsoRules',
           value: {
             dsoAction: {
               tag: 'SRARC_GrantFeaturedAppRight',
-              value: { provider: idValue },
+              value: { provider: formValues.idValue },
             },
           },
         }),
-        SRARC_RevokeFeaturedAppRight: (idValue: string) => ({
+        SRARC_RevokeFeaturedAppRight: formValues => ({
           tag: 'ARC_DsoRules',
           value: {
             dsoAction: {
               tag: 'SRARC_RevokeFeaturedAppRight',
-              value: { rightCid: idValue as ContractId<FeaturedAppRight> },
+              value: { rightCid: formValues.rightCid as ContractId<FeaturedAppRight> },
             },
           },
         }),
       };
 
-      const action = actionMap[formAction](value.idValue);
+      const action = actionMap[formAction](value);
 
       if (!showConfirmation) {
         setShowConfirmation(true);
@@ -152,6 +184,17 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     },
   });
 
+  useEffect(() => {
+    if (formAction !== 'SRARC_RevokeFeaturedAppRight') return;
+
+    const currentRightCid = form.state.values.rightCid;
+    const hasSelectedOption = revokeRightOptions.some(option => option.value === currentRightCid);
+    if (hasSelectedOption) return;
+
+    const nextRightCid = revokeRightOptions.length === 1 ? revokeRightOptions[0].value : '';
+    form.setFieldValue('rightCid', nextRightCid);
+  }, [form, formAction, revokeRightOptions]);
+
   return (
     <>
       <FormLayout form={form} id={`${testIdPrefix}-form`}>
@@ -164,7 +207,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
             formType={reviewFormKey}
             grantRight={form.state.values.idValue}
-            revokeRight={form.state.values.idValue}
+            providerPartyId={form.state.values.partyId}
+            revokeRight={form.state.values.rightCid}
             onEdit={() => setShowConfirmation(false)}
             onSubmit={() => {}}
           />
@@ -230,24 +274,65 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
               {field => <field.TextField title="URL" id={`${testIdPrefix}-url`} />}
             </form.AppField>
 
-            <form.AppField
-              name="idValue"
-              validators={{
-                onBlur: ({ value }) => validateIdValue(value),
-                onChange: ({ value }) => validateIdValue(value),
-                onChangeAsyncDebounceMs: 500,
-                onChangeAsync: ({ value }) => validateProviderExists(value),
-                onBlurAsync: ({ value }) => validateProviderExists(value),
-              }}
-            >
-              {field => (
-                <field.TextField
-                  title={idValueFieldTitle}
-                  id={`${testIdPrefix}-idValue`}
-                  subtitle={field.state.meta.isValidating ? 'Validating provider...' : undefined}
-                />
-              )}
-            </form.AppField>
+            {formAction === 'SRARC_GrantFeaturedAppRight' && (
+              <form.AppField
+                name="idValue"
+                validators={{
+                  onBlur: ({ value }) => validatePartyId(value),
+                  onChange: ({ value }) => validatePartyId(value),
+                  onChangeAsyncDebounceMs: 500,
+                  onChangeAsync: ({ value }) => validateGrantProviderExists(value),
+                  onBlurAsync: ({ value }) => validateGrantProviderExists(value),
+                }}
+              >
+                {field => (
+                  <field.TextField
+                    title={providerFieldTitle}
+                    id={`${testIdPrefix}-idValue`}
+                    subtitle={field.state.meta.isValidating ? 'Validating provider...' : undefined}
+                  />
+                )}
+              </form.AppField>
+            )}
+
+            {formAction === 'SRARC_RevokeFeaturedAppRight' && (
+              <>
+                <form.AppField
+                  name="partyId"
+                  validators={{
+                    onChange: ({ value }) => validatePartyId(value),
+                    onChangeAsyncDebounceMs: 500,
+                    onChangeAsync: ({ value }) => loadFeaturedAppRightsAndValidate(value),
+                  }}
+                >
+                  {field => (
+                    <field.TextField
+                      title={providerFieldTitle}
+                      id={`${testIdPrefix}-partyId`}
+                      subtitle={field.state.meta.isValidating ? 'Loading app rights...' : undefined}
+                      onChange={() => setRevokeRightOptions([])}
+                    />
+                  )}
+                </form.AppField>
+
+                <form.AppField
+                  name="rightCid"
+                  validators={{
+                    onBlur: ({ value }) => validateRevokeRightSelection(value),
+                    onChange: ({ value }) => validateRevokeRightSelection(value),
+                  }}
+                >
+                  {field => (
+                    <field.SelectField
+                      title={rightCidFieldTitle!}
+                      id={`${testIdPrefix}-rightCid`}
+                      options={revokeRightOptions}
+                      disabled={revokeRightOptions.length === 0}
+                    />
+                  )}
+                </form.AppField>
+              </>
+            )}
           </>
         )}
 

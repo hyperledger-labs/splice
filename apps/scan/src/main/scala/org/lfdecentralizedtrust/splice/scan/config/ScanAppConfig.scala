@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.data.CantonTimestamp
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -83,6 +84,7 @@ case class ScanAppBackendConfig(
     externalTransactionHashThresholdTime: Option[Instant] =
       ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
     globalSynchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("global"),
+    rollForwardLsu: Option[ScanRollForwardLsuConfig] = None,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -90,6 +92,12 @@ case class ScanAppBackendConfig(
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
+
+final case class ScanRollForwardLsuConfig(
+    upgradeTime: Option[
+      CantonTimestamp
+    ] // If not set, we assume that there is an LsuAnnouncement on the legacy synchronizer.
+)
 
 object ScanAppBackendConfig {
   val DefaultExternalTransactionHashThresholdTime: Option[Instant] =

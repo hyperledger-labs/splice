@@ -351,22 +351,28 @@
         }
       ],
       "identitiesBackupLocation": {
-        "bucket": {
-          "bucketName": "da-cn-data-dumps",
-          "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-          "projectId": "da-cn-devnet",
-          "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-        }
-      },
-      "isDevNet": false,
-      "periodicBackupConfig": {
-        "backupInterval": "10m",
-        "location": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "bucket": {
             "bucketName": "da-cn-data-dumps",
             "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
             "projectId": "da-cn-devnet",
             "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          }
+        }
+      },
+      "isDevNet": false,
+      "periodicBackupConfig": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "backupInterval": "10m",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+            }
           }
         }
       },
@@ -1381,6 +1387,10 @@
           "name": "rewards-collected",
           "type": "banned"
         },
+        "/api/scan/v0/roll-forward-lsu": {
+          "name": "rollForwardLsu",
+          "type": "unlimited"
+        },
         "/api/scan/v0/round-of-latest-data": {
           "name": "round-of-latest-data",
           "type": "banned"
@@ -1631,6 +1641,10 @@
         "/api/scan/v0/rewards-collected": {
           "name": "rewards-collected",
           "type": "banned"
+        },
+        "/api/scan/v0/roll-forward-lsu": {
+          "name": "rollForwardLsu",
+          "type": "unlimited"
         },
         "/api/scan/v0/round-of-latest-data": {
           "name": "round-of-latest-data",
@@ -2307,239 +2321,242 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [
-          {
-            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
-            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+              "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
+              "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
+            }
+          ],
+          "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
           },
-          {
-            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
-            "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
-            "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
-          }
-        ],
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
+          "apiRequestLogLevel": "DEBUG",
+          "approvedSvIdentities": [
+            {
+              "name": "Digital-Asset-2",
+              "publicKey": "sv1-id-public-key",
+              "rewardWeightBps": 100000
+            },
+            {
+              "name": "SV1",
+              "publicKey": "PUBLIC_KEY_1==",
+              "rewardWeightBps": 1000000
+            },
+            {
+              "extraBeneficiaries": [
                 {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "In",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
+                  "beneficiary": "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678",
+                  "weight": 100000
+                },
+                {
+                  "beneficiary": "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5",
+                  "weight": 50000
                 }
-              ]
+              ],
+              "name": "SV2",
+              "publicKey": "PUBLIC_KEY_2==",
+              "rewardWeightBps": 150000
+            },
+            {
+              "name": "Digital-Asset-1",
+              "publicKey": "svda1-mock-id-public-key",
+              "rewardWeightBps": 150000
+            },
+            {
+              "name": "DA-Helm-Test-Node",
+              "publicKey": "sv-id-public-key",
+              "rewardWeightBps": 10000
             }
-          }
-        },
-        "apiRequestLogLevel": "DEBUG",
-        "approvedSvIdentities": [
-          {
-            "name": "Digital-Asset-2",
-            "publicKey": "sv1-id-public-key",
-            "rewardWeightBps": 100000
+          ],
+          "auth": {
+            "audience": "https://canton.network.global",
+            "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
           },
-          {
-            "name": "SV1",
-            "publicKey": "PUBLIC_KEY_1==",
-            "rewardWeightBps": 1000000
+          "cluster": {
+            "dnsName": "mock.global.canton.network.digitalasset.com",
+            "fixedTokens": false,
+            "hostname": "mock.global.canton.network.digitalasset.com",
+            "name": "cn-mocknet"
           },
-          {
-            "extraBeneficiaries": [
-              {
-                "beneficiary": "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678",
-                "weight": 100000
-              },
-              {
-                "beneficiary": "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5",
-                "weight": 50000
+          "contactPoint": "sv-support@digitalasset.com",
+          "delegatelessAutomationExpectedTaskDuration": 5000,
+          "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+          "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
+          "disableOnboardingParticipantPromotionDelay": false,
+          "enablePostgresMetrics": true,
+          "expectedValidatorOnboardings": [
+            {
+              "expiresIn": "24h",
+              "secretFrom": {
+                "secretKeyRef": {
+                  "key": "secret",
+                  "name": "splice-app-validator-onboarding-splitwell2",
+                  "optional": false
+                }
               }
-            ],
-            "name": "SV2",
-            "publicKey": "PUBLIC_KEY_2==",
-            "rewardWeightBps": 150000
-          },
-          {
-            "name": "Digital-Asset-1",
-            "publicKey": "svda1-mock-id-public-key",
-            "rewardWeightBps": 150000
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "sv-id-public-key",
-            "rewardWeightBps": 10000
-          }
-        ],
-        "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "delegatelessAutomationExpectedTaskDuration": 5000,
-        "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
-        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
-        "disableOnboardingParticipantPromotionDelay": false,
-        "enablePostgresMetrics": true,
-        "expectedValidatorOnboardings": [
-          {
-            "expiresIn": "24h",
-            "secretFrom": {
-              "secretKeyRef": {
-                "key": "secret",
-                "name": "splice-app-validator-onboarding-splitwell2",
-                "optional": false
+            },
+            {
+              "expiresIn": "24h",
+              "secretFrom": {
+                "secretKeyRef": {
+                  "key": "secret",
+                  "name": "splice-app-validator-onboarding-validator12",
+                  "optional": false
+                }
               }
             }
-          },
-          {
-            "expiresIn": "24h",
-            "secretFrom": {
-              "secretKeyRef": {
-                "key": "secret",
-                "name": "splice-app-validator-onboarding-validator12",
-                "optional": false
-              }
-            }
-          }
-        ],
-        "failOnAppVersionMismatch": true,
-        "identitiesExport": {
-          "bucket": {
-            "bucketName": "da-cn-data-dumps",
-            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-            "projectId": "da-cn-devnet",
-            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-          },
-          "prefix": "mock/sv-1"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "initialAmuletPrice": "0.0517",
-        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
-        "initialRound": "0",
-        "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 200000,
-          "baseRateBurstWindowMins": 20,
-          "extraTrafficPrice": 16.67,
-          "minTopupAmount": 200000,
-          "readVsWriteScalingFactor": 4
-        },
-        "isDevNet": false,
-        "logAsyncFlush": false,
-        "logLevel": "WARN",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migration": {
-          "id": 2,
-          "migrating": false
-        },
-        "nodeIdentifier": "Digital-Asset-2",
-        "onboardingFoundingSvRewardWeightBps": 100000,
-        "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "2 h",
-        "onboardingType": "found-dso",
-        "participantAddress": "participant-2",
-        "periodicTopologySnapshotConfig": {
-          "backupInterval": "12h",
-          "location": {
+          ],
+          "failOnAppVersionMismatch": true,
+          "identitiesExport": {
             "bucket": {
-              "bucketName": "cn-topology-snapshots",
-              "jsonCredentials": "{\"projectId\":\"da-cn-shared\",\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
-              "projectId": "da-cn-shared",
-              "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
             "prefix": "mock/sv-1"
-          }
-        },
-        "permissionedSynchronizer": false,
-        "persistence": {
-          "databaseName": "sv_sv_1",
-          "port": 5432,
-          "postgresName": "cn-apps-pg",
-          "schema": "sv_sv_1",
-          "secretName": "cn-apps-pg-secrets",
-          "user": "cnadmin"
-        },
-        "pvc": {
-          "volumeName": "sv-app-global-domain-migration-hd-pvc",
-          "volumeStorageClass": "hyperdisk-standard-rwo"
-        },
-        "resources": {
-          "limits": {
-            "memory": "2Gi"
           },
-          "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
-          }
-        },
-        "scan": {
-          "internalUrl": "http://scan-app.sv-1:5012",
-          "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
-        },
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-              "enabled": true
-            },
-            "mediatorAddress": "global-domain-3-mediator",
-            "sequencerAddress": "global-domain-3-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
-            },
-            "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "initialAmuletPrice": "0.0517",
+          "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
+          "initialRound": "0",
+          "initialSynchronizerFeesConfig": {
+            "baseRateBurstAmount": 200000,
+            "baseRateBurstWindowMins": 20,
+            "extraTrafficPrice": 16.67,
+            "minTopupAmount": 200000,
+            "readVsWriteScalingFactor": 4
           },
-          "skipInitialization": true,
-          "successor": {
-            "enableBftSequencer": true,
-            "mediatorAddress": "global-domain-4-mediator",
-            "sequencerAddress": "global-domain-4-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
+          "isDevNet": false,
+          "logAsyncFlush": false,
+          "logLevel": "WARN",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migration": {
+            "id": 2,
+            "migrating": false
+          },
+          "nodeIdentifier": "Digital-Asset-2",
+          "onboardingFoundingSvRewardWeightBps": 100000,
+          "onboardingName": "Digital-Asset-2",
+          "onboardingRoundZeroDuration": "2 h",
+          "onboardingType": "found-dso",
+          "participantAddress": "participant-2",
+          "periodicTopologySnapshotConfig": {
+            "backupInterval": "12h",
+            "location": {
+              "bucket": {
+                "bucketName": "cn-topology-snapshots",
+                "jsonCredentials": "{\"projectId\":\"da-cn-shared\",\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
+                "projectId": "da-cn-shared",
+                "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
+              },
+              "prefix": "mock/sv-1"
+            }
+          },
+          "permissionedSynchronizer": false,
+          "persistence": {
+            "databaseName": "sv_sv_1",
+            "port": 5432,
+            "postgresName": "cn-apps-pg",
+            "schema": "sv_sv_1",
+            "secretName": "cn-apps-pg-secrets",
+            "user": "cnadmin"
+          },
+          "pvc": {
+            "volumeName": "sv-app-global-domain-migration-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
             },
-            "sequencerPublicUrl": "https://sequencer-4.sv-2.mock.global.canton.network.digitalasset.com"
-          }
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
+          },
+          "scan": {
+            "internalUrl": "http://scan-app.sv-1:5012",
+            "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
+          },
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "synchronizers": {
+            "current": {
+              "cometBftConfig": {
+                "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+                "enabled": true
+              },
+              "mediatorAddress": "global-domain-3-mediator",
+              "sequencerAddress": "global-domain-3-sequencer",
+              "sequencerPruningConfig": {
+                "enabled": true,
+                "pruningInterval": "1 hour",
+                "retentionPeriod": "30 days"
+              },
+              "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+            },
+            "skipInitialization": true,
+            "successor": {
+              "enableBftSequencer": true,
+              "mediatorAddress": "global-domain-4-mediator",
+              "sequencerAddress": "global-domain-4-sequencer",
+              "sequencerPruningConfig": {
+                "enabled": true,
+                "pruningInterval": "1 hour",
+                "retentionPeriod": "30 days"
+              },
+              "sequencerPublicUrl": "https://sequencer-4.sv-2.mock.global.canton.network.digitalasset.com"
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        }
       },
       "version": "0.3.20"
     },
@@ -2558,134 +2575,137 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
-            "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
-            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 /10 * * * ?\"\n                    max-duration = \"5m\"\n                    retention = \"30d\"\n                  }"
-          }
-        ],
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "additionalUsers": [],
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "In",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "apiRequestLogLevel": "DEBUG",
-        "appDars": [],
-        "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "disableAllocateLedgerApiUserParty": true,
-        "disableAuth": false,
-        "enablePostgresMetrics": true,
-        "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logAsyncFlush": false,
-        "logLevel": "WARN",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migration": {
-          "id": 2
-        },
-        "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-2",
-        "participantIdentitiesDumpPeriodicBackup": {
-          "backupInterval": "10m",
-          "location": {
-            "bucket": {
-              "bucketName": "da-cn-data-dumps",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-devnet",
-              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
+              "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
             },
-            "prefix": "mock/sv-1"
-          }
-        },
-        "persistence": {
-          "databaseName": "validator_sv_1",
-          "port": 5432,
-          "postgresName": "cn-apps-pg",
-          "schema": "validator_sv_1",
-          "secretName": "cn-apps-pg-secrets",
-          "user": "cnadmin"
-        },
-        "pvc": {
-          "volumeName": "domain-migration-validator-hd-pvc",
-          "volumeStorageClass": "hyperdisk-standard-rwo"
-        },
-        "resources": {
-          "limits": {
-            "memory": "4Gi"
+            {
+              "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+              "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 /10 * * * ?\"\n                    max-duration = \"5m\"\n                    retention = \"30d\"\n                  }"
+            }
+          ],
+          "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+          "additionalUsers": [],
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
           },
-          "requests": {
-            "memory": "2Gi"
-          }
-        },
-        "scanAddress": "http://scan-app.sv-1:5012",
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "svValidator": true,
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ],
-        "topup": {
-          "enabled": true,
-          "minTopupInterval": "1m",
-          "targetThroughput": 0
-        },
-        "useSequencerConnectionsFromScan": true,
-        "validatorWalletUsers": [
-          "google-oauth2|1234567890",
-          "auth0|64529b128448ded6aa68048f"
-        ],
-        "walletSweep": {
-          "mock::11111111111111111111111111111111111111111111111111111111111111111111": {
-            "maxBalanceUSD": 12345,
-            "minBalanceUSD": 17,
-            "receiver": "mock-2::222222222222222222222222222222222222222222222222222222222222222222222"
+          "apiRequestLogLevel": "DEBUG",
+          "appDars": [],
+          "auth": {
+            "audience": "https://canton.network.global",
+            "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+          },
+          "cluster": {
+            "dnsName": "mock.global.canton.network.digitalasset.com",
+            "fixedTokens": false,
+            "hostname": "mock.global.canton.network.digitalasset.com",
+            "name": "cn-mocknet"
+          },
+          "contactPoint": "sv-support@digitalasset.com",
+          "disableAllocateLedgerApiUserParty": true,
+          "disableAuth": false,
+          "enablePostgresMetrics": true,
+          "failOnAppVersionMismatch": true,
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "logAsyncFlush": false,
+          "logLevel": "WARN",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migration": {
+            "id": 2
+          },
+          "nodeIdentifier": "Digital-Asset-2",
+          "participantAddress": "participant-2",
+          "participantIdentitiesDumpPeriodicBackup": {
+            "backupInterval": "10m",
+            "location": {
+              "bucket": {
+                "bucketName": "da-cn-data-dumps",
+                "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+                "projectId": "da-cn-devnet",
+                "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+              },
+              "prefix": "mock/sv-1"
+            }
+          },
+          "persistence": {
+            "databaseName": "validator_sv_1",
+            "port": 5432,
+            "postgresName": "cn-apps-pg",
+            "schema": "validator_sv_1",
+            "secretName": "cn-apps-pg-secrets",
+            "user": "cnadmin"
+          },
+          "pvc": {
+            "volumeName": "domain-migration-validator-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "resources": {
+            "limits": {
+              "memory": "4Gi"
+            },
+            "requests": {
+              "memory": "2Gi"
+            }
+          },
+          "scanAddress": "http://scan-app.sv-1:5012",
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "svValidator": true,
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ],
+          "topup": {
+            "enabled": true,
+            "minTopupInterval": "1m",
+            "targetThroughput": 0
+          },
+          "useSequencerConnectionsFromScan": true,
+          "validatorWalletUsers": [
+            "google-oauth2|1234567890",
+            "auth0|64529b128448ded6aa68048f"
+          ],
+          "walletSweep": {
+            "mock::11111111111111111111111111111111111111111111111111111111111111111111": {
+              "maxBalanceUSD": 12345,
+              "minBalanceUSD": 17,
+              "receiver": "mock-2::222222222222222222222222222222222222222222222222222222222222222222222"
+            }
           }
         }
       },
@@ -3277,204 +3297,207 @@
       "namespace": "sv-da-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [
-          {
-            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
-            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
-            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
-            "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
-            "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
-          }
-        ],
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "In",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
-                }
-              ]
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+              "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+              "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
+              "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
             }
-          }
-        },
-        "apiRequestLogLevel": "DEBUG",
-        "approvedSvIdentities": [
-          {
-            "name": "Digital-Asset-2",
-            "publicKey": "sv1-id-public-key",
-            "rewardWeightBps": 100000
-          },
-          {
-            "name": "SV1",
-            "publicKey": "PUBLIC_KEY_1==",
-            "rewardWeightBps": 1000000
-          },
-          {
-            "extraBeneficiaries": [
-              {
-                "beneficiary": "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678",
-                "weight": 100000
-              },
-              {
-                "beneficiary": "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5",
-                "weight": 50000
+          ],
+          "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
               }
-            ],
-            "name": "SV2",
-            "publicKey": "PUBLIC_KEY_2==",
-            "rewardWeightBps": 150000
+            }
           },
-          {
-            "name": "Digital-Asset-1",
-            "publicKey": "svda1-mock-id-public-key",
-            "rewardWeightBps": 150000
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "sv-id-public-key",
-            "rewardWeightBps": 10000
-          }
-        ],
-        "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
-        "delegatelessAutomationExpectedTaskDuration": 5000,
-        "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
-        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
-        "disableOnboardingParticipantPromotionDelay": false,
-        "enablePostgresMetrics": true,
-        "expectedValidatorOnboardings": [],
-        "failOnAppVersionMismatch": true,
-        "identitiesExport": {
-          "bucket": {
-            "bucketName": "da-cn-data-dumps",
-            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-            "projectId": "da-cn-devnet",
-            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-          },
-          "prefix": "mock/sv-da-1"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "initialAmuletPrice": "0.0517",
-        "isDevNet": false,
-        "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
-        },
-        "logAsyncFlush": false,
-        "logLevel": "INFO",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migration": {
-          "id": 2,
-          "migrating": false
-        },
-        "nodeIdentifier": "Digital-Asset-1",
-        "onboardingName": "Digital-Asset-1",
-        "onboardingType": "join-with-key",
-        "participantAddress": "participant-2",
-        "permissionedSynchronizer": false,
-        "persistence": {
-          "databaseName": "sv_sv_da_1",
-          "port": 5432,
-          "postgresName": "cn-apps-pg",
-          "schema": "sv_sv_da_1",
-          "secretName": "cn-apps-pg-secrets",
-          "user": "cnadmin"
-        },
-        "pvc": {
-          "volumeName": "sv-app-global-domain-migration-hd-pvc",
-          "volumeStorageClass": "hyperdisk-standard-rwo"
-        },
-        "resources": {
-          "limits": {
-            "memory": "2Gi"
-          },
-          "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
-          }
-        },
-        "scan": {
-          "internalUrl": "http://scan-app.sv-da-1:5012",
-          "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com"
-        },
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-              "enabled": true,
-              "externalGovernanceKey": true
+          "apiRequestLogLevel": "DEBUG",
+          "approvedSvIdentities": [
+            {
+              "name": "Digital-Asset-2",
+              "publicKey": "sv1-id-public-key",
+              "rewardWeightBps": 100000
             },
-            "mediatorAddress": "global-domain-3-mediator",
-            "sequencerAddress": "global-domain-3-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
+            {
+              "name": "SV1",
+              "publicKey": "PUBLIC_KEY_1==",
+              "rewardWeightBps": 1000000
             },
-            "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
+            {
+              "extraBeneficiaries": [
+                {
+                  "beneficiary": "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678",
+                  "weight": 100000
+                },
+                {
+                  "beneficiary": "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5",
+                  "weight": 50000
+                }
+              ],
+              "name": "SV2",
+              "publicKey": "PUBLIC_KEY_2==",
+              "rewardWeightBps": 150000
+            },
+            {
+              "name": "Digital-Asset-1",
+              "publicKey": "svda1-mock-id-public-key",
+              "rewardWeightBps": 150000
+            },
+            {
+              "name": "DA-Helm-Test-Node",
+              "publicKey": "sv-id-public-key",
+              "rewardWeightBps": 10000
+            }
+          ],
+          "auth": {
+            "audience": "https://canton.network.global",
+            "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
           },
-          "skipInitialization": true,
-          "successor": {
-            "enableBftSequencer": true,
-            "mediatorAddress": "global-domain-4-mediator",
-            "sequencerAddress": "global-domain-4-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
+          "cluster": {
+            "dnsName": "mock.global.canton.network.digitalasset.com",
+            "fixedTokens": false,
+            "hostname": "mock.global.canton.network.digitalasset.com",
+            "name": "cn-mocknet"
+          },
+          "contactPoint": "sv-support@digitalasset.com",
+          "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
+          "delegatelessAutomationExpectedTaskDuration": 5000,
+          "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+          "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
+          "disableOnboardingParticipantPromotionDelay": false,
+          "enablePostgresMetrics": true,
+          "expectedValidatorOnboardings": [],
+          "failOnAppVersionMismatch": true,
+          "identitiesExport": {
+            "bucket": {
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "sequencerPublicUrl": "https://sequencer-4.sv-1.mock.global.canton.network.digitalasset.com"
-          }
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
+            "prefix": "mock/sv-da-1"
+          },
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "initialAmuletPrice": "0.0517",
+          "isDevNet": false,
+          "joinWithKeyOnboarding": {
+            "sponsorApiUrl": "http://sv-app.sv-1:5014"
+          },
+          "logAsyncFlush": false,
+          "logLevel": "INFO",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migration": {
+            "id": 2,
+            "migrating": false
+          },
+          "nodeIdentifier": "Digital-Asset-1",
+          "onboardingName": "Digital-Asset-1",
+          "onboardingType": "join-with-key",
+          "participantAddress": "participant-2",
+          "permissionedSynchronizer": false,
+          "persistence": {
+            "databaseName": "sv_sv_da_1",
+            "port": 5432,
+            "postgresName": "cn-apps-pg",
+            "schema": "sv_sv_da_1",
+            "secretName": "cn-apps-pg-secrets",
+            "user": "cnadmin"
+          },
+          "pvc": {
+            "volumeName": "sv-app-global-domain-migration-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
+          },
+          "scan": {
+            "internalUrl": "http://scan-app.sv-da-1:5012",
+            "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com"
+          },
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "synchronizers": {
+            "current": {
+              "cometBftConfig": {
+                "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+                "enabled": true,
+                "externalGovernanceKey": true
+              },
+              "mediatorAddress": "global-domain-3-mediator",
+              "sequencerAddress": "global-domain-3-sequencer",
+              "sequencerPruningConfig": {
+                "enabled": true,
+                "pruningInterval": "1 hour",
+                "retentionPeriod": "30 days"
+              },
+              "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
+            },
+            "skipInitialization": true,
+            "successor": {
+              "enableBftSequencer": true,
+              "mediatorAddress": "global-domain-4-mediator",
+              "sequencerAddress": "global-domain-4-sequencer",
+              "sequencerPruningConfig": {
+                "enabled": true,
+                "pruningInterval": "1 hour",
+                "retentionPeriod": "30 days"
+              },
+              "sequencerPublicUrl": "https://sequencer-4.sv-1.mock.global.canton.network.digitalasset.com"
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        }
       },
       "version": "0.3.20"
     },
@@ -3493,142 +3516,145 @@
       "namespace": "sv-da-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [
-          {
-            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
-            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
-            "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
-          },
-          {
-            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
-            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
-          }
-        ],
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "additionalUsers": [],
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "In",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "apiRequestLogLevel": "DEBUG",
-        "appDars": [],
-        "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "disableAllocateLedgerApiUserParty": true,
-        "disableAuth": false,
-        "enablePostgresMetrics": true,
-        "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logAsyncFlush": false,
-        "logLevel": "INFO",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migration": {
-          "id": 2
-        },
-        "nodeIdentifier": "Digital-Asset-1",
-        "participantAddress": "participant-2",
-        "participantIdentitiesDumpPeriodicBackup": {
-          "backupInterval": "10m",
-          "location": {
-            "bucket": {
-              "bucketName": "da-cn-data-dumps",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-devnet",
-              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+              "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
             },
-            "prefix": "mock/sv-da-1"
-          }
-        },
-        "persistence": {
-          "databaseName": "validator_sv_da_1",
-          "port": 5432,
-          "postgresName": "cn-apps-pg",
-          "schema": "validator_sv_da_1",
-          "secretName": "cn-apps-pg-secrets",
-          "user": "cnadmin"
-        },
-        "pvc": {
-          "volumeName": "domain-migration-validator-hd-pvc",
-          "volumeStorageClass": "hyperdisk-standard-rwo"
-        },
-        "resources": {
-          "limits": {
-            "memory": "4Gi"
+            {
+              "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
+              "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+            },
+            {
+              "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+              "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            }
+          ],
+          "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+          "additionalUsers": [],
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
           },
-          "requests": {
-            "memory": "2Gi"
-          }
-        },
-        "scanAddress": "http://scan-app.sv-da-1:5012",
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "svValidator": true,
-        "synchronizer": {
-          "connectionType": "trust-single",
-          "url": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ],
-        "topup": {
-          "enabled": true,
-          "minTopupInterval": "1m",
-          "targetThroughput": 0
-        },
-        "useSequencerConnectionsFromScan": true,
-        "validatorWalletUsers": [
-          "google-oauth2|1234567890",
-          "auth0|68c2c41e6470184569e4521e"
-        ],
-        "walletSweep": {
-          "mock-3::33333333333333333333333333333333333333333333333333333333333333333333": {
-            "maxBalanceUSD": 67890,
-            "minBalanceUSD": 42,
-            "receiver": "mock-4::444444444444444444444444444444444444444444444444444444444444444444444"
+          "apiRequestLogLevel": "DEBUG",
+          "appDars": [],
+          "auth": {
+            "audience": "https://canton.network.global",
+            "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+          },
+          "cluster": {
+            "dnsName": "mock.global.canton.network.digitalasset.com",
+            "fixedTokens": false,
+            "hostname": "mock.global.canton.network.digitalasset.com",
+            "name": "cn-mocknet"
+          },
+          "contactPoint": "sv-support@digitalasset.com",
+          "disableAllocateLedgerApiUserParty": true,
+          "disableAuth": false,
+          "enablePostgresMetrics": true,
+          "failOnAppVersionMismatch": true,
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "logAsyncFlush": false,
+          "logLevel": "INFO",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migration": {
+            "id": 2
+          },
+          "nodeIdentifier": "Digital-Asset-1",
+          "participantAddress": "participant-2",
+          "participantIdentitiesDumpPeriodicBackup": {
+            "backupInterval": "10m",
+            "location": {
+              "bucket": {
+                "bucketName": "da-cn-data-dumps",
+                "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+                "projectId": "da-cn-devnet",
+                "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+              },
+              "prefix": "mock/sv-da-1"
+            }
+          },
+          "persistence": {
+            "databaseName": "validator_sv_da_1",
+            "port": 5432,
+            "postgresName": "cn-apps-pg",
+            "schema": "validator_sv_da_1",
+            "secretName": "cn-apps-pg-secrets",
+            "user": "cnadmin"
+          },
+          "pvc": {
+            "volumeName": "domain-migration-validator-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "resources": {
+            "limits": {
+              "memory": "4Gi"
+            },
+            "requests": {
+              "memory": "2Gi"
+            }
+          },
+          "scanAddress": "http://scan-app.sv-da-1:5012",
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "svValidator": true,
+          "synchronizer": {
+            "connectionType": "trust-single",
+            "url": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ],
+          "topup": {
+            "enabled": true,
+            "minTopupInterval": "1m",
+            "targetThroughput": 0
+          },
+          "useSequencerConnectionsFromScan": true,
+          "validatorWalletUsers": [
+            "google-oauth2|1234567890",
+            "auth0|68c2c41e6470184569e4521e"
+          ],
+          "walletSweep": {
+            "mock-3::33333333333333333333333333333333333333333333333333333333333333333333": {
+              "maxBalanceUSD": 67890,
+              "minBalanceUSD": 42,
+              "receiver": "mock-4::444444444444444444444444444444444444444444444444444444444444444444444"
+            }
           }
         }
       },
