@@ -359,6 +359,19 @@ class SvAppBackendReference(
       )
     }
 
+  @Help.Summary(
+    "Grant permission to a validator to join the permissioned synchronizer (via admin API)"
+  )
+  def grantValidatorPermission(
+      validatorParty: PartyId,
+      validatorParticipant: ParticipantId,
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvOperatorAppClient.GrantValidatorPermission(validatorParty, validatorParticipant)
+      )
+    }
+
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via admin API)")
   def prepareValidatorOnboarding(expiresIn: FiniteDuration, partyHint: Option[String]): String =
     consoleEnvironment.run {
