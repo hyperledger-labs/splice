@@ -571,18 +571,23 @@ class TokenStandardV2AllocationIntegrationTest
       }
     }
 
-    // This is easier than building it from the OTCTrade. In daml there's `mkOtcTradeSettlementInfo`
-    val oneAllocationRequestView =
-      allocations.headOption.valueOrFail("Allocations list cannot be empty")._2
-    val settlementInfo = oneAllocationRequestView.settlement
-    val transferLegs = oneAllocationRequestView.transferLegs
+    // equivalent to mkOtcTradeSettlementInfo in Daml
+    val settlementInfo = new allocationv2.SettlementInfo(
+      java.util.List.of(venueParty.toProtoPrimitive),
+      new allocationv2.Reference(
+        "OTCTradeProposal",
+        java.util.Optional.of(new metadatav1.AnyContract.ContractId(otcTrade.id.contractId)),
+      ),
+      otcTrade.data.createdAt,
+      otcTrade.data.settleAt,
+      otcTrade.data.settlementDeadline,
+      emptyMetadata,
+    )
     val settleBatch = new allocationv2.SettlementFactory_SettleBatch(
       settlementInfo,
-      transferLegs,
+      otcTrade.data.transferLegs,
       allocations.map(_._1).asJava,
-      /* extraReceiptAuthorizers =*/ otcTrade.data.autoReceiptAuthorizers.asScala
-        .map(party => basicAccount(PartyId.tryFromProtoPrimitive(party)))
-        .asJava,
+      /* extraReceiptAuthorizers =*/ List(aliceParty, bobParty).map(basicAccount).asJava,
       /*actors = */ java.util.List.of(aliceParty.toProtoPrimitive, bobParty.toProtoPrimitive),
       emptyExtraArgs,
     )
