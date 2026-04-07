@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
@@ -7,11 +7,10 @@ import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.digitalasset.canton.BigDecimalImplicits.*
-import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
@@ -21,7 +20,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.tests.multihostedparties.DivulgenceIntegrationTest.ParticipantSimpleStreamHelper
+import com.digitalasset.canton.integration.tests.multihostedparties.DivulgenceIntegrationTestHelpers.ParticipantSimpleStreamHelper
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.OffsetOutOfRange
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError.UnsafeToPrune
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
@@ -53,7 +52,7 @@ import scala.jdk.CollectionConverters.*
 @nowarn("msg=match may not be exhaustive")
 abstract class LedgerPruningIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment[CantonConfig, CantonEnvironment]
+    with SharedEnvironment
     with HasCycleUtils
     with HasProgrammableSequencer {
 
@@ -604,13 +603,19 @@ abstract class LedgerPruningIntegrationTest
 
     // divulgence proxy contract for divulgence operations: divulging to bob
     val (_, divulgeIouByExerciseContract) = participant2.createDivulgeIou(alice, bob)
+    // ping to ensure P1 sees DivulgeIouByExercise contract created above by Bob for use by Alice
+    participant2.health.ping(participant1)
 
     // creating an iou with alice, which will be divulged to bob
     val (immediateDivulgedP1, immediateDivulgedContract) =
       participant1.immediateDivulgeIou(alice, divulgeIouByExerciseContract)
     contractFor(participant1, daId, immediateDivulgedP1.contractId) should not be empty
     // Immediately divulged contracts are stored in the ContractStore
-    contractFor(participant2, daId, immediateDivulgedP1.contractId) should not be empty
+    // eventually since participant1.immediateDivulgeIou() above only waits for participant1
+    logger.debug(s"Find immediately divulged contract ${immediateDivulgedP1.contractId} on P2")
+    eventually() {
+      contractFor(participant2, daId, immediateDivulgedP1.contractId) should not be empty
+    }
     checkCreatedEventFor(participant1, immediateDivulgedP1.contractId, alice)
     participant2
       .acsDeltas(bob, end2AtStart)

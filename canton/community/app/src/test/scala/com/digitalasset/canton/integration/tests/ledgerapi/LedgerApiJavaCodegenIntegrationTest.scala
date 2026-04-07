@@ -1,26 +1,25 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
 
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.damltests.java.test.Dummy
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.Party
 
 import scala.jdk.CollectionConverters.*
 
 trait LedgerApiJavaCodegenIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
 
-  var alice: PartyId = _
-  var bob: PartyId = _
+  var alice: Party = _
+  var bob: Party = _
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
@@ -28,14 +27,14 @@ trait LedgerApiJavaCodegenIntegrationTest extends CommunityIntegrationTest with 
         import env.*
         participant1.synchronizers.connect_local(sequencer1, alias = daName)
         participant1.dars.upload(CantonTestsPath)
-        alice = participant1.parties.enable("alice")
-        bob = participant1.parties.enable("bob")
+        alice = participant1.parties.testing.enable("alice")
+        bob = participant1.parties.testing.enable("bob")
 
         eventually() {
           // wait until
-          participant1.parties
+          participant1.parties.testing
             .list(asOf = Some(environment.clock.now.toInstant))
-            .map(_.party) should contain allElementsOf (Seq(alice, bob))
+            .map(_.partyResult) should contain allElementsOf (Seq(alice, bob))
         }
       }
 
@@ -84,5 +83,6 @@ trait LedgerApiJavaCodegenIntegrationTest extends CommunityIntegrationTest with 
 }
 
 class LedgerApiJavaCodegenIntegrationTestDefault extends LedgerApiJavaCodegenIntegrationTest {
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

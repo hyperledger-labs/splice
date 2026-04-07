@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer
 
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -21,7 +22,6 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
   TestConsoleEnvironment,
 }
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import eu.rekawek.toxiproxy.model.{Toxic, ToxicDirection, ToxicList}
 import monocle.macros.syntax.lens.*
 import org.scalatest.BeforeAndAfter

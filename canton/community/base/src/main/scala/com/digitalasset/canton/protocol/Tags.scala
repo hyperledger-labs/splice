@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -145,18 +145,19 @@ object UpdateId {
     prettyOfParam(_.hash)
   }
 
-  implicit val setParameterUpdateId: SetParameter[UpdateId] = (v, pp) => pp.>>(v.hash)
+  implicit def setParameterUpdateId(implicit setHash: SetParameter[Hash]): SetParameter[UpdateId] =
+    setHash.contramap(_.hash)
 
-  implicit val getResultUpdateId: GetResult[UpdateId] = GetResult { r =>
-    UpdateId(r.<<)
-  }
+  implicit def getResultUpdateId(implicit getHash: GetResult[Hash]): GetResult[UpdateId] =
+    getHash.andThen(UpdateId(_))
 
-  implicit val setParameterOptionUpdateId: SetParameter[Option[UpdateId]] = (v, pp) =>
-    pp.>>(v.map(_.hash))
+  implicit def setParameterOptionUpdateId(implicit
+      setHash: SetParameter[Option[Hash]]
+  ): SetParameter[Option[UpdateId]] = setHash.contramap(_.map(_.hash))
 
-  implicit val getResultOptionUpdateId: GetResult[Option[UpdateId]] = GetResult { r =>
-    (r.<<[Option[Hash]]).map(UpdateId(_))
-  }
+  implicit def getResultOptionUpdateId(implicit
+      getHash: GetResult[Option[Hash]]
+  ): GetResult[Option[UpdateId]] = getHash.andThen(_.map(UpdateId(_)))
 }
 
 /** A hash-based transaction view id
@@ -291,13 +292,13 @@ object ReassignmentId {
         contractIdCounters: Map[LfContractId, ReassignmentCounter],
     ): ReassignmentId = {
       val builder = Hash.build(HashPurpose.ReassignmentId, HashAlgorithm.Sha256)
-      builder.add(source.unwrap.toProtoPrimitive)
-      builder.add(target.unwrap.toProtoPrimitive)
-      builder.add(unassignmentTs.toProtoPrimitive)
+      builder.addString(source.unwrap.toProtoPrimitive)
+      builder.addString(target.unwrap.toProtoPrimitive)
+      builder.addLong(unassignmentTs.toProtoPrimitive)
       contractIdCounters.view.toSeq.sortBy(_._1.coid).foreach {
         case (contractId, reassignmentCounter) =>
-          builder.add(contractId.coid)
-          builder.add(reassignmentCounter.toProtoPrimitive)
+          builder.addString(contractId.coid)
+          builder.addLong(reassignmentCounter.toProtoPrimitive)
       }
       V0(builder.finish().getCryptographicEvidence)
     }

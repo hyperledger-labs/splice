@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory
 
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
@@ -17,7 +18,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
   EpochStore,
   EpochStoreReader,
-  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
@@ -41,7 +41,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Prepare,
   ViewChange,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.TryUtil
 
 import scala.collection.MapView
@@ -131,21 +131,22 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
 
   override def latestEpoch(includeInProgress: Boolean)(implicit
       traceContext: TraceContext
-  ): E#FutureUnlessShutdownT[EpochStore.Epoch] =
+  ): E#FutureUnlessShutdownT[Option[EpochStore.Epoch]] =
     createFuture(latestEpochActionName) { () =>
       Try {
-        val epochInfo = epochs
-          .filter { case (_, EpochStatus(_, isInProgress)) =>
-            includeInProgress || (!includeInProgress && !isInProgress)
-          }
-          .maxByOption { case (epochNumber, _) => epochNumber }
-          .map { case (_, EpochStatus(epochInfo, _)) => epochInfo }
-          .getOrElse(Genesis.GenesisEpochInfo)
-        val commits =
-          blocks
-            .get(epochInfo.lastBlockNumber)
-            .fold[Seq[SignedMessage[Commit]]](Seq.empty)(_.commits)
-        Epoch(epochInfo, commits)
+        for {
+          epochInfo <-
+            epochs
+              .filter { case (_, EpochStatus(_, isInProgress)) =>
+                includeInProgress || (!includeInProgress && !isInProgress)
+              }
+              .maxByOption { case (epochNumber, _) => epochNumber }
+              .map { case (_, EpochStatus(epochInfo, _)) => epochInfo }
+          commits =
+            blocks
+              .get(epochInfo.lastBlockNumber)
+              .fold(Seq.empty[SignedMessage[Commit]])(_.commits)
+        } yield Epoch(epochInfo, commits)
       }
     }
 
@@ -157,22 +158,20 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
     }
 
   override def addPreparesAtomically(
-      prepares: Seq[SignedMessage[Prepare]]
+      prepares: NonEmpty[Seq[Traced[SignedMessage[Prepare]]]]
   )(implicit traceContext: TraceContext): E#FutureUnlessShutdownT[Unit] =
     createFuture(addPreparesActionName) { () =>
-      prepares.headOption.fold(TryUtil.unit) { head =>
-        preparesMap
-          .putIfAbsent(
-            head.message.blockMetadata.blockNumber,
-            TrieMap[ViewNumber, Seq[SignedMessage[Prepare]]](),
-          )
-          .discard
-        putIfAbsent(
-          store = preparesMap(head.message.blockMetadata.blockNumber),
-          key = head.message.viewNumber,
-          value = prepares,
-        )
-      }
+      val head = prepares.head1
+      val message = head.value.message
+      val blockNumber = message.blockMetadata.blockNumber
+      preparesMap
+        .putIfAbsent(blockNumber, TrieMap[ViewNumber, Seq[SignedMessage[Prepare]]]())
+        .discard
+      putIfAbsent(
+        store = preparesMap(blockNumber),
+        key = message.viewNumber,
+        value = prepares.forgetNE.map(_.value),
+      )
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -194,7 +193,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
 
   override def addOrderedBlockAtomically(
       prePrepare: SignedMessage[PrePrepare],
-      commitMessages: Seq[SignedMessage[Commit]],
+      commitMessages: Seq[Traced[SignedMessage[Commit]]],
   )(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[Unit] = {
@@ -204,7 +203,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       putIfAbsent(
         store = blocks,
         key = blockNumber,
-        value = CompletedBlock(prePrepare, commitMessages),
+        value = CompletedBlock(prePrepare, commitMessages.map(_.value)),
       )
     }
   }
@@ -345,6 +344,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
         .map(_.sortBy(_.orderedBlock.metadata.blockNumber))
     }
 
+  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   override def loadNumberOfRecords(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[EpochStore.NumberOfRecords] =
@@ -358,6 +358,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       )
     }
 
+  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   override def prune(epochNumberExclusive: EpochNumber)(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[EpochStore.NumberOfRecords] =

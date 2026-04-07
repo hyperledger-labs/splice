@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.db
@@ -28,8 +28,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.concurrent.ExecutionContext
-
-import DbStorage.Implicits.*
 
 class DbOutputMetadataStore(
     override protected val storage: DbStorage,

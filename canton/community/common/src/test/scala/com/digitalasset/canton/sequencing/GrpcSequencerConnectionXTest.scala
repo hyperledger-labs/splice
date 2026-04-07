@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -30,7 +30,7 @@ class GrpcSequencerConnectionXTest
         staticParametersResponses = Seq(correctStaticParametersResponse),
         acknowledgeResponses = Seq(positiveAcknowledgeResponse),
       )
-      withConnection(responses) { case (internalConnection, listener) =>
+      withConnection(responses) { (internalConnection, listener) =>
         internalConnection.start().valueOrFail("start connection")
 
         listener.shouldStabilizeOn(SequencerConnectionXState.Validated)

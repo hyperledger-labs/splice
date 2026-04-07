@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -19,11 +19,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   emitConsensusLatencyStats,
   emitNonCompliance,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap.BootstrapEpochNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.{
-  GenesisEpoch,
-  GenesisEpochInfo,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions.RetransmissionsManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.StateTransferBehavior.StateTransferType
@@ -34,7 +31,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
-  EpochLength,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
@@ -76,7 +72,6 @@ import scala.util.{Failure, Random, Success}
 
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 final class IssConsensusModule[E <: Env[E]](
-    private val epochLength: EpochLength, // TODO(#19289): support variable epoch lengths
     private val initialState: InitialState[E],
     epochStore: EpochStore[E],
     clock: Clock,
@@ -111,6 +106,10 @@ final class IssConsensusModule[E <: Env[E]](
 ) extends Consensus[E]
     with HasDelayedInit[Consensus.Message[E]] {
 
+  logger.info(
+    s"Consensus module instantiated with epoch length ${initialState.topologyInfo.currentMembership.orderingTopology.epochLength}"
+  )(TraceContext.empty)
+
   private val thisNode = initialState.topologyInfo.thisNode
 
   // An instance of state transfer manager to be used only in a server role.
@@ -119,7 +118,6 @@ final class IssConsensusModule[E <: Env[E]](
       new StateTransferManager(
         thisNode,
         dependencies,
-        epochLength,
         epochStore,
         random,
         metrics,
@@ -159,9 +157,9 @@ final class IssConsensusModule[E <: Env[E]](
   ): Unit =
     message match {
 
-      case Consensus.Init =>
+      case _: Consensus.Init =>
         abort(
-          s"${PreIssConsensusModule.getClass.getSimpleName} should be the only one receiving ${Consensus.Init.getClass.getSimpleName}"
+          s"${classOf[PreIssConsensusModule[?]].getSimpleName} should be the only one receiving ${classOf[Consensus.Init].getSimpleName}"
         )
 
       case Consensus.SegmentCancelledEpoch =>
@@ -172,7 +170,7 @@ final class IssConsensusModule[E <: Env[E]](
       case Consensus.Start =>
         val maybeSnapshotAdditionalInfo = initialState.sequencerSnapshotAdditionalInfo
         BootstrapDetector.detect(
-          epochLength,
+          activeTopologyInfo.currentMembership.orderingTopology.epochLength,
           maybeSnapshotAdditionalInfo,
           activeTopologyInfo.currentMembership,
           latestCompletedEpoch,
@@ -210,7 +208,7 @@ final class IssConsensusModule[E <: Env[E]](
         )
         val currentEpochInfo = epochState.epoch.info
         val newEpochInfo = currentEpochInfo.next(
-          epochLength,
+          newEpochTopologyMessage.membership.orderingTopology.epochLength,
           newEpochTopologyMessage.membership.orderingTopology.activationTime,
         )
         // Set the new epoch state before processing queued messages (including a proper segment module factory)
@@ -235,9 +233,10 @@ final class IssConsensusModule[E <: Env[E]](
 
       case newEpochTopologyMessage: Consensus.NewEpochTopology[E] =>
         val currentEpochInfo = epochState.epoch.info
+        val newEpochLength = newEpochTopologyMessage.membership.orderingTopology.epochLength
         val newTopologyActivationTime =
           newEpochTopologyMessage.membership.orderingTopology.activationTime
-        val newEpochInfo = currentEpochInfo.next(epochLength, newTopologyActivationTime)
+        val newEpochInfo = currentEpochInfo.next(newEpochLength, newTopologyActivationTime)
         processNewEpochTopology(newEpochTopologyMessage, currentEpochInfo, newEpochInfo)
 
       case newEpochStored @ Consensus.NewEpochStored(
@@ -387,6 +386,7 @@ final class IssConsensusModule[E <: Env[E]](
           msg,
           activeTopologyInfo,
           latestCompletedEpoch,
+          currentEpochInfo = epochState.epoch.info,
         )(abort) match {
           case StateTransferMessageResult.Continue =>
           case other => abort(s"Unexpected result $other from server-side state transfer manager")
@@ -463,41 +463,58 @@ final class IssConsensusModule[E <: Env[E]](
             commitCertificate: CommitCertificate,
             hasCompletedLedSegment,
           ) =>
-        // Note that (hopefully) the below message is the only block-level INFO log in the BFT Orderer.
-        //  We intend to minimize the number of logs on the hot path.
-        logger.info(s"Block ${orderedBlock.metadata} has been ordered")
-        emitConsensusLatencyStats(metrics)
-
-        if (hasCompletedLedSegment)
-          consensusWaitingForEpochCompletionSince = Some(Instant.now())
-
-        epochState.confirmBlockCompleted(orderedBlock.metadata, commitCertificate)
-
-        epochState.epochCompletionStatus match {
-          case EpochState.Complete(commitCertificates) =>
-            emitEpochCompletionWaitLatency()
-            consensusWaitingForEpochStartSince = Some(Instant.now())
-            storeEpochCompletion(commitCertificates).discard
-          case _ => ()
-        }
-
-        // TODO(#16761) - ensure the output module gets and processes the ordered block
-        val epochNumber = epochState.epoch.info.number
+        val epochNumber = orderedBlock.metadata.epochNumber
         val blockNumber = orderedBlock.metadata.blockNumber
-        val blockSegment = epochState.epoch.segments
-          .find(_.slotNumbers.contains(blockNumber))
-          .getOrElse(abort(s"block $blockNumber not part of any segment in epoch $epochNumber"))
-        dependencies.output.asyncSend(
-          Output.BlockOrdered(
-            OrderedBlockForOutput(
-              orderedBlock,
-              commitCertificate.prePrepare.message.viewNumber,
-              blockSegment.originalLeader,
-              blockNumber == epochState.epoch.info.lastBlockNumber,
-              OrderedBlockForOutput.Mode.FromConsensus,
+        val thisNodeEpochNumber = epochState.epoch.info.number
+
+        if (epochNumber < thisNodeEpochNumber) {
+          logger.info(
+            s"$messageType: dropping block completion for old epoch $epochNumber (likely preempted by state transfer)"
+          )
+        } else if (epochNumber > thisNodeEpochNumber) {
+          abort(
+            s"Trying to complete block in future epoch $epochNumber before local epoch $thisNodeEpochNumber has caught up!"
+          )
+        } else {
+          // Note that (hopefully) the below message is the only block-level INFO log in the BFT Orderer.
+          //  We intend to minimize the number of logs on the hot path.
+          logger.info(s"Block ${orderedBlock.metadata} has been ordered")
+          logger.debug(
+            s"The newly ordered block ${orderedBlock.metadata} contains batch IDs ${orderedBlock.batchRefs.map(_.batchId).mkString(", ")}"
+          )
+          emitConsensusLatencyStats(metrics)
+
+          if (hasCompletedLedSegment) {
+            logger.debug(s"Locally-led segment in epoch $thisNodeEpochNumber is complete")
+            consensusWaitingForEpochCompletionSince = Some(Instant.now())
+          }
+
+          epochState.confirmBlockCompleted(orderedBlock.metadata, commitCertificate)
+
+          epochState.epochCompletionStatus match {
+            case EpochState.Complete(commitCertificates) =>
+              emitEpochCompletionWaitLatency()
+              consensusWaitingForEpochStartSince = Some(Instant.now())
+              storeEpochCompletion(commitCertificates).discard
+            case _ => ()
+          }
+
+          // TODO(#16761) - ensure the output module gets and processes the ordered block
+          val blockSegment = epochState.epoch.segments
+            .find(_.slotNumbers.contains(blockNumber))
+            .getOrElse(abort(s"block $blockNumber not part of any segment in epoch $epochNumber"))
+          dependencies.output.asyncSend(
+            Output.BlockOrdered(
+              OrderedBlockForOutput(
+                orderedBlock,
+                commitCertificate.prePrepare.message.viewNumber,
+                blockSegment.originalLeader,
+                blockNumber == epochState.epoch.info.lastBlockNumber,
+                OrderedBlockForOutput.Mode.FromConsensus,
+              )
             )
           )
-        )
+        }
 
       case Consensus.ConsensusMessage.CompleteEpochStored(epoch, commitCertificates) =>
         advanceEpoch(epoch, commitCertificates, Some(messageType))
@@ -532,7 +549,11 @@ final class IssConsensusModule[E <: Env[E]](
     } else {
       // The current epoch can be completed
 
-      if (!initInProgress) {
+      if (initInProgress) {
+        // Ensure that the retransmissions manager can provide commit certificates for the completing epoch
+        retransmissionsManager.startEpoch(epochState, initInProgress = true)
+        retransmissionsManager.epochEnded(completeEpochCommitCertificates, initInProgress = true)
+      } else {
         // When initializing, the retransmission manager is inactive and segment modules are not started
         retransmissionsManager.epochEnded(completeEpochCommitCertificates)
         epochState.notifyEpochCompletionToSegments(completeEpochNumber)
@@ -547,7 +568,7 @@ final class IssConsensusModule[E <: Env[E]](
           emitEpochStartLatency()
           val currentEpochInfo = epochState.epoch.info
           val newEpochInfo = currentEpochInfo.next(
-            epochLength,
+            newMembership.orderingTopology.epochLength,
             newMembership.orderingTopology.activationTime,
           )
           if (newEpochNumber != newEpochInfo.number) {
@@ -573,7 +594,7 @@ final class IssConsensusModule[E <: Env[E]](
       traceContext: TraceContext,
   ): Unit = {
     val epochInfo = epochState.epoch.info
-    if (epochInfo == GenesisEpoch.info) {
+    if (epochInfo.number == BootstrapEpochNumber) {
       logger.debug("Started at genesis, self-sending its topology to start epoch 0")
       context.self.asyncSend(
         NewEpochTopology(
@@ -646,7 +667,7 @@ final class IssConsensusModule[E <: Env[E]](
       // It can happen after storing the first epoch after state transfer.
       logger.debug(s"New epoch state for epoch ${newEpochInfo.number} already set")
     } else if (
-      newEpochInfo.number == currentEpochInfo.number + 1 || currentEpochInfo == GenesisEpochInfo
+      newEpochInfo.number == currentEpochInfo.number + 1 || currentEpochInfo.number == BootstrapEpochNumber
     ) {
       maybeNewMembershipAndCryptoProvider.foreach { case (newMembership, newCryptoProvider) =>
         activeTopologyInfo = activeTopologyInfo.updateMembership(newMembership, newCryptoProvider)
@@ -778,7 +799,13 @@ final class IssConsensusModule[E <: Env[E]](
     val currentEpochNumber = epochState.epoch.info.number
     val latestCompletedEpochNumber = latestCompletedEpoch.info.number
     val minimumEndEpochNumber = catchupDetector.shouldCatchUpTo(currentEpochNumber)
-    if (updatedEpoch && minimumEndEpochNumber.isDefined) {
+    if (
+      updatedEpoch &&
+      minimumEndEpochNumber.isDefined &&
+      // if epochState is closed, we have probably just finished an epoch and are waiting for new topology.
+      // So we should wait with state transfer until we are in the new epoch.
+      !epochState.isClosing
+    ) {
       logger.debug(
         s"Switching to catch-up state transfer (up to at least $minimumEndEpochNumber) while in epoch $currentEpochNumber; " +
           s"latestCompletedEpoch is $latestCompletedEpochNumber and message epoch is $pbftMessageEpochNumber"
@@ -798,7 +825,6 @@ final class IssConsensusModule[E <: Env[E]](
     logger.info(s"Starting $stateTransferType state transfer from epoch $startEpochNumber")
     resetConsensusWaitingForEpochCompletion()
     val newBehavior = new StateTransferBehavior(
-      epochLength,
       StateTransferBehavior.InitialState[E](
         startEpochNumber,
         minimumEndEpochNumber,
@@ -987,7 +1013,6 @@ object IssConsensusModule {
   @VisibleForTesting
   private[iss] def unapply(issConsensusModule: IssConsensusModule[?]): Option[
     (
-        EpochLength,
         Option[SequencerSnapshotAdditionalInfo],
         OrderingTopologyInfo[?],
         Seq[Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage],
@@ -996,7 +1021,6 @@ object IssConsensusModule {
   ] =
     Some(
       (
-        issConsensusModule.epochLength,
         issConsensusModule.initialState.sequencerSnapshotAdditionalInfo,
         issConsensusModule.activeTopologyInfo,
         issConsensusModule.futurePbftMessageQueue.dump,

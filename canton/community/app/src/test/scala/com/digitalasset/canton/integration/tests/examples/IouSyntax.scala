@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.examples
@@ -102,8 +102,8 @@ object IouSyntax {
       participant: ParticipantReference,
       synchronizerId: Option[SynchronizerId] = None,
   )(
-      payer: PartyId,
-      owner: PartyId,
+      payer: Party,
+      owner: Party,
       amount: Double = 100.0,
   ): (Iou.Contract, Transaction, Completion) =
     complete(participant, payer) {
@@ -125,8 +125,8 @@ object IouSyntax {
       participant: ParticipantReference,
       synchronizerId: Option[SynchronizerId] = None,
   )(
-      payer: PartyId,
-      divulgee: PartyId,
+      payer: Party,
+      divulgee: Party,
   ): (DivulgeIouByExercise.Contract, Transaction, Completion) =
     complete(participant, divulgee) {
       val createDivulgeIouByExerciseCmd =
@@ -146,7 +146,7 @@ object IouSyntax {
       participant: ParticipantReference,
       synchronizerId: Option[SynchronizerId] = None,
   )(
-      payer: PartyId,
+      payer: Party,
       divulgenceContract: DivulgeIouByExercise.Contract,
   ): (Iou.Contract, Transaction, Completion) =
     complete(participant, payer) {
@@ -167,7 +167,7 @@ object IouSyntax {
       participant: ParticipantReference,
       synchronizerId: Option[SynchronizerId] = None,
   )(
-      payer: PartyId,
+      payer: Party,
       divulgenceContract: DivulgeIouByExercise.Contract,
       iouContractId: Iou.ContractId,
   ): (Transaction, Completion) = {
@@ -193,7 +193,10 @@ object IouSyntax {
 
   def archive(participant: ParticipantReference, synchronizerId: Option[SynchronizerId] = None)(
       contract: Iou.Contract,
-      submittingParty: PartyId,
+      submittingParty: Party,
+      optTimeout: Option[config.NonNegativeDuration] = Some(
+        participant.consoleEnvironment.commandTimeouts.ledgerCommand
+      ),
   ): Unit =
     participant.ledger_api.commands
       .submit(
@@ -205,10 +208,32 @@ object IouSyntax {
           .toSeq
           .map(c => Command.fromJavaProto(c.toProtoCommand)),
         synchronizerId,
+        optTimeout = optTimeout,
       )
       .discard
 
-  private def complete[T](participant: ParticipantReference, submitterParty: PartyId)(
+  def call(participant: ParticipantReference, synchronizerId: Option[SynchronizerId] = None)(
+      contract: Iou.Contract,
+      submittingParty: Party,
+      optTimeout: Option[config.NonNegativeDuration] = Some(
+        participant.consoleEnvironment.commandTimeouts.ledgerCommand
+      ),
+  ): Unit =
+    participant.ledger_api.commands
+      .submit(
+        Seq(submittingParty),
+        contract.id
+          .exerciseCall()
+          .commands
+          .asScala
+          .toSeq
+          .map(c => Command.fromJavaProto(c.toProtoCommand)),
+        synchronizerId,
+        optTimeout = optTimeout,
+      )
+      .discard
+
+  private def complete[T](participant: ParticipantReference, submitterParty: Party)(
       submission: => T
   ): (T, Transaction, Completion) = {
     val ledgerEnd = participant.ledger_api.state.end()

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output
@@ -8,11 +8,9 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.sequencing.protocol.{
-  AllMembersOfSynchronizer,
-  MaxRequestSizeToDeserialize,
-}
+import com.digitalasset.canton.sequencing.protocol.AllMembersOfSynchronizer
 import com.digitalasset.canton.synchronizer.block.BlockFormat
+import com.digitalasset.canton.synchronizer.block.BlockFormat.Block.TickTopology
 import com.digitalasset.canton.synchronizer.block.BlockFormat.OrderedRequest
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.deserializeSignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
@@ -45,6 +43,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   BlockNumber,
   EpochNumber,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.BlockMetadata
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.{
   OrderedBlock,
   OrderedBlockForOutput,
@@ -89,13 +88,15 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PureFun,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.SingleUseCell
+import com.digitalasset.canton.util.{MaxBytesToDecompress, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
+import io.opentelemetry.api.trace.{Span, Tracer}
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
+import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Success}
 
 /** A module responsible for calculating the [[time.BftTime]], querying the topology at epoch ends
@@ -125,6 +126,7 @@ class OutputModule[E <: Env[E]](
     override val config: BftBlockOrdererConfig,
     synchronizerProtocolVersion: ProtocolVersion,
     mc: MetricsContext,
+    tracer: Tracer,
 ) extends Output[E]
     with HasDelayedInit[Message[E]] {
 
@@ -182,6 +184,7 @@ class OutputModule[E <: Env[E]](
     new SequencerSnapshotAdditionalInfoProvider[E](
       store,
       epochStoreReader,
+      orderingTopologyProvider,
       loggerFactory,
     )
 
@@ -196,6 +199,8 @@ class OutputModule[E <: Env[E]](
   private var processingFetchedBlocksInEpoch: Option[EpochNumber] = None
 
   private val leaderSelectionPolicy = startupState.initialLeaderSelectionPolicy
+
+  private val blockSpanMap: mutable.Map[BlockNumber, (Span, TraceContext)] = mutable.Map()
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   override def receiveInternal(message: Message[E])(implicit
@@ -343,10 +348,18 @@ class OutputModule[E <: Env[E]](
                   mode,
                 )
               ) =>
+            val blockNumber = orderedBlock.metadata.blockNumber
+            val newTraceContext: TraceContext = if (orderedBlock.batchRefs.nonEmpty) {
+              val (span, tc) = startSpan(s"BftOrderer.Output")
+              blockSpanMap
+                .put(blockNumber, (span.setAttribute("block.number", blockNumber), tc))
+                .discard
+              tc
+            } else traceContext
+
             logger.debug(
               s"Output received from local consensus ordered block (mode = $mode) with batch IDs ${orderedBlock.batchRefs}"
             )
-            val blockNumber = orderedBlock.metadata.blockNumber
             if (completedBlocksPeanoQueue.alreadyInserted(blockNumber)) {
               // This can happen if we start catching up in the middle of an epoch, as state transfer has epoch granularity.
               logger.debug(s"Skipping block $blockNumber as it's been provided already")
@@ -362,12 +375,10 @@ class OutputModule[E <: Env[E]](
               //  to the sequencer runtime, but this also ensures that all batches are stored locally
               //  when the epoch ends, so that we can provide past block data (e.g. to a re-subscription from
               //  the sequencer runtime after a crash) even if the topology changes drastically afterward.
-              context.withNewTraceContext { implicit traceContext =>
-                logger.debug(s"Fetching data for block $blockNumber through local availability")
-                availability.asyncSend(
-                  Availability.LocalOutputFetch.FetchBlockData(orderedBlockForOutput)
-                )
-              }
+              logger.debug(s"Fetching data for block $blockNumber through local availability")
+              availability.asyncSend(
+                Availability.LocalOutputFetch.FetchBlockData(orderedBlockForOutput)
+              )(newTraceContext, mc)
               blocksBeingFetched.put(blockNumber, Instant.now()).discard
             } else {
               logger.debug(s"Block $blockNumber is already being fetched")
@@ -433,14 +444,23 @@ class OutputModule[E <: Env[E]](
               //  avoiding possible future problems e.g. with pruning and/or BFT onboarding from multiple
               //  sequencer snapshots.
               val tickTopology = isBlockLastInEpoch && epochCouldAlterOrderingTopology
-              // TODO(#23345): there should be no need to log this if we correlate request trace IDs with batches,
-              //  batch trace IDs with blocks and we propagate block trace IDs properly
+
+              val blockTraceContext = blockSpanMap
+                .remove(orderedBlockNumber)
+                .map { case (span, traceContext) =>
+                  span.end()
+                  traceContext
+                }
+                .getOrElse(traceContext)
+
+              // Being able to correlate the trace contexts of submission requests with
+              // the block containing them can be useful for troubleshooting issues.
               val traceIdsString =
                 orderedBlockData.requestsView.flatMap(_.traceContext.traceId).mkString(",")
               logger.debug(
                 s"Block $orderedBlockNumber being output contains requests " +
                   s"with the following trace IDs: [$traceIdsString]"
-              )
+              )(blockTraceContext)
               logger.debug(
                 s"Sending block $orderedBlockNumber " +
                   s"(current epoch = $epochNumber, " +
@@ -450,17 +470,23 @@ class OutputModule[E <: Env[E]](
                   s"could alter sequencing topology = $epochCouldAlterOrderingTopology, " +
                   s"tick topology = $tickTopology) " +
                   "to sequencer subscription"
-              )
+              )(blockTraceContext)
 
               blockSubscription.receiveBlock(
                 BlockFormat.Block(
                   orderedBlockNumber,
+                  orderedBlockBftTime.toMicros,
                   blockDataToOrderedRequests(orderedBlockData, orderedBlockBftTime),
-                  tickTopologyAtMicrosFromEpoch = Option.when(tickTopology)(
-                    BftTime.epochEndBftTime(orderedBlockBftTime, orderedBlockData).toMicros
+                  tickTopology = Option.when(tickTopology)(
+                    TickTopology(
+                      BftTime
+                        .epochEndBftTime(orderedBlockBftTime, orderedBlockData)
+                        .toMicros,
+                      broadcast = false, // Address only to sequencers
+                    )
                   ),
                 )
-              )
+              )(blockTraceContext)
             }
 
           case UpdateLeaderSelection(topologyFetched) =>
@@ -485,7 +511,7 @@ class OutputModule[E <: Env[E]](
             // We only store metadata for an epoch if it may alter the topology, i.e.,
             //  we never insert `false` and then change it; this avoids updates
             //  and allows leveraging idempotency for easier CFT support.
-            if (orderingTopology.areTherePendingCantonTopologyChanges) {
+            if (orderingTopology.areTherePendingCantonTopologyChanges.exists(identity)) {
               val outputEpochMetadata =
                 OutputEpochMetadata(newEpochNumber, couldAlterOrderingTopology = true)
               logger.debug(s"Storing $outputEpochMetadata")
@@ -668,11 +694,13 @@ class OutputModule[E <: Env[E]](
     emitOrderingStageLatency(
       labels.stage.values.output.Inspection,
       () =>
-        orderedBlockData.requestsView.toSeq.findLast {
-          case tracedOrderingRequest @ Traced(orderingRequest) =>
+        orderedBlockData.requestsView.zipWithIndex.toSeq.findLast {
+          case (tracedOrderingRequest @ Traced(orderingRequest), idx) =>
             requestInspector.isRequestToAllMembersOfSynchronizer(
+              orderedBlockData.orderedBlockForOutput.orderedBlock.metadata,
+              idx,
               orderingRequest,
-              currentEpochOrderingTopology.maxRequestSizeToDeserialize,
+              currentEpochOrderingTopology.maxBytesToDecompress,
               logger,
               tracedOrderingRequest.traceContext,
             )
@@ -724,7 +752,8 @@ class OutputModule[E <: Env[E]](
       //  (and successfully processed and applied by the topology processor).
       pipeToSelf(
         orderingTopologyProvider.getOrderingTopologyAt(
-          TopologyActivationTime(epochEndBftTime.immediateSuccessor)
+          Some(TopologyActivationTime(epochEndBftTime.immediateSuccessor)),
+          checkPendingChanges = true,
         ),
         metrics.topology.queryLatency,
       ) {
@@ -816,12 +845,12 @@ class OutputModule[E <: Env[E]](
       logger.debug(
         s"Pending topology changes in new ordering topology = $pendingTopologyChanges"
       )
-      currentEpochCouldAlterOrderingTopology = pendingTopologyChanges
+      currentEpochCouldAlterOrderingTopology = pendingTopologyChanges.exists(identity)
 
       metrics.topology.validators.updateValue(currentEpochOrderingTopology.nodes.size)
       logger.debug(
         s"Sending topology $currentEpochOrderingTopology of a new epoch $newEpochNumber " +
-          "to a consensus behavior"
+          s"to a consensus behavior (epochLength= ${newEpochTopologyMessage.membership.orderingTopology.epochLength})"
       )
 
       consensus.asyncSend(newEpochTopologyMessage)
@@ -840,7 +869,7 @@ class OutputModule[E <: Env[E]](
       blockBftTime: CantonTimestamp,
   ): Seq[Traced[OrderedRequest]] =
     blockData.requestsView.zipWithIndex.map {
-      case (tracedRequest @ Traced(OrderingRequest(tag, body, _)), index) =>
+      case (tracedRequest @ Traced(OrderingRequest(tag, _, body, _)), index) =>
         val timestamp = BftTime.requestBftTime(blockBftTime, index)
         // "You [were supposed to] propose for ordering, you are responsible for the traffic" policy: all
         //  requests in a block are marked, for accounting purposes, as having gone through ordering because of the
@@ -920,8 +949,10 @@ object OutputModule {
   trait RequestInspector {
 
     def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean
@@ -930,22 +961,29 @@ object OutputModule {
   object DefaultRequestInspector extends RequestInspector {
 
     override def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean =
       // TODO(#21615) we should avoid a further deserialization downstream, which would also eliminate
       //  a zip bomb vulnerability in the BUG that could be triggered by byzantine sequencers (#26169)
-      deserializeSignedSubmissionRequest(synchronizerProtocolVersion, maxRequestSizeToDeserialize)(
+      deserializeSignedSubmissionRequest(synchronizerProtocolVersion, maxBytesToDecompress)(
         request.payload
       ) match {
         case Right(signedSubmissionRequest) =>
           signedSubmissionRequest.content.batch.allRecipients
             .contains(AllMembersOfSynchronizer)
+            .tap(result =>
+              logger.debug(
+                s"BFT ordering request at index $requestNumber in output block $blockMetadata with message ID ${signedSubmissionRequest.content.messageId} is to all members of synchronizer: $result"
+              )(traceContext)
+            )
         case Left(error) =>
           logger.debug(
-            s"Skipping ordering request while looking for sequencer events as it failed to deserialize: $error"
+            s"Skipping BFT ordering ordering request in output while looking for sequencer events as it failed to deserialize: $error"
           )(traceContext)
           false
       }
@@ -954,8 +992,10 @@ object OutputModule {
   class FixedResultRequestInspector(result: Boolean) extends RequestInspector {
 
     override def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean =

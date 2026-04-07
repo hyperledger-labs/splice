@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state.index
@@ -21,6 +21,7 @@ trait IndexUpdateService extends LedgerEndService {
       begin: Option[Offset],
       endAt: Option[Offset],
       updateFormat: UpdateFormat,
+      descendingOrder: Boolean,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdatesResponse, NotUsed]
 
   def getUpdateBy(

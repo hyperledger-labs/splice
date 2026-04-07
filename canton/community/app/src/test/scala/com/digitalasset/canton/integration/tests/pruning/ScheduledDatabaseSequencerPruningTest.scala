@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
@@ -19,12 +19,13 @@ import scala.util.chaining.*
 
 // TODO(#16089) enable one of these tests after sequencer unification
 //class ScheduledDatabaseSequencerPruningTestDefault extends ScheduledDatabaseSequencerPruningTest {
-//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+//  registerPlugin(new UseH2(loggerFactory))
+//  registerPlugin(new UseBftSequencer(loggerFactory))
 //}
 
 //class ScheduledDatabaseSequencerPruningTestPostgres extends ScheduledDatabaseSequencerPruningTest {
 //  registerPlugin(new UsePostgres(loggerFactory))
-//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+//  registerPlugin(new UseBftSequencer(loggerFactory))
 //}
 
 abstract class ScheduledDatabaseSequencerPruningTest

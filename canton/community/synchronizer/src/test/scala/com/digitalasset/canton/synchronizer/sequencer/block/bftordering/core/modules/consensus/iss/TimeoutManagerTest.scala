@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
 
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssSegmentModule.BlockCompletionTimeout
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.{
   ProgrammableUnitTestContext,
   ProgrammableUnitTestEnv,
@@ -35,7 +35,7 @@ class TimeoutManagerTest extends AsyncWordSpec with BftSequencerBaseTest {
       val timeoutManager =
         new TimeoutManager[ProgrammableUnitTestEnv, ConsensusSegment.Message, BlockNumber](
           loggerFactory,
-          BlockCompletionTimeout,
+          BftBlockOrdererConfig().consensusBlockCompletionTimeout,
           timeoutId = BlockNumber.First,
         )
       val context = new ProgrammableUnitTestContext[ConsensusSegment.Message]()

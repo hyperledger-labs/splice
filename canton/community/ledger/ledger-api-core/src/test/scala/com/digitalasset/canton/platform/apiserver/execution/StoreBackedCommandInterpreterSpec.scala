@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.execution
@@ -12,8 +12,6 @@ import com.digitalasset.canton.ledger.participant.state.index.{ContractState, Co
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.*
-import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.InterpretationTimeExceeded
 import com.digitalasset.canton.platform.config.CommandServiceConfig
@@ -21,16 +19,22 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ContractValidator.ContractAuthenticatorFn
 import com.digitalasset.canton.util.TestEngine
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext, LfPartyId, LfValue}
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.Identifier
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.engine
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
-import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Node as LfNode}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  FatContractInstance,
+  NextGenContractStateMachine as ContractStateMachine,
+  Node as LfNode,
+}
 import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.{crypto, engine}
 import com.google.protobuf.ByteString
 import monocle.Monocle.toAppliedFocusOps
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
@@ -48,7 +52,11 @@ class StoreBackedCommandInterpreterSpec
     with BaseTest {
 
   private val testEngine =
-    new TestEngine(packagePaths = Seq(CantonExamplesPath), iterationsBetweenInterruptions = 10)
+    new TestEngine(
+      packagePaths = Seq(CantonExamplesPath),
+      iterationsBetweenInterruptions = 10,
+      loggerFactory = loggerFactory,
+    )
   private val alice = LfPartyId.assertFromString("Alice")
 
   private val createCycleApiCommand: Commands =
@@ -95,6 +103,7 @@ class StoreBackedCommandInterpreterSpec
         KeyWithMaintainers.assertBuild(
           templateId = identifier,
           LfValue.ValueTrue,
+          crypto.Hash.hashPrivateKey("dummy-key-hash"),
           Set(Ref.Party.assertFromString("unexpectedSig")),
           packageName,
         )
@@ -122,12 +131,12 @@ class StoreBackedCommandInterpreterSpec
   ) =
     new StoreBackedCommandInterpreter(
       engine = engine,
+      contractStateMode = ContractStateMachine.Mode.default,
       participant = Ref.ParticipantId.assertFromString("anId"),
       packageResolver = testEngine.packageResolver,
       contractStore = contractStore,
       contractAuthenticator = contractAuthenticator,
       metrics = LedgerApiServerMetrics.ForTesting,
-      config = EngineLoggingConfig(),
       prefetchingRecursionLevel = CommandServiceConfig.DefaultContractPrefetchingDepth,
       loggerFactory = loggerFactory,
       dynParamGetter = new TestDynamicSynchronizerParameterGetter(tolerance),
@@ -297,19 +306,15 @@ class StoreBackedCommandInterpreterSpec
       val commands = repeatCycleApiCommand(invalidCid)
 
       val sut = mkSut(testEngine.engine, contractStore = contractStore)
-
-      // TODO(#27344) - This should not throw an exception but return a failure error cause
-      loggerFactory.suppressErrors {
-        sut
-          .interpret(commands, submissionSeed)(
-            LoggingContextWithTrace(loggerFactory),
-            executionContext,
-          )
-          .failed
-          .map { _ =>
-            succeed
-          }
-      }
+      sut
+        .interpret(commands, submissionSeed)(
+          LoggingContextWithTrace(loggerFactory),
+          executionContext,
+        )
+        .failed
+        .map { _ =>
+          succeed
+        }
 
     }
 

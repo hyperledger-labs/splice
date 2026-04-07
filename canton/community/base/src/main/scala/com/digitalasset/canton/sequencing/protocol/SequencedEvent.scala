@@ -1,29 +1,30 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.Applicative
+import cats.syntax.traverse.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.{DefaultOpenEnvelope, ProtocolMessage}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{v30, v31}
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.sequencing.{EnvelopeBox, RawSignedContentEnvelopeBox}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
-import com.digitalasset.canton.util.NoCopy
+import com.digitalasset.canton.util.{MaxBytesToDecompress, NoCopy}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
-  VersioningCompanionMemoization2,
+  VersioningCompanionContextMemoization2,
 }
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -44,6 +45,8 @@ sealed trait SequencedEvent[+Env <: Envelope[?]]
   @transient override protected lazy val companionObj: SequencedEvent.type = SequencedEvent
 
   protected def toProtoV30: v30.SequencedEvent
+
+  protected def toProtoV31: v31.SequencedEvent
 
   /** The timestamp of the previous event in the member's subscription, or `None` if this event is
     * the first
@@ -71,9 +74,11 @@ sealed trait SequencedEvent[+Env <: Envelope[?]]
 }
 
 object SequencedEvent
-    extends VersioningCompanionMemoization2[
+    extends VersioningCompanionContextMemoization2[
       SequencedEvent[Envelope[?]],
+      MaxBytesToDecompress,
       SequencedEvent[ClosedEnvelope],
+      Unit,
     ] {
   override def name: String = "SequencedEvent"
 
@@ -81,23 +86,85 @@ object SequencedEvent
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SequencedEvent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
-    )
+    ),
+    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.v35)(v31.SequencedEvent)(
+      supportedProtoVersionMemoized(_)(fromProtoV31),
+      _.toProtoV31,
+    ),
   )
 
-  private[sequencing] def fromProtoV30(sequencedEventP: v30.SequencedEvent)(
+  sealed private trait ProtoSequencedEvent {
+    def batch: Option[ProtoBatch]
+  }
+  private final case class ProtoSequencedEventV30(wrapped: v30.SequencedEvent)
+      extends ProtoSequencedEvent {
+    def batch: Option[ProtoBatchV30] = wrapped.batch.map(ProtoBatchV30.apply)
+  }
+  private final case class ProtoSequencedEventV31(wrapped: v31.SequencedEvent)
+      extends ProtoSequencedEvent {
+    def batch: Option[ProtoBatchV31] = wrapped.batch.map(ProtoBatchV31.apply)
+  }
+
+  private[sequencing] def fromProtoV30(
+      maxBytesToDecompress: MaxBytesToDecompress,
+      sequencedEventP: v30.SequencedEvent,
+  )(
+      bytes: ByteString
+  ): ParsingResult[SequencedEvent[ClosedEnvelope]] =
+    fromProtoGeneric(maxBytesToDecompress, ProtoSequencedEventV30(sequencedEventP))(bytes)
+
+  private[sequencing] def fromProtoV31(
+      maxBytesToDecompress: MaxBytesToDecompress,
+      sequencedEventP: v31.SequencedEvent,
+  )(
+      bytes: ByteString
+  ): ParsingResult[SequencedEvent[ClosedEnvelope]] =
+    fromProtoGeneric(maxBytesToDecompress, ProtoSequencedEventV31(sequencedEventP))(bytes)
+
+  private[sequencing] def fromProtoGeneric(
+      maxBytesToDecompress: MaxBytesToDecompress,
+      protoSequencedEvent: ProtoSequencedEvent,
+  )(
       bytes: ByteString
   ): ParsingResult[SequencedEvent[ClosedEnvelope]] = {
-    import cats.syntax.traverse.*
-    val v30.SequencedEvent(
+
+    val (
       previousTimestampP,
       tsP,
       synchronizerIdP,
       mbMsgIdP,
-      mbBatchP,
       mbDeliverErrorReasonP,
       topologyTimestampP,
       trafficConsumedP,
-    ) = sequencedEventP
+    ) = protoSequencedEvent match {
+      case ProtoSequencedEventV30(wrapped) =>
+        (
+          wrapped.previousTimestamp,
+          wrapped.timestamp,
+          wrapped.physicalSynchronizerId,
+          wrapped.messageId,
+          wrapped.deliverErrorReason,
+          wrapped.topologyTimestamp,
+          wrapped.trafficReceipt,
+        )
+      case ProtoSequencedEventV31(wrapped) =>
+        (
+          wrapped.previousTimestamp,
+          wrapped.timestamp,
+          wrapped.physicalSynchronizerId,
+          wrapped.messageId,
+          wrapped.deliverErrorReason,
+          wrapped.topologyTimestamp,
+          wrapped.trafficReceipt,
+        )
+    }
+
+    def batchFromProto: ParsingResult[Option[Batch[ClosedEnvelope]]] = protoSequencedEvent match {
+      case ProtoSequencedEventV30(wrapped) =>
+        wrapped.batch.traverse(Batch.fromProtoV30(maxBytesToDecompress, _))
+      case ProtoSequencedEventV31(wrapped) =>
+        wrapped.batch.traverse(Batch.fromProtoV31(maxBytesToDecompress, _))
+    }
 
     for {
       previousTimestamp <- previousTimestampP.traverse(CantonTimestamp.fromProtoPrimitive)
@@ -106,10 +173,7 @@ object SequencedEvent
         synchronizerIdP,
         "SequencedEvent.physical_synchronizer_id",
       )
-      mbBatch <- mbBatchP.traverse(
-        // TODO(i26169) Prevent zip bombing when decompressing the request
-        Batch.fromProtoV30(_, maxRequestSize = MaxRequestSizeToDeserialize.NoLimit)
-      )
+      mbBatch <- batchFromProto
       trafficConsumed <- trafficConsumedP.traverse(TrafficReceipt.fromProtoV30)
       // errors have an error reason, delivers have a batch
       event <- ((mbDeliverErrorReasonP, mbBatch) match {
@@ -154,11 +218,15 @@ object SequencedEvent
     } yield event
   }
 
-  def fromByteStringOpen(hashOps: HashOps, protocolVersion: ProtocolVersion)(
+  def fromByteStringOpen(
+      maxBytesToDecompress: MaxBytesToDecompress,
+      hashOps: HashOps,
+      protocolVersion: ProtocolVersion,
+  )(
       bytes: ByteString
   ): ParsingResult[SequencedEvent[DefaultOpenEnvelope]] =
-    fromTrustedByteString(bytes).flatMap(
-      _.traverse(_.openEnvelope(hashOps, protocolVersion))
+    fromTrustedByteString(maxBytesToDecompress)(bytes).flatMap(
+      _.traverse(_.toOpenEnvelope(hashOps, protocolVersion))
     )
 
   implicit val sequencedEventEnvelopeBox: EnvelopeBox[SequencedEvent] =
@@ -206,6 +274,17 @@ sealed abstract case class DeliverError private[sequencing] (
     SequencedEvent.protocolVersionRepresentativeFor(synchronizerId.protocolVersion)
 
   def toProtoV30: v30.SequencedEvent = v30.SequencedEvent(
+    previousTimestamp = previousTimestamp.map(_.toProtoPrimitive),
+    timestamp = timestamp.toProtoPrimitive,
+    physicalSynchronizerId = synchronizerId.toProtoPrimitive,
+    messageId = Some(messageId.toProtoPrimitive),
+    batch = None,
+    deliverErrorReason = Some(reason),
+    topologyTimestamp = None,
+    trafficReceipt = trafficReceipt.map(_.toProtoV30),
+  )
+
+  def toProtoV31: v31.SequencedEvent = v31.SequencedEvent(
     previousTimestamp = previousTimestamp.map(_.toProtoPrimitive),
     timestamp = timestamp.toProtoPrimitive,
     physicalSynchronizerId = synchronizerId.toProtoPrimitive,
@@ -338,7 +417,18 @@ case class Deliver[+Env <: Envelope[?]] private[sequencing] (
     trafficReceipt = trafficReceipt.map(_.toProtoV30),
   )
 
-  protected def traverse[F[_], Env2 <: Envelope[?]](
+  protected def toProtoV31: v31.SequencedEvent = v31.SequencedEvent(
+    previousTimestamp = previousTimestamp.map(_.toProtoPrimitive),
+    timestamp = timestamp.toProtoPrimitive,
+    physicalSynchronizerId = synchronizerId.toProtoPrimitive,
+    messageId = messageIdO.map(_.toProtoPrimitive),
+    batch = Some(batch.toProtoV31),
+    deliverErrorReason = None,
+    topologyTimestamp = topologyTimestampO.map(_.toProtoPrimitive),
+    trafficReceipt = trafficReceipt.map(_.toProtoV30),
+  )
+
+  override protected def traverse[F[_], Env2 <: Envelope[?]](
       f: Env => F[Env2]
   )(implicit F: Applicative[F]): F[SequencedEvent[Env2]] =
     F.map(batch.traverse(f))(
@@ -412,14 +502,6 @@ object Deliver {
       topologyTimestampO,
       trafficReceipt,
     )(None)
-
-  def fromSequencedEvent[Env <: Envelope[?]](
-      deliverEvent: SequencedEvent[Env]
-  ): Option[Deliver[Env]] =
-    deliverEvent match {
-      case deliver @ Deliver(_, _, _, _, _, _, _) => Some(deliver)
-      case _: DeliverError => None
-    }
 
   def openEnvelopes(
       deliver: Deliver[ClosedEnvelope]

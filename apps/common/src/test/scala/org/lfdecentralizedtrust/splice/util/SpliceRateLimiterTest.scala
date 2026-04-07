@@ -2,22 +2,25 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
-import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
-import org.apache.pekko.stream.testkit.StreamSpec
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
-
-  override val patience: PatienceConfig = defaultPatience
+class SpliceRateLimiterTest
+    extends BaseTest
+    with AnyWordSpecLike
+    with HasActorSystem
+    with HasExecutionContext
+    with MetricValues {
 
   private val elementsToRun = 100
 

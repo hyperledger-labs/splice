@@ -4,14 +4,37 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.{NonEmptyVector, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.{
+  ByteStringUtil,
+  ErrorUtil,
+  GrpcStreamingUtils,
+  MaxBytesToDecompress,
+  MonadUtil,
+  ResourceUtil,
+}
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
+import com.google.protobuf.ByteString
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet, ans as ansCodegen}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommand,
@@ -22,15 +45,22 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, Thresholds}
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
   ParticipantAdminConnection,
   SequencerAdminConnection,
+  SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.http.{
+  HttpFeatureSupportHandler,
+  HttpValidatorLicensesHandler,
+  HttpVotesHandler,
+  UrlValidator,
+}
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
@@ -45,8 +75,17 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   UpdateHistoryItem,
   UpdateHistoryRequestV2,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  AbortTransferInstruction,
+  DevnetTap,
+  Mint,
+  Transfer,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
+import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
+import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanEventStore,
@@ -58,47 +97,12 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   BulkStorage,
   UpdateHistoryBulkStorage,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  Codec,
-  Contract,
-  ContractWithState,
-  PackageQualifiedName,
-  QualifiedName,
-}
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
-import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
-import scala.util.{Try, Using}
-import java.io.ByteArrayInputStream
-import java.util.Base64
-import java.util.zip.GZIPOutputStream
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
-  AbortTransferInstruction,
-  DevnetTap,
-  Mint,
-  Transfer,
-}
-import org.lfdecentralizedtrust.splice.http.{
-  HttpFeatureSupportHandler,
-  HttpValidatorLicensesHandler,
-  HttpVotesHandler,
-  UrlValidator,
-}
-import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.UpdateHistoryObjectsResponse
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   AppStoreWithIngestion,
@@ -107,29 +111,36 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
   VotesStore,
 }
-import AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.util.ErrorUtil
-import org.apache.pekko.http.scaladsl.model.Uri
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
-import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
-import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.UpdateHistoryObjectsResponse
-import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  QualifiedName,
+}
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+
+import java.io.ByteArrayInputStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
+import scala.collection.concurrent
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
+import scala.util.{Try, Using}
 
 class HttpScanHandler(
     svParty: PartyId,
     svUserName: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: SequencerAdminConnection,
+    synchronizerNodeService: SynchronizerNodeService[ScanSynchronizerNode],
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
@@ -162,6 +173,13 @@ class HttpScanHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
+
+  private val initializedBftSequencersCache
+      : concurrent.Map[Int, definitions.SynchronizerBftSequencer] =
+    new java.util.concurrent.ConcurrentHashMap[Int, definitions.SynchronizerBftSequencer]().asScala
+
+  private val uninitializedBftSequencersCooldown: Cache[Int, Unit] =
+    Scaffeine().expireAfterWrite(10.seconds).build[Int, Unit]()
 
   private implicit val offsetDateTimeCodecInstance: Codec[CantonTimestamp, OffsetDateTime] =
     Codec.OffsetDateTime.instance
@@ -647,32 +665,77 @@ class HttpScanHandler(
       respond: v0.ScanResource.ListDsoSequencersResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.ListDsoSequencersResponse] = {
     implicit val tc = extracted
+
+    def extractSequencersForSynchronizersFromLegacyState(
+        nodeName: String,
+        synchronizerConfig: SynchronizerNodeConfig,
+    ) = {
+      val sequencers = for {
+        sequencer <- synchronizerConfig.sequencer.toScala
+        availableAfter <- sequencer.availableAfter.toScala
+      } yield definitions.DsoSequencer(
+        sequencer.migrationId,
+        None,
+        sequencer.sequencerId,
+        sequencer.url,
+        nodeName,
+        OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+      )
+      val legacySequencers = for {
+        legacyConfig <- synchronizerConfig.legacySequencerConfig.toScala.toList
+      } yield definitions.DsoSequencer(
+        legacyConfig.migrationId,
+        None,
+        legacyConfig.sequencerId,
+        legacyConfig.url,
+        nodeName,
+        OffsetDateTime.MIN,
+      )
+      (legacySequencers ++ sequencers).distinct
+    }
+
+    def extractSequencersForSynchronizers(
+        nodeName: String,
+        synchronizerConfig: SynchronizerNodeConfig,
+    ) = {
+      synchronizerConfig.physicalSynchronizers.toScala.toList.flatMap(_.asScala.flatMap {
+        case (serial, nodeConfig) =>
+          nodeConfig.sequencer.toScala.flatMap { sequencerConfig =>
+            synchronizerConfig.sequencerIdentity.toScala.flatMap { identity =>
+              identity.availableAfter.toScala.map { availableAfter =>
+                definitions.DsoSequencer(
+                  NoMigrationIdSet,
+                  Some(serial),
+                  identity.sequencerId,
+                  sequencerConfig.url,
+                  nodeName,
+                  OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+                )
+              }
+            }
+          }
+      })
+    }
+
+    def extractSequencersFromNodeState(nodeState: SvNodeState) = {
+      nodeState.state.synchronizerNodes.asScala.toVector
+        .flatMap { case (synchronizerId, domainConfig) =>
+          val legacyConfig = extractSequencersForSynchronizersFromLegacyState(
+            nodeState.svName,
+            domainConfig,
+          )
+          val physicalSequencers = extractSequencersForSynchronizers(
+            nodeState.svName,
+            domainConfig,
+          )
+          (legacyConfig ++ physicalSequencers).map(synchronizerId -> _)
+        }
+    }
+
     withSpan(s"$workflowId.listDsoSequencers") { _ => _ =>
       store
         .listFromSvNodeStates { nodeState =>
-          for {
-            (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
-            sequencers = for {
-              sequencer <- domainConfig.sequencer.toScala
-              availableAfter <- sequencer.availableAfter.toScala
-            } yield synchronizerId -> definitions.DsoSequencer(
-              sequencer.migrationId,
-              sequencer.sequencerId,
-              sequencer.url,
-              nodeState.svName,
-              OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
-            )
-            legacySequencers = for {
-              legacyConfig <- domainConfig.legacySequencerConfig.toScala.toList
-            } yield synchronizerId -> definitions.DsoSequencer(
-              legacyConfig.migrationId,
-              legacyConfig.sequencerId,
-              legacyConfig.url,
-              nodeState.svName,
-              OffsetDateTime.MIN,
-            )
-            sequencerConfig <- (legacySequencers ++ sequencers).distinct
-          } yield sequencerConfig
+          extractSequencersFromNodeState(nodeState)
         }
         .map(list =>
           list.map { case (synchronizerId, sequencers) =>
@@ -711,6 +774,45 @@ class HttpScanHandler(
             )
           })
         )
+    }
+  }
+
+  override def getActivePhysicalSynchronizerSerial(
+      respond: ScanResource.GetActivePhysicalSynchronizerSerialResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.GetActivePhysicalSynchronizerSerialResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getActivePhysicalSynchronizerSerial") { _ => _ =>
+      for {
+        synchronizerId <- store
+          .lookupAmuletRules()
+          .map(_.flatMap(_.state.fold(_.some, None)))
+        connectedDomains <- participantAdminConnection.listConnectedDomains()
+      } yield {
+        synchronizerId.fold(
+          ScanResource.GetActivePhysicalSynchronizerSerialResponse.NotFound(
+            definitions.ErrorResponse(
+              "No amulet rules"
+            )
+          )
+        )(syncId =>
+          connectedDomains
+            .find(_.synchronizerId == syncId)
+            .map(_.physicalSynchronizerId) match {
+            case Some(psid) =>
+              ScanResource.GetActivePhysicalSynchronizerSerialResponse.OK(
+                definitions.GetActivePhysicalSynchronizerSerialResponse(
+                  serial = psid.serial.unwrap.toLong
+                )
+              )
+            case None =>
+              ScanResource.GetActivePhysicalSynchronizerSerialResponse.NotFound(
+                definitions.ErrorResponse(
+                  "No active synchronizer connected"
+                )
+              )
+          }
+        )
+      }
     }
   }
 
@@ -1337,7 +1439,7 @@ class HttpScanHandler(
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
     val decompressedBytes =
       ByteStringUtil
-        .decompressGzip(input, None)
+        .decompressGzip(input, MaxBytesToDecompress.MaxValueUnsafe)
         .valueOr(err =>
           throw Status.INVALID_ARGUMENT
             .withDescription(s"Failed to decompress bytes: $err")
@@ -1402,7 +1504,7 @@ class HttpScanHandler(
             storeWithIngestion
               .connection(SpliceLedgerConnectionPriority.Low)
               .ledgerEnd()
-              .map(offset => Right(NonNegativeLong.tryCreate(offset)))
+              .map(offset => Right(offset))
           case Some(time) => Future.successful(Left(time.toInstant))
         }
         acsSnapshot <- participantAdminConnection.downloadAcsSnapshotNonChunked(
@@ -2223,7 +2325,9 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
             )
         }
-        actual <- sequencerAdminConnection.getSequencerTrafficControlState(member)
+        actual <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(_.getSequencerTrafficControlState(member))
         actualConsumed = actual.extraTrafficConsumed.value
         actualLimit = actual.extraTrafficLimit.value
         targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(member, domain)
@@ -2259,13 +2363,17 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(
-          domain,
-          party,
-          topologyTransactionType = AuthorizedState,
-          topologySnapshot =
-            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
-        )
+        response <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(
+            _.getPartyToParticipant(
+              domain,
+              party,
+              topologyTransactionType = AuthorizedState,
+              topologySnapshot =
+                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+            )
+          )
         participantId <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(
@@ -2308,13 +2416,17 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(
-          domain,
-          party,
-          topologyTransactionType = AuthorizedState,
-          topologySnapshot =
-            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
-        )
+        response <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(
+            _.getPartyToParticipant(
+              domain,
+              party,
+              topologyTransactionType = AuthorizedState,
+              topologySnapshot =
+                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+            )
+          )
         _ <-
           if (response.mapping.partyId == party) Future.unit
           else
@@ -2388,22 +2500,51 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvBftSequencers") { _ => _ =>
       MonadUtil
-        .sequentialTraverse(bftSequencers) { case (sequencerAdminConnection, bftSequencer) =>
-          for {
-            sequencerId <- sequencerAdminConnection.getSequencerId
-          } yield {
-            definitions.SynchronizerBftSequencer(
-              bftSequencer.migrationId,
-              sequencerId.toProtoPrimitive,
-              bftSequencer.p2pUrl,
-            )
-          }
+        .sequentialTraverse(bftSequencers.zipWithIndex) {
+          case ((sequencerAdminConnection, bftSequencer), idx) =>
+            initializedBftSequencersCache.get(idx) match {
+              case Some(cached) =>
+                Future.successful(Some(cached))
+              case None if uninitializedBftSequencersCooldown.getIfPresent(idx).isDefined =>
+                Future.successful(None)
+              case None =>
+                sequencerAdminConnection.getStatus
+                  .flatMap { status =>
+                    if (status.isInitialized) {
+                      val sequencerStatus = status.trySuccess
+                      val psid = sequencerStatus.synchronizerId
+                      sequencerAdminConnection.getSequencerId.map { id =>
+                        val entry = definitions.SynchronizerBftSequencer(
+                          psid.serial.unwrap.toLong,
+                          id.toProtoPrimitive,
+                          bftSequencer.p2pUrl,
+                        )
+                        initializedBftSequencersCache.put(idx, entry).discard
+                        Some(entry)
+                      }
+                    } else {
+                      logger.info(
+                        s"Skipping BFT sequencer with p2p url ${bftSequencer.p2pUrl} as it is not initialized"
+                      )
+                      uninitializedBftSequencersCooldown.put(idx, ()).discard
+                      Future.successful(None)
+                    }
+                  }
+                  .recover { case ex =>
+                    logger.warn(
+                      s"Failed to get status of BFT sequencer with p2p url ${bftSequencer.p2pUrl}",
+                      ex,
+                    )
+                    uninitializedBftSequencersCooldown.put(idx, ()).discard
+                    None
+                  }
+            }
         }
-        .map(sequencers =>
+        .map { results =>
           ScanResource.ListSvBftSequencersResponse.OK(
-            definitions.ListSvBftSequencersResponse(sequencers.toVector)
+            definitions.ListSvBftSequencersResponse(results.flatten.toVector)
           )
-        )
+        }
     }
   }
 
@@ -2514,6 +2655,10 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  // for DsoSequencers that use the serial instead of the migration we set -1 as the migration id
+  // we can't simply make it non required as it's part of the public API and it would break clients
+  val NoMigrationIdSet = -1L
 
   def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
     definitions.RoundTotals(

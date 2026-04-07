@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.auth
@@ -90,7 +90,7 @@ final class Authorizer(
         case None =>
           Left(
             AuthorizationError.InternalAuthorizationError(
-              "unexpectedly the user-id is not set in the authenticated claims",
+              "User-id is not set in the authenticated claims",
               new RuntimeException(),
             )
           )

@@ -1,17 +1,16 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.topology.ListOwnerToKeyMappingResult
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.crypto.SigningKeyUsage.{Namespace, Protocol}
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -29,6 +28,7 @@ import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId, Topolog
 import com.digitalasset.daml.lf.archive.DarParser
 
 import java.io.File
+import scala.annotation.nowarn
 
 trait TopologyAdministrationTest extends CommunityIntegrationTest with SharedEnvironment {
 
@@ -219,12 +219,16 @@ trait TopologyAdministrationTest extends CommunityIntegrationTest with SharedEnv
         _.shouldBeCommandFailure(TopologyManagerError.NoAppropriateSigningKeyInStore),
       )
 
-      participant1.topology.party_to_key_mappings.propose(
-        PartyId.tryCreate("nsd-test", participant1.namespace),
-        PositiveInt.one,
-        NonEmpty(Seq, restrictedKey),
-        signedBy = Some(restrictedKey.fingerprint),
-      )
+      @nowarn("cat=deprecation")
+      def updateP2k =
+        participant1.topology.party_to_key_mappings.propose(
+          PartyId.tryCreate("nsd-test", participant1.namespace),
+          PositiveInt.one,
+          NonEmpty(Seq, restrictedKey),
+          signedBy = Some(restrictedKey.fingerprint),
+        )
+
+      updateP2k
     }
 
   }
@@ -312,6 +316,7 @@ trait TopologyAdministrationTest extends CommunityIntegrationTest with SharedEnv
 
     val bob = participant1.ledger_api.parties.allocate("Bob")
 
+    @nowarn("cat=deprecation")
     def ptkForP1(key: SigningPublicKey) =
       participant1.topology.party_to_key_mappings.propose(
         bob.party,
@@ -485,7 +490,7 @@ trait TopologyAdministrationTest extends CommunityIntegrationTest with SharedEnv
 
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         participant1.topology.transactions.genesis_state(),
-        _.errorMessage should include("reason=>FieldNotSet(filter_synchronizer_store)"),
+        _.errorMessage should include("reason=>FieldNotSet(synchronizer_store)"),
       )
     }
   }
@@ -493,10 +498,10 @@ trait TopologyAdministrationTest extends CommunityIntegrationTest with SharedEnv
 
 // Default meaning in-memory
 //class TopologyConsoleCommandsTestDefault extends TopologyConsoleCommandsTest {
-//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+//  registerPlugin(new UseBftSequencer(loggerFactory))
 //}
 
 class TopologyAdministrationTestPostgres extends TopologyAdministrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

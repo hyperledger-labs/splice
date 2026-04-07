@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -31,7 +31,11 @@ trait CommandResubmissionIntegrationTest
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
-      .addConfigTransform(ConfigTransforms.useStaticTime)
+      .addConfigTransforms(
+        ConfigTransforms.useStaticTime,
+        // enable retries, as the test uses ProgrammableSequencer to fail pings
+        ConfigTransforms.setPingRetries(true),
+      )
       .withSetup { env =>
         import env.*
         sequencer1.topology.synchronizer_parameters.propose_update(

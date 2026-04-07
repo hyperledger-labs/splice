@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
 
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
 import com.daml.ledger.api.v2.admin.party_management_service.{
+  AllocatePartyRequest,
   AllocatePartyResponse,
   GetPartiesResponse,
   ListKnownPartiesResponse,
@@ -42,8 +43,6 @@ import com.daml.ledger.api.v2.{
 }
 import com.digitalasset.base.error.ErrorCategory
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.http.json.SprayJson
 import com.digitalasset.canton.http.json.v2.JsCommandServiceCodecs.*
 import com.digitalasset.canton.http.json.v2.JsContractEntry.JsActiveContract
 import com.digitalasset.canton.http.json.v2.JsEventServiceCodecs.*
@@ -51,13 +50,11 @@ import com.digitalasset.canton.http.json.v2.JsIdentityProviderCodecs.*
 import com.digitalasset.canton.http.json.v2.JsPackageCodecs.*
 import com.digitalasset.canton.http.json.v2.JsPartyManagementCodecs.*
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
-import com.digitalasset.canton.http.json.v2.JsSchema.JsServicesCommonCodecs.*
-import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
+import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent, JsTreeEvent}
 import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.*
 import com.digitalasset.canton.http.json.v2.JsUpdateServiceCodecs.*
 import com.digitalasset.canton.http.json.v2.JsUserManagementCodecs.*
 import com.digitalasset.canton.http.json.v2.JsVersionServiceCodecs.*
-import com.digitalasset.canton.http.json.v2.js.AllocatePartyRequest
 import com.digitalasset.canton.http.json.v2.{
   IdentifierConverter,
   JsCommand,
@@ -71,11 +68,12 @@ import com.digitalasset.canton.http.json.v2.{
   JsSubmitAndWaitForTransactionResponse,
   JsSubmitAndWaitForTransactionTreeResponse,
   JsUpdate,
+  JsUpdateTree,
   LegacyDTOs,
 }
 import com.digitalasset.canton.http.util.ClientUtil.uniqueId
 import com.digitalasset.canton.http.{Party, WebsocketConfig}
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.tests.jsonapi.AbstractHttpServiceIntegrationTestFuns.{
   HttpServiceTestFixtureData,
   dar1,
@@ -85,9 +83,7 @@ import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.Offse
 import com.digitalasset.canton.ledger.service.MetadataReader
 import com.digitalasset.canton.logging.NamedLogging.loggerWithoutTracing
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.testing.utils.TestModels
 import com.digitalasset.canton.tracing.{SerializableTraceContextConverter, W3CTraceContext}
-import com.digitalasset.canton.util.JarResourceUtils
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.language.LanguageVersion
@@ -95,7 +91,7 @@ import com.google.protobuf
 import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.circe.Json
-import io.circe.parser.decode
+import io.circe.parser.{decode, parse}
 import io.circe.syntax.*
 import org.apache.commons.lang3.RandomStringUtils
 import org.apache.pekko.http.scaladsl.model.Uri.Query
@@ -103,9 +99,8 @@ import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpMethods, StatusCodes, Uri}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import scalaz.syntax.tag.*
-import spray.json.{JsArray, JsNumber, JsObject, JsString, JsonParser}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Paths}
 import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -117,7 +112,8 @@ import scala.concurrent.duration.*
 class JsonV2Tests
     extends AbstractHttpServiceIntegrationTestFuns
     with HttpServiceUserFixture.UserToken {
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   // Configure extremely small wait time to avoid long test times and test edge cases
   override def wsConfig: Option[WebsocketConfig] = Some(
@@ -128,13 +124,13 @@ class JsonV2Tests
 
   "package management" should {
     "upload and download dar" in httpTestFixture { fixture =>
-      val darPath = JarResourceUtils
-        .resourceFile(
-          TestModels.daml_lf_encoder_test_dar(
-            LanguageVersion.StableVersions(LanguageVersion.Major.V2).max.pretty
-          )
+      val darPath =
+        Paths.get(
+          getClass.getClassLoader
+            .getResource(s"test-${LanguageVersion.latestStableLfVersion.pretty}.dar")
+            .toURI
         )
-        .toPath
+
       val darContent: ByteString = protobuf.ByteString.copyFrom(Files.readAllBytes(darPath))
       fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
         for {
@@ -161,8 +157,10 @@ class JsonV2Tests
               // TODO (i19593) Dar upload and download work on different object
               result should not be empty
           }
-          _ <- fixture
-            .getRequestString(Uri.Path(s"/v2/packages/$newPackage/status"), headers)
+          _ <- getRequestEncoded(
+            fixture.uri withPath Uri.Path(s"/v2/packages/$newPackage/status"),
+            headers,
+          )
             .map { case (status, _) =>
               status should be(StatusCodes.OK)
             }
@@ -184,9 +182,8 @@ class JsonV2Tests
     "allocate, update and get party" in httpTestFixture { fixture =>
       val partyId = uniqueId()
       fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
-        val jsAllocate = JsonParser(
-          AllocatePartyRequest(partyIdHint = s"Carol:-_ $partyId").asJson
-            .toString()
+        val jsAllocate = Json.obj(
+          "partyIdHint" -> Json.fromString(s"Carol:-_ $partyId")
         )
 
         for {
@@ -220,7 +217,7 @@ class JsonV2Tests
           )
             .map { case (_, result) =>
               val parties = decode[ListKnownPartiesResponse](result).value
-              parties.nextPageToken should not be (nextPageToken)
+              parties.nextPageToken should not be nextPageToken
               parties.partyDetails.length should be(1)
               parties.nextPageToken
             }
@@ -242,24 +239,21 @@ class JsonV2Tests
               HttpMethods.PATCH,
               Uri.Path(s"/v2/parties/$allocatedParty"),
               Some(
-                JsonParser(
-                  party_management_service
-                    .UpdatePartyDetailsRequest(
-                      partyDetails = Some(
-                        PartyDetails(
-                          party = allocatedParty,
-                          isLocal = false,
-                          localMetadata = Some(
-                            ObjectMeta(resourceVersion = "", annotations = Map("test" -> "test"))
-                          ),
-                          identityProviderId = "",
-                        )
-                      ),
-                      updateMask = Some(new FieldMask(Seq("local_metadata"))),
-                    )
-                    .asJson
-                    .toString()
-                )
+                party_management_service
+                  .UpdatePartyDetailsRequest(
+                    partyDetails = Some(
+                      PartyDetails(
+                        party = allocatedParty,
+                        isLocal = false,
+                        localMetadata = Some(
+                          ObjectMeta(resourceVersion = "", annotations = Map("test" -> "test"))
+                        ),
+                        identityProviderId = "",
+                      )
+                    ),
+                    updateMask = Some(new FieldMask(Seq("local_metadata"))),
+                  )
+                  .asJson
               ),
               headers,
             )
@@ -273,13 +267,13 @@ class JsonV2Tests
     "allocate a party on a specific synchronizers" in httpTestFixture { fixture =>
       val partyId = uniqueId()
       fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
-        val jsAllocate = JsonParser(
-          AllocatePartyRequest(
-            partyIdHint = s"Carol:-_ $partyId",
-            synchronizerId = validSynchronizerId.toProtoPrimitive,
-          ).asJson
-            .toString()
-        )
+        val jsAllocate = AllocatePartyRequest(
+          partyIdHint = s"Carol:-_ $partyId",
+          synchronizerId = validSynchronizerId.toProtoPrimitive,
+          localMetadata = None,
+          identityProviderId = "",
+          userId = "",
+        ).asJson
 
         for {
           allocatedParty <- fixture
@@ -345,7 +339,7 @@ class JsonV2Tests
   "user management service" should {
     "create, update and delete user" in httpTestFixture { fixture =>
       fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
-        val userId = "CreatedUser@^$.!`-#+'~_|:"
+        val userId = "CreatedUser@^$.!`-#+'~_|:()"
         val user = user_management_service.User.defaultInstance.copy(id = userId)
         val updated_user =
           user_management_service.User.defaultInstance.copy(id = userId, isDeactivated = true)
@@ -354,9 +348,7 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/users"),
-              toSprayJson(
-                user_management_service.CreateUserRequest(user = Some(user), rights = Nil)
-              ),
+              user_management_service.CreateUserRequest(user = Some(user), rights = Nil).asJson,
               headers,
             )
             .map { case (status, user) =>
@@ -382,12 +374,12 @@ class JsonV2Tests
               HttpMethods.PATCH,
               Uri.Path(s"/v2/users/$userId"),
               Some(
-                toSprayJson(
-                  user_management_service.UpdateUserRequest(
+                user_management_service
+                  .UpdateUserRequest(
                     user = Some(updated_user),
                     updateMask = Some(new FieldMask(Seq("is_deactivated"))),
                   )
-                )
+                  .asJson
               ),
               headers,
             )
@@ -424,9 +416,7 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/users"),
-              toSprayJson(
-                user_management_service.CreateUserRequest(user = Some(user), rights = Nil)
-              ),
+              user_management_service.CreateUserRequest(user = Some(user), rights = Nil).asJson,
               headers,
             )
             .map { case (status, user) =>
@@ -436,10 +426,9 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path(s"/v2/users/$testUserName/rights"),
-              toSprayJson(
-                user_management_service
-                  .GrantUserRightsRequest(testUserName, Seq(adminPermission), "")
-              ),
+              user_management_service
+                .GrantUserRightsRequest(testUserName, Seq(adminPermission), "")
+                .asJson,
               headers,
             )
             .map { case (status, result) =>
@@ -454,10 +443,9 @@ class JsonV2Tests
               HttpMethods.PATCH,
               Uri.Path(s"/v2/users/$testUserName/rights"),
               Some(
-                toSprayJson(
-                  user_management_service
-                    .RevokeUserRightsRequest(testUserName, Seq(adminPermission), "")
-                )
+                user_management_service
+                  .RevokeUserRightsRequest(testUserName, Seq(adminPermission), "")
+                  .asJson
               ),
               headers,
             )
@@ -494,19 +482,20 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/idps"),
-              toSprayJson(
-                identity_provider_config_service.CreateIdentityProviderConfigRequest(
+              identity_provider_config_service
+                .CreateIdentityProviderConfigRequest(
                   Some(
-                    identity_provider_config_service.IdentityProviderConfig(
-                      identityProviderId = idpId,
-                      isDeactivated = false,
-                      issuer = "user-idp-test",
-                      jwksUrl = "https://localhost",
-                      audience = "",
-                    )
+                    identity_provider_config_service
+                      .IdentityProviderConfig(
+                        identityProviderId = idpId,
+                        isDeactivated = false,
+                        issuer = "user-idp-test",
+                        jwksUrl = "https://localhost",
+                        audience = "",
+                      )
                   )
                 )
-              ),
+                .asJson,
               headers,
             )
             .map { case (status, result) =>
@@ -516,9 +505,7 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/users"),
-              toSprayJson(
-                user_management_service.CreateUserRequest(user = Some(user), rights = Nil)
-              ),
+              user_management_service.CreateUserRequest(user = Some(user), rights = Nil).asJson,
               headers,
             )
             .map { case (status, user) =>
@@ -530,10 +517,9 @@ class JsonV2Tests
               HttpMethods.PATCH,
               Uri.Path(s"/v2/users/$testUserName/identity-provider-id"),
               Some(
-                toSprayJson(
-                  user_management_service
-                    .UpdateUserIdentityProviderIdRequest(testUserName, "", idpId)
-                )
+                user_management_service
+                  .UpdateUserIdentityProviderIdRequest(testUserName, "", idpId)
+                  .asJson
               ),
               headers,
             )
@@ -564,19 +550,20 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/idps"),
-              toSprayJson(
-                identity_provider_config_service.CreateIdentityProviderConfigRequest(
+              identity_provider_config_service
+                .CreateIdentityProviderConfigRequest(
                   Some(
-                    identity_provider_config_service.IdentityProviderConfig(
-                      identityProviderId = idpId,
-                      isDeactivated = false,
-                      issuer = "createIdpTest",
-                      jwksUrl = "https://localhost",
-                      audience = "",
-                    )
+                    identity_provider_config_service
+                      .IdentityProviderConfig(
+                        identityProviderId = idpId,
+                        isDeactivated = false,
+                        issuer = "createIdpTest",
+                        jwksUrl = "https://localhost",
+                        audience = "",
+                      )
                   )
                 )
-              ),
+                .asJson,
               headers,
             )
             .map { case (status, result) =>
@@ -588,8 +575,8 @@ class JsonV2Tests
               HttpMethods.PATCH,
               Uri.Path(s"/v2/idps/$idpId"),
               Some(
-                toSprayJson(
-                  identity_provider_config_service.UpdateIdentityProviderConfigRequest(
+                identity_provider_config_service
+                  .UpdateIdentityProviderConfigRequest(
                     Some(
                       identity_provider_config_service.IdentityProviderConfig(
                         identityProviderId = idpId,
@@ -601,7 +588,7 @@ class JsonV2Tests
                     ),
                     updateMask = Some(new FieldMask(Seq("is_deactivated"))),
                   )
-                )
+                  .asJson
               ),
               headers,
             )
@@ -680,6 +667,7 @@ class JsonV2Tests
             minLedgerTimeRel = None,
             disclosedContracts = Seq.empty,
             packageIdSelectionPreference = Seq.empty,
+            tapsMaxPasses = None,
           )
         }
 
@@ -693,22 +681,18 @@ class JsonV2Tests
         )
 
         def generateHex(length: Int): String =
-          RandomStringUtils.random(length, "0123456789abcdef").toLowerCase
+          RandomStringUtils.insecure.next(length, "0123456789abcdef").toLowerCase
 
         val randomTraceId = generateHex(32)
 
         val testContextHeaders =
           extractHeaders(W3CTraceContext(s"00-$randomTraceId-93bb0fa23a8fb53a-01"))
-
         for {
-
           _ <- loggerFactory.assertLogsSeq(SuppressionRule.Level(org.slf4j.event.Level.DEBUG))(
             postJsonRequest(
               uri =
                 fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait-for-transaction-tree")),
-              json = SprayJson
-                .parse(jsCommands(createJsCommand).asJson.noSpaces)
-                .valueOr(err => fail(s"$err")),
+              json = jsCommands(createJsCommand).asJson,
               headers = headers ++ testContextHeaders,
             ).map { case (statusCode, result) =>
               statusCode should be(StatusCodes.OK)
@@ -733,13 +717,9 @@ class JsonV2Tests
           // check wrong template error
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait")),
-            json = SprayJson
-              .parse(
-                jsCommands(
-                  createJsCommand.copy(templateId = Identifier("Bad", "Template", "Id"))
-                ).asJson.noSpaces
-              )
-              .valueOr(err => fail(s"$err")),
+            json = jsCommands(
+              createJsCommand.copy(templateId = Identifier("Bad", "Template", "Id"))
+            ).asJson,
             headers = headers,
           ).map { case (statusCode, result) =>
             statusCode should be(StatusCodes.NotFound)
@@ -752,13 +732,9 @@ class JsonV2Tests
           // malformed  template error
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait")),
-            json = SprayJson
-              .parse(
-                jsCommands(
-                  createJsCommand.copy(templateId = Identifier("###TemplateMalformed", "x", "y"))
-                ).asJson.noSpaces
-              )
-              .valueOr(err => fail(s"$err")),
+            json = jsCommands(
+              createJsCommand.copy(templateId = Identifier("###TemplateMalformed", "x", "y"))
+            ).asJson,
             headers = headers,
           ).map { case (statusCode, result) =>
             statusCode should be(StatusCodes.BadRequest)
@@ -770,9 +746,7 @@ class JsonV2Tests
           }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait")),
-            json = SprayJson
-              .parse(jsCommands(createJsCommand).asJson.noSpaces)
-              .valueOr(err => fail(s"$err")),
+            json = jsCommands(createJsCommand).asJson,
             headers = headers,
           ).map { case (statusCode, result) =>
             statusCode should be(StatusCodes.OK)
@@ -785,25 +759,21 @@ class JsonV2Tests
           }
           (contractId, assignment) <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait-for-transaction")),
-            json = SprayJson
-              .parse(
-                JsSubmitAndWaitForTransactionRequest(
-                  jsCommands(createJsCommand),
-                  Some(
-                    TransactionFormat(
-                      eventFormat = Some(
-                        EventFormat(
-                          filtersByParty = Map(alice.unwrap -> Filters(Nil)),
-                          filtersForAnyParty = None,
-                          verbose = true,
-                        )
-                      ),
-                      transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+            json = JsSubmitAndWaitForTransactionRequest(
+              jsCommands(createJsCommand),
+              Some(
+                TransactionFormat(
+                  eventFormat = Some(
+                    EventFormat(
+                      filtersByParty = Map(alice.unwrap -> Filters(Nil)),
+                      filtersForAnyParty = None,
+                      verbose = true,
                     )
                   ),
-                ).asJson.noSpaces
-              )
-              .valueOr(err => fail(s"$err")),
+                  transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+                )
+              ),
+            ).asJson,
             headers = headers,
           ).map { case (statusCode, result) =>
             statusCode should be(StatusCodes.OK)
@@ -819,28 +789,25 @@ class JsonV2Tests
                 workflowId = "",
                 userId = s"defaultuser$sId",
                 commandId = transactionResponse.transaction.commandId,
+                submitter = "Alice",
+                submissionId = "1",
                 commands = Seq(
                   reassignment_commands.ReassignmentCommand(
-                    reassignment_commands.ReassignmentCommand.Command.UnassignCommand(
-                      reassignment_commands.UnassignCommand(
+                    command = reassignment_commands.ReassignmentCommand.Command.UnassignCommand(
+                      value = reassignment_commands.UnassignCommand(
                         contractId = contractId,
                         source = validSynchronizerId.toProtoPrimitive,
-                        target =
-                          validSynchronizerId.toProtoPrimitive, // Delibaretely wrong synchronizer here - we expect bad request
+                        target = validSynchronizerId.toProtoPrimitive, // intentionally wrong
                       )
                     )
                   )
                 ),
-                submitter = "Alice",
-                submissionId = "1",
               ),
             )
           }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/async/submit")),
-            json = SprayJson
-              .parse(jsCommands(createJsCommand).asJson.noSpaces)
-              .valueOr(err => fail(s"$err")),
+            json = jsCommands(createJsCommand).asJson,
             headers = headers,
           ).map { case (statusCode, result) =>
             statusCode should be(StatusCodes.OK)
@@ -853,9 +820,7 @@ class JsonV2Tests
 
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/commands/async/submit-reassignment")),
-            json = SprayJson
-              .parse(assignmentReq.asJson.noSpaces)
-              .valueOr(err => fail(s"$err")),
+            json = assignmentReq.asJson,
             headers = headers,
           ).map { case (statusCode, resp) =>
             // We would need 2 synchronizers to properly test submit-reassignment
@@ -955,26 +920,20 @@ class JsonV2Tests
           _ <- fixture
             .postJsonRequest(
               Uri.Path("/v2/events/events-by-contract-id"),
-              SprayJson
-                .parse(s"""{
+              parse(s"""{
                 "contractId": "$contractId",
                 "eventFormat" : {
                      "filtersForAnyParty" : {
                           "cumulative" : [{
                             "identifierFilter" :  {
                                  "WildcardFilter" : {
-                                      "value" : {
-                                           "includeCreatedEventBlob" : false
-                                      }
+                                      "value" : {}
                                  }
                               }
                           }]
-                     },
-                     "verbose": false
+                     }
                 }
-              }""")
-                .toEither
-                .value,
+              }""").fold(err => fail(s"$err"), identity),
               headers,
             )
             .map { case (status, result) =>
@@ -1005,6 +964,7 @@ class JsonV2Tests
               .GetActiveContractsRequest(
                 activeAtOffset = endOffset,
                 eventFormat = Some(allTransactionsFormat),
+                streamContinuationToken = None,
               )
 
             val message = TextMessage(
@@ -1046,6 +1006,7 @@ class JsonV2Tests
                 activeAtOffset = endOffset,
                 verbose = true,
                 eventFormat = None,
+                streamContinuationToken = None,
               )
 
             val message = TextMessage(
@@ -1086,6 +1047,7 @@ class JsonV2Tests
                 filter = None,
                 activeAtOffset = endOffset,
                 eventFormat = None,
+                streamContinuationToken = None,
               )
 
             val message = TextMessage(
@@ -1128,17 +1090,13 @@ class JsonV2Tests
           result <- fixture
             .postJsonRequest(
               Uri.Path("/v2/state/active-contracts"),
-              SprayJson
-                .parse(
-                  state_service
-                    .GetActiveContractsRequest(
-                      activeAtOffset = endOffset,
-                      eventFormat = Some(allTransactionsFormat),
-                    )
-                    .asJson
-                    .toString()
+              state_service
+                .GetActiveContractsRequest(
+                  activeAtOffset = endOffset,
+                  eventFormat = Some(allTransactionsFormat),
+                  streamContinuationToken = None,
                 )
-                .valueOr(err => fail(s"$err")),
+                .asJson,
               headers,
             )
             .map { case (_, list) =>
@@ -1162,19 +1120,15 @@ class JsonV2Tests
             _ <- fixture
               .postJsonRequest(
                 Uri.Path("/v2/state/active-contracts"),
-                SprayJson
-                  .parse(
-                    LegacyDTOs
-                      .GetActiveContractsRequest(
-                        filter = None,
-                        activeAtOffset = endOffset,
-                        verbose = true,
-                        eventFormat = Some(allTransactionsFormat),
-                      )
-                      .asJson
-                      .toString()
+                LegacyDTOs
+                  .GetActiveContractsRequest(
+                    filter = None,
+                    activeAtOffset = endOffset,
+                    verbose = true,
+                    eventFormat = Some(allTransactionsFormat),
+                    streamContinuationToken = None,
                   )
-                  .valueOr(err => fail(s"$err")),
+                  .asJson,
                 headers,
               )
               .map { case (status, result) =>
@@ -1200,18 +1154,14 @@ class JsonV2Tests
             _ <- fixture
               .postJsonRequest(
                 Uri.Path("/v2/state/active-contracts"),
-                SprayJson
-                  .parse(
-                    LegacyDTOs
-                      .GetActiveContractsRequest(
-                        filter = Some(allTransactionsFilter),
-                        activeAtOffset = endOffset,
-                        eventFormat = Some(allTransactionsFormat),
-                      )
-                      .asJson
-                      .toString()
+                LegacyDTOs
+                  .GetActiveContractsRequest(
+                    filter = Some(allTransactionsFilter),
+                    activeAtOffset = endOffset,
+                    eventFormat = Some(allTransactionsFormat),
+                    streamContinuationToken = None,
                   )
-                  .valueOr(err => fail(s"$err")),
+                  .asJson,
                 headers,
               )
               .map { case (status, result) =>
@@ -1237,17 +1187,13 @@ class JsonV2Tests
           error <- fixture
             .postJsonRequest(
               Uri.Path("/v2/state/active-contracts"),
-              SprayJson
-                .parse(
-                  state_service
-                    .GetActiveContractsRequest(
-                      activeAtOffset = endOffset + 100,
-                      eventFormat = Some(allTransactionsFormat),
-                    )
-                    .asJson
-                    .toString()
+              state_service
+                .GetActiveContractsRequest(
+                  activeAtOffset = endOffset + 100,
+                  eventFormat = Some(allTransactionsFormat),
+                  streamContinuationToken = None,
                 )
-                .valueOr(err => fail(s"$err")),
+                .asJson,
               headers,
             )
             .map { case (status, response) =>
@@ -1322,8 +1268,17 @@ class JsonV2Tests
       fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (alice, headers) =>
         for {
           jwt <- jwtForParties(fixture.uri)(List(alice), List())
-          (_, offset) <- createCommand(fixture, alice, headers)
-          (updateId, _, alternateParty) <- {
+          (contractId, offset) <- createCommand(fixture, alice, headers)
+          _ <- exerciseCommand(
+            fixture = fixture,
+            party = alice,
+            headers = headers,
+            contractId = contractId,
+            choice = "Archive",
+            argument = io.circe.Json.Null,
+          )
+
+          (updateId, alternateParty) <- {
             val webSocketFlow =
               websocket(fixture.uri.withPath(Uri.Path("/v2/updates")), jwt)
             Source
@@ -1345,7 +1300,7 @@ class JsonV2Tests
                   .map(decode[JsGetUpdatesResponse])
                   .collect { case Right(JsGetUpdatesResponse(JsUpdate.Transaction(tx))) =>
                     inside(tx.events.head) { case event: JsEvent.CreatedEvent =>
-                      (tx.updateId, event.nodeId, event.signatories.head)
+                      (tx.updateId, event.signatories.head)
                     }
                   }
                   .head
@@ -1371,7 +1326,7 @@ class JsonV2Tests
                 fixture.uri withPath Uri.Path("/v2/updates") withQuery Query(
                   ("stream_idle_timeout_ms", "500")
                 ),
-                updatesRequest.asJson.toString(),
+                updatesRequest.asJson.noSpaces,
                 headers,
               )
               .map { case (status, result) =>
@@ -1379,6 +1334,24 @@ class JsonV2Tests
 
                 val responses = decode[Seq[JsGetUpdatesResponse]](result.toString()).value
                 responses.size should be >= 1
+                assertAcsDeltaEvents(responses)
+              }
+          }
+          _ <- {
+            fixture
+              .postJsonStringRequest(
+                fixture.uri withPath Uri.Path("/v2/updates") withQuery Query(
+                  ("stream_idle_timeout_ms", "500")
+                ),
+                updatesRequestLegacy.asJson.toString(),
+                headers,
+              )
+              .map { case (status, result) =>
+                status should be(StatusCodes.OK)
+
+                val responses = decode[Seq[JsGetUpdatesResponse]](result.toString()).value
+                responses.size should be >= 1
+                assertAcsDeltaEvents(responses)
               }
           }
           _ <- {
@@ -1387,11 +1360,20 @@ class JsonV2Tests
             Source
               .single(
                 TextMessage(
-                  updatesRequestLegacy.asJson.noSpaces
+                  updatesRequestLegacy.copy(beginExclusive = offset - 1).asJson.noSpaces
                 )
               )
               .concatMat(Source.maybe[Message])(Keep.left)
               .via(webSocketFlow)
+              // filter out OffsetCheckpoints that may cause flakes
+              .filter {
+                case m: TextMessage =>
+                  decode[JsGetUpdatesResponse](m.getStrictText) match {
+                    case Right(JsGetUpdatesResponse(JsUpdate.OffsetCheckpoint(_))) => false
+                    case _ => true
+                  }
+                case _ => true
+              }
               .take(2)
               .collect { case m: TextMessage =>
                 m.getStrictText
@@ -1399,14 +1381,13 @@ class JsonV2Tests
               .toMat(Sink.seq)(Keep.right)
               .run()
               .map { updates =>
-                updates
+                val responses = updates
                   .map(decode[JsGetUpdatesResponse])
-                  .collect { case Right(JsGetUpdatesResponse(JsUpdate.Transaction(tx))) =>
-                    inside(tx.events.head) { case event: JsEvent.CreatedEvent =>
-                      (tx.updateId, event.nodeId, event.signatories.head)
-                    }
+                  .collect { case Right(response) =>
+                    response
                   }
-                  .head
+                responses should not be empty
+                assertAcsDeltaEvents(responses)
               }
           }
           _ <- {
@@ -1457,6 +1438,7 @@ class JsonV2Tests
 
                 val responses = decode[Seq[JsGetUpdatesResponse]](result.toString()).value
                 responses.size should be >= 1
+                assertAcsDeltaEvents(responses)
               }
           }
           _ <- {
@@ -1465,21 +1447,33 @@ class JsonV2Tests
             Source
               .single(
                 TextMessage(
-                  updatesRequestLegacy.asJson.noSpaces
+                  updatesRequestLegacy.copy(beginExclusive = offset - 1).asJson.noSpaces
                 )
               )
               .concatMat(Source.maybe[Message])(Keep.left)
               .via(webSocketFlow)
-              .take(1)
+              // filter out OffsetCheckpoints that may cause flakes
+              .filter {
+                case m: TextMessage =>
+                  decode[JsGetUpdateTreesResponse](m.getStrictText) match {
+                    case Right(JsGetUpdateTreesResponse(JsUpdateTree.OffsetCheckpoint(_))) => false
+                    case _ => true
+                  }
+                case _ => true
+              }
+              .take(2)
               .collect { case m: TextMessage =>
                 m.getStrictText
               }
               .toMat(Sink.seq)(Keep.right)
               .run()
               .map { updates =>
-                inside(decode[JsGetUpdateTreesResponse](updates.head)) { case Right(value) =>
-                  value.update should not be null
-                }
+                val responses = updates
+                  .map(decode[JsGetUpdateTreesResponse])
+                  .collect { case Right(response) =>
+                    response
+                  }
+                assertTreeEvents(responses)
               }
           }
           _ <- {
@@ -1529,6 +1523,7 @@ class JsonV2Tests
 
                 val responses = decode[Seq[JsGetUpdateTreesResponse]](result.toString()).value
                 responses.size should be >= 1
+                assertTreeEvents(responses)
               }
           }
           _ <- {
@@ -1566,13 +1561,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-offset")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByOffsetRequest(
+            json = LegacyDTOs
+              .GetTransactionByOffsetRequest(
                 offset = offset,
                 transactionFormat = transactionFormat(alice.unwrap),
                 requestingParties = Nil,
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1580,13 +1575,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-offset")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByOffsetRequest(
+            json = LegacyDTOs
+              .GetTransactionByOffsetRequest(
                 offset = offset,
                 transactionFormat = None,
                 requestingParties = Seq(alice.unwrap),
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1594,13 +1589,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-offset")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByOffsetRequest(
+            json = LegacyDTOs
+              .GetTransactionByOffsetRequest(
                 offset = offset,
                 transactionFormat = None,
                 requestingParties = Nil,
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, result) =>
@@ -1616,13 +1611,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-id")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByIdRequest(
+            json = LegacyDTOs
+              .GetTransactionByIdRequest(
                 updateId = updateId,
                 transactionFormat = transactionFormat(alternateParty), // the party is different
                 requestingParties = Nil,
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1630,13 +1625,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-id")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByIdRequest(
+            json = LegacyDTOs
+              .GetTransactionByIdRequest(
                 updateId = updateId,
                 transactionFormat = None,
                 requestingParties = Seq(alternateParty),
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1644,13 +1639,13 @@ class JsonV2Tests
             }
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/transaction-by-id")),
-            json = toSprayJson(
-              LegacyDTOs.GetTransactionByIdRequest(
+            json = LegacyDTOs
+              .GetTransactionByIdRequest(
                 updateId = updateId,
                 transactionFormat = transactionFormat(alternateParty),
                 requestingParties = Seq(alternateParty),
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, result) =>
@@ -1667,12 +1662,12 @@ class JsonV2Tests
 
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/update-by-offset")),
-            json = toSprayJson(
-              update_service.GetUpdateByOffsetRequest(
+            json = update_service
+              .GetUpdateByOffsetRequest(
                 offset = offset,
                 updateFormat = Some(updateFormat(alice.unwrap)),
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1681,12 +1676,12 @@ class JsonV2Tests
 
           _ <- postJsonRequest(
             uri = fixture.uri.withPath(Uri.Path("/v2/updates/update-by-id")),
-            json = toSprayJson(
-              update_service.GetUpdateByIdRequest(
+            json = update_service
+              .GetUpdateByIdRequest(
                 updateId = updateId,
                 updateFormat = Some(updateFormat(alternateParty)), // the party is different
               )
-            ),
+              .asJson,
             headers = headers,
           )
             .map { case (status, _) =>
@@ -1778,6 +1773,7 @@ class JsonV2Tests
             "old_timestamp_check",
           )
         } yield {
+
           regularTime.toString() should be(""""2000-01-01T12:12:32.777111Z"""")
           oldTime.toString() should be(""""1930-04-14T12:12:32.777111Z"""")
         }
@@ -1808,6 +1804,31 @@ class JsonV2Tests
     }
   }
 
+  "health service" should {
+    "return OK status for livez endpoint" in httpTestFixture { fixture =>
+      fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
+        fixture.getRequestString(path = Uri.Path("/livez"), headers = headers).map {
+          case (status, result) =>
+            status should be(StatusCodes.OK)
+            result should be("")
+        }
+      }
+    }
+    "return OK response for readyz endpoint" in httpTestFixture { fixture =>
+      fixture.getUniquePartyAndAuthHeaders("Alice").flatMap { case (_, headers) =>
+        fixture.getRequestString(path = Uri.Path("/readyz"), headers = headers).map {
+          case (status, result) =>
+            status should be(StatusCodes.OK)
+            result should be(
+              """|[+] ledger ok (SERVING)
+              |readyz check passed
+              |""".stripMargin
+            )
+        }
+      }
+    }
+  }
+
   private def submitCommand[T](
       fixture: HttpServiceTestFixtureData,
       party: Party,
@@ -1818,38 +1839,43 @@ class JsonV2Tests
       commandId: String,
       userId: String,
   ): Future[T] = {
-    val jsCommandJson = JsObject(
-      ("commands", JsArray(toSprayJson(jsCommand))),
-      ("commandId", JsString(commandId)),
-      ("actAs", JsArray(JsString(party.unwrap))),
-      ("userId", JsString(userId)),
-      ("minLedgerTimeRel", JsObject("nanos" -> JsNumber(100), "seconds" -> JsNumber(1))),
+    val commandsWrapper = JsCommands(
+      commands = Seq(jsCommand),
+      workflowId = None,
+      userId = Some(userId),
+      commandId = commandId,
+      deduplicationPeriod = Some(DeduplicationPeriod.Empty),
+      actAs = Seq(party.unwrap),
+      readAs = Seq(party.unwrap),
+      submissionId = None,
+      synchronizerId = None,
+      minLedgerTimeAbs = None,
+      minLedgerTimeRel = None,
+      disclosedContracts = Seq.empty,
+      packageIdSelectionPreference = Seq.empty,
     )
 
-    val jsSubmitAndWaitForTransactionRequest = JsObject(
-      "commands" -> jsCommandJson,
-      "transactionFormat" -> toSprayJson(
-        TransactionFormat(
-          eventFormat = Some(
-            EventFormat(
-              filtersByParty = Map(party.unwrap -> Filters(Nil)),
-              filtersForAnyParty = None,
-              verbose = true,
-            )
-          ),
-          transactionShape = transactionShape,
+    val txFormat = TransactionFormat(
+      eventFormat = Some(
+        EventFormat(
+          filtersByParty = Map(party.unwrap -> Filters(Nil)),
+          filtersForAnyParty = None,
+          verbose = true,
         )
       ),
+      transactionShape = transactionShape,
     )
+
+    val request = JsSubmitAndWaitForTransactionRequest(commandsWrapper, Some(txFormat))
 
     postJsonRequest(
       uri = fixture.uri.withPath(Uri.Path("/v2/commands/submit-and-wait-for-transaction")),
-      json = jsSubmitAndWaitForTransactionRequest,
+      json = request.asJson,
       headers = headers,
     ).map { case (statusCode, result) =>
       assert(statusCode == StatusCodes.OK, s"Expected OK, got $statusCode with response: $result")
       val transactionResponse =
-        decode[JsSubmitAndWaitForTransactionResponse](result.toString()).getOrElse(fail())
+        decode[JsSubmitAndWaitForTransactionResponse](result.noSpaces).getOrElse(fail())
       parseResponse(transactionResponse)
     }
   }
@@ -1987,10 +2013,6 @@ class JsonV2Tests
     ),
   )
 
-  private def toSprayJson[T](t: T)(implicit encoder: io.circe.Encoder[T]) = JsonParser(
-    t.asJson.toString()
-  )
-
   private def transactionFormat(party: String): Option[TransactionFormat] = Some(
     TransactionFormat(
       eventFormat = Some(
@@ -2010,4 +2032,37 @@ class JsonV2Tests
       includeReassignments = None,
       includeTopologyEvents = None,
     )
+
+  private def assertAcsDeltaEvents(
+      responses: Seq[JsGetUpdatesResponse]
+  ): Unit = {
+    val events = responses
+      .map(_.update)
+      .collect { case JsUpdate.Transaction(tx) =>
+        tx.events
+      }
+      .flatten
+
+    events should not be empty
+    withClue(s"Events: $events") {
+      events.collect { case _: JsEvent.CreatedEvent => () } should not be empty
+      events.collect { case _: JsEvent.ArchivedEvent => () } should not be empty
+      events.collect { case _: JsEvent.ExercisedEvent => () } shouldBe empty
+    }
+  }
+
+  private def assertTreeEvents(responses: Seq[JsGetUpdateTreesResponse]): Unit = {
+    val events = responses
+      .map(_.update)
+      .collect { case JsUpdateTree.TransactionTree(tx) =>
+        tx.eventsById.values
+      }
+      .flatten
+
+    events should not be empty
+    withClue(s"Events: $events") {
+      events.collect { case _: JsTreeEvent.CreatedTreeEvent => () } should not be empty
+      events.collect { case _: JsTreeEvent.ExercisedTreeEvent => () } should not be empty
+    }
+  }
 }

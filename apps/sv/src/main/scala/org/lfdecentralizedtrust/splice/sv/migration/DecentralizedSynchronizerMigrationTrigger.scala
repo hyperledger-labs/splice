@@ -7,7 +7,6 @@ import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
-  SequencerAdminConnection,
   SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.migration.{AcsExporter, DomainMigrationTrigger}
@@ -34,7 +33,6 @@ final class DecentralizedSynchronizerMigrationTrigger(
     dsoStore: SvDsoStore,
     ledgerConnection: SpliceLedgerConnection,
     protected val participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: SequencerAdminConnection,
     protected val dumpPath: Path,
     featureConfig: EnabledFeaturesConfig,
 )(implicit
@@ -54,7 +52,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
 
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,
-    sequencerAdminConnection,
+    localSynchronizerNode.sequencerAdminConnection,
     dsoStore,
     new AcsExporter(
       participantAdminConnection,

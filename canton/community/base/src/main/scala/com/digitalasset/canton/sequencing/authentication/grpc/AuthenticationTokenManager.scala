@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.authentication.grpc
@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationToken,
   AuthenticationTokenManagerConfig,
+  AuthenticationTokenProvider,
 }
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth.TokenFetcher
 import com.digitalasset.canton.time.Clock
@@ -64,7 +65,8 @@ class AuthenticationTokenManager(
     */
   def invalidateToken(invalidToken: AuthenticationToken): Unit = {
     val _ = state.updateAndGet {
-      case HaveToken(token) if invalidToken == token => NoToken
+      case HaveToken(AuthenticationTokenWithExpiry(token, _expiresAt)) if invalidToken == token =>
+        NoToken
       case other => other
     }
   }
@@ -81,17 +83,31 @@ class AuthenticationTokenManager(
       )
     val refreshingState = Refreshing(EitherT(refreshTokenPromise.futureUS))
 
+    val now = clock.now
+
+    def needToRefresh(token: AuthenticationTokenWithExpiry): Boolean = {
+      // We use the same logic as in `scheduleRefreshBefore` and consider the token expired
+      // if we are within the configurable cutoff of the expiration time.
+      val hasExpired = now >= token.expiresAt.minus(config.refreshAuthTokenBeforeExpiry.asJava)
+      if (hasExpired) {
+        logger.debug("Current authentication token has expired -- refreshing")
+      }
+
+      refreshWhenHaveToken || hasExpired
+    }
+
     state.getAndUpdate {
       case NoToken => refreshingState
-      case have @ HaveToken(_) => if (refreshWhenHaveToken) refreshingState else have
+      case have @ HaveToken(tokenWithExpiry) =>
+        if (needToRefresh(tokenWithExpiry)) refreshingState else have
       case other => other
     } match {
       // we are already refreshing, so pass future result
       case Refreshing(pending) => pending.map(_.token)
       // we have a token, so share it
-      case HaveToken(token) =>
-        if (refreshWhenHaveToken) createRefreshTokenFuture(refreshTokenPromise)
-        else EitherT.rightT[FutureUnlessShutdown, Status](token)
+      case HaveToken(tokenWithExpiry) =>
+        if (needToRefresh(tokenWithExpiry)) createRefreshTokenFuture(refreshTokenPromise)
+        else EitherT.rightT[FutureUnlessShutdown, Status](tokenWithExpiry.token)
       // there is no token yet, so start refreshing and return pending result
       case NoToken =>
         createRefreshTokenFuture(refreshTokenPromise)
@@ -120,8 +136,7 @@ class AuthenticationTokenManager(
               if ex.getStatus.getCode == io.grpc.Status.Code.CANCELLED =>
             logger.info("Token refresh cancelled", ex)
           case ex: io.grpc.StatusRuntimeException
-              if ex.getStatus.getCode == io.grpc.Status.Code.UNAVAILABLE &&
-                ex.getMessage.contains("Channel shutdown invoked") =>
+              if AuthenticationTokenProvider.unavailableDueToChannelShutdown(ex.getStatus) =>
             logger.info("Token refresh aborted due to shutdown", ex)
           case ex: io.grpc.StatusRuntimeException =>
             def collectCause(ex: Throwable): Seq[String] =
@@ -141,10 +156,12 @@ class AuthenticationTokenManager(
           logger.warn(s"Token refresh encountered error: $error")
         completeRefresh(NoToken)
       case Success(
-            UnlessShutdown.Outcome(Right(AuthenticationTokenWithExpiry(newToken, expiresAt)))
+            UnlessShutdown.Outcome(
+              Right(newTokenWithExpiry @ AuthenticationTokenWithExpiry(_token, expiresAt))
+            )
           ) =>
         logger.debug("Token refresh complete")
-        completeRefresh(HaveToken(newToken))
+        completeRefresh(HaveToken(newTokenWithExpiry))
         scheduleRefreshBefore(expiresAt)
     }
 
@@ -178,5 +195,5 @@ object AuthenticationTokenManager {
   final case class Refreshing(
       pending: EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry]
   ) extends State
-  final case class HaveToken(token: AuthenticationToken) extends State
+  final case class HaveToken(token: AuthenticationTokenWithExpiry) extends State
 }

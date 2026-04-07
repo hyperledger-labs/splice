@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -100,6 +100,7 @@ class BlockSequencerCircuitBreaker(
       messages.confirmationRequest -> SubmissionRequestType.ConfirmationRequest.name,
       messages.verdict -> SubmissionRequestType.Verdict.name,
       messages.commitment -> SubmissionRequestType.Commitment.name,
+      messages.lsuSequencingTest -> SubmissionRequestType.LsuSequencingTest.name,
       messages.topUp -> SubmissionRequestType.TopUp.name,
       messages.topUp -> SubmissionRequestType.TopUpMed.name,
       messages.topology -> SubmissionRequestType.TopologyTransaction.name,
@@ -123,6 +124,7 @@ class BlockSequencerCircuitBreaker(
         SubmissionRequestType.ConfirmationRequest -> messages.confirmationRequest,
         SubmissionRequestType.Verdict -> messages.verdict,
         SubmissionRequestType.Commitment -> messages.commitment,
+        SubmissionRequestType.LsuSequencingTest -> messages.lsuSequencingTest,
         SubmissionRequestType.TopUp -> messages.topUp,
         SubmissionRequestType.TopUpMed -> messages.topUp,
         SubmissionRequestType.TopologyTransaction -> messages.topology,

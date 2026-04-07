@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology
 
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.DynamicSequencingParametersPayload
@@ -12,6 +13,13 @@ import com.google.protobuf.ByteString
 import java.time.Duration
 
 final case class SequencingParameters(pbftViewChangeTimeout: PositiveFiniteDuration)
+    extends PrettyPrinting {
+
+  override protected def pretty: Pretty[SequencingParameters.this.type] =
+    prettyOfClass(
+      param("pbftViewChangeTimeout", _.pbftViewChangeTimeout)
+    )
+}
 object SequencingParameters {
 
   private val DefaultPbftViewChangeTimeout =

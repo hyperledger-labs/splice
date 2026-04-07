@@ -71,6 +71,13 @@ pulumiStacks:
 validator1:
   logging:
     level: DEBUG
+  participant:
+    additionalEnvVars:
+      - !include(./participant_pruning.yaml)
+splitwell:
+  participant:
+    additionalEnvVars:
+      - !include(./participant_pruning.yaml)
 # initial round used only on fresh initialization or resets
 # first SV bootstraps the network with it, other SVs learn it via their sponsors
 initialRound: 0
@@ -203,9 +210,7 @@ svs:
         limits:
           memory: '18Gi'
       additionalEnvVars:
-        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
-          value: |
-            canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
+        - !include(./participant_pruning.yaml)
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499

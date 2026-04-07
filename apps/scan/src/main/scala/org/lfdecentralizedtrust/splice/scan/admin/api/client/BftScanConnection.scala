@@ -61,6 +61,7 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
@@ -691,6 +692,11 @@ class BftScanConnection(
   ): Future[Seq[
     ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
   ]] = bftCall(_.listUnclaimedDevelopmentFundCoupons())
+
+  override def getActivePhysicalSynchronizerSerial()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[NonNegativeInt] = bftCall(_.getActivePhysicalSynchronizerSerial())
 }
 trait HasUrl {
   def url: Uri

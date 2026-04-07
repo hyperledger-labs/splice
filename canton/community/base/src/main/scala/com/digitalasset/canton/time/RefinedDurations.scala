@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -175,7 +175,7 @@ object PositiveFiniteDuration extends RefinedDurationCompanion[PositiveFiniteDur
     _.duration
   implicit val forgetRefinementFDuration: Transformer[PositiveFiniteDuration, FiniteDuration] =
     _.toScala
-  implicit val toNonNegativeDurationConfig
+  implicit val toPositiveFiniteDurationConfig
       : Transformer[PositiveFiniteDuration, PositiveFiniteDurationConfig] = _.toConfig
 
   override def create(duration: Duration): Either[String, PositiveFiniteDuration] =

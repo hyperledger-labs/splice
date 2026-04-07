@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.transaction
@@ -82,6 +82,7 @@ trait DelegatedTopologyTransactionLike[+Op <: TopologyChangeOp, +M <: TopologyMa
   override final def serial: PositiveInt = transactionLikeDelegate.serial
   override final def mapping: M = transactionLikeDelegate.mapping
   override final def hash: TxHash = transactionLikeDelegate.hash
+
 }
 
 /** Change to the distributed synchronizer topology

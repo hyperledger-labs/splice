@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
@@ -23,6 +23,7 @@ import com.digitalasset.canton.{
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Time}
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 import com.digitalasset.daml.lf.transaction.{
   CreationTime,
   FatContractInstance,
@@ -82,10 +83,10 @@ final class GeneratorsInteractiveSubmission(
       Value.ValueGenMap(entries.map { case (k, v) =>
         (normalizeValue(k), normalizeValue(v))
       })
-    case leaf: Value.ValueCidlessLeaf => leaf
+    case atom: Value.ValueCidLessAtom => atom
   }
 
-  // Updated nodes that filter out fields not supported in LF 2.2
+  // Updated nodes that filter out fields not supported in LF 2.1
   def normalizeNodeForV1[N <: Node](node: N): N = node match {
     case node: Node.Create =>
       node
@@ -229,8 +230,8 @@ final class GeneratorsInteractiveSubmission(
     optByKeyNodeO,
   )
 
-  private val globalKeyMappingGen: Gen[Map[GlobalKey, Option[Value.ContractId]]] =
-    boundedMapGen[GlobalKey, Option[Value.ContractId]]
+  private val globalKeyMappingGen: Gen[Map[GlobalKey, Vector[Value.ContractId]]] =
+    boundedMapGen[GlobalKey, Option[Value.ContractId]].map(_.transform((_, v) => v.asCidVector))
 
   private def inputContractsGen(overrideCid: Value.ContractId): Gen[LfFatContractInst] = for {
     create <- ValueGenerators

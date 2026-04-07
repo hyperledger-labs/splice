@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
@@ -7,13 +7,12 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.Authorizer
 import com.digitalasset.canton.config
+import com.digitalasset.canton.health.HealthChecks
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
-import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher.PackageResolver
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
 import com.digitalasset.canton.ledger.api.auth.services.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService
-import com.digitalasset.canton.ledger.api.health.HealthChecks
-import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.util.{TimeProvider, TimeProviderType}
 import com.digitalasset.canton.ledger.api.validation.*
 import com.digitalasset.canton.ledger.localstore.api.{
   IdentityProviderConfigStore,
@@ -26,9 +25,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
-import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.*
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.services.*
 import com.digitalasset.canton.platform.apiserver.services.admin.*
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl
@@ -38,17 +35,17 @@ import com.digitalasset.canton.platform.apiserver.services.command.{
   CommandSubmissionServiceImpl,
 }
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
-import com.digitalasset.canton.platform.config.{
-  CommandServiceConfig,
-  InteractiveSubmissionServiceConfig,
-  PackageServiceConfig,
-  PartyManagementServiceConfig,
-  UserManagementServiceConfig,
-}
+import com.digitalasset.canton.platform.config.*
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ContractValidator.ContractAuthenticatorFn
+import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.engine.*
+import com.digitalasset.daml.lf.language.Ast
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine as ContractStateMachine
 import io.grpc.BindableService
 import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.opentelemetry.api.trace.Tracer
@@ -98,6 +95,7 @@ object ApiServices {
       partyRecordStore: PartyRecordStore,
       authorizer: Authorizer,
       engine: Engine,
+      contractStateMode: ContractStateMachine.Mode,
       timeProvider: TimeProvider,
       timeProviderType: TimeProviderType,
       transactionSubmissionTracker: SubmissionTracker,
@@ -118,7 +116,6 @@ object ApiServices {
       userManagementServiceConfig: UserManagementServiceConfig,
       partyManagementServiceConfig: PartyManagementServiceConfig,
       packageServiceConfig: PackageServiceConfig,
-      engineLoggingConfig: EngineLoggingConfig,
       contractAuthenticator: ContractAuthenticatorFn,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
@@ -127,6 +124,8 @@ object ApiServices {
       interactiveSubmissionEnricher: InteractiveSubmissionEnricher,
       logger: TracedLogger,
       packagePreferenceBackend: PackagePreferenceBackend,
+      apiContractService: ApiContractService,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
   )(implicit
       materializer: Materializer,
       esf: ExecutionSequencerFactory,
@@ -191,6 +190,7 @@ object ApiServices {
             acsService = activeContractsService,
             syncService = syncService,
             updateService = updateService,
+            participantId = participantId,
             metrics = metrics,
             telemetry = telemetry,
             loggerFactory = loggerFactory,
@@ -212,6 +212,7 @@ object ApiServices {
             new PackageServiceAuthorization(apiPackageService, authorizer),
             new UpdateServiceAuthorization(apiUpdateService, authorizer),
             new StateServiceAuthorization(apiStateService, authorizer),
+            new ContractServiceAuthorization(apiContractService, authorizer),
             apiVersionService,
           )
 
@@ -231,7 +232,6 @@ object ApiServices {
               submissionIdGenerator = SubmissionIdGenerator.Random,
               identityProviderExists = new IdentityProviderExists(identityProviderConfigStore),
               partyRecordExist = new PartyRecordsExist(partyRecordStore),
-              indexPartyManagementService = partyManagementService,
               telemetry = telemetry,
               loggerFactory = loggerFactory,
             )
@@ -267,25 +267,28 @@ object ApiServices {
 
       val packageLoader = new DeduplicatingPackageLoader()
 
-      val packageResolver: PackageResolver = (packageId: Ref.PackageId) =>
-        (tc: TraceContext) =>
+      val packageResolver: PackageResolver = new PackageResolver {
+        override protected def resolveInternal(
+            packageId: PackageId
+        )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[Ast.Package]] =
           FutureUnlessShutdown.outcomeF(
             packageLoader.loadPackage(
               packageId,
-              syncService.getLfArchive(_)(tc),
+              syncService.getLfArchive(_),
               metrics.execution.getLfPackage,
             )
           )
+      }
 
       val commandInterpreter =
         new StoreBackedCommandInterpreter(
           engine = engine,
+          contractStateMode = contractStateMode,
           participant = participantId,
           packageResolver = packageResolver,
           contractStore = contractStore,
           contractAuthenticator = contractAuthenticator,
           metrics = metrics,
-          config = engineLoggingConfig,
           prefetchingRecursionLevel = commandConfig.contractPrefetchingDepth,
           loggerFactory = loggerFactory,
           dynParamGetter = dynParamGetter,
@@ -299,6 +302,9 @@ object ApiServices {
               syncService = syncService,
               commandInterpreter = commandInterpreter,
               topologyAwarePackageSelectionEnabled = ledgerFeatures.topologyAwarePackageSelection,
+              tapsMaxPassesDefault = ledgerFeatures.tapsMaxPassesDefault,
+              tapsMaxPassesLimit = ledgerFeatures.tapsMaxPassesLimit,
+              metrics = metrics,
               loggerFactory = loggerFactory,
             ),
             new ResolveMaximumLedgerTime(maximumLedgerTimeService, loggerFactory),
@@ -356,6 +362,7 @@ object ApiServices {
         syncService,
         metrics,
         telemetry,
+        safeToPruneCommitmentState,
         loggerFactory,
       )
 
@@ -415,6 +422,7 @@ object ApiServices {
           currentUtcTime = () => Instant.now,
           maxDeduplicationDuration = maxDeduplicationDuration.asJava,
           submissionIdGenerator = SubmissionIdGenerator.Random,
+          tracker = commandProgressTracker,
           metrics = metrics,
           telemetry = telemetry,
           loggerFactory = loggerFactory,

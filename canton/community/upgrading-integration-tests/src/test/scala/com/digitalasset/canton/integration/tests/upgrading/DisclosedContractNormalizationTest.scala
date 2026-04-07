@@ -1,32 +1,32 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
 
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.damltests.upgrade.v2.java.upgrade.Upgrading
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.participant.state.index.ContractStore
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.{
   StoreBackedCommandInterpreter,
   TestDynamicSynchronizerParameterGetter,
 }
 import com.digitalasset.canton.platform.config.CommandServiceConfig
-import com.digitalasset.canton.protocol.{
-  AuthenticatedContractIdVersionV10,
-  AuthenticatedContractIdVersionV11,
-  LfFatContractInst,
-}
+import com.digitalasset.canton.protocol.{AuthenticatedContractIdVersionV10, LfFatContractInst}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.util.{ContractValidator, TestEngine}
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.*
-import com.digitalasset.daml.lf.language.{LanguageMajorVersion, LanguageVersion}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node, TransactionCoder}
+import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
+  NextGenContractStateMachine,
+  Node,
+  TransactionCoder,
+}
+import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -43,15 +43,14 @@ class DisclosedContractNormalizationTest
   private val ec: ExecutionContext = executorService
 
   val engine = new Engine(
-    EngineConfig(allowedLanguageVersions = LanguageVersion.AllVersions(LanguageMajorVersion.V2))
+    EngineConfig(allowedLanguageVersions = LanguageVersion.allLfVersionsRange),
+    loggerFactory,
   )
 
-  private val testEngine = new TestEngine(
-    packagePaths = Seq(UpgradingBaseTest.UpgradeV2),
-    cantonContractIdVersion = AuthenticatedContractIdVersionV11,
-  )
+  private val testEngine =
+    new TestEngine(packagePaths = Seq(UpgradingBaseTest.UpgradeV2), loggerFactory = loggerFactory)
 
-  private def buildV11upgrading(
+  private def buildUpgrading(
       alice: String,
       value: Long,
   ): (Upgrading.ContractId, LfFatContractInst) = {
@@ -62,25 +61,32 @@ class DisclosedContractNormalizationTest
     (new Upgrading.ContractId(fat.contractId.coid), fat)
   }
 
-  // Simulate a (denormalized) V10 contract, starting from a V11 contract
+  // Simulate a (denormalized) V10 contract, starting from a current contract
   private def buildV10upgrading(
       alice: String,
       value: Long,
   ): (Upgrading.ContractId, LfFatContractInst) = {
 
-    val (_, v11fat) = buildV11upgrading(alice, value)
+    val (_, fat) = buildUpgrading(alice, value)
 
-    val enrichedArg =
-      testEngine.enrichContract(Upgrading.TEMPLATE_ID_WITH_PACKAGE_ID, v11fat.createArg)
+    val enrichedArg: Value =
+      testEngine.enrichContract(Upgrading.TEMPLATE_ID_WITH_PACKAGE_ID, fat.createArg)
+
+    inside(enrichedArg) { case Value.ValueRecord(_, fields) =>
+      inside(fields.last._2) {
+        case Value.ValueOptional(None) => succeed
+        case other => fail(s"Expected last field to be an optional none, got: $other")
+      }
+    }
 
     val enrichedFat = FatContractInstance.fromCreateNode(
-      v11fat.toCreateNode.copy(arg = enrichedArg),
-      v11fat.createdAt,
-      v11fat.authenticationData,
+      fat.toCreateNode.copy(arg = enrichedArg),
+      fat.createdAt,
+      fat.authenticationData,
     )
 
     val v10contractId = AuthenticatedContractIdVersionV10.fromDiscriminator(
-      v11fat.contractId.asInstanceOf[ContractId.V1].discriminator,
+      fat.contractId.asInstanceOf[ContractId.V1].discriminator,
       testEngine.recomputeUnicum(enrichedFat, AuthenticatedContractIdVersionV10),
     )
 
@@ -109,12 +115,12 @@ class DisclosedContractNormalizationTest
     val underTest =
       new StoreBackedCommandInterpreter(
         engine = testEngine.engine,
+        contractStateMode = NextGenContractStateMachine.Mode.default,
         participant = Ref.ParticipantId.assertFromString("anId"),
         packageResolver = testEngine.packageResolver,
         contractStore = mock[ContractStore],
         metrics = LedgerApiServerMetrics.ForTesting,
         contractAuthenticator = validator.authenticateHash,
-        config = EngineLoggingConfig(),
         prefetchingRecursionLevel = CommandServiceConfig.DefaultContractPrefetchingDepth,
         loggerFactory = loggerFactory,
         dynParamGetter =
@@ -122,10 +128,7 @@ class DisclosedContractNormalizationTest
         timeProvider = TimeProvider.UTC,
       )(ec)
 
-    def verifyDisclosure(cId: Upgrading.ContractId, fat: LfFatContractInst): Assertion = {
-      implicit val loggingContext: LoggingContext = LoggingContextWithTrace(loggerFactory)
-
-      validator.authenticate(fat, fat.templateId.packageId).futureValueUS shouldBe Right(())
+    def interpretDisclosure(cId: Upgrading.ContractId, fat: LfFatContractInst): Assertion = {
 
       val command = cId.exerciseUpgrading_Fetch(alice).commands().loneElement
       val commands = testEngine.validateCommand(command, alice, disclosedContracts = Seq(fat))
@@ -142,14 +145,26 @@ class DisclosedContractNormalizationTest
       disclosedFat shouldBe fat
     }
 
-    "work with V11 contracts" in {
-      val (v11Cid, v11fat) = buildV11upgrading(alice, 7)
-      verifyDisclosure(v11Cid, v11fat)
+    def authenticateContract(fat: LfFatContractInst): Assertion =
+      validator.authenticate(fat, fat.templateId.packageId).futureValueUS shouldBe Right(())
+
+    val (cid, fat) = buildUpgrading(alice, 7)
+    val (v10Cid, v10fat) = buildV10upgrading(alice, 7)
+
+    "authenticate normalized contracts" in {
+      authenticateContract(fat)
     }
 
-    "work with V10 contracts" in {
-      val (v10Cid, v10fat) = buildV10upgrading(alice, 7)
-      verifyDisclosure(v10Cid, v10fat)
+    "authenticate unnormalized v10 contracts" in {
+      authenticateContract(v10fat)
+    }
+
+    "interpret normalized contracts" in {
+      interpretDisclosure(cid, fat)
+    }
+
+    "interpret unnormalized V10 contracts" in {
+      interpretDisclosure(v10Cid, v10fat)
     }
 
   }

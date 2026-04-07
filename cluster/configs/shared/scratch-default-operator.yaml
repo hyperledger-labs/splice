@@ -1,0 +1,10 @@
+operatorDeployment:
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    pulumiStacksDir: "cluster/stacks/prod"
+    pulumiBaseDir: "splice/cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "splice"
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"

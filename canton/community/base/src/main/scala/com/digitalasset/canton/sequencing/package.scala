@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -79,7 +79,8 @@ package object sequencing {
 
   type OrdinarySerializedEvent = BoxedEnvelope[OrdinarySequencedEvent, ClosedEnvelope]
 
-  type PossiblyIgnoredSerializedEvent = BoxedEnvelope[PossiblyIgnoredSequencedEvent, ClosedEnvelope]
+  type PossiblyIgnoredSerializedEvent =
+    BoxedEnvelope[PossiblyIgnoredSequencedEvent, ClosedEnvelope]
 
   type OrdinaryEventOrError = Either[SequencedEventError, OrdinarySerializedEvent]
 

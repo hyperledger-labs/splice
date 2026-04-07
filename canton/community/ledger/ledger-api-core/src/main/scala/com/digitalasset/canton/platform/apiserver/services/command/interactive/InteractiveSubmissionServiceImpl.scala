@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
@@ -15,7 +15,6 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
 }
 import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
 import com.daml.ledger.api.v2.update_service.GetUpdateResponse
-import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.LfTimestamp
@@ -69,7 +68,7 @@ import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.TryUtil
-import com.digitalasset.canton.version.HashingSchemeVersionConverter
+import com.digitalasset.canton.version.{HashingSchemeVersion, HashingSchemeVersionConverter}
 import com.digitalasset.daml.lf.command.ApiCommand
 import com.digitalasset.daml.lf.crypto
 import io.grpc.Context
@@ -139,6 +138,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
     interactiveSubmissionEnricher,
     contractStore,
     syncService,
+    config,
     loggerFactory,
   )
 
@@ -177,13 +177,22 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
           request.commands.submissionId.map(SubmissionId.unwrap),
         )
 
-      evaluateAndHash(
-        seedService.nextSeed(),
-        request.commands,
-        request.verboseHashing,
-        request.maxRecordTime,
-        request.costEstimationHints,
-      )
+      if (config.enforceSingleRootNode && cmds.length > 1) {
+        FutureUnlessShutdown.failed(
+          InteractiveSubmissionPreparationError
+            .Reject("Preparing multiple commands is currently not supported")
+            .asGrpcError
+        )
+      } else {
+        evaluateAndHash(
+          seedService.nextSeed(),
+          request.commands,
+          request.verboseHashing,
+          request.maxRecordTime,
+          request.costEstimationHints,
+          request.hashingSchemeVersion,
+        )
+      }
     }
 
   private def evaluateAndHash(
@@ -192,26 +201,29 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       verboseHashing: Boolean,
       maxRecordTime: Option[LfTimestamp],
       costEstimationHints: Option[CostEstimationHints],
+      hashingSchemeVersion: HashingSchemeVersion,
   )(implicit
       loggingContext: LoggingContextWithTrace,
       errorLoggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[proto.PrepareSubmissionResponse] = {
     val result: EitherT[FutureUnlessShutdown, RpcError, proto.PrepareSubmissionResponse] = for {
       commandExecutionResult <- withSpan("InteractiveSubmissionService.evaluate") { _ => _ =>
-        val synchronizerState = syncService.getRoutingSynchronizerState
-        commandExecutor
-          .execute(
-            commands = commands,
-            submissionSeed = submissionSeed,
-            routingSynchronizerState = synchronizerState,
-            forExternallySigned = true,
-          )
-          .leftFlatMap { errCause =>
-            metrics.commands.failedCommandInterpretations.mark()
-            EitherT.right[RpcError](
-              RejectionGenerators.commandExecutorErrorFUS[CommandExecutionResult](errCause)
+        for {
+          synchronizerState <- EitherT.liftF(syncService.getRoutingSynchronizerState)
+          result <- commandExecutor
+            .execute(
+              commands = commands,
+              submissionSeed = submissionSeed,
+              routingSynchronizerState = synchronizerState,
+              forExternallySigned = true,
             )
-          }
+            .leftFlatMap { errCause =>
+              metrics.commands.failedCommandInterpretations.mark()
+              EitherT.right[RpcError](
+                RejectionGenerators.commandExecutorErrorFUS[CommandExecutionResult](errCause)
+              )
+            }
+        } yield result
       }
       hashTracer: HashTracer =
         if (config.enableVerboseHashing && verboseHashing)
@@ -225,6 +237,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
           config.contractLookupParallelism,
           hashTracer,
           maxRecordTime,
+          hashingSchemeVersion,
         )
         .leftWiden[RpcError]
       hashingDetails = hashTracer match {
@@ -301,7 +314,6 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         result.commandInterpretationResult.globalKeyMapping,
         result.commandInterpretationResult.processedDisclosedContracts,
       )
-      .toScalaUnwrapped
   }
 
   private def handleSubmissionResult(result: Try[state.SubmissionResult])(implicit

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.execution
@@ -44,7 +44,7 @@ private[canton] final case class CommandInterpretationResult(
     transaction: SubmittedTransaction,
     dependsOnLedgerTime: Boolean,
     interpretationTimeNanos: Long,
-    globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
+    globalKeyMapping: Map[GlobalKey, Vector[Value.ContractId]],
     processedDisclosedContracts: ImmArray[LfFatContractInst],
     // TODO(#25385): Consider removing the prescribed synchronizer decision from command interpreter
     //               and factor this field out of here as well.

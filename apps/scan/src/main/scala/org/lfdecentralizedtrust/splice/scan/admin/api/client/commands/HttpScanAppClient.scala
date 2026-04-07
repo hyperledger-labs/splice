@@ -8,7 +8,9 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
-import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
+import com.daml.tls.TlsClientConfig
+import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
@@ -864,6 +866,7 @@ object HttpScanAppClient {
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
                   DsoSequencer(
                     s.migrationId,
+                    s.synchronizerSerial,
                     sequencerId,
                     s.url,
                     s.svName,
@@ -883,13 +886,14 @@ object HttpScanAppClient {
 
   final case class DsoSequencer(
       migrationId: Long,
+      serial: Option[Long],
       id: SequencerId,
       url: String,
       svName: String,
       availableAfter: Instant,
   )
   final case class BftSequencer(
-      migrationId: Long,
+      serialId: Long,
       id: SequencerId,
       url: String,
   ) {
@@ -2437,7 +2441,7 @@ object HttpScanAppClient {
         response.bftSequencers.traverse { sequencer =>
           Codec.decode(Codec.Sequencer)(sequencer.id).map { sequencerId =>
             BftSequencer(
-              sequencer.migrationId,
+              sequencer.serialId,
               sequencerId,
               sequencer.p2pUrl,
             )
@@ -2600,5 +2604,31 @@ object HttpScanAppClient {
     ]] = { case BulkStorageDownloadResponse.OK(response) =>
       Right(response.dataBytes)
     }
+  }
+
+  case class GetActivePhysicalSynchronizerSerial()
+      extends InternalBaseCommand[
+        http.GetActivePhysicalSynchronizerSerialResponse,
+        NonNegativeInt,
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetActivePhysicalSynchronizerSerialResponse] =
+      client.getActivePhysicalSynchronizerSerial(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.GetActivePhysicalSynchronizerSerialResponse.OK(response) =>
+        NonNegativeInt.create(response.serial.toInt).leftMap(_.message)
+      case http.GetActivePhysicalSynchronizerSerialResponse.NotFound(_) =>
+        Left("No active synchronizer serial found")
+    }
+
   }
 }
