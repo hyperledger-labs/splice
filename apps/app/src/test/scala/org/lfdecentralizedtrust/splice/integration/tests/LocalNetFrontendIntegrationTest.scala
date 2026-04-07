@@ -186,7 +186,7 @@ class LocalNetFrontendIntegrationTest
       implicit val actorSystem: ActorSystem = env.actorSystem
       registerHttpConnectionPoolsCleanup(env)
       val host = "json-ledger-api.localhost"
-      val port = 3975 // JSON API of app provider
+      val port = 3000 // JSON API of app provider
       val url = s"http://$host:$port"
       val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
       val filePath = Paths.get("apps/app/src/test/resources/nuck-example-main-0.0.1.dar")
