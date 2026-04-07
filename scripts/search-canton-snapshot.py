@@ -79,8 +79,10 @@ def main():
 
     # Validate that sha looks hex
     if not re.fullmatch(r"[0-9a-f]+", sha):
-        print(f"error: CANTON_SHA must be a hex string, got: {args.canton_sha}", file=sys.stderr)
+        print(f"error: CANTON_SHA must be a hex string, got: {args.canton_sha!r}", file=sys.stderr)
         sys.exit(1)
+
+    sha = sha[:8]
 
     # Fetch tags in parallel
     matches_by_image: dict[str, list[str]] = {}
