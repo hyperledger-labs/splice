@@ -841,6 +841,48 @@ object SvApp {
       )
   }
 
+  def grantValidatorPermission(
+      validatorPartyId: String,
+      validatorParticipantId: String,
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Either[String, splice.validatorpermission.ValidatorPermission.ContractId]] = {
+    val store = dsoStoreWithIngestion.store
+    val svParty = store.key.svParty
+    val dsoParty = store.key.dsoParty
+
+    for {
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_GrantValidatorPermission(
+          svParty.toProtoPrimitive,
+          validatorPartyId,
+          validatorParticipantId,
+        )
+      )
+      res <- retryProvider.retryForClientCalls(
+        "grantValidatorPermission",
+        "grant validator permission via DsoRules",
+        for {
+          res <- dsoStoreWithIngestion
+            .connection(SpliceLedgerConnectionPriority.Low)
+            .submit(
+              actAs = Seq(svParty),
+              readAs = Seq(dsoParty),
+              update = cmd,
+            )
+            .noDedup
+            .yieldResult()
+        } yield res,
+        logger,
+      )
+    } yield Right(res.exerciseResult.permissionCid)
+  }
+
   // TODO(DACH-NY/canton-network-node#5364): move this and like functions into appropriate utility namespaces
   def prepareValidatorOnboarding(
       secret: ValidatorOnboardingSecret,
