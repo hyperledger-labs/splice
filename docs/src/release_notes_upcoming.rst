@@ -9,6 +9,7 @@
 
 .. release-notes:: Upcoming
 
+
     - Deployment
 
         - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
