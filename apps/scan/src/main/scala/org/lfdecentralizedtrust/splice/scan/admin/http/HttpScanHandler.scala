@@ -73,7 +73,9 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItem,
+  UpdateHistoryItemV2WithHash,
   UpdateHistoryRequestV2,
+  UpdateHistoryTransactionV2WithHash,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
@@ -84,7 +86,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanRollForwardLsuConfig}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
@@ -108,11 +110,13 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   PageLimit,
   SortOrder,
-  UpdateHistory,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import java.lang.IllegalStateException
+import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -158,6 +162,7 @@ class HttpScanHandler(
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
     publicUrlO: Option[Uri],
+    lsuRollForwardConfigO: Option[ScanRollForwardLsuConfig],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -1152,6 +1157,30 @@ class HttpScanHandler(
     }
   }
 
+  private def toUpdateV2WithHash(update: UpdateHistoryItem): UpdateHistoryItemV2WithHash =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryItemV2WithHash.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryTransactionV2WithHash(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash.getOrElse(
+              throw new IllegalStateException("externalTransactionHash must not be empty")
+            ),
+          )
+        )
+    }
+
   private def confirmBackfillingIsCompleteThen[T](
       updateHistory: UpdateHistory
   )(body: => Future[T])(implicit tc: TraceContext): Future[T] = {
@@ -2040,6 +2069,53 @@ class HttpScanHandler(
     }
   }
 
+  def getUpdateByHash(
+      hash: String,
+      encoding: DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      tx <- updateHistory.getUpdateByHash(hash)
+    } yield {
+      tx.fold[Either[ErrorResponse, UpdateHistoryItem]](
+        Left(
+          ErrorResponse(s"Transaction with hash $hash not found")
+        )
+      )(txWithMigration =>
+        Right(
+          ScanHttpEncodings.encodeUpdate(
+            txWithMigration,
+            encoding = encoding,
+            version = ScanHttpEncodings.V1,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
+            None,
+          )
+        )
+      )
+    }
+  }
+
+  override def getUpdateByHash(respond: ScanResource.GetUpdateByHashResponse.type)(
+      hash: String,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByHash") { _ => _ =>
+      getUpdateByHash(
+        hash = hash,
+        encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByHashResponse.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByHashResponse.OK(toUpdateV2WithHash(update))
+        }
+    }
+  }
+
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
       f: => Future[T]
   )(implicit tc: com.digitalasset.canton.tracing.TraceContext): Future[T] = {
@@ -2683,6 +2759,58 @@ class HttpScanHandler(
               )
             }
       }
+    }
+  }
+
+  def getRollForwardLsu(respond: ScanResource.GetRollForwardLsuResponse.type)()(
+      extracted: TraceContext
+  ): Future[ScanResource.GetRollForwardLsuResponse] = {
+    implicit val tc = extracted
+    lsuRollForwardConfigO match {
+      case None =>
+        Future.successful(
+          ScanResource.GetRollForwardLsuResponse.OK(definitions.GetRollForwardLsuResponse())
+        )
+      case Some(rollForward) =>
+        val legacy = synchronizerNodeService.nodes.legacy.getOrElse(
+          throw Status.INTERNAL
+            .withDescription(s"Roll forward LSU config set but no legacy synchronizer configured")
+            .asRuntimeException
+        )
+        for {
+          legacySynchronizerId <- legacy.sequencerAdminConnection.getPhysicalSynchronizerId()
+          currentSynchronizerId <- synchronizerNodeService.nodes.current.sequencerAdminConnection
+            .getPhysicalSynchronizerId()
+          upgradeTime <- rollForward.upgradeTime match {
+            case Some(t) => Future.successful(t)
+            case None =>
+              for {
+                announcements <- legacy.sequencerAdminConnection.listLsuAnnouncements(
+                  legacySynchronizerId.logical
+                )
+              } yield {
+                announcements match {
+                  case Seq(announcement) => announcement.mapping.upgradeTime
+                  case _ =>
+                    throw Status.INTERNAL
+                      .withDescription(
+                        s"Expected exactly one LSU annoucement on legacy synchronizer but got $announcements"
+                      )
+                      .asRuntimeException
+                }
+              }
+          }
+        } yield ScanResource.GetRollForwardLsuResponse.OK(
+          definitions.GetRollForwardLsuResponse(
+            Some(
+              definitions.RollForwardLsu(
+                upgradeTime = upgradeTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+                currentPhysicalSynchronizerId = legacySynchronizerId.toProtoPrimitive,
+                successorPhysicalSynchronizerId = currentSynchronizerId.toProtoPrimitive,
+              )
+            )
+          )
+        )
     }
   }
 }

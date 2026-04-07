@@ -247,6 +247,12 @@ class BftScanConnection(
     bftCall(_.listDsoSequencers())
   }
 
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    bftCall(_.lookupRollForwardLsu())
+  }
+
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,

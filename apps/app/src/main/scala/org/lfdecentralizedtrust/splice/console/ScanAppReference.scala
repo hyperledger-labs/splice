@@ -570,6 +570,14 @@ abstract class ScanAppReference(
     }
   }
 
+  def getUpdateByHash(extTxnHash: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateByHash(extTxnHash, encoding)
+      )
+    }
+  }
+
   def getEventHistory(
       count: Int,
       after: Option[(Long, String)],

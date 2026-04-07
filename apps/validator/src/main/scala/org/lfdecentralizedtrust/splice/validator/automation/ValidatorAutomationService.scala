@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.automation
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration as ConfigNonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.SequencerConnectionPoolDelays
@@ -34,6 +35,7 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
+import org.lfdecentralizedtrust.splice.validator.lsu.RollForwardLsuTrigger
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
@@ -82,6 +84,7 @@ class ValidatorAutomationService(
     latestPackagesOnly: Boolean,
     enabledFeatures: EnabledFeaturesConfig,
     additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
+    globalSynchronizerAlias: SynchronizerAlias,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -285,6 +288,15 @@ class ValidatorAutomationService(
         )
       )
     }
+
+    registerTrigger(
+      new RollForwardLsuTrigger(
+        participantAdminConnection,
+        scanConnection,
+        globalSynchronizerAlias,
+        triggerContext,
+      )
+    )
   }
 
   registerTrigger(
