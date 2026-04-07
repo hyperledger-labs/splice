@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.tracking
@@ -41,7 +41,7 @@ class CancellableTimeoutSupportSpec
 
   it should "cancel a scheduled task on close" in new TestFixture {
     override def run(): Unit = {
-      val timeoutDuration = config.NonNegativeFiniteDuration.ofMillis(10L)
+      val timeoutDuration = config.NonNegativeFiniteDuration.ofMillis(100L)
       val exception = new RuntimeException("on failure")
       val failure = Failure(exception)
       val promise = Promise[String]()

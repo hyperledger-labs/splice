@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -27,8 +27,9 @@ import com.digitalasset.canton.error.{
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
+import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError
-import com.digitalasset.canton.topology.PhysicalSynchronizerId
+import com.digitalasset.canton.topology.{ConfiguredPhysicalSynchronizerId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LedgerSubmissionId, LfPartyId, SynchronizerAlias}
@@ -193,7 +194,6 @@ object SyncServiceError extends SyncServiceErrorGroup {
             s"The synchronizer with physical synchronizer id $synchronizerId cannot be registered: $error"
         )
         with SyncServiceError
-
   }
 
   @Explanation("This error results if a admin command is submitted to the passive replica.")
@@ -301,7 +301,10 @@ object SyncServiceError extends SyncServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
 
-    final case class Error(synchronizerAlias: SynchronizerAlias)(implicit
+    final case class Error(
+        synchronizerAlias: SynchronizerAlias,
+        inactive: Seq[(ConfiguredPhysicalSynchronizerId, SynchronizerConnectionConfigStore.Status)],
+    )(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"$synchronizerAlias is not active and can therefore not be connected to."
@@ -417,7 +420,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
 
-    final case class Failure(synchronizerAlias: SynchronizerAlias, throwable: Throwable)(implicit
+    final case class Failure(synchronizer: String, throwable: Throwable)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "The synchronizer failed to startup due to an internal error",
@@ -426,8 +429,8 @@ object SyncServiceError extends SyncServiceErrorGroup {
         with SyncServiceError
 
     final case class SynchronizerIsMissingInternally(
-        synchronizerAlias: SynchronizerAlias,
-        where: String,
+        synchronizer: String,
+        details: String,
     )(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(

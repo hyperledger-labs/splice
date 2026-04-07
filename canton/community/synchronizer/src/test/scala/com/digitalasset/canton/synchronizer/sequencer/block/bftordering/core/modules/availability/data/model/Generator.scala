@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.model
@@ -8,6 +8,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   AddBatch,
   FetchBatches,
   GC,
+  Prune,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.BatchId
@@ -48,6 +49,7 @@ class Generator(random: Random, inMemoryStore: InMemoryAvailabilityStore) {
   def genOrderingRequest: Gen[OrderingRequest] = _ => {
     OrderingRequest(
       genString.apply(()),
+      genString.apply(()),
       ByteString.copyFromUtf8(genString.apply(())),
     )
   }
@@ -65,11 +67,13 @@ class Generator(random: Random, inMemoryStore: InMemoryAvailabilityStore) {
   }
 
   def generateCommand: Gen[Command] = _ => {
-    random.nextInt(3) match {
+    random.nextInt(4) match {
       case 0 =>
         GC(genSeq(genBatchId).apply(()))
       case 1 =>
         FetchBatches(genSeq(genBatchId).apply(()))
+      case 2 =>
+        Prune(genEpochNumber(()))
       case _ =>
         AddBatch(genBatchId.apply(()), genBatch.apply(()))
     }

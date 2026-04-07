@@ -12,8 +12,10 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.server.{RejectionHandler, Route}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.{RejectionHandler, Route}
+import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
@@ -73,6 +75,23 @@ object HttpAdminService {
       loggerFactory,
     )
     private val routes: AtomicReference[List[Route]] = new AtomicReference(List())
+    // added here instead of inside HttpErrorHandler to ensure it triggers even before all the routes are registered
+    private val notFoundRoute: Route = extractUri { uri =>
+      complete(
+        HttpResponse(
+          StatusCodes.NotFound,
+          entity = HttpEntity(
+            ContentTypes.`application/json`,
+            d0.ErrorResponse
+              .encodeErrorResponse(
+                d0.ErrorResponse(s"The requested resource could not be found: $uri")
+              )
+              .toString,
+          ),
+        )
+      )
+    }
+
     private val dynamicRoute: Route = ctx => {
       withTraceContext { traceContext =>
         // The logger logs the request and uses mapResponse to log the response.
@@ -81,7 +100,13 @@ object HttpAdminService {
         // exactly one "Responding with status code" per request.
         HttpRequestLogger(apiLoggingConfig, loggerFactory)(traceContext) {
           handleRejections(RejectionHandler.default) {
-            encodeResponse(concat((commonAdminRoute +: routes.get())*))
+            encodeResponse(
+              handleRejections(
+                RejectionHandler.newBuilder().handleNotFound(notFoundRoute).result()
+              ) {
+                concat((commonAdminRoute +: routes.get())*)
+              }
+            )
           }
         }
       }(ctx)

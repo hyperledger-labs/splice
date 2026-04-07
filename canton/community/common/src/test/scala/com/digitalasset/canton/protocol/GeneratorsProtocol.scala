@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -25,9 +25,10 @@ import com.digitalasset.canton.topology.{
   PhysicalSynchronizerId,
   SynchronizerId,
 }
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.TestContractHasher
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
-import com.digitalasset.canton.{GeneratorsLf, LfPartyId, ReassignmentCounter}
+import com.digitalasset.canton.{GeneratorsLf, LfPartyId}
 import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
 import com.google.protobuf.ByteString
 import magnolify.scalacheck.auto.*
@@ -387,16 +388,28 @@ final class GeneratorsProtocol(
     } yield CreatedContract.create(contract, consumedInCore, rolledBack).value
   )
 
-  implicit val contractReassignmentBatch: Arbitrary[ContractsReassignmentBatch] = Arbitrary(
-    for {
-      metadata <- contractMetadataArb(canHaveEmptyKey = true).arbitrary
-      contracts <- nonEmptyListGen[ContractInstance](
-        Arbitrary(contractInstanceWithMetadataArb(metadata).arbitrary)
-      )
-      reassignmentCounters <- Gen
-        .containerOfN[Seq, ReassignmentCounter](contracts.length, reassignmentCounterGen)
-      contractCounters = contracts.zip(reassignmentCounters)
-    } yield ContractsReassignmentBatch.create(contractCounters).value
+  implicit val contractReassignmentBatch: Arbitrary[ContractsReassignmentBatch] = {
+
+    def tuple(metadata: ContractMetadata) = Arbitrary(
+      for {
+        contract <- Arbitrary(contractInstanceWithMetadataArb(metadata).arbitrary).arbitrary
+        // TODO(#26468): Use lfPackageId.arbitrary for PV>=35
+        sourceValidationId = contract.templateId.packageId // lfPackageId.arbitrary
+        targetValidationId = contract.templateId.packageId // lfPackageId.arbitrary
+        counter <- reassignmentCounterGen
+      } yield (contract, Source(sourceValidationId), Target(targetValidationId), counter)
+    )
+
+    Arbitrary(
+      for {
+        metadata <- contractMetadataArb(canHaveEmptyKey = true).arbitrary
+        contractCounters <- nonEmptyListGen(tuple(metadata))
+      } yield ContractsReassignmentBatch.create(contractCounters).value
+    )
+  }
+
+  implicit val hashingSchemeVersionArb: Arbitrary[HashingSchemeVersion] = Arbitrary(
+    Gen.oneOf(HashingSchemeVersion.getHashingSchemeVersionsForProtocolVersion(protocolVersion))
   )
 
   implicit val externalAuthorizationArb: Arbitrary[ExternalAuthorization] = Arbitrary(
@@ -405,10 +418,16 @@ final class GeneratorsProtocol(
       signatures <- Gen.sequence(
         parties.map(p => boundedListGen[Signature].map(p -> _))
       )
-      hashingSchemeVersion <- Arbitrary.arbitrary[HashingSchemeVersion]
+      maxRecordTime <-
+        if (protocolVersion >= ProtocolVersion.v35)
+          Gen.option(Arbitrary.arbitrary[CantonTimestamp])
+        else
+          Gen.const[Option[CantonTimestamp]](None)
+      hashingSchemeVersion <- hashingSchemeVersionArb.arbitrary
     } yield ExternalAuthorization.create(
       signatures.asScala.toMap,
       hashingSchemeVersion,
+      maxRecordTime,
       protocolVersion,
     )
   )

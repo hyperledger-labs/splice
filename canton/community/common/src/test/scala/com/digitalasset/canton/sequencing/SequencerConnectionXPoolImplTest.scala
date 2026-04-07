@@ -1,12 +1,15 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.health.ComponentHealthState
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.metrics.{SequencerClientHistograms, SequencerClientMetrics}
 import com.digitalasset.canton.sequencing.SequencerConnectionXPool.SequencerConnectionXPoolError
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SequencerId
@@ -161,11 +164,10 @@ class SequencerConnectionXPoolImplTest
       )
 
       val poolDelays = SequencerConnectionPoolDelays(
-        minRestartDelay = config.NonNegativeFiniteDuration.ofMillis(100),
-        maxRestartDelay = config.NonNegativeFiniteDuration.ofSeconds(10),
-        warnValidationDelay =
-          config.NonNegativeFiniteDuration.ofMillis(700), // 100 + 200 + 400 = 700
-        subscriptionRequestDelay = config.NonNegativeFiniteDuration.ofSeconds(1),
+        minRestartDelay = NonNegativeFiniteDuration.tryOfMillis(100),
+        maxRestartDelay = NonNegativeFiniteDuration.tryOfSeconds(10),
+        warnValidationDelay = NonNegativeFiniteDuration.tryOfMillis(700), // 100 + 200 + 400 = 700
+        subscriptionRequestDelay = NonNegativeFiniteDuration.tryOfSeconds(1),
       )
 
       withConnectionPool(
@@ -180,10 +182,10 @@ class SequencerConnectionXPoolImplTest
         val exponentialDelays = (0 until 4).map(minRestartConnectionDelay << _)
 
         def retryLogEntry(delayMs: Long) =
-          s"Scheduling restart after ${LoggerUtil.roundDurationForHumans(NonNegativeFiniteDuration.tryOfMillis(delayMs).toScala)}"
+          s"Scheduling restart after ${LoggerUtil.roundDurationForHumans(NonNegativeFiniteDuration.tryOfMillis(delayMs).duration)}"
 
         val warningRegex =
-          raw"""(?s)Connection has failed validation since \S+ \((\d+) milliseconds ago\). Last failure reason: "Network error: .*"""".r
+          raw"""(?s)Connection has failed validation since \S+ \((\d+) (\w+) ago\). Last failure reason: "Network error: .*"""".r
 
         loggerFactory.assertLogsSeq(
           SuppressionRule.LevelAndAbove(INFO) && SuppressionRule.LoggerNameContains(
@@ -208,8 +210,9 @@ class SequencerConnectionXPoolImplTest
             val warnings = logEntries.filter(_.level == WARN).map(_.warningMessage)
             warnings should not be empty
             forEvery(warnings) {
-              case warningRegex(delay) =>
-                delay.toLong shouldBe >(poolDelays.warnValidationDelay.duration.toMillis)
+              case warningRegex(value, unit) =>
+                val failedValidationDuration = FiniteDuration(value.toLong, unit)
+                failedValidationDuration shouldBe >(poolDelays.warnValidationDelay.toScala)
               case _ => fail("warning log entry not found")
             }
           },
@@ -289,7 +292,7 @@ class SequencerConnectionXPoolImplTest
         // Changing the expected synchronizer is not supported
         inside(
           pool
-            .updateConfig(pool.config.copy(expectedPSIdO = Some(testSynchronizerId(2))))
+            .updateConfig(pool.config.copy(expectedPsidO = Some(testSynchronizerId(2))))
         ) { case Left(SequencerConnectionXPoolError.InvalidConfigurationError(error)) =>
           error shouldBe "The expected physical synchronizer ID can only be changed during a node restart."
         }
@@ -620,6 +623,91 @@ class SequencerConnectionXPoolImplTest
             )
           ),
         )
+      }
+    }
+
+    "clean up metrics" in {
+      val poolMetrics = new SequencerClientMetrics(
+        new SequencerClientHistograms(MetricName("test"))(new HistogramInventory()),
+        NoOpMetricsFactory,
+      )(MetricsContext.Empty).connectionPool
+
+      def currentMetrics =
+        poolMetrics.connectionHealthMetrics.map { case (mc, gauge) =>
+          mc.labels.get("connection").value -> gauge.value.getValue
+        }
+
+      withConnectionPool(
+        nbConnections = PositiveInt.tryCreate(3),
+        trustThreshold = PositiveInt.tryCreate(2),
+        i => mkConnectionAttributes(synchronizerIndex = 1, sequencerIndex = i + 1),
+        metrics = poolMetrics,
+        namePrefix = "first-config",
+      ) { (pool, _, _, _) =>
+        // on the first connect, the metrics should be empty
+        poolMetrics.connectionHealthMetrics shouldBe empty
+
+        pool.start().futureValueUS.value
+
+        eventually() {
+          forAll(currentMetrics) { case (name, value) =>
+            name should startWith("first-config")
+            value shouldBe 2 // validated
+          }
+        }
+
+        // remove a connection and add a new one
+        val connections =
+          pool.getConnections("test", nb = PositiveInt.three, exclusions = Set.empty).toSeq
+        val toRemove = connections.take(1).loneElement
+        val toKeep = connections.drop(1)
+
+        toRemove.fatal("failure")
+        currentMetrics.get(toRemove.config.name).value shouldBe 0 // fatal
+
+        val newConnectionConfigs = NonEmpty
+          .from(
+            toKeep.map(_.config) :+ toRemove.config
+              .copy(name = s"first-config-${connections.size}")
+          )
+          .value
+
+        pool.updateConfig(pool.config.copy(connections = newConnectionConfigs)).value
+
+        eventually() {
+          currentMetrics.get(toRemove.config.name) shouldBe empty
+          currentMetrics should contain theSameElementsAs (newConnectionConfigs.map(
+            _.name -> 2 /* validated */
+          ))
+        }
+      }
+
+      withConnectionPool(
+        nbConnections = PositiveInt.three,
+        trustThreshold = PositiveInt.two,
+        i => mkConnectionAttributes(synchronizerIndex = 1, sequencerIndex = i + 1),
+        metrics = poolMetrics, // reuse the same metrics
+        namePrefix = "second-config",
+      ) { (pool, _, _, _) =>
+        // when creating a new pool for the same synchronizer, the same metrics are reused and
+        // the connections from the first connect are still in there.
+        // this means, disconnecting from a synchronizer keeps the metric in fatal state
+        poolMetrics.connectionHealthMetrics should not be empty
+        forAll(currentMetrics) { case (name, value) =>
+          name should startWith("first-config")
+          value shouldBe 0 // fatal
+        }
+
+        pool.start().futureValueUS.value
+
+        // the pool startup removes all previous (lingering) metrics and creates new ones
+        // according to new configuration
+        eventually() {
+          forAll(currentMetrics) { case (name, value) =>
+            name should startWith("second-config")
+            value shouldBe 2 // validated
+          }
+        }
       }
     }
   }

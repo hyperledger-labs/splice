@@ -148,20 +148,22 @@ class DbTcsStore(
     earliestArchivedAtCache.get() match {
       case some @ Some(_) => Future.successful(some)
       case None =>
-        val storeId = acsStore.acsStoreId
-        val migrationId = acsStore.domainMigrationId
-        storage
-          .query(
-            sql"""SELECT MIN(archived_at) FROM #$archiveTableName
+        acsStore.waitUntilAcsIngested {
+          val storeId = acsStore.acsStoreId
+          val migrationId = acsStore.domainMigrationId
+          storage
+            .query(
+              sql"""SELECT MIN(archived_at) FROM #$archiveTableName
                   WHERE store_id = $storeId
                     AND migration_id = $migrationId
                """.as[Option[CantonTimestamp]].head,
-            "getEarliestArchivedAt",
-          )
-          .map { tsO =>
-            tsO.foreach(ts => earliestArchivedAtCache.compareAndSet(None, Some(ts)))
-            tsO
-          }
+              "getEarliestArchivedAt",
+            )
+            .map { tsO =>
+              tsO.foreach(ts => earliestArchivedAtCache.compareAndSet(None, Some(ts)))
+              tsO
+            }
+        }
     }
   }
 }

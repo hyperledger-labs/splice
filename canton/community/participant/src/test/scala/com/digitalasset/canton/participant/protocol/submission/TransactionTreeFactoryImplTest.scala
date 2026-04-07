@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -6,7 +6,6 @@ package com.digitalasset.canton.participant.protocol.submission
 import cats.data.EitherT
 import com.digitalasset.canton.*
 import com.digitalasset.canton.data.GenTransactionTree
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.*
 import com.digitalasset.canton.protocol.*
@@ -21,6 +20,8 @@ import com.digitalasset.canton.topology.store.PackageDependencyResolver
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.TestContractHasher
 import com.digitalasset.daml.lf.data.Ref.{IdString, PackageId}
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
+import com.digitalasset.daml.lf.transaction.LegacyContractStateMachine
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
@@ -62,7 +63,7 @@ final class TransactionTreeFactoryImplTest
           treeFactory: TransactionTreeFactoryImpl,
           transaction: WellFormedTransaction[WithoutSuffixes],
           contractInstanceOfId: ContractInstanceOfId,
-          keyResolver: LfKeyResolver,
+          keyResolver: LegacyContractStateMachine.KeyResolver,
           actAs: List[LfPartyId] = List(ExampleTransactionFactory.submitter),
           snapshot: TopologySnapshot = factory.topologySnapshot,
       ): EitherT[Future, TransactionTreeConversionError, GenTransactionTree] = {
@@ -95,7 +96,7 @@ final class TransactionTreeFactoryImplTest
                 treeFactory,
                 example.wellFormedUnsuffixedTransaction,
                 successfulLookup(example),
-                example.keyResolver,
+                example.keyResolver.asCidOptionMap,
               ).value.flatMap(_ should equal(Right(example.transactionTree)))
             }
           }
@@ -114,7 +115,7 @@ final class TransactionTreeFactoryImplTest
               treeFactory,
               example.wellFormedUnsuffixedTransaction,
               failedLookup(errorMessage),
-              example.keyResolver,
+              example.keyResolver.asCidOptionMap,
             ).value.flatMap(
               _ shouldEqual Left(
                 ContractLookupError(example.absolutizedContractId, errorMessage)
@@ -132,7 +133,7 @@ final class TransactionTreeFactoryImplTest
               treeFactory,
               example.wellFormedUnsuffixedTransaction,
               successfulLookup(example),
-              example.keyResolver,
+              example.keyResolver.asCidOptionMap,
               actAs = List.empty,
             ).value
               .flatMap(
@@ -149,7 +150,7 @@ final class TransactionTreeFactoryImplTest
               treeFactory,
               example.wellFormedUnsuffixedTransaction,
               successfulLookup(example),
-              example.keyResolver,
+              example.keyResolver.asCidOptionMap,
               snapshot = defaultTestingTopology.withPackages(Map.empty).build().topologySnapshot(),
             ).value.flatMap(_ should matchPattern { case Left(UnknownPackageError(_)) => })
           }
@@ -161,7 +162,7 @@ final class TransactionTreeFactoryImplTest
                 treeFactory,
                 example.wellFormedUnsuffixedTransaction,
                 successfulLookup(example),
-                example.keyResolver,
+                example.keyResolver.asCidOptionMap,
                 snapshot = defaultTestingIdentityFactory.topologySnapshot(
                   packageDependencyResolver = TestPackageDependencyResolver
                 ),
@@ -181,7 +182,7 @@ final class TransactionTreeFactoryImplTest
                 treeFactory,
                 example.wellFormedUnsuffixedTransaction,
                 successfulLookup(example),
-                example.keyResolver,
+                example.keyResolver.asCidOptionMap,
                 snapshot = defaultTestingIdentityFactory.topologySnapshot(
                   packageDependencyResolver = MisconfiguredPackageDependencyResolver
                 ),
@@ -201,27 +202,20 @@ final class TransactionTreeFactoryImplTest
   }
 
   object TestPackageDependencyResolver extends PackageDependencyResolver {
-    import cats.syntax.either.*
     val exampleDependency: IdString.PackageId = PackageId.assertFromString("example-dependency")
-    override def packageDependencies(packageId: PackageId)(implicit
+    override def packageDependencies(packageIds: Set[PackageId])(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]] =
-      packageId match {
-        case ExampleTransactionFactory.packageId =>
-          Right(Set(exampleDependency)).toEitherT[FutureUnlessShutdown]
-        case _ => Right(Set.empty[PackageId]).toEitherT[FutureUnlessShutdown]
-      }
+    ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]] =
+      if (packageIds.contains(ExampleTransactionFactory.packageId)) Right(Set(exampleDependency))
+      else Right(Set.empty[PackageId])
   }
 
   object MisconfiguredPackageDependencyResolver extends PackageDependencyResolver {
-    import cats.syntax.either.*
-    val exampleParticipant: ParticipantId = ParticipantId("MisconfiguredPackageDependencyResolver")
-    val exampleDependency: IdString.PackageId = PackageId.assertFromString("example-dependency")
+    private val participantId = ParticipantId("MisconfiguredPackageDependencyResolver")
 
-    override def packageDependencies(packageId: PackageId)(implicit
+    override def packageDependencies(packageIds: Set[PackageId])(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]] =
-      Left(packageId -> exampleParticipant).toEitherT[FutureUnlessShutdown]
+    ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]] = Left(participantId -> packageIds)
   }
 
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.admin.grpc
@@ -15,7 +15,11 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.client.*
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.store.{
+  NoPackageDependencies,
+  TopologyStore,
+  TopologyStoreId,
+}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{
   MemberCode,
@@ -43,9 +47,10 @@ class GrpcTopologyAggregationService(
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
   ): TopologySnapshotLoader =
     new StoreBasedTopologySnapshot(
+      store.storeId.psid,
       asOf,
       store,
-      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      NoPackageDependencies,
       loggerFactory,
     )
 
@@ -99,7 +104,7 @@ class GrpcTopologyAggregationService(
     .foldLeftM((Set.empty[PartyId], false), clients) { case ((res, isDone), (_, client)) =>
       if (isDone) FutureUnlessShutdown.pure((res, true))
       else
-        client.inspectKnownParties(filterParty, filterParticipant).map { found =>
+        client.inspectKnownParties(filterParty, filterParticipant, limit = limit).map { found =>
           val tmp = found ++ res
           if (tmp.sizeIs >= limit) (tmp.take(limit), true) else (tmp, false)
         }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -6,7 +6,7 @@ package com.digitalasset.canton.topology
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -40,12 +40,15 @@ final class GeneratorsTopology(protocolVersion: ProtocolVersion) {
       partyId <- Arbitrary.arbitrary[PartyId]
       signingFingerprints <- nonEmptyListGen[Fingerprint]
       keyThreshold <- Arbitrary.arbitrary[PositiveInt]
-    } yield ExternalParty(partyId, signingFingerprints, keyThreshold)
+      version <- Gen.oneOf[HashingSchemeVersion](
+        Seq(HashingSchemeVersion.V2, HashingSchemeVersion.V3)
+      )
+    } yield ExternalParty(partyId, signingFingerprints, keyThreshold, version)
   )
   implicit val identityArb: Arbitrary[Identity] = genArbitrary
 
   implicit val physicalSynchronizerIdArb: Arbitrary[PhysicalSynchronizerId] = Arbitrary(for {
     synchronizerId <- synchronizerIdArb.arbitrary
     serial <- Arbitrary.arbitrary[NonNegativeInt]
-  } yield PhysicalSynchronizerId(synchronizerId, protocolVersion, serial))
+  } yield PhysicalSynchronizerId(synchronizerId, serial, protocolVersion))
 }

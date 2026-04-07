@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.submission
@@ -7,6 +7,7 @@ import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event.Event.Event
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  HashingSchemeVersion as ApiHashingSchemeVersion,
   Metadata,
   PrepareSubmissionResponse,
   PreparedTransaction,
@@ -18,11 +19,12 @@ import com.daml.ledger.api.v2.transaction_filter.TransactionShape.{
 }
 import com.daml.ledger.api.v2.value.Value
 import com.daml.ledger.api.v2.value.Value.Sum
-import com.daml.ledger.javaapi.data.DisclosedContract
 import com.daml.ledger.javaapi.data.codegen.ContractId as CodeGenCID
+import com.daml.ledger.javaapi.data.{Command, DisclosedContract}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.TransactionWrapper
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
@@ -32,6 +34,7 @@ import com.digitalasset.canton.console.commands.PartiesAdministration
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.damltests.java.test.DummyFactory
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.UnknownInformees
 import com.digitalasset.canton.examples.java.cycle.Cycle
 import com.digitalasset.canton.examples.java.trailingnone.TrailingNone
 import com.digitalasset.canton.examples.java.{cycle as M, trailingnone as T}
@@ -48,6 +51,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   MultiTransactionSignature,
@@ -60,7 +64,8 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyTransaction,
 }
-import com.digitalasset.canton.topology.{ExternalParty, Namespace, PartyId}
+import com.digitalasset.canton.topology.{DefaultTestIdentities, ExternalParty, Namespace, PartyId}
+import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import monocle.Optional
@@ -90,7 +95,7 @@ trait InteractiveSubmissionIntegrationTestSetup
     preparedSubmissionResponseOpt
       .andThen(preparedTxMetadataOpt)
       .andThen(
-        GenLens[Metadata]((m: Metadata) => m.inputContracts)
+        GenLens[Metadata].apply((m: Metadata) => m.inputContracts)
       )
 
   protected var aliceE: ExternalParty = _
@@ -103,7 +108,7 @@ trait InteractiveSubmissionIntegrationTestSetup
         participants.all.dars.upload(CantonExamplesPath, synchronizerId = daId)
         participants.all.dars.upload(CantonTestsPath, synchronizerId = daId)
 
-        aliceE = cpn.parties.external.enable("Alice")
+        aliceE = cpn.parties.testing.external.enable("Alice")
       }
       .addConfigTransform(ConfigTransforms.enableInteractiveSubmissionTransforms)
 
@@ -171,10 +176,49 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
     var danE: ExternalParty = null
 
     "onboard a new party with external keys" in { implicit env =>
-      danE = cpn.parties.external.enable(
+      danE = cpn.parties.testing.external.enable(
         "Dan",
         keysCount = PositiveInt.three,
         keysThreshold = PositiveInt.two,
+      )
+    }
+
+    "fail preparing multiple commands" in { implicit env =>
+      val commands = Seq(
+        createCycleCommand(aliceE, "a"),
+        createCycleCommand(aliceE, "b"),
+      )
+
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        cpn.ledger_api.interactive_submission.prepare(Seq(aliceE), commands),
+        _.errorMessage should include("Preparing multiple commands is currently not supported"),
+      )
+    }
+
+    "fail executing multiple root nodes" in { implicit env =>
+      import env.*
+
+      val prepared = cpn.ledger_api.interactive_submission
+        .prepare(
+          Seq(aliceE),
+          Seq(createCycleCommand(aliceE, "a")),
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
+        )
+      val preparedWithAddedRootNode = prepared.preparedTransaction.value.update(
+        _.transaction.update(_.roots.modify(_ :+ "new_node"))
+      )
+      // The hash is technically wrong but the root node check happens even before we verify the signature so it
+      // doesn't matter
+      val signature = global_secret.sign(prepared.preparedTransactionHash, aliceE)
+
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        cpn.ledger_api.interactive_submission.execute(
+          preparedWithAddedRootNode,
+          Map(aliceE.partyId -> signature),
+          UUID.randomUUID().toString,
+          ApiHashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
+        ),
+        _.errorMessage should include("Transaction with multiple root nodes are not supported"),
       )
     }
 
@@ -308,9 +352,22 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
         synchronizerId = synchronizer1Id.logical,
       )
 
+      // Wait until the PartyToKey mapping is also there.
+      // The outbox may dispatch it in a different batch than the PartyToParticipant mapping.
+      eventually() {
+        val ptks = participant1.topology.transactions.list(
+          store = daId,
+          filterMappings = Seq(Code.PartyToKeyMapping),
+          filterNamespace = partyId.namespace.filterString,
+        )
+        ptks should not be Seq.empty
+      }
+      participant1.topology.synchronisation.await_idle()
+
       val prepared = participant1.ledger_api.interactive_submission.prepare(
         Seq(partyId),
         Seq(createCycleCommand(partyId, UUID.randomUUID().toString)),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       def signWithProtocolKey1 = global_secret.sign(
@@ -325,7 +382,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
           // Provide 2 signatures from the same key
           Map(partyId -> Seq(signWithProtocolKey1, signWithProtocolKey1)),
           UUID.randomUUID().toString,
-          HASHING_SCHEME_VERSION_V2,
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         ),
         _.errorMessage should include(
           "Received 1 valid signatures from distinct keys (0 invalid), but expected at least 2 valid"
@@ -337,7 +394,11 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
       implicit env =>
         import env.*
 
-        val partyE = cpn.parties.external.enable("Party")
+        val partyE = cpn.parties.testing.external.enable("Party")
+        val currentP2P = cpn.topology.party_to_participant_mappings
+          .list(synchronizer1Id, filterParty = partyE.filterString)
+          .loneElement
+          .item
 
         // Change cpn to observation rights
         val newPTP = TopologyTransaction(
@@ -348,8 +409,9 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
               partyE.partyId,
               threshold = PositiveInt.one,
               Seq(
-                HostingParticipant(cpn, ParticipantPermission.Observation, false)
+                HostingParticipant(cpn, ParticipantPermission.Observation, onboarding = false)
               ),
+              partySigningKeysWithThreshold = currentP2P.partySigningKeysWithThreshold,
             )
             .value,
           protocolVersion = testedProtocolVersion,
@@ -383,6 +445,52 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
         )
     }
 
+    "use the appropriate synchronizer ID value based on the protocol version" in { implicit env =>
+      import env.*
+
+      val cycle =
+        new M.Cycle(UUID.randomUUID().toString, aliceE.toProtoPrimitive).create.commands.loneElement
+      val preparedTransaction = cpn.ledger_api.javaapi.interactive_submission.prepare(
+        Seq(aliceE.partyId),
+        Seq(cycle),
+      )
+      val preparedSynchronizerId =
+        preparedTransaction.preparedTransaction.value.metadata.value.synchronizerId
+
+      if (testedProtocolVersion <= ProtocolVersion.v34)
+        preparedSynchronizerId shouldBe synchronizer1Id.logical.toProtoPrimitive
+      else
+        preparedSynchronizerId shouldBe synchronizer1Id.toProtoPrimitive
+    }
+
+    "return a clear error if the wrong kind of synchronizer ID is used" in { implicit env =>
+      val cycle: Command =
+        new M.Cycle(
+          UUID.randomUUID().toString,
+          aliceE.toProtoPrimitive,
+        ).create.commands.loneElement
+
+      val (signature, preparedTransactionWithWrongSyncIdFormat) =
+        prepareTransactionsWithIncorrectSynchronizerIdFormat(cycle, aliceE)
+
+      val expectedErrorMessage = if (testedProtocolVersion <= ProtocolVersion.v34) {
+        "Please use a Logical Synchronizer ID in the prepared transaction metadata on PVs <= 34"
+      } else {
+        "Please use a Physical Synchronizer ID in the prepared transaction metadata on PVs > 34"
+      }
+
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        cpn.ledger_api.interactive_submission
+          .execute_and_wait(
+            preparedTransactionWithWrongSyncIdFormat,
+            Map(aliceE.partyId -> Seq(signature)),
+            UUID.randomUUID().toString,
+            testedHashingSchemeVersion.toLedgerApiProto,
+          ),
+        _.errorMessage should include(expectedErrorMessage),
+      )
+    }
+
     "create a contract" in { implicit env =>
       createCycleContract(epn, aliceE, "test-external-signing")
     }
@@ -404,6 +512,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
       val preparedTransaction = cpn.ledger_api.javaapi.interactive_submission.prepare(
         Seq(aliceE.partyId),
         Seq(exerciseCommand.commands().loneElement),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val exerciseTransaction = epn.ledger_api.commands.external.submit_prepared(
@@ -437,6 +546,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
               aliceE.toProtoPrimitive,
             ).create.commands.loneElement
           ),
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
 
         val submissionId = UUID.randomUUID().toString
@@ -500,6 +610,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
                 aliceE.toProtoPrimitive,
               ).create.commands.loneElement
             ),
+            hashingSchemeVersion = testedApiHashingSchemeVersion,
           )
           val pn = if (epnIsCpn) cpn else epn
           val expectedSize = if (expectsEvents) 1L else 0L
@@ -528,6 +639,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val submissionId = UUID.randomUUID().toString
@@ -558,6 +670,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val submissionId = UUID.randomUUID().toString
@@ -590,6 +703,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             danE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       val transactionSignatures = Map(
         danE.partyId -> global_secret.sign(prepared.preparedTransactionHash, danE)
@@ -617,6 +731,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val transactionSignatures = Map(
@@ -651,6 +766,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val transactionSignatures = Map(
@@ -697,6 +813,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             Some(contract1CreatedEvent.contractId).toJava,
           )
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       cpn.ledger_api.commands.external.submit_prepared(aliceE, preparedArchive).discard
@@ -707,7 +824,8 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
         .commands()
         .loneElement
 
-      cpn.ledger_api.javaapi.commands.submit(Seq(aliceE), Seq(archiveCmd2))
+      cpn.ledger_api.javaapi.commands
+        .submit(Seq(aliceE), Seq(archiveCmd2))
     }
 
     "create a contract with verbose hashing" in { implicit env =>
@@ -718,6 +836,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
         Seq(createCycleCommand(aliceE, "test-external-signing")),
         synchronizerId = None,
         verboseHashing = true,
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       prepared.hashingDetails.value should not be "Verbose hashing is disabled on this participant. Contact the node administrator for more details."
@@ -768,6 +887,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             Some(cycleCreated.contractId).toJava,
           )
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       // Check that input contracts also have identifiers and labels
@@ -795,6 +915,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val transactionSignatures = Map(
@@ -813,6 +934,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             danE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       // Not enough because threshold is 2
@@ -839,6 +961,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
       val prepared = cpn.ledger_api.javaapi.interactive_submission.prepare(
         Seq(aliceE.partyId),
         Seq(exerciseRepeatOnCycleContract),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       // Remove input contracts from the prepared transaction
@@ -910,6 +1033,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
       val prepared = cpn.ledger_api.javaapi.interactive_submission.prepare(
         Seq(aliceE.partyId),
         Seq(exerciseRepeatOnCycleContract),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       epn.ledger_api.commands.external.submit_prepared(aliceE, prepared)
@@ -957,6 +1081,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
         Seq(aliceE.partyId),
         Seq(prepareExerciseOnAliceContract),
         synchronizerId = Some(daId),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
     }
 
@@ -969,6 +1094,7 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       val badSignature = env.global_secret.sign(
@@ -995,8 +1121,109 @@ class InteractiveSubmissionIntegrationTest extends InteractiveSubmissionIntegrat
       )
     }
 
-  }
+    "fail to prepare if the party does not exist on the synchronizer" in { implicit env =>
+      val nonExistingParty = DefaultTestIdentities.party1
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        ppn.ledger_api.javaapi.interactive_submission.prepare(
+          Seq(nonExistingParty),
+          Seq(
+            new M.Cycle(
+              "test-external-signing",
+              nonExistingParty.toProtoPrimitive,
+            ).create.commands.loneElement
+          ),
+        ),
+        _.errorMessage should (include(UnknownInformees.id) and include(
+          s"unknownInformees=>Set(${nonExistingParty.partyId.toProtoPrimitive})"
+        )),
+      )
+    }
+    "fail to execute if the party does not exist on the synchronizer" in { implicit env =>
+      import env.*
+      val temporaryPartyE = ppn.parties.testing.external.enable("temp")
+      val prepared = ppn.ledger_api.javaapi.interactive_submission.prepare(
+        Seq(temporaryPartyE.partyId),
+        Seq(
+          new M.Cycle(
+            "test-external-signing",
+            temporaryPartyE.partyId.toProtoPrimitive,
+          ).create.commands.loneElement
+        ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
+      )
+      // Offboard the party from the synchronizer before executing
+      offboardParty(temporaryPartyE, ppn, synchronizer1Id)
 
+      // Execute should fail
+      val signatures = global_secret.sign(prepared.preparedTransactionHash, temporaryPartyE)
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        ppn.ledger_api.interactive_submission.execute(
+          prepared.getPreparedTransaction,
+          Map(temporaryPartyE.partyId -> signatures),
+          UUID.randomUUID().toString,
+          HASHING_SCHEME_VERSION_V2,
+        ),
+        _.errorMessage should include(
+          s"Could not find party signing keys for ${temporaryPartyE.partyId}"
+        ),
+      )
+    }
+
+    val supportedHashingSchemeVersions: Set[HashingSchemeVersion] =
+      HashingSchemeVersion.getHashingSchemeVersionsForProtocolVersion(testedProtocolVersion)
+    forAll(supportedHashingSchemeVersions) { hashingSchemeVersion =>
+      val expected = hashingSchemeVersion.toLedgerApiProto
+
+      s"prepare should respect respect $expected" in { implicit env =>
+        val command = createCycleCommand(aliceE, "c1")
+
+        val prepared = epn.ledger_api.interactive_submission
+          .prepare(Seq(aliceE), Seq(command), hashingSchemeVersion = expected)
+
+        execAndWaitForTransaction(
+          prepared,
+          Map(aliceE.partyId -> env.global_secret.sign(prepared.preparedTransactionHash, aliceE)),
+        )
+
+        prepared.hashingSchemeVersion shouldBe expected
+
+      }
+
+      s"prepare (java-api) should respect $expected" in { implicit env =>
+        val command = createCycleCommandJava(aliceE, "c1")
+
+        val prepared = epn.ledger_api.javaapi.interactive_submission
+          .prepare(Seq(aliceE), Seq(command), hashingSchemeVersion = expected)
+
+        execAndWaitForTransaction(
+          prepared,
+          Map(aliceE.partyId -> env.global_secret.sign(prepared.preparedTransactionHash, aliceE)),
+        )
+
+        prepared.hashingSchemeVersion shouldBe expected
+      }
+
+    }
+
+    "fail if unsupported hashing scheme version is used" onlyRunWith ProtocolVersion.v34 in {
+      implicit env =>
+        val command = createCycleCommand(aliceE, "c1")
+
+        assertThrowsAndLogsCommandFailures(
+          epn.ledger_api.interactive_submission
+            .prepare(
+              Seq(aliceE),
+              Seq(command),
+              hashingSchemeVersion = ApiHashingSchemeVersion.HASHING_SCHEME_VERSION_V3,
+            ),
+          le => {
+            le.errorMessage should include regex "INVALID_ARGUMENT/FAILED_TO_PREPARE_TRANSACTION.*Hashing scheme version V3 is not supported on protocol version 34"
+          },
+        )
+
+    }
+
+  }
 }
 
 class InteractiveSubmissionMultiSynchronizerIntegrationTest
@@ -1035,10 +1262,11 @@ class InteractiveSubmissionMultiSynchronizerIntegrationTest
     "can be allocated in a multi-synchronizer scenario" in { implicit env =>
       import env.*
 
-      val aliceE = participant1.parties.external.enable("Alice", synchronizer = Some(daName))
+      val aliceE =
+        participant1.parties.testing.external.enable("Alice", synchronizer = Some(daName))
 
       // Check that alice is hosted on `hostedCount` synchronizers
-      def ensureCorrectHosting(hostedCount: Int) = {
+      def ensureCorrectHosting(hostedCount: Int): Unit = {
         val synchronizers = Seq(daId, acmeId, repairSynchronizerId)
         val activeOn = synchronizers.take(hostedCount)
         val inactiveOn = synchronizers.drop(hostedCount)
@@ -1056,15 +1284,16 @@ class InteractiveSubmissionMultiSynchronizerIntegrationTest
 
       ensureCorrectHosting(1)
 
-      participant1.parties.external.also_enable(aliceE, acmeName)
+      participant1.parties.testing.external.also_enable(aliceE, acmeName)
       ensureCorrectHosting(2)
 
-      participant1.parties.external.also_enable(aliceE, repairSynchronizerName)
+      participant1.parties.testing.external.also_enable(aliceE, repairSynchronizerName)
       ensureCorrectHosting(3)
     }
   }
 }
 
+@UnstableTest // TODO(#20038)
 class InteractiveSubmissionIntegrationTestTimeouts
     extends InteractiveSubmissionIntegrationTestSetup {
   "timeout if CPN does not respond" in { implicit env =>
@@ -1088,6 +1317,7 @@ class InteractiveSubmissionIntegrationTestTimeouts
           aliceE.toProtoPrimitive,
         ).create.commands.loneElement
       ),
+      hashingSchemeVersion = testedApiHashingSchemeVersion,
     )
     val signatures = Map(
       aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)
@@ -1133,6 +1363,7 @@ class InteractiveSubmissionIntegrationTestPostgres
           aliceE.toProtoPrimitive,
         ).create.commands.loneElement
       ),
+      hashingSchemeVersion = testedApiHashingSchemeVersion,
     )
     val signatures = Map(
       aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)

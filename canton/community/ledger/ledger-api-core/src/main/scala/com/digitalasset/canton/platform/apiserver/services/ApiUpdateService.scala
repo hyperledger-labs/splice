@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -73,7 +73,12 @@ final class ApiUpdateService(
             }
             logger.trace(s"Update request: $req.")
             updateService
-              .updates(req.startExclusive, req.endInclusive, req.updateFormat)
+              .updates(
+                req.startExclusive,
+                req.endInclusive,
+                req.updateFormat,
+                descendingOrder = false,
+              )
               .via(logger.enrichedDebugStream("Responding with updates.", updatesLoggable))
               .via(logger.logErrorsOnStream)
               .via(StreamMetrics.countElements(metrics.lapi.streams.updates))

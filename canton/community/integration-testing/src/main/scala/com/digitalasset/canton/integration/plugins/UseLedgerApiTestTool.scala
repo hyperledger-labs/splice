@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -30,9 +30,10 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.OptionUtil
+import io.circe.*
+import io.circe.generic.semiauto.*
+import io.circe.parser.*
 import monocle.macros.syntax.lens.*
-import spray.json.*
-import spray.json.DefaultJsonProtocol.*
 
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.net.{Authenticator, PasswordAuthentication, URI}
@@ -320,7 +321,11 @@ object UseLedgerApiTestTool {
 
   object LfVersion {
     case object Stable extends LfVersion {
-      override def testToolSuffix: String = "-2.2"
+      override def testToolSuffix: String = "-2.1"
+    }
+
+    case object V21 extends LfVersion {
+      override def testToolSuffix: String = "-2.1"
     }
 
     case object Dev extends LfVersion {
@@ -346,6 +351,7 @@ object UseLedgerApiTestTool {
   // Ideally we'd rely on sbt and coursier to manage the dependency to avoid having to deal with  caching ourselves,
   // but these does not seem to be a straightforward way to keep the test tool off from the classpath so that the
   // fat jar contents don't interfere with canton dependencies (e.g. fastparse).
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   def download(
       url: String,
       destination: File,
@@ -426,9 +432,7 @@ object UseLedgerApiTestTool {
 
   final case class ArtifactoryItem(uri: String, folder: Boolean)
 
-  implicit val artifactoryItemFormat: RootJsonFormat[ArtifactoryItem] = jsonFormat2(
-    ArtifactoryItem.apply
-  )
+  implicit val artifactoryItemDecoder: Decoder[ArtifactoryItem] = deriveDecoder[ArtifactoryItem]
 
   private def credentialsFromNetrcFile: (Option[String], Option[String]) = {
     val netrcPath = System.getProperty("user.home") + "/.netrc"
@@ -463,8 +467,15 @@ object UseLedgerApiTestTool {
       )
 
     // from jfrog api a json object is returned which contains the folders in children field
-    val obj = response.body.parseJson.asJsObject
-    val files = obj.fields("children").convertTo[Seq[ArtifactoryItem]]
+    val json = parse(response.body) match {
+      case Left(err) => sys.error(s"Failed to parse artifactory response body: ${err.getMessage}")
+      case Right(j) => j
+    }
+
+    val files = json.hcursor.downField("children").as[Seq[ArtifactoryItem]] match {
+      case Left(err) => sys.error(s"Failed to decode artifactory children: ${err.getMessage}")
+      case Right(seq) => seq
+    }
 
     files
       .map(_.uri)
@@ -558,6 +569,7 @@ object UseLedgerApiTestTool {
             sys.env
               .get("ARTIFACTORY_PASSWORD")
               .flatMap(OptionUtil.emptyStringAsNone)
+              .orElse(sys.env.get("ARTIFACTORY_TOKEN").flatMap(OptionUtil.emptyStringAsNone))
               .orElse(credentialsFromNetrcFile._2)
               .getOrElse("")
               .toCharArray,

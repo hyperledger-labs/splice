@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -10,12 +10,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.networking.grpc.GrpcError.{
   GrpcClientError,
   GrpcRequestRefusedByServer,
   GrpcServiceUnavailable,
 }
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.sequencing.ConnectionX.{ConnectionXConfig, ConnectionXError}
 import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.{
   ConnectionAttributes,
@@ -212,6 +212,7 @@ class GrpcSequencerConnectionX(
   override def getTrafficStateForMember(
       request: GetTrafficStateForMemberRequest,
       timeout: Duration,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] =
@@ -220,6 +221,7 @@ class GrpcSequencerConnectionX(
         request,
         timeout,
         retryPolicy = retryPolicy(retryOnUnavailable = true),
+        logPolicy = logPolicy,
       )
       .map { res =>
         logger.debug(s"Got traffic state ${res.trafficState}")
@@ -249,8 +251,8 @@ class GrpcSequencerConnectionX(
       result <- stub.downloadTopologyStateForInit(request, timeout).leftMap(_.toString)
       storedTxs = result.topologyTransactions.value
       _ = logger.debug(
-        s"Downloaded topology state for initialization with last change timestamp at " +
-          s"${storedTxs.lastChangeTimestamp}: ${storedTxs.result.size} transactions"
+        s"Downloaded topology state for initialization with last change timestamp at ${storedTxs.lastChangeTimestamp}: " +
+          s"${storedTxs.result.size} transactions"
       )
     } yield result
   }

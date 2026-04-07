@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
@@ -108,9 +108,6 @@ trait RefinedNonNegativeDuration[D <: RefinedNonNegativeDuration[D]] extends Pre
 }
 
 trait RefinedNonNegativeDurationCompanion[D <: RefinedNonNegativeDuration[D]] {
-
-  implicit val refinedNonNegativeDurationCantonConfigValidator: CantonConfigValidator[D] =
-    CantonConfigValidator.validateAll[D]
 
   protected[this] def apply(newDuration: Duration): D
 

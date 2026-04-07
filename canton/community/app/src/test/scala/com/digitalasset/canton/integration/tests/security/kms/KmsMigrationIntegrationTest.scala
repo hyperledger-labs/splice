@@ -1,20 +1,15 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security.kms
 
 import better.files.File
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{KeyPurpose, SigningPublicKeyWithName}
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UsePostgres,
-  UseReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.tests.security.kms.aws.AwsKmsCryptoIntegrationTestBase
 import com.digitalasset.canton.integration.tests.security.kms.gcp.GcpKmsCryptoIntegrationTestBase
@@ -196,7 +191,7 @@ trait KmsMigrationIntegrationTest
     File.usingTemporaryFile("participantOld-acs", suffix = ".txt") { acsFile =>
       val acsFileName = acsFile.toString
 
-      val ledgerEnd = NonNegativeLong.tryCreate(participantOld.ledger_api.state.end())
+      val ledgerEnd = participantOld.ledger_api.state.end()
 
       // Export from old participant
       participantOld.repair.export_acs(
@@ -207,7 +202,7 @@ trait KmsMigrationIntegrationTest
       )
 
       // Import to new participant
-      participantNew.repair.import_acs(acsFileName)
+      participantNew.repair.import_acs(newKmsSynchronizerId.logical, acsFileName)
     }
 
     // Kill/stop the old participant
@@ -260,15 +255,14 @@ trait KmsMigrationIntegrationTest
   }
 }
 
-class AwsKmsMigrationReferenceIntegrationTestPostgres
+class AwsKmsMigrationBftOrderingIntegrationTestPostgres
     extends KmsMigrationIntegrationTest
     with AwsKmsCryptoIntegrationTestBase {
 
   setupPlugins(
     withAutoInit = false,
     storagePlugin = Some(new UsePostgres(loggerFactory)),
-    sequencerPlugin =
-      new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory, sequencerGroups),
+    sequencerPlugin = new UseBftSequencer(loggerFactory, sequencerGroups),
   )
 
 }

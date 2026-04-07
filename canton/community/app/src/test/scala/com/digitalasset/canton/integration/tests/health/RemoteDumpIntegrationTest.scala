@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.health
@@ -16,9 +16,10 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
   UseExternalProcess,
+  UseH2,
   UsePostgres,
-  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -27,9 +28,9 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
-import com.digitalasset.canton.participant.CommunityParticipantNodeBootstrapFactory
-import com.digitalasset.canton.synchronizer.mediator.CommunityMediatorNodeBootstrapFactory
-import com.digitalasset.canton.synchronizer.sequencer.CommunitySequencerNodeBootstrapFactory
+import com.digitalasset.canton.participant.ParticipantNodeBootstrapFactoryImpl
+import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrapFactoryImpl
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrapFactoryImpl
 import com.digitalasset.canton.version.{ProtocolVersionCompatibility, ReleaseVersion}
 import com.digitalasset.canton.{HasExecutionContext, config}
 import io.circe.generic.auto.*
@@ -46,7 +47,7 @@ final class RemoteDumpIntegrationTest
     with StatusIntegrationTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P3_S1M1_Config
+    EnvironmentDefinition.P3S1M1_Config
       .addConfigTransform(
         _.focus(_.monitoring.dumpNumRollingLogFiles).replace(NonNegativeInt.tryCreate(100))
       )
@@ -307,7 +308,8 @@ class NegativeRemoteDumpIntegrationTest
 
   private val dumpDelay = 1.second
 
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   // Customize the environment factory to tweak the health dump generation
   override protected val environmentFactory: EnvironmentFactory =
@@ -318,11 +320,10 @@ class NegativeRemoteDumpIntegrationTest
     ) =>
       new Environment(
         config,
-        CommunityCantonEdition,
         testingConfigInternal,
-        CommunityParticipantNodeBootstrapFactory,
-        CommunitySequencerNodeBootstrapFactory,
-        CommunityMediatorNodeBootstrapFactory,
+        ParticipantNodeBootstrapFactoryImpl,
+        SequencerNodeBootstrapFactoryImpl,
+        MediatorNodeBootstrapFactoryImpl,
         loggerFactory,
       ) {
         override def createHealthDumpGenerator(

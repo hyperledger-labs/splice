@@ -138,7 +138,7 @@ jobs:
       - name: Run Tests
         uses: ./splice-shared-gha/.github/actions/tests/scala_test
         with:
-          cache_version: 7
+          cache_version: 8
           with_canton: ${{ inputs.with_canton }}
           start_canton_options: ${{ inputs.start_canton_options }}
           test_suite_name: ${{ inputs.test_name }}

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -10,6 +10,18 @@ sealed trait SubmissionRequestType {
 }
 
 object SubmissionRequestType {
+
+  val capAdmissible: Seq[SubmissionRequestType] =
+    Seq[SubmissionRequestType](
+      ConfirmationResponse,
+      ConfirmationRequest,
+      Commitment,
+      TopologyTransaction,
+      TimeProof,
+    )
+  def fromStringForCap(name: String): Option[SubmissionRequestType] =
+    capAdmissible.find(_.name == name)
+
   case object ConfirmationResponse extends SubmissionRequestType {
     override val name: String = "confirmation response"
   }
@@ -21,6 +33,9 @@ object SubmissionRequestType {
   }
   case object Commitment extends SubmissionRequestType {
     override def name: String = "commitment"
+  }
+  case object LsuSequencingTest extends SubmissionRequestType {
+    override def name: String = "test lsu sequencing"
   }
   case object TopUp extends SubmissionRequestType {
     override def name: String = "top up"
@@ -66,6 +81,7 @@ object SubmissionRequestType {
         case (ParticipantId(_), true, false, false, false) => Commitment
         case (SequencerId(_), true, false, true, false) => TopUp
         case (SequencerId(_), false, true, true, false) => TopUpMed
+        case (SequencerId(_), false, true, false, false) => LsuSequencingTest
         case (_, false, false, false, true) => TopologyTransaction
         case (_, false, false, false, false) => TimeProof
         case _ =>

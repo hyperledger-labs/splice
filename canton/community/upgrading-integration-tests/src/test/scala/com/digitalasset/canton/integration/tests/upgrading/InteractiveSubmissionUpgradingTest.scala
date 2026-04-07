@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -41,9 +41,9 @@ class InteractiveSubmissionUpgradingTest
         participant2.dars.upload(UpgradingBaseTest.UpgradeV2)
         participant3.dars.upload(UpgradingBaseTest.UpgradeV1)
 
-        lse = participant1.parties.external.enable("LSE")
-        alice = participant2.parties.external.enable("Alice")
-        bob = participant3.parties.external.enable("Bob")
+        lse = participant1.parties.testing.external.enable("LSE")
+        alice = participant2.parties.testing.external.enable("Alice")
+        bob = participant3.parties.testing.external.enable("Bob")
 
       }
 
@@ -72,18 +72,17 @@ class InteractiveSubmissionUpgradingTest
           confirmingParticipant: LocalParticipantReference
       ): Unit =
         PartyToParticipantDeclarative(
-          Set(participant2, participant3),
-          Set(daId),
+          participants = Set(participant1, participant2, participant3),
+          synchronizerIds = Set(daId),
         )(
           owningParticipants = Map.empty,
           targetTopology = Map(
-            bob.partyId -> Map(
+            bob -> Map(
               daId -> (PositiveInt.one, Set(
                 (confirmingParticipant, ParticipantPermission.Confirmation)
               ))
             )
           ),
-          externalParties = Set(bob),
         )(executorService, env)
 
       // Set Bob confirmer to participant2 so that V2 gets used for the prepare step
@@ -92,6 +91,7 @@ class InteractiveSubmissionUpgradingTest
         Seq(bob.partyId),
         Seq(fetchQuote.id.exerciseFQ_ExFetch(quoteCid).commands().loneElement),
         disclosedContracts = Seq(disclosedQuote, disclosedFetch),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
       // Set Bob confirmer to participant3 where V2 is not available
@@ -121,6 +121,7 @@ class InteractiveSubmissionUpgradingTest
       Seq(party.partyId),
       Seq(fetchQuote.id.exerciseFQ_ExFetch(quoteCid).commands().loneElement),
       disclosedContracts = Seq(disclosedQuote),
+      hashingSchemeVersion = testedApiHashingSchemeVersion,
     )
     participant.ledger_api.commands.external.submit_prepared(party, preparedExercise)
   }

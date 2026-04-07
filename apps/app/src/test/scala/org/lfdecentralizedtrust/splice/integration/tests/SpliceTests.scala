@@ -5,27 +5,14 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
-import com.digitalasset.canton.config.{
-  CantonEdition,
-  CommunityCantonEdition,
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.environment.EnvironmentFactory
-
-import java.time.Duration
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.tracing.NoReportingTracerProvider
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.pekko.Done
 import org.apache.pekko.actor.CoordinatedShutdown
@@ -50,43 +37,29 @@ import org.lfdecentralizedtrust.splice.integration.plugins.{
   WaitForPorts,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
+import org.lfdecentralizedtrust.splice.test.HasRetryProvider
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.scalactic.source
-import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
+import org.scalatest.exceptions.TestFailedException
+import org.scalatest.matchers.{Matcher, MatchResult}
 
+import java.time.Duration
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
-object SpliceTests extends LazyLogging {
+object SpliceTests extends LazyLogging with HasRetryProvider {
   val IsCI: Boolean = sys.env.contains("CI")
   val testGrpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
     NoOpMetricsFactory,
     "testing",
   )
-
-  val testScheduler: ScheduledExecutorService =
-    Threading.singleThreadScheduledExecutor(
-      "test-env-sched",
-      logger,
-    )
-
-  val testRetryProvider = new RetryProvider(
-    NamedLoggerFactory.root,
-    ProcessingTimeout(),
-    new FutureSupervisor.Impl(
-      NonNegativeDuration.tryFromDuration(10.seconds),
-      NamedLoggerFactory.root,
-    )(testScheduler),
-    NoOpMetricsFactory,
-  )(NoReportingTracerProvider.tracer)
 
   type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, SpliceEnvironment]
   type SharedSpliceEnvironment =
@@ -103,14 +76,8 @@ object SpliceTests extends LazyLogging {
     override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
       SpliceEnvironmentFactory
 
-    override val edition: CantonEdition = CommunityCantonEdition
-
     type SpliceEnvironmentDefinition =
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
-
-    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new InMemoryMetricsFactory
-    }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
@@ -177,8 +144,6 @@ object SpliceTests extends LazyLogging {
     override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
       SpliceEnvironmentFactory
 
-    override val edition: CantonEdition = CommunityCantonEdition
-
     type SpliceEnvironmentDefinition =
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
@@ -201,10 +166,6 @@ object SpliceTests extends LazyLogging {
     }
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
-
-    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new InMemoryMetricsFactory
-    }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
@@ -358,8 +319,8 @@ object SpliceTests extends LazyLogging {
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialTickDuration.asJava
-        case Some(_: SvOnboardingConfig.JoinWithKey) |
-            Some(_: SvOnboardingConfig.DomainMigration) | None =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
+            Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1.")
       }).toSeconds)
 
@@ -373,7 +334,7 @@ object SpliceTests extends LazyLogging {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialSynchronizerFeesConfig
         case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
-            None =>
+            Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
           fail("Failed to retrieve defaultSynchronizerFeesConfig from sv1.")
       }
 

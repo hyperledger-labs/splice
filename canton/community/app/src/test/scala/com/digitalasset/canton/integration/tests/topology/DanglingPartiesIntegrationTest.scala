@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -89,6 +89,7 @@ class DanglingPartiesIntegrationTest
           }
           participant.topology.transactions.authorize(sequencer1.synchronizer_id, proposal.txHash)
         }
+
         participants.all.foreach { p =>
           eventually() {
             val mapping =
@@ -111,7 +112,7 @@ class DanglingPartiesIntegrationTest
                       ParticipantPermission.Confirmation,
                       false, // onboarding
                     ),
-                  ) if participant1.id == p1 && participant2.id == p2 && participant3.id == p3 =>
+                  ) if (participant1.id == p1 && participant2.id == p2 && participant3.id == p3) =>
             }
           }
         }

@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
 
+import com.daml.nameof.NameOf
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -16,6 +17,7 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   HasRunOnClosing,
   PromiseUnlessShutdown,
+  RunOnClosing,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -28,7 +30,7 @@ import com.digitalasset.canton.sequencing.protocol.SignedContent
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.common.annotations.VisibleForTesting
 import org.slf4j.event.Level
@@ -40,6 +42,7 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, blocking}
 
 class SequencerAggregator(
+    postAggregationHandler: PostAggregationHandler,
     cryptoPureApi: CryptoPureApi,
     eventInboxSize: PositiveInt,
     val loggerFactory: NamedLoggerFactory,
@@ -47,27 +50,14 @@ class SequencerAggregator(
     updateSendTracker: Seq[SequencedEventWithTraceContext[?]] => Unit,
     override val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
-    useNewConnectionPool: Boolean,
 ) extends SubscriptionStartProvider
     with NamedLogging
     with FlagCloseable {
 
-  private val postAggregationHandlerRef = new AtomicReference[Option[PostAggregationHandler]](None)
-  def setPostAggregationHandler(postAggregationHandler: PostAggregationHandler): Unit =
-    postAggregationHandlerRef
-      .getAndSet(Some(postAggregationHandler))
-      .foreach(_ => throw new IllegalStateException("Post aggregation handler already set"))
+  private val lock = Mutex()
 
   private val configRef: AtomicReference[MessageAggregationConfig] =
     new AtomicReference[MessageAggregationConfig](initialConfig)
-  def expectedSequencers: NonEmpty[Set[SequencerId]] = configRef
-    .get()
-    .expectedSequencersO
-    .getOrElse(
-      throw new IllegalStateException(
-        "Missing `expectedSequencers`: called while using the connection pool?"
-      )
-    )
 
   def sequencerTrustThreshold: PositiveInt = configRef.get().sequencerTrustThreshold
 
@@ -82,6 +72,18 @@ class SequencerAggregator(
     new ArrayBlockingQueue[SequencedSerializedEvent](eventInboxSize.unwrap)
 
   private val sequenceData = mutable.TreeMap.empty[CantonTimestamp, SequencerMessageData]
+
+  runOnClose(new RunOnClosing {
+    override def name: String = "abort-pending-sequencer-aggregations"
+
+    override def done: Boolean = sequenceData.view.values.forall(_.promise.isCompleted)
+
+    override def run()(implicit traceContext: TraceContext): Unit =
+      lock.exclusive {
+        sequenceData.view.values
+          .foreach(_.promise.shutdown_())
+      }
+  }).discard
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var cursor: Option[CantonTimestamp] = None
@@ -148,12 +150,8 @@ class SequencerAggregator(
       )
     }
 
-    if (useNewConnectionPool) {
-      logger.debug("Signalling the application handler")
-      postAggregationHandlerRef.get
-        .getOrElse(ErrorUtil.invalidState("Missing post aggregation handler"))
-        .signalHandler()
-    }
+    logger.debug("Signalling the application handler")
+    postAggregationHandler.signalHandler(receivedEvents)
   }
 
   private def addEventToQueue(
@@ -169,50 +167,36 @@ class SequencerAggregator(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[Either[SequencerAggregatorError, Boolean]] =
-    // The reason why this was checked here is unclear. The SequencedEventValidator already checks that
-    // events come from valid sequencers by verifying the signature using up-to-date topology state.
-    if (!useNewConnectionPool && !expectedSequencers.contains(sequencerId)) {
-      FutureUnlessShutdown(
-        ErrorUtil.internalErrorAsync(
-          new IllegalArgumentException(s"Unexpected sequencerId: $sequencerId")
-        )
-      )
-    } else
+    synchronizeWithClosing(NameOf.functionFullName)(
       try {
-        blocking {
-          this.synchronized {
-            if (cursor.forall(message.timestamp > _)) {
-              val sequencerMessageData = updatedSequencerMessageData(sequencerId, message)
-              sequenceData.put(message.timestamp, sequencerMessageData).discard
+        lock.exclusive {
+          if (cursor.forall(message.timestamp > _)) {
+            val sequencerMessageData = updatedSequencerMessageData(sequencerId, message)
+            sequenceData.put(message.timestamp, sequencerMessageData).discard
 
-              val (nextMinimumTimestamp, nextData) =
-                sequenceData.headOption.getOrElse(
-                  (message.timestamp, sequencerMessageData)
-                ) // returns min message.timestamp
+            val (nextMinimumTimestamp, nextData) =
+              sequenceData.headOption.getOrElse(
+                (message.timestamp, sequencerMessageData)
+              ) // returns min message.timestamp
 
-              pushDownstreamIfConsensusIsReached(nextMinimumTimestamp, nextData)
+            pushDownstreamIfConsensusIsReached(nextMinimumTimestamp, nextData)
 
-              sequencerMessageData.promise.futureUS.map(_.map(_ == sequencerId))
-            } else
-              FutureUnlessShutdown.pure(Right(false))
-          }
+            sequencerMessageData.promise.futureUS.map(_.map(_ == sequencerId))
+          } else
+            FutureUnlessShutdown.pure(Right(false))
         }
       } catch {
         case t: Throwable =>
           logger.error("Error while combining and merging event", t)
           FutureUnlessShutdown.failed(t)
       }
+    )
 
   private def pushDownstreamIfConsensusIsReached(
       nextMinimumTimestamp: CantonTimestamp,
       nextData: SequencerMessageData,
   ): Unit = {
-    val expectedMessages =
-      if (useNewConnectionPool) nextData.eventBySequencer
-      else
-        nextData.eventBySequencer.view.filterKeys { sequencerId =>
-          expectedSequencers.contains(sequencerId)
-        }.toMap
+    val expectedMessages = nextData.eventBySequencer
 
     if (expectedMessages.sizeCompare(sequencerTrustThreshold.unwrap) >= 0) {
       cursor = Some(nextMinimumTimestamp)
@@ -248,8 +232,8 @@ class SequencerAggregator(
 
   def changeMessageAggregationConfig(
       newConfig: MessageAggregationConfig
-  ): Unit = blocking {
-    this.synchronized {
+  ): Unit =
+    lock.exclusive {
       configRef.set(newConfig)
       sequenceData.headOption.foreach { case (nextMinimumTimestamp, nextData) =>
         pushDownstreamIfConsensusIsReached(
@@ -258,22 +242,10 @@ class SequencerAggregator(
         )
       }
     }
-  }
-
-  @SuppressWarnings(Array("NonUnitForEach"))
-  override protected def onClosed(): Unit =
-    blocking {
-      this.synchronized {
-        sequenceData.view.values
-          .foreach(_.promise.shutdown_())
-      }
-    }
 }
+
 object SequencerAggregator {
-  final case class MessageAggregationConfig(
-      expectedSequencersO: Option[NonEmpty[Set[SequencerId]]],
-      sequencerTrustThreshold: PositiveInt,
-  )
+  final case class MessageAggregationConfig(sequencerTrustThreshold: PositiveInt)
   sealed trait SequencerAggregatorError extends Product with Serializable with PrettyPrinting
   object SequencerAggregatorError {
     final case class NotTheSameContentHash(hashes: NonEmpty[Set[Hash]])

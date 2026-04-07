@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer.grpc
@@ -88,13 +88,13 @@ class SequencerInfoLoader(
     logger.debug(s"Querying bootstrap information for synchronizer $synchronizerAlias")
     for {
       bootstrapInfo <- client
-        .getSynchronizerClientBootstrapInfo(synchronizerAlias)
+        .getSynchronizerClientBootstrapInfo()
         .leftMap(SequencerInfoLoader.fromSequencerConnectClientError(synchronizerAlias))
 
       _ <- performHandshake(client, synchronizerAlias, sequencerAlias)
 
       synchronizerParameters <- client
-        .getSynchronizerParameters(synchronizerAlias.unwrap)
+        .getSynchronizerParameters()
         .leftMap(SequencerInfoLoader.fromSequencerConnectClientError(synchronizerAlias))
 
       _ = logger.info(
@@ -183,7 +183,6 @@ class SequencerInfoLoader(
     for {
       success <- sequencerConnectClient
         .handshake(
-          alias,
           HandshakeRequest(
             clientProtocolVersions,
             minimumProtocolVersion,
@@ -442,16 +441,16 @@ object SequencerInfoLoader {
           synchronizerClientBootstrapInfo: SynchronizerClientBootstrapInfo,
           staticSynchronizerParameters: StaticSynchronizerParameters,
       ): Either[InconsistentConnectivity, Valid] = {
-        val providedPSId = synchronizerClientBootstrapInfo.psid
-        val expectedPSId =
-          PhysicalSynchronizerId(providedPSId.logical, staticSynchronizerParameters)
+        val providedPsid = synchronizerClientBootstrapInfo.psid
+        val expectedPsid =
+          PhysicalSynchronizerId(providedPsid.logical, staticSynchronizerParameters)
 
         Either
           .cond(
-            providedPSId == expectedPSId,
+            providedPsid == expectedPsid,
             (),
             InconsistentConnectivity(
-              s"Provided physical synchronizer id `$providedPSId` is inconsistent with static synchronizer parameters"
+              s"Provided physical synchronizer id `$providedPsid` is inconsistent with static synchronizer parameters"
             ),
           )
           .map(_ =>
@@ -508,7 +507,7 @@ object SequencerInfoLoader {
     * changes
     */
   def validateNewSequencerConnectionResults(
-      expectedPSId: Option[PhysicalSynchronizerId],
+      expectedPsid: Option[PhysicalSynchronizerId],
       sequencerConnectionValidation: SequencerConnectionValidation,
       sequencerTrustThreshold: PositiveInt,
       logger: TracedLogger,
@@ -562,10 +561,10 @@ object SequencerInfoLoader {
           )
           // check that physical synchronizer id matches expected
           _ <- Either.cond(
-            expectedPSId.forall(_ == valid.synchronizerClientBootstrapInfo.psid),
+            expectedPsid.forall(_ == valid.synchronizerClientBootstrapInfo.psid),
             (),
             SequencerInfoLoaderError.InconsistentConnectivity(
-              show"Synchronizer id ${valid.synchronizerClientBootstrapInfo.psid} does not match expected $expectedPSId"
+              show"Synchronizer id ${valid.synchronizerClientBootstrapInfo.psid} does not match expected $expectedPsid"
             ),
           )
 

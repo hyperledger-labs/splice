@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
@@ -8,17 +8,18 @@ import com.daml.metrics.api.{MetricHandle, MetricsContext}
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.TestAcsChangeFactory
-import com.digitalasset.canton.protocol.TestUpdateId
+import com.digitalasset.canton.ledger.participant.state.Update.ContractInfo
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.SameAsContractPackageId
+import com.digitalasset.canton.protocol.{LfSerializationVersion, TestUpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.transaction.TransactionNodeStatistics.EmptyActions
 import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.transaction.{
   CommittedTransaction,
   NodeId,
-  SerializationVersion as LfSerializationVersion,
   TransactionNodeStatistics,
   VersionedTransaction,
 }
@@ -83,22 +84,29 @@ class EventMetricsUpdaterSpec extends AnyWordSpec with MetricValues {
     val someTransactionAccepted = state.Update.SequencedTransactionAccepted(
       completionInfoO = Some(someCompletionInfo),
       transactionMeta = someTransactionMeta,
-      transaction = TransactionBuilder.justCommitted(
-        someContractNode,
-        someContractNode,
-        someConsumingExerciseNode,
-        TestNodeBuilder.rollback(
-          ImmArray(
-            NodeId(2)
-          )
-        ),
+      transactionInfo = state.Update.TransactionAccepted.TransactionInfo(
+        TransactionBuilder.justCommitted(
+          someContractNode,
+          someContractNode,
+          someConsumingExerciseNode,
+          TestNodeBuilder.rollback(
+            ImmArray(
+              NodeId(2)
+            )
+          ),
+        )
       ),
       updateId = TestUpdateId("UpdateId"),
-      Map.empty,
       synchronizerId = SynchronizerId.tryFromString("da::default"),
-      CantonTimestamp.now(),
+      recordTime = CantonTimestamp.now(),
       acsChangeFactory = TestAcsChangeFactory(),
-      internalContractIds = Map.empty,
+      contractInfos = Map(
+        someContractNode.coid -> ContractInfo(
+          internalContractId = 0L,
+          contractAuthenticationData = Bytes.Empty,
+          representativePackageId = SameAsContractPackageId,
+        )
+      ),
     )
 
     "extract transaction metering" in {
@@ -151,10 +159,25 @@ class EventMetricsUpdaterSpec extends AnyWordSpec with MetricValues {
     "no metrics for infrastructure transactions" in {
 
       val meter: MetricHandle.Meter = mock[MetricHandle.Meter]
-      val txWithNoActionCount = someTransactionAccepted.copy(
-        transaction = CommittedTransaction(
-          VersionedTransaction(LfSerializationVersion.VDev, Map.empty, ImmArray.empty)
-        )
+      val txWithNoActionCount = state.Update.SequencedTransactionAccepted(
+        completionInfoO = Some(someCompletionInfo),
+        transactionMeta = someTransactionMeta,
+        transactionInfo = state.Update.TransactionAccepted.TransactionInfo(
+          CommittedTransaction(
+            VersionedTransaction(LfSerializationVersion.VDev, Map.empty, ImmArray.empty)
+          )
+        ),
+        updateId = TestUpdateId("UpdateId"),
+        synchronizerId = SynchronizerId.tryFromString("da::default"),
+        recordTime = CantonTimestamp.now(),
+        acsChangeFactory = TestAcsChangeFactory(),
+        contractInfos = Map(
+          someContractNode.coid -> ContractInfo(
+            internalContractId = 0L,
+            contractAuthenticationData = Bytes.Empty,
+            representativePackageId = SameAsContractPackageId,
+          )
+        ),
       )
 
       EventMetricsUpdater(meter)(

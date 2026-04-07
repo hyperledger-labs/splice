@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.service
 
 import com.daml.scalautil.ExceptionOps.*
-import com.digitalasset.daml.lf.archive.{ArchivePayload, Dar, DarReader}
+import com.digitalasset.daml.lf.archive.{ArchivePayload, Dar, DarSchemaReader}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.typesig
@@ -29,7 +29,7 @@ object MetadataReader {
   def readFromDar(darFile: File): Error \/ LfMetadata =
     for {
       dar <- \/.fromEither(
-        DarReader.readArchiveFromFile(darFile)
+        DarSchemaReader.readArchiveFromFile(darFile)
       ).leftMap(e => Error(Symbol("readFromDar"), e.msg))
 
       packageStore <- decodePackageStoreFromDar(dar)

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -33,7 +33,7 @@ import com.digitalasset.canton.util.{EitherTUtil, OrderedBucketMergeConfig, Reso
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutionContext,
-  ProtocolVersionChecksFixtureAnyWordSpec,
+  TestPredicateFiltersFixtureAnyWordSpec,
 }
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
@@ -49,7 +49,7 @@ class SequencerAggregatorPekkoTest
     extends FixtureAnyWordSpec
     with BaseTest
     with HasExecutionContext
-    with ProtocolVersionChecksFixtureAnyWordSpec {
+    with TestPredicateFiltersFixtureAnyWordSpec {
 
   override protected type FixtureParam = SequencedEventTestFixture
 
@@ -418,7 +418,7 @@ class SequencerAggregatorPekkoTest
           ).map(_.map(event => normalize(event.asOrdinarySerializedEvent)))
           outputs shouldBe expected
         },
-        _.errorMessage should include(ResilientSequencerSubscription.ForkHappened.id),
+        _.errorMessage should include(SequencerSubscriptionError.ForkHappened.id),
         _.warningMessage should include(s"Sequencer subscription for $sequencerBob failed with"),
       )
       source.complete()
