@@ -387,6 +387,8 @@ export function installGcpQuotaAlerts(
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
+          // Surface the quota metric name in incident details
+          labels: { quota_metric: '{{quota_metric}}' },
         },
       },
     ],
@@ -407,6 +409,8 @@ export function installGcpQuotaAlerts(
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
+          // Surface the quota metric name in incident details
+          labels: { quota_metric: '{{quota_metric}}' },
         },
       },
     ],
