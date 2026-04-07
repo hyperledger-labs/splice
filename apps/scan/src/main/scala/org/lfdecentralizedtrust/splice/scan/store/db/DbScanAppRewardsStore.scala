@@ -301,6 +301,7 @@ class DbScanAppRewardsStore(
   }
 
   /** DBIO action to read the total activity weight for a round. */
+  // .head is safe: only called after aggregateActivityTotalsAction in the same transaction.
   private def getAppActivityRoundTotalWeightAction(roundNumber: Long) =
     sql"""select total_round_app_activity_weight
           from #${Tables.appActivityRoundTotals}
@@ -561,6 +562,13 @@ class DbScanAppRewardsStore(
       "appRewards.lookupBatchByHash.children",
     ).map(_.map(ByteString.copyFrom))
 
+  /** Retrieve minting allowances for a leaf batch range.
+    *
+    * Uses a LEFT JOIN from activity totals to reward totals because parties
+    * whose reward fell below the threshold have no row in `app_reward_party_totals`.
+    * `coalesce` maps these NULLs to zero, matching the hashing convention
+    * used in `insertLeafBatches` where below-threshold parties hash as '0.0000000000'.
+    */
   private def getLeafAllowances(
       roundNumber: Long,
       beginIncl: Int,
@@ -830,10 +838,16 @@ class DbScanAppRewardsStore(
 
   /** Level 0: group parties into batches, hash each as BatchOfMintingAllowances.
     *
-    * LEFT JOINs activity totals with reward totals so parties below threshold
-    * appear with amount='0'.
+    * Uses a LEFT JOIN from activity totals to reward totals because parties
+    * whose reward fell below the threshold have no row in `app_reward_party_totals`.
+    * `coalesce` maps these NULLs to the text '0.0000000000' before hashing,
+    * so below-threshold parties contribute a deterministic zero-amount hash
+    * rather than being omitted from the Merkle tree.
     *
-    * Uses plpgsql hash functions equivalents to Splice.Amulet.CryptoHash for hashing.
+    * Parties are grouped into batches of `batchSize` by integer division on
+    * `app_provider_party_seq_num`. Each batch is hashed using the plpgsql
+    * `hash_batch_of_minting_allowances` function (equivalent to
+    * `Splice.Amulet.CryptoHash` on-ledger).
     *
     * Returns the number of leaf batches created.
     */
