@@ -373,6 +373,14 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
     ...baseArgs,
     displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Allocation quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+      content: [
+        `An allocation quota (CPUs, Static IPs, Disk Space, etc.) is >${quotaUsageThresholdPercent}% utilized in **${CLUSTER_BASENAME}**.`,
+        'Check the incident details, chart under "Alert Metrics", for the specific quota.',
+      ].join('\n\n'),
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // Tracks resources like CPUs, Static IPs, Disk Space
@@ -385,8 +393,6 @@ export function installGcpQuotaAlerts(
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
-          // Surface the quota metric name in incident details
-          labels: { quota_metric: '{{quota_metric}}' },
         },
       },
     ],
@@ -395,6 +401,14 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaRateAlert', {
     ...baseArgs,
     displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Rate quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+      content: [
+        `A rate quota (API requests per minute, HSM operations, etc.) is >${quotaUsageThresholdPercent}% utilized in **${CLUSTER_BASENAME}**.`,
+        'Check the incident details, chart under "Alert Metrics", for the specific quota.',
+      ].join('\n\n'),
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // Tracks API requests, HSM operations per minute, etc.
@@ -407,8 +421,6 @@ export function installGcpQuotaAlerts(
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
-          // Surface the quota metric name in incident details
-          labels: { quota_metric: '{{quota_metric}}' },
         },
       },
     ],
