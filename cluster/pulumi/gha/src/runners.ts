@@ -25,10 +25,12 @@ type ResourcesSpec = {
   requests?: {
     cpu?: string;
     memory?: string;
+    ephemeralStorage?: string;
   };
   limits?: {
     cpu?: string;
     memory?: string;
+    ephemeralStorage?: string;
   };
 };
 

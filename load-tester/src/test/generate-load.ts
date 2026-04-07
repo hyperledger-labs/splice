@@ -22,6 +22,7 @@ export type ValidatorConf = {
   walletBaseUrl: string;
   adminToken: string;
   userTokens: string[];
+  userFeatured: boolean[];
 };
 
 export function setup(): ValidatorConf[] {
@@ -29,6 +30,7 @@ export function setup(): ValidatorConf[] {
 
   settings.validators.forEach((validator, validatorIndex) => {
     let tokens: string[] = [];
+    let featured: boolean[] = [];
 
     if (validator.auth.kind === 'oauth') {
       const auth0 = new Auth0Manager(
@@ -42,6 +44,7 @@ export function setup(): ValidatorConf[] {
       for (let i = 0; i < settings.usersPerValidator; i++) {
         const t = logInUser(auth0, `user-${i}@cn-load-tester.com`, validator.auth.usersPassword);
         tokens = [...tokens, t];
+        featured = [...featured, i < settings.featuredUsersPerValidator];
       }
 
       const adminToken = logInUser(
@@ -53,6 +56,7 @@ export function setup(): ValidatorConf[] {
       validatorConfs[validatorIndex] = {
         adminToken,
         userTokens: tokens,
+        userFeatured: featured,
         walletBaseUrl: validator.walletBaseUrl,
       };
     } else if (validator.auth.kind === 'self-signed') {
@@ -83,9 +87,14 @@ export function setup(): ValidatorConf[] {
           ),
         );
 
+      const userFeatured = Array(settings.usersPerValidator)
+        .fill(0)
+        .map((_, i) => i < settings.featuredUsersPerValidator);
+
       validatorConfs[validatorIndex] = {
         adminToken,
         userTokens,
+        userFeatured,
         walletBaseUrl: validator.walletBaseUrl,
       };
     }
@@ -95,7 +104,7 @@ export function setup(): ValidatorConf[] {
 }
 
 export default function (data: ValidatorConf[]): void {
-  const { adminClient, senderClient, receipientClient } = pickTwoRandomUsers(data);
+  const { adminClient, senderClient, recipientClient } = pickTwoRandomUsers(data);
 
   // Track the admin's balance on non-devnet to send out top-up alerts
   if (!settings.isDevNet) {
@@ -105,10 +114,10 @@ export default function (data: ValidatorConf[]): void {
     }
   }
 
-  doIfOnboarded(receipientClient, () => {
+  doIfOnboarded(recipientClient, () => {
     doIfOnboarded(senderClient, () => {
       waitForBalance(senderClient, 10, '1000.0', adminClient, settings.isDevNet);
-      sendAndWaitForTransferOffer(senderClient, receipientClient, '1.00');
+      sendAndWaitForTransferOffer(senderClient, recipientClient, '1.00');
     });
   });
 }

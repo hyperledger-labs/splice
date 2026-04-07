@@ -104,6 +104,7 @@ case class AutomationConfig(
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
     ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
     ignoredFeaturedAppActivityMarkerPartyIds: Set[PartyId] = Set.empty,
+    ignoredExpiredAmuletTransferInstructionPartyIds: Set[PartyId] = Set.empty,
     ingestion: IngestionConfig = IngestionConfig(),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(

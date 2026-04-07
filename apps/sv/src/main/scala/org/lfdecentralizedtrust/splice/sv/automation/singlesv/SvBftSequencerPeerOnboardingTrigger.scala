@@ -43,6 +43,7 @@ class SvBftSequencerPeerOnboardingTrigger(
       sequencerAdminConnection,
       loggerFactory,
       scanConnection,
+      baseContext.retryProvider,
     )
 
 }
