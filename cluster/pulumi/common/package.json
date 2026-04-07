@@ -35,7 +35,7 @@
     "@jest/globals": "^30.3.0",
     "@types/js-yaml": "^4.0.5",
     "@types/lodash": "^4.17.24",
-    "@types/sinon": "^21.0.0",
+    "@types/sinon": "^21.0.1",
     "@types/ws": "^8.18.1",
     "dedent": "^1.7.2",
     "sinon": "^21.0.3"
