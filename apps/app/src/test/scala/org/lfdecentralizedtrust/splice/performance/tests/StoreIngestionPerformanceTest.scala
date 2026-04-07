@@ -39,8 +39,9 @@ final case class StoreIngestionPerfMetrics(
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
 
   /** Ratio of process CPU time to wall-clock time.
+    * Some thresholds we can use for rough classification:
     * > 0.7 : CPU-bound
-    * 0.25 - 0.7: Standard
+    * 0.25 - 0.7: balanced
     * < 0.25 : I/O-bound
     */
   def cpuToWallClockRatio: BigDecimal =
@@ -164,14 +165,14 @@ abstract class StoreIngestionPerformanceTest(
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val wallBefore = System.nanoTime()
-        val cpuSnapshotBefore = captureCpuSnapshot()
+        val cpuBefore = getProcessCpuTimeNs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val wallAfter = System.nanoTime()
-            val cpuSnapshotAfter = captureCpuSnapshot()
+            val cpuAfter = getProcessCpuTimeNs
             val duration = wallAfter - wallBefore
-            val cpuDeltaNs = cpuDelta(cpuSnapshotBefore, cpuSnapshotAfter)
+            val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
             totalTimeNs += duration
             totalCpuNs += cpuDeltaNs
             val heapNow = getHeapUsedBytes
@@ -200,45 +201,15 @@ abstract class StoreIngestionPerformanceTest(
       }
   }
 
-  /** Per-thread CPU time snapshot: threadId -> cpuTimeNs. */
-  private type CpuSnapshot = Map[Long, Long]
-
-  /** Capture per-thread total CPU time for all live threads. */
-  private def captureCpuSnapshot(): CpuSnapshot = {
-    val threadBean = ManagementFactory.getThreadMXBean
-    if (threadBean.isThreadCpuTimeSupported && threadBean.isThreadCpuTimeEnabled) {
-      threadBean.getAllThreadIds.flatMap { id =>
-        val cpuNs = threadBean.getThreadCpuTime(id)
-        if (cpuNs >= 0) Some(id -> cpuNs) else None
-      }.toMap
-    } else {
-      Map.empty
-    }
-  }
-
-  /** Compute total CPU delta between two snapshots, considering only threads
-    * present in both.
-    *
-    * Background threads (GC, Pekko dispatchers, timers) can start or stop between
-    * snapshots.
-    * Common thread IDs of two snapshots ensure we ignore dead threads (avoids negative
-    * deltas) and new threads (avoids counting unrelated work).
-    *
-    * The ingestion-runner thread is always present in both snapshots
-    * (cpuSnapshotBefore and cpuSnapshotAfter) because `captureCpuSnapshot()` is called
-    * within the runner thread before and after the ingestion of each batch,
-    * so we are guaranteed to capture its CPU time deltas accurately.
+  /** Process-wide CPU time in nanoseconds.
+    * Returns -1 if not supported (treated as 0 by the caller via math.max).
     */
-  private def cpuDelta(before: CpuSnapshot, after: CpuSnapshot): BigDecimal = {
-    var delta = 0L
-    after.foreach { case (id, cpuAfter) =>
-      before.get(id).foreach { cpuBefore =>
-        delta += math.max(cpuAfter - cpuBefore, 0L)
-      }
+  private def getProcessCpuTimeNs: Long = {
+    ManagementFactory.getOperatingSystemMXBean match {
+      case osBean: com.sun.management.OperatingSystemMXBean => osBean.getProcessCpuTime
+      case _ => -1L
     }
-    BigDecimal(delta)
   }
-
 
   /** Process-wide current heap memory usage in bytes (point-in-time snapshot). */
   private def getHeapUsedBytes: BigDecimal = {
