@@ -310,14 +310,12 @@ export function installGcpQuotaAlerts(
 
   // Build exclusion fragments for threshold filters and PromQL queries.
   // excludedMetrics applies to all alerts; excludedApproachingMetrics only to the >90% alerts.
-  const exclusionRegex = excludedMetrics.length > 0 ? excludedMetrics.join('|') : null;
-  const thresholdExclusion =
-    exclusionRegex !== null ? ` AND metric.label.quota_metric !~ "${exclusionRegex}"` : '';
+  // Cloud Monitoring filters only support = and != (no regex), so we use one != per metric.
+  const thresholdExclusion = excludedMetrics
+    .map(m => ` AND metric.label.quota_metric != "${m}"`)
+    .join('');
 
-  const approachingExcluded = [
-    ...excludedMetrics,
-    ...gcpQuotasConfig.excludedApproachingMetrics,
-  ];
+  const approachingExcluded = [...excludedMetrics, ...gcpQuotasConfig.excludedApproachingMetrics];
   const approachingExclusionRegex =
     approachingExcluded.length > 0 ? approachingExcluded.join('|') : null;
   const promqlExclusion =

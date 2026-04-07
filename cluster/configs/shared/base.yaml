@@ -140,7 +140,14 @@ monitoring:
         # Each entry is matched as a substring against the quota_metric label
         # (regex not-match in threshold filters, !~ in PromQL).
         # Example: "hsm_asymmetric_usage" excludes HSM asymmetric signing quotas.
-        excludedMetrics: []
+        excludedMetrics:
+          - cloudkms.googleapis.com/read_requests
+          - cloudkms.googleapis.com/write_requests
+          - cloudkms.googleapis.com/crypto_requests
+          - cloudkms.googleapis.com/hsm_symmetric_requests
+          - cloudkms.googleapis.com/hsm_asymmetric_requests
+          - cloudkms.googleapis.com/hsm_generate_random_requests
+          - cloudkms.googleapis.com/external_kms_requests
         # Quota metric names to exclude only from the "approaching limit" (>90%) alerts.
         # These metrics will still trigger the "quota exceeded" alert.
         excludedApproachingMetrics: []
