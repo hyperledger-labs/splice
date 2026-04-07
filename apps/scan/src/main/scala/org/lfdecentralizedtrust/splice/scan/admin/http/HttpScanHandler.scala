@@ -84,7 +84,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanRollForwardLsuConfig}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
@@ -158,6 +158,7 @@ class HttpScanHandler(
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
     publicUrlO: Option[Uri],
+    lsuRollForwardConfigO: Option[ScanRollForwardLsuConfig],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -2683,6 +2684,58 @@ class HttpScanHandler(
               )
             }
       }
+    }
+  }
+
+  def getRollForwardLsu(respond: ScanResource.GetRollForwardLsuResponse.type)()(
+      extracted: TraceContext
+  ): Future[ScanResource.GetRollForwardLsuResponse] = {
+    implicit val tc = extracted
+    lsuRollForwardConfigO match {
+      case None =>
+        Future.successful(
+          ScanResource.GetRollForwardLsuResponse.OK(definitions.GetRollForwardLsuResponse())
+        )
+      case Some(rollForward) =>
+        val legacy = synchronizerNodeService.nodes.legacy.getOrElse(
+          throw Status.INTERNAL
+            .withDescription(s"Roll forward LSU config set but no legacy synchronizer configured")
+            .asRuntimeException
+        )
+        for {
+          legacySynchronizerId <- legacy.sequencerAdminConnection.getPhysicalSynchronizerId()
+          currentSynchronizerId <- synchronizerNodeService.nodes.current.sequencerAdminConnection
+            .getPhysicalSynchronizerId()
+          upgradeTime <- rollForward.upgradeTime match {
+            case Some(t) => Future.successful(t)
+            case None =>
+              for {
+                announcements <- legacy.sequencerAdminConnection.listLsuAnnouncements(
+                  legacySynchronizerId.logical
+                )
+              } yield {
+                announcements match {
+                  case Seq(announcement) => announcement.mapping.upgradeTime
+                  case _ =>
+                    throw Status.INTERNAL
+                      .withDescription(
+                        s"Expected exactly one LSU annoucement on legacy synchronizer but got $announcements"
+                      )
+                      .asRuntimeException
+                }
+              }
+          }
+        } yield ScanResource.GetRollForwardLsuResponse.OK(
+          definitions.GetRollForwardLsuResponse(
+            Some(
+              definitions.RollForwardLsu(
+                upgradeTime = upgradeTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+                currentPhysicalSynchronizerId = legacySynchronizerId.toProtoPrimitive,
+                successorPhysicalSynchronizerId = currentSynchronizerId.toProtoPrimitive,
+              )
+            )
+          )
+        )
     }
   }
 }

@@ -358,6 +358,15 @@ class SingleScanConnection private[client] (
     )
   }
 
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupRollForwardLsu(),
+    )
+  }
+
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,

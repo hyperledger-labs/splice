@@ -152,7 +152,7 @@ class SequencerAdminConnection(
       _.successOption
         .map(_.synchronizerId)
         .getOrElse(
-          throw Status.FAILED_PRECONDITION
+          throw Status.UNAVAILABLE
             .withDescription("Sequencer does not have a synchronizer ID in its status response")
             .asRuntimeException()
         )

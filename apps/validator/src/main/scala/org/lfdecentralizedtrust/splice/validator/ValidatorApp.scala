@@ -908,6 +908,7 @@ class ValidatorApp(
         config.latestPackagesOnly,
         config.parameters.enabledFeatures,
         config.additionalPackagesToUnvet,
+        config.domains.global.alias,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
