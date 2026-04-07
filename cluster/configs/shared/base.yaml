@@ -137,9 +137,8 @@ monitoring:
         tolerance: 1.5
       gcpQuotas:
         # Quota metric names to exclude from all GCP quota alerts.
-        # Each entry is matched as a substring against the quota_metric label
-        # (regex not-match in threshold filters, !~ in PromQL).
-        # Example: "hsm_asymmetric_usage" excludes HSM asymmetric signing quotas.
+        # Each entry is matched exactly for quota exceeded.
+        # Prefer `excludedApproachingMetrics` to ignore only the >90% alerts.
         excludedMetrics:
           - cloudkms.googleapis.com/read_requests
           - cloudkms.googleapis.com/write_requests
@@ -150,6 +149,7 @@ monitoring:
           - cloudkms.googleapis.com/external_kms_requests
         # Quota metric names to exclude only from the "approaching limit" (>90%) alerts.
         # These metrics will still trigger the "quota exceeded" alert.
+        # GCP is more forgiving of larger sets in this value.
         excludedApproachingMetrics: []
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
