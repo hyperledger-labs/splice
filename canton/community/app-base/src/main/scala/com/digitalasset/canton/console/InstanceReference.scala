@@ -1,19 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
 
-import com.daml.tls.TlsClientConfig
 import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.FindPruningTimestampCommand
 import com.digitalasset.canton.admin.api.client.data.topology.ListParticipantSynchronizerPermissionResult
 import com.digitalasset.canton.admin.api.client.data.{
-  GrpcSequencerConnection,
   MediatorStatus,
-  MemberAuthenticationToken,
   NodeStatus,
   ParticipantStatus,
-  SequencerConnections,
   SequencerStatus,
   StaticSynchronizerParameters as ConsoleStaticSynchronizerParameters,
 }
@@ -37,6 +33,7 @@ import com.digitalasset.canton.participant.config.{
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
 import com.digitalasset.canton.sequencer.admin.v30.SequencerPruningAdministrationServiceGrpc
 import com.digitalasset.canton.sequencer.admin.v30.SequencerPruningAdministrationServiceGrpc.SequencerPruningAdministrationServiceStub
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNode,
   MediatorNodeBootstrap,
@@ -46,7 +43,6 @@ import com.digitalasset.canton.synchronizer.mediator.{
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.{
   OrderingTopology,
   PeerNetworkStatus,
-  WriteReadiness,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
@@ -65,10 +61,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.{SequencerAlias, config}
-import com.google.protobuf.ByteString
 
-import java.util.Base64
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -96,7 +89,7 @@ trait InstanceReference
   override protected def pretty: Pretty[InstanceReference] =
     prettyOfString(inst => show"${inst.instanceType.unquoted} ${inst.name.singleQuoted}")
 
-  implicit val consoleEnvironment: ConsoleEnvironment
+  val consoleEnvironment: ConsoleEnvironment
 
   override protected[console] def tracedLogger: TracedLogger = logger
 
@@ -110,8 +103,7 @@ trait InstanceReference
   // this is just testing, because the cached values should remain unchanged in operation
   @Help.Summary("Clear locally cached variables", FeatureFlag.Testing)
   @Help.Description(
-    """Some commands cache values on the client side. Use this command to explicitly clear
-      |the caches of these values."""
+    "Some commands cache values on the client side. Use this command to explicitly clear the caches of these values."
   )
   def clear_cache(): Unit = check(FeatureFlag.Testing)(topology.clearCache())
 
@@ -133,6 +125,17 @@ trait InstanceReference
   def parties: PartiesAdministrationGroup
 
   def topology: TopologyAdministrationGroup
+
+  private lazy val trafficControl_ =
+    new TrafficControlAdministrationGroup(
+      this,
+      consoleEnvironment,
+      loggerFactory,
+    )
+  @Help.Summary("Traffic control related commands")
+  @Help.Group("Traffic")
+  def traffic_control: TrafficControlAdministrationGroup = trafficControl_
+
 }
 
 object InstanceReference {
@@ -157,23 +160,21 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     @Help.Summary("Migrates the instance's database if using a database storage")
     @Help.Description(
       """When instances reside on different nodes, their database migration can be run in parallel
-        |to save time. Please not that the migration commands must however must be run on each
-        |node individually, because remote migration through `participants.remote...` is not
-        |supported.
-        """
+        |to save time. Please not that the migration commands must however must be run on each node
+        |individually, because remote migration through `participants.remote...` is not supported.
+        |"""
     )
     def migrate(): Unit = consoleEnvironment.run(migrateDbCommand())
 
-    @Help.Summary("Repairs database migration (use only when advised)")
+    @Help.Summary(
+      "Only use when advised - repairs the database migration of the instance's database"
+    )
     @Help.Description(
-      """In some rare cases, we change already applied database migration files in a new release
-        |and the repair command resets the checksums we use to ensure that in general already
-        |applied migration files have not been changed.
-        |
-        |You should only use `db.repair_migration` when advised and otherwise use it at your own
-        |risk - in the worst case running it may lead to data corruption when an incompatible
-        |database migration (one that should be rejected because the already applied database
-        |migration files have changed) is subsequently falsely applied.
+      """In some rare cases, we change already applied database migration files in a new release and the repair
+        |command resets the checksums we use to ensure that in general already applied migration files have not been changed.
+        |You should only use `db.repair_migration` when advised and otherwise use it at your own risk - in the worst case running
+        |it may lead to data corruption when an incompatible database migration (one that should be rejected because
+        |the already applied database migration files have changed) is subsequently falsely applied.
         |"""
     )
     def repair_migration(force: Boolean = false): Unit =
@@ -222,9 +223,10 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     ): Either[String, MetricValue] = check(FeatureFlag.Testing) {
       val candidates = consoleEnvironment.environment.configuredOpenTelemetry.onDemandMetricsReader
         .read()
-
       val res = candidates
-        .find(_.getName.equals(metricName))
+        .find { data =>
+          data.getName.equals(metricName)
+        }
         .toList
         .flatMap(MetricValue.fromMetricData)
         .filter(filterByNodeAndAttribute(attributes))
@@ -232,8 +234,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
         case one :: Nil => Right(one)
         case Nil =>
           Left(s"No metric of name $metricName with instance name $name found.")
-        case other =>
-          Left(s"Found ${other.length} matching metrics: $other")
+        case other => Left(s"Found ${other.length} matching metrics")
       }
     }
 
@@ -252,9 +253,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     @Help.Summary("Get a particular metric")
     @Help.Description(
-      """Returns the metric with the given name and optionally matching attributes, or error if
-        |multiple matching are found.
-        """
+      """Returns the metric with the given name and optionally matching attributes, or error if multiple matching are found."""
     )
     def get(
         metricName: String,
@@ -264,9 +263,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     @Help.Summary("Get a particular histogram")
     @Help.Description(
-      """Returns the metric with the given name and optionally matching attributes, or error if
-        |multiple matching are found.
-        """
+      """Returns the metric with the given name and optionally matching attributes, or error if multiple matching are found."""
     )
     def get_histogram(
         metricName: String,
@@ -275,9 +272,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     @Help.Summary("Get a particular summary")
     @Help.Description(
-      """Returns the metric with the given name and optionally matching attributes, or error if
-        |multiple matching are found.
-        """
+      """Returns the metric with the given name and optionally matching attributes, or error if multiple matching are found."""
     )
     def get_summary(
         metricName: String,
@@ -286,9 +281,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     @Help.Summary("Get a particular long point")
     @Help.Description(
-      """Returns the metric with the given name and optionally matching attributes, or error if
-        |multiple matching are found.
-        """
+      """Returns the metric with the given name and optionally matching attributes, or error if multiple matching are found."""
     )
     def get_long_point(
         metricName: String,
@@ -297,9 +290,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     @Help.Summary("Get a particular double point")
     @Help.Description(
-      """Returns the metric with the given name and optionally matching attributes, or error if
-        |multiple matching are found.
-        """
+      """Returns the metric with the given name and optionally matching attributes, or error if multiple matching are found."""
     )
     def get_double_point(
         metricName: String,
@@ -506,17 +497,15 @@ abstract class ParticipantReference(
   override protected[canton] val instanceType: String = ParticipantReference.InstanceType
   override protected def runner: AdminCommandRunner = this
 
-  @Help.Summary("Yields the globally unique id of this participant")
-  @Help.Description(
-    """Throws an exception, if the id has not yet been allocated. For example when the
-       |participant has not yet been started."""
+  @Help.Summary(
+    "Yields the globally unique id of this participant. " +
+      "Throws an exception, if the id has not yet been allocated (e.g., the participant has not yet been started)."
   )
   override def id: ParticipantId = topology.idHelper(ParticipantId(_))
 
-  @Help.Summary("Yields Some(id) of this participant if id present")
-  @Help.Description(
-    """Returns None, if the id has not yet been allocated. For example the participant
-      |has not yet been initialised."""
+  @Help.Summary(
+    "Yields Some(id) of this participant if id present. " +
+      "Returns None, if the id has not yet been allocated (e.g., the participant has not yet been initialised)."
   )
   override def maybeId: Option[ParticipantId] = topology.maybeIdHelper(ParticipantId(_))
 
@@ -565,7 +554,7 @@ abstract class ParticipantReference(
     new ParticipantReplicationAdministrationGroup(this, consoleEnvironment)
 
   private lazy val repair_ =
-    new ParticipantRepairAdministration(this, loggerFactory)(consoleEnvironment)
+    new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory)
 
   private lazy val commitments_ =
     new CommitmentsAdministrationGroup(this, consoleEnvironment, loggerFactory)
@@ -576,16 +565,6 @@ abstract class ParticipantReference(
   @Help.Summary("Commands to repair the participant contract state", FeatureFlag.Repair)
   @Help.Group("Repair")
   def repair: ParticipantRepairAdministration = repair_
-
-  private lazy val trafficControl_ =
-    new ParticipantTrafficControlAdministrationGroup(
-      this,
-      consoleEnvironment,
-      loggerFactory,
-    )
-  @Help.Summary("Traffic control related commands")
-  @Help.Group("Traffic")
-  def traffic_control: ParticipantTrafficControlAdministrationGroup = trafficControl_
 
   /** Waits until for every participant p (drawn from consoleEnvironment.participants.all) that is
     * running and initialized and for each synchronizer to which both this participant and p are
@@ -720,9 +699,8 @@ class LocalParticipantReference(
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  @Help.Summary("Returns the node specific simClock")
-  @Help.Description(
-    "There is a race condition possibility if the environment.SimClock is being used as well."
+  @Help.Summary(
+    "Returns the node specific simClock, possible race condition if using environment.SimClock as well."
   )
   def simClock: Option[DelegatingSimClock] = cantonConfig.parameters.clock match {
     case ClockConfig.SimClock =>
@@ -835,17 +813,15 @@ abstract class SequencerReference(
   private val synchronizerId: AtomicReference[Option[PhysicalSynchronizerId]] =
     new AtomicReference[Option[PhysicalSynchronizerId]](None)
 
-  @Help.Summary("Yields the globally unique id of this sequencer")
-  @Help.Description(
-    """Throws an exception, if the id has not yet been allocated. For example the
-      |sequencer has not yet been started)."""
+  @Help.Summary(
+    "Yields the globally unique id of this sequencer. " +
+      "Throws an exception, if the id has not yet been allocated (e.g., the sequencer has not yet been started)."
   )
   override def id: SequencerId = topology.idHelper(SequencerId(_))
 
-  @Help.Summary("Yields Some(id) of this sequencer if id present")
-  @Help.Description(
-    """Returns None, if the id has not yet been allocated. For example the sequencer
-      |has not yet been initialised"""
+  @Help.Summary(
+    "Yields Some(id) of this sequencer if id present. " +
+      "Returns None, if the id has not yet been allocated (e.g., the sequencer has not yet been initialised)."
   )
   override def maybeId: Option[SequencerId] = topology.maybeIdHelper(SequencerId(_))
 
@@ -871,7 +847,7 @@ abstract class SequencerReference(
 
   @Help.Summary("Admin traffic control related commands")
   @Help.Group("Traffic")
-  def traffic_control: TrafficControlSequencerAdministrationGroup =
+  override def traffic_control: TrafficControlSequencerAdministrationGroup =
     sequencerTrafficControl
 
   @Help.Summary("Returns the logical synchronizer id of the synchronizer")
@@ -1019,60 +995,6 @@ abstract class SequencerReference(
     }
   }
 
-  @Help.Summary("Sequencer authentication related commands")
-  object authentication {
-    @Help.Summary(
-      "Generate an authentication token for a given member on this sequencer",
-      FeatureFlag.Testing,
-    )
-    @Help.Description(
-      """Generates a token that can be used to authenticate
-        |on behalf of a member on this sequencer.
-        |If expiresIn is empty, the configured maxTokenExpirationInterval
-        |config on the sequencer will be used.
-        |Only use for troubleshooting. Requires enable-testing-commands to be enabled.
-        |
-        |Parameters:
-        |- member: Member to generate the token for
-        |- expiresIn: Optional duration after which the token will expire.
-        |  When empty, the maxTokenExpirationInterval configured on the sequencer is used
-        |"""
-    )
-    def generate_authentication_token(
-        member: Member,
-        expiresIn: Option[config.NonNegativeFiniteDuration] = None,
-    ): MemberAuthenticationToken = check(FeatureFlag.Testing) {
-      consoleEnvironment.run {
-        runner.adminCommand(
-          SequencerAdminCommands.GenerateAuthenticationToken(member, expiresIn.map(_.toInternal))
-        )
-      }
-    }
-
-    @Help.Summary(
-      "Invalidates an authentication token on the sequencer and disconnects the corresponding member"
-    )
-    @Help.Description(
-      """Invalidates the authentication token and disconnects the sequencer client of its member"""
-    )
-    def logout(token: ByteString): Unit = doLogout(token)
-
-    @Help.Summary(
-      "Invalidates a base64 encoded authentication token on the sequencer and disconnects the corresponding member"
-    )
-    @Help.Description(
-      """Invalidates the authentication token and disconnects the sequencer client of its member"""
-    )
-    def logout(token: String): Unit = doLogout(ByteString.copyFrom(Base64.getDecoder.decode(token)))
-
-    private def doLogout(token: ByteString): Unit =
-      consoleEnvironment.run {
-        publicApiClient.publicApiCommand(
-          SequencerPublicCommands.Logout(token)
-        )
-      }
-  }
-
   @Help.Summary("Pruning of the sequencer")
   object pruning
       extends PruningSchedulerAdministration(
@@ -1093,12 +1015,11 @@ abstract class SequencerReference(
     @Help.Summary("Status of the sequencer and its connected clients")
     @Help.Description(
       """Provides a detailed breakdown of information required for pruning:
-        |- the current time according to this sequencer instance
-        |- synchronizer members that the sequencer supports
-        |- for each member when they were registered and whether they are enabled
-        |- a list of clients for each member, their last acknowledgement, and whether they are
-        |  enabled
-        """
+        | - the current time according to this sequencer instance
+        | - synchronizer members that the sequencer supports
+        | - for each member when they were registered and whether they are enabled
+        | - a list of clients for each member, their last acknowledgement, and whether they are enabled
+        |"""
     )
     def status(): SequencerPruningStatus =
       this.consoleEnvironment.run {
@@ -1107,25 +1028,23 @@ abstract class SequencerReference(
 
     @Help.Summary("Remove unnecessary data from the Sequencer up until the default retention point")
     @Help.Description(
-      """Removes unnecessary data from the Sequencer that is earlier than the default retention
-        |period. The default retention period is set in the configuration of the canton processing
-        |running this command under `parameters.retention-period-defaults.sequencer`.
+      """Removes unnecessary data from the Sequencer that is earlier than the default retention period.
+        |The default retention period is set in the configuration of the canton processing running this
+        |command under `parameters.retention-period-defaults.sequencer`.
         |This pruning command requires that data is read and acknowledged by clients before
         |considering it safe to remove.
         |
-        |If no data is being removed it could indicate that clients are not reading or
-        |acknowledging data in a timely fashion (typically due to nodes going offline for long
-        |periods).
-        |You have the option of disabling the members running on these nodes to allow removal of
-        |this data, however this will mean that they will be unable to reconnect to the
-        |synchronizer in the future.
-        |To do this run `force_prune(dryRun = true)` to return a description of which members
-        |would be disabled in order to prune the Sequencer.
-        |If you are happy to disable the described clients then run `force_prune(dryRun = false)`
-        |to permanently remove their unread data.
+        |If no data is being removed it could indicate that clients are not reading or acknowledging data
+        |in a timely fashion (typically due to nodes going offline for long periods).
+        |You have the option of disabling the members running on these nodes to allow removal of this data,
+        |however this will mean that they will be unable to reconnect to the synchronizer in the future.
+        |To do this run `force_prune(dryRun = true)` to return a description of which members would be
+        |disabled in order to prune the Sequencer.
+        |If you are happy to disable the described clients then run `force_prune(dryRun = false)` to
+        |permanently remove their unread data.
         |
         |Once offline clients have been disabled you can continue to run `prune` normally.
-        """
+        |"""
     )
     def prune(): String = {
       val defaultRetention =
@@ -1139,13 +1058,11 @@ abstract class SequencerReference(
     @Help.Description(
       """Will force pruning up until the default retention period by potentially disabling clients
         |that have not yet read data we would like to remove.
-        |Disabling these clients will prevent them from ever reconnecting to the Synchronizer so
-        |should only be used if the Synchronizer operator is confident they can be permanently
-        |ignored.
-        |
+        |Disabling these clients will prevent them from ever reconnecting to the Synchronizer so should only be
+        |used if the Synchronizer operator is confident they can be permanently ignored.
         |Run with `dryRun = true` to review a description of which clients will be disabled first.
         |Run with `dryRun = false` to disable these clients and perform a forced pruning.
-        """
+        |"""
     )
     def force_prune(dryRun: Boolean): String = {
       val defaultRetention =
@@ -1155,7 +1072,7 @@ abstract class SequencerReference(
 
     @Help.Summary("Remove data that has been read up until a custom retention period")
     @Help.Description(
-      "Similar to the above `prune` command but allows specifying a custom retention period."
+      "Similar to the above `prune` command but allows specifying a custom retention period"
     )
     def prune_with_retention_period(retentionPeriod: FiniteDuration): String = {
       val status = this.status()
@@ -1165,11 +1082,10 @@ abstract class SequencerReference(
     }
 
     @Help.Summary(
-      "Force remove Sequencer data up to a custom period, including unread data"
+      "Force removing data from the Sequencer including data that may have not been read by offline clients up until a custom retention period"
     )
     @Help.Description(
-      """Force removing data from the Sequencer including data that may have not been read by
-        |offline clients up until a custom retention period."""
+      "Similar to the above `force_prune` command but allows specifying a custom retention period"
     )
     def force_prune_with_retention_period(
         retentionPeriod: FiniteDuration,
@@ -1183,26 +1099,19 @@ abstract class SequencerReference(
 
     @Help.Summary("Remove data that has been read up until the specified time")
     @Help.Description(
-      """Similar to the above `prune` command but allows specifying the exact time at which to
-        |prune.
-        |
-        |The command will fail if a client has not yet read and acknowledged some data up to the
-        |specified time.
-        """
+      """Similar to the above `prune` command but allows specifying the exact time at which to prune.
+        |The command will fail if a client has not yet read and acknowledged some data up to the specified time."""
     )
     def prune_at(timestamp: CantonTimestamp): String =
       this.consoleEnvironment.run {
         runner.adminCommand(SequencerAdminCommands.Prune(timestamp))
       }
 
-    @Help.Summary("Force remove Sequencer data up to a custom period, including unread data")
+    @Help.Summary(
+      "Force removing data from the Sequencer including data that may have not been read by offline clients up until the specified time"
+    )
     @Help.Description(
-      """Force removing data from the Sequencer including data that may have not been read by
-        |offline clients up until the specified time.
-        |
-        |Similar to the above `force_prune` command but allows specifying the exact time at
-        |which to prune.
-        """
+      "Similar to the above `force_prune` command but allows specifying the exact time at which to prune"
     )
     def force_prune_at(timestamp: CantonTimestamp, dryRun: Boolean): String = {
       val initialStatus = status()
@@ -1257,12 +1166,10 @@ abstract class SequencerReference(
 
     @Help.Summary("Obtain a timestamp at or near the beginning of sequencer state")
     @Help.Description(
-      """This command provides insight into the current state of sequencer pruning when called
-        |with the default value of `index` 1.
-        |When pruning the sequencer manually via `prune_at` and with the intent to prune in
-        |batches, specify a value such as 1000 to obtain a pruning timestamp that corresponds to
-        |the "end" of the batch.
-        """
+      """This command provides insight into the current state of sequencer pruning when called with
+        |the default value of `index` 1.
+        |When pruning the sequencer manually via `prune_at` and with the intent to prune in batches, specify
+        |a value such as 1000 to obtain a pruning timestamp that corresponds to the "end" of the batch."""
     )
     def find_pruning_timestamp(
         index: PositiveInt = PositiveInt.tryCreate(1)
@@ -1284,10 +1191,9 @@ abstract class SequencerReference(
     @Help.Description(
       """This will prevent any client for the given member to reconnect the Sequencer
         |and allow any unread/unacknowledged data they have to be removed.
-        |This should only be used if the synchronizer operation is confident the member will never
-        |need to reconnect as there is no way to re-enable the member.
-        |To view members using the sequencer run `sequencer.status()`.
-        """"
+        |This should only be used if the synchronizer operation is confident the member will never need
+        |to reconnect as there is no way to re-enable the member.
+        |To view members using the sequencer run `sequencer.status()`.""""
     )
     def disable_member(member: Member): Unit = consoleEnvironment.run {
       runner.adminCommand(SequencerAdminCommands.DisableMember(member))
@@ -1326,14 +1232,6 @@ abstract class SequencerReference(
       consoleEnvironment.run {
         runner.adminCommand(
           SequencerBftAdminCommands.GetPeerNetworkStatus(endpoints.map(_.map(toInternal)))
-        )
-      }
-
-    @Help.Summary("Get write readiness")
-    def get_write_readiness(): WriteReadiness =
-      consoleEnvironment.run {
-        runner.adminCommand(
-          SequencerBftAdminCommands.GetWriteReadiness
         )
       }
 
@@ -1388,10 +1286,7 @@ class LocalSequencerReference(
     consoleEnvironment.environment.config.sequencersByString(name)
 
   override lazy val sequencerConnection: GrpcSequencerConnection =
-    GrpcSequencerConnection.fromInternal(
-      config.publicApi.clientConfig
-        .asSequencerConnection(sequencerAlias = SequencerAlias.tryCreate(name), sequencerId = None)
-    )
+    config.publicApi.clientConfig.asSequencerConnection()
 
   val nodes: SequencerNodes =
     consoleEnvironment.environment.sequencers
@@ -1422,12 +1317,7 @@ class RemoteSequencerReference(val environment: ConsoleEnvironment, val name: St
     environment.environment.config.remoteSequencersByString(name)
 
   override def sequencerConnection: GrpcSequencerConnection =
-    GrpcSequencerConnection.fromInternal(
-      config.publicApi.asSequencerConnection(
-        sequencerAlias = SequencerAlias.tryCreate(name),
-        sequencerId = None,
-      )
-    )
+    config.publicApi.asSequencerConnection()
 
   protected lazy val publicApiClient: SequencerPublicApiClient = new SequencerPublicApiClient(
     name,
@@ -1451,17 +1341,15 @@ abstract class MediatorReference(val consoleEnvironment: ConsoleEnvironment, nam
     consoleEnvironment.environment.loggerFactory
       .append(MediatorNodeBootstrap.LoggerFactoryKeyName, name)
 
-  @Help.Summary("Yields the mediator id of this mediator")
-  @Help.Description(
-    """Throws an exception, if the id has not yet been allocated (e.g., the mediator has not
-      |yet been initialised)."""
+  @Help.Summary(
+    "Yields the mediator id of this mediator. " +
+      "Throws an exception, if the id has not yet been allocated (e.g., the mediator has not yet been initialised)."
   )
   override def id: MediatorId = topology.idHelper(MediatorId(_))
 
-  @Help.Summary("Yields Some(id) of this mediator if id present")
-  @Help.Description(
-    """Returns None, if the id has not yet been allocated (e.g., the mediator has not
-      |yet been initialised)."""
+  @Help.Summary(
+    "Yields Some(id) of this mediator if id present. " +
+      "Returns None, if the id has not yet been allocated (e.g., the mediator has not yet been initialised)."
   )
   override def maybeId: Option[MediatorId] = topology.maybeIdHelper(MediatorId(_))
 

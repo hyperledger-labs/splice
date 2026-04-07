@@ -25,8 +25,6 @@ class AppActivityComputation(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def waitUntilInitialized: Future[Unit] = rewardsReferenceStore.waitUntilInitialized
-
   /** Compute app activity records for a batch of verdicts.
     *
     * Records are returned with verdictRowId = DUMMY_VERDICT_ROW_ID as a placeholder.

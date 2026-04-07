@@ -420,7 +420,7 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-2",
+      "name": "participant-3",
       "namespace": "validator",
       "timeout": 600,
       "values": {
@@ -472,7 +472,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 3
           }
         },
         "participantAdminUserNameFrom": {
@@ -483,7 +483,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_3",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -507,7 +507,7 @@
       },
       "version": "0.3.20"
     },
-    "name": "validator-participant-2",
+    "name": "validator-participant-3",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -552,7 +552,7 @@
           "name": "cn-mocknet"
         },
         "config": {
-          "jsonLedgerApiUrl": "http://participant-2:7575",
+          "jsonLedgerApiUrl": "http://participant-3:7575",
           "keyDirectory": "/keys",
           "maxParties": 1234,
           "parallelism": 321,
@@ -739,10 +739,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "2"
+          "id": "3"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

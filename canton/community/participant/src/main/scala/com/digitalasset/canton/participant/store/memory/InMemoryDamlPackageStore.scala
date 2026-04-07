@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -68,11 +68,6 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[DamlLf.Archive]] =
     FutureUnlessShutdown.pure(pkgData.get(packageId).map(_._1))
-
-  override def filterExisting(packageIds: Set[LfPackageId])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Set[PackageId]] =
-    FutureUnlessShutdown.pure(pkgData.view.filterKeys(packageIds).keySet.toSet)
 
   override def getPackageDescription(
       packageId: LfPackageId

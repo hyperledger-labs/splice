@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -84,7 +84,6 @@ final class MediatorRuntime(
       mediator.state.finalizedResponseStore,
       mediator.state.recordOrderTimeAwaiter,
       batchingConfig.maxItemsInBatch,
-      mediator.getActiveLsuSuccessor,
       loggerFactory,
     ),
     ec,
@@ -120,7 +119,6 @@ object MediatorRuntimeFactory {
       syncCrypto: SynchronizerCryptoClient,
       topologyClient: SynchronizerTopologyClientWithInit,
       topologyTransactionProcessor: TopologyTransactionProcessor,
-      topologyManager: SynchronizerTopologyManager,
       topologyManagerStatus: TopologyManagerStatus,
       synchronizerOutboxFactory: SynchronizerOutboxFactory,
       timeTracker: SynchronizerTimeTracker,
@@ -141,10 +139,6 @@ object MediatorRuntimeFactory {
       syncCrypto.pureCrypto,
       sequencerClient.protocolVersion,
       nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
-      fetchAggregatorConfig =
-        nodeParameters.batchingConfig.mediatorFetchFinalizedResponsesAggregator,
-      storeAggregatorConfig =
-        nodeParameters.batchingConfig.mediatorStoreFinalizedResponsesAggregator,
       nodeParameters.processingTimeouts,
       loggerFactory,
     )
@@ -168,7 +162,6 @@ object MediatorRuntimeFactory {
       )
 
     val synchronizerOutbox = synchronizerOutboxFactory.create(
-      topologyManager,
       topologyClient,
       sequencerClient,
       timeTracker,
@@ -182,12 +175,10 @@ object MediatorRuntimeFactory {
       topologyClient,
       syncCrypto,
       topologyTransactionProcessor,
-      topologyManager,
       topologyManagerStatus,
       synchronizerOutbox,
       timeTracker,
       state,
-      asynchronousProcessing = config.asynchronousProcessing,
       sequencerCounterTrackerStore,
       sequencedEventStore,
       nodeParameters,

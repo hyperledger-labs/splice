@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
@@ -17,9 +17,10 @@ import com.daml.ledger.api.v2.update_service.{GetUpdatesRequest, UpdateServiceGr
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.UpdateWrapper
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.ConsoleCommandResult
 import com.digitalasset.canton.damltests.java.simplecontractwithpayload.SimpleContractWithPayload
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -68,15 +69,14 @@ class LedgerApiStreamingTest extends CommunityIntegrationTest with SharedEnviron
     None,
   )
 
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   "test various stream closure scenarios and verify closure in logs, akka stream, gRPC" in {
     implicit env: TestConsoleEnvironment =>
       import env.*
 
       val suppressionRules = FullSuppression && (
-        LoggerNameContains("RequestLogger") ||
+        LoggerNameContains("ApiRequestLogger") ||
           LoggerNameContains("ApiUpdateService")
       )
       participant1.synchronizers.connect_local(sequencer1, alias = daName)

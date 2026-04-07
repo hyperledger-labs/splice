@@ -1,14 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.ha
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 
 import java.util.{Timer, TimerTask}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.{Failure, Success}
 
 /** PreemptableSequence is a helper to
@@ -117,7 +116,6 @@ object PreemptableSequence {
     val resultHandle = Handle(resultCompleted.future, killSwitchCaptor)
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var releaseStack: List[() => Future[Unit]] = Nil
-    val lock = new Mutex()
 
     val helper: SequenceHelper = new SequenceHelper {
       private def waitFor(delayMillis: Long): Future[Unit] = {
@@ -131,7 +129,7 @@ object PreemptableSequence {
         goF(p.future)
       }
 
-      override def registerRelease(release: => Unit): Unit = (lock.exclusive {
+      override def registerRelease(release: => Unit): Unit = blocking(synchronized {
         logger.info(s"Registered release function")
         releaseStack = (() => Future(release)) :: releaseStack
       })
@@ -211,7 +209,7 @@ object PreemptableSequence {
     }
 
     def release: Future[Unit] =
-      (lock.exclusive {
+      blocking(synchronized {
         releaseStack match {
           case Nil => None
           case x :: xs =>

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -109,8 +109,6 @@ object HashPurpose {
   val EncryptedSessionKey = HashPurpose(58, "EncryptedSessionKey")
   val ContractIdAbsolutization = HashPurpose(59, "ContractIdAbsolutization")
   val InitialTopologyStateConsistency = HashPurpose(60, "InitialTopologyStateConsistency")
-  val AcsContinuationToken = HashPurpose(61, "AcsContinuationToken")
-  val LsuSequencingTestMessageContent = HashPurpose(62, "LsuSequencingTestMessageContent")
 
   // Do not use for anything other than testing or "mock" hashes
   // Is not in a testing-only module because it used in traffic cost estimation that requires mock hashes

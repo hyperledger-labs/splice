@@ -1,20 +1,26 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.environment.NodeFactoryArguments
-import com.digitalasset.canton.resource.{DbLockCounters, StorageMultiFactory}
+import com.digitalasset.canton.resource.StorageSingleFactory
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
 import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 
 trait MediatorNodeBootstrapFactory {
+
   def create(
-      arguments: NodeFactoryArguments[MediatorNodeConfig, MediatorNodeParameters, MediatorMetrics]
+      arguments: NodeFactoryArguments[
+        MediatorNodeConfig,
+        MediatorNodeParameters,
+        MediatorMetrics,
+      ]
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -23,7 +29,7 @@ trait MediatorNodeBootstrapFactory {
   ): Either[String, MediatorNodeBootstrap]
 }
 
-object MediatorNodeBootstrapFactoryImpl extends MediatorNodeBootstrapFactory {
+object CommunityMediatorNodeBootstrapFactory extends MediatorNodeBootstrapFactory {
 
   override def create(
       arguments: NodeFactoryArguments[MediatorNodeConfig, MediatorNodeParameters, MediatorMetrics]
@@ -32,39 +38,25 @@ object MediatorNodeBootstrapFactoryImpl extends MediatorNodeBootstrapFactory {
       scheduler: ScheduledExecutorService,
       executionSequencerFactory: ExecutionSequencerFactory,
       actorSystem: ActorSystem,
-  ): Either[String, MediatorNodeBootstrap] = {
-    val replicaManager =
-      new MediatorReplicaManager(
-        arguments.parameters.exitOnFatalFailures,
-        arguments.parameters.processingTimeouts,
-        arguments.loggerFactory,
-        arguments.futureSupervisor,
-      )
-
+  ): Either[String, MediatorNodeBootstrap] =
     arguments
       .toCantonNodeBootstrapCommonArguments(
-        new StorageMultiFactory(
-          arguments.config.storage,
-          exitOnFatalFailures = arguments.parameters.exitOnFatalFailures,
-          arguments.config.replication,
-          _ => replicaManager.setActive(),
-          _ => replicaManager.setPassive(),
-          mustStayActive = false,
-          DbLockCounters.MEDIATOR_WRITE,
-          DbLockCounters.MEDIATOR_WRITERS,
-          arguments.futureSupervisor,
-          arguments.loggerFactory,
-          Some(() => replicaManager.getSessionContext),
+        new StorageSingleFactory(arguments.config.storage),
+        new CryptoPrivateStoreFactory(
+          arguments.config.crypto.provider,
+          arguments.config.parameters.caching.kmsMetadataCache,
+          arguments.config.crypto.privateKeyStore,
+          replicaManager = None,
         ),
-        Some(replicaManager),
       )
       .map { bootstrapArguments =>
-        new MediatorNodeBootstrap(bootstrapArguments, replicaManager) {
-          override def onClosed(): Unit = {
-            this.replicaManager.close()
-            super.onClosed()
-          }
-        }
+        new MediatorNodeBootstrap(
+          bootstrapArguments,
+          new CommunityMediatorReplicaManager(
+            arguments.parameters.processingTimeouts,
+            arguments.loggerFactory,
+          ),
+        )
       }
-  }
+
 }

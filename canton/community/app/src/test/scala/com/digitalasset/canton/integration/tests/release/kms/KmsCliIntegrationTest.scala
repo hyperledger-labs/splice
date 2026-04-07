@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release.kms
@@ -20,6 +20,7 @@ trait KmsCliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
   protected def bootstrapScript: String
   protected def testName: String
 
+  override protected val isEnterprise: Boolean = false
   override protected def withFixture(test: OneArgTest): Outcome = test(new BufferedProcessLogger)
 
   override type FixtureParam = BufferedProcessLogger

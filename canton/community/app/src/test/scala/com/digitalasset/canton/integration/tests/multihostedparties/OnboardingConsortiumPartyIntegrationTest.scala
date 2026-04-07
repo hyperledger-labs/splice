@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multihostedparties
@@ -6,11 +6,11 @@ package com.digitalasset.canton.integration.tests.multihostedparties
 import better.files.File
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest.CantonLfV21
-import com.digitalasset.canton.config.CommitmentSendDelay
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeProportion, PositiveInt}
+import com.digitalasset.canton.config.{CommitmentSendDelay, DbConfig}
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.integration.EnvironmentDefinition
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.LoggerSuppressionHelpers
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
@@ -181,8 +181,7 @@ sealed trait OnboardingConsortiumPartyIntegrationTest extends ConsortiumPartyInt
 
           logger.debug("Onboarding: Import ACS to P4 (an empty participant)")
           participant4.ledger_api.state.acs.of_all() shouldBe empty
-          // TODO(#29427) - Potentially worthwhile to swtich back parties.import_party_acs
-          participant4.repair.import_acs(daId, acsFilename)
+          participant4.parties.import_party_acs(acsFilename)
 
           logger.debug(s"Onboarding: Connect P4 to the synchronizer $daName")
           participant4.synchronizers.connect_local(sequencer1, daName)
@@ -362,5 +361,5 @@ sealed trait OnboardingConsortiumPartyIntegrationTest extends ConsortiumPartyInt
 final class OnboardingConsortiumPartyIntegrationTestPostgres
     extends OnboardingConsortiumPartyIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

@@ -1,9 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
+import cats.implicits.catsSyntaxEitherId
+import com.daml.logging.LoggingContext
 import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{Signature, SigningKeyUsage}
@@ -14,15 +16,13 @@ import com.digitalasset.canton.data.{
   UnassignmentViewTree,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetectionHelpers.mkActivenessResult
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentDataHelpers.TestValidator
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
   ParsedReassignmentRequest,
   ReassignmentProcessorError,
 }
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.{
-  ContractValidationError,
+  ContractAuthenticationFailure,
   ReassigningParticipantsMismatch,
   StakeholdersMismatch,
   SubmitterMustBeStakeholder,
@@ -35,11 +35,15 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ContractValidator
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.{ContractValidator, ReassignmentTag}
+import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.transaction.FatContractInstance
+import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.http.NotImplementedException
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   private val sourceSynchronizer = Source(
@@ -134,44 +138,37 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       validation.reassigningParticipantValidationResult.isTargetTsValidatable shouldBe false
     }
 
-    def testContractValidationAgainstRepresentativePackage(
-        invalidRpId: ReassignmentTag[LfPackageId]
-    ): Unit = {
+    "fail if contract validation fails" in {
 
       val expected = "bad-contract"
 
-      val failingContractValidator =
-        new TestValidator(Map((contract.contractId, invalidRpId.unwrap) -> expected))
+      val failingContractValidator = new ContractValidator {
+        override def authenticate(contract: FatContractInstance, targetPackageId: PackageId)(
+            implicit
+            ec: ExecutionContext,
+            traceContext: TraceContext,
+            loggingContext: LoggingContext,
+        ): EitherT[FutureUnlessShutdown, String, Unit] =
+          EitherT.fromEither[FutureUnlessShutdown](expected.asLeft[Unit])
+        override def authenticateHash(
+            contract: FatContractInstance,
+            contractHash: LfHash,
+        ): Either[String, Unit] = throw new NotImplementedException()
+      }
 
       inside(
         performValidation(
           contract,
           contractValidator = failingContractValidator,
-          sourceValidationPackageId = invalidRpId match {
-            case Source(pkgId) => Some(pkgId)
-            case Target(_) => None
-          },
-          targetValidationPackageId = invalidRpId match {
-            case Source(_) => None
-            case Target(pkgId) => Some(pkgId)
-          },
         ).futureValueUS.value.commonValidationResult.contractAuthenticationResultF.futureValueUS.left.value
-      ) { case ContractValidationError(ref, contractId, representativePackageId, reason) =>
-        ref shouldBe ReassignmentRef(contract.contractId)
-        contractId shouldBe contract.contractId
-        representativePackageId shouldBe invalidRpId.unwrap
-        reason should include(expected)
+      ) {
+        case ContractAuthenticationFailure(ref, reason, contractId) =>
+          ref shouldBe ReassignmentRef(contract.contractId)
+          contractId shouldBe contract.contractId
+          reason should include(expected)
+        case other => fail(s"Did not expect $other")
       }
-    }
 
-    "fail if contract validation fails with source package" in {
-      val invalidRpId = LfPackageId.assertFromString("invalid-representative-package")
-      testContractValidationAgainstRepresentativePackage(Source(invalidRpId))
-    }
-
-    "fail if contract validation fails with target package" in {
-      val invalidRpId = LfPackageId.assertFromString("invalid-representative-package")
-      testContractValidationAgainstRepresentativePackage(Target(invalidRpId))
     }
 
     "fail when inconsistent stakeholders are given" in {
@@ -182,18 +179,16 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
        */
 
       def createUnassignmentTree(metadata: ContractMetadata): FullUnassignmentTree =
-        ReassignmentDataHelpers
-          .apply(
-            ExampleContractFactory.modify(contract, metadata = Some(metadata)),
-            sourceSynchronizer,
-            targetSynchronizer,
-            identityFactory,
-          )
-          .unassignmentRequest(
-            submitter = signatory,
-            submittingParticipant = confirmingParticipant,
-            sourceMediator = sourceMediator,
-          )(reassigningParticipants)
+        ReassignmentDataHelpers(
+          ExampleContractFactory.modify(contract, metadata = Some(metadata)),
+          sourceSynchronizer,
+          targetSynchronizer,
+          identityFactory,
+        ).unassignmentRequest(
+          submitter = signatory,
+          submittingParticipant = confirmingParticipant,
+          sourceMediator = sourceMediator,
+        )(reassigningParticipants)
           .toFullUnassignmentTree(
             pureCrypto,
             pureCrypto,
@@ -288,29 +283,33 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       )
 
       // Missing reassigning participant
-      val missingObservingReassigningParticipant = Set(confirmingParticipant)
+      val missingConfirmingReassigningParticipant = Set.empty[ParticipantId]
       unassignmentValidation(
-        reassigningParticipants = missingObservingReassigningParticipant
+        reassigningParticipants = missingConfirmingReassigningParticipant
       ) shouldBe Seq(
         ReassigningParticipantsMismatch(
           ReassignmentRef(contract.contractId),
           expected = reassigningParticipants,
-          declared = missingObservingReassigningParticipant,
+          declared = missingConfirmingReassigningParticipant,
         )
       )
 
-      // If the request declares no reassigning participants, the validator treats this participant
-      // as non-reassigning for this check and therefore skips reassigning-participant validation.
+      // Empty set
       unassignmentValidation(
         reassigningParticipants = Set.empty
-      ) shouldBe Seq()
+      ) shouldBe Seq(
+        ReassigningParticipantsMismatch(
+          ReassignmentRef(contract.contractId),
+          expected = reassigningParticipants,
+          declared = Set.empty,
+        )
+      )
     }
   }
 
   private val cryptoSnapshot = identityFactory
     .forOwnerAndSynchronizer(confirmingParticipant, sourceSynchronizer.unwrap)
     .currentSnapshotApproximation
-    .futureValueUS
 
   private val reassignmentId = ReassignmentId.tryCreate("00")
 
@@ -345,40 +344,28 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       reassigningParticipants.toSeq.tail*
     )
     val signature = cryptoSnapshot
-      .sign(
-        fullUnassignmentTree.rootHash.unwrap,
-        SigningKeyUsage.ProtocolOnly,
-        None, // not needed for unit tests; session signing keys disabled
-      )
+      .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
       .futureValueUS
       .value
     val parsed = mkParsedRequest(fullUnassignmentTree, recipients, Some(signature))
 
     val getTopologyAtTs = new GetTopologyAtTimestamp {
-
+      import com.digitalasset.canton.tracing.TraceContext
       override def maybeAwaitTopologySnapshot(
-          targetPsid: Target[PhysicalSynchronizerId],
+          targetPSId: Target[PhysicalSynchronizerId],
           requestedTimestamp: Target[CantonTimestamp],
-      )(implicit
-          traceContext: TraceContext
-      ): EitherT[
-        FutureUnlessShutdown,
-        ReassignmentProcessorError,
-        Option[Target[TopologySnapshot]],
-      ] = EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](targetTopology)
-
+      )(implicit tc: TraceContext) = EitherT.rightT(targetTopology)
     }
 
-    val unassignmentValidation = new UnassignmentValidation(
+    val unassignmentValidation = UnassignmentValidation(
+      isReassigningParticipant = true,
       participantId = confirmingParticipant,
       contractValidator = contractValidator,
+      activenessF = FutureUnlessShutdown.pure(mkActivenessResult()),
       getTopologyAtTs = getTopologyAtTs,
     )
 
-    unassignmentValidation.perform(
-      parsedRequest = parsed,
-      activenessF = FutureUnlessShutdown.pure(mkActivenessResult()),
-    )
+    unassignmentValidation.perform(parsedRequest = parsed)
   }
 
   private def performValidation(
@@ -390,20 +377,9 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
         Target(identityFactory.topologySnapshot())
       ),
       contractValidator: ContractValidator = ContractValidator.AllowAll,
-      sourceValidationPackageId: Option[LfPackageId] = None,
-      targetValidationPackageId: Option[LfPackageId] = None,
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, UnassignmentValidationResult] = {
     val unassignmentRequest =
-      ReassignmentDataHelpers
-        .apply(
-          contract = contract,
-          sourceSynchronizer = sourceSynchronizer,
-          targetSynchronizer = targetSynchronizer,
-          identityFactory = identityFactory,
-          targetTimestamp = Target(CantonTimestamp.Epoch),
-          sourceValidationPackageId = sourceValidationPackageId,
-          targetValidationPackageId = targetValidationPackageId,
-        )
+      ReassignmentDataHelpers(contract, sourceSynchronizer, targetSynchronizer, identityFactory)
         .unassignmentRequest(
           submitter,
           submittingParticipant = confirmingParticipant,

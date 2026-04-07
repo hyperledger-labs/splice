@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
@@ -26,11 +26,12 @@ private[interning] object RawStringInterning {
       )
 
   def newEntries(
-      distinctRawStrings: Iterable[String],
+      strings: Iterator[String],
       rawStringInterning: RawStringInterning,
   ): Vector[(Int, String)] =
-    distinctRawStrings.view
+    strings
       .filterNot(rawStringInterning.map.contains)
+      .distinct
       .zipWithIndex
       .map { case (string, index) =>
         (index + 1 + rawStringInterning.lastId, string)

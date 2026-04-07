@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.gcp
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{KmsConfig, ProcessingTimeout}
@@ -69,11 +68,7 @@ class GcpKms(
   private val gcpKeyversion = "1"
 
   private val errorMessagesToRetry =
-    Set(
-      "io.grpc.StatusRuntimeException: UNAVAILABLE: Connection closed",
-      "Internal error encountered",
-      "INTERNAL: http2 exception",
-    )
+    Set("io.grpc.StatusRuntimeException: UNAVAILABLE: Connection closed")
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def convertPublicKeyFromPemToDer(pubKeyPEM: String): Either[String, ByteString] = {
@@ -120,8 +115,7 @@ class GcpKms(
         )
         kmsErrorGen(ErrorUtil.messageWithStacktrace(err), true)
       case internalErr: com.google.api.gax.rpc.InternalException
-          if Option(internalErr.getMessage)
-            .exists(errMsg => errorMessagesToRetry.exists(errMsg.contains(_))) =>
+          if Option(internalErr.getMessage).exists(_.contains("Internal error encountered")) =>
         logger.debug(
           "Got InternalException(Internal error encountered) — treating it as retryable"
         )(
@@ -134,14 +128,11 @@ class GcpKms(
         kmsErrorGen(ErrorUtil.messageWithStacktrace(err), false)
     }
 
-  private def wrapKmsCall[A](
-      kmsErrorGen: (String, Boolean) => KmsError,
-      functionName: String,
-  )(
+  private def wrapKmsCall[A](kmsErrorGen: (String, Boolean) => KmsError)(
       kmsCall: => A
-  )(implicit ec: ExecutionContext, tc: TraceContext): EitherT[FutureUnlessShutdown, KmsError, A] =
+  )(implicit ec: ExecutionContext): EitherT[FutureUnlessShutdown, KmsError, A] =
     EitherT {
-      synchronizeWithClosingF(functionName) {
+      FutureUnlessShutdown.outcomeF {
         Future {
           blocking {
             Either.catchOnly[RuntimeException](kmsCall)
@@ -178,25 +169,20 @@ class GcpKms(
       _ <- loggerKms.withLogging[gcp.CryptoKey](
         loggerKms.createKeyRequestMsg(keyPurpose.name, keySpec.name),
         _ => loggerKms.createKeyResponseMsg(kmsKeyIdStr, keyPurpose.name, keySpec.name),
-      ) {
-        wrapKmsCall(
-          kmsErrorGen = (errStr, retryable) => KmsCreateKeyError(errStr, retryable),
-          functionName = functionFullName,
-        ) {
-          val key =
-            gcp.CryptoKey
-              .newBuilder()
-              .setPurpose(keyPurpose)
-              .setVersionTemplate(
-                gcp.CryptoKeyVersionTemplate
-                  .newBuilder()
-                  .setAlgorithm(keySpec)
-                  .setProtectionLevel(gcp.ProtectionLevel.HSM)
-              )
-              .build()
-          kmsClient.createCryptoKey(keyRingName, kmsKeyIdStr, key)
-        }
-      }
+      )(wrapKmsCall((errStr, retryable) => KmsCreateKeyError(errStr, retryable)) {
+        val key =
+          gcp.CryptoKey
+            .newBuilder()
+            .setPurpose(keyPurpose)
+            .setVersionTemplate(
+              gcp.CryptoKeyVersionTemplate
+                .newBuilder()
+                .setAlgorithm(keySpec)
+                .setProtectionLevel(gcp.ProtectionLevel.HSM)
+            )
+            .build()
+        kmsClient.createCryptoKey(keyRingName, kmsKeyIdStr, key)
+      })
       kmsKeyId <- String300
         .create(kmsKeyIdStr)
         .toEitherT[FutureUnlessShutdown]
@@ -272,10 +258,9 @@ class GcpKms(
       loggerKms.getPublicKeyRequestMsg(keyId.unwrap),
       publicKey => loggerKms.getPublicKeyResponseMsg(keyId.unwrap, publicKey.getAlgorithm.name),
     )(
-      wrapKmsCall(
-        kmsErrorGen = (errStr, retryable) => KmsGetPublicKeyError(keyId, errStr, retryable),
-        functionName = functionFullName,
-      )(kmsClient.getPublicKey(keyVersionName))
+      wrapKmsCall((errStr, retryable) => KmsGetPublicKeyError(keyId, errStr, retryable))(
+        kmsClient.getPublicKey(keyVersionName)
+      )
     )
   }
 
@@ -424,10 +409,9 @@ class GcpKms(
         loggerKms.encryptRequestMsg(keyId.unwrap, encryptionAlgorithm.name),
         _ => loggerKms.encryptResponseMsg(keyId.unwrap, encryptionAlgorithm.name),
       )(
-        wrapKmsCall(
-          kmsErrorGen = (errStr, retryable) => KmsEncryptError(keyId, errStr, retryable),
-          functionName = functionFullName,
-        )(kmsClient.encrypt(keyName, data.unwrap).getCiphertext)
+        wrapKmsCall((errStr, retryable) => KmsEncryptError(keyId, errStr, retryable))(
+          kmsClient.encrypt(keyName, data.unwrap).getCiphertext
+        )
       )
       ciphertext <- ByteString6144
         .create(dataEnc)
@@ -459,10 +443,7 @@ class GcpKms(
         loggerKms.decryptRequestMsg(keyId.unwrap, encryptionAlgorithm.name),
         _ => loggerKms.decryptResponseMsg(keyId.unwrap, encryptionAlgorithm.name),
       )(
-        wrapKmsCall(
-          kmsErrorGen = (errStr, retryable) => KmsDecryptError(keyId, errStr, retryable),
-          functionName = functionFullName,
-        )(
+        wrapKmsCall((errStr, retryable) => KmsDecryptError(keyId, errStr, retryable))(
           kmsClient.decrypt(keyName, data.unwrap).getPlaintext
         )
       )
@@ -499,10 +480,7 @@ class GcpKms(
         loggerKms.decryptRequestMsg(keyId.unwrap, encryptionAlgorithm.name),
         _ => loggerKms.decryptResponseMsg(keyId.unwrap, encryptionAlgorithm.name),
       )(
-        wrapKmsCall(
-          kmsErrorGen = (errStr, retryable) => KmsDecryptError(keyId, errStr, retryable),
-          functionName = functionFullName,
-        )(
+        wrapKmsCall((errStr, retryable) => KmsDecryptError(keyId, errStr, retryable))(
           kmsClient.asymmetricDecrypt(keyName, data.unwrap).getPlaintext
         )
       )
@@ -528,10 +506,7 @@ class GcpKms(
       loggerKms.signRequestMsg(keyId.unwrap, "data", signingAlgorithm.name),
       _ => loggerKms.signResponseMsg(keyId.unwrap, signingAlgorithm.name),
     )(
-      wrapKmsCall(
-        kmsErrorGen = (errStr, retryable) => KmsSignError(keyId, errStr, retryable),
-        functionName = functionFullName,
-      ) {
+      wrapKmsCall((errStr, retryable) => KmsSignError(keyId, errStr, retryable)) {
         val request =
           AsymmetricSignRequest.newBuilder().setData(data).setName(keyVersionName.toString).build()
         kmsClient.asymmetricSign(request).getSignature
@@ -615,10 +590,7 @@ class GcpKms(
       loggerKms.deleteKeyRequestMsg(keyId.unwrap),
       _ => loggerKms.deleteKeyResponseMsg(keyId.unwrap),
     )(
-      wrapKmsCall(
-        kmsErrorGen = (errStr, retryable) => KmsDeleteKeyError(keyId, errStr, retryable),
-        functionName = functionFullName,
-      )(
+      wrapKmsCall((errStr, retryable) => KmsDeleteKeyError(keyId, errStr, retryable))(
         kmsClient.destroyCryptoKeyVersion(keyVersionName).discard
       )
     )
@@ -647,10 +619,7 @@ class GcpKms(
           keyMetadata.getState.name,
         ),
     )(
-      wrapKmsCall(
-        kmsErrorGen = (errStr, retryable) => KmsRetrieveKeyMetadataError(keyId, errStr, retryable),
-        functionName = functionFullName,
-      )(
+      wrapKmsCall((errStr, retryable) => KmsRetrieveKeyMetadataError(keyId, errStr, retryable))(
         kmsClient.getCryptoKeyVersion(keyVersionName)
       )
     )

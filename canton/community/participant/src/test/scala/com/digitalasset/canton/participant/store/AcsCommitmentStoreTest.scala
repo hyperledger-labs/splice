@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -23,7 +23,6 @@ import com.digitalasset.canton.participant.store.AcsCommitmentStore.{
   ReinitializationStatus,
 }
 import com.digitalasset.canton.participant.store.UpdateMode.Checkpoint
-import com.digitalasset.canton.platform.store.interning.MockStringInterning
 import com.digitalasset.canton.protocol.ContractMetadata
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -32,7 +31,6 @@ import com.digitalasset.canton.protocol.messages.{
   SignedProtocolMessage,
 }
 import com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants
-import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState.{All, MatchOrMismatch}
 import com.digitalasset.canton.store.PrunableByTimeTest
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{
@@ -94,7 +92,7 @@ trait CommitmentStoreBaseTest
   protected lazy val remoteIdNESet: NonEmpty[Set[ParticipantId]] =
     NonEmptyUtil.fromElement(remoteId).toSet
   protected lazy val remoteId1And2NESet: NonEmpty[Set[ParticipantId]] =
-    NonEmpty(Set, remoteId, remoteId2)
+    NonEmptyUtil.fromUnsafe(Set(remoteId, remoteId2))
 
   protected lazy val intervalInt: Int = 1
   protected lazy val interval: PositiveSeconds = PositiveSeconds.tryOfSeconds(intervalInt.toLong)
@@ -184,12 +182,6 @@ trait CommitmentStoreBaseTest
   lazy val alice: LfPartyId = LfPartyId.assertFromString("Alice")
   lazy val bob: LfPartyId = LfPartyId.assertFromString("bob")
   lazy val charlie: LfPartyId = LfPartyId.assertFromString("charlie")
-
-  lazy val mockStringInterning = new MockStringInterning
-
-  lazy val internalizedAlice: Int = mockStringInterning.party.internalize(alice)
-  lazy val internalizedBob: Int = mockStringInterning.party.internalize(bob)
-  lazy val internalizedCharlie: Int = mockStringInterning.party.internalize(charlie)
 }
 
 trait AcsCommitmentStoreTest
@@ -439,7 +431,7 @@ trait AcsCommitmentStoreTest
         _ <- store.markComputedAndSent(deriveFullPeriod(periods(4, 6)))
         _ <- store.markOutstanding(
           periods(6, 8),
-          NonEmpty(Set, remoteId, remoteId2, remoteId3),
+          NonEmptyUtil.fromUnsafe(Set(remoteId, remoteId2, remoteId3)),
         )
         _ <- store.markComputedAndSent(deriveFullPeriod(periods(6, 8)))
         limitNoIgnore <- store.noOutstandingCommitments(endOfTime)
@@ -815,7 +807,6 @@ trait AcsCommitmentStoreTest
       val beforeOrAt = ts(20)
 
       def times(i: Integer, j: Integer) = ts(i) -> ts(j)
-
       val uncleanPeriodsWithResults = List(
         List() -> ts(20),
         List(times(0, 5)) -> ts(20),
@@ -918,18 +909,41 @@ trait AcsCommitmentStoreTest
       }
     }
 
+    "can idempotent mark period as multi hosted cleared" in {
+      val store = mk()
+      for {
+        _ <- store.markOutstanding(periods(0, 1), remoteIdNESet)
+        _ <- store.markComputedAndSent(period(0, 1))
+        noOutstanding <- store.noOutstandingCommitments(ts(10))
+        _ <- store.markMultiHostedCleared(period(0, 1))
+        noOutstandingAfterCleared <- store.noOutstandingCommitments(ts(10))
+        _ <- store.markMultiHostedCleared(period(0, 1))
+        noOutstandingAfterClearedIdempotent <- store.noOutstandingCommitments(ts(10))
+
+      } yield {
+        noOutstanding shouldBe Some(ts(0))
+        noOutstandingAfterCleared shouldBe Some(ts(1))
+        noOutstandingAfterClearedIdempotent shouldBe noOutstandingAfterCleared
+      }
+    }
+
     "can mark non-existing period without problems" in {
       val store = mk()
       for {
         _ <- store.markOutstanding(periods(0, 1), remoteIdNESet)
         _ <- store.markComputedAndSent(period(0, 1))
         noOutstanding <- store.noOutstandingCommitments(ts(10))
+        _ <- store.markMultiHostedCleared(period(0, 2))
+        noOutstandingAfterCleared <- store.noOutstandingCommitments(ts(10))
+
       } yield {
         noOutstanding shouldBe Some(ts(0))
+        // we marked an invalid period so it shouldn't advance
+        noOutstandingAfterCleared shouldBe noOutstanding
       }
     }
 
-    "periods are not cleared if there are mismatches" in {
+    "marked periods are fine even with mismatches" in {
       val store = mk()
       for {
         _ <- store.markOutstanding(periods(0, 1), remoteIdNESet)
@@ -937,138 +951,28 @@ trait AcsCommitmentStoreTest
         noOutstanding <- store.noOutstandingCommitments(ts(10))
         _ <- store.markUnsafe(remoteId, periods(0, 1))
         noOutstandingUnsafe <- store.noOutstandingCommitments(ts(10))
+        _ <- store.markMultiHostedCleared(period(0, 1))
+        noOutstandingAfterCleared <- store.noOutstandingCommitments(ts(10))
+
+        // we try to remark the period as unsafe, this should not cause an update
+        _ <- store.markUnsafe(remoteId, periods(0, 1))
+        noOutStandingAfterMarkUnsafe <- store.noOutstandingCommitments(ts(10))
       } yield {
         noOutstanding shouldBe Some(ts(0))
         noOutstandingUnsafe shouldBe noOutstanding
+
+        noOutstandingAfterCleared shouldBe Some(ts(1))
+        noOutStandingAfterMarkUnsafe shouldBe noOutstandingAfterCleared
       }
     }
 
-    "allow pruning with ignore counter participants parameter:" must {
-      // in the following scenarios, the participant computed up to timestamp = 7 > outstanding call parameter beforeOrAt = 3
-      "prune with mismatches" in {
-        // a counter-participant exhibiting mismatches
-        val store = mk()
-        for {
-          _ <- store.markOutstanding(
-            periods(0, 7),
-            NonEmpty(Set, remoteId, remoteId2, remoteId3),
-          )
-          _ <- store.markComputedAndSent(period(0, 7))
-
-          // everything used to be safe to prune up to 2
-          _ <- store.markSafe(remoteId, periods(0, 2))
-          _ <- store.markSafe(remoteId2, periods(0, 2))
-          _ <- store.markSafe(remoteId3, periods(0, 2))
-
-          // clean periods according to policy matched or mismatched are the ones below
-          // the latest period where everything is clean is ts(2)
-          _ <- store.markSafe(remoteId, periods(4, 5))
-          _ <- store.markSafe(remoteId2, periods(4, 7))
-          _ <- store.markUnsafe(remoteId3, periods(5, 6))
-
-          out3 <- store.noOutstandingCommitments(ts(3), Some(MatchOrMismatch))
-
-          // now additionally mark as clean
-          // the latest period where everything is clean is ts(5)
-          _ <- store.markUnsafe(remoteId3, periods(3, 5))
-
-          out5 <- store.noOutstandingCommitments(ts(5), Some(MatchOrMismatch))
-          out7 <- store.noOutstandingCommitments(ts(7), Some(MatchOrMismatch))
-
-          // now we have a new outstanding
-          _ <- store.markOutstanding(
-            periods(7, 11),
-            NonEmpty(Set, remoteId, remoteId2, remoteId3, remoteId4),
-          )
-
-          _ <- store.markComputedAndSent(period(0, 11))
-
-          // clean periods according to policy matched or mismatched are the ones below
-          // the latest period where ids 1 2 and 3 are clean is ts(9), but 1, 2, 3, 4 are clean only at ts(5)
-          _ <- store.markUnsafe(remoteId, periods(7, 10))
-          _ <- store.markUnsafe(remoteId2, periods(8, 9))
-          _ <- store.markUnsafe(remoteId3, periods(5, 9))
-
-          out101 <- store.noOutstandingCommitments(ts(10), Some(MatchOrMismatch))
-
-          // clean 4 at ts(9) too
-          _ <- store.markUnsafe(remoteId4, periods(7, 9))
-          out102 <- store.noOutstandingCommitments(ts(10), Some(MatchOrMismatch))
-        } yield {
-          out3 shouldBe Some(ts(2))
-          out5 shouldBe Some(ts(5))
-          out7 shouldBe Some(ts(5))
-          out101 shouldBe Some(ts(5))
-          out102 shouldBe Some(ts(9))
-        }
-      }
-
-      "prune with mismatches or unresponsive" in {
-        // a counter-participant exhibiting mismatches
-        val store = mk()
-        for {
-          _ <- store.markOutstanding(
-            periods(0, 7),
-            NonEmpty(Set, remoteId, remoteId2, remoteId3),
-          )
-          _ <- store.markComputedAndSent(period(0, 7))
-
-          // everything used to be safe to prune up to 2
-          _ <- store.markSafe(remoteId, periods(0, 2))
-          _ <- store.markSafe(remoteId2, periods(0, 2))
-          _ <- store.markSafe(remoteId3, periods(0, 2))
-
-          // clean periods according to policy matched are the ones below
-          _ <- store.markSafe(remoteId, periods(4, 5))
-          _ <- store.markSafe(remoteId2, periods(4, 7))
-
-          // we always get that the requested timestamp is safe to prune, because matched or mismatched or unresponsive are all states
-          out31 <- store.noOutstandingCommitments(ts(3), Some(All))
-          out71 <- store.noOutstandingCommitments(ts(7), Some(All))
-
-          // now we make some periods unclean for id 3
-          _ <- store.markUnsafe(remoteId3, periods(3, 5))
-
-          // the latest clean period remains unchanged
-          out32 <- store.noOutstandingCommitments(ts(3), Some(All))
-          out72 <- store.noOutstandingCommitments(ts(7), Some(All))
-
-          // now we make some more periods clean
-          // the latest clean timestamp remains unchanged
-          _ <- store.markSafe(remoteId, periods(5, 7))
-
-          out33 <- store.noOutstandingCommitments(ts(3), Some(All))
-          out73 <- store.noOutstandingCommitments(ts(7), Some(All))
-
-          // now we have a new outstanding
-          _ <- store.markOutstanding(
-            periods(7, 11),
-            NonEmpty(Set, remoteId, remoteId2, remoteId3, remoteId4),
-          )
-          _ <- store.markComputedAndSent(period(0, 11))
-          // now we make a later period unclean for id 3
-          _ <- store.markUnsafe(remoteId3, periods(10, 11))
-
-          // the latest clean timestamp remains unchanged
-          out74 <- store.noOutstandingCommitments(ts(7), Some(All))
-        } yield {
-          out31 shouldBe Some(ts(3))
-          out71 shouldBe Some(ts(7))
-
-          out32 shouldBe Some(ts(3))
-          out72 shouldBe Some(ts(7))
-
-          out33 shouldBe Some(ts(3))
-          out73 shouldBe Some(ts(7))
-
-          out74 shouldBe Some(ts(7))
-        }
-      }
-    }
   }
+
 }
 
 trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
+  import com.digitalasset.canton.lfPartyOrdering
+
   def commitmentSnapshotStore(mkWith: ExecutionContext => IncrementalCommitmentStore): Unit = {
 
     def mk() = mkWith(executionContext)
@@ -1092,10 +996,7 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
 
           _ <- snapshot.update(
             rt(1, 0),
-            updates = Map(
-              SortedSet(internalizedAlice, internalizedBob) -> snapAB10,
-              SortedSet(internalizedBob, internalizedCharlie) -> snapBC10,
-            ),
+            updates = Map(SortedSet(alice, bob) -> snapAB10, SortedSet(bob, charlie) -> snapBC10),
             deletes = Set.empty,
             mode,
           )
@@ -1104,7 +1005,7 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
 
           _ <- snapshot.update(
             rt(1, 1),
-            updates = Map(SortedSet(internalizedBob, internalizedCharlie) -> snapBC11),
+            updates = Map(SortedSet(bob, charlie) -> snapBC11),
             deletes = Set.empty,
             mode,
           )
@@ -1113,11 +1014,8 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
 
           _ <- snapshot.update(
             rt(2, 0),
-            updates = Map(
-              SortedSet(internalizedAlice, internalizedBob) -> snapAB2,
-              SortedSet(internalizedAlice, internalizedCharlie) -> snapAC2,
-            ),
-            deletes = Set(SortedSet(internalizedBob, internalizedCharlie)),
+            updates = Map(SortedSet(alice, bob) -> snapAB2, SortedSet(alice, charlie) -> snapAC2),
+            deletes = Set(SortedSet(bob, charlie)),
             mode,
           )
           res2 <- snapshot.get()
@@ -1126,10 +1024,7 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
           _ <- snapshot.update(
             rt(3, 0),
             updates = Map.empty,
-            deletes = Set(
-              SortedSet(internalizedAlice, internalizedBob),
-              SortedSet(internalizedAlice, internalizedCharlie),
-            ),
+            deletes = Set(SortedSet(alice, bob), SortedSet(alice, charlie)),
             mode,
           )
           res3 <- snapshot.get()
@@ -1141,20 +1036,20 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
 
           wm1 shouldBe rt(1, 0)
           res1 shouldBe (rt(1, 0) -> Map(
-            SortedSet(internalizedAlice, internalizedBob) -> snapAB10,
-            SortedSet(internalizedBob, internalizedCharlie) -> snapBC10,
+            SortedSet(alice, bob) -> snapAB10,
+            SortedSet(bob, charlie) -> snapBC10,
           ))
 
           wm11 shouldBe rt(1, 1)
           res11 shouldBe (rt(1, 1) -> Map(
-            SortedSet(internalizedAlice, internalizedBob) -> snapAB10,
-            SortedSet(internalizedBob, internalizedCharlie) -> snapBC11,
+            SortedSet(alice, bob) -> snapAB10,
+            SortedSet(bob, charlie) -> snapBC11,
           ))
 
           ts2 shouldBe rt(2, 0)
           res2 shouldBe (rt(2, 0) -> Map(
-            SortedSet(internalizedAlice, internalizedBob) -> snapAB2,
-            SortedSet(internalizedAlice, internalizedCharlie) -> snapAC2,
+            SortedSet(alice, bob) -> snapAB2,
+            SortedSet(alice, charlie) -> snapAC2,
           ))
 
           ts3 shouldBe rt(3, 0)
@@ -1200,36 +1095,6 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
         completion2 shouldBe true
         completion2Read shouldBe ReinitializationStatus(Some(ts2), Some(ts2))
         reinit3 shouldBe ReinitializationStatus(Some(ts3), Some(ts2))
-      }
-    }
-
-    "truncateCheckpoints forgets all checkpointed commitments" in {
-      val snapshot = mk()
-      val snapAB10 = ByteString.copyFromUtf8("AB10")
-
-      for {
-        _ <- snapshot.update(
-          rt(1, 0),
-          updates = Map(
-            SortedSet(internalizedAlice, internalizedBob) -> snapAB10
-          ),
-          deletes = Set.empty,
-          Checkpoint,
-        )
-        res1 <- snapshot.get()
-        wm1 <- snapshot.watermark
-
-        _ <- snapshot.forgetCheckpoints()
-        res2 <- snapshot.get()
-        wm2 <- snapshot.watermark
-      } yield {
-        wm1 shouldBe rt(1, 0)
-        res1 shouldBe (rt(1, 0) -> Map(
-          SortedSet(internalizedAlice, internalizedBob) -> snapAB10
-        ))
-
-        wm2 shouldBe RecordTime.MinValue
-        res2 shouldBe (RecordTime.MinValue -> Map.empty)
       }
     }
   }

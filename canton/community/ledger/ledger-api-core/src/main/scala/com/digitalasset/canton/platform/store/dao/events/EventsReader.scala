@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -14,8 +14,9 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.InternalEventFormat
-import com.digitalasset.canton.platform.store.LedgerApiContractStore
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   FatCreatedEventProperties,
   RawFatCreatedEvent,
@@ -34,7 +35,7 @@ private[dao] sealed class EventsReader(
     val parameterStorageBackend: ParameterStorageBackend,
     val metrics: LedgerApiServerMetrics,
     val lfValueTranslation: LfValueTranslation,
-    val contractStore: LedgerApiContractStore,
+    val contractStore: ContractStore,
     val ledgerEndCache: LedgerEndCache,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -46,13 +47,13 @@ private[dao] sealed class EventsReader(
       contractId: ContractId,
       internalEventFormatO: Option[InternalEventFormat],
   )(implicit loggingContext: LoggingContextWithTrace): Future[GetEventsByContractIdResponse] = {
-    implicit val errorLoggingContext: ErrorLoggingContext =
-      ErrorLoggingContext(logger, loggingContext)
+    implicit val errorLoggingContext: ErrorLoggingContext = ErrorLoggingContext(logger, implicitly)
     (for {
       internalEventFormat <- OptionT.fromOption[Future](internalEventFormatO)
       internalContractId <- OptionT(
         contractStore
-          .lookupBatchedInternalIdsNonReadThrough(List(contractId))
+          .lookupBatchedNonCachedInternalIds(List(contractId))
+          .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
           .map(_.values.headOption)
       )
       (create, archiveO) <- OptionT(

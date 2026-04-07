@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
-import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
@@ -17,7 +16,6 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvTopologyStatePollingAndAssignedTrigger.{
   StreamedAssignedContract,
@@ -65,7 +63,6 @@ trait DsoRulesTopologyStateReconciler[Task] {
 abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
     originalContext: TriggerContext,
     store: SvDsoStore,
-    participantAdminConnection: Option[ParticipantAdminConnection],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -78,7 +75,7 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
   override protected lazy val context: TriggerContext = noParallelismContext
 
   val reconciler: DsoRulesTopologyStateReconciler[Task]
-  private val contractsToRunOn
+  protected val contractsToRunOn
       : Seq[ContractCompanion.WithoutKey[DsoRules.Contract, DsoRules.ContractId, DsoRules]] = Seq(
     DsoRules.COMPANION
   )
@@ -101,14 +98,8 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
 
   override protected def isStaleTask(task: TaskTrigger)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
-    for {
-      noDsoRules <- store.lookupDsoRules().map(_.isEmpty)
-      // required to prevent bogus topology transactions from being created during LSUs
-      connectedSyncs <- participantAdminConnection.traverse(_.listConnectedDomains())
-    } yield noDsoRules || connectedSyncs.exists(_.isEmpty)
-
-  }
+  ): Future[Boolean] =
+    store.lookupDsoRules().map(_.isEmpty)
 
   override protected def completeTask(task: TaskTrigger)(implicit
       tc: TraceContext

@@ -1,23 +1,28 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.grpc
 
 import cats.data.EitherT
+import cats.implicits.catsSyntaxParallelTraverse_
 import cats.syntax.either.*
 import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.participant.state.InternalIndexService
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.participant.admin.data.{
+  ActiveContract as ActiveContractValueClass,
   ContractImportMode,
   RepairContract,
   RepresentativePackageIdOverride,
 }
-import com.digitalasset.canton.participant.admin.party.LapiAcsHelper
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError.ImportAcsError
+import com.digitalasset.canton.participant.admin.repair.{
+  ContractAuthenticationImportProcessor,
+  SelectRepresentativePackageIds,
+}
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,7 +34,7 @@ import java.io.OutputStream
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-private[participant] object ParticipantCommon {
+private[admin] object ParticipantCommon {
 
   private[grpc] def findLedgerEnd(sync: CantonSyncService): Either[String, Offset] =
     sync.participantNodePersistentState.value.ledgerApiStore.ledgerEndCache
@@ -75,20 +80,36 @@ private[participant] object ParticipantCommon {
       _ <- EitherT
         .apply[Future, String, Unit](
           ResourceUtil.withResourceM(destination)(out =>
-            LapiAcsHelper
-              .ledgerApiAcsSource(
-                indexService,
-                parties,
-                atOffset,
-                excludedStakeholders,
-                synchronizerId,
-                contractSynchronizerRenames,
+            indexService
+              .activeContracts(parties.map(_.toLf), Some(atOffset))
+              .map(response => response.getActiveContract)
+              .filter(contract =>
+                synchronizerId
+                  .forall(filterId => contract.synchronizerId == filterId.toProtoPrimitive)
               )
-              .map(_.writeDelimitedTo(out) match {
-                // throwing intentionally to immediately interrupt any further Pekko source stream processing
-                case Left(errorMessage) => throw new RuntimeException(errorMessage)
-                case Right(_) => out.flush()
-              })
+              .filter { contract =>
+                val event = contract.getCreatedEvent
+                val stakeholders = (event.signatories ++ event.observers).toSet
+                val excludeStakeholdersS = excludedStakeholders.map(_.toProtoPrimitive)
+                excludeStakeholdersS.intersect(stakeholders).isEmpty
+              }
+              .map { contract =>
+                if (contractSynchronizerRenames.contains(contract.synchronizerId)) {
+                  val synchronizerId = contractSynchronizerRenames
+                    .getOrElse(contract.synchronizerId, contract.synchronizerId)
+                  contract.copy(synchronizerId = synchronizerId)
+                } else {
+                  contract
+                }
+              }
+              .map(ActiveContractValueClass.tryCreate)
+              .map {
+                _.writeDelimitedTo(out) match {
+                  // throwing intentionally to immediately interrupt any further Pekko source stream processing
+                  case Left(errorMessage) => throw new RuntimeException(errorMessage)
+                  case Right(_) => out.flush()
+                }
+              }
               .run()
               .transform {
                 case Failure(e) => Success(Left(e.getMessage)) // a Pekko stream error
@@ -104,31 +125,43 @@ private[participant] object ParticipantCommon {
       batching: BatchingConfig,
       contractImportMode: ContractImportMode,
       excludedStakeholders: Set[PartyId],
+      loggerFactory: NamedLoggerFactory,
       representativePackageIdOverride: RepresentativePackageIdOverride,
       sync: CantonSyncService,
       workflowIdPrefix: String,
-      alphaMultiSynchronizerSupport: Boolean,
   )(implicit
       ec: ExecutionContext,
       elc: ErrorLoggingContext,
       traceContext: TraceContext,
-  ): Future[Unit] =
-    new AcsImporter(
+  ): Future[Map[String, String]] = {
+
+    val packageMetadataSnapshot = sync.getPackageMetadataSnapshot
+    val selectRepresentativePackageIds = new SelectRepresentativePackageIds(
+      representativePackageIdOverride = representativePackageIdOverride,
+      knownPackages = packageMetadataSnapshot.packages.keySet,
+      packageNameMap = packageMetadataSnapshot.packageNameMap,
+      contractImportMode = contractImportMode,
+      loggerFactory = loggerFactory,
+    )
+    val importer = new AcsImporter(
       sync,
       batching,
+      loggerFactory,
       workflowIdPrefix,
       contractImportMode,
-      representativePackageIdOverride,
-      alphaMultiSynchronizerSupport,
-    ).runImport(acsSnapshot, excludedStakeholders)
+      selectRepresentativePackageIds,
+    )
+
+    importer.runImport(acsSnapshot, excludedStakeholders)
+  }
 
   private final class AcsImporter(
       sync: CantonSyncService,
       batching: BatchingConfig,
+      loggerFactory: NamedLoggerFactory,
       workflowIdPrefix: String,
       contractImportMode: ContractImportMode,
-      representativePackageIdOverride: RepresentativePackageIdOverride,
-      alphaMultiSynchronizerSupport: Boolean,
+      selectRepresentativePackageIds: SelectRepresentativePackageIds,
   )(implicit
       ec: ExecutionContext,
       elc: ErrorLoggingContext,
@@ -141,7 +174,7 @@ private[participant] object ParticipantCommon {
     def runImport(
         acsSnapshot: ByteString,
         excludedStakeholders: Set[PartyId],
-    ): Future[Unit] = {
+    ): Future[Map[String, String]] = {
 
       val contractsE = if (excludedStakeholders.isEmpty) {
         RepairContract.loadAcsSnapshot(acsSnapshot)
@@ -153,56 +186,58 @@ private[participant] object ParticipantCommon {
           )
       }
 
-      importAcsContracts(contractsE, contractImportMode, alphaMultiSynchronizerSupport)
+      importAcsContracts(contractsE)
     }
 
     private def importAcsContracts(
-        contracts: Either[String, List[RepairContract]],
-        contractImportMode: ContractImportMode,
-        alphaMultiSynchronizerSupport: Boolean,
-    ): Future[Unit] = {
+        contracts: Either[String, List[RepairContract]]
+    ): Future[Map[String, String]] = {
       val resultET = for {
         repairContracts <- contracts
           .toEitherT[FutureUnlessShutdown]
-          .ensure(
-            "Found at least one contract with a non-zero reassignment counter. ACS import does not yet support it unless `alpha-multi-synchronizer-support` is enabled."
-          )(contracts =>
-            alphaMultiSynchronizerSupport || contracts.forall(
-              _.reassignmentCounter == ReassignmentCounter.Genesis
-            )
-          )
+          .ensure( // TODO(#23073) - Remove this restriction once #27325 has been re-implemented
+            "Found at least one contract with a non-zero reassignment counter. ACS import does not yet support it."
+          )(_.forall(_.reassignmentCounter == ReassignmentCounter.Genesis))
 
-        _ <- MonadUtil.sequentialTraverse_(
-          repairContracts
-            .groupBy(_.synchronizerId)
-            .toSeq
-        ) { case (synchronizerId, contracts) =>
-          MonadUtil.batchedSequentialTraverse_(
-            batching.parallelism,
-            batching.maxAcsImportBatchSize,
-          )(contracts)(
-            writeContractsBatch(
-              synchronizerId,
-              _,
-              contractImportMode,
-              representativePackageIdOverride,
+        contractsWithOverriddenRpId <- selectRepresentativePackageIds(repairContracts)
+          .toEitherT[FutureUnlessShutdown]
+
+        activeContractsWithRemapping <-
+          ContractAuthenticationImportProcessor(
+            loggerFactory,
+            sync.syncPersistentStateManager,
+            sync.pureCryptoApi,
+            sync.contractHasher,
+            sync.contractValidator,
+            contractImportMode,
+          )(contractsWithOverriddenRpId)
+        (activeContractsWithValidContractIds, contractIdRemapping) =
+          activeContractsWithRemapping
+
+        _ <- activeContractsWithValidContractIds.groupBy(_.synchronizerId).toSeq.parTraverse_ {
+          case (synchronizerId, contracts) =>
+            MonadUtil.batchedSequentialTraverse_(
+              batching.parallelism,
+              batching.maxAcsImportBatchSize,
+            )(contracts)(
+              writeContractsBatch(synchronizerId, _).mapK(FutureUnlessShutdown.outcomeK)
             )
-              .mapK(FutureUnlessShutdown.outcomeK)
-          )
         }
-      } yield ()
+
+      } yield contractIdRemapping
 
       resultET.value.flatMap {
         case Left(error) => FutureUnlessShutdown.failed(ImportAcsError.Error(error).asGrpcError)
-        case Right(()) => FutureUnlessShutdown.unit
+        case Right(contractIdRemapping) =>
+          FutureUnlessShutdown.pure(
+            contractIdRemapping.map { case (oldCid, newCid) => (oldCid.coid, newCid.coid) }
+          )
       }.asGrpcFuture
     }
 
     private def writeContractsBatch(
         synchronizerId: SynchronizerId,
         contracts: Seq[RepairContract],
-        contractImportMode: ContractImportMode,
-        representativePackageIdOverride: RepresentativePackageIdOverride,
     ): EitherT[Future, String, Unit] =
       for {
         alias <- EitherT.fromEither[Future](
@@ -215,9 +250,8 @@ private[participant] object ParticipantCommon {
           sync.repairService.addContracts(
             alias,
             contracts,
-            contractImportMode,
-            sync.getPackageMetadataSnapshot,
-            representativePackageIdOverride,
+            ignoreAlreadyAdded = true,
+            ignoreStakeholderCheck = true,
             workflowIdPrefix = workflowIdPrefixO,
           )
         )

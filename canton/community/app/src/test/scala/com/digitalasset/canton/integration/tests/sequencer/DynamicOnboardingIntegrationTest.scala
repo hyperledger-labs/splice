@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer
@@ -7,11 +7,6 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Reliability.*
-import com.digitalasset.canton.admin.api.client.data.{
-  GrpcSequencerConnection,
-  SequencerConnection,
-  SequencerConnections,
-}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.{
   CommandFailure,
@@ -41,9 +36,13 @@ import com.digitalasset.canton.protocol.messages.{
   EmptyRootHashMessagePayload,
   RootHashMessage,
 }
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{SendResult, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SequencerConnections,
+}
 import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
@@ -125,11 +124,10 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         PositiveInt.tryCreate(2),
         testedProtocolVersion,
       )
-      val now = environment.now
-      maxSequencingTimeOfAggregation = now.add(
+      maxSequencingTimeOfAggregation = env.environment.clock.now.add(
         Duration.ofMinutes(2)
       ) // cannot exceed the DynamicSynchronizerParameters.sequencerAggregateSubmissionTimeout (defaults to 5m)
-      topologyTimestampTombstone = now
+      topologyTimestampTombstone = env.environment.clock.now
 
       aggregatedBatch = Batch.of(
         testedProtocolVersion,
@@ -148,11 +146,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         p1SequencerClient
           .send(
             aggregatedBatch,
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = None,
-              approximateTimestampForSigning = now,
-              maxSequencingTime = maxSequencingTimeOfAggregation,
-            ),
+            maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule1),
             callback = send1ResultPromise.success,
           )
@@ -174,14 +168,11 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         val send2 = p1SequencerClient
           .send(
             Batch.empty(testedProtocolVersion),
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = None,
-              approximateTimestampForSigning = now,
-              maxSequencingTime = maxSequencingTimeOfAggregation,
-            ),
+            maxSequencingTime = maxSequencingTimeOfAggregation,
             messageId = MessageId.tryCreate("aggregation-2-part-1a"),
             aggregationRule = Some(aggregationRule2),
             callback = send2ResultPromise.success,
+            topologyTimestamp = None,
           )
           .valueOrFailShutdown("send aggregation 2 part 1a")
 
@@ -189,14 +180,11 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         val send3 = p3SequencerClient
           .send(
             Batch.empty(testedProtocolVersion),
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = None,
-              approximateTimestampForSigning = now,
-              maxSequencingTime = maxSequencingTimeOfAggregation,
-            ),
+            maxSequencingTime = maxSequencingTimeOfAggregation,
             messageId = MessageId.tryCreate("aggregation-2-part-1b"),
             aggregationRule = Some(aggregationRule2),
             callback = send3ResultPromise.success,
+            topologyTimestamp = None,
           )
           .valueOrFailShutdown("send aggregation 2 part 1b")
 
@@ -237,19 +225,21 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
 
       onboardNewSequencer(
         synchronizerId = daId,
-        newSequencer = sequencer2,
-        existingSequencer = sequencer1,
+        newSequencerReference = sequencer2,
+        existingSequencerReference = sequencer1,
         synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
       )
 
       sequencer2.health.initialized() shouldBe true
 
       // Restart the new sequencer to make sure that the initialization survives a restart
-      // TODO(#25004): restart the BFT sequencer too once it's fully crash fault-tolerant
+      // TODO(#25004): restart the BFT sequencer too once it's fully crash fault-tolerant (and remove the flag).
       // Currently this fails because we're stopping the sequencer before it finished its initial state transfer process.
       // Ideally we wait for that to be concluded before considering the sequencer initialized and ready to tolerate crashes.
-      // sequencer2.stop()
-      // sequencer2.start()
+      if (!isBftSequencer) {
+        sequencer2.stop()
+        sequencer2.start()
+      }
 
       participant2.synchronizers.connect_local(sequencer2, daName)
       participant1.health.ping(participant2, timeout = 30.seconds)
@@ -305,11 +295,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         p3SequencerClient
           .send(
             aggregatedBatch,
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = None,
-              approximateTimestampForSigning = environment.now,
-              maxSequencingTime = maxSequencingTimeOfAggregation,
-            ),
+            maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule1),
             callback = send1ResultPromise.success,
           )
@@ -325,11 +311,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         p3SequencerClient
           .send(
             Batch.empty(testedProtocolVersion),
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = None,
-              approximateTimestampForSigning = environment.now,
-              maxSequencingTime = maxSequencingTimeOfAggregation,
-            ),
+            maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule2),
             callback = send2ResultPromise.success,
           )
@@ -356,6 +338,8 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
       implicit env =>
         import env.*
         // participant3 now talks to the newly onboarded sequencer
+
+        val usingPool = participant1.config.sequencerClient.useNewConnectionPool
 
         val logAssertions: Seq[LogEntry => scalatest.Assertion] =
           Seq {
@@ -390,20 +374,26 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
             },
             // The participant's resilient sequencer subscription warns that it is giving up the sequencer-client-side
             // subscription due to the tombstone error.
-            logEntry => {
-              logEntry.loggerName should include("SequencerSubscriptionX")
-              logEntry.warningMessage should (include(
-                "Permanently closing sequencer subscription due to error"
-              ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
+            logEntry =>
+              if (usingPool) {
+                logEntry.loggerName should include("SequencerSubscriptionX")
+                logEntry.warningMessage should (include(
+                  "Permanently closing sequencer subscription due to error"
+                ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
 
-            },
+              } else {
+                logEntry.loggerName should include("ResilientSequencerSubscription")
+                logEntry.warningMessage should (include(
+                  "Closing resilient sequencer subscription due to error"
+                ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
+              },
             // The participant's sync service errors that the participant has lost access to the sequencer's
             // corresponding synchronizer.
             logEntry => {
               logEntry.loggerName should include("SynchronizerConnectionsManager")
-              logEntry.errorMessage should include(
+              logEntry.errorMessage should (include(
                 "SYNC_SERVICE_SYNCHRONIZER_DISCONNECTED"
-              )
+              ))
             },
           )
 
@@ -416,12 +406,9 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
               p3SequencerClient
                 .send(
                   Batch.empty(testedProtocolVersion),
-                  timestamps = SendRequestTimestamps(
-                    topologyTimestamp = Some(topologyTimestampTombstone),
-                    approximateTimestampForSigning = environment.now,
-                    maxSequencingTime = maxSequencingTimeOfAggregation,
-                  ),
+                  maxSequencingTime = maxSequencingTimeOfAggregation,
                   callback = send1ResultPromise.success,
+                  topologyTimestamp = Some(topologyTimestampTombstone),
                   messageId = MessageId.tryCreate("tombstone-submission-request"),
                 )
                 .valueOrFailShutdown("tombstone submission request submission")

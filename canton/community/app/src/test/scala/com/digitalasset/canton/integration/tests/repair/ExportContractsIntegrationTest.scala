@@ -1,12 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.repair
 
 import better.files.*
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.integration.{
@@ -14,10 +15,14 @@ import com.digitalasset.canton.integration.{
   EnvironmentDefinition,
   SharedEnvironment,
 }
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 
+import scala.annotation.nowarn
+
+@nowarn("cat=deprecation") // Usage of old acs export
 final class ExportContractsIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
@@ -43,7 +48,9 @@ final class ExportContractsIntegrationTest
       }
 
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+  )
 
   "Exporting an ACS" should {
 
@@ -57,16 +64,15 @@ final class ExportContractsIntegrationTest
         IouSyntax.createIou(participant1)(payer, owner)
 
         val uninformedOffset = participant1.parties.find_party_max_activation_offset(
-          partyId = uninformed.partyId,
+          partyId = uninformed,
           participantId = participant1.id,
           synchronizerId = daId,
           completeAfter = PositiveInt.one,
-          onboarding = false,
         )
 
         File.usingTemporaryFile() { file =>
           participant1.repair.export_acs(
-            parties = Set(uninformed.partyId),
+            parties = Set(uninformed),
             exportFilePath = file.toString,
             synchronizerId = Some(daId),
             ledgerOffset = uninformedOffset,
@@ -84,18 +90,17 @@ final class ExportContractsIntegrationTest
           IouSyntax.createIou(participant1)(payer, owner)
 
           val payerOffset = participant1.parties.find_party_max_activation_offset(
-            partyId = payer.partyId,
+            partyId = payer,
             participantId = participant1.id,
             synchronizerId = daId,
             completeAfter = PositiveInt.one,
-            onboarding = false,
           )
 
           File.usingTemporaryFile() { file =>
             loggerFactory.assertThrowsAndLogs[CommandFailure](
               participant1.repair
                 .export_acs(
-                  parties = Set(payer.partyId),
+                  parties = Set(payer),
                   exportFilePath = file.toString,
                   synchronizerId = Some(
                     SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", "id"))
@@ -133,15 +138,15 @@ final class ExportContractsIntegrationTest
             // exporting contracts from the participant where they are not hosted
             participant1.repair
               .export_acs(
-                parties = Set(bob.partyId),
+                parties = Set(bob),
                 exportFilePath = dumpForAlice.canonicalPath,
-                ledgerOffset = ledgerEndP1,
+                ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP1),
               )
             participant2.repair
               .export_acs(
-                parties = Set(alice.partyId),
+                parties = Set(alice),
                 exportFilePath = dumpForBob.canonicalPath,
-                ledgerOffset = ledgerEndP2,
+                ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP2),
               )
 
             val forAlice = repair.acs
@@ -162,6 +167,8 @@ final class ExportContractsIntegrationTest
       for {
         explicitExport <- File.temporaryFile()
         wildcardExport <- File.temporaryFile()
+        explicitExportOld <- File.temporaryFile()
+        wildcardExportOld <- File.temporaryFile()
       } {
         val ledgerEndP1 = participant1.ledger_api.state.end()
         val p1Parties = participant1.parties
@@ -173,26 +180,46 @@ final class ExportContractsIntegrationTest
         participant1.repair.export_acs(
           parties = p1Parties,
           exportFilePath = explicitExport.canonicalPath,
-          ledgerOffset = ledgerEndP1,
+          ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP1),
+        )
+        participant1.repair.export_acs_old(
+          parties = p1Parties,
+          partiesOffboarding = false,
+          outputFile = explicitExportOld.canonicalPath,
         )
 
         // export contracts for all parties with the wildcard filter
         participant1.repair.export_acs(
           parties = Set.empty,
           exportFilePath = wildcardExport.canonicalPath,
-          ledgerOffset = ledgerEndP1,
+          ledgerOffset = NonNegativeLong.tryCreate(ledgerEndP1),
+        )
+        participant1.repair.export_acs_old(
+          parties = Set.empty,
+          partiesOffboarding = false,
+          outputFile = wildcardExportOld.canonicalPath,
         )
 
         val forExplicit = repair.acs
           .read_from_file(explicitExport.canonicalPath)
           .map(_.getCreatedEvent.contractId)
+        val forExplicitOld = ActiveContractOld
+          .loadFromByteString(utils.read_byte_string_from_file(explicitExportOld.canonicalPath))
+          .value
+          .map(_.contract.contractId.coid)
 
         val forWildcard = repair.acs
           .read_from_file(wildcardExport.canonicalPath)
           .map(_.getCreatedEvent.contractId)
+        val forWildcardOld = ActiveContractOld
+          .loadFromByteString(utils.read_byte_string_from_file(wildcardExportOld.canonicalPath))
+          .value
+          .map(_.contract.contractId.coid)
 
         forExplicit should not be empty
         forExplicit should contain theSameElementsAs forWildcard
+        forExplicit should contain theSameElementsAs forExplicitOld
+        forExplicit should contain theSameElementsAs forWildcardOld
       }
     }
   }

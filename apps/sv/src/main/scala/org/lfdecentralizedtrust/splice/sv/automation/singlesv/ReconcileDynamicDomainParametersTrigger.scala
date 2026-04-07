@@ -41,14 +41,13 @@ import scala.jdk.OptionConverters.*
 class ReconcileDynamicSynchronizerParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    val participantAdminConnection: ParticipantAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
     config: SvAppBackendConfig,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[Task]
-    with SyncConnectionStalenessCheck {
+) extends PollingParallelTaskExecutionTrigger[Task] {
 
   private val internalPreparationTimeRecordTimeTolerance =
     InternalNonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance)
@@ -173,7 +172,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
   override def isStaleTask(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
-    isNotConnectedToSync()
+    Future.successful(false)
   }
 
   private def updateDomainParameters(

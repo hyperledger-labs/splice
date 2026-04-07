@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -140,21 +140,14 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
   }))
   logger.debug("Registered shutdown-hook.")
   private object Config {
-    val multiSuffix = if (cliOptions.multiSync) "-multi-sync" else ""
-    val devConfig = Option.when(cliOptions.devProtocol)(
-      JarResourceUtils.extractFileFromJar(s"sandbox/dev$multiSuffix.conf")
-    )
-    val sandboxConfig = JarResourceUtils.extractFileFromJar(s"sandbox/sandbox$multiSuffix.conf")
-
-    val sandboxBootstrap = JarResourceUtils.extractFileFromJar(s"sandbox/bootstrap.canton")
-
+    val sandboxConfig = JarResourceUtils.extractFileFromJar("sandbox/sandbox.conf")
+    val sandboxBotstrap = JarResourceUtils.extractFileFromJar("sandbox/bootstrap.canton")
     val configFiles = cliOptions.command
       .collect { case Sandbox => sandboxConfig }
       .toList
       .concat(cliOptions.configFiles)
-      .concat(devConfig)
     val bootstrapFile = cliOptions.command
-      .collect { case Sandbox => sandboxBootstrap }
+      .collect { case Sandbox => sandboxBotstrap }
       .orElse(cliOptions.bootstrapScriptPath)
     val configFromMap = {
       import scala.jdk.CollectionConverters.*

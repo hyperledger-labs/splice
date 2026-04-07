@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -137,7 +137,7 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
 
     def limit(n: Int): Iterable[Shown] = {
       val (prefix, remainder) = trav.splitAt(n)
-      val ellipsis = if (remainder.isEmpty) Seq.empty else Seq(Shown(s"... ${remainder.size} more"))
+      val ellipsis = if (remainder.isEmpty) Seq.empty else Seq(Shown("..."))
       prefix.map(e => e: Shown) ++ ellipsis
     }
   }

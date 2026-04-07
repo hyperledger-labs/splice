@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -17,8 +17,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModuleTest.myId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.EpochInProgress
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
-  Bootstrap,
   EpochStore,
+  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.StateTransferBehavior.StateTransferType
@@ -51,7 +51,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.ConsensusModuleDependencies
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   failingCryptoProvider,
@@ -85,7 +84,7 @@ class StateTransferBehaviorTest
 
         stateTransferBehavior.ready(context.self)
 
-        context.extractSelfMessages() shouldBe Seq(Consensus.Init.KickOff)
+        context.extractSelfMessages() shouldBe Seq(Consensus.Init)
       }
     }
 
@@ -97,7 +96,7 @@ class StateTransferBehaviorTest
           createStateTransferBehavior(preConfiguredInitialEpochState = Some(_ => epochStateMock))
         implicit val ctx: ContextType = context
 
-        stateTransferBehavior.receive(Consensus.Init.KickOff)
+        stateTransferBehavior.receive(Consensus.Init)
 
         verify(epochStateMock, times(1)).notifyEpochCancellationToSegments(EpochNumber(1))
 
@@ -113,8 +112,9 @@ class StateTransferBehaviorTest
           val stateTransferManagerMock = mock[StateTransferManager[ProgrammableUnitTestEnv]]
           when(stateTransferManagerMock.inStateTransfer) thenReturn false
           val epochStoreMock = mock[EpochStore[ProgrammableUnitTestEnv]]
-          when(epochStoreMock.latestEpoch(includeInProgress = eqTo(false))(any[TraceContext]))
-            .thenReturn(() => Some(anEpochStoreEpoch))
+          when(
+            epochStoreMock.latestEpoch(includeInProgress = eqTo(false))(any[TraceContext])
+          ) thenReturn (() => anEpochStoreEpoch)
           val (context, stateTransferBehavior) =
             createStateTransferBehavior(
               preConfiguredInitialEpochState = Some(_ => epochStateMock),
@@ -157,16 +157,17 @@ class StateTransferBehaviorTest
       "hand it to the state transfer manager" in {
         val stateTransferManagerMock = mock[StateTransferManager[ProgrammableUnitTestEnv]]
         val epochStoreMock = mock[EpochStore[ProgrammableUnitTestEnv]]
-        when(epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext]))
-          .thenReturn(() => Some(anEpochStoreEpoch))
-        when(epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(any[TraceContext]))
-          .thenReturn(() => EpochInProgress())
+        when(
+          epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext])
+        ) thenReturn (() => anEpochStoreEpoch)
+        when(
+          epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(any[TraceContext])
+        ) thenReturn (() => EpochInProgress())
         when(
           stateTransferManagerMock.handleStateTransferMessage(
             any[Consensus.StateTransferMessage],
             any[OrderingTopologyInfo[ProgrammableUnitTestEnv]],
             any[EpochStore.Epoch],
-            any[EpochInfo],
           )(any[String => Nothing])(any[ContextType], any[TraceContext])
         ) thenReturn StateTransferMessageResult.Continue
         val (context, stateTransferBehavior) =
@@ -176,14 +177,13 @@ class StateTransferBehaviorTest
           )
         implicit val ctx: ContextType = context
 
-        val aStateTransferMessage = BlockStored(aCommitCert, anEpochInfo, myId)
+        val aStateTransferMessage = BlockStored(aCommitCert, myId)
         stateTransferBehavior.receive(aStateTransferMessage)
 
         verify(stateTransferManagerMock, times(1)).handleStateTransferMessage(
           eqTo(aStateTransferMessage),
           eqTo(aTopologyInfo),
           eqTo(anEpochStoreEpoch),
-          eqTo(anEpochInfo),
         )(any[String => Nothing])(any[ContextType], any[TraceContext])
 
         succeed
@@ -226,10 +226,12 @@ class StateTransferBehaviorTest
           ).forEvery { (newEpochTopologyMessage, minimumEndEpoch) =>
             val stateTransferManagerMock = mock[StateTransferManager[ProgrammableUnitTestEnv]]
             val epochStoreMock = mock[EpochStore[ProgrammableUnitTestEnv]]
-            when(epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext]))
-              .thenReturn(() => Some(anEpochStoreEpoch))
-            when(epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(any[TraceContext]))
-              .thenReturn(() => EpochInProgress())
+            when(
+              epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext])
+            ) thenReturn (() => anEpochStoreEpoch)
+            when(
+              epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(any[TraceContext])
+            ) thenReturn (() => EpochInProgress())
             val (context, stateTransferBehavior) =
               createStateTransferBehavior(
                 epochStore = epochStoreMock,
@@ -264,10 +266,12 @@ class StateTransferBehaviorTest
           Some(EpochNumber(anEpochInfo.number)), // the same as the "current epoch", see below
         ).forEvery { minimumEndEpoch =>
           val epochStoreMock = mock[EpochStore[ProgrammableUnitTestEnv]]
-          when(epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext]))
-            .thenReturn(() => Some(anEpochStoreEpoch))
-          when(epochStoreMock.loadEpochProgress(eqTo(anEpochInfo))(any[TraceContext]))
-            .thenReturn(() => EpochInProgress())
+          when(
+            epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext])
+          ) thenReturn (() => anEpochStoreEpoch)
+          when(
+            epochStoreMock.loadEpochProgress(eqTo(anEpochInfo))(any[TraceContext])
+          ) thenReturn (() => EpochInProgress())
           val (context, stateTransferBehavior) =
             createStateTransferBehavior(
               epochStore = epochStoreMock,
@@ -292,6 +296,7 @@ class StateTransferBehaviorTest
           inside(becomes) {
             case Seq(
                   consensusModule @ IssConsensusModule(
+                    TestEpochLength,
                     None, // snapshotAdditionalInfo
                     `aTopologyInfo`,
                     futurePbftMessageQueue,
@@ -309,11 +314,12 @@ class StateTransferBehaviorTest
   "receiving a new epoch topology message" should {
     "store the new epoch and update availability topology" in {
       val epochStoreMock = mock[EpochStore[ProgrammableUnitTestEnv]]
-      when(epochStoreMock.latestEpoch(anyBoolean)(anyTraceContext)) thenReturn (() =>
-        Some(anEpochStoreEpoch)
-      )
-      when(epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(anyTraceContext))
-        .thenReturn(() => EpochInProgress())
+      when(
+        epochStoreMock.latestEpoch(any[Boolean])(any[TraceContext])
+      ) thenReturn (() => anEpochStoreEpoch)
+      when(
+        epochStoreMock.loadEpochProgress(eqTo(anEpochStoreEpoch.info))(any[TraceContext])
+      ) thenReturn (() => EpochInProgress())
       val stateTransferManagerMock = mock[StateTransferManager[ProgrammableUnitTestEnv]]
       val availabilityMock = mock[ModuleRef[Availability.Message[ProgrammableUnitTestEnv]]]
       val (context, stateTransferBehavior) =
@@ -330,7 +336,7 @@ class StateTransferBehaviorTest
         newEpochNumber,
         BlockNumber(11L),
         TestEpochLength,
-        TestBootstrapTopologyActivationTime,
+        TopologyActivationTime(CantonTimestamp.MinValue),
       )
 
       stateTransferBehavior.receive(
@@ -348,7 +354,7 @@ class StateTransferBehaviorTest
       verify(epochStoreMock, times(1)).startEpoch(newEpoch)
       verify(availabilityMock, times(1)).asyncSend(
         Availability.Consensus.UpdateTopologyDuringStateTransfer[ProgrammableUnitTestEnv](
-          aMembership,
+          aMembership.orderingTopology,
           DelegationCryptoProvider(aFakeCryptoProviderInstance, aFakeCryptoProviderInstance),
         )
       )
@@ -397,6 +403,7 @@ class StateTransferBehaviorTest
           // Should have set the new epoch state.
           stateTransferBehavior should matchPattern {
             case StateTransferBehavior(
+                  TestEpochLength,
                   _,
                   _,
                   _,
@@ -430,7 +437,7 @@ class StateTransferBehaviorTest
       stateTransferBehavior.receive(Consensus.Admin.GetOrderingTopology(callback))
 
       callbackCell.get shouldBe
-        Some(Bootstrap.BootstrapEpochNumber -> aMembership.orderingTopology.nodes)
+        Some(Genesis.GenesisEpochNumber -> aMembership.orderingTopology.nodes)
     }
   }
 
@@ -486,6 +493,7 @@ class StateTransferBehaviorTest
       outputModuleRef: ModuleRef[Output.Message[ProgrammableUnitTestEnv]] =
         fakeModuleExpectingSilence,
       p2pNetworkOutModuleRef: ModuleRef[P2PNetworkOut.Message] = fakeModuleExpectingSilence,
+      epochLength: EpochLength = TestEpochLength,
       topologyInfo: OrderingTopologyInfo[ProgrammableUnitTestEnv] = aTopologyInfo,
       epochStore: EpochStore[ProgrammableUnitTestEnv] =
         new InMemoryUnitTestEpochStore[ProgrammableUnitTestEnv],
@@ -511,9 +519,7 @@ class StateTransferBehaviorTest
     )
 
     val latestCompletedEpochFromStore =
-      epochStore
-        .latestEpoch(includeInProgress = false)(TraceContext.empty)()
-        .getOrElse(Bootstrap.bootstrapEpoch(TestBootstrapTopologyActivationTime))
+      epochStore.latestEpoch(includeInProgress = false)(TraceContext.empty)()
 
     val metrics = SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
 
@@ -522,9 +528,7 @@ class StateTransferBehaviorTest
         .map(_(context))
         .getOrElse {
           val latestEpochFromStore =
-            epochStore
-              .latestEpoch(includeInProgress = true)(TraceContext.empty)()
-              .getOrElse(Bootstrap.bootstrapEpoch(TestBootstrapTopologyActivationTime))
+            epochStore.latestEpoch(includeInProgress = true)(TraceContext.empty)()
           val epoch = EpochState.Epoch(
             latestEpochFromStore.info,
             topologyInfo.currentMembership,
@@ -560,6 +564,7 @@ class StateTransferBehaviorTest
 
     context ->
       new StateTransferBehavior(
+        epochLength,
         initialState,
         stateTransferType,
         maybeCatchupDetector.getOrElse(
@@ -604,8 +609,8 @@ object StateTransferBehaviorTest {
     TopologyActivationTime(CantonTimestamp.Epoch),
   )
   private val otherId: BftNodeId = BftNodeId("other")
-  private def aMembership =
-    Membership.forTesting(myId, otherNodes = Set(otherId), epochLength = TestEpochLength)
+  private val aMembership =
+    Membership.forTesting(myId, otherNodes = Set(otherId))
   private val anEpoch = EpochState.Epoch(
     anEpochInfo,
     currentMembership = aMembership,

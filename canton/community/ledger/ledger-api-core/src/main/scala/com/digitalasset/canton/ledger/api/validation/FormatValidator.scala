@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -32,7 +32,7 @@ import com.digitalasset.canton.ledger.api.{
 }
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, PackageRef}
+import com.digitalasset.daml.lf.data.Ref.{PackageRef, TypeConRef}
 import io.grpc.StatusRuntimeException
 import scalaz.std.either.*
 import scalaz.std.list.*
@@ -170,7 +170,7 @@ object FormatValidator {
   ): Either[StatusRuntimeException, TemplateFilter] =
     for {
       templateId <- requirePresence(filter.templateId, "templateId")
-      typeConRef <- validateNameTypeConRef(templateId)
+      typeConRef <- validateTypeConRefWithWarning(templateId)
     } yield TemplateFilter(
       templateTypeRef = typeConRef,
       includeCreatedEventBlob = filter.includeCreatedEventBlob,
@@ -181,29 +181,28 @@ object FormatValidator {
   ): Either[StatusRuntimeException, InterfaceFilter] =
     for {
       interfaceId <- requirePresence(filter.interfaceId, "interfaceId")
-      typeConRef <- validateNameTypeConRef(interfaceId)
+      typeConRef <- validateTypeConRefWithWarning(interfaceId)
     } yield InterfaceFilter(
       interfaceTypeRef = typeConRef,
       includeView = filter.includeInterfaceView,
       includeCreatedEventBlob = filter.includeCreatedEventBlob,
     )
 
-  private def validateNameTypeConRef(identifier: Identifier)(implicit
+  private def validateTypeConRefWithWarning(identifier: Identifier)(implicit
       errorLoggingContext: ErrorLoggingContext
-  ): Either[StatusRuntimeException, NameTypeConRef] =
+  ): Either[StatusRuntimeException, TypeConRef] =
     for {
       typeConRef <- validateTypeConRef(identifier)
-      nameTypeConRef <- typeConRef.pkg match {
-        case n: PackageRef.Name => Right(NameTypeConRef(n, typeConRef.qualifiedName))
+      _ = typeConRef.pkg match {
+        case PackageRef.Name(_) => ()
         case PackageRef.Id(id) =>
-          Left(
-            invalidField(
-              "packageId",
-              s"Received an identifier with package ID $id, but expected a package name.",
-            )
-          )
+          errorLoggingContext.logger.warn(
+            s"Received an identifier with package ID $id, but expected a package name. " +
+              "The query will be resolved for the package-name pertaining to the requested package-id instead. " +
+              "The usage of package IDs in identifiers is deprecated and will be removed in a future release."
+          )(errorLoggingContext.traceContext)
       }
-    } yield nameTypeConRef
+    } yield typeConRef
 
   private def validateNonEmptyFilters(
       templateFilters: Seq[ProtoTemplateFilter],

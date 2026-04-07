@@ -3,16 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration as ConfigNonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.SequencerConnectionPoolDelays
-import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
@@ -32,7 +22,6 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
@@ -44,16 +33,26 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 }
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.sequencing.SequencerConnectionPoolDelays
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
     backupDumpConfig: Option[PeriodicBackupDumpConfig],
     validatorTopupConfig: ValidatorTopupConfig,
-    grpcDeadline: Option[ConfigNonNegativeFiniteDuration],
+    grpcDeadline: Option[NonNegativeFiniteDuration],
     transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
     isSvValidator: Boolean,
@@ -77,11 +76,10 @@ class ValidatorAutomationService(
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     contactPoint: String,
     initialSynchronizerTime: Option[CantonTimestamp],
-    maxVettingDelay: ConfigNonNegativeFiniteDuration,
+    maxVettingDelay: NonNegativeFiniteDuration,
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
     enabledFeatures: EnabledFeaturesConfig,
-    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -246,7 +244,6 @@ class ValidatorAutomationService(
       latestPackagesOnly,
       svValidator,
       enabledFeatures.enableUnsupportedDarsUnvetting,
-      additionalPackagesToUnvet,
     )
   )
 
@@ -296,6 +293,5 @@ class ValidatorAutomationService(
 }
 
 object ValidatorAutomationService extends AutomationServiceCompanion {
-
   override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

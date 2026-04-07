@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.data
@@ -27,7 +27,6 @@ final case class BlockInfo(
     height: Long,
     lastTs: CantonTimestamp,
     latestSequencerEventTimestamp: Option[CantonTimestamp],
-    latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
 ) {
   require(
     latestSequencerEventTimestamp.forall(lastTs >= _),
@@ -37,21 +36,19 @@ final case class BlockInfo(
 
 object BlockInfo {
   val initial: BlockInfo =
-    BlockInfo(UninitializedBlockHeight, lastTs = CantonTimestamp.Epoch, None, None)
+    BlockInfo(UninitializedBlockHeight, lastTs = CantonTimestamp.Epoch, None)
 
   implicit val getResultBlockInfo: GetResult[BlockInfo] = GetResult { r =>
     val height = r.<<[Long]
     val lastTs = r.<<[CantonTimestamp]
     val latestSequencerEventTs = r.<<[Option[CantonTimestamp]]
-    val latestPendingTopologyTransactionTimestamp = r.<<[Option[CantonTimestamp]]
-    BlockInfo(height, lastTs, latestSequencerEventTs, latestPendingTopologyTransactionTimestamp)
+    BlockInfo(height, lastTs, latestSequencerEventTs)
   }
 
   def fromSequencerInitialState(initial: SequencerInitialState): BlockInfo = BlockInfo(
     initial.snapshot.latestBlockHeight,
     initial.snapshot.lastTs,
     initial.latestSequencerEventTimestamp,
-    initial.latestPendingTopologyTransactionTimestamp,
   )
 }
 
@@ -99,7 +96,6 @@ object BlockEphemeralState {
       initialState.snapshot.latestBlockHeight,
       initialState.snapshot.lastTs,
       initialState.latestSequencerEventTimestamp,
-      None,
     )
     BlockEphemeralState(
       block,

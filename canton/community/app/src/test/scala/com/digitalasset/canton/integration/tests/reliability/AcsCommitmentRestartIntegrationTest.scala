@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.reliability
@@ -16,10 +16,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseProgrammableSequencer,
   UseReferenceBlockSequencer,
 }
-import com.digitalasset.canton.integration.tests.acs.commitment.util.{
-  CommitmentTestUtil,
-  IntervalDuration,
-}
+import com.digitalasset.canton.integration.tests.util.{CommitmentTestUtil, IntervalDuration}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -62,8 +59,6 @@ trait AcsCommitmentRestartIntegrationTest
     EnvironmentDefinition.P2_S1M1
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
-        // enabling retries to be on the safe side
-        ConfigTransforms.setPingRetries(true),
         ProgrammableSequencer.configOverride(this.getClass.toString, loggerFactory),
         ConfigTransforms.updateCommitmentCheckpointInterval(
           PositiveDurationSeconds.ofSeconds(checkpointInterval.duration.getSeconds)
@@ -106,9 +101,8 @@ trait AcsCommitmentRestartIntegrationTest
       LedgerApiStore
         .initialize(
           storageConfig = participant.config.storage,
-          storage = None,
           ledgerParticipantId = LedgerParticipantId.assertFromString("fakeid"),
-          ledgerApiDatabaseConnectionTimeout = LedgerApiServerConfig().databaseConnectionTimeout,
+          legderApiDatabaseConnectionTimeout = LedgerApiServerConfig().databaseConnectionTimeout,
           ledgerApiPostgresDataSourceConfig = PostgresDataSourceConfig(),
           timeouts = timeouts,
           loggerFactory = loggerFactory,
@@ -122,7 +116,7 @@ trait AcsCommitmentRestartIntegrationTest
       import env.*
 
       val simClock = environment.simClock.value
-      // Advance the sim clock so that we can be sure that the reconciliation interval of one minute is used
+// Advance the sim clock so that we can be sure that the reconciliation interval of one minute is used
       simClock.advance(java.time.Duration.ofDays(1))
       val start = simClock.uniqueTime()
       preCommitmentTs = start

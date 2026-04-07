@@ -960,7 +960,6 @@ abstract class StoreTestBase
 
   private var offsetCounter: Long = 0L
 
-  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   protected def nextOffset(): Long = blocking {
     synchronized {
       val offset = offsetCounter

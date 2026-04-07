@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.validator.automation
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
@@ -24,7 +23,6 @@ class ValidatorPackageVettingTrigger(
     latestPackagesOnly: Boolean,
     svValidator: Boolean,
     enableUnsupportedDarsUnvetting: Boolean,
-    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -34,7 +32,6 @@ class ValidatorPackageVettingTrigger(
       latestPackagesOnly,
       svValidator,
       enableUnsupportedDarsUnvetting,
-      additionalPackagesToUnvet,
     ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =

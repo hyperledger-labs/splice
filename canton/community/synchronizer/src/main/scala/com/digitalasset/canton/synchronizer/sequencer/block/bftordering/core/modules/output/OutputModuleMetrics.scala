@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output
@@ -20,7 +20,6 @@ private[output] object OutputModuleMetrics {
       orderedBlockBftTime: CantonTimestamp,
   )(implicit mc: MetricsContext): Unit = {
     val orderingCompletionInstant = Instant.now
-    val blockNumber = orderedBlockData.orderedBlockForOutput.orderedBlock.metadata.blockNumber
     val requests = orderedBlockData.batches.flatMap(_._2.requests.map(_.value))
     val bytesOrdered = requests.map(_.payload.size().toLong).sum
     val requestsOrdered = requests.length.toLong
@@ -41,7 +40,7 @@ private[output] object OutputModuleMetrics {
       metrics.output.blockDelay,
       Duration.between(orderedBlockBftTime.toInstant, orderingCompletionInstant),
     )(outputMc)
-    metrics.global.blockNumber.updateValue(blockNumber)(
+    metrics.global.blocksOrdered.mark(1L)(
       mc.withExtraLabels(
         metrics.global.labels.IsBlockEmpty -> orderedBlockData.batches.isEmpty.toString
       )

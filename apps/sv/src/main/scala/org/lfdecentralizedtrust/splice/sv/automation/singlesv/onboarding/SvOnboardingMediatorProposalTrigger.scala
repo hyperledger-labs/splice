@@ -22,7 +22,6 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
@@ -40,13 +39,12 @@ import scala.jdk.OptionConverters.RichOptional
 class SvOnboardingMediatorProposalTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    val participantAdminConnection: ParticipantAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard]
-    with SyncConnectionStalenessCheck {
+) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -62,17 +60,14 @@ class SvOnboardingMediatorProposalTrigger(
     } yield {
       val currentSynchronizerConfigs = rulesAndStates.currentSynchronizerNodeConfigs()
       val synchronizerNodeConfiguredNodes = currentSynchronizerConfigs
-        .flatMap { domainConfigs =>
-          val sequencerIdOpt = domainConfigs.sequencerIdentity.toScala
-            .map(_.sequencerId)
-            .orElse(domainConfigs.sequencer.toScala.map(_.sequencerId))
-          (domainConfigs.mediator.toScala -> sequencerIdOpt).tupled
-        }
-        .map { case (mediatorConfig, sequencerId) =>
+        .flatMap(domainConfigs =>
+          (domainConfigs.mediator.toScala -> domainConfigs.sequencer.toScala).tupled
+        )
+        .map { case (mediatorConfig, sequencerConfig) =>
           val mediatorId = mediatorConfig.mediatorId
           MemberIdUtil.MediatorId
             .tryFromProtoPrimitive(mediatorId, "mediatorId") -> MemberIdUtil.SequencerId
-            .tryFromProtoPrimitive(sequencerId, "sequencerId")
+            .tryFromProtoPrimitive(sequencerConfig.sequencerId, "sequencerId")
         }
       val mediatorsToAdd =
         synchronizerNodeConfiguredNodes
@@ -134,18 +129,16 @@ class SvOnboardingMediatorProposalTrigger(
 
   override protected def isStaleTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
-    for {
-      notConnected <- isNotConnectedToSync()
-      state <- participantAdminConnection.getMediatorSynchronizerState(
+  ): Future[Boolean] =
+    participantAdminConnection
+      .getMediatorSynchronizerState(
         task.synchronizerId,
         TopologySnapshot.Sequenced,
         AuthorizedState,
       )
-    } yield {
-      state.mapping.active.contains(task.mediatorId) || notConnected
-    }
-  }
+      .map { state =>
+        state.mapping.active.contains(task.mediatorId)
+      }
 }
 
 object SvOnboardingMediatorProposalTrigger {

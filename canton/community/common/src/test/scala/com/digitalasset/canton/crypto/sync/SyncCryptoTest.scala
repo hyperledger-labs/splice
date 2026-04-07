@@ -1,22 +1,19 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.sync
 
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.KmsConfig.Driver
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
-  BatchingConfig,
   CachingConfigs,
   CryptoConfig,
   CryptoProvider,
-  SessionEncryptionKeyCacheConfig,
   SessionSigningKeysConfig,
 }
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.crypto.verifier.SyncCryptoVerifier
 import com.digitalasset.canton.crypto.{
   Crypto,
@@ -29,7 +26,6 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.topology.DefaultTestIdentities.{participant1, participant2}
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -109,14 +105,13 @@ trait SyncCryptoTest
       sessionSigningKeys: SessionSigningKeysConfig
   ): CryptoConfig =
     cryptoConfig
-      .focus(_.sessionSigningKeys)
-      .replace(sessionSigningKeys)
       .focus(_.kms)
       .replace(
         Some(
           Driver(
             "mock",
             ConfigValueFactory.fromAnyRef(0),
+            sessionSigningKeys = sessionSigningKeys,
           )
         )
       )
@@ -126,20 +121,17 @@ trait SyncCryptoTest
   protected lazy val crypto: Crypto = Crypto
     .create(
       cryptoConfig,
-      CachingConfigs.defaultKmsMetadataCache,
-      SessionEncryptionKeyCacheConfig(),
+      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
       CachingConfigs.defaultPublicKeyConversionCache,
       new MemoryStorage(loggerFactory, timeouts),
-      Option.empty[ReplicaManager],
+      CryptoPrivateStoreFactory.withoutKms(),
       testedReleaseProtocolVersion,
       futureSupervisor,
       wallClock,
       executorService,
       timeouts,
-      BatchingConfig(),
       loggerFactory,
       NoReportingTracerProvider,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
     .valueOrFailShutdown("Failed to create crypto object")
     .futureValue
@@ -164,34 +156,11 @@ trait SyncCryptoTest
       val signature = syncCryptoSignerP1
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )
         .valueOrFail("sign failed")
         .futureValueUS
-
-      syncCryptoVerifierP1
-        .verifyKeyUsage(
-          testSnapshot,
-          participant1.member,
-          signature.signedBy,
-          signature.signatureDelegation,
-          defaultUsage,
-        )
-        .futureValueUS
-        .valueOrFail("key usage failed")
-
-      syncCryptoVerifierP1
-        .verifyKeyUsage(
-          testSnapshot,
-          participant2.member,
-          signature.signedBy,
-          signature.signatureDelegation,
-          defaultUsage,
-        )
-        .futureValueUS
-        .isLeft shouldBe true
 
       syncCryptoVerifierP1
         .verifySignature(
@@ -209,7 +178,6 @@ trait SyncCryptoTest
       val signature = syncCryptoSignerP1
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )
@@ -233,7 +201,6 @@ trait SyncCryptoTest
       val signature_1 = syncCryptoSignerP1
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )
@@ -243,7 +210,6 @@ trait SyncCryptoTest
       val signature_2 = syncCryptoSignerP1
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )
@@ -268,7 +234,6 @@ trait SyncCryptoTest
       val signature1 = syncCryptoSignerP1
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )
@@ -278,7 +243,6 @@ trait SyncCryptoTest
       val signature2 = syncCryptoSignerP2
         .sign(
           testSnapshot,
-          None,
           hash,
           defaultUsage,
         )

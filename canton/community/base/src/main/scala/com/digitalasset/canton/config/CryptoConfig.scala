@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.crypto.{
   EncryptionAlgorithmSpec,
   EncryptionKeySpec,
@@ -29,7 +30,14 @@ final case class CryptoProviderScheme[S](default: S, supported: NonEmpty[Set[S]]
 final case class CryptoSchemeConfig[S](
     default: Option[S] = None,
     allowed: Option[NonEmpty[Set[S]]] = None,
-)
+) extends UniformCantonConfigValidation
+
+object CryptoSchemeConfig {
+  implicit def cryptoSchemeConfigCantonConfigValidator[S](implicit
+      ev: CantonConfigValidator[S]
+  ): CantonConfigValidator[CryptoSchemeConfig[S]] =
+    CantonConfigValidatorDerivation[CryptoSchemeConfig[S]]
+}
 
 /** Stores the configuration of the signing scheme.
   *
@@ -41,7 +49,13 @@ final case class CryptoSchemeConfig[S](
 final case class SigningSchemeConfig(
     algorithms: CryptoSchemeConfig[SigningAlgorithmSpec] = CryptoSchemeConfig(),
     keys: CryptoSchemeConfig[SigningKeySpec] = CryptoSchemeConfig(),
-)
+) extends UniformCantonConfigValidation
+
+object SigningSchemeConfig {
+  implicit val signingSchemeConfigCantonConfigValidator
+      : CantonConfigValidator[SigningSchemeConfig] =
+    CantonConfigValidatorDerivation[SigningSchemeConfig]
+}
 
 /** Stores the configuration of the encryption scheme.
   *
@@ -53,7 +67,13 @@ final case class SigningSchemeConfig(
 final case class EncryptionSchemeConfig(
     algorithms: CryptoSchemeConfig[EncryptionAlgorithmSpec] = CryptoSchemeConfig(),
     keys: CryptoSchemeConfig[EncryptionKeySpec] = CryptoSchemeConfig(),
-)
+) extends UniformCantonConfigValidation
+
+object EncryptionSchemeConfig {
+  implicit val encryptionSchemeConfigCantonConfigValidator
+      : CantonConfigValidator[EncryptionSchemeConfig] =
+    CantonConfigValidatorDerivation[EncryptionSchemeConfig]
+}
 
 /** Cryptography configuration.
   * @param provider
@@ -70,8 +90,6 @@ final case class EncryptionSchemeConfig(
   *   the password-based key derivation function configuration
   * @param kms
   *   optional support for a KMS
-  * @param sessionSigningKeys
-  *   session signing keys' configuration
   * @param privateKeyStore
   *   private key store configuration to allow for encrypted key storage
   */
@@ -83,7 +101,10 @@ final case class CryptoConfig(
     hash: CryptoSchemeConfig[HashAlgorithm] = CryptoSchemeConfig(),
     pbkdf: CryptoSchemeConfig[PbkdfScheme] = CryptoSchemeConfig(),
     kms: Option[KmsConfig] = None,
-    // TODO(#27529): Enable after the topology snapshot problem has been fixed
-    sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
     privateKeyStore: PrivateKeyStoreConfig = PrivateKeyStoreConfig(),
-)
+) extends UniformCantonConfigValidation
+
+object CryptoConfig {
+  implicit val cryptoConfigValidator: CantonConfigValidator[CryptoConfig] =
+    CantonConfigValidatorDerivation[CryptoConfig]
+}

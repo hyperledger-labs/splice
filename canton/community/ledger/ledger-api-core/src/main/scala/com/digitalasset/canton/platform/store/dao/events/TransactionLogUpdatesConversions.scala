@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -39,8 +39,8 @@ import com.digitalasset.canton.platform.{
   TemplatePartiesFilter,
   Value,
 }
-import com.digitalasset.canton.tracing.SerializableTraceContext
 import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
+import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.{IdentifierConverter, NameTypeConRef, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -139,6 +139,7 @@ private[events] object TransactionLogUpdatesConversions {
         transactionAccepted,
         internalTransactionFormat,
         lfValueTranslation,
+        transactionAccepted.traceContext,
       )
         .map(transaction =>
           GetUpdatesResponse(GetUpdatesResponse.Update.Transaction(transaction))
@@ -157,6 +158,7 @@ private[events] object TransactionLogUpdatesConversions {
         reassignmentInternalEventFormat.templatePartiesFilter.allFilterParties,
         reassignmentInternalEventFormat.eventProjectionProperties,
         lfValueTranslation,
+        reassignmentAccepted.traceContext,
       )
         .map(reassignment =>
           GetUpdatesResponse(GetUpdatesResponse.Update.Reassignment(reassignment))
@@ -193,6 +195,7 @@ private[events] object TransactionLogUpdatesConversions {
             transactionAccepted,
             internalTransactionFormat,
             lfValueTranslation,
+            transactionAccepted.traceContext,
           )
             .map(transaction =>
               GetUpdateResponse(GetUpdateResponse.Update.Transaction(transaction))
@@ -211,6 +214,7 @@ private[events] object TransactionLogUpdatesConversions {
             reassignmentInternalEventFormat.templatePartiesFilter.allFilterParties,
             reassignmentInternalEventFormat.eventProjectionProperties,
             lfValueTranslation,
+            reassignmentAccepted.traceContext,
           )
             .map(reassignment =>
               GetUpdateResponse(GetUpdateResponse.Update.Reassignment(reassignment))
@@ -230,6 +234,7 @@ private[events] object TransactionLogUpdatesConversions {
       transactionAccepted: TransactionLogUpdate.TransactionAccepted,
       internalTransactionFormat: InternalTransactionFormat,
       lfValueTranslation: LfValueTranslation,
+      traceContext: TraceContext,
   )(implicit
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
@@ -252,7 +257,7 @@ private[events] object TransactionLogUpdatesConversions {
             events = events,
             offset = transactionAccepted.offset.unwrap,
             synchronizerId = transactionAccepted.synchronizerId,
-            traceContext = SerializableTraceContext(transactionAccepted.traceContext).toDamlProto,
+            traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
             recordTime = Some(TimestampConversion.fromLf(transactionAccepted.recordTime)),
             externalTransactionHash = transactionAccepted.externalTransactionHash.map(_.unwrap),
           )
@@ -464,18 +469,6 @@ private[events] object TransactionLogUpdatesConversions {
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
   ): Future[apiEvent.CreatedEvent] = {
-    val keyOpt = createdEvent.contractKey
-      .zip(createdEvent.createKeyHash)
-      .zip(createdEvent.createKeyMaintainers)
-      .map { case ((keyVersionedValue, keyHash), maintainers) =>
-        GlobalKeyWithMaintainers.assertBuild(
-          templateId = createdEvent.templateId,
-          value = keyVersionedValue.unversioned,
-          valueHash = keyHash,
-          maintainers = maintainers,
-          packageName = createdEvent.packageName,
-        )
-      }
     val createNode = Node.Create(
       coid = createdEvent.contractId,
       templateId = createdEvent.templateId,
@@ -483,7 +476,9 @@ private[events] object TransactionLogUpdatesConversions {
       arg = createdEvent.createArgument.unversioned,
       signatories = createdEvent.createSignatories,
       stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
-      keyOpt = keyOpt,
+      keyOpt = createdEvent.createKey.flatMap(k =>
+        createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
+      ),
       version = createdEvent.createArgument.version,
     )
     createdToApiCreatedEvent(
@@ -565,6 +560,7 @@ private[events] object TransactionLogUpdatesConversions {
       requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
       lfValueTranslation: LfValueTranslation,
+      traceContext: TraceContext,
   )(implicit
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
@@ -584,7 +580,7 @@ private[events] object TransactionLogUpdatesConversions {
             offset = reassignmentAccepted.offset,
             nodeId = assigned.nodeId,
             authenticationData = assigned.contractAuthenticationData,
-            // TODO(#28301): Use the assignment representative package ID when available
+            // TODO(#27872): Use the assignment representative package ID when available
             representativePackageId = assigned.createNode.templateId.packageId,
             createdEventWitnesses = assigned.createNode.stakeholders,
             flatEventWitnesses = assigned.createNode.stakeholders,
@@ -638,7 +634,7 @@ private[events] object TransactionLogUpdatesConversions {
           workflowId = reassignmentAccepted.workflowId,
           offset = reassignmentAccepted.offset.unwrap,
           events = events,
-          traceContext = SerializableTraceContext(reassignmentAccepted.traceContext).toDamlProto,
+          traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
           recordTime = Some(TimestampConversion.fromLf(reassignmentAccepted.recordTime)),
           synchronizerId = reassignmentAccepted.synchronizerId,
         )
@@ -660,7 +656,7 @@ private[events] object TransactionLogUpdatesConversions {
           authorizationEvent = event.authorizationEvent,
         )
       ),
-      traceContext = SerializableTraceContext(topologyTransaction.traceContext).toDamlProto,
+      traceContext = SerializableTraceContext(topologyTransaction.traceContext).toDamlProtoOpt,
     )
   }
 }

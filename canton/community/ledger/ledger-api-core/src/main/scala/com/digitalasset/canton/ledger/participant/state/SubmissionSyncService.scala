@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -9,7 +9,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
 import com.digitalasset.daml.lf.transaction.SubmittedTransaction
 
-import scala.concurrent.Future
+import java.util.concurrent.CompletionStage
 
 trait SubmissionSyncService {
 
@@ -99,7 +99,7 @@ trait SubmissionSyncService {
       processedDisclosedContracts: ImmArray[LfFatContractInst],
   )(implicit
       traceContext: TraceContext
-  ): Future[SubmissionResult]
+  ): CompletionStage[SubmissionResult]
 
   /** Submit a reassignment command for acceptance to the ledger.
     *
@@ -135,6 +135,6 @@ trait SubmissionSyncService {
       reassignmentCommands: Seq[ReassignmentCommand],
   )(implicit
       traceContext: TraceContext
-  ): Future[SubmissionResult]
+  ): CompletionStage[SubmissionResult]
 
 }

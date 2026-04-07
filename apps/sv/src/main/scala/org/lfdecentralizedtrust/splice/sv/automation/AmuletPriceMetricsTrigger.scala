@@ -73,7 +73,6 @@ object AmuletPriceMetricsTrigger {
       Double.NaN,
     )(MetricsContext.Empty)
 
-    @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
     private def getSvStatusMetrics(sv: String): Gauge[Double] =
       svAmuletPrices.getOrElse(
         sv,
@@ -103,7 +102,6 @@ object AmuletPriceMetricsTrigger {
       latestOpenRoundPrice.updateValue(price.doubleValue)
     }
 
-    @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
     def closeAllOffboardedSvMetrics(svs: Seq[String]): Unit = {
       val svIdsToClose = svAmuletPrices.keySet.toSet -- svs
       svAmuletPrices.view.filterKeys(svIdsToClose.contains).foreach(_._2.close())

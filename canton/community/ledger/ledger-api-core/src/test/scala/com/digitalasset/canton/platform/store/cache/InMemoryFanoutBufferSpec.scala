@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.cache
@@ -12,7 +12,6 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer.BufferSlice.LastBufferChunkSuffix
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer.{
-  BackwardBufferSlice,
   BufferSlice,
   UnorderedException,
 }
@@ -296,109 +295,6 @@ class InMemoryFanoutBufferSpec
               )
             }
             Succeeded
-          }
-        }
-      }
-
-      "sliceBackwards" when {
-        "called with startInclusive gteq than the buffer start" should {
-          "return an Final slice" in withBuffer() { buffer =>
-            buffer.sliceBackwards(
-              offset1,
-              succ(offset3),
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice
-              .FinalSlice(
-                Vector(entry3, entry2, entry1)
-              )
-            buffer.sliceBackwards(
-              offset2,
-              succ(offset3),
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice
-              .FinalSlice(
-                Vector(entry3, entry2)
-              )
-            buffer.sliceBackwards(offset2, offset4, IdentityFilter) shouldBe BackwardBufferSlice
-              .FinalSlice(
-                Vector(entry4, entry3, entry2)
-              )
-            buffer.sliceBackwards(
-              succ(offset1),
-              offset4,
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice
-              .FinalSlice(
-                Vector(entry4, entry3, entry2)
-              )
-          }
-
-          "return an PartialSlice chunk result if resulting slice is bigger than maxFetchSize" in withBuffer(
-            maxFetchSize = 2
-          ) { buffer =>
-            buffer.sliceBackwards(offset2, offset4, IdentityFilter) shouldBe BackwardBufferSlice
-              .PartialSlice(
-                Vector(entry4, entry3)
-              )
-          }
-        }
-
-        "called with endInclusive lteq startInclusive" should {
-          "return an empty FinalSlice if startInclusive is greater than buffer start and endInclusive" in withBuffer() {
-            buffer =>
-              buffer.sliceBackwards(offset2, offset1, IdentityFilter) shouldBe BackwardBufferSlice
-                .FinalSlice(
-                  Vector.empty
-                )
-          }
-          "return an FinalSlice if startInclusive is greater than buffer start and equal to endInclusive" in withBuffer() {
-            buffer =>
-              buffer.sliceBackwards(offset2, offset2, IdentityFilter) shouldBe BackwardBufferSlice
-                .FinalSlice(
-                  Vector(entry2)
-                )
-          }
-          "return an empty PartialSlice if startExclusive is before buffer start" in withBuffer(
-            maxBufferSize = 2
-          ) { buffer =>
-            buffer.sliceBackwards(offset1, offset1, IdentityFilter) shouldBe BackwardBufferSlice
-              .PartialSlice(
-                Vector.empty
-              )
-            buffer.sliceBackwards(offset2, offset1, IdentityFilter) shouldBe BackwardBufferSlice
-              .PartialSlice(
-                Vector.empty
-              )
-          }
-        }
-        "called with startInclusive before the buffer start" should {
-          "return a PartialSlice" in withBuffer() { buffer =>
-            buffer.sliceBackwards(
-              firstOffset,
-              offset3,
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice.PartialSlice(
-              Vector(entry3, entry2, entry1)
-            )
-            buffer.sliceBackwards(
-              firstOffset,
-              succ(offset3),
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice.PartialSlice(
-              Vector(entry3, entry2, entry1)
-            )
-          }
-
-          "return Inclusive slice if resulting slice is bigger than maxFetchSize" in withBuffer(
-            maxFetchSize = 2
-          ) { buffer =>
-            buffer.sliceBackwards(
-              firstOffset,
-              offset4,
-              IdentityFilter,
-            ) shouldBe BackwardBufferSlice.PartialSlice(
-              Vector(entry4, entry3)
-            )
           }
         }
       }

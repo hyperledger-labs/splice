@@ -1,16 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.connection
 
-import com.digitalasset.canton.admin.api.client.data.{
-  GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
-  SequencerConnectionValidation,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
-import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
@@ -31,6 +23,11 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionValidation,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.{SequencerAlias, config}
 import org.scalatest.Assertion
@@ -77,10 +74,11 @@ sealed trait BftSequencerConnectionsIntegrationTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2S4M1_Config
       .addConfigTransforms(
+        ConfigTransforms.setConnectionPool(true),
         // Increase the acknowledgement interval to avoid flakes with failing acknowledgements log messages
         ConfigTransforms.updateSequencerClientAcknowledgementInterval(
           NonNegativeFiniteDuration.tryOfMinutes(60)
-        )
+        ),
       )
       .withManualStart
       .withSetup { implicit env =>
@@ -160,21 +158,13 @@ sealed trait BftSequencerConnectionsIntegrationTest
             sequencerTrustThreshold = old.sequencerTrustThreshold,
             sequencerLivenessMargin = old.sequencerLivenessMargin,
             submissionRequestAmplification = amplification,
-            // Make the warning delay large to avoid these warnings in the test
-            sequencerConnectionPoolDelays =
-              old.sequencerConnectionPoolDelays.copy(warnValidationDelay = 1.day),
+            sequencerConnectionPoolDelays = old.sequencerConnectionPoolDelays,
           )
         }
       }
 
       val connectionsConfig = sequencers.remote.map(s =>
-        GrpcSequencerConnection.fromInternal(
-          s.config.publicApi
-            .asSequencerConnection(SequencerAlias.tryCreate(s.name), sequencerId = None)
-        )
-      )
-      val delays = SequencerConnectionPoolDelays.default.copy(warnValidationDelay =
-        config.NonNegativeFiniteDuration.tryFromDuration(1.days)
+        s.config.publicApi.asSequencerConnection(SequencerAlias.tryCreate(s.name))
       )
 
       clue("connect participant1 to all sequencers") {
@@ -184,7 +174,6 @@ sealed trait BftSequencerConnectionsIntegrationTest
           sequencerTrustThreshold = PositiveInt.two,
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification = amplification,
-          sequencerConnectionPoolDelays = delays,
           synchronizerAlias = daName,
           physicalSynchronizerId = Some(daId),
           validation = SequencerConnectionValidation.Disabled,
@@ -198,7 +187,6 @@ sealed trait BftSequencerConnectionsIntegrationTest
           sequencerTrustThreshold = PositiveInt.two,
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification = amplification,
-          sequencerConnectionPoolDelays = delays,
           synchronizerAlias = daName,
           physicalSynchronizerId = Some(daId),
           validation = SequencerConnectionValidation.Disabled,
@@ -251,7 +239,6 @@ sealed trait BftSequencerConnectionsIntegrationTest
   }
 }
 
-@UnstableTest // TODO(#27384)
 class BftSequencerConnectionsIntegrationTestDefault extends BftSequencerConnectionsIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))

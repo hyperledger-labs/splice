@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -9,12 +9,12 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 import scala.annotation.tailrec
-import scala.collection.{IterableOps, immutable}
+import scala.collection.immutable
 
 object MonadUtil {
 
   object syntax {
-    implicit class IterableSyntax[A](private val xs: Iterable[A]) extends AnyVal {
+    implicit class IterableSyntax[A](xs: Iterable[A]) {
       def sequentialTraverse_[M[_], B](step: A => M[B])(implicit
           monad: Monad[M]
       ): M[Unit] =
@@ -93,73 +93,38 @@ object MonadUtil {
     if (cond) trueM else monad.unit
 
   def sequentialTraverse[X, M[_], S](
-      xs: Iterator[X]
+      xs: Seq[X]
   )(f: X => M[S])(implicit monad: Monad[M]): M[Seq[S]] = {
     val result = foldLeftM(Seq.empty: Seq[S], xs)((ys, x) => monad.map(f(x))(y => y +: ys))
     monad.map(result)(seq => seq.reverse)
   }
 
-  def sequentialTraverse[X, M[_], S](
-      xs: Seq[X]
-  )(f: X => M[S])(implicit monad: Monad[M]): M[Seq[S]] =
-    sequentialTraverse(xs.iterator)(f)
-
-  /** Batched version of `sequentialTraverse`
+  /** Batched version of sequential traverse
     *
     * Can be used to avoid overloading the database queue. Use e.g. maxDbConnections * 2 as
     * parameter for parallelism to not overload the database queue but to make sufficient use of the
     * existing resources.
     */
-  def batchedSequentialTraverse[X, C, M[_], S](
-      parallelism: PositiveInt,
-      chunkSize: PositiveInt,
-  )(
-      xs: IterableOps[X, CC, C & immutable.Iterable[X]] forSome { type CC[_] }
-  )(
-      processChunk: C & immutable.Iterable[X] => M[Seq[S]]
-  )(implicit M: Parallel[M]): M[Seq[S]] =
+  def batchedSequentialTraverse[X, M[_], S](parallelism: PositiveInt, chunkSize: PositiveInt)(
+      xs: Seq[X]
+  )(processChunk: Seq[X] => M[Seq[S]])(implicit M: Parallel[M]): M[Seq[S]] =
     M.monad.map(
-      sequentialTraverse(xs.grouped(chunkSize.value).grouped(parallelism.value))(
+      sequentialTraverse(xs.grouped(chunkSize.value).grouped(parallelism.value).toSeq)(
         _.parFlatTraverse(processChunk)
       )(M.monad)
     )(_.flatten)
 
-  /** Batched version of `sequentialTraverse_` that discards the results
+  /** Batched version of sequential traverse
     *
     * Can be used to avoid overloading the database queue. Use e.g. maxDbConnections * 2 as
     * parameter for parallelism to not overload the database queue but to make sufficient use of the
     * existing resources.
     */
-  def batchedSequentialTraverse_[X, C, M[_]](
-      parallelism: PositiveInt,
-      chunkSize: PositiveInt,
-  )(xs: IterableOps[X, CC, C & immutable.Iterable[X]] forSome { type CC[_] })(
-      processChunk: C & immutable.Iterable[X] => M[Unit]
-  )(implicit M: Parallel[M]): M[Unit] =
-    sequentialTraverse_(xs.grouped(chunkSize.value).grouped(parallelism.value))(
-      _.parTraverse_(processChunk)
-    )(M.monad)
-
-  /** Non-empty version of [[batchedSequentialTraverse]] */
-  def batchedSequentialTraverseNE[A, C, M[_], S](
-      parallelism: PositiveInt,
-      chunkSize: PositiveInt,
-  )(xs: NonEmpty[IterableOps[A, CC, C & immutable.Iterable[A]] forSome { type CC[_] }])(
-      processChunk: NonEmpty[C & immutable.Iterable[A]] => M[Seq[S]]
-  )(implicit M: Parallel[M]): M[Seq[S]] =
-    batchedSequentialTraverse(parallelism, chunkSize)(xs.forgetNE) { chunk =>
+  def batchedSequentialTraverseNE[X, M[_], S](parallelism: PositiveInt, chunkSize: PositiveInt)(
+      xs: NonEmpty[Seq[X]]
+  )(processChunk: NonEmpty[Seq[X]] => M[Seq[S]])(implicit M: Parallel[M]): M[Seq[S]] =
+    batchedSequentialTraverse(parallelism, chunkSize)(xs) { chunk =>
       NonEmpty.from(chunk).fold(M.monad.pure(Seq.empty[S]))(processChunk)
-    }
-
-  /** Non-empty version of [[batchedSequentialTraverse_]] */
-  def batchedSequentialTraverseNE_[X, C, M[_]](
-      parallelism: PositiveInt,
-      chunkSize: PositiveInt,
-  )(xs: NonEmpty[IterableOps[X, CC, C & immutable.Iterable[X]] forSome { type CC[_] }])(
-      processChunk: NonEmpty[C & immutable.Iterable[X]] => M[Unit]
-  )(implicit M: Parallel[M]): M[Unit] =
-    batchedSequentialTraverse_(parallelism, chunkSize)(xs) { chunk =>
-      NonEmpty.from(chunk).fold(M.monad.unit)(processChunk)
     }
 
   /** Parallel traverse with limited parallelism
@@ -168,7 +133,7 @@ object MonadUtil {
       xs: Seq[X]
   )(processElement: X => M[S])(implicit M: Parallel[M]): M[Seq[S]] =
     M.monad.map(
-      sequentialTraverse(xs.grouped(parallelism.value))(
+      sequentialTraverse(xs.grouped(parallelism.value).toSeq)(
         _.parTraverse(processElement)
       )(M.monad)
     )(_.flatten)
@@ -176,14 +141,18 @@ object MonadUtil {
   def parTraverseWithLimit_[X, M[_], S](parallelism: PositiveInt)(
       xs: Seq[X]
   )(processElement: X => M[S])(implicit M: Parallel[M]): M[Unit] =
-    sequentialTraverse_(xs.grouped(parallelism.value))(_.parTraverse_(processElement))(M.monad)
+    M.monad.void(
+      sequentialTraverse(xs.grouped(parallelism.value).toSeq)(
+        _.parTraverse(processElement)
+      )(M.monad)
+    )
 
-  def parTraverseFilterWithLimit[X, M[_], S](parallelism: PositiveInt)(
+  def batchedSequentialTraverse_[X, M[_]](parallelism: PositiveInt, chunkSize: PositiveInt)(
       xs: Seq[X]
-  )(processElement: X => M[Option[S]])(implicit M: Parallel[M]): M[Seq[S]] =
-    M.monad.map(
-      parTraverseWithLimit(parallelism)(xs)(processElement)
-    )(_.flatten)
+  )(processChunk: Seq[X] => M[Unit])(implicit M: Parallel[M]): M[Unit] =
+    sequentialTraverse_(xs.grouped(chunkSize.value).grouped(parallelism.value))(chunk =>
+      chunk.parTraverse_(processChunk)
+    )(M.monad)
 
   /** Conceptually equivalent to `sequentialTraverse(xs)(step).map(monoid.combineAll)`.
     */

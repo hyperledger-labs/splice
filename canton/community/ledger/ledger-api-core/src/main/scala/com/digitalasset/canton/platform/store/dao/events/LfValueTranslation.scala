@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -8,7 +8,12 @@ import com.daml.ledger.api.v2.value
 import com.daml.ledger.api.v2.value.{Record as ApiRecord, Value as ApiValue}
 import com.daml.metrics.Timed
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
-import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  NamedLogging,
+}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, RejectionGenerators}
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
@@ -24,15 +29,14 @@ import com.digitalasset.canton.platform.{
   PackageId as LfPackageId,
   Value as LfValue,
 }
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{FullIdentifier, Identifier}
+import com.digitalasset.daml.lf.engine as LfEngine
 import com.digitalasset.daml.lf.engine.Engine
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.VersionedValue
-import com.digitalasset.daml.lf.{crypto, engine as LfEngine}
 import com.google.protobuf.ByteString
 import com.google.rpc.Status
 import com.google.rpc.status.Status as ProtoStatus
@@ -71,24 +75,20 @@ final class LfValueTranslation(
     engineO: Option[Engine],
     loadPackage: (
         LfPackageId,
-        TraceContext,
+        LoggingContextWithTrace,
     ) => Future[Option[com.digitalasset.daml.lf.archive.DamlLf.Archive]],
     val loggerFactory: NamedLoggerFactory,
 ) extends LfValueSerialization
     with NamedLogging {
-  import LoggingContextWithTrace.implicitExtractTraceContext
-
-  private[this] val packageLoader = new DeduplicatingPackageLoader()
 
   private val enricherO: Option[LfEnricher] = engineO.map(engine =>
     LfEnricher(
       engine = engine,
       forbidLocalContractIds = engine.config.forbidLocalContractIds,
-      metrics,
-      packageLoader,
-      loadPackage,
     )
   )
+
+  private[this] val packageLoader = new DeduplicatingPackageLoader()
 
   private def cantSerialize(attribute: String, forContract: ContractId): String =
     s"Cannot serialize $attribute for ${forContract.coid}"
@@ -153,17 +153,51 @@ final class LfValueTranslation(
       serializeNullableKeyOrThrow(exercise),
     )
 
+  private[this] def consumeEnricherResult[V](
+      result: LfEngine.Result[V]
+  )(implicit
+      ec: ExecutionContext,
+      loggingContext: LoggingContextWithTrace,
+  ): Future[V] =
+    result match {
+      case LfEngine.ResultDone(r) => Future.successful(r)
+      case LfEngine.ResultError(e) => Future.failed(new RuntimeException(e.message))
+      case LfEngine.ResultNeedPackage(packageId, resume) =>
+        packageLoader
+          .loadPackage(
+            packageId = packageId,
+            delegate = packageId => loadPackage(packageId, loggingContext),
+            metric = metrics.index.db.translation.getLfPackage,
+          )
+          .flatMap(pkgO => consumeEnricherResult(resume(pkgO)))
+      case result =>
+        Future.failed(new RuntimeException(s"Unexpected ValueEnricher result: $result"))
+    }
+
+  def enrichVersionedTransaction(versionedTransaction: VersionedTransaction)(implicit
+      ec: ExecutionContext,
+      loggingContext: LoggingContextWithTrace,
+  ): Future[VersionedTransaction] =
+    consumeEnricherResult(enricher.enrichVersionedTransaction(versionedTransaction))
+
+  def enrichContract(contract: FatContractInstance)(implicit
+      ec: ExecutionContext,
+      loggingContext: LoggingContextWithTrace,
+  ): Future[FatContractInstance] =
+    consumeEnricherResult(enricher.enrichContractInstance(contract))
+
   def toApiValue(
       value: LfValue,
       verbose: Boolean,
       attribute: => String,
-      enrich: LfValue => Future[com.digitalasset.daml.lf.value.Value],
+      enrich: LfValue => LfEngine.Result[com.digitalasset.daml.lf.value.Value],
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      loggingContext: LoggingContextWithTrace,
   ): Future[ApiValue] = for {
     enrichedValue <-
       if (verbose)
-        enrich(value)
+        consumeEnricherResult(enrich(value))
       else
         Future.successful(value.unversioned)
   } yield {
@@ -297,7 +331,7 @@ final class LfValueTranslation(
       loggingContext: LoggingContextWithTrace,
   ): Future[CreatedEvent] = {
     val createArgument = fatContractInstance.createArg
-    val createKey = fatContractInstance.contractKeyWithMaintainers.map(_.globalKey)
+    val createKey = fatContractInstance.contractKeyWithMaintainers.map(_.globalKey.key)
 
     val representativeTemplateId =
       fatContractInstance.templateId
@@ -320,8 +354,7 @@ final class LfValueTranslation(
       templateId = Some(
         LfEngineToApi.toApiIdentifier(fatContractInstance.templateId)
       ),
-      contractKey = apiContractData.contractKey.map(_._1),
-      contractKeyHash = apiContractData.contractKey.fold(ByteString.EMPTY)(_._2.bytes.toByteString),
+      contractKey = apiContractData.contractKey,
       createArguments = Some(apiContractData.createArguments),
       createdEventBlob = apiContractData.createdEventBlob.getOrElse(ByteString.EMPTY),
       interfaceViews = apiContractData.interfaceViews,
@@ -340,7 +373,7 @@ final class LfValueTranslation(
 
   private def toApiContractData(
       value: Value,
-      keyO: Option[GlobalKey],
+      keyO: Option[Value],
       representativeTemplateId: FullIdentifier,
       witnesses: Set[String],
       eventProjectionProperties: EventProjectionProperties,
@@ -361,14 +394,14 @@ final class LfValueTranslation(
         .map(toContractArgumentApi(verbose))
     def asyncContractKey = keyO match {
       case None => Future.successful(None)
-      case Some(gkey) =>
+      case Some(key) =>
         enrichAsync(
           verbose = verbose,
-          value = gkey.key,
+          value = key,
           enrich = enricher.enrichContractKey(representativeTemplateId.toIdentifier, _),
         )
           .map(toContractKeyApi(verbose))
-          .map(value => Some((value, gkey.hash)))
+          .map(Some(_))
     }
 
     def asyncInterfaceViews =
@@ -389,7 +422,6 @@ final class LfValueTranslation(
             verbose = eventProjectionProperties.verbose,
             interfaceId = interfaceId.toIdentifier,
             result = viewResult,
-            implementationPackageId = upgradedInstanceIdentifierResultE.toOption,
           )
         } yield interfaceView
       )
@@ -435,19 +467,17 @@ final class LfValueTranslation(
       verbose: Boolean,
       interfaceId: Identifier,
       result: Either[Status, Versioned[Value]],
-      implementationPackageId: Option[Identifier],
   )(implicit ec: ExecutionContext, loggingContext: LoggingContextWithTrace): Future[InterfaceView] =
     result match {
       case Right(versionedValue) =>
         enrichAsync(verbose, versionedValue.unversioned, enricher.enrichView(interfaceId, _))
-          .map(toInterfaceViewApi(verbose, interfaceId, implementationPackageId))
+          .map(toInterfaceViewApi(verbose, interfaceId))
       case Left(errorStatus) =>
         Future.successful(
           InterfaceView(
             interfaceId = Some(LfEngineToApi.toApiIdentifier(interfaceId)),
             viewStatus = Some(ProtoStatus.fromJavaProto(errorStatus)),
             viewValue = None,
-            implementationPackageId = implementationPackageId.map(_.packageId).getOrElse(""),
           )
         )
     }
@@ -457,11 +487,13 @@ final class LfValueTranslation(
   ): Future[Option[T]] =
     if (cond) f.map(Some(_)) else Future.successful(None)
 
-  private def enrichAsync(verbose: Boolean, value: Value, enrich: Value => Future[Value])(implicit
-      ec: ExecutionContext
+  private def enrichAsync(verbose: Boolean, value: Value, enrich: Value => LfEngine.Result[Value])(
+      implicit
+      ec: ExecutionContext,
+      loggingContext: LoggingContextWithTrace,
   ): Future[Value] =
     condFuture(verbose)(
-      Future.delegate(enrich(value))
+      Future(enrich(value)).flatMap(consumeEnricherResult)
     ).map(_.getOrElse(value))
 
   private def toApi[T](
@@ -480,23 +512,11 @@ final class LfValueTranslation(
   private def toContractKeyApi(verbose: Boolean)(value: Value): ApiValue =
     toApi(verbose, LfEngineToApi.lfValueToApiValue, "create key")(value)
 
-  private def toInterfaceViewApi(
-      verbose: Boolean,
-      interfaceId: Identifier,
-      implementationPackageId: Option[Identifier],
-  )(value: Value)(implicit loggingContextWithTrace: LoggingContextWithTrace) =
+  private def toInterfaceViewApi(verbose: Boolean, interfaceId: Identifier)(value: Value) =
     InterfaceView(
       interfaceId = Some(LfEngineToApi.toApiIdentifier(interfaceId)),
       viewStatus = Some(ProtoStatus.of(Code.OK.value(), "", Seq.empty)),
       viewValue = Some(toApi(verbose, LfEngineToApi.lfValueToApiRecord, "interface view")(value)),
-      implementationPackageId = implementationPackageId
-        .map(_.packageId)
-        .getOrElse {
-          logger.error(
-            s"Unexpected missing implementation package id for interface view of interface $interfaceId"
-          )(loggingContextWithTrace.traceContext)
-          ""
-        },
     )
 
   private def computeInterfaceView(
@@ -508,6 +528,9 @@ final class LfValueTranslation(
       executionContext: ExecutionContext,
   ): Future[Either[Status, Versioned[Value]]] = Timed.future(
     metrics.index.lfValue.computeInterfaceView, {
+      implicit val errorLogger: ErrorLoggingContext =
+        ErrorLoggingContext(logger, loggingContext)
+
       def goAsync(
           res: LfEngine.Result[Versioned[Value]]
       ): Future[Either[Status, Versioned[Value]]] =
@@ -528,14 +551,14 @@ final class LfValueTranslation(
           case LfEngine.ResultNeedContract(_, _) =>
             Future.failed(new IllegalStateException("View computation must be a pure function"))
 
-          case LfEngine.ResultNeedKey(_, _, _, _) =>
+          case LfEngine.ResultNeedKey(_, _) =>
             Future.failed(new IllegalStateException("View computation must be a pure function"))
 
           case LfEngine.ResultNeedPackage(packageId, resume) =>
             packageLoader
               .loadPackage(
                 packageId = packageId,
-                delegate = packageId => loadPackage(packageId, loggingContext.traceContext),
+                delegate = packageId => loadPackage(packageId, loggingContext),
                 metric = metrics.index.db.translation.getLfPackage,
               )
               .map(resume)
@@ -559,7 +582,7 @@ object LfValueTranslation {
   final case class ApiContractData(
       createArguments: ApiRecord,
       createdEventBlob: Option[ByteString],
-      contractKey: Option[(ApiValue, crypto.Hash)],
+      contractKey: Option[ApiValue],
       interfaceViews: Seq[InterfaceView],
   )
 }

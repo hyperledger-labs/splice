@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -21,16 +21,14 @@ object InputContractPackages {
       case (
             acc,
             (_, Node.Exercise(coid, _, templateId, _, _, _, _, _, _, _, _, _, _, _, _, _, _)),
-          ) if !tx.localContractIds.contains(coid) =>
+          ) =>
         Relation.update(acc, coid, templateId.packageId)
-      case (acc, (_, Node.Fetch(coid, _, templateId, _, _, _, _, _, _, _)))
-          if !tx.localContractIds.contains(coid) =>
+      case (acc, (_, Node.Fetch(coid, _, templateId, _, _, _, _, _, _, _))) =>
         Relation.update(acc, coid, templateId.packageId)
-      case (acc, (_, Node.LookupByKey(_, templateId, _, Some(coid), _)))
-          if !tx.localContractIds.contains(coid) =>
+      case (acc, (_, Node.LookupByKey(_, templateId, _, Some(coid), _))) =>
         Relation.update(acc, coid, templateId.packageId)
       case (acc, _) => acc
-    }
+    } -- tx.localContracts.keySet
 
   /** Merges two maps, returning an error if their key sets differ. */
   private[events] def strictZipByKey[K, V1, V2](

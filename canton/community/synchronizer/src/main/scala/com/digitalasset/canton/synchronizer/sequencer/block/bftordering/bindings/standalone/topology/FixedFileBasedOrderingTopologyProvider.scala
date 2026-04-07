@@ -1,12 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.standalone.topology
 
 import better.files.File as BFile
 import com.digitalasset.canton.crypto.{CryptoPureApi, SigningPrivateKey, SigningPublicKey, v30}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
   PekkoEnv,
@@ -19,30 +19,26 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
   OrderingTopologyProvider,
   TopologyActivationTime,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftKeyId,
   BftNodeId,
-  EpochLength,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   OrderingTopology,
   SequencingParameters,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MaxBytesToDecompress
 
 import java.io.File
 import scala.concurrent.ExecutionContext
 
 class FixedFileBasedOrderingTopologyProvider(
     standaloneConfig: BftBlockOrdererConfig.BftBlockOrderingStandaloneNetworkConfig,
-    epochLength: EpochLength,
     crypto: CryptoPureApi,
     metrics: BftOrderingMetrics,
 )(implicit executionContext: ExecutionContext)
     extends OrderingTopologyProvider[PekkoEnv] {
-
-  import FixedFileBasedOrderingTopologyProvider.*
 
   private val pubKey = readSigningPublicKey(standaloneConfig.signingPublicKeyProtoFile)
 
@@ -65,31 +61,31 @@ class FixedFileBasedOrderingTopologyProvider(
       Map(
         BftNodeId(standaloneConfig.thisSequencerId) ->
           OrderingTopology.NodeTopologyInfo(
-            Set(BftKeyId(pubKey.fingerprint.toProtoPrimitive))
+            Genesis.GenesisTopologyActivationTime,
+            Set(BftKeyId(pubKey.fingerprint.toProtoPrimitive)),
           )
       ) ++ standaloneConfig.peers.map { peerConfig =>
         BftNodeId(peerConfig.sequencerId) ->
           OrderingTopology.NodeTopologyInfo(
+            Genesis.GenesisTopologyActivationTime,
             Set(
               BftKeyId(
                 peerSigningPublicKeys(
                   BftNodeId(peerConfig.sequencerId)
                 ).fingerprint.toProtoPrimitive
               )
-            )
+            ),
           )
       },
-      epochLength,
       SequencingParameters.Default,
-      MaxBytesToDecompress(DynamicSynchronizerParameters.defaultMaxRequestSize.value),
-      ConventionalBootstrapTopologyActivationTime,
-      areTherePendingCantonTopologyChanges = Some(false),
+      MaxRequestSizeToDeserialize.Limit(
+        DynamicSynchronizerParameters.defaultMaxRequestSize.value
+      ),
+      Genesis.GenesisTopologyActivationTime,
+      areTherePendingCantonTopologyChanges = false,
     )
 
-  override def getOrderingTopologyAt(
-      activationTime: Option[TopologyActivationTime],
-      checkPendingChanges: Boolean,
-  )(implicit
+  override def getOrderingTopologyAt(activationTime: TopologyActivationTime)(implicit
       traceContext: TraceContext
   ): PekkoEnv#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[PekkoEnv])]] =
     PekkoFutureUnlessShutdown.pure(
@@ -98,21 +94,6 @@ class FixedFileBasedOrderingTopologyProvider(
           orderingTopology,
           new FixedKeysCryptoProvider(privKey, peerSigningPublicKeys, crypto, metrics),
         )
-      )
-    )
-
-  override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
-      traceContext: TraceContext
-  ): PekkoFutureUnlessShutdown[Option[Map[BftNodeId, TopologyActivationTime]]] =
-    PekkoFutureUnlessShutdown.pure(
-      Some(
-        Map(
-          BftNodeId(standaloneConfig.thisSequencerId) ->
-            ConventionalBootstrapTopologyActivationTime
-        ) ++ standaloneConfig.peers.map { peerConfig =>
-          BftNodeId(peerConfig.sequencerId) ->
-            ConventionalBootstrapTopologyActivationTime
-        }
       )
     )
 
@@ -126,10 +107,4 @@ class FixedFileBasedOrderingTopologyProvider(
       .getOrElse(
         throw new IllegalArgumentException("Failed to parse signing public key")
       )
-}
-
-object FixedFileBasedOrderingTopologyProvider {
-
-  private val ConventionalBootstrapTopologyActivationTime =
-    TopologyActivationTime(CantonTimestamp.MinValue)
 }

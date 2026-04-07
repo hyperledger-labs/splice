@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer
@@ -26,18 +26,26 @@ import scala.concurrent.ExecutionContextExecutor
 
 trait SequencerConnectClient extends NamedLogging with AutoCloseable {
 
-  def getSynchronizerClientBootstrapInfo()(implicit
+  def getSynchronizerClientBootstrapInfo(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, SynchronizerClientBootstrapInfo]
 
   /** @param synchronizerIdentifier
     *   Used for logging purpose
     */
-  def getSynchronizerParameters()(implicit
+  def getSynchronizerParameters(synchronizerIdentifier: String)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, StaticSynchronizerParameters]
 
+  /** @param synchronizerIdentifier
+    *   Used for logging purpose
+    */
+  def getSynchronizerId(synchronizerIdentifier: String)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, Error, PhysicalSynchronizerId]
+
   def handshake(
+      synchronizerAlias: SynchronizerAlias,
       request: HandshakeRequest,
       dontWarnOnDeprecatedPV: Boolean,
   )(implicit
@@ -46,6 +54,7 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
 
   def isActive(
       participantId: ParticipantId,
+      synchronizerAlias: SynchronizerAlias,
       waitForActive: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -63,6 +72,7 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
   }
 
   def registerOnboardingTopologyTransactions(
+      synchronizerAlias: SynchronizerAlias,
       member: Member,
       topologyTransactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit]
@@ -97,7 +107,6 @@ object SequencerConnectClient {
       case connection: GrpcSequencerConnection =>
         new GrpcSequencerConnectClient(
           connection,
-          synchronizerAlias,
           timeouts,
           traceContextPropagation,
           SequencerClient

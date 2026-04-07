@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -6,16 +6,14 @@ package com.digitalasset.canton.synchronizer.mediator.store
 import cats.data.OptionT
 import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{BatchAggregatorConfig, CacheConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyUtil}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.{
   EnvelopeContent,
@@ -25,13 +23,11 @@ import com.digitalasset.canton.protocol.messages.{
 import com.digitalasset.canton.resource.{DbStorage, DbStore, MemoryStorage, Storage}
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.synchronizer.mediator.FinalizedResponse
-import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
-import com.digitalasset.canton.util.BatchAggregator
+import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.canton.version.ProtocolVersion
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.collection.immutable
 import scala.collection.immutable.SortedSet
 import scala.concurrent.ExecutionContext
 
@@ -101,8 +97,6 @@ private[mediator] object FinalizedResponseStore {
       cryptoApi: CryptoPureApi,
       protocolVersion: ProtocolVersion,
       finalizedRequestCache: CacheConfig,
-      fetchAggregatorConfig: BatchAggregatorConfig,
-      storeAggregatorConfig: BatchAggregatorConfig,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -116,8 +110,6 @@ private[mediator] object FinalizedResponseStore {
         cryptoApi,
         protocolVersion,
         finalizedRequestCache,
-        fetchAggregatorConfig,
-        storeAggregatorConfig,
         timeouts,
         loggerFactory,
       )
@@ -185,7 +177,6 @@ private[mediator] class InMemoryFinalizedResponseStore(
         .foreach(finalizedRequests.remove(_).discard[Option[FinalizedResponse]])
     }
 
-  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   override def count()(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
@@ -213,8 +204,6 @@ private[mediator] class DbFinalizedResponseStore(
     cryptoApi: CryptoPureApi,
     protocolVersion: ProtocolVersion,
     finalizedRequestCache: CacheConfig,
-    fetchAggregatorConfig: BatchAggregatorConfig,
-    storeAggregatorConfig: BatchAggregatorConfig,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext, implicit val traceContext: TraceContext)
@@ -229,7 +218,7 @@ private[mediator] class DbFinalizedResponseStore(
     * processing stage, slowing things down quite a bit
     */
   private val finishedRequests = finalizedRequestCache
-    .buildScaffeine(loggerFactory)
+    .buildScaffeine()
     .build[RequestId, FinalizedResponse]()
 
   private implicit val getResultRequestId: GetResult[RequestId] =
@@ -258,66 +247,31 @@ private[mediator] class DbFinalizedResponseStore(
     (r: MediatorConfirmationRequest, pp: PositionedParameters) =>
       pp >> EnvelopeContent(r, protocolVersion).toByteArray
 
-  private val storeAggregatorProcessor = new BatchAggregator.Processor[FinalizedResponse, Unit] {
-    override def kind: String = "store-finalized-responses"
-
-    override def logger: TracedLogger = DbFinalizedResponseStore.this.logger
-
-    override def executeBatch(items: NonEmpty[Seq[Traced[FinalizedResponse]]])(implicit
-        traceContext: TraceContext,
-        callerCloseContext: CloseContext,
-    ): FutureUnlessShutdown[immutable.Iterable[Unit]] =
-      storeBatched(items.map(_.value))(traceContext, callerCloseContext).map(_ =>
-        items.map(_ => ())
-      )
-
-    override val prettyItem: Pretty[FinalizedResponse] =
-      PrettyUtil.prettyOfParam(_.requestId.unwrap)
-  }
-
-  private val storeAggregator = BatchAggregator(
-    storeAggregatorProcessor,
-    storeAggregatorConfig,
-  )
-
-  private def storeBatched(
-      responses: NonEmpty[Seq[FinalizedResponse]]
-  )(implicit
-      traceContext: TraceContext,
-      callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Unit] = {
-    val insert =
-      """insert into med_response_aggregations(request_id, mediator_confirmation_request, finalization_time, verdict, request_trace_context)
-             values (?, ?, ?, ?, ?) on conflict do nothing"""
-
-    def setData(pp: PositionedParameters)(finalizedResponse: FinalizedResponse): Unit = {
-      pp >> finalizedResponse.requestId
-      pp >> finalizedResponse.request
-      pp >> finalizedResponse.finalizationTime
-      pp >> finalizedResponse.verdict
-      pp >> SerializableTraceContext(finalizedResponse.requestTraceContext)
-    }
-
-    CloseContext
-      .withCombinedContext(callerCloseContext, closeContext, timeouts, logger) { closeContext =>
-        storage.queryAndUpdate(
-          DbStorage.bulkOperation_(insert, responses, storage.profile)(setData),
-          operationName = s"store ${responses.size} batched responses",
-        )(traceContext, closeContext)
-      }
-      .map { _ =>
-        // keep the request around for a while to avoid a database lookup under contention
-        finishedRequests.putAll(responses.map(r => r.requestId -> r).toMap.forgetNE)
-      }
-  }
-
   override def store(
       finalizedResponse: FinalizedResponse
   )(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Unit] =
-    storeAggregator.run(finalizedResponse)(ec, traceContext, callerCloseContext)
+  ): FutureUnlessShutdown[Unit] = {
+    val insert =
+      sqlu"""insert into med_response_aggregations(request_id, mediator_confirmation_request, finalization_time, verdict, request_trace_context)
+             values (
+               ${finalizedResponse.requestId},${finalizedResponse.request},${finalizedResponse.finalizationTime},${finalizedResponse.verdict},
+               ${SerializableTraceContext(finalizedResponse.requestTraceContext)}
+             ) on conflict do nothing"""
+
+    CloseContext
+      .withCombinedContext(callerCloseContext, closeContext, timeouts, logger) { closeContext =>
+        storage.update_(
+          insert,
+          operationName = s"${this.getClass}: store request ${finalizedResponse.requestId}",
+        )(traceContext, closeContext)
+      }
+      .map { _ =>
+        // keep the request around for a while to avoid a database lookup under contention
+        finishedRequests.put(finalizedResponse.requestId, finalizedResponse).discard
+      }
+  }
 
   override def fetch(requestId: RequestId)(implicit
       traceContext: TraceContext,
@@ -327,49 +281,22 @@ private[mediator] class DbFinalizedResponseStore(
       case Some(response) =>
         OptionT.pure[FutureUnlessShutdown](response)
       case None =>
-        OptionT(fetchAggregator.run(requestId)(ec, traceContext, callerCloseContext)).map {
-          response =>
-            finishedRequests.put(requestId, response)
-            response
+        fetchFromDb(requestId)(traceContext, callerCloseContext).map { response =>
+          finishedRequests.put(requestId, response)
+          response
         }
     }
 
-  private val fetchAggregatorProcessor =
-    new BatchAggregator.Processor[RequestId, Option[FinalizedResponse]] {
-      override def kind: String = "fetch-verdicts"
-
-      override def logger: TracedLogger = DbFinalizedResponseStore.this.logger
-
-      override def executeBatch(items: NonEmpty[Seq[Traced[RequestId]]])(implicit
-          traceContext: TraceContext,
-          closeContext: CloseContext,
-      ): FutureUnlessShutdown[immutable.Iterable[Option[FinalizedResponse]]] =
-        fetchFromDb(items.map(_.value)).map { results =>
-          val resultsMap = results.map(resp => resp.requestId -> resp).toMap
-          items.map(requestId => resultsMap.get(requestId.value))
-        }
-
-      override val prettyItem: Pretty[RequestId] = PrettyUtil.prettyOfParam(_.unwrap)
-    }
-  private val fetchAggregator = BatchAggregator(
-    fetchAggregatorProcessor,
-    fetchAggregatorConfig,
-  )
-
-  private def fetchFromDb(requestIds: NonEmpty[Seq[RequestId]])(implicit
+  private def fetchFromDb(requestId: RequestId)(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Seq[FinalizedResponse]] =
+  ): OptionT[FutureUnlessShutdown, FinalizedResponse] =
     CloseContext.withCombinedContext(callerCloseContext, closeContext, timeouts, logger) {
       closeContext =>
-        import DbStorage.Implicits.BuilderChain.*
-
-        val inClause = DbStorage.toInClause("request_id", requestIds.map(_.unwrap))
-        val query =
+        storage.querySingle(
           sql"""select request_id, mediator_confirmation_request, finalization_time, verdict, request_trace_context
-              from med_response_aggregations where """ ++ inClause
-        storage.query(
-          query
+              from med_response_aggregations where request_id=${requestId.unwrap}
+           """
             .as[
               (
                   RequestId,
@@ -379,6 +306,7 @@ private[mediator] class DbFinalizedResponseStore(
                   SerializableTraceContext,
               )
             ]
+            .headOption
             .map {
               _.map {
                 case (
@@ -393,9 +321,8 @@ private[mediator] class DbFinalizedResponseStore(
                   )
               }
             },
-          operationName = s"${this.getClass}: fetch requests",
+          operationName = s"${this.getClass}: fetch request $requestId",
         )(traceContext, closeContext)
-
     }
 
   override def highestRecordTime()(implicit

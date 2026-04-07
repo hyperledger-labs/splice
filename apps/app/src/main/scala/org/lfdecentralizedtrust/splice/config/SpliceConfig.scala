@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppClientConfig,
   ScanCacheConfig,
   ScanSynchronizerConfig,
-  ScanSynchronizerNodesConfig,
   CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -56,7 +55,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
-import com.digitalasset.canton.admin.api.client.data.{
+import com.digitalasset.canton.sequencing.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
@@ -64,7 +63,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
-import pureconfig.configurable.{genericMapReader, genericMapWriter}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
@@ -87,7 +85,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
   SequencerNodeConfig,
 }
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
@@ -111,10 +109,11 @@ case class SpliceConfig(
       )
     ),
     features: CantonFeatures = CantonFeatures(),
+    override val pekkoConfig: Option[Config] = None,
 ) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
-  override def withDefaults(defaults: Option[DefaultPorts]): SpliceConfig =
+  override def withDefaults(defaults: Option[DefaultPorts], edition: CantonEdition): SpliceConfig =
     this
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
@@ -337,7 +336,7 @@ object SpliceConfig {
         loadRawConfig(resolvedConfig)
           .flatMap { conf =>
             val confWithDefaults =
-              conf.withDefaults(Some(DefaultPorts.create()))
+              conf.withDefaults(Some(DefaultPorts.create()), CommunityCantonEdition)
             confWithDefaults.validate.toEither
               .map(_ => confWithDefaults)
               .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))
@@ -421,8 +420,6 @@ object SpliceConfig {
     implicit val contractFetchLedgerFallbackConfigReader
         : ConfigReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
       deriveReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
-    implicit val spliceCachingConfigs: ConfigReader[SpliceCachingConfigs] =
-      deriveReader[SpliceCachingConfigs]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -463,8 +460,8 @@ object SpliceConfig {
       deriveReader[ScanSynchronizerConfig]
     // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
     implicit val bftSequencerConfigReader: ConfigReader[BftSequencerConfig] =
-      ConfigReader.forProduct1("p2p-url")(
-        BftSequencerConfig(_)
+      ConfigReader.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(
+        BftSequencerConfig(_, _, _)
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
@@ -477,8 +474,6 @@ object SpliceConfig {
       deriveReader[S3Config]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
-    implicit val scanSynchronizerNodes: ConfigReader[ScanSynchronizerNodesConfig] =
-      deriveReader[ScanSynchronizerNodesConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -540,11 +535,6 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationReader
         : ConfigReader[SvOnboardingConfig.DomainMigration] =
       deriveReader[SvOnboardingConfig.DomainMigration]
-    implicit val svOnboardingRollForwardLsuTimestampConfigReader
-        : ConfigReader[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
-      deriveReader[SvOnboardingConfig.RollForwardLsuTimestampConfig]
-    implicit val svOnboardingRollForwardLsuReader: ConfigReader[SvOnboardingConfig.RollForwardLsu] =
-      deriveReader[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
       deriveReader[SvOnboardingConfig]
     implicit val expectedValidatorOnboardingConfigReader
@@ -580,8 +570,6 @@ object SpliceConfig {
       deriveReader[SvScanConfig]
     implicit val svSynchronizerNodeConfig: ConfigReader[SvSynchronizerNodeConfig] =
       deriveReader[SvSynchronizerNodeConfig]
-    implicit val svSynchronizerNodesConfig: ConfigReader[SvSynchronizerNodesConfig] =
-      deriveReader[SvSynchronizerNodesConfig]
     implicit val svDecentralizedSynchronizerConfigReader
         : ConfigReader[SvDecentralizedSynchronizerConfig] =
       deriveReader[SvDecentralizedSynchronizerConfig]
@@ -606,11 +594,6 @@ object SpliceConfig {
       ConfigReader.fromString(str =>
         PackageVersion.fromString(str).left.map(err => CannotConvert(str, "PackageVersion", err))
       )
-    implicit val additionalPackagesToUnvetReader
-        : ConfigReader[Map[PackageName, Set[PackageVersion]]] =
-      genericMapReader(str =>
-        PackageName.fromString(str).left.map(err => CannotConvert(str, "PackageName", err))
-      )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
@@ -628,8 +611,11 @@ object SpliceConfig {
             case foundDso: SvOnboardingConfig.FoundDso => check(conf, foundDso)
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
-            case _: SvOnboardingConfig.RollForwardLsu => true
           }
+        // We support joining nodes without sequencers/mediators but
+        // sv1 must alway configure one to bootstrap the domain.
+        val sv1NodeHasSynchronizerConfig =
+          checkFoundDsoConfig((conf, _) => conf.localSynchronizerNode.isDefined)
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
         val sv1NodeHasNoSequencerUrl =
           checkFoundDsoConfig((conf, _) => conf.domains.global.url.isEmpty)
@@ -642,6 +628,11 @@ object SpliceConfig {
             validateInitialPackageConfigDependencies(foundDsoConf.initialPackageConfig)
           )
         for {
+          _ <- Either.cond(
+            sv1NodeHasSynchronizerConfig,
+            (),
+            ConfigValidationFailed("SV1 must always specify a domain config"),
+          )
           _ <- Either.cond(
             sv1NodeHasNoSequencerUrl,
             (),
@@ -866,8 +857,6 @@ object SpliceConfig {
     implicit val contractFetchLedgerFallbackConfigWriter
         : ConfigWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
       deriveWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
-    implicit val spliceCachingConfigs: ConfigWriter[SpliceCachingConfigs] =
-      deriveWriter[SpliceCachingConfigs]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
@@ -926,9 +915,9 @@ object SpliceConfig {
       deriveWriter[ScanSynchronizerConfig]
     // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
     implicit val bftSequencerConfigWriter: ConfigWriter[BftSequencerConfig] =
-      ConfigWriter.forProduct1("p2p-url")(c => c.p2pUrl)
-    implicit val scanSynchronizerNodes: ConfigWriter[ScanSynchronizerNodesConfig] =
-      deriveWriter[ScanSynchronizerNodesConfig]
+      ConfigWriter.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(c =>
+        (c.migrationId, c.sequencerAdminClient, c.p2pUrl)
+      )
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
@@ -997,11 +986,6 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationWriter
         : ConfigWriter[SvOnboardingConfig.DomainMigration] =
       deriveWriter[SvOnboardingConfig.DomainMigration]
-    implicit val svOnboardingRollForwardLsuTimestampConfigWriter
-        : ConfigWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
-      deriveWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig]
-    implicit val svOnboardingRollForwardLsuWriter: ConfigWriter[SvOnboardingConfig.RollForwardLsu] =
-      deriveWriter[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
       confidentialWriter[SvOnboardingConfig](SvOnboardingConfig.hideConfidential)
 
@@ -1030,8 +1014,6 @@ object SpliceConfig {
       deriveWriter[SvScanConfig]
     implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =
       deriveWriter[SvSynchronizerNodeConfig]
-    implicit val svSynchronizerNodesConfig: ConfigWriter[SvSynchronizerNodesConfig] =
-      deriveWriter[SvSynchronizerNodesConfig]
     implicit val spliceInstanceNamesConfigWriter: ConfigWriter[SpliceInstanceNamesConfig] =
       deriveWriter[SpliceInstanceNamesConfig]
     implicit val svDecentralizedSynchronizerConfigWriter
@@ -1053,9 +1035,6 @@ object SpliceConfig {
       implicitly[ConfigWriter[String]].contramap(_.toProtoPrimitive)
     implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
-    implicit val additionalPackagesToUnvetWriter
-        : ConfigWriter[Map[PackageName, Set[PackageVersion]]] =
-      genericMapWriter(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =

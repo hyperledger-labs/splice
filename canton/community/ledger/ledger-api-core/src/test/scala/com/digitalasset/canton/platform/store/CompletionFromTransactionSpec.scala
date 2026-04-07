@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store
@@ -6,10 +6,7 @@ package com.digitalasset.canton.platform.store
 import com.daml.ledger.api.v2.completion.Completion.DeduplicationPeriod
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.platform.store.CompletionFromTransaction.CommonCompletionProperties
 import com.digitalasset.canton.protocol.TestUpdateId
-import com.digitalasset.canton.tracing.SerializableTraceContext
-import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.daml.lf.data.Time
 import com.google.protobuf.duration.Duration
 import com.google.protobuf.timestamp.Timestamp
@@ -73,21 +70,18 @@ class CompletionFromTransactionSpec
             expectedDeduplicationPeriod,
         ) =>
           val completionStream = CompletionFromTransaction.acceptedCompletion(
-            CompletionFromTransaction.CommonCompletionProperties
-              .createFromRecordTimeAndSynchronizerId(
-                submitters = Set("party1", "party2"),
-                recordTime = Time.Timestamp.Epoch,
-                completionOffset = Offset.firstOffset,
-                commandId = "commandId",
-                userId = "userId",
-                submissionId = submissionId,
-                synchronizerId = "synchronizer id",
-                traceContext = SerializableTraceContext(traceContext).toDamlProto,
-                deduplicationOffset = deduplicationOffset,
-                deduplicationDurationSeconds = deduplicationDurationSeconds,
-                deduplicationDurationNanos = deduplicationDurationNanos,
-              ),
+            Set("party1", "party2"),
+            Time.Timestamp.Epoch,
+            Offset.firstOffset,
+            "commandId",
             TestUpdateId("updateId"),
+            "userId",
+            "synchronizer id",
+            traceContext,
+            submissionId,
+            deduplicationOffset,
+            deduplicationDurationSeconds,
+            deduplicationDurationNanos,
           )
 
           val completion = completionStream.completionResponse.completion.value
@@ -113,20 +107,18 @@ class CompletionFromTransactionSpec
       forEvery(testCases) { (deduplicationDurationSeconds, deduplicationDurationNanos) =>
         an[IllegalArgumentException] shouldBe thrownBy(
           CompletionFromTransaction.acceptedCompletion(
-            CommonCompletionProperties.createFromRecordTimeAndSynchronizerId(
-              submitters = Set.empty,
-              recordTime = Time.Timestamp.Epoch,
-              completionOffset = Offset.firstOffset,
-              commandId = "commandId",
-              userId = "userId",
-              submissionId = Some("submissionId"),
-              synchronizerId = "synchronizer id",
-              traceContext = SerializableTraceContext(traceContext).toDamlProto,
-              deduplicationOffset = None,
-              deduplicationDurationSeconds = deduplicationDurationSeconds,
-              deduplicationDurationNanos = deduplicationDurationNanos,
-            ),
-            updateId = TestUpdateId("updateId"),
+            Set.empty,
+            Time.Timestamp.Epoch,
+            Offset.firstOffset,
+            "commandId",
+            TestUpdateId("updateId"),
+            "userId",
+            "synchronizer id",
+            traceContext,
+            Some("submissionId"),
+            None,
+            deduplicationDurationSeconds,
+            deduplicationDurationNanos,
           )
         )
       }
@@ -135,21 +127,15 @@ class CompletionFromTransactionSpec
     "create a rejected completion" in {
       val status = Status.of(io.grpc.Status.Code.INTERNAL.value(), "message", Seq.empty)
       val completionStream = CompletionFromTransaction.rejectedCompletion(
-        commonCompletionProperties = CompletionFromTransaction.CommonCompletionProperties
-          .createFromRecordTimeAndSynchronizerId(
-            submitters = Set("party"),
-            recordTime = Time.Timestamp.Epoch,
-            completionOffset = Offset.tryFromLong(2L),
-            commandId = "commandId",
-            userId = "userId",
-            submissionId = Some("submissionId"),
-            synchronizerId = "synchronizer id",
-            traceContext = SerializableTraceContext(traceContext).toDamlProto,
-            deduplicationOffset = None,
-            deduplicationDurationSeconds = None,
-            deduplicationDurationNanos = None,
-          ),
-        status = status,
+        Set("party"),
+        Time.Timestamp.Epoch,
+        Offset.tryFromLong(2L),
+        "commandId",
+        status,
+        "userId",
+        "synchronizer id",
+        traceContext,
+        Some("submissionId"),
       )
 
       val completion = completionStream.completionResponse.completion.value

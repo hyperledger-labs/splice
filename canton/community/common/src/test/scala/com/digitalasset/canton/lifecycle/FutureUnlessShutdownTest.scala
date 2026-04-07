@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -16,7 +16,7 @@ class FutureUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExecu
   "DiscardedFuture" should {
     "detect discarded FutureUnlessShutdown" in {
       val result = WartTestTraverser(DiscardedFuture) {
-        FutureUnlessShutdown.unit
+        FutureUnlessShutdown.pure(())
         ()
       }
       DiscardedFutureTest.assertErrors(result, 1)

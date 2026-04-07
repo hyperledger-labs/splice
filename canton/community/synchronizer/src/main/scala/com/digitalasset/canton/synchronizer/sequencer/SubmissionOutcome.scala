@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -10,12 +10,11 @@ import com.digitalasset.canton.sequencing.protocol.{
   AggregationId,
   Batch,
   ClosedEnvelope,
-  MemberRecipient,
-  MemberRecipientOrBroadcast,
   SequencerDeliverError,
   SubmissionRequest,
 }
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.rpc.status.Status
 
@@ -27,7 +26,7 @@ sealed trait DeliverableSubmissionOutcome extends SubmissionOutcome {
 
   def sequencingTime: CantonTimestamp
 
-  def recipients: Set[MemberRecipientOrBroadcast]
+  def deliverToMembers: Set[Member]
 
   def submissionTraceContext: TraceContext
 
@@ -37,14 +36,7 @@ sealed trait DeliverableSubmissionOutcome extends SubmissionOutcome {
       trafficReceiptO: Option[TrafficReceipt]
   ): DeliverableSubmissionOutcome
 
-  /** Contains the computed inflight aggregation update result
-    *
-    * If this submission contained an aggregation rule, then we return here:
-    *   - the aggregation id
-    *   - the updated inflight aggregation with this request included
-    *   - the update applied separately (so it can be stored in a batch update)
-    */
-  def inFlightAggregation: Option[(AggregationId, InFlightAggregation, InFlightAggregationUpdate)]
+  def inFlightAggregation: Option[(AggregationId, InFlightAggregationUpdate)]
 }
 
 object SubmissionOutcome {
@@ -54,7 +46,7 @@ object SubmissionOutcome {
     *   The original submission request.
     * @param sequencingTime
     *   The time at which the submission was sequenced.
-    * @param recipients
+    * @param deliverToMembers
     *   The members to which the submission should be delivered, only needed before group addressing
     *   in DBS is finished.
     * @param batch
@@ -64,13 +56,11 @@ object SubmissionOutcome {
   final case class Deliver(
       override val submission: SubmissionRequest,
       override val sequencingTime: CantonTimestamp,
-      override val recipients: Set[MemberRecipientOrBroadcast],
+      override val deliverToMembers: Set[Member],
       batch: Batch[ClosedEnvelope],
       override val submissionTraceContext: TraceContext,
       override val trafficReceiptO: Option[TrafficReceipt],
-      override val inFlightAggregation: Option[
-        (AggregationId, InFlightAggregation, InFlightAggregationUpdate)
-      ],
+      override val inFlightAggregation: Option[(AggregationId, InFlightAggregationUpdate)],
   ) extends DeliverableSubmissionOutcome {
     override def updateTrafficReceipt(
         trafficReceiptO: Option[TrafficReceipt]
@@ -94,12 +84,9 @@ object SubmissionOutcome {
       override val sequencingTime: CantonTimestamp,
       override val submissionTraceContext: TraceContext,
       override val trafficReceiptO: Option[TrafficReceipt],
-      override val inFlightAggregation: Option[
-        (AggregationId, InFlightAggregation, InFlightAggregationUpdate)
-      ],
+      override val inFlightAggregation: Option[(AggregationId, InFlightAggregationUpdate)],
   ) extends DeliverableSubmissionOutcome {
-    override def recipients: Set[MemberRecipientOrBroadcast] =
-      Set(MemberRecipient(submission.sender))
+    override def deliverToMembers: Set[Member] = Set(submission.sender)
 
     override def updateTrafficReceipt(
         trafficReceiptO: Option[TrafficReceipt]
@@ -135,15 +122,13 @@ object SubmissionOutcome {
       override val submissionTraceContext: TraceContext,
       override val trafficReceiptO: Option[TrafficReceipt],
   ) extends DeliverableSubmissionOutcome {
-    override def recipients: Set[MemberRecipientOrBroadcast] =
-      Set(MemberRecipient(submission.sender))
+    override def deliverToMembers: Set[Member] = Set(submission.sender)
 
     override def updateTrafficReceipt(
         trafficReceiptO: Option[TrafficReceipt]
     ): DeliverableSubmissionOutcome = copy(trafficReceiptO = trafficReceiptO)
 
-    override def inFlightAggregation
-        : Option[(AggregationId, InFlightAggregation, InFlightAggregationUpdate)] = None
+    override def inFlightAggregation: Option[(AggregationId, InFlightAggregationUpdate)] = None
   }
 
   object Reject {

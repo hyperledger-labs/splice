@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive.codec
@@ -18,10 +18,10 @@ import com.digitalasset.canton.platform.apiserver.execution.CommandInterpretatio
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.protocol.LfFatContractInst
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, Synchronizer, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
+import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.data.{ImmArray, Time}
 import com.digitalasset.daml.lf.engine.Enricher
 import com.digitalasset.daml.lf.transaction.{
   FatContractInstance,
@@ -72,12 +72,11 @@ private[interactive] sealed trait EnrichedTransactionData {
   private[codec] def submitterInfo: state.SubmitterInfo
   private[codec] def transactionMeta: state.TransactionMeta
   private[codec] def transaction: SubmittedTransaction
-  private[codec] def globalKeyMapping: Map[GlobalKey, Vector[Value.ContractId]]
+  private[codec] def globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]]
   private[codec] def inputContracts: Map[ContractId, ExternalInputContract]
-  private[codec] def synchronizer: Synchronizer
+  private[codec] def synchronizerId: SynchronizerId
   private[codec] def mediatorGroup: Int
   private[codec] def transactionUUID: UUID
-  private[codec] def maxRecordTime: Option[Time.Timestamp]
 
   def computeHash(
       hashVersion: HashingSchemeVersion,
@@ -85,16 +84,15 @@ private[interactive] sealed trait EnrichedTransactionData {
       hashTracer: HashTracer = HashTracer.NoOp,
   ): Either[InteractiveSubmission.HashError, Hash] = {
     val metadataForHashing = TransactionMetadataForHashing.create(
-      actAs = submitterInfo.actAs.toSet,
-      commandId = submitterInfo.commandId,
-      transactionUUID = transactionUUID,
-      mediatorGroup = mediatorGroup,
-      synchronizer = synchronizer,
-      timeBoundaries = transactionMeta.timeBoundaries,
-      preparationTime = transactionMeta.preparationTime,
-      maxRecordTime = maxRecordTime,
+      submitterInfo.actAs.toSet,
+      submitterInfo.commandId,
+      transactionUUID,
+      mediatorGroup,
+      synchronizerId,
+      transactionMeta.timeBoundaries,
+      transactionMeta.preparationTime,
       // The hash is computed from the enriched contract because that's what the external party signs
-      disclosedContracts = inputContracts.view.mapValues(_.enrichedContract).toMap,
+      inputContracts.view.mapValues(_.enrichedContract).toMap,
     )
     InteractiveSubmission.computeVersionedHash(
       hashVersion,
@@ -116,9 +114,9 @@ final case class PrepareTransactionData(
     private[codec] val submitterInfo: state.SubmitterInfo,
     private[codec] val transactionMeta: state.TransactionMeta,
     private[codec] val transaction: SubmittedTransaction,
-    private[codec] val globalKeyMapping: Map[GlobalKey, Vector[Value.ContractId]],
+    private[codec] val globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
     private[codec] val inputContracts: Map[ContractId, ExternalInputContract],
-    private[codec] val synchronizer: Synchronizer,
+    private[codec] val synchronizerId: SynchronizerId,
     private[codec] val mediatorGroup: Int,
     private[codec] val transactionUUID: UUID,
     private[codec] val maxRecordTime: Option[Timestamp],
@@ -132,15 +130,13 @@ final case class ExecuteTransactionData(
     private[codec] val submitterInfo: state.SubmitterInfo,
     private[codec] val transactionMeta: state.TransactionMeta,
     private[codec] val transaction: SubmittedTransaction,
-    private[codec] val globalKeyMapping: Map[GlobalKey, Vector[Value.ContractId]],
+    private[codec] val globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
     private[codec] val inputContracts: Map[ContractId, ExternalInputContract],
-    private[codec] val synchronizer: Synchronizer,
+    private[codec] val synchronizerId: SynchronizerId,
     private val externallySignedSubmission: ExternallySignedSubmission,
 ) extends EnrichedTransactionData {
   override private[codec] val mediatorGroup: Int = externallySignedSubmission.mediatorGroup.value
   override private[codec] val transactionUUID: UUID = externallySignedSubmission.transactionUUID
-
-  override def maxRecordTime: Option[Timestamp] = externallySignedSubmission.maxRecordTime
 
   def impoverish: CommandInterpretationResult = {
     val normalizedTransaction = Enricher.impoverish(transaction)
@@ -153,7 +149,7 @@ final case class ExecuteTransactionData(
       globalKeyMapping = globalKeyMapping,
       // Make sure to use the original contract instance here. No need to impoverish it as it hasn't been enriched
       processedDisclosedContracts = ImmArray.from(inputContracts.values.map(_.originalContract)),
-      optSynchronizerId = Some(synchronizer.logical),
+      optSynchronizerId = Some(synchronizerId),
     )
   }
 
@@ -170,15 +166,11 @@ final case class ExecuteTransactionData(
           .toRight("Missing externally signed submission")
       )
       physicalSynchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
-        synchronizer match {
-          case lsid: SynchronizerId =>
-            routingSynchronizerState
-              .getPhysicalId(lsid)
-              .toRight(
-                s"Cannot find a physical synchronizer for $synchronizer. Make sure the participant is connected to the synchronizer."
-              )
-          case psid: PhysicalSynchronizerId => Right(psid)
-        }
+        routingSynchronizerState
+          .getPhysicalId(synchronizerId)
+          .toRight(
+            s"Cannot find a physical synchronizer for $synchronizerId. Make sure the participant is connected to the synchronizer."
+          )
       )
       protocolVersion = physicalSynchronizerId.protocolVersion
       hash <- EitherT

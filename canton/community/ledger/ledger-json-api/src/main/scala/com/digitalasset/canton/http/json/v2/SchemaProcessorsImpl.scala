@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -23,10 +23,10 @@ import com.digitalasset.daml.lf.data.Ref.{
 }
 import com.digitalasset.daml.lf.language.Ast
 import com.digitalasset.transcode.codec.json.JsonCodec
-import com.digitalasset.transcode.codec.proto.ProtobufCodec
-import com.digitalasset.transcode.daml_lf.LfSchemaProcessor
-import com.digitalasset.transcode.schema.{Dictionary, IdentifierFilter, SchemaVisitor}
-import com.digitalasset.transcode.{Converter, schema}
+import com.digitalasset.transcode.codec.proto.GrpcValueCodec
+import com.digitalasset.transcode.daml_lf.{Dictionary, SchemaEntity, SchemaProcessor}
+import com.digitalasset.transcode.schema.SchemaVisitor
+import com.digitalasset.transcode.{Codec, Converter}
 import io.grpc.StatusRuntimeException
 
 import java.util.concurrent.atomic.AtomicReference
@@ -36,8 +36,6 @@ import scala.util.{Failure, Success}
 class SchemaProcessorsImpl(
     fetchSignatures: ErrorLoggingContext => PackageSignatures,
     val loggerFactory: NamedLoggerFactory,
-    // used in testing to create JSON requests with missing arguments
-    allowMissingFields: Boolean = false,
 )(implicit executionContext: ExecutionContext)
     extends SchemaProcessors
     with NamedLogging {
@@ -47,28 +45,24 @@ class SchemaProcessorsImpl(
       jsonArgsValue: ujson.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[value.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[value.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      protoDict <- prepareProtoDict(signatures)
-      templateValueConverter <- extractTemplateValue(protoDict)(templateId)
+      templateId <- resolveIdentifier(template).toFuture
+      protoDict <- prepareProtoDict
+      templateValueConverter <- extractTemplateValue(protoDict.templates)(templateId)
     } yield templateValueConverter.convert(jsonArgsValue)
-  }
 
   override def contractArgFromProtoToJson(
       template: value.Identifier,
       protoArgs: value.Record,
   )(implicit
       traceContext: TraceContext
-  ): Future[ujson.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[ujson.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      jsonDict <- prepareJsonDict(signatures)
-      templateValueConverter <- extractTemplateValue(jsonDict)(templateId)
+      templateId <- resolveIdentifier(template).toFuture
+      dict <- prepareJsonDict
+      templateValueConverter <- extractTemplateValue(dict.templates)(templateId)
     } yield templateValueConverter.convert(value.Value(value.Value.Sum.Record(protoArgs)))
-  }
 
   override def choiceArgsFromJsonToProto(
       template: value.Identifier,
@@ -76,14 +70,15 @@ class SchemaProcessorsImpl(
       jsonArgsValue: ujson.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[value.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[value.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      protoDict <- prepareProtoDict(signatures)
-      choiceArgsConverter <- extractChoiceArgument(protoDict)(templateId, choiceName)
-    } yield choiceArgsConverter.convert(nullToEmpty(jsonArgsValue))
-  }
+      templateId <- resolveIdentifier(template).toFuture
+      protoDict <- prepareProtoDict
+      templateValueConverter <- protoDict.choiceArguments
+        .get(templateId -> choiceName)
+        .toRight(invalidChoiceException(templateId, choiceName))
+        .toFuture
+    } yield templateValueConverter.convert(nullToEmpty(jsonArgsValue))
 
   override def choiceArgsFromProtoToJson(
       template: value.Identifier,
@@ -91,42 +86,39 @@ class SchemaProcessorsImpl(
       protoArgs: value.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[ujson.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[ujson.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      jsonDict <- prepareJsonDict(signatures)
-      choiceArgsConverter <- extractChoiceArgument(jsonDict)(templateId, choiceName)
+      templateId <- resolveIdentifier(template).toFuture
+      jsonDict <- prepareJsonDict
+      choiceArgsConverter <- jsonDict.choiceArguments
+        .get(templateId -> choiceName)
+        .toRight(invalidChoiceException(templateId, choiceName))
+        .toFuture
     } yield choiceArgsConverter.convert(protoArgs)
-  }
 
   override def keyArgFromProtoToJson(
       template: value.Identifier,
       protoArgs: value.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[ujson.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[ujson.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      jsonDict <- prepareJsonDict(signatures)
-      templateKeyConverter <- extractTemplateKey(jsonDict)(templateId)
-    } yield templateKeyConverter.convert(protoArgs)
-  }
+      templateId <- resolveIdentifier(template).toFuture
+      jsonDict <- prepareJsonDict
+      templateValueConverter <- extractTemplateValue(jsonDict.templateKeys)(templateId)
+    } yield templateValueConverter.convert(protoArgs)
 
   override def keyArgFromJsonToProto(
       template: value.Identifier,
-      jsonArgs: ujson.Value,
+      protoArgs: ujson.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[value.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[value.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      protoDict <- prepareProtoDict(signatures)
-      templateKeyConverter <- extractTemplateKey(protoDict)(templateId)
-    } yield templateKeyConverter.convert(jsonArgs)
-  }
+      templateId <- resolveIdentifier(template).toFuture
+      protoDict <- prepareProtoDict
+      templateValueConverter <- extractTemplateValue(protoDict.templateKeys)(templateId)
+    } yield templateValueConverter.convert(protoArgs)
 
   override def exerciseResultFromProtoToJson(
       template: value.Identifier,
@@ -134,14 +126,15 @@ class SchemaProcessorsImpl(
       v: value.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[ujson.Value] = {
-    val signatures = fetchSignatures(errorLoggingContext)
+  ): Future[ujson.Value] =
     for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      jsonDict <- prepareJsonDict(signatures)
-      choiceResultConverter <- extractChoiceResult(jsonDict)(templateId, choiceName)
+      templateId <- resolveIdentifier(template).toFuture
+      jsonDict <- prepareJsonDict
+      choiceResultConverter <- jsonDict.choiceResults
+        .get(templateId -> choiceName)
+        .toRight(invalidChoiceException(templateId, choiceName))
+        .toFuture
     } yield choiceResultConverter.convert(v)
-  }
 
   override def exerciseResultFromJsonToProto(
       template: value.Identifier,
@@ -149,28 +142,29 @@ class SchemaProcessorsImpl(
       jvalue: ujson.Value,
   )(implicit
       traceContext: TraceContext
-  ): Future[Option[value.Value]] = {
-    val signatures = fetchSignatures(errorLoggingContext)
-    for {
-      templateId <- resolveIdentifier(template, signatures).toFuture
-      protoDict <- prepareProtoDict(signatures)
-      choiceResultConverter <- extractChoiceResult(protoDict)(templateId, choiceName)
-    } yield Some(choiceResultConverter.convert(jvalue))
+  ): Future[Option[value.Value]] = jvalue match {
+    case ujson.Null => Future(None)
+    case _ =>
+      for {
+        templateId <- resolveIdentifier(template).toFuture
+        protoDict <- prepareProtoDict
+        choiceResultConverter <- protoDict.choiceResults
+          .get(templateId -> choiceName)
+          .toRight(invalidChoiceException(templateId, choiceName))
+          .toFuture
+      } yield Some(choiceResultConverter.convert(jvalue))
   }
 
-  private def invalidChoiceException(templateId: schema.Identifier, choiceName: IdString.Name)(
-      implicit traceContext: TraceContext
+  private def invalidChoiceException(templateId: Ref.Identifier, choiceName: IdString.Name)(implicit
+      traceContext: TraceContext
   ): StatusRuntimeException =
-    InvalidArgument
-      .Reject(s"Invalid template:${lfIdentifier(templateId)} or choice:$choiceName")
-      .asGrpcError
+    InvalidArgument.Reject(s"Invalid template:$templateId or choice:$choiceName").asGrpcError
 
   private def resolveIdentifier(
-      template: value.Identifier,
-      signatures: PackageSignatures,
+      template: value.Identifier
   )(implicit
       traceContext: TraceContext
-  ): Either[StatusRuntimeException, schema.Identifier] =
+  ): Either[StatusRuntimeException, Ref.Identifier] =
     PackageRef
       .fromString(template.packageId)
       .left
@@ -184,80 +178,86 @@ class SchemaProcessorsImpl(
               )
               .asGrpcError
           )
-        case PackageRef.Id(packageId) =>
-          signatures
-            .get(packageId)
-            .toRight(
-              RequestValidationErrors.NotFound.TemplateOrInterfaceIdsNotFound
-                .Reject(Seq(Left(lfIdentifier(template))))
-                .asGrpcError
-            )
-            .map { pkg =>
-              schema.Identifier(
-                schema.PackageId(packageId),
-                schema.PackageName(pkg.metadata.name),
-                schema.PackageVersion(pkg.metadata.version.toString),
-                schema.ModuleName(template.moduleName),
-                schema.EntityName(template.entityName),
-              )
-            }
+        case PackageRef.Id(_) => Right(template)
       }
+      .map(lfIdentifier)
 
-  private def prepareProtoDict(signatures: PackageSignatures)(implicit
+  private def prepareProtoDict(implicit
       traceContext: TraceContext
   ): Future[Dictionary[Converter[ujson.Value, value.Value]]] =
-    prepareDictionaries(signatures).map(_._1)
+    memoizedDictionaries(errorLoggingContext).map(_._1)
 
-  private def prepareJsonDict(signatures: PackageSignatures)(implicit
+  private def prepareJsonDict(implicit
       traceContext: TraceContext
   ): Future[Dictionary[Converter[value.Value, ujson.Value]]] =
-    prepareDictionaries(signatures).map(_._2)
+    memoizedDictionaries(errorLoggingContext).map(_._2)
 
-  private val memoizedDictionaries =
-    new AtomicReference[(PackageSignatures, Future[(ProtoDict, JsonDict)])]()
-  private def prepareDictionaries(
+  private def computeProtoDict(
       signatures: PackageSignatures
-  )(implicit traceContext: TraceContext): Future[(ProtoDict, JsonDict)] =
-    memoizedDictionaries.updateAndGet { prev =>
-      prev match {
-        // Use identity instead to avoid deep equality comparison of the packageMeta
-        case prev @ (prevSigs, _) if prevSigs eq signatures => prev
-        case _ =>
-          errorLoggingContext.debug(
-            "Package metadata view changed or not initialized. Recomputing converter dictionaries."
-          )
-          signatures -> Future(computeDictionaries(signatures))
-            // We allow "caching" a failed future since it's not clear that we can recover anyway
-            // We do not explicitly crash the participant to allow graceful degradation
-            // (gRPC API or other JSON endpoints could still be working fine)
-            .thereafter {
-              case Failure(error) =>
-                errorLoggingContext.error(
-                  "Failed to compute JSON API converter dictionaries. This is likely a programming error. Please contact support",
-                  error,
-                )
-              case Success(_) => ()
-            }
-      }
-    }._2
+  ): Dictionary[Converter[ujson.Value, value.Value]] = {
+    val visitor: SchemaVisitor { type Type = (Codec[ujson.Value], Codec[value.Value]) } =
+      SchemaVisitor.compose(new JsonCodec(), GrpcValueCodec)
+    val collector =
+      Dictionary.collect[Converter[ujson.Value, value.Value]] compose SchemaEntity
+        .map((v: visitor.Type) => Converter(v._1, v._2))
 
-  private def computeDictionaries(
-      signatures: PackageSignatures
-  ): (
-      Dictionary[Converter[ujson.Value, value.Value]],
-      Dictionary[Converter[value.Value, ujson.Value]],
-  ) = {
-    val jsonCodec =
-      new JsonCodec(allowMissingFields = allowMissingFields, removeTrailingNonesInRecords = true)
-    val visitor = SchemaVisitor.compose(jsonCodec, ProtobufCodec)
-
-    val (jsonDic, protoDic) = LfSchemaProcessor
-      .process(packages = signatures, IdentifierFilter.AcceptAll)(visitor)
+    SchemaProcessor
+      .process(packages = signatures)(visitor)(collector)
       .fold(error => throw new IllegalStateException(error), identity)
-    (
-      jsonDic.useStrictPackageMatching(true).zipWith(protoDic)(Converter(_, _)),
-      protoDic.useStrictPackageMatching(true).zipWith(jsonDic)(Converter(_, _)),
-    )
+  }
+
+  private def computeJsonDict(
+      signatures: PackageSignatures
+  ): Dictionary[Converter[value.Value, ujson.Value]] = {
+    val visitor: SchemaVisitor { type Type = (Codec[value.Value], Codec[ujson.Value]) } =
+      SchemaVisitor.compose(GrpcValueCodec, new JsonCodec())
+    val collector =
+      Dictionary.collect[Converter[value.Value, ujson.Value]] compose SchemaEntity
+        .map((v: visitor.Type) => Converter(v._1, v._2))
+
+    SchemaProcessor
+      .process(packages = signatures)(visitor)(collector)
+      .fold(error => throw new IllegalStateException(error), identity)
+  }
+
+  private val memoizedDictionaries: ErrorLoggingContext => Future[(ProtoDict, JsonDict)] = {
+    val ref = new AtomicReference[Option[(PackageSignatures, Future[(ProtoDict, JsonDict)])]]()
+
+    (errorLoggingContext: ErrorLoggingContext) =>
+      {
+        ref.updateAndGet { curr =>
+          val currentSignatures = fetchSignatures(errorLoggingContext)
+          curr match {
+            case curr @ Some((signatures, _dictF))
+                // Use identity instead to avoid deep equality comparison of the packageMeta
+                if signatures eq currentSignatures =>
+              curr
+            case _other =>
+              errorLoggingContext.debug(
+                "Package metadata view changed or not initialized. Recomputing converter dictionaries."
+              )
+              Some(
+                currentSignatures -> Future {
+                  computeProtoDict(currentSignatures) -> computeJsonDict(currentSignatures)
+                }
+                  // We allow "caching" a failed future since it's not clear that we can recover anyway
+                  // We do not explicitly crash the participant to allow graceful degradation
+                  // (gRPC API or other JSON endpoints could still be working fine)
+                  .thereafter {
+                    case Failure(error) =>
+                      errorLoggingContext.error(
+                        "Failed to compute JSON API converter dictionaries. This is likely a programming error. Please contact support",
+                        error,
+                      )
+                    case Success(_) => ()
+                  }
+              )
+          }
+        }
+      }.map(_._2)
+        .getOrElse(
+          throw new IllegalStateException("Schema processor dictionary references not populated")
+        )
   }
 
   private def nullToEmpty(jsonVal: ujson.Value): ujson.Value = jsonVal match {
@@ -265,50 +265,17 @@ class SchemaProcessorsImpl(
     case any => any
   }
 
-  private def extractTemplateValue[V](dict: Dictionary[V])(templateId: schema.Identifier)(implicit
+  private def extractTemplateValue[V](map: Map[Ref.Identifier, V])(key: Ref.Identifier)(implicit
       traceContext: TraceContext
   ): Future[V] =
-    dict
-      .getTemplate(templateId)
+    map
+      .get(key)
       .toRight(
         RequestValidationErrors.NotFound.TemplateOrInterfaceIdsNotFound
-          .Reject(Seq(Left(lfIdentifier(templateId))))
+          .Reject(Seq(Left(key)))
           .asGrpcError
       )
       .toFuture
-
-  private def extractTemplateKey[V](dict: Dictionary[V])(templateId: schema.Identifier)(implicit
-      traceContext: TraceContext
-  ): Future[V] =
-    dict
-      .getTemplateKey(templateId)
-      .toRight(
-        RequestValidationErrors.NotFound.TemplateOrInterfaceIdsNotFound
-          .Reject(Seq(Left(lfIdentifier(templateId))))
-          .asGrpcError
-      )
-      .toFuture
-
-  private def extractChoiceArgument[V](
-      dict: Dictionary[V]
-  )(templateId: schema.Identifier, choiceName: IdString.Name)(implicit
-      traceContext: TraceContext
-  ): Future[V] =
-    dict
-      .getChoiceArgument(templateId, schema.ChoiceName(choiceName))
-      .toRight(invalidChoiceException(templateId, choiceName))
-      .toFuture
-
-  private def extractChoiceResult[V](
-      dict: Dictionary[V]
-  )(templateId: schema.Identifier, choiceName: IdString.Name)(implicit
-      traceContext: TraceContext
-  ): Future[V] =
-    dict
-      .getChoiceResult(templateId, schema.ChoiceName(choiceName))
-      .toRight(invalidChoiceException(templateId, choiceName))
-      .toFuture
-
 }
 
 object SchemaProcessorsImpl {
@@ -321,15 +288,6 @@ object SchemaProcessorsImpl {
       case Right(value) => Future.successful(value)
     }
   }
-
-  def lfIdentifier(a: schema.Identifier): Ref.Identifier =
-    Ref.Identifier(
-      pkg = PackageId.assertFromString(a.packageId),
-      qualifiedName = QualifiedName(
-        module = ModuleName.assertFromString(a.moduleName),
-        name = DottedName.assertFromString(a.entityName),
-      ),
-    )
 
   def lfIdentifier(a: value.Identifier): Ref.Identifier =
     Ref.Identifier(

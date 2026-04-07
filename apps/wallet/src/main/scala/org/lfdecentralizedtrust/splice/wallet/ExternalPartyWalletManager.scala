@@ -21,12 +21,11 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{blocking, ExecutionContext}
+import scala.concurrent.{ExecutionContext, blocking}
 
 /** Manages all services comprising an external party wallets. */
 class ExternalPartyWalletManager(
@@ -59,7 +58,6 @@ class ExternalPartyWalletManager(
   private[this] val externalPartyWalletsMap
       : scala.collection.concurrent.Map[PartyId, (RetryProvider, ExternalPartyWalletService)] =
     TrieMap.empty
-  private val mutex = Mutex()
 
   // Note: putIfAbsent() eagerly evaluates the value to be inserted, but we only want to start
   // the new service if there is no existing service for the party yet.
@@ -68,7 +66,7 @@ class ExternalPartyWalletManager(
       externalParty: PartyId,
       createWallet: PartyId => (RetryProvider, ExternalPartyWalletService),
   ): Option[(RetryProvider, ExternalPartyWalletService)] = blocking {
-    mutex.exclusive {
+    this.synchronized {
       if (externalPartyWalletsMap.contains(externalParty)) {
         logger.debug(
           show"Wallet for external party ${externalParty} already exists, not creating a new one."

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -13,19 +13,18 @@ import java.io.*
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
+import scala.concurrent.blocking
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 /** Persists data for replay tests.
   */
-@SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
 class MessageRecorder(
     override protected val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 ) extends FlagCloseable
     with NamedLogging {
 
-  private val lock = new Mutex()
   val streamRef: AtomicReference[Option[ObjectOutputStream]] = new AtomicReference(None)
 
   def startRecording(destination: Path)(implicit traceContext: TraceContext): Unit = {
@@ -53,7 +52,7 @@ class MessageRecorder(
   /** Serializes and saves the provided message to the output stream. This method is synchronized as
     * the write operations on the underlying [[java.io.ObjectOutputStream]] are not thread safe.
     */
-  def record(message: Serializable): Unit = (lock.exclusive {
+  def record(message: Serializable): Unit = blocking(synchronized {
     streamRef.get().foreach(_.writeObject(message))
   })
 
@@ -61,7 +60,7 @@ class MessageRecorder(
     logger.debug("Stopping recording...")
     streamRef.getAndSet(None) match {
       case Some(stream) =>
-        (lock.exclusive {
+        blocking(synchronized {
           stream.close()
           streamRef.set(None)
         })

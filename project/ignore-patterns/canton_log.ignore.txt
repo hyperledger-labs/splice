@@ -151,9 +151,6 @@ ACS_COMMITMENT_DEGRADATION
 # TODO(#2706) Investigate and remove once fixed
 Waiting for allocation of.*on synchronizer splitwell.*timed out
 
-#Todo(DACH-NY/cn-test-failures/7808)
-The synchronizer Synchronizer 'global' failed the following topology transactions
-
 # rejections when the sync is paused
 # error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
 SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
@@ -166,21 +163,5 @@ java.lang.IllegalStateException: cannot enqueue after timer shutdown
 
 # Sometimes we deliberately break sequencer connections in tests
 Connection has failed validation
-
-# During the LSU at upgrade time submissions time-out
-Submission timed out at
-
-# SV that joins late as part of the LSU test
-Missing successor information for the following sequencers.*sv4
-
-# We don't use the onboarding flag clearance atm.
-Skipping insertion of pending onboarding flag clearance operation as no party ID was provided
-
-# SV4 migrates late
-SEQ::sv4.*Sequencer can't take requests because it is behind on processing events
-
-# Triggered by roll-forward LSU test
-No sequencer successor was found
-P2P connectivity is not ready
 
 # Make sure to have a trailing newline

@@ -1,18 +1,24 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Parameters for that batcher that batches queries (e.g., to a DB).
   */
-sealed trait BatchAggregatorConfig extends Product with Serializable {
-
-  def maximumBatchSize: PositiveNumeric[Int]
-}
+sealed trait BatchAggregatorConfig
+    extends Product
+    with Serializable
+    with UniformCantonConfigValidation
 
 object BatchAggregatorConfig {
+  implicit val batchAggregatorConfigCantonConfigValidator
+      : CantonConfigValidator[BatchAggregatorConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[BatchAggregatorConfig]
+  }
 
   val defaultMaximumInFlight: PositiveNumeric[Int] = PositiveNumeric.tryCreate(2)
   val defaultMaximumBatchSize: PositiveNumeric[Int] = PositiveNumeric.tryCreate(500)
@@ -39,18 +45,9 @@ object BatchAggregatorConfig {
     */
   final case class Batching(
       maximumInFlight: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,
-      override val maximumBatchSize: PositiveNumeric[Int] =
-        BatchAggregatorConfig.defaultMaximumBatchSize,
+      maximumBatchSize: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumBatchSize,
   ) extends BatchAggregatorConfig
 
-  /** @param maxParallelBatches
-    *   Maximum number of batches to execute in parallel when using runMany.
-    * @param maximumBatchSize
-    *   Maximum number of queries in a batch.
-    */
-  final case class NoBatching(
-      maxParallelBatches: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,
-      override val maximumBatchSize: PositiveNumeric[Int] =
-        BatchAggregatorConfig.defaultMaximumBatchSize,
-  ) extends BatchAggregatorConfig
+  final case object NoBatching extends BatchAggregatorConfig
+
 }

@@ -1,24 +1,25 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.daml.ledger.javaapi.data.Command
 import com.digitalasset.canton.BigDecimalImplicits.*
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.{
   UnknownInformees,
   UnknownSubmitters,
 }
 import com.digitalasset.canton.examples.java.iou.*
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.PackageSelectionFailed
-import com.digitalasset.canton.topology.{Party, PartyId}
-import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.NotFound
+import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
@@ -33,8 +34,8 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
 
   val amount: Amount = new Amount(100.toBigDecimal, "CHF")
 
-  var Bank: Party = _
-  var Alice: Party = _
+  var Bank: PartyId = _
+  var Alice: PartyId = _
   var cmds: Seq[Command] = _
 
   "Canton" can {
@@ -42,9 +43,9 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
       import env.*
 
       val submitterForUnknownPackageTest =
-        participant1.parties.testing.enable("SubmitterForUnknownPackageTest")
+        participant1.parties.enable("SubmitterForUnknownPackageTest")
       val observerForUnknownPackageTest =
-        participant1.parties.testing.enable("ObserverForUnknownPackageTest")
+        participant1.parties.enable("ObserverForUnknownPackageTest")
 
       cmds = new Iou(
         submitterForUnknownPackageTest.toProtoPrimitive,
@@ -56,8 +57,8 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
       assertThrowsAndLogsCommandFailures(
         participant1.ledger_api.javaapi.commands.submit(Seq(submitterForUnknownPackageTest), cmds),
         x => {
-          x.shouldBeCommandFailure(PackageSelectionFailed)
-          x.message should include(Iou.PACKAGE_NAME)
+          x.shouldBeCommandFailure(NotFound.Package)
+          x.message should include("Iou:Iou")
         },
       )
 
@@ -74,7 +75,7 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
         _.commandFailureMessage should include(UnknownSubmitters.id),
       )
 
-      Bank = participant1.parties.testing.enable("Bank")
+      Bank = participant1.parties.enable("Bank")
 
       cmds = new Iou(
         Bank.toProtoPrimitive,
@@ -92,7 +93,7 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
     "not execute a command due to missing package on a non-confirmer" in { implicit env =>
       import env.*
 
-      Alice = participant2.parties.testing.enable(
+      Alice = participant2.parties.enable(
         "Alice",
         synchronizeParticipants = Seq(participant1),
       )
@@ -105,9 +106,13 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
 
       assertThrowsAndLogsCommandFailures(
         participant1.ledger_api.javaapi.commands.submit(Seq(Bank), cmds),
+        // TODO(#25385): Improve error assertion once the detailed rejection is propagated
         _.commandFailureMessage should (include(PackageSelectionFailed.id) and include(
-          show"$daId: Failed to select package-id for package-name '${Iou.PACKAGE_NAME}' appearing in a command root node due to: No package with package-name '${Iou.PACKAGE_NAME}' is consistently vetted by all hosting participants of party $Alice"
+          "No synchronizers satisfy the draft transaction topology requirements"
         )),
+        //        _.commandFailureMessage should (include(
+        //          NoSynchronizerForSubmission.id
+        //        ) and include regex "Participant PAR::participant2::.* has not vetted"),
       )
     }
 
@@ -133,15 +138,14 @@ trait SubmitCommandTrialErrorTest extends CommunityIntegrationTest with SharedEn
 }
 
 //class SubmitCommandTrialErrorTestDefault extends SubmitCommandTrialErrorTest {
-//  registerPlugin(new UseH2(loggerFactory))
 //  registerPlugin(
-//    new UseBftSequencer(loggerFactory)
+//    new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory)
 //  )
 //}
 
 class SubmitCommandTrialErrorTestPostgres extends SubmitCommandTrialErrorTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseBftSequencer(loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
   )
 }

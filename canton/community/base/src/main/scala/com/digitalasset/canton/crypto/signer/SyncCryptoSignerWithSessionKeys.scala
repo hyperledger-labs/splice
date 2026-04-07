@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.signer
@@ -13,7 +13,6 @@ import com.digitalasset.canton.crypto.EncryptionAlgorithmSpec.RsaOaepSha256
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.crypto.SymmetricKeyScheme.Aes128Gcm
 import com.digitalasset.canton.crypto.provider.jce.{JcePrivateCrypto, JcePureCrypto}
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.signer.SyncCryptoSignerWithSessionKeys.{
   PendingUsableSessionKeysAndMetadata,
   SessionKeyAndDelegation,
@@ -34,7 +33,6 @@ import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.github.benmanes.caffeine.cache.Scheduler
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
@@ -43,7 +41,7 @@ import com.google.common.annotations.VisibleForTesting
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.Success
 
 /** Defines the methods for protocol message signing using a session signing key. This requires
@@ -112,14 +110,10 @@ class SyncCryptoSignerWithSessionKeys(
   /** The key specification for the session signing keys. */
   private val sessionKeySpec = sessionSigningKeysConfig.signingKeySpec
 
-  /** A value used to shift the validity interval in order to minimize the number of keys created
-    * and reduce overlapping intervals.
-    */
-  @VisibleForTesting
-  private[crypto] val toleranceShiftDuration = sessionSigningKeysConfig.toleranceShiftDuration
-
-  /** A cut-off duration that determines when the key should start and stop being used to prevent
-    * signature verification failures due to unpredictable sequencing timestamps.
+  /** A cut-off duration that determines when the key should stop being used to prevent signature
+    * verification failures due to unpredictable sequencing timestamps. It is also used to tweak the
+    * validity period of a key from which a key is considered valid (i.e., ts - cutOff/2 to ts + x -
+    * cutOff/2), allowing closely decreasing timestamps to still be signed with the same key.
     */
   @VisibleForTesting
   private[crypto] val cutOffDuration =
@@ -174,7 +168,7 @@ class SyncCryptoSignerWithSessionKeys(
   }
 
   /** To control access to the [[sessionKeysSigningCache]] and the [[pendingRequests]]. */
-  private val lock = new Mutex()
+  private val lock = new Object()
 
   /** Creates a delegation signature that authorizes the session key to act on behalf of the
     * long-term key.
@@ -213,13 +207,13 @@ class SyncCryptoSignerWithSessionKeys(
 
   private def isUsableDelegation(
       timestamp: CantonTimestamp,
-      approximateTimestamp: Boolean,
       validityPeriod: SignatureDelegationValidityPeriod,
-  ): Boolean = {
-    val (start, end) =
-      validityPeriod.computeCutOffTimestamp(cutOffDuration.asJava, approximateTimestamp)
-    timestamp > start && timestamp < end
-  }
+  ): Boolean =
+    validityPeriod.covers(timestamp) &&
+      // If sufficient time has passed and the cut-off threshold has been reached,
+      // the current signing key is no longer used, and a different or new key must be used.
+      timestamp < validityPeriod
+        .computeCutOffTimestamp(cutOffDuration.asJava)
 
   private def generateNewSessionKey(
       validityPeriod: SignatureDelegationValidityPeriod,
@@ -254,20 +248,19 @@ class SyncCryptoSignerWithSessionKeys(
     } yield sessionKeyAndDelegation
 
   private def determineValidityPeriod(
-      timestamp: CantonTimestamp
+      topologySnapshot: TopologySnapshot
   ): SignatureDelegationValidityPeriod = {
     /* If the session signing key created for a signing request at timestamp ts is valid from
-     * ts-tolerance to ts+l-tolerance, then if there is a sequence of
-     * signature request timestamps in the following order ts, ts-1us , ts-2us, ts-3us, ... ts-n, we do not
-     * create n session keys, but rather n / (2*tolerance).
-     * Although not optimal, depending on how transactions are ordered, this a better approach than
-     * setting the validity period from ts to ts+l in terms of number of keys created.
+     * ts-cutoff/2 to ts+x-cutoff/2, then if there is a sequence of signature request timestamps in the following
+     * order ts, ts-1us , ts-2us, ts-3us, ... ts-n, we do not create n session keys, but rather n / cutoff.
+     * Although not optimal this a better approach than setting the validity period from ts to ts+x in terms
+     * of number of keys created.
      */
+    val margin = cutOffDuration.asJava.dividedBy(2) // cuttoff/2
     val validityStart =
       Either
         .catchOnly[IllegalArgumentException](
-          timestamp
-            .minus(toleranceShiftDuration.asJava)
+          topologySnapshot.timestamp.minus(margin)
         )
         .getOrElse(CantonTimestamp.MinValue)
     SignatureDelegationValidityPeriod(
@@ -281,29 +274,20 @@ class SyncCryptoSignerWithSessionKeys(
     * another is already being created.
     */
   private def getSessionKey(
-      timestamp: CantonTimestamp,
-      approximateTimestamp: Boolean,
+      topologySnapshot: TopologySnapshot,
       activeLongTermKey: SigningPublicKey,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, SessionKeyAndDelegation] = {
 
-    val sessionKeyOrGenerationData = (lock.exclusive {
+    val sessionKeyOrGenerationData = blocking(lock.synchronized {
       // get hold of all existing or pending session keys
       val pendingSessionKeys = pendingRequests.toMap
       val keysInCache = sessionKeysSigningCache.asMap().values.toSeq
 
-      // check if there is a session key in the cache that is valid and can be used. Since
-      // we only use a session key if the authorizing long-term key is still active,
-      // even though the validity period is defined as [ts−tolerance, ts+l-tolerance],
-      // the actual usable interval may be shorter if the active long-term key has been
-      // replaced in the meantime.
+      // check if there is a session key in the cache that is valid and can be used
       val validUsableSessionKeysInCache = keysInCache.filter { skD =>
-        isUsableDelegation(
-          timestamp,
-          approximateTimestamp,
-          skD.signatureDelegation.validityPeriod,
-        ) &&
+        isUsableDelegation(topologySnapshot.timestamp, skD.signatureDelegation.validityPeriod) &&
         activeLongTermKey.id == skD.signatureDelegation.delegatingKeyId
       }
 
@@ -312,11 +296,11 @@ class SyncCryptoSignerWithSessionKeys(
           // find if there is a pending session key that is valid and can be used
           val validUsablePendingRequests =
             pendingSessionKeys.view.filterKeys { case (validityPeriod, signedBy) =>
-              isUsableDelegation(timestamp, approximateTimestamp, validityPeriod) &&
+              isUsableDelegation(topologySnapshot.timestamp, validityPeriod) &&
               activeLongTermKey.id == signedBy
             }.toMap
 
-          val validityPeriod = determineValidityPeriod(timestamp)
+          val validityPeriod = determineValidityPeriod(topologySnapshot)
 
           // if there are no pending keys valid and usable, we add a promise to the [[pendingRequests]] map
           // and store this information in the [[PendingValidSessionKeysAndMetadata]].
@@ -378,7 +362,7 @@ class SyncCryptoSignerWithSessionKeys(
             EitherT(first.transformWith {
               case Success(UnlessShutdown.Outcome(Some(sessionKeyAndDelegation))) =>
                 FutureUnlessShutdown.pure(Right(sessionKeyAndDelegation))
-              case _ => getSessionKey(timestamp, approximateTimestamp, activeLongTermKey).value
+              case _ => getSessionKey(topologySnapshot, activeLongTermKey).value
             })
         }
       case Right(sessionKeyAndDelegation) =>
@@ -388,7 +372,6 @@ class SyncCryptoSignerWithSessionKeys(
 
   override def sign(
       topologySnapshot: TopologySnapshot,
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       hash: Hash,
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit
@@ -403,8 +386,6 @@ class SyncCryptoSignerWithSessionKeys(
         ),
       )
       activeLongTermKey <- findSigningKey(member, topologySnapshot, usage)
-      approximateTimestampForSigning = signingTimestampOverrides.map(_.approximateTimestamp)
-      timestamp = approximateTimestampForSigning.getOrElse(topologySnapshot.timestamp)
       // The only exception where we cannot use a session signing key is for the sequencer initialization request,
       // where the timestamp has not yet been assigned and is set with `CantonTimestamp.MinValue` as the reference time
       // (e.g. 0001-01-01T00:00:00.000002Z).
@@ -418,12 +399,7 @@ class SyncCryptoSignerWithSessionKeys(
             .leftMap[SyncCryptoError](SyncCryptoError.SyncCryptoSigningError.apply)
         else
           for {
-            sessionKeyAndDelegation <- getSessionKey(
-              timestamp,
-              approximateTimestampForSigning.isDefined, // if an approximate timestamp is used for signing
-              // (e.g., the current local time), a `cutOff` is applied to both ends of the validity period.
-              activeLongTermKey,
-            )
+            sessionKeyAndDelegation <- getSessionKey(topologySnapshot, activeLongTermKey)
             SessionKeyAndDelegation(sessionKey, delegation) = sessionKeyAndDelegation
             signature <- signPublicApiSoftwareBased
               .sign(hash, sessionKey, usage)

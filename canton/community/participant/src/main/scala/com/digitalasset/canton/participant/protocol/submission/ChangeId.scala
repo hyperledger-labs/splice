@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -6,9 +6,8 @@ package com.digitalasset.canton.participant.protocol.submission
 import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.LfHash
-import com.digitalasset.canton.resource.ToDbPrimitive
 import com.digitalasset.canton.store.db.DbDeserializationException
-import slick.jdbc.GetResult
+import slick.jdbc.{GetResult, SetParameter}
 
 final case class ChangeIdHash(hash: LfHash) extends PrettyPrinting {
   override protected def pretty: Pretty[ChangeIdHash] = prettyOfClass(
@@ -29,7 +28,6 @@ object ChangeIdHash {
     )
   }
 
-  implicit val changeIdToDbPrimitive: ToDbPrimitive[ChangeIdHash, String] =
-    ToDbPrimitive(_.hash.toHexString)
-
+  implicit val setParameterChangeId: SetParameter[ChangeIdHash] = (changeIdHash, pp) =>
+    pp.setString(changeIdHash.hash.toHexString)
 }

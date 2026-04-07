@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -37,7 +38,6 @@ import org.scalatest.Assertions.fail
 import org.scalatest.concurrent.{PatienceConfiguration, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 
-import java.util.concurrent.BlockingQueue
 import scala.concurrent.{ExecutionContext, Future}
 
 class SequencedEventTestFixture(
@@ -117,18 +117,16 @@ class SequencedEventTestFixture(
     ).onShutdown(throw new RuntimeException("failed to create carlos event")).futureValue
   )
 
-  def mkAggregator(
-      config: MessageAggregationConfig = MessageAggregationConfig(PositiveInt.tryCreate(1))
-  ) = {
-    val postAggregationHandler = new PostAggregationHandler {
-      override def handlerIsIdleF: Future[Unit] = Future.unit
-      override def signalHandler(eventQueue: BlockingQueue[SequencedSerializedEvent])(implicit
-          traceContext: TraceContext
-      ): Unit = ()
-    }
+  // TODO(i27260): cleanup when the new connection pool is stable
+  private val useNewConnectionPool = true
 
-    new SequencerAggregator(
-      postAggregationHandler = postAggregationHandler,
+  def mkAggregator(
+      config: MessageAggregationConfig = MessageAggregationConfig(
+        Option.when(!useNewConnectionPool)(NonEmptyUtil.fromUnsafe(Set(sequencerAlice))),
+        PositiveInt.tryCreate(1),
+      )
+  ) = {
+    val aggregator = new SequencerAggregator(
       cryptoPureApi = subscriberCryptoApi.pureCrypto,
       eventInboxSize = PositiveInt.tryCreate(2),
       loggerFactory = loggerFactory,
@@ -136,11 +134,27 @@ class SequencedEventTestFixture(
       updateSendTracker = _ => (),
       timeouts = timeouts,
       futureSupervisor = futureSupervisor,
+      useNewConnectionPool = useNewConnectionPool,
     )
+
+    if (useNewConnectionPool) {
+      aggregator.setPostAggregationHandler(new PostAggregationHandler {
+        override def handlerIsIdleF: Future[Unit] = Future.unit
+        override def signalHandler()(implicit traceContext: TraceContext): Unit = ()
+      })
+    }
+
+    aggregator
   }
 
-  def config(sequencerTrustThreshold: Int = 1): MessageAggregationConfig =
-    MessageAggregationConfig(PositiveInt.tryCreate(sequencerTrustThreshold))
+  def config(
+      expectedSequencers: Set[SequencerId] = Set(sequencerAlice),
+      sequencerTrustThreshold: Int = 1,
+  ): MessageAggregationConfig =
+    MessageAggregationConfig(
+      Option.when(!useNewConnectionPool)(NonEmptyUtil.fromUnsafe(expectedSequencers)),
+      PositiveInt.tryCreate(sequencerTrustThreshold),
+    )
 
   def mkValidator(
       syncCryptoApi: SynchronizerCryptoClient = subscriberCryptoApi
@@ -166,7 +180,7 @@ class SequencedEventTestFixture(
       val fullInformeeTree = factory.MultipleRootsAndViewNestings.fullInformeeTree
       InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion)
     }
-    val envelope = ClosedUncompressedEnvelope.create(
+    val envelope = ClosedEnvelope.create(
       serializedOverride.getOrElse(
         EnvelopeContent(message, testedProtocolVersion).toByteString
       ),
@@ -229,12 +243,7 @@ class SequencedEventTestFixture(
     for {
       cryptoApi <- sequencerCryptoApi.snapshot(timestamp)
       signature <- cryptoApi
-        .sign(
-          hash(bytes),
-          SigningKeyUsage.ProtocolOnly,
-          signingTimestampOverrides =
-            None, // not needed for unit tests; session signing keys disabled
-        )
+        .sign(hash(bytes), SigningKeyUsage.ProtocolOnly)
         .value
         .map(_.valueOr(err => fail(s"Failed to sign: $err")))(executionContext)
     } yield signature

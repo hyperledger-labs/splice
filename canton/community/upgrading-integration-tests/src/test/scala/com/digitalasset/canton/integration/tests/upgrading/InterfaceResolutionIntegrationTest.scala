@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -6,6 +6,7 @@ package com.digitalasset.canton.integration.tests.upgrading
 import com.daml.ledger.javaapi.data.CreateCommand
 import com.daml.ledger.javaapi.data.codegen.{Created, Update}
 import com.digitalasset.canton.LfPackageId
+import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.damltests.upgrade.v1.java.upgrade.{
   UpgradeItCallInterface as UpgradeItCallInterfaceV1,
   UpgradeItTemplate as UpgradeItTemplateV1,
@@ -15,7 +16,7 @@ import com.digitalasset.canton.damltests.upgrade.v1.java.upgradeif.{
   UpgradeItVersionStamp,
 }
 import com.digitalasset.canton.damltests.upgrade.v2.java.upgrade.UpgradeItTemplate as UpgradeItTemplateV2
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -175,6 +176,5 @@ sealed abstract class InterfaceResolutionIntegrationTest
 }
 
 final class InterfaceResolutionIntegrationRefTest extends InterfaceResolutionIntegrationTest {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[Postgres](loggerFactory))
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -34,7 +34,6 @@ import com.digitalasset.canton.{
 }
 import com.digitalasset.daml.lf.archive.{DamlLf, Dar, Decode}
 import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.digitalasset.daml.lf.engine.EngineLoggingConfig
 import com.digitalasset.daml.lf.language.Ast
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
@@ -269,7 +268,7 @@ class PackageUploaderTest
     private val clock = new SimClock(start = clockNow, loggerFactory = loggerFactory)
     val mutablePackageMetadataViewImpl = new MutablePackageMetadataViewImpl(
       clock = clock,
-      packageStore = packageStore,
+      damlPackageStore = packageStore,
       new PackageUpgradeValidator(CachingConfigs.defaultPackageUpgradeCache, loggerFactory),
       loggerFactory = loggerFactory,
       packageMetadataViewConfig = PackageMetadataViewConfig(),
@@ -285,9 +284,6 @@ class PackageUploaderTest
         enableLfBeta = false,
         enableStackTraces = false,
         paranoidMode = true,
-        submissionPhaseLogging = EngineLoggingConfig(),
-        validationPhaseLogging = EngineLoggingConfig(),
-        loggerFactory = loggerFactory,
       ),
       enableStrictDarValidation = enableStrictDarValidation,
       packageMetadataView = mutablePackageMetadataViewImpl,

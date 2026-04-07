@@ -1,15 +1,22 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
 
 import com.daml.ledger.api.v2.state_service.GetLedgerEndResponse
+import com.daml.tls.TlsVersion
 import com.daml.tls.TlsVersion.TlsVersion
-import com.daml.tls.{TlsClientCertificate, TlsClientConfig, TlsServerConfig, TlsVersion}
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
-import com.digitalasset.canton.config.{CantonConfig, PemFile}
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.config.{
+  CantonConfig,
+  DbConfig,
+  PemFile,
+  TlsClientCertificate,
+  TlsClientConfig,
+  TlsServerConfig,
+}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.CantonFixture
 import com.digitalasset.canton.integration.{
   ConfigTransforms,
@@ -37,8 +44,7 @@ abstract class BaseTlsServerIT(minimumServerProtocolVersion: Option[TlsVersion])
     extends CantonFixture {
 
   registerPlugin(TLSPlugin(loggerFactory))
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   minimumServerProtocolVersion match {
     case Some(TlsVersion.V1_3) =>

@@ -1,12 +1,12 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.daml.ledger.javaapi.data as j
-import com.daml.ledger.javaapi.data.codegen as jcg
 import com.digitalasset.canton.BaseTest
+import com.daml.ledger.javaapi.data as j
+import j.codegen as jcg
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks.{
-  PropertyCheckConfiguration,
   forAll as scForAll,
+  PropertyCheckConfiguration,
 }
 
 import scala.jdk.CollectionConverters.*
@@ -88,6 +88,7 @@ class TransactionTreeExtensionsTest extends AnyWordSpec with BaseTest {
 
 object TransactionTreeExtensionsTest {
   import org.scalacheck.Arbitrary
+  import j.Generators
 
   implicit val `arb TransactionTree`: Arbitrary[j.Transaction] = Arbitrary(
     Generators.transactionGen.map(j.Transaction.fromProto)

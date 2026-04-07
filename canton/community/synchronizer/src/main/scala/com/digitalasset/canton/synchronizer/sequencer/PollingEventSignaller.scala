@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -11,6 +11,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
+import scala.concurrent.Future
+
 /** Ignore local writes and simply trigger reads periodically based on a static polling interval.
   * Suitable for horizontally scaled sequencers where the local process will not have in-process
   * visibility of all writes.
@@ -20,8 +22,10 @@ class PollingEventSignaller(
     val loggerFactory: NamedLoggerFactory,
 ) extends EventSignaller
     with NamedLogging {
-  override def notifyOfLocalWrite(notification: WriteNotification): Unit =
-    ()
+  override def notifyOfLocalWrite(notification: WriteNotification)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    Future.unit
 
   override def readSignalsForMember(
       member: Member,

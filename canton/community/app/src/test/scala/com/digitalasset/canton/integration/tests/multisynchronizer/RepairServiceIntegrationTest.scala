@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
@@ -8,11 +8,11 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
   UnassignedWrapper,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{DbConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.examples.java.iou.Iou
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.AcsInspection
 import com.digitalasset.canton.integration.{
@@ -99,6 +99,7 @@ abstract class RepairServiceIntegrationTest
           val afterRepair = participant1.ledger_api.state.end()
           val updates = participant1.ledger_api.updates.reassignments(
             partyIds = Set(payer),
+            filterTemplates = Seq.empty,
             completeAfter = Int.MaxValue,
             beginOffsetExclusive = beforeRepair,
             endOffsetInclusive = Some(afterRepair),
@@ -206,26 +207,20 @@ abstract class RepairServiceIntegrationTest
               acmeId.logical,
             )
             forAll(reinitCmtsResult)(_.acsTimestamp.isDefined shouldBe true)
-
-            // TODO(i23735): When we fix that, we should have no more ACS_COMMITMENT_INTERNAL_ERROR logs, and the
-            //  log suppression and the comment below should be removed
-            //  After reinitializing the commitments, there should not be any more ACS_COMMITMENT_INTERNAL_ERROR. However,
-            //  there are still some happening in flakes, because seemingly we don't wait for all events to be processed
-            //  before reinitializing commitments. Writing the exat conditions to wait for is time consuming, and pretty
-            //  useless because the repair command for changing the reassignment counter is broken, and needs to be fixed
-            //  in #23735
-
-            val archiveCmd = participant1.ledger_api.javaapi.state.acs
-              .await(Iou.COMPANION)(payer, predicate = _.id.toLf == cid)
-              .id
-              .exerciseArchive()
-              .commands()
-              .asScala
-              .toSeq
-            participant1.ledger_api.javaapi.commands.submit(Seq(payer), archiveCmd)
           },
           expectedLogs *,
         )
+
+        // After reinitializing the commitments, there should not be any more ACS_COMMITMENT_INTERNAL_ERROR
+
+        val archiveCmd = participant1.ledger_api.javaapi.state.acs
+          .await(Iou.COMPANION)(payer, predicate = _.id.toLf == cid)
+          .id
+          .exerciseArchive()
+          .commands()
+          .asScala
+          .toSeq
+        participant1.ledger_api.javaapi.commands.submit(Seq(payer), archiveCmd)
       }
     }
   }
@@ -233,7 +228,7 @@ abstract class RepairServiceIntegrationTest
 
 class ReferenceRepairServiceIntegrationTest extends RepairServiceIntegrationTest {
   override protected lazy val plugin =
-    new UseBftSequencer(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

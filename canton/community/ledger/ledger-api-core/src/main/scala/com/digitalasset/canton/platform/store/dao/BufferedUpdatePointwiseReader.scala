@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -20,15 +20,15 @@ import scala.concurrent.Future
   * @param toApiResponse
   *   Convert a [[com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate]] to a
   *   specific API response while also filtering for visibility.
-  * @tparam QueryParamType
+  * @tparam QUERY_PARAM_TYPE
   *   The query parameter type.
-  * @tparam ApiResponse
+  * @tparam API_RESPONSE
   *   The Ledger API response type.
   */
-class BufferedUpdatePointwiseReader[QueryParamType, ApiResponse](
-    fetchFromPersistence: FetchUpdatePointwiseFromPersistence[QueryParamType, ApiResponse],
-    fetchFromBuffer: QueryParamType => Option[TransactionLogUpdate],
-    toApiResponse: ToApiResponse[QueryParamType, ApiResponse],
+class BufferedUpdatePointwiseReader[QUERY_PARAM_TYPE, API_RESPONSE](
+    fetchFromPersistence: FetchUpdatePointwiseFromPersistence[QUERY_PARAM_TYPE, API_RESPONSE],
+    fetchFromBuffer: QUERY_PARAM_TYPE => Option[TransactionLogUpdate],
+    toApiResponse: ToApiResponse[QUERY_PARAM_TYPE, API_RESPONSE],
 ) {
 
   /** Serves processed and filtered update from the buffer by the query parameter, with fallback to
@@ -41,9 +41,9 @@ class BufferedUpdatePointwiseReader[QueryParamType, ApiResponse](
     * @return
     *   A future wrapping the API response if found.
     */
-  def fetch(queryParam: QueryParamType)(implicit
+  def fetch(queryParam: QUERY_PARAM_TYPE)(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Option[ApiResponse]] =
+  ): Future[Option[API_RESPONSE]] =
     fetchFromBuffer(queryParam) match {
       case Some(value) => toApiResponse(value, queryParam, loggingContext)
       case None =>
@@ -52,18 +52,18 @@ class BufferedUpdatePointwiseReader[QueryParamType, ApiResponse](
 }
 
 object BufferedUpdatePointwiseReader {
-  trait FetchUpdatePointwiseFromPersistence[QueryParamType, ApiResponse] {
+  trait FetchUpdatePointwiseFromPersistence[QUERY_PARAM_TYPE, API_RESPONSE] {
     def apply(
-        queryParam: QueryParamType,
+        queryParam: QUERY_PARAM_TYPE,
         loggingContext: LoggingContextWithTrace,
-    ): Future[Option[ApiResponse]]
+    ): Future[Option[API_RESPONSE]]
   }
 
-  trait ToApiResponse[QueryParamType, ApiResponse] {
+  trait ToApiResponse[QUERY_PARAM_TYPE, API_RESPONSE] {
     def apply(
         transactionAccepted: TransactionLogUpdate,
-        queryParam: QueryParamType,
+        queryParam: QUERY_PARAM_TYPE,
         loggingContext: LoggingContextWithTrace,
-    ): Future[Option[ApiResponse]]
+    ): Future[Option[API_RESPONSE]]
   }
 }

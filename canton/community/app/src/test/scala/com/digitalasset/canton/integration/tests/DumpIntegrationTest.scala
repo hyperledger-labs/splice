@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -6,13 +6,13 @@ package com.digitalasset.canton.integration.tests
 import better.files.*
 import cats.syntax.either.*
 import com.digitalasset.canton.BigDecimalImplicits.*
-import com.digitalasset.canton.config.LocalNodeConfig
+import com.digitalasset.canton.config.{DbConfig, LocalNodeConfig}
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
 import com.digitalasset.canton.crypto.{CryptoPureApi, CryptoSchemes}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou
 import com.digitalasset.canton.examples.java.iou.Amount
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.{UseH2, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -110,11 +110,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
         PossiblyIgnoredProtocolEvent,
       ] =
         PossiblyIgnoredSequencedEvent
-          .fromProtoV30(
-            defaultMaxBytesToDecompress,
-            testedProtocolVersion,
-            cryptoPureApi(participant1.config),
-          )(
+          .fromProtoV30(testedProtocolVersion, cryptoPureApi(participant1.config))(
             dumpedLastEventP
           )
 // architecture-handbook-entry-end: DumpLastSequencedEventToFile
@@ -150,7 +146,6 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       ]] =
         dumpedEventsP.map {
           PossiblyIgnoredSequencedEvent.fromProtoV30(
-            defaultMaxBytesToDecompress,
             testedProtocolVersion,
             cryptoPureApi(participant1.config),
           )(_)
@@ -191,7 +186,6 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 
       val dumpedEventsOrErr = dumpedEventsP.map {
         PossiblyIgnoredSequencedEvent.fromProtoV30(
-          defaultMaxBytesToDecompress,
           testedProtocolVersion,
           cryptoPureApi(participant1.config),
         )(_)
@@ -277,5 +271,5 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 
 final class DumpIntegrationTestH2 extends DumpIntegrationTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }

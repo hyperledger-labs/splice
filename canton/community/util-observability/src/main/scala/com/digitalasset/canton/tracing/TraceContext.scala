@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -7,6 +7,7 @@ import cats.Show.Shown
 import com.daml.nonempty.NonEmpty
 import com.daml.tracing as damlTelemetry
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
+import com.digitalasset.daml.lf.data.NoCopy
 import io.opentelemetry.api.trace.{Span, Tracer}
 import io.opentelemetry.context.Context as OpenTelemetryContext
 import io.opentelemetry.sdk.trace.ReadableSpan
@@ -18,7 +19,8 @@ import scala.language.implicitConversions
   */
 class TraceContext private[tracing] (val context: OpenTelemetryContext)
     extends Equals
-    with Serializable {
+    with Serializable
+    with NoCopy {
 
   lazy val asW3CTraceContext: Option[W3CTraceContext] =
     W3CTraceContext.fromOpenTelemetryContext(context)
@@ -153,7 +155,7 @@ object TraceContext {
           withNewTraceContext(name) { implicit traceContext =>
             // log that we're creating a single traceContext from many trace ids
             val traceIds = validTracesNE.map(_.traceId).collect { case Some(traceId) => traceId }
-            logger.debug(s"Created batch $name from traceIds: [${traceIds.mkString(",")}]")
+            logger.info(s"Created batch $name from traceIds: [${traceIds.mkString(",")}]")
             traceContext
           }
     }

@@ -1,12 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.metrics
 
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.*
 import com.daml.metrics.api.HistogramInventory.Item
 import com.daml.metrics.api.MetricHandle.*
-import com.daml.metrics.{CacheMetrics, HealthMetrics}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.pretty.PrettyNameOnlyCase
@@ -29,13 +29,12 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Env,
   ModuleContext,
 }
-import com.digitalasset.canton.util.Mutex
 
 import java.time.{Duration, Instant}
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Future, blocking}
 import scala.jdk.DurationConverters.ScalaDurationOps
 
 private[metrics] final class BftOrderingHistograms(val parent: MetricName)(implicit
@@ -416,14 +415,13 @@ class BftOrderingMetrics private[metrics] (
 
     private val prefix = histograms.global.prefix
 
-    val blockNumber: Gauge[Long] = openTelemetryMetricsFactory.gauge(
+    val blocksOrdered: Meter = openTelemetryMetricsFactory.meter(
       MetricInfo(
-        prefix :+ "block-number",
-        summary = "Block number",
-        description = "Latest block number ordered by the node.",
+        prefix :+ "ordered-blocks",
+        summary = "Blocks ordered",
+        description = "Measures the total blocks ordered.",
         qualification = MetricQualification.Traffic,
-      ),
-      0,
+      )
     )
 
     val batchesOrdered: Meter = openTelemetryMetricsFactory.meter(
@@ -600,9 +598,6 @@ class BftOrderingMetrics private[metrics] (
         ),
         0,
       )
-
-      val batchCache: CacheMetrics =
-        new CacheMetrics("batch-cache", openTelemetryMetricsFactory)
     }
 
     object regression {
@@ -820,7 +815,6 @@ class BftOrderingMetrics private[metrics] (
 
       private val prepareGauges = mutable.Map[BftNodeId, Gauge[Double]]()
       private val commitGauges = mutable.Map[BftNodeId, Gauge[Double]]()
-      private val lock = new Mutex()
 
       val discardedRepeatedMessageMeter: Meter = openTelemetryMetricsFactory.meter(
         MetricInfo(
@@ -851,9 +845,11 @@ class BftOrderingMetrics private[metrics] (
         )
 
       def cleanupVoteGauges(keepOnly: Set[BftNodeId]): Unit =
-        lock.exclusive {
-          keepOnlyGaugesFor(prepareGauges, keepOnly)
-          keepOnlyGaugesFor(commitGauges, keepOnly)
+        blocking {
+          synchronized {
+            keepOnlyGaugesFor(prepareGauges, keepOnly)
+            keepOnlyGaugesFor(commitGauges, keepOnly)
+          }
         }
 
       private def getOrElseUpdateGauge(
@@ -864,22 +860,23 @@ class BftOrderingMetrics private[metrics] (
           description: String,
       ): Gauge[Double] = {
         val mc1 = metricsContext.withExtraLabels(labels.VotingSequencer -> node)
-
-        lock.exclusive {
-          locally {
-            implicit val metricsContext: MetricsContext = mc1
-            gauges.getOrElseUpdate(
-              node,
-              openTelemetryMetricsFactory.gauge(
-                MetricInfo(
-                  prefix :+ name,
-                  summary,
-                  MetricQualification.Traffic,
-                  description,
+        blocking {
+          synchronized {
+            locally {
+              implicit val metricsContext: MetricsContext = mc1
+              gauges.getOrElseUpdate(
+                node,
+                openTelemetryMetricsFactory.gauge(
+                  MetricInfo(
+                    prefix :+ name,
+                    summary,
+                    MetricQualification.Traffic,
+                    description,
+                  ),
+                  0.0d,
                 ),
-                0.0d,
-              ),
-            )
+              )
+            }
           }
         }
       }
@@ -1027,7 +1024,6 @@ class BftOrderingMetrics private[metrics] (
       0,
     )
 
-    private val lock = new Mutex()
     def update(newMembership: Membership)(implicit metricsContext: MetricsContext): Unit = {
       val orderingTopology = newMembership.orderingTopology
       val members = orderingTopology.nodes
@@ -1038,8 +1034,8 @@ class BftOrderingMetrics private[metrics] (
       weakQuorumGauge.updateValue(orderingTopology.weakQuorum)
       strongQuorumGauge.updateValue(orderingTopology.strongQuorum)
 
-      {
-        lock.exclusive {
+      blocking {
+        synchronized {
           cleanupGauges(topologyGauges, members)
           cleanupGauges(leadersGauges, members)
           updateMetrics(
@@ -1073,33 +1069,37 @@ class BftOrderingMetrics private[metrics] (
     }
 
     private val blacklistGauges = mutable.Map[BftNodeId, Gauge[Long]]()
-    private val lock = new Mutex()
+
     def blacklist(node: BftNodeId): Gauge[Long] = {
       val mc1 = metricsContext.withExtraLabels(labels.blacklistNode -> node)
-      lock.exclusive {
-        locally {
-          implicit val metricsContext: MetricsContext = mc1
-          blacklistGauges.getOrElseUpdate(
-            node,
-            openTelemetryMetricsFactory.gauge(
-              MetricInfo(
-                prefix :+ "blacklist-sequencer",
-                "Amount of epochs the node is blacklisted for",
-                MetricQualification.Traffic,
-                "The amount of epochs an BFT sequencer is blacklisted from being a leader",
+      blocking {
+        synchronized {
+          locally {
+            implicit val metricsContext: MetricsContext = mc1
+            blacklistGauges.getOrElseUpdate(
+              node,
+              openTelemetryMetricsFactory.gauge(
+                MetricInfo(
+                  prefix :+ "blacklist-sequencer",
+                  "Amount of epochs the node is blacklisted for",
+                  MetricQualification.Traffic,
+                  "The amount of epochs an BFT sequencer is blacklisted from being a leader",
+                ),
+                0,
               ),
-              0,
-            ),
-          )
+            )
+          }
         }
       }
     }
 
     def cleanupBlacklistGauges(keepOnly: Set[BftNodeId]): Unit =
-      lock.exclusive {
-        blacklistGauges.view.filterKeys(!keepOnly.contains(_)).foreach { case (id, gauge) =>
-          gauge.close()
-          blacklistGauges.remove(id).discard
+      blocking {
+        synchronized {
+          blacklistGauges.view.filterKeys(!keepOnly.contains(_)).foreach { case (id, gauge) =>
+            gauge.close()
+            blacklistGauges.remove(id).discard
+          }
         }
       }
   }
@@ -1117,7 +1117,6 @@ class BftOrderingMetrics private[metrics] (
     private val authenticatedGauges = mutable.Map[String, Gauge[Int]]()
     private val unauthenticatedGauges = mutable.Map[String, Gauge[Int]]()
     private val disconnectedGauges = mutable.Map[String, Gauge[Int]]()
-    private val lock = new Mutex()
 
     def update(status: PeerNetworkStatus)(implicit metricsContext: MetricsContext): Unit = {
       val statusView = status.endpointStatuses.view
@@ -1171,8 +1170,8 @@ class BftOrderingMetrics private[metrics] (
       val connectedSortedWithIndex = unauthenticated.toSeq.sorted.zipWithIndex
       val disconnectedSortedWithIndex = disconnected.toSeq.sorted.zipWithIndex
 
-      {
-        lock.exclusive {
+      blocking {
+        synchronized {
           cleanupGauges(authenticatedGauges, authenticated.toSet)
           cleanupGauges(unauthenticatedGauges, unauthenticated.toSet)
           cleanupGauges(disconnectedGauges, disconnected.toSet)

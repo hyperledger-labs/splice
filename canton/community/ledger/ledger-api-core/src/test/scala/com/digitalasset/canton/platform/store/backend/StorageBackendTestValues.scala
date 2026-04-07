@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -23,21 +23,12 @@ import com.digitalasset.canton.tracing.SerializableTraceContextConverter.Seriali
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.{
-  ChoiceName,
-  Identifier,
-  NameTypeConRef,
-  NameTypeConRefConverter,
-  PackageId,
-  Party,
-  UserId,
-}
+import com.digitalasset.daml.lf.data.Ref.{Identifier, NameTypeConRef, NameTypeConRefConverter}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
 import org.scalatest.OptionValues
-import scalaz.Tag
 
 import java.time.Instant
 import java.util.UUID
@@ -73,14 +64,9 @@ private[store] object StorageBackendTestValues extends OptionValues {
   val someTemplateId2: NameTypeConRef = NameTypeConRef.assertFromString("#pkg-name:Mod:Template2")
   val someIdentityParams: ParameterStorageBackend.IdentityParams =
     ParameterStorageBackend.IdentityParams(someParticipantId)
-  val someChoice: Ref.ChoiceName = Ref.ChoiceName.assertFromString("choice")
   val someParty: Ref.Party = Ref.Party.assertFromString("party")
   val someParty2: Ref.Party = Ref.Party.assertFromString("party2")
   val someParty3: Ref.Party = Ref.Party.assertFromString("party3")
-  val someParty4: Ref.Party = Ref.Party.assertFromString("party4")
-  val someParty5: Ref.Party = Ref.Party.assertFromString("party5")
-  def someParties(names: String*): Set[Ref.Party] = Set(names.map(Ref.Party.assertFromString)*)
-  val someParticipant: Ref.ParticipantId = Ref.ParticipantId.assertFromString("participant1")
   val someUserId: Ref.UserId = Ref.UserId.assertFromString("user_id")
   val someSubmissionId: Ref.SubmissionId = Ref.SubmissionId.assertFromString("submission_id")
   val someAuthenticationData: Bytes = Bytes.assertFromString("00abcd")
@@ -98,7 +84,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
 
   val testTraceContext = TraceContext.withNewTraceContext("test trace context")(identity)
   val serializableTraceContext: Array[Byte] =
-    SerializableTraceContext(testTraceContext).toSerializedDamlProto
+    SerializableTraceContext(testTraceContext).toDamlProto.toByteArray
   val someExternalTransactionHash: CantonHash =
     CantonHash
       .digest(HashPurpose.PreparedSubmission, ByteString.copyFromUtf8("mock_hash"), Sha256)
@@ -109,7 +95,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
 
   def dtoPartyEntry(
       offset: Offset,
-      party: Party = someParty,
+      party: String = someParty,
       isLocal: Boolean = true,
       reject: Boolean = false,
   ): DbDto.PartyEntry =
@@ -129,9 +115,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitters: Option[Set[Party]] = Some(
-        Set("submitter1", "submitter2").map(Party.assertFromString)
-      ),
+      submitters: Option[Set[String]] = Some(Set("submitter1", "submitter2")),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -140,16 +124,16 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // event related columns
       event_sequential_id: Long = 500L,
       node_id: Int = 15,
-      additional_witnesses: Set[Party] = Set("witness1", "witness2").map(Party.assertFromString),
-      representative_package_id: PackageId = PackageId.assertFromString("representativepackage"),
+      additional_witnesses: Set[String] = Set("witness1", "witness2"),
+      representative_package_id: String = "representativepackage",
 
       // contract related columns
       notPersistedContractId: ContractId = hashCid("c1"),
       internal_contract_id: Long = 10,
       create_key_hash: Option[String] = Some("keyhash"),
   )(
-      stakeholders: Set[Party] = Set("stakeholder1", "stakeholder2").map(Party.assertFromString),
-      template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
+      stakeholders: Set[String] = Set("stakeholder1", "stakeholder2"),
+      template_id: String = "tem:pl:ate",
   ): Seq[DbDto] = DbDto
     .createDbDtos(
       event_offset = event_offset,
@@ -180,7 +164,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitter: Option[Party] = Some(Party.assertFromString("submitter1")),
+      submitter: Option[String] = Some("submitter1"),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -191,15 +175,14 @@ private[store] object StorageBackendTestValues extends OptionValues {
       source_synchronizer_id: SynchronizerId = someSynchronizerId2,
       reassignment_counter: Long = 345,
       reassignment_id: Array[Byte] = reassignmentId,
-      representative_package_id: PackageId = PackageId.assertFromString("representativepackage"),
+      representative_package_id: String = "representativepackage",
 
       // contract related columns
       notPersistedContractId: ContractId = hashCid("c1"),
       internal_contract_id: Long = 10,
-      create_key_hash: Option[String] = Some("keyhash"),
   )(
-      stakeholders: Set[Party] = Set("stakeholder1", "stakeholder2").map(Party.assertFromString),
-      template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
+      stakeholders: Set[String] = Set("stakeholder1", "stakeholder2"),
+      template_id: String = "tem:pl:ate",
   ): Seq[DbDto] = DbDto
     .assignDbDtos(
       event_offset = event_offset,
@@ -218,7 +201,6 @@ private[store] object StorageBackendTestValues extends OptionValues {
       representative_package_id = representative_package_id,
       notPersistedContractId = notPersistedContractId,
       internal_contract_id = internal_contract_id,
-      create_key_hash = create_key_hash,
     )(
       stakeholders = stakeholders,
       template_id = template_id,
@@ -231,9 +213,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitters: Option[Set[Party]] = Some(
-        Set("submitter1", "submitter2").map(Party.assertFromString)
-      ),
+      submitters: Option[Set[String]] = Some(Set("submitter1", "submitter2")),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -243,14 +223,12 @@ private[store] object StorageBackendTestValues extends OptionValues {
       event_sequential_id: Long = 500L,
       node_id: Int = 15,
       deactivated_event_sequential_id: Option[Long] = Some(2L),
-      additional_witnesses: Set[Party] = Set("witness1", "witness2").map(Party.assertFromString),
-      exercise_choice: ChoiceName = ChoiceName.assertFromString("choice"),
-      exercise_choice_interface_id: Option[Identifier] = Some(
-        Identifier.assertFromString("in:ter:face")
-      ),
+      additional_witnesses: Set[String] = Set("witness1", "witness2"),
+      exercise_choice: String = "choice",
+      exercise_choice_interface_id: Option[String] = Some("in:ter:face"),
       exercise_argument: Array[Byte] = Array(1, 2, 3),
       exercise_result: Option[Array[Byte]] = Some(Array(2, 3, 4)),
-      exercise_actors: Set[Party] = Set("actor1", "actor2").map(Party.assertFromString),
+      exercise_actors: Set[String] = Set("actor1", "actor2"),
       exercise_last_descendant_node_id: Int = 3,
       exercise_argument_compression: Option[Int] = Some(1),
       exercise_result_compression: Option[Int] = Some(2),
@@ -258,9 +236,9 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // contract related columns
       contract_id: ContractId = hashCid("c1"),
       internal_contract_id: Option[Long] = Some(10),
-      template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
-      package_id: PackageId = PackageId.assertFromString("package"),
-      stakeholders: Set[Party] = Set("stakeholder1", "stakeholder2").map(Party.assertFromString),
+      template_id: String = "#tem:pl:ate",
+      package_id: String = "package",
+      stakeholders: Set[String] = Set("stakeholder1", "stakeholder2"),
       ledger_effective_time: Long = 123456,
   ): Seq[DbDto] = DbDto
     .consumingExerciseDbDtos(
@@ -300,7 +278,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitter: Option[Party] = Some(Party.assertFromString("submitter1")),
+      submitter: Option[String] = Some("submitter1"),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -317,9 +295,9 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // contract related columns
       contract_id: ContractId = hashCid("c1"),
       internal_contract_id: Option[Long] = Some(10),
-      template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
-      package_id: PackageId = PackageId.assertFromString("package"),
-      stakeholders: Set[Party] = Set("stakeholder1", "stakeholder2").map(Party.assertFromString),
+      template_id: String = "#tem:pl:ate",
+      package_id: String = "package",
+      stakeholders: Set[String] = Set("stakeholder1", "stakeholder2"),
   ): Seq[DbDto] = DbDto
     .unassignDbDtos(
       event_offset = event_offset,
@@ -351,9 +329,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitters: Option[Set[Party]] = Some(
-        Set("submitter1", "submitter2").map(Party.assertFromString)
-      ),
+      submitters: Option[Set[String]] = Some(Set("submitter1", "submitter2")),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -362,32 +338,31 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // event related columns
       event_sequential_id: Long = 500L,
       node_id: Int = 15,
-      additional_witnesses: Set[Party] = Set("witness1", "witness2").map(Party.assertFromString),
-      representative_package_id: PackageId = PackageId.assertFromString("representativepackage"),
+      additional_witnesses: Set[String] = Set("witness1", "witness2"),
+      representative_package_id: String = "representativepackage",
 
       // contract related columns
       internal_contract_id: Long = 10,
-  )(template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate")): Seq[DbDto] =
-    DbDto
-      .witnessedCreateDbDtos(
-        event_offset = event_offset,
-        update_id = update_id,
-        workflow_id = workflow_id,
-        command_id = command_id,
-        submitters = submitters,
-        record_time = record_time,
-        synchronizer_id = synchronizer_id,
-        trace_context = trace_context,
-        external_transaction_hash = external_transaction_hash,
-        event_sequential_id = event_sequential_id,
-        node_id = node_id,
-        additional_witnesses = additional_witnesses,
-        representative_package_id = representative_package_id,
-        internal_contract_id = internal_contract_id,
-      )(
-        template_id = template_id
-      )
-      .toSeq
+  )(template_id: String = "tem:pl:ate"): Seq[DbDto] = DbDto
+    .witnessedCreateDbDtos(
+      event_offset = event_offset,
+      update_id = update_id,
+      workflow_id = workflow_id,
+      command_id = command_id,
+      submitters = submitters,
+      record_time = record_time,
+      synchronizer_id = synchronizer_id,
+      trace_context = trace_context,
+      external_transaction_hash = external_transaction_hash,
+      event_sequential_id = event_sequential_id,
+      node_id = node_id,
+      additional_witnesses = additional_witnesses,
+      representative_package_id = representative_package_id,
+      internal_contract_id = internal_contract_id,
+    )(
+      template_id = template_id
+    )
+    .toSeq
 
   def dtosWitnessedExercised(
       // update related columns
@@ -395,9 +370,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitters: Option[Set[Party]] = Some(
-        Set("submitter1", "submitter2").map(Party.assertFromString)
-      ),
+      submitters: Option[Set[String]] = Some(Set("submitter1", "submitter2")),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
@@ -406,15 +379,13 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // event related columns
       event_sequential_id: Long = 500L,
       node_id: Int = 15,
-      additional_witnesses: Set[Party] = Set("witness1", "witness2").map(Party.assertFromString),
+      additional_witnesses: Set[String] = Set("witness1", "witness2"),
       consuming: Boolean = true,
-      exercise_choice: ChoiceName = someChoice,
-      exercise_choice_interface_id: Option[Identifier] = Some(
-        Identifier.assertFromString("in:ter:face")
-      ),
+      exercise_choice: String = "choice",
+      exercise_choice_interface_id: Option[String] = Some("in:ter:face"),
       exercise_argument: Array[Byte] = Array(1, 2, 3),
       exercise_result: Option[Array[Byte]] = Some(Array(2, 3, 4)),
-      exercise_actors: Set[Party] = Set("actor1", "actor2").map(Party.assertFromString),
+      exercise_actors: Set[String] = Set("actor1", "actor2"),
       exercise_last_descendant_node_id: Int = 3,
       exercise_argument_compression: Option[Int] = Some(1),
       exercise_result_compression: Option[Int] = Some(2),
@@ -422,8 +393,8 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // contract related columns
       contract_id: ContractId = hashCid("c1"),
       internal_contract_id: Option[Long] = Some(10),
-      template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
-      package_id: PackageId = PackageId.assertFromString("package"),
+      template_id: String = "#tem:pl:ate",
+      package_id: String = "package",
       ledger_effective_time: Long = 123456,
   ): Seq[DbDto] = DbDto
     .witnessedExercisedDbDtos(
@@ -459,8 +430,8 @@ private[store] object StorageBackendTestValues extends OptionValues {
   def dtoPartyToParticipant(
       offset: Offset,
       eventSequentialId: Long,
-      party: Party = someParty,
-      participant: ParticipantId = someParticipantId,
+      party: String = someParty,
+      participant: String = someParticipantId.toString,
       authorizationEvent: AuthorizationEvent = Added(AuthorizationLevel.Submission),
       synchronizerId: SynchronizerId = someSynchronizerId,
       recordTime: Timestamp = someTime,
@@ -472,7 +443,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       event_offset = offset.unwrap,
       update_id = updateId,
       party_id = party,
-      participant_id = Tag.unwrap(participant),
+      participant_id = participant,
       participant_permission = participantPermissionInt(authorizationEvent),
       participant_authorization_event = authorizationEventInt(authorizationEvent),
       synchronizer_id = synchronizerId,
@@ -483,9 +454,9 @@ private[store] object StorageBackendTestValues extends OptionValues {
 
   def dtoCompletion(
       offset: Offset,
-      submitters: Set[Party] = Set(Party.assertFromString("signatory")),
+      submitters: Set[String] = Set("signatory"),
       commandId: String = UUID.randomUUID().toString,
-      userId: UserId = someUserId,
+      userId: String = someUserId,
       submissionId: Option[String] = Some(UUID.randomUUID().toString),
       deduplicationOffset: Option[Long] = None,
       deduplicationDurationSeconds: Option[Long] = None,
@@ -586,7 +557,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       update_id: Array[Byte] = TestUpdateId("update").toProtoPrimitive.toByteArray,
       workflow_id: Option[String] = Some("workflow-id"),
       command_id: Option[String] = Some("command-id"),
-      submitters: Option[Set[Party]] = Some(Set(Party.assertFromString("submitter1"))),
+      submitters: Option[Set[String]] = Some(Set("submitter1")),
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,

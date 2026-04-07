@@ -1,17 +1,18 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.tls
 
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
-import com.daml.tls.{
+import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
+import com.digitalasset.canton.config.{
+  PemFile,
   ServerAuthRequirementConfig,
+  ServerConfig,
   TlsClientCertificate,
   TlsClientConfig,
   TlsServerConfig,
 }
-import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
 import com.digitalasset.canton.grpc.sampleservice.HelloServiceReferenceImplementation
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
@@ -93,8 +94,6 @@ final case class TlsFixture(
           desiredPort = Port.Dynamic,
           maxInboundMessageSize = ServerConfig.defaultMaxInboundMessageSize.unwrap,
           maxInboundMetadataSize = ServerConfig.defaultMaxInboundMetadataSize.unwrap,
-          maxConcurrentStreamsPerConnection =
-            ServerConfig.defaultMaxConcurrentStreamsPerConnection.unwrap,
           address = None,
           tlsConfiguration = serverTlsConfiguration,
           servicesExecutor = servicesExecutor,

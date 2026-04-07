@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -71,7 +71,7 @@ object MetricValue {
     def value: T
 
     override def toCsvHeader(data: MetricData): String =
-      "timestamp,count,attributes"
+      (Seq("timestamp", "count", "attributes")).mkString(",")
 
     override def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String =
       (Seq(ts.getEpochSecond.toString, value.toString) :+ renderUnknownKeys(
@@ -85,7 +85,10 @@ object MetricValue {
       with Point[Long] {
     override protected def pretty: Pretty[LongPoint] = prettyOfClass(
       param("value", _.value),
-      param("attributes", _.attributes),
+      param(
+        "attributes",
+        _.attributes,
+      ),
     )
 
   }
@@ -95,7 +98,10 @@ object MetricValue {
       with Point[Double] {
     override protected def pretty: Pretty[DoublePoint] = prettyOfClass(
       param("value", _.value.toString.unquoted),
-      param("attributes", _.attributes),
+      param(
+        "attributes",
+        _.attributes,
+      ),
     )
 
   }
@@ -110,7 +116,10 @@ object MetricValue {
       param("sum", _.sum.toString.unquoted),
       param("count", _.count),
       param("quantiles", _.quantiles),
-      param("attributes", _.attributes),
+      param(
+        "attributes",
+        _.attributes,
+      ),
     )
 
     override def toCsvHeader(data: MetricData): String =
@@ -161,11 +170,15 @@ object MetricValue {
       param("count", _.count),
       param("counts", _.counts),
       param("boundaries", _.boundaries.map(_.toString.unquoted)),
-      param("attributes", _.attributes),
+      param(
+        "attributes",
+        _.attributes,
+      ),
     )
 
     override def toCsvHeader(data: MetricData): String =
-      "timestamp,sum,count,attributes"
+      (Seq("timestamp", "sum", "count", "attributes"))
+        .mkString(",")
 
     override def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String =
       (Seq(ts.getEpochSecond.toString, sum.toString, count.toString) :+ renderUnknownKeys(

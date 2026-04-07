@@ -4,54 +4,12 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sv1
 
 import cats.implicits.{
-  catsSyntaxOptionId,
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
   catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
 }
 import cats.syntax.functorFilter.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.{SequencerConnections, TrafficControlParameters}
-import com.digitalasset.canton.time.{
-  Clock,
-  NonNegativeFiniteDuration,
-  PositiveFiniteDuration,
-  PositiveSeconds,
-}
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransaction,
-  StoredTopologyTransactions,
-}
-import com.digitalasset.canton.topology.transaction.{
-  DecentralizedNamespaceDefinition,
-  ParticipantPermission,
-  SignedTopologyTransaction,
-  TopologyChangeOp,
-  TopologyMapping,
-}
-import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -67,16 +25,16 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
   SvCantonIdentifierConfig,
   SvOnboardingConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
@@ -94,6 +52,53 @@ import org.lfdecentralizedtrust.splice.util.{
   UploadablePackage,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.SequencerAlias
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnections,
+  TrafficControlParameters,
+}
+import com.digitalasset.canton.time.{
+  Clock,
+  NonNegativeFiniteDuration,
+  PositiveFiniteDuration,
+  PositiveSeconds,
+}
+import com.digitalasset.canton.topology.{transaction, *}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransaction,
+  StoredTopologyTransactions,
+}
+import com.digitalasset.canton.topology.transaction.{
+  DecentralizedNamespaceDefinition,
+  ParticipantPermission,
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyMapping,
+}
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -101,11 +106,12 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize sv1. */
 class SV1Initializer(
-    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
+    localSynchronizerNode: LocalSynchronizerNode,
     sv1Config: SvOnboardingConfig.FoundDso,
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
+    override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
@@ -144,8 +150,7 @@ class SV1Initializer(
     )
   ] = {
     for {
-      _ <- synchronizerNodeService.nodes.current.cometbftNode
-        .traverse(_.rotateGenesisGovernanceKeyForSV1(sv1Config.name))
+      _ <- rotateGenesisGovernanceKeyForSV1(cometBftNode, sv1Config.name)
       initConnection = ledgerClient.readOnlyConnection(
         this.getClass.getSimpleName,
         loggerFactory,
@@ -157,7 +162,7 @@ class SV1Initializer(
         if (!config.shouldSkipSynchronizerInitialization) {
           SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
             cantonIdentifierConfig,
-            synchronizerNodeService.nodes.current,
+            localSynchronizerNode,
             clock,
             loggerFactory,
             retryProvider,
@@ -174,20 +179,28 @@ class SV1Initializer(
             (s.namespace, s)
           }
         } else {
-          bootstrapDomain(synchronizerNodeService.nodes.current)
+          bootstrapDomain(localSynchronizerNode)
         }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
+      internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         SynchronizerConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.tryMany(
-            Seq(synchronizerNodeService.nodes.current.internalSequencerConnection),
+            Seq(
+              new GrpcSequencerConnection(
+                NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
+                transportSecurity = internalSequencerApi.tlsConfig.isDefined,
+                customTrustCertificates = None,
+                SequencerAlias.Default,
+                sequencerId = None,
+              )
+            ),
             PositiveInt.one,
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
-            config.participantClient.sequencerRequestAmplification.toInternal,
-            sequencerConnectionPoolDelays =
-              config.participantClient.sequencerConnectionPoolDelays.toInternal,
+            config.participantClient.sequencerRequestAmplification,
+            sequencerConnectionPoolDelays = config.participantClient.sequencerConnectionPoolDelays,
           ),
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
@@ -205,7 +218,7 @@ class SV1Initializer(
       _ <- ensureCantonNodesOTKRotatedIfNeeded(
         config.skipSynchronizerInitialization,
         cantonIdentifierConfig,
-        Some(synchronizerNodeService.nodes.current),
+        Some(localSynchronizerNode),
         clock,
         loggerFactory,
         retryProvider,
@@ -283,7 +296,7 @@ class SV1Initializer(
         dsoStore,
         ledgerClient,
         participantAdminConnection,
-        synchronizerNodeService,
+        Some(localSynchronizerNode),
       )
       connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       (_, decentralizedSynchronizer) <- (
@@ -336,40 +349,28 @@ class SV1Initializer(
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,
-        synchronizerNodeService,
+        Some(localSynchronizerNode),
         upgradesConfig,
         packageVersionSupport,
         decentralizedSynchronizer,
         enabledFeatures,
-        new SynchronizerNodeReconciler(
-          dsoStore,
-          connection,
-          config.legacyMigrationId,
-          packageVersionSupport,
-          clock,
-          retryProvider,
-          loggerFactory,
-          config.domainMigrationId,
-          config.scan,
-        ),
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
       withDsoStore = new WithDsoStore(
         dsoAutomation,
         decentralizedSynchronizer,
-        packageVersionSupport,
       )
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_dso_rules",
         show"the DsoRules and AmuletRules are bootstrapped",
         dsoStore.lookupDsoRules().map(_.isDefined), {
-          withDsoStore.foundDso(initialRound)
+          withDsoStore.foundDso(initialRound, packageVersionSupport)
         },
         logger,
       )
       _ <- ensureCometBftGovernanceKeysAreSet(
-        synchronizerNodeService.nodes.current.cometbftNode,
+        cometBftNode,
         svParty,
         dsoStore,
         dsoAutomation,
@@ -387,7 +388,10 @@ class SV1Initializer(
       // We only set the domain sequencer config if the existing one is different here.
       _ <-
         if (!config.shouldSkipSynchronizerInitialization) {
-          withDsoStore.reconcileSequencerConfigIfRequired()
+          withDsoStore.reconcileSequencerConfigIfRequired(
+            Some(localSynchronizerNode),
+            config.domainMigrationId,
+          )
         } else {
           logger.info(
             "Skipping reconcile sequencer config step because skipSynchronizerInitialization is enabled"
@@ -475,8 +479,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues =
-          DynamicSynchronizerParameters.initialValues(synchronizerNode.config.protocolVersion)
+        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v34)
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
@@ -582,7 +585,7 @@ class SV1Initializer(
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactions(bootstrapTransactions),
-                synchronizerNode.staticSynchronizerParameters(NonNegativeInt.zero),
+                synchronizerNode.staticDomainParameters,
               )
             } yield (),
             logger,
@@ -594,9 +597,9 @@ class SV1Initializer(
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
               physicalSynchronizerId,
-              synchronizerNode.internalSequencerConnection,
-              synchronizerNode.mediatorSequencerAmplification.toInternal,
-              synchronizerNode.mediatorSequencerConnectionPoolDelays.toInternal,
+              synchronizerNode.sequencerConnection,
+              synchronizerNode.mediatorSequencerAmplification,
+              synchronizerNode.mediatorSequencerConnectionPoolDelays,
             ),
             logger,
           )
@@ -605,9 +608,7 @@ class SV1Initializer(
     }
   }
 
-  private def requiredDars(
-      initialPackageConfig: InitialPackageConfig
-  )(implicit tc: TraceContext): Seq[UploadablePackage] = {
+  private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
     Seq(
       DarResources.amulet -> initialPackageConfig.amuletVersion,
       DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
@@ -619,7 +620,6 @@ class SV1Initializer(
           PackageVersion.assertFromString(requiredVersion),
           enabledFeatures.enableUnsupportedDarsUnvetting,
           config.latestPackagesOnly,
-          config.additionalPackagesToUnvet,
         )
         .map(UploadablePackage.fromResource)
     }
@@ -631,7 +631,6 @@ class SV1Initializer(
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       synchronizerId: SynchronizerId,
-      packageVersionSupport: PackageVersionSupport,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -643,16 +642,13 @@ class SV1Initializer(
       config.legacyMigrationId,
       clock = clock,
       retryProvider = retryProvider,
-      versionSupport = packageVersionSupport,
-      migrationId = config.domainMigrationId,
-      scanConfig = config.scan,
-      loggerFactory = loggerFactory,
+      logger = logger,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly
       * allocated DSO party
       */
-    def foundDso(initialRound: Long)(implicit
+    def foundDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
@@ -662,13 +658,18 @@ class SV1Initializer(
       logger,
     )
 
-    def reconcileSequencerConfigIfRequired()(implicit
+    def reconcileSequencerConfigIfRequired(
+        localSynchronizerNode: Option[LocalSynchronizerNode],
+        migrationId: Long,
+    )(implicit
         tc: TraceContext
     ): Future[Unit] = {
       synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-        synchronizerNodeService.nodes.some,
+        localSynchronizerNode,
         synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
+        migrationId,
+        config.scan,
       )
     }
 
@@ -684,11 +685,7 @@ class SV1Initializer(
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
-          synchronizerNodeService
-            .sequencerAdminConnection()
-            .flatMap(
-              _.listSequencerTrafficControlState()
-            ),
+          localSynchronizerNode.sequencerAdminConnection.listSequencerTrafficControlState(),
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithStateWithOffset(),
         ).tupled
@@ -727,8 +724,8 @@ class SV1Initializer(
                     optValidatorFaucetCap = sv1Config.optValidatorFaucetCap,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
-                    synchronizerNodeService.nodes.current.cometbftNode,
-                    synchronizerNodeService.nodes.current,
+                    cometBftNode,
+                    localSynchronizerNode,
                     config.scan,
                     synchronizerId,
                     clock,

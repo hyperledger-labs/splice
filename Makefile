@@ -55,7 +55,6 @@ clean-all: clean ## Completely clean all local build state, including model code
 	sbt --client --batch clean-splice
 	find . -type d -name ".daml" -exec rm -rf {} +
 	find . -type d -name "target" -exec rm -rf {} +
-	find . -type d -name "node_modules" -exec rm -rf {} +
 
 .PHONY: format
 format:	cluster/format ## Automatically reformat and apply scalaFix to source code

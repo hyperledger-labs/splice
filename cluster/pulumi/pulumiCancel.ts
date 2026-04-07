@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
 import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/pulumi';
-import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 import { awaitAllOrThrowAllExceptions, Operation, stack } from './pulumi';
 import { operation } from './pulumiOperations';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 export async function runStacksCancel(): Promise<void> {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
@@ -27,7 +27,7 @@ export async function runStacksCancel(): Promise<void> {
       return stack.cancel();
     },
     false,
-    true
+    true,
   );
   operations = operations.concat(svStacksOperations);
   const validator1 = await stack('validator1', 'validator1', true, {});

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -36,7 +36,6 @@ class BufferedCommandCompletionsReader(
         persistenceFetchArgs = userId -> parties,
         bufferFilter = filterCompletions(_, parties, userId),
         toApiResponse = (response: CompletionStreamResponse) => Future.successful(response),
-        descendingOrder = false,
       )
 
   private def filterCompletions(
@@ -86,12 +85,10 @@ object BufferedCommandCompletionsReader {
       override def apply(
           startInclusive: Offset,
           endInclusive: Offset,
-          descendingOrder: Boolean,
           filter: (UserId, Parties),
       )(implicit
           loggingContext: LoggingContextWithTrace
       ): Source[(Offset, CompletionStreamResponse), NotUsed] = {
-        require(!descendingOrder, s"This flow cannot use descending order")
         val (userId, parties) = filter
         delegate
           .getCommandCompletions(

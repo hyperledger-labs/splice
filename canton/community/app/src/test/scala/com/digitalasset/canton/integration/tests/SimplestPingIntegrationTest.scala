@@ -1,9 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2, UsePostgres}
+import com.digitalasset.canton.config.{DbConfig, StorageConfig}
+import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
+  UseH2,
+  UsePostgres,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -44,12 +50,18 @@ class SimplestPingIntegrationTestInMemory extends SimplestPingIntegrationTest {
       .addConfigTransform(ConfigTransforms.allInMemory)
       .addConfigTransform(_.focus(_.monitoring.logging.api.messagePayloads).replace(false))
 
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
+
 }
 
-class SimplestPingBftOrderingIntegrationTestH2 extends SimplestPingIntegrationTest {
+class SimplestPingReferenceIntegrationTestH2 extends SimplestPingIntegrationTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+}
+
+class SimplestPingReferenceIntegrationTestPostgres extends SimplestPingIntegrationTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 class SimplestPingBftOrderingIntegrationTestPostgres extends SimplestPingIntegrationTest {

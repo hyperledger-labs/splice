@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
-    spliceCachingConfigs: SpliceCachingConfigs = SpliceCachingConfigs(),
     contractFetchLedgerFallbackConfig: ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig =
       ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig(),
     // Do not define any defaults on the class containing the `SpliceParametersConfig` as they'll be overwritten.

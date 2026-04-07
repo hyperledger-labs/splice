@@ -1,32 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.platform.Party
 import com.digitalasset.canton.platform.store.backend.DbDto.IdFilter
-import com.digitalasset.canton.platform.store.interning.StringInterningBuilder
 import com.digitalasset.canton.protocol.TestUpdateId
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{
-  ChoiceName,
-  Identifier,
-  NameTypeConRef,
-  PackageId,
-  ParticipantId,
-  UserId,
-}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.mutable
-
 class DbDtoSpec extends AnyWordSpec with Matchers {
-
   import StorageBackendTestValues.*
-
   implicit private val DbDtoEqual: org.scalactic.Equality[DbDto] = ScalatestEqualityHelpers.DbDtoEq
 
   val updateId = TestUpdateId("mock_hash")
@@ -40,21 +23,21 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
           external_transaction_hash = Some(someExternalTransactionHashBinary),
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           representative_package_id = someRepresentativePackageId,
           notPersistedContractId = hashCid("1"),
           internal_contract_id = 3,
           create_key_hash = Some("hash"),
         )(
-          stakeholders = Set(someParty3, someParty4),
-          template_id = someTemplateId,
+          stakeholders = Set("party3", "party4"),
+          template_id = "template",
         )
         .toList should contain theSameElementsInOrderAs List(
         DbDto.EventActivate(
@@ -62,7 +45,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -70,7 +53,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_type = PersistentEventType.Create.asInt,
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Some(Set(someParty2)),
+          additional_witnesses = Some(Set("party2")),
           source_synchronizer_id = None,
           reassignment_counter = None,
           reassignment_id = None,
@@ -82,24 +65,24 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
         DbDto.IdFilterActivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty3,
+            template_id = "template",
+            party_id = "party3",
             first_per_sequential_id = true,
           )
         ),
         DbDto.IdFilterActivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty4,
+            template_id = "template",
+            party_id = "party4",
             first_per_sequential_id = false,
           )
         ),
         DbDto.IdFilterActivateWitness(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty2,
+            template_id = "template",
+            party_id = "party2",
             first_per_sequential_id = true,
           )
         ),
@@ -115,7 +98,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitter = Some(someParty),
+          submitter = Some("party"),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -127,10 +110,9 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           representative_package_id = someRepresentativePackageId,
           notPersistedContractId = hashCid("1"),
           internal_contract_id = 3,
-          create_key_hash = Some("abc"),
         )(
-          stakeholders = someParties("party3", "party4"),
-          template_id = someTemplateId,
+          stakeholders = Set("party3", "party4"),
+          template_id = "template",
         )
         .toList should contain theSameElementsInOrderAs List(
         DbDto.EventActivate(
@@ -138,7 +120,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -153,21 +135,21 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           representative_package_id = someRepresentativePackageId,
           notPersistedContractId = hashCid("1"),
           internal_contract_id = 3,
-          create_key_hash = Some("abc"),
+          create_key_hash = None,
         ),
         DbDto.IdFilterActivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty3,
+            template_id = "template",
+            party_id = "party3",
             first_per_sequential_id = true,
           )
         ),
         DbDto.IdFilterActivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty4,
+            template_id = "template",
+            party_id = "party4",
             first_per_sequential_id = false,
           )
         ),
@@ -183,7 +165,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -191,20 +173,20 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_sequential_id = 3,
           node_id = 4,
           deactivated_event_sequential_id = Some(10),
-          additional_witnesses = Set(someParty2),
-          exercise_choice = someChoice,
-          exercise_choice_interface_id = Some(someInterfaceId),
+          additional_witnesses = Set("party2"),
+          exercise_choice = "choice",
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Array(1, 2, 3),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Set(someParty5),
+          exercise_actors = Set("party5"),
           exercise_last_descendant_node_id = 10,
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
-          stakeholders = someParties("1", "2", "3"),
+          template_id = "template",
+          package_id = "package",
+          stakeholders = Set("1", "2", "3"),
           ledger_effective_time = 13,
         )
         .toList should contain theSameElementsInOrderAs List(
@@ -213,7 +195,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -222,12 +204,12 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_sequential_id = 3,
           node_id = 4,
           deactivated_event_sequential_id = Some(10),
-          additional_witnesses = Some(Set(someParty2)),
-          exercise_choice = Some(someChoice),
-          exercise_choice_interface_id = Some(someInterfaceId),
+          additional_witnesses = Some(Set("party2")),
+          exercise_choice = Some("choice"),
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Some(Array(1, 2, 3)),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Some(Set(someParty5)),
+          exercise_actors = Some(Set("party5")),
           exercise_last_descendant_node_id = Some(10),
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
@@ -237,40 +219,40 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           reassignment_counter = None,
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
-          stakeholders = someParties("1", "2", "3"),
+          template_id = "template",
+          package_id = "package",
+          stakeholders = Set("1", "2", "3"),
           ledger_effective_time = Some(13),
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("1"),
+            template_id = "template",
+            party_id = "1",
             first_per_sequential_id = true,
           )
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("2"),
+            template_id = "template",
+            party_id = "2",
             first_per_sequential_id = false,
           )
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("3"),
+            template_id = "template",
+            party_id = "3",
             first_per_sequential_id = false,
           )
         ),
         DbDto.IdFilterDeactivateWitness(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty2,
+            template_id = "template",
+            party_id = "party2",
             first_per_sequential_id = true,
           )
         ),
@@ -286,7 +268,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitter = Some(someParty),
+          submitter = Some("party"),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -299,9 +281,9 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           reassignment_counter = 234,
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
-          stakeholders = someParties("1", "2", "3"),
+          template_id = "template",
+          package_id = "package",
+          stakeholders = Set("1", "2", "3"),
         )
         .toList should contain theSameElementsInOrderAs List(
         DbDto.EventDeactivate(
@@ -309,7 +291,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -333,32 +315,32 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           reassignment_counter = Some(234),
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
-          stakeholders = someParties("1", "2", "3"),
+          template_id = "template",
+          package_id = "package",
+          stakeholders = Set("1", "2", "3"),
           ledger_effective_time = None,
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("1"),
+            template_id = "template",
+            party_id = "1",
             first_per_sequential_id = true,
           )
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("2"),
+            template_id = "template",
+            party_id = "2",
             first_per_sequential_id = false,
           )
         ),
         DbDto.IdFilterDeactivateStakeholder(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = Ref.Party.assertFromString("3"),
+            template_id = "template",
+            party_id = "3",
             first_per_sequential_id = false,
           )
         ),
@@ -374,27 +356,27 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
           external_transaction_hash = Some(someExternalTransactionHashBinary),
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           consuming = true,
-          exercise_choice = someChoice,
-          exercise_choice_interface_id = Some(someInterfaceId),
+          exercise_choice = "choice",
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Array(1, 2, 3),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Set(someParty5),
+          exercise_actors = Set("party5"),
           exercise_last_descendant_node_id = 10,
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
+          template_id = "template",
+          package_id = "package",
           ledger_effective_time = 13,
         )
         .toList should contain theSameElementsInOrderAs List(
@@ -403,7 +385,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -411,28 +393,28 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_type = PersistentEventType.WitnessedConsumingExercise.asInt,
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           consuming = Some(true),
-          exercise_choice = Some(someChoice),
-          exercise_choice_interface_id = Some(someInterfaceId),
+          exercise_choice = Some("choice"),
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Some(Array(1, 2, 3)),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Some(Set(someParty5)),
+          exercise_actors = Some(Set("party5")),
           exercise_last_descendant_node_id = Some(10),
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
           representative_package_id = None,
           contract_id = Some(hashCid("23")),
           internal_contract_id = Some(3),
-          template_id = Some(someTemplateId),
-          package_id = Some(somePackageId),
+          template_id = Some("template"),
+          package_id = Some("package"),
           ledger_effective_time = Some(13),
         ),
         DbDto.IdFilterVariousWitness(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty2,
+            template_id = "template",
+            party_id = "party2",
             first_per_sequential_id = true,
           )
         ),
@@ -448,27 +430,27 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
           external_transaction_hash = Some(someExternalTransactionHashBinary),
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           consuming = false,
-          exercise_choice = someChoice,
-          exercise_choice_interface_id = Some(someInterfaceId),
+          exercise_choice = "choice",
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Array(1, 2, 3),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Set(someParty5),
+          exercise_actors = Set("party5"),
           exercise_last_descendant_node_id = 10,
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
           contract_id = hashCid("23"),
           internal_contract_id = Some(3),
-          template_id = someTemplateId,
-          package_id = somePackageId,
+          template_id = "template",
+          package_id = "package",
           ledger_effective_time = 13,
         )
         .toList should contain theSameElementsInOrderAs List(
@@ -477,7 +459,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -485,28 +467,28 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_type = PersistentEventType.NonConsumingExercise.asInt,
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           consuming = Some(false),
-          exercise_choice = Some(someChoice),
-          exercise_choice_interface_id = Some(someInterfaceId),
+          exercise_choice = Some("choice"),
+          exercise_choice_interface_id = Some("interface"),
           exercise_argument = Some(Array(1, 2, 3)),
           exercise_result = Some(Array(1, 2, 3, 4)),
-          exercise_actors = Some(Set(someParty5)),
+          exercise_actors = Some(Set("party5")),
           exercise_last_descendant_node_id = Some(10),
           exercise_argument_compression = Some(1),
           exercise_result_compression = Some(2),
           representative_package_id = None,
           contract_id = Some(hashCid("23")),
           internal_contract_id = Some(3),
-          template_id = Some(someTemplateId),
-          package_id = Some(somePackageId),
+          template_id = Some("template"),
+          package_id = Some("package"),
           ledger_effective_time = Some(13),
         ),
         DbDto.IdFilterVariousWitness(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty2,
+            template_id = "template",
+            party_id = "party2",
             first_per_sequential_id = true,
           )
         ),
@@ -522,24 +504,24 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
           external_transaction_hash = Some(someExternalTransactionHashBinary),
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           representative_package_id = someRepresentativePackageId,
           internal_contract_id = 3,
-        )(template_id = someTemplateId)
+        )(template_id = "template")
         .toList should contain theSameElementsInOrderAs List(
         DbDto.EventVariousWitnessed(
           event_offset = 1,
           update_id = updateIdByteArray,
           workflow_id = Some("w"),
           command_id = Some("c"),
-          submitters = Some(Set(someParty)),
+          submitters = Some(Set("party")),
           record_time = 2,
           synchronizer_id = someSynchronizerId,
           trace_context = serializableTraceContext,
@@ -547,7 +529,7 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
           event_type = PersistentEventType.WitnessedCreate.asInt,
           event_sequential_id = 3,
           node_id = 4,
-          additional_witnesses = Set(someParty2),
+          additional_witnesses = Set("party2"),
           consuming = None,
           exercise_choice = None,
           exercise_choice_interface_id = None,
@@ -567,242 +549,12 @@ class DbDtoSpec extends AnyWordSpec with Matchers {
         DbDto.IdFilterVariousWitness(
           IdFilter(
             event_sequential_id = 3,
-            template_id = someTemplateId,
-            party_id = someParty2,
+            template_id = "template",
+            party_id = "party2",
             first_per_sequential_id = true,
           )
         ),
       )
-    }
-  }
-
-  "DbDto.provideInternedStrings" should {
-    import StorageBackendTestValues.*
-
-    class TestBuilder extends StringInterningBuilder {
-      val templates: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addTemplateId(templateId: NameTypeConRef): Unit =
-        templates.addOne(templateId.toString)
-
-      val packages: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addPackageId(packageId: PackageId): Unit = packages.addOne(packageId)
-
-      val parties: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addParty(party: Party): Unit = parties.addOne(party)
-
-      val syncs: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addSynchronizerId(synchronizerId: SynchronizerId): Unit =
-        syncs.addOne(synchronizerId.toProtoPrimitive)
-
-      val users: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addUserId(userId: UserId): Unit = users.addOne(userId)
-
-      val ps: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addParticipantId(participantId: ParticipantId): Unit = ps.addOne(participantId)
-
-      val choices: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addChoiceName(choiceName: ChoiceName): Unit = choices.addOne(choiceName)
-
-      val interfaces: mutable.Builder[String, List[String]] = List.newBuilder[String]
-      override def addInterfaceId(interfaceId: Identifier): Unit =
-        interfaces.addOne(interfaceId.toString)
-    }
-
-    "provide correct strings for interning for create" in {
-      val testBuilder = new TestBuilder
-      dtosCreate()().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set(
-        "submitter1",
-        "submitter2",
-        "witness1",
-        "witness2",
-      )
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set("representativepackage")
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for assign" in {
-      val testBuilder = new TestBuilder
-      dtosAssign()().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("submitter1")
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set("representativepackage")
-      testBuilder.syncs.result().toSet shouldBe Set(
-        "x::sourcesynchronizer",
-        "x::targetsynchronizer",
-      )
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for consuming exercise" in {
-      val testBuilder = new TestBuilder
-      dtosConsumingExercise().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set(
-        "submitter1",
-        "submitter2",
-        "witness1",
-        "witness2",
-        "actor1",
-        "actor2",
-        "stakeholder1",
-        "stakeholder2",
-      )
-      testBuilder.templates.result().toSet shouldBe Set("#tem:pl:ate")
-      testBuilder.packages.result().toSet shouldBe Set("package")
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set("choice")
-      testBuilder.interfaces.result().toSet shouldBe Set("in:ter:face")
-    }
-
-    "provide correct strings for interning for unassign" in {
-      val testBuilder = new TestBuilder
-      dtosUnassign().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("submitter1", "stakeholder1", "stakeholder2")
-      testBuilder.templates.result().toSet shouldBe Set("#tem:pl:ate")
-      testBuilder.packages.result().toSet shouldBe Set("package")
-      testBuilder.syncs.result().toSet shouldBe Set(
-        "x::sourcesynchronizer",
-        "x::targetsynchronizer",
-      )
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for witnessed create" in {
-      val testBuilder = new TestBuilder
-      dtosWitnessedCreate()().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set(
-        "submitter1",
-        "submitter2",
-        "witness1",
-        "witness2",
-      )
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set("representativepackage")
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for witnessed exercised" in {
-      val testBuilder = new TestBuilder
-      dtosWitnessedExercised().headOption.value.provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set(
-        "submitter1",
-        "submitter2",
-        "witness1",
-        "witness2",
-        "actor1",
-        "actor2",
-      )
-      testBuilder.templates.result().toSet shouldBe Set("#tem:pl:ate")
-      testBuilder.packages.result().toSet shouldBe Set("package")
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set("choice")
-      testBuilder.interfaces.result().toSet shouldBe Set("in:ter:face")
-    }
-
-    "provide correct strings for interning for PTP" in {
-      val testBuilder = new TestBuilder
-      dtoPartyToParticipant(Offset.tryFromLong(1L), 10).provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("party")
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set("participant")
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for completion" in {
-      val testBuilder = new TestBuilder
-      dtoCompletion(Offset.tryFromLong(1L)).provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("signatory")
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set("user_id")
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for transaction meta" in {
-      val testBuilder = new TestBuilder
-      dtoTransactionMeta(Offset.tryFromLong(1L), 1, 1).provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set()
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for party entry" in {
-      val testBuilder = new TestBuilder
-      dtoPartyEntry(Offset.tryFromLong(1L)).provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("party")
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set()
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for sequencer index moved" in {
-      val testBuilder = new TestBuilder
-      DbDto.SequencerIndexMoved(someSynchronizerId).provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set()
-      testBuilder.templates.result().toSet shouldBe Set()
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set("x::sourcesynchronizer")
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
-    }
-
-    "provide correct strings for interning for sequencer IdFilter" in {
-      val testBuilder = new TestBuilder
-      DbDto
-        .IdFilterVariousWitness(
-          IdFilter(
-            1L,
-            someTemplateId,
-            someParty,
-            first_per_sequential_id = false,
-          )
-        )
-        .provideInternedStrings(testBuilder)
-      testBuilder.parties.result().toSet shouldBe Set("party")
-      testBuilder.templates.result().toSet shouldBe Set("#pkg-name:Mod:Template")
-      testBuilder.packages.result().toSet shouldBe Set()
-      testBuilder.syncs.result().toSet shouldBe Set()
-      testBuilder.users.result().toSet shouldBe Set()
-      testBuilder.ps.result().toSet shouldBe Set()
-      testBuilder.choices.result().toSet shouldBe Set()
-      testBuilder.interfaces.result().toSet shouldBe Set()
     }
   }
 }

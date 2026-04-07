@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
@@ -10,7 +10,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.FutureSimulator.RunningFuture
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.RunningFuture
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   ModuleName,
   P2PConnectionEventListener,
@@ -54,12 +54,10 @@ final case class InjectedSend[MessageT](
     from: EventOriginator,
     msg: MessageT,
 ) extends Command
-final case class RunFuture[FutureT](nodeId: BftNodeId, runningFuture: RunningFuture[FutureT])
-    extends Command
-final case class RunFutureContinuation[FutureT, MessageT](
-    nodeId: BftNodeId,
+final case class RunFuture[FutureT, MessageT](
+    node: BftNodeId,
     to: ModuleName,
-    resolvedValue: Try[FutureT],
+    toRun: RunningFuture[FutureT],
     fun: Try[FutureT] => Option[MessageT],
     traceContext: TraceContext,
 ) extends Command

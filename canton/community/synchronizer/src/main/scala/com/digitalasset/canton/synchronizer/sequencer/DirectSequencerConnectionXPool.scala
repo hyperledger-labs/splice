@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -6,9 +6,9 @@ package com.digitalasset.canton.synchronizer.sequencer
 import cats.data.EitherT
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config as cantonConfig
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
-import com.digitalasset.canton.health.HealthQuasiComponent
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.Endpoint
@@ -20,7 +20,6 @@ import com.digitalasset.canton.sequencing.SequencerConnectionXPool.{
   SequencerConnectionXPoolHealth,
 }
 import com.digitalasset.canton.sequencing.{SequencerConnectionX, SequencerConnectionXPool}
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
@@ -42,7 +41,7 @@ class DirectSequencerConnectionXPool(
     extends SequencerConnectionXPool {
   import DirectSequencerConnectionXPool.*
 
-  val directConnection = new DirectSequencerConnectionX(
+  private val directConnection = new DirectSequencerConnectionX(
     directConnectionDummyConfig,
     sequencer,
     mySynchronizerId,
@@ -76,10 +75,6 @@ class DirectSequencerConnectionXPool(
 
   override val health: SequencerConnectionXPoolHealth =
     new SequencerConnectionXPoolHealth.AlwaysHealthy("direct-pool-health", logger)
-
-  override def getConnectionsHealthStatus: Seq[HealthQuasiComponent] = Seq(
-    directConnection.health
-  )
 
   override def nbSequencers: NonNegativeInt = NonNegativeInt.one
 
@@ -121,8 +116,8 @@ object DirectSequencerConnectionXPool {
     connections = NonEmpty(Seq, directConnectionDummyConfig),
     trustThreshold = PositiveInt.one,
     // Not relevant for the direct pool
-    minRestartConnectionDelay = NonNegativeFiniteDuration.Zero,
-    maxRestartConnectionDelay = NonNegativeFiniteDuration.Zero,
-    warnConnectionValidationDelay = NonNegativeFiniteDuration.Zero,
+    minRestartConnectionDelay = cantonConfig.NonNegativeFiniteDuration.Zero,
+    maxRestartConnectionDelay = cantonConfig.NonNegativeFiniteDuration.Zero,
+    warnConnectionValidationDelay = cantonConfig.NonNegativeFiniteDuration.Zero,
   )
 }

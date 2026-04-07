@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.store
@@ -37,14 +37,6 @@ trait SequencerWriterStore extends AutoCloseable {
   ): FutureUnlessShutdown[Option[RegisteredMember]] =
     store.lookupMember(member)
 
-  /** Lookup several existing member ids for given members. Return [[scala.None]] if no id exists
-    * for a member
-    */
-  def lookupMembers(members: Seq[Member])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[Member, Option[RegisteredMember]]] =
-    store.lookupMembers(members)
-
   /** Save a series of payloads to the store. Is up to the caller to determine a reasonable batch
     * size and no batching is done within the store.
     */
@@ -62,9 +54,7 @@ trait SequencerWriterStore extends AutoCloseable {
   ): FutureUnlessShutdown[Unit] =
     store.saveEvents(instanceIndex, events)
 
-  def bufferEvents(events: NonEmpty[Seq[Sequenced[IdOrPayload]]])(implicit
-      traceContext: TraceContext
-  ): Unit =
+  def bufferEvents(events: NonEmpty[Seq[Sequenced[IdOrPayload]]]): Unit =
     store.bufferEvents(events)
 
   def bufferPayload(payload: BytesPayload)(implicit tc: TraceContext): Unit =

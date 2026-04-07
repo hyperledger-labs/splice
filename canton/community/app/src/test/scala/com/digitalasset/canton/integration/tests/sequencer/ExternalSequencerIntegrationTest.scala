@@ -1,19 +1,22 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   CantonConfig,
   CantonFeatures,
+  DbConfig,
   LoggingConfig,
   MonitoringConfig,
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
 }
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
@@ -23,6 +26,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
   UseExternalProcess,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -43,7 +47,7 @@ import monocle.macros.syntax.lens.*
 
 abstract class ExternalSequencerIntegrationTest(override val name: String)
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext
     with BasicSequencerTest
     with SequencerRestartTest {
@@ -82,7 +86,7 @@ abstract class ExternalSequencerIntegrationTest(override val name: String)
   ): Unit = {
     import env.*
     sequencerNamesList.foreach(external.kill(_))
-    sequencerNamesList.foreach(external.start(_))
+    sequencerNamesList.foreach(external.start)
     // wait for the sequencers to have fully restarted
     val sequencers = sequencerNamesList.map(rs)
     sequencers.foreach(_.health.wait_for_running())
@@ -111,7 +115,7 @@ abstract class ExternalSequencerIntegrationTest(override val name: String)
         import env.*
         val sequencers = sequencerNamesList.map(rs)
         logger.info(s"$name external sequencers are starting")
-        sequencerNamesList.foreach(external.start(_))
+        sequencerNamesList.foreach(external.start)
         sequencers.foreach(_.health.wait_for_running())
         logger.info(s"$name external sequencers are running")
       }
@@ -176,6 +180,13 @@ private[tests] final case class QuickSequencerReconnection(
         .focus(_.maxConnectionRetryDelay)
         .replace(NonNegativeFiniteDurationConfig.ofSeconds(1))
     )(config)
+}
+
+class ExternalReferenceSequencerIntegrationTest
+    extends ExternalSequencerIntegrationTest("reference") {
+
+  override protected lazy val sequencerPlugin: UseReferenceBlockSequencer[DbConfig.Postgres] =
+    new UseReferenceBlockSequencer[Postgres](loggerFactory)
 }
 
 class ExternalBftOrderingSequencerIntegrationTest

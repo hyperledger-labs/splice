@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -17,7 +17,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.ComponentHealthState
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.resource.DbStorage.DbAction.{All, ReadTransactional}
 import com.digitalasset.canton.resource.DbStorageMulti.passiveInstanceHealthState
@@ -26,12 +26,11 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureUnlessShutdownUtil
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import slick.jdbc.JdbcBackend.Database
-import slick.jdbc.SimpleJdbcAction
 import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, QueryCostTrackerImpl}
 
-import java.sql.{Connection, SQLTransientConnectionException}
+import java.sql.SQLTransientConnectionException
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.ExecutionContext
 
 /** DB Storage implementation that allows multiple processes to access the underlying database and
@@ -46,8 +45,8 @@ final class DbStorageMulti private (
     generalDb: Database,
     private[resource] val writeConnectionPool: DbLockedConnectionPool,
     val dbConfig: DbConfig,
-    onActive: TracedLogger => FutureUnlessShutdown[Unit],
-    onPassive: TracedLogger => FutureUnlessShutdown[Unit],
+    onActive: () => FutureUnlessShutdown[Unit],
+    onPassive: () => FutureUnlessShutdown[Option[CloseContext]],
     checkPeriod: PositiveFiniteDuration,
     clock: Clock,
     closeClock: Boolean,
@@ -56,7 +55,7 @@ final class DbStorageMulti private (
     override protected val timeouts: ProcessingTimeout,
     override val threadsAvailableForWriting: PositiveInt,
     override protected val loggerFactory: NamedLoggerFactory,
-    getSessionContext: () => CloseContext,
+    initialCloseContext: Option[CloseContext],
     writeDbExecutor: AsyncExecutor,
 )(override protected implicit val ec: ExecutionContext)
     extends DbStorage
@@ -66,6 +65,8 @@ final class DbStorageMulti private (
   protected val logOperations: Boolean = logQueryCost.exists(_.logOperations)
 
   private val active: AtomicBoolean = new AtomicBoolean(writeConnectionPool.isActive)
+
+  private val sessionCloseContext = new AtomicReference[Option[CloseContext]](initialCloseContext)
 
   override def initialHealthState: ComponentHealthState =
     if (active.get()) ComponentHealthState.Ok()
@@ -85,10 +86,11 @@ final class DbStorageMulti private (
           // We have a transition of the activeness
           val transitionReplicaState =
             if (connectionPoolActive)
-              onActive(logger)
+              onActive()
                 .thereafter(_ => reportHealthState(ComponentHealthState.Ok()))
             else
-              onPassive(logger)
+              onPassive()
+                .map(sessionCloseContext.set)
                 .thereafter(_ => reportHealthState(passiveInstanceHealthState))
 
           FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
@@ -138,27 +140,34 @@ final class DbStorageMulti private (
   )(
       f: => FutureUnlessShutdown[A]
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] = {
-    val sessionCC = getSessionContext()
-    val result =
-      if (sessionCC.context.isClosing) {
-        FutureUnlessShutdown.abortedDueToShutdown
-      } else {
-        CloseContext.withCombinedContext(closeContext, sessionCC, timeouts, logger) { cc =>
-          run(action, operationName, maxRetries) {
-            f
-          }(traceContext, cc)
+    val sessionContext = sessionCloseContext.get
+    sessionContext
+      .map { sessionCC =>
+        if (sessionCC.context.isClosing) {
+          FutureUnlessShutdown.abortedDueToShutdown
+        } else {
+          CloseContext.withCombinedContext(closeContext, sessionCC, timeouts, logger) { cc =>
+            run(action, operationName, maxRetries) {
+              f
+            }(traceContext, cc)
+          }
         }
       }
-    result.recover {
-      // If the session close context is closed, DB queries won't be retried but may end up bubbling up SQL errors that would
-      // normally be retried. Catch them here and replace them with a more appropriate AbortedDueToShutdown.
-      case e: SQLTransientConnectionException if sessionCC.context.isClosing =>
-        logger.debug(
-          "Caught a transient DB error while session close context is closing. Masking it with AbortedDueToShutdown",
-          e,
-        )
-        UnlessShutdown.AbortedDueToShutdown
-    }
+      .getOrElse {
+        run(action, operationName, maxRetries) {
+          f
+        }
+      }
+      .recover {
+        // If the session close context is closed, DB queries won't be retried but may end up bubbling up SQL errors that would
+        // normally be retried. Catch them here and replace them with a more appropriate AbortedDueToShutdown.
+        case e: SQLTransientConnectionException if sessionContext.exists(_.context.isClosing) =>
+          logger.debug(
+            "Caught a transient DB error while session close context is closing. Masking it with AbortedDueToShutdown",
+            e,
+          )
+          UnlessShutdown.AbortedDueToShutdown
+      }
   }
 
   override protected[canton] def runRead[A](
@@ -194,15 +203,8 @@ final class DbStorageMulti private (
   ): EitherT[FutureUnlessShutdown, String, Unit] =
     writeConnectionPool.setPassive()
 
-  override def runJdbcWrite[T](
-      traceContext: TraceContext,
-      body: Connection => T,
-  ): FutureUnlessShutdown[T] =
-    runIfSessionIsOpen("writing", "runGenericJdbcWrite", 0)(
-      FutureUnlessShutdown.outcomeF(
-        writeDb.run(SimpleJdbcAction(c => body(c.connection)))
-      )
-    )(traceContext, closeContext)
+  def setSessionCloseContext(sessionContext: Option[CloseContext]): Unit =
+    sessionCloseContext.set(sessionContext)
 }
 
 object DbStorageMulti {
@@ -224,9 +226,8 @@ object DbStorageMulti {
       writePoolSize: PositiveInt,
       mainLockCounter: DbLockCounter,
       poolLockCounter: DbLockCounter,
-      onActive: TracedLogger => FutureUnlessShutdown[Unit],
-      onPassive: TracedLogger => FutureUnlessShutdown[Unit],
-      mustStayActive: Boolean,
+      onActive: () => FutureUnlessShutdown[Unit],
+      onPassive: () => FutureUnlessShutdown[Option[CloseContext]],
       metrics: DbStorageMetrics,
       logQueryCost: Option[QueryCostMonitoringConfig],
       customClock: Option[Clock],
@@ -235,7 +236,7 @@ object DbStorageMulti {
       exitOnFatalFailures: Boolean,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      getSessionContext: () => CloseContext,
+      initialCloseContext: Option[CloseContext] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -246,9 +247,7 @@ object DbStorageMulti {
     // By default, ensure that storage runs with wallclock for its health checks
     val clock: Clock = customClock.getOrElse(new WallClock(timeouts, loggerFactory))
 
-    logger.info(
-      s"Creating storage, num-reads: $readPoolSize, num-writes: $writePoolSize, must-stay-active: $mustStayActive"
-    )
+    logger.info(s"Creating storage, num-reads: $readPoolSize, num-writes: $writePoolSize")
     for {
       generalDb <- DbStorage
         .createDatabase(
@@ -298,7 +297,6 @@ object DbStorageMulti {
           futureSupervisor,
           loggerFactory,
           writeExecutor,
-          mustStayActive,
         )
         .leftMap(err => s"Failed to create write connection pool: $err")
         .toEitherT[UnlessShutdown]
@@ -318,7 +316,7 @@ object DbStorageMulti {
         timeouts,
         writePoolSize,
         loggerFactory,
-        getSessionContext,
+        initialCloseContext,
         writeExecutor,
       )
     } yield sharedStorage

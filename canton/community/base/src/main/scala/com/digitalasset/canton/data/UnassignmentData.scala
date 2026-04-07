@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -27,8 +27,8 @@ final case class UnassignmentData(
     submitterMetadata: ReassignmentSubmitterMetadata,
     contractsBatch: ContractsReassignmentBatch,
     reassigningParticipants: Set[ParticipantId],
-    sourcePsid: Source[PhysicalSynchronizerId],
-    targetPsid: Target[PhysicalSynchronizerId],
+    sourcePSId: Source[PhysicalSynchronizerId],
+    targetPSId: Target[PhysicalSynchronizerId],
     targetTimestamp: Target[CantonTimestamp],
     // Data unknown by the submitter
     unassignmentTs: CantonTimestamp,
@@ -37,11 +37,11 @@ final case class UnassignmentData(
 
   override val representativeProtocolVersion: RepresentativeProtocolVersion[
     UnassignmentData.type
-  ] = UnassignmentData.protocolVersionRepresentativeFor(sourcePsid.unwrap.protocolVersion)
+  ] = UnassignmentData.protocolVersionRepresentativeFor(sourcePSId.unwrap.protocolVersion)
 
   lazy val reassignmentId: ReassignmentId = ReassignmentId(
-    sourcePsid.map(_.logical),
-    targetPsid.map(_.logical),
+    sourcePSId.map(_.logical),
+    targetPSId.map(_.logical),
     unassignmentTs,
     contractsBatch.contractIdCounters,
   )
@@ -57,8 +57,8 @@ final case class UnassignmentData(
       )
     },
     reassigningParticipantUids = reassigningParticipants.map(_.uid.toProtoPrimitive).toSeq,
-    sourcePhysicalSynchronizerId = sourcePsid.unwrap.toProtoPrimitive,
-    targetPhysicalSynchronizerId = targetPsid.unwrap.toProtoPrimitive,
+    sourcePhysicalSynchronizerId = sourcePSId.unwrap.toProtoPrimitive,
+    targetPhysicalSynchronizerId = targetPSId.unwrap.toProtoPrimitive,
     targetTimestamp = targetTimestamp.unwrap.toProtoTimestamp.some,
     unassignmentTs = unassignmentTs.toProtoTimestamp.some,
   )
@@ -69,7 +69,7 @@ object UnassignmentData
     with ProtocolVersionedCompanionDbHelpers[UnassignmentData] {
 
   override def name: String = "UnassignmentData"
-  override val versioningTable: VersioningTable = VersioningTable(
+  override def versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec
       .storage(ReleaseProtocolVersion(ProtocolVersion.v34), v30.UnassignmentData)(
         supportedProtoVersion(_)(fromProtoV30),
@@ -84,8 +84,8 @@ object UnassignmentData
     submitterMetadata = unassignmentRequest.submitterMetadata,
     contractsBatch = unassignmentRequest.contracts,
     reassigningParticipants = unassignmentRequest.reassigningParticipants,
-    sourcePsid = unassignmentRequest.sourceSynchronizer,
-    targetPsid = unassignmentRequest.targetSynchronizer,
+    sourcePSId = unassignmentRequest.sourceSynchronizer,
+    targetPSId = unassignmentRequest.targetSynchronizer,
     unassignmentTs = unassignmentTs,
     targetTimestamp = unassignmentRequest.targetTimestamp,
   )
@@ -103,14 +103,7 @@ object UnassignmentData
           ContractInstance
             .decodeWithCreatedAt(contractP)
             .leftMap(err => ContractDeserializationError(err))
-            .map(c =>
-              (
-                c,
-                Source(c.templateId.packageId),
-                Target(c.templateId.packageId),
-                ReassignmentCounter(reassignmentCounterP),
-              )
-            )
+            .map(_ -> ReassignmentCounter(reassignmentCounterP))
       }
       .flatMap(
         ContractsReassignmentBatch
@@ -154,8 +147,8 @@ object UnassignmentData
     submitterMetadata = submitterMetadata,
     contractsBatch = contracts,
     reassigningParticipants = reassigningParticipants.toSet,
-    sourcePsid = sourceSynchronizer,
-    targetPsid = targetSynchronizer,
+    sourcePSId = sourceSynchronizer,
+    targetPSId = targetSynchronizer,
     targetTimestamp = targetTimestamp,
     unassignmentTs = unassignmentTs,
   )

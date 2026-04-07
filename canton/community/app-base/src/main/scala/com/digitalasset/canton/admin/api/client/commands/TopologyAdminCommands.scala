@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -436,18 +436,19 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class ListLsuAnnouncement(
+    final case class ListSynchronizerUpgradeAnnouncement(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListLsuAnnouncementRequest,
-          v30.ListLsuAnnouncementResponse,
-          Seq[ListLsuAnnouncementResult],
+          v30.ListSynchronizerUpgradeAnnouncementRequest,
+          v30.ListSynchronizerUpgradeAnnouncementResponse,
+          Seq[ListSynchronizerUpgradeAnnouncementResult],
         ] {
 
-      override protected def createRequest(): Either[String, v30.ListLsuAnnouncementRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListSynchronizerUpgradeAnnouncementRequest] =
         Right(
-          new ListLsuAnnouncementRequest(
+          new ListSynchronizerUpgradeAnnouncementRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -455,49 +456,47 @@ object TopologyAdminCommands {
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListLsuAnnouncementRequest,
-      ): Future[v30.ListLsuAnnouncementResponse] =
-        service.listLsuAnnouncement(request)
+          request: v30.ListSynchronizerUpgradeAnnouncementRequest,
+      ): Future[v30.ListSynchronizerUpgradeAnnouncementResponse] =
+        service.listSynchronizerUpgradeAnnouncement(request)
 
       override protected def handleResponse(
-          response: v30.ListLsuAnnouncementResponse
-      ): Either[String, Seq[ListLsuAnnouncementResult]] =
+          response: v30.ListSynchronizerUpgradeAnnouncementResponse
+      ): Either[String, Seq[ListSynchronizerUpgradeAnnouncementResult]] =
         response.results
-          .traverse(ListLsuAnnouncementResult.fromProtoV30)
+          .traverse(ListSynchronizerUpgradeAnnouncementResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
-    final case class ListLsuSequencerConnectionSuccessor(
+    final case class ListSequencerConnectionSuccessor(
         query: BaseQuery,
         filterSequencerId: String,
-        filterSuccessorPhysicalSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListLsuSequencerConnectionSuccessorRequest,
-          v30.ListLsuSequencerConnectionSuccessorResponse,
-          Seq[ListLsuSequencerConnectionSuccessorResult],
+          v30.ListSequencerConnectionSuccessorRequest,
+          v30.ListSequencerConnectionSuccessorResponse,
+          Seq[ListSequencerConnectionSuccessorResult],
         ] {
 
       override protected def createRequest()
-          : Either[String, v30.ListLsuSequencerConnectionSuccessorRequest] =
+          : Either[String, v30.ListSequencerConnectionSuccessorRequest] =
         Right(
-          new ListLsuSequencerConnectionSuccessorRequest(
+          new ListSequencerConnectionSuccessorRequest(
             baseQuery = Some(query.toProtoV1),
             filterSequencerId = filterSequencerId,
-            filterSuccessorPhysicalSynchronizerId = filterSuccessorPhysicalSynchronizerId,
           )
         )
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListLsuSequencerConnectionSuccessorRequest,
-      ): Future[v30.ListLsuSequencerConnectionSuccessorResponse] =
-        service.listLsuSequencerConnectionSuccessor(request)
+          request: v30.ListSequencerConnectionSuccessorRequest,
+      ): Future[v30.ListSequencerConnectionSuccessorResponse] =
+        service.listSequencerConnectionSuccessor(request)
 
       override protected def handleResponse(
-          response: v30.ListLsuSequencerConnectionSuccessorResponse
-      ): Either[String, Seq[ListLsuSequencerConnectionSuccessorResult]] =
+          response: v30.ListSequencerConnectionSuccessorResponse
+      ): Either[String, Seq[ListSequencerConnectionSuccessorResult]] =
         response.results
-          .traverse(ListLsuSequencerConnectionSuccessorResult.fromProtoV30)
+          .traverse(ListSequencerConnectionSuccessorResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -660,24 +659,24 @@ object TopologyAdminCommands {
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
-    final case class SequencerLsuState(
-        store: Option[TopologyStoreId],
-        ts: Option[CantonTimestamp],
-        observer: StreamObserver[SequencerLsuStateResponse],
+    final case class LogicalUpgradeState(
+        observer: StreamObserver[LogicalUpgradeStateResponse]
     ) extends BaseCommand[
-          v30.SequencerLsuStateRequest,
+          v30.LogicalUpgradeStateRequest,
           CancellableContext,
           CancellableContext,
         ] {
-      override protected def createRequest(): Either[String, v30.SequencerLsuStateRequest] =
-        Right(v30.SequencerLsuStateRequest(store.map(_.toProtoV30), ts.map(_.toProtoTimestamp)))
+      override protected def createRequest(): Either[String, v30.LogicalUpgradeStateRequest] =
+        Right(
+          v30.LogicalUpgradeStateRequest()
+        )
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.SequencerLsuStateRequest,
+          request: v30.LogicalUpgradeStateRequest,
       ): Future[CancellableContext] = {
         val context = Context.current().withCancellation()
-        context.run(() => service.sequencerLsuState(request, observer))
+        context.run(() => service.logicalUpgradeState(request, observer))
         Future.successful(context)
       }
 

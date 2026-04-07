@@ -132,7 +132,6 @@ class UpdateIngestionService(
   /** Note that any in-flight events being processed when `pause` is called will still be processed.
     */
   @VisibleForTesting
-  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   def pause(): Future[Unit] = blocking {
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Pausing UpdateIngestionService.")
@@ -148,7 +147,6 @@ class UpdateIngestionService(
   }
 
   @VisibleForTesting
-  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   def resume(): Unit = blocking {
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Resuming UpdateIngestionService.")

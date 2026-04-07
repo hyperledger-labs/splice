@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -13,17 +13,15 @@ import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.{
   TypeSig,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import sttp.tapir.path
 
 import scala.annotation.unused
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 class JsDamlDefinitionsService(
     damlDefinitionsView: DamlDefinitionsView,
-    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
-)(implicit val authInterceptor: AuthInterceptor, val executionContext: ExecutionContext)
+)(implicit val authInterceptor: AuthInterceptor)
     extends Endpoints {
   import JsDamlDefinitionsService.*
   private val packageSignatureSelectorPath = "package-signature"

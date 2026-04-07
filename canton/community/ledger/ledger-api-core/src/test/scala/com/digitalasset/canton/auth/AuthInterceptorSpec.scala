@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.auth
 
 import com.daml.tracing.NoOpTelemetry
-import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import io.grpc.MethodDescriptor.Marshaller
@@ -69,7 +68,6 @@ class AuthInterceptorSpec
     val promise = Promise[Unit]()
     // Using a promise to ensure the verify call below happens after the expected call to `serverCall.close`
     when(serverCall.getMethodDescriptor).thenReturn(methodDescriptor)
-    when(serverCall.getAttributes).thenCallRealMethod();
     when(serverCall.close(any[Status], any[Metadata])).thenAnswer {
       promise.success(())
       ()
@@ -92,7 +90,6 @@ class AuthInterceptorSpec
       authInterceptor,
       NoOpTelemetry,
       loggerFactory,
-      ApiLoggingConfig(),
       executionContext,
     ).interceptCall[Nothing, Nothing](serverCall, new Metadata(), null)
 

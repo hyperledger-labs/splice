@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{DynamicSynchronizerParametersWithValidity, RequestId}
 import com.digitalasset.canton.synchronizer.mediator.store.MediatorState
-import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherUtil.RichEither
@@ -51,7 +50,6 @@ private[mediator] object MediatorEventDeduplicator {
       verdictSender: VerdictSender,
       topologyClient: SynchronizerTopologyClient,
       protocolVersion: ProtocolVersion,
-      metrics: MediatorMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): MediatorEventDeduplicator = {
 
@@ -86,7 +84,6 @@ private[mediator] object MediatorEventDeduplicator {
       getDeduplicationTimeout,
       getDecisionTime,
       protocolVersion,
-      metrics,
       loggerFactory,
     )
   }
@@ -98,7 +95,6 @@ class DefaultMediatorEventDeduplicator(
     getDeduplicationTimeout: Traced[CantonTimestamp] => FutureUnlessShutdown[Duration],
     getDecisionTime: Traced[CantonTimestamp] => FutureUnlessShutdown[CantonTimestamp],
     protocolVersion: ProtocolVersion,
-    metrics: MediatorMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends MediatorEventDeduplicator
@@ -150,13 +146,10 @@ class DefaultMediatorEventDeduplicator(
       traceContext: TraceContext,
       closeContext: CloseContext,
   ): FutureUnlessShutdown[FutureUnlessShutdown[Unit]] = {
-    val rejection = MediatorError.DuplicateConfirmationRequest.Reject(
-      request.requestUuid,
-      expireAfter,
+    val rejection = MediatorError.MalformedMessage.Reject(
+      s"The request uuid (${request.requestUuid}) must not be used until $expireAfter."
     )
     rejection.report()
-    // Mark the request in the metric because we spend time on processing and send a verdict.
-    metrics.requests.mark()(MediatorMetrics.duplicateRejectContext)
 
     val requestId = RequestId(requestTimestamp)
     val verdict = MediatorVerdict.MediatorReject(rejection).toVerdict(protocolVersion)

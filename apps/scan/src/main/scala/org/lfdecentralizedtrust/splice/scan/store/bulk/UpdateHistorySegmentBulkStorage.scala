@@ -56,14 +56,9 @@ class UpdateHistorySegmentBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  case class UpdatesChunk(
-      updateBytes: ByteString,
-      numUpdates: Int,
-  )
-
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
-  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, UpdatesChunk)]] = {
+  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, ByteString)]] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
@@ -93,7 +88,7 @@ class UpdateHistorySegmentBulkStorage(
               Some(
                 (
                   TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
-                  UpdatesChunk(updatesBytes, updatesInSegment.length),
+                  updatesBytes,
                 )
               )
             )
@@ -113,7 +108,7 @@ class UpdateHistorySegmentBulkStorage(
             appConfig.updatesPollingInterval.underlying,
             actorSystem.scheduler,
           ) {
-            Future.successful(Some((afterTs, UpdatesChunk(ByteString.empty, 0))))
+            Future.successful(Some((afterTs, ByteString.empty)))
           }
         }
     } yield {
@@ -147,10 +142,6 @@ class UpdateHistorySegmentBulkStorage(
   ): Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
-      .map(chunk => {
-        historyMetrics.BulkStorage.incUpdatesCount(chunk.numUpdates)
-        chunk.updateBytes
-      })
       .via(
         // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
         // since it assumes that it gets at least one chunk to write.

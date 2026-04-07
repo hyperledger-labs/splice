@@ -1,20 +1,17 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
 
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{CacheConfig, CachingConfigs}
+import com.digitalasset.canton.config.CachingConfigs
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
 import com.digitalasset.canton.crypto.SigningKeyUsage.compatibleUsageForSignAndVerify
 import com.digitalasset.canton.crypto.provider.jce.{JceJavaKeyConverter, JceSecurityProvider}
 import com.digitalasset.canton.util.{EitherUtil, ErrorUtil}
-import com.github.blemale.scaffeine.Cache
 import com.google.common.annotations.VisibleForTesting
-import com.google.protobuf.ByteString
-import org.bouncycastle.jcajce.provider.asymmetric.edec.{BCEdDSAPrivateKey, BCEdDSAPublicKey}
-import org.bouncycastle.math.ec.custom.sec.{SecP256K1Curve, SecP256R1Curve, SecP384R1Curve}
+import com.google.crypto.tink.internal.EllipticCurvesUtil
 import org.bouncycastle.math.ec.rfc8032.Ed25519.{SECRET_KEY_SIZE, validatePublicKeyFull}
 
 import java.math.BigInteger
@@ -33,30 +30,29 @@ import java.security.{
   PublicKey as JPublicKey,
 }
 import scala.annotation.nowarn
+import scala.collection.concurrent.TrieMap
+import scala.concurrent.blocking
 
 object CryptoKeyValidation {
 
-  private val cacheConfig = CacheConfig(
-    maximumSize = CachingConfigs.defaultPublicKeyConversionCache.maximumSize
-  )
-
   // Keeps track of the public keys that have been validated.
-  private lazy val validatedPublicKeys: Cache[Fingerprint, Either[KeyParseAndValidateError, Unit]] =
-    cacheConfig
-      .buildScaffeineWithoutExecutor()
-      .build[Fingerprint, Either[KeyParseAndValidateError, Unit]]()
+  private lazy val validatedPublicKeys
+      : TrieMap[Fingerprint, Either[KeyParseAndValidateError, Unit]] =
+    TrieMap.empty
 
   private lazy val validatedPrivateKeys
-      : Cache[Fingerprint, Either[KeyParseAndValidateError, Unit]] =
-    cacheConfig
-      .buildScaffeineWithoutExecutor()
-      .build[Fingerprint, Either[KeyParseAndValidateError, Unit]]()
+      : TrieMap[Fingerprint, Either[KeyParseAndValidateError, Unit]] =
+    TrieMap.empty
 
   @VisibleForTesting
   def clearValidationCaches(): Unit = {
-    validatedPublicKeys.invalidateAll()
-    validatedPrivateKeys.invalidateAll()
+    validatedPublicKeys.clear()
+    validatedPrivateKeys.clear()
   }
+
+  // To prevent concurrent cache cleanups
+  private val cachePrivateLock = new Object
+  private val cachePublicLock = new Object
 
   /** Validates a symmetric key by checking:
     *   - Symmetric key format
@@ -111,18 +107,11 @@ object CryptoKeyValidation {
     * the key is encoded using the DER-encoded PKCS#8 structure.
     */
   private def validateEd25519PrivateKey(
-      privateKey: JPrivateKey
+      privateKey: PrivateKey
   ): Either[KeyParseAndValidateError, Unit] =
     for {
-      edPrivateKey <- privateKey match {
-        case k: BCEdDSAPrivateKey => Right(k)
-        case _ =>
-          Left(KeyParseAndValidateError(s"Private key is not an ED25519 private key"))
-      }
       // Extract raw 32-byte Ed25519 private key from PKCS #8 PKI
-      rawPrivateKey <- CryptoKeyFormat.extractPrivateKeyFromPkcs8Pki(
-        ByteString.copyFrom(edPrivateKey.getEncoded)
-      )
+      rawPrivateKey <- CryptoKeyFormat.extractPrivateKeyFromPkcs8Pki(privateKey.key)
       _ <- EitherUtil.condUnit(
         rawPrivateKey.length == SECRET_KEY_SIZE,
         KeyParseAndValidateError(
@@ -137,18 +126,11 @@ object CryptoKeyValidation {
     * SubjectPublicKeyInfo (SPKI) format.
     */
   private def validateEd25519PublicKey(
-      pubKey: JPublicKey
+      pubKey: PublicKey
   ): Either[KeyParseAndValidateError, Unit] =
     for {
-      edPublicKey <- pubKey match {
-        case k: BCEdDSAPublicKey => Right(k)
-        case _ =>
-          Left(KeyParseAndValidateError(s"Public key is not an ED25519 public key"))
-      }
       // Extract raw 32-byte Ed25519 public key from DER-encoded SPKI
-      rawKeyBytes <- CryptoKeyFormat.extractPublicKeyFromX509Spki(
-        ByteString.copyFrom(edPublicKey.getEncoded)
-      )
+      rawKeyBytes <- CryptoKeyFormat.extractPublicKeyFromX509Spki(pubKey.key)
       _ <- Either
         .catchOnly[GeneralSecurityException] {
           validatePublicKeyFull(rawKeyBytes, 0)
@@ -219,7 +201,8 @@ object CryptoKeyValidation {
       )
     } yield ()
 
-  /** Validates the public key by ensuring that the EC public key point lies on the correct curve.
+  /** Validates the public key by ensuring that the EC public key point lies on the correct curve,
+    * using Tink `checkPointOnCurve` primitive.
     */
   private def validateEcPublicKey(
       pubKey: JPublicKey,
@@ -231,35 +214,24 @@ object CryptoKeyValidation {
         case _ =>
           Left(KeyParseAndValidateError(s"Public key is not an EC public key"))
       }
+      point = ecPublicKey.getW
 
-      x = ecPublicKey.getW.getAffineX
-      y = ecPublicKey.getW.getAffineY
-
-      curve <- ecKeySpec match {
-        case EncryptionKeySpec.EcP256 | SigningKeySpec.EcP256 =>
-          Right(new SecP256R1Curve())
-        case SigningKeySpec.EcSecp256k1 =>
-          Right(new SecP256K1Curve())
-        case SigningKeySpec.EcP384 =>
-          Right(new SecP384R1Curve())
-        case other =>
-          Left(KeyParseAndValidateError(s"Unsupported elliptic curve key spec: $other"))
-      }
+      paramSpec = new ECGenParameterSpec(ecKeySpec.jcaCurveName)
+      params = AlgorithmParameters.getInstance("EC", JceSecurityProvider.bouncyCastleProvider)
+      _ = params.init(paramSpec)
+      ecSpec = params.getParameterSpec(classOf[ECParameterSpec])
+      curve = ecSpec.getCurve
 
       // Ensures the point lies on the elliptic curve defined by the given parameters.
-      point <- Either
-        .catchOnly[GeneralSecurityException](curve.createPoint(x, y))
+      _ <- Either
+        .catchOnly[GeneralSecurityException](
+          EllipticCurvesUtil.checkPointOnCurve(point, curve)
+        )
         .leftMap(err =>
           KeyParseAndValidateError(
-            s"Failed to create point on curve '${ecKeySpec.jcaCurveName}': ${ErrorUtil.messageWithStacktrace(err)}"
+            s"EC key not in curve $curve: ${ErrorUtil.messageWithStacktrace(err)}"
           )
         )
-      _ <- EitherUtil.condUnit(
-        point.isValid && !point.isInfinity,
-        KeyParseAndValidateError(
-          s"EC key not in curve '${ecKeySpec.jcaCurveName}'."
-        ),
-      )
     } yield ()
 
   private def checkRsaModulus(modulus: BigInteger) =
@@ -355,7 +327,7 @@ object CryptoKeyValidation {
               }
             case signKey: SigningPrivateKey =>
               signKey.keySpec match {
-                case SigningKeySpec.EcCurve25519 => validateEd25519PrivateKey(jKey)
+                case SigningKeySpec.EcCurve25519 => validateEd25519PrivateKey(privateKey)
                 case ks: EcKeySpec => validateEcPrivateKey(jKey, ks)
               }
             case _ => Left(KeyParseAndValidateError("Unknown key type"))
@@ -367,9 +339,19 @@ object CryptoKeyValidation {
         Left(KeyParseAndValidateError(s"Invalid format for private key: $format"))
     }
 
+    // Temporary workaround to clear this TrieMap and prevent memory leaks.
+    blocking {
+      cachePrivateLock.synchronized {
+        if (
+          validatedPrivateKeys.size > CachingConfigs.defaultPublicKeyConversionCache.maximumSize.value
+        ) {
+          validatedPrivateKeys.clear()
+        }
+      }
+    }
     // If the result is already in the cache it means the key has already been validated.
     (if (cacheValidation)
-       validatedPrivateKeys.get(privateKey.id, _ => parseRes)
+       validatedPrivateKeys.getOrElseUpdate(privateKey.id, parseRes)
      else parseRes).leftMap(err =>
       errFn(s"Failed to deserialize or validate ${privateKey.format} private key: $err")
     )
@@ -401,7 +383,7 @@ object CryptoKeyValidation {
               }
             case signKey: SigningPublicKey =>
               signKey.keySpec match {
-                case SigningKeySpec.EcCurve25519 => validateEd25519PublicKey(jKey)
+                case SigningKeySpec.EcCurve25519 => validateEd25519PublicKey(publicKey)
                 case ks: EcKeySpec => validateEcPublicKey(jKey, ks)
               }
             case _ => Left(KeyParseAndValidateError("Unknown key type"))
@@ -413,9 +395,19 @@ object CryptoKeyValidation {
         Left(KeyParseAndValidateError(s"Invalid format for public key: $format"))
     }
 
+    // Temporary workaround to clear this TrieMap and prevent memory leaks.
+    blocking {
+      cachePublicLock.synchronized {
+        if (
+          validatedPublicKeys.size > CachingConfigs.defaultPublicKeyConversionCache.maximumSize.value
+        ) {
+          validatedPublicKeys.clear()
+        }
+      }
+    }
     // If the result is already in the cache it means the key has already been validated.
     (if (cacheValidation)
-       validatedPublicKeys.get(publicKey.id, _ => parseRes)
+       validatedPublicKeys.getOrElseUpdate(publicKey.id, parseRes)
      else parseRes).leftMap(err =>
       errFn(s"Failed to deserialize or validate ${publicKey.format} public key: $err")
     )

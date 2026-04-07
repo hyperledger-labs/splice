@@ -305,7 +305,6 @@ declare -A subcommand_whitelist
 source "${TOOLS_LIB}/pulumi-helpers"
 source "${TOOLS_LIB}/pulumi-commands"
 source "${TOOLS_LIB}/hard-domain-migration-commands"
-source "${TOOLS_LIB}/logical-synchronizer-upgrade-commands"
 source "${TOOLS_LIB}/disaster-recovery-commands"
 
 function _prompt_to_confirm() {
@@ -1352,6 +1351,7 @@ function subcmd_wait() {
 
     namespace="${1-}"
     app="${2-}"
+    migration_id=${3:-0}
 
     if [ -z "$namespace" ]; then
         _log "Waiting for all pods to become ready"
@@ -1363,8 +1363,8 @@ function subcmd_wait() {
             _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=3s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
-            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app"
-            _log "Pod for app $app ready in namespace $namespace"
+            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app,migration=$migration_id"
+            _log "Pod for app $app ready in namespace $namespace for migration id $migration_id"
         fi
     fi
 }

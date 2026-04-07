@@ -1,15 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
 
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
   UsePostgres,
   UseReferenceBlockSequencer,
 }
-import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -21,7 +21,7 @@ import com.digitalasset.canton.protocol.TestSynchronizerParameters
 
 import scala.concurrent.Future
 
-trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
+trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment[CantonConfig, CantonEnvironment] {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
@@ -51,10 +51,7 @@ trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with Share
     val responseTimeout = confirmationResponseTimeout
     val prunedBeforeDuration = defaultRetention.asJava.plus(responseTimeout.unwrap)
 
-    val simClock = environment.simClock.value
-    simClock.advance(prunedBeforeDuration)
-    // The BFT sequencer doesn't advance record time until the next block
-    waitForTargetTimeOnSequencer(sequencer1, simClock.now, logger)
+    environment.simClock.value.advance(prunedBeforeDuration)
 
     // do something to kick everything to working at this advanced time
     participant1.health.ping(participant2)
@@ -81,7 +78,7 @@ trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with Share
   }
 
   private def countFinalizedResponses()(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Future[Long] = {
     val daMediatorStateInspection =
       env.mediator1.underlying

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -13,7 +13,6 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyMapping,
 }
-import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -24,8 +23,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 abstract class TopologyTransactionHandlingBase
     extends AsyncWordSpec
     with BaseTest
-    with HasExecutionContext
-    with HasTestCloseContext {
+    with HasExecutionContext {
 
   protected val crypto = new SymbolicPureCrypto()
   object Factory extends TopologyTransactionTestFactory(loggerFactory, parallelExecutionContext)

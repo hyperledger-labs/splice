@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -6,7 +6,7 @@ package com.digitalasset.canton.console
 import cats.data.{EitherT, OptionT}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.{ErrorUtil, Mutex}
+import com.digitalasset.canton.util.ErrorUtil
 import org.scalactic.source
 import org.scalatest.Assertion
 import org.scalatest.Inspectors.*
@@ -14,6 +14,7 @@ import org.scalatest.matchers.should.Matchers.*
 
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{Future, TimeUnit}
+import scala.concurrent.blocking
 import scala.jdk.CollectionConverters.*
 
 /** Implementation of [[com.digitalasset.canton.console.ConsoleOutput]] for test purposes. By
@@ -25,7 +26,6 @@ class TestConsoleOutput(override val loggerFactory: NamedLoggerFactory)
     with NamedLogging
     with NoTracing {
 
-  private val lock = new Mutex()
   private val messageQueue: java.util.concurrent.BlockingQueue[String] =
     new java.util.concurrent.LinkedBlockingQueue[String]()
 
@@ -64,7 +64,7 @@ class TestConsoleOutput(override val loggerFactory: NamedLoggerFactory)
       pos: source.Position
   ): T = {
     // We need to prevent nested usage, because we are clearing messageQueue.
-    (lock.exclusive {
+    blocking(this.synchronized {
       require(!recording.get(), "Nested use of Unable to record console output messages.")
       recording.set(true)
     })

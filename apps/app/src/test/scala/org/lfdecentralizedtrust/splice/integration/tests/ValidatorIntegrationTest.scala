@@ -63,9 +63,11 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
           .focus(_.svApps)
           .modify(_.updatedWith(InstanceName.tryCreate("sv4")) {
             _.map(
-              _.focus(_.localSynchronizerNodes.current).modify(
-                _.focus(_.sequencer.externalPublicApiUrl)
-                  .replace("http://example.com")
+              _.focus(_.localSynchronizerNode).modify(
+                _.map(
+                  _.focus(_.sequencer.externalPublicApiUrl)
+                    .replace("http://example.com")
+                )
               )
             )
           })
@@ -162,9 +164,9 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       sequencerConnections.connections.size shouldBe 4 withClue "sequencerConnections count"
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
-      sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
+      sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
-        ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience.toInternal,
+        ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
       )
     }
   }

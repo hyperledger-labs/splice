@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -57,7 +57,7 @@ message Enums {
     reserved 16; // was TrafficControlState
     TOPOLOGY_MAPPING_CODE_SEQUENCING_DYNAMIC_PARAMETERS_STATE = 17;
     TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING = 18;
-    TOPOLOGY_MAPPING_CODE_LSU_ANNOUNCEMENT = 19;
+    TOPOLOGY_MAPPING_CODE_SYNCHRONIZER_MIGRATION_ANNOUNCEMENT = 19;
     TOPOLOGY_MAPPING_CODE_SEQUENCER_CONNECTION_SUCCESSOR = 20;
   }
 
@@ -66,8 +66,6 @@ message Enums {
     // UNUSED in PV >= 34 - Was meant to tactically fix a bug in the external signing hash computation
     // in model conformance in PV 33
     PARTICIPANT_FEATURE_FLAG_PV33_EXTERNAL_SIGNING_LOCAL_CONTRACT_IN_SUBVIEW = 1;
-    // This flag indicates that the participant supports reassignments between synchronizers.
-    PARTICIPANT_FEATURE_FLAG_ENABLE_UNSAFE_MULTI_SYNCHRONIZER = 2;
   }
 }
 
@@ -368,7 +366,7 @@ message SequencerSynchronizerState {
 // removing this mapping unfreezes the topology state again.
 // authorization: whoever controls the synchronizer
 // UNIQUE(successor_physical_synchronizer_id.logical)
-message LsuAnnouncement {
+message SynchronizerUpgradeAnnouncement {
   // the physical synchronizer id of the successor synchronizer
   string successor_physical_synchronizer_id = 1;
   // when the upgrade happens
@@ -377,20 +375,26 @@ message LsuAnnouncement {
 
 // a sequencer can announce its connections on the successor synchronizer
 // authorization: whoever controls the sequencer
-// UNIQUE(sequencer_id, successor_physical_synchronizer_id.logical)
-message LsuSequencerConnectionSuccessor {
+// UNIQUE(sequencer_id, synchronizer_id)
+message SequencerConnectionSuccessor {
   // the sequencer id
   string sequencer_id = 1;
-  // the physical synchronizer id of the successor synchronizer
-  string successor_physical_synchronizer_id = 2;
+  // to synchronizer id
+  string synchronizer_id = 2;
   // the connection details with which members can connect to the sequencer on the successor synchronizer
   SequencerConnection connection = 3;
 
   message SequencerConnection {
-    // connection information to sequencer (http[s]://<host>:<port>")
-    // all endpoints must agree on using HTTPS or HTTP
-    repeated string endpoints = 1;
-    optional bytes custom_trust_certificates = 2;
+    oneof connection_type {
+      Grpc grpc = 1;
+    }
+
+    message Grpc {
+      // connection information to sequencer (http[s]://<host>:<port>")
+      // all endpoints must agree on using HTTPS or HTTP
+      repeated string endpoints = 1;
+      optional bytes custom_trust_certificates = 2;
+    }
   }
 }
 
@@ -416,8 +420,8 @@ message TopologyMapping {
 
     PartyToKeyMapping party_to_key_mapping = 16;
 
-    LsuAnnouncement synchronizer_upgrade_announcement = 17;
-    LsuSequencerConnectionSuccessor sequencer_connection_successor = 18;
+    SynchronizerUpgradeAnnouncement synchronizer_upgrade_announcement = 17;
+    SequencerConnectionSuccessor sequencer_connection_successor = 18;
   }
   reserved 2; // was identifier_delegation
   reserved 10; // was authority_of

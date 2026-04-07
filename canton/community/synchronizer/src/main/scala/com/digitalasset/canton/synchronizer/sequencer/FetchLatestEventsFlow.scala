@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -25,7 +25,7 @@ object FetchLatestEventsFlow {
     // i've struggled to work out a pekko-stream only way of maintaining this state.
     // we really want a `statefulFlatMapConcat` however that doesn't exist and trying to attempt
     // something similar in a custom graph is problematic. the current usage of a separate atomic reference
-    // with the flatMapConcat operator appears correct and a ConcurrentModificationException will be thrown
+    // with the flatmapConcat operator appears correct and a ConcurrentModificationException will be thrown
     // if this assumptions are violated.
     val stateRef = new AtomicReference[State](initialState)
 
@@ -48,6 +48,7 @@ object FetchLatestEventsFlow {
 
     Flow[ReadSignal]
       .buffer(1, OverflowStrategy.dropHead)
+      .prepend(Source.single(ReadSignal))
       .flatMapConcat(_ => fetchAllEventsUntilEmpty())
       .mapConcat(identity)
   }

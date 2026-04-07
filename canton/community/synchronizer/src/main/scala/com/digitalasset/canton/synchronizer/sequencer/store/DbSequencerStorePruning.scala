@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.store
@@ -46,7 +46,7 @@ trait DbSequencerStorePruning {
       functionName: String = functionFullName,
   )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Seq[Int]] =
     MonadUtil.batchedSequentialTraverse(
-      batchingConfig.pruningParallelism,
+      batchingConfig.parallelism,
       batchingConfig.maxItemsInBatch,
     )(intervals) { intervalsChunk =>
       val chunkDBIO = DbStorage.bulkOperation(

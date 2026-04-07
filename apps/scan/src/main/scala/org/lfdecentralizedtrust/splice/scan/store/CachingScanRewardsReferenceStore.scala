@@ -38,8 +38,6 @@ class CachingScanRewardsReferenceStore private[splice] (
 
   override def key: ScanRewardsReferenceStore.Key = store.key
 
-  override def waitUntilInitialized: Future[Unit] = store.waitUntilInitialized
-
   override def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
   )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]] =

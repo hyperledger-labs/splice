@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
@@ -14,26 +14,11 @@ import com.digitalasset.daml.lf.data.Ref.{
   UserId,
 }
 
-trait StringInterningBuilder {
-  def addTemplateId(templateId: NameTypeConRef): Unit
-  def addPackageId(packageId: PackageId): Unit
-  def addParty(party: Party): Unit
-  def addSynchronizerId(synchronizerId: SynchronizerId): Unit
-  def addUserId(userId: UserId): Unit
-  def addParticipantId(participantId: ParticipantId): Unit
-  def addChoiceName(choiceName: ChoiceName): Unit
-  def addInterfaceId(interfaceId: Identifier): Unit
-}
-
-trait StringInterningProvider {
-  def provideInternedStrings(builder: StringInterningBuilder): Unit
-}
-
 /** The facade for all supported string-interning domains
   *
   * @note
   *   The accessors defined in this interface are thread-safe and can be used concurrently with
-  *   StringInterningView.internize and [[StringInterningView.update]].
+  *   [[StringInterningView.internize]] and [[StringInterningView.update]].
   */
 trait StringInterning {
   def templateId: StringInterningDomain[NameTypeConRef]

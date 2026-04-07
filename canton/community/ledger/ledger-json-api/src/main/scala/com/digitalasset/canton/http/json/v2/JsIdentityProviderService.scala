@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -11,7 +11,6 @@ import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
@@ -20,14 +19,12 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.ServerEndpoint
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
-@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsIdentityProviderService(
     identityProviderConfigClient: IdentityProviderConfigClient,
-    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
-)(implicit val authInterceptor: AuthInterceptor, val executionContext: ExecutionContext)
+)(implicit val authInterceptor: AuthInterceptor)
     extends Endpoints
     with NamedLogging {
 
@@ -59,27 +56,24 @@ class JsIdentityProviderService(
       callerContext: CallerContext
   ): TracedInput[Unit] => Future[
     Either[JsCantonError, identity_provider_config_service.ListIdentityProviderConfigsResponse]
-  ] = _ => {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
+  ] = req =>
     identityProviderConfigClient
-      .serviceStub(callerContext.token())
+      .serviceStub(callerContext.token())(req.traceContext)
       .listIdentityProviderConfigs(
         new identity_provider_config_service.ListIdentityProviderConfigsRequest()
       )
       .resultToRight
-  }
 
   private def createIdps(
       callerContext: CallerContext
   ): TracedInput[identity_provider_config_service.CreateIdentityProviderConfigRequest] => Future[
     Either[JsCantonError, identity_provider_config_service.CreateIdentityProviderConfigResponse]
-  ] = { req =>
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-    identityProviderConfigClient
-      .serviceStub(callerContext.token())
-      .createIdentityProviderConfig(req.in)
-      .resultToRight
-  }
+  ] =
+    req =>
+      identityProviderConfigClient
+        .serviceStub(callerContext.token())(req.traceContext)
+        .createIdentityProviderConfig(req.in)
+        .resultToRight
 
   private def updateIdp(
       callerContext: CallerContext
@@ -87,15 +81,15 @@ class JsIdentityProviderService(
     (String, identity_provider_config_service.UpdateIdentityProviderConfigRequest)
   ] => Future[
     Either[JsCantonError, identity_provider_config_service.UpdateIdentityProviderConfigResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
+  ] =
     req =>
       if (req.in._2.identityProviderConfig.map(_.identityProviderId).contains(req.in._1)) {
         identityProviderConfigClient
-          .serviceStub(callerContext.token())
+          .serviceStub(callerContext.token())(req.traceContext)
           .updateIdentityProviderConfig(req.in._2)
           .resultToRight
-      } else
+      } else {
+        implicit val traceContext: TraceContext = req.traceContext
         error(
           JsCantonError.fromErrorCode(
             InvalidArgument.Reject(
@@ -103,41 +97,35 @@ class JsIdentityProviderService(
             )
           )
         )
-  }
+      }
 
   private def getIdp(
       callerContext: CallerContext
   ): TracedInput[String] => Future[
     Either[JsCantonError, identity_provider_config_service.GetIdentityProviderConfigResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-
-    req =>
-      identityProviderConfigClient
-        .serviceStub(callerContext.token())
-        .getIdentityProviderConfig(
-          identity_provider_config_service
-            .GetIdentityProviderConfigRequest(identityProviderId = req.in)
-        )
-        .resultToRight
+  ] = { req =>
+    identityProviderConfigClient
+      .serviceStub(callerContext.token())(req.traceContext)
+      .getIdentityProviderConfig(
+        identity_provider_config_service
+          .GetIdentityProviderConfigRequest(identityProviderId = req.in)
+      )
+      .resultToRight
   }
 
   private def deleteIdp(
       callerContext: CallerContext
   ): TracedInput[String] => Future[
     Either[JsCantonError, identity_provider_config_service.DeleteIdentityProviderConfigResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-
+  ] =
     req =>
       identityProviderConfigClient
-        .serviceStub(callerContext.token())
+        .serviceStub(callerContext.token())(req.traceContext)
         .deleteIdentityProviderConfig(
           identity_provider_config_service
             .DeleteIdentityProviderConfigRequest(identityProviderId = req.in)
         )
         .resultToRight
-  }
 
 }
 
@@ -151,42 +139,32 @@ object JsIdentityProviderService extends DocumentationEndpoints {
   val listIdpsEndpoint =
     idps.get
       .out(jsonBody[identity_provider_config_service.ListIdentityProviderConfigsResponse])
-      .protoRef(
-        identity_provider_config_service.IdentityProviderConfigServiceGrpc.METHOD_LIST_IDENTITY_PROVIDER_CONFIGS
-      )
+      .description("List all identity provider configs")
 
   val createIdpsEndpoint =
     idps.post
       .in(jsonBody[identity_provider_config_service.CreateIdentityProviderConfigRequest])
       .out(jsonBody[identity_provider_config_service.CreateIdentityProviderConfigResponse])
-      .protoRef(
-        identity_provider_config_service.IdentityProviderConfigServiceGrpc.METHOD_CREATE_IDENTITY_PROVIDER_CONFIG
-      )
+      .description("Create identity provider configs")
 
   val updateIdpEndpoint =
     idps.patch
       .in(path[String](identityProviderPath))
       .in(jsonBody[identity_provider_config_service.UpdateIdentityProviderConfigRequest])
       .out(jsonBody[identity_provider_config_service.UpdateIdentityProviderConfigResponse])
-      .protoRef(
-        identity_provider_config_service.IdentityProviderConfigServiceGrpc.METHOD_UPDATE_IDENTITY_PROVIDER_CONFIG
-      )
+      .description("Update identity provider config")
 
   val getIdpEndpoint =
     idps.get
       .in(path[String](identityProviderPath))
       .out(jsonBody[identity_provider_config_service.GetIdentityProviderConfigResponse])
-      .protoRef(
-        identity_provider_config_service.IdentityProviderConfigServiceGrpc.METHOD_GET_IDENTITY_PROVIDER_CONFIG
-      )
+      .description("Get identity provider config")
 
   val deleteIdpEndpoint =
     idps.delete
       .in(path[String](identityProviderPath))
       .out(jsonBody[identity_provider_config_service.DeleteIdentityProviderConfigResponse])
-      .protoRef(
-        identity_provider_config_service.IdentityProviderConfigServiceGrpc.METHOD_DELETE_IDENTITY_PROVIDER_CONFIG
-      )
+      .description("Delete identity provider config")
 
   override def documentation: Seq[AnyEndpoint] = List(
     createIdpsEndpoint,

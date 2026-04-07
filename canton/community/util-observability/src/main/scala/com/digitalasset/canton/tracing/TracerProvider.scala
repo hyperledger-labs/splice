@@ -1,14 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
 
-import com.daml.metrics.OnDemandMetricsReader.NoOpOnDemandMetricsReader$
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.telemetry.{
-  ConfiguredOpenTelemetry,
-  UnsetSpanEndingThreadReferenceSpanProcessor,
-}
+import com.digitalasset.canton.metrics.OnDemandMetricsReader.NoOpOnDemandMetricsReader$
+import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Tracer
@@ -44,10 +40,7 @@ private[tracing] class ReportingTracerProvider(
           .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
           .build(),
         SdkTracerProvider.builder
-          .addSpanProcessor(SimpleSpanProcessor.create(exporter))
-          .addSpanProcessor(
-            new UnsetSpanEndingThreadReferenceSpanProcessor(NamedLoggerFactory.root)
-          ),
+          .addSpanProcessor(SimpleSpanProcessor.create(exporter)),
         NoOpOnDemandMetricsReader$,
       ),
       name,
@@ -97,8 +90,6 @@ object NoopSpanExporter extends SpanExporter {
 
 object TracerProvider {
   object Factory {
-
-    @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
     def apply(configuredOpenTelemetry: ConfiguredOpenTelemetry, name: String): TracerProvider =
       blocking(synchronized {
         // Because nodes of the same type are started in parallel, this could cause some issues with multiple instances

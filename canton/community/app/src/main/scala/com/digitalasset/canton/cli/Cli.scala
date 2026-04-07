@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.cli
@@ -51,17 +51,14 @@ final case class Cli(
     logFileName: Option[String] = None,
     kmsLogFileName: Option[String] = None,
     logEncoder: LogEncoder = LogEncoder.Plain,
-    logAccess: Boolean = false,
-    logAccessFileName: Option[String] = None,
-    logAccessErrors: Boolean = false,
-    logAccessErrorsFileName: Option[String] = None,
+    logLastErrors: Boolean = false,
+    logLastErrorsFileName: Option[String] = None,
     logImmediateFlush: Option[Boolean] = None,
     kmsLogImmediateFlush: Option[Boolean] = None,
     bootstrapScriptPath: Option[File] = None,
     manualStart: Boolean = false,
     exitAfterBootstrap: Boolean = false,
     devProtocol: Boolean = false,
-    multiSync: Boolean = false,
     dars: Seq[String] = Seq.empty,
 ) {
 
@@ -98,19 +95,19 @@ final case class Cli(
       "KMS_LOG_FILE_ROLLING_PATTERN",
       "LOG_FILE_HISTORY",
       "KMS_LOG_FILE_HISTORY",
+      "LOG_LAST_ERRORS",
+      "LOG_LAST_ERRORS_FILE_NAME",
       "LOG_FORMAT_JSON",
       "LOG_IMMEDIATE_FLUSH",
       "KMS_LOG_IMMEDIATE_FLUSH",
-      "LOG_ACCESS",
-      "LOG_ACCESS_ERRORS",
     ).foreach(System.clearProperty(_).discard[String])
     logFileName.foreach(System.setProperty("LOG_FILE_NAME", _))
     kmsLogFileName.foreach(System.setProperty("KMS_LOG_FILE_NAME", _))
+    logLastErrorsFileName.foreach(System.setProperty("LOG_LAST_ERRORS_FILE_NAME", _))
     logFileHistory.foreach(x => System.setProperty("LOG_FILE_HISTORY", x.toString))
     kmsLogFileHistory.foreach(x => System.setProperty("KMS_LOG_FILE_HISTORY", x.toString))
     logFileRollingPattern.foreach(System.setProperty("LOG_FILE_ROLLING_PATTERN", _))
     kmsLogFileRollingPattern.foreach(System.setProperty("KMS_LOG_FILE_ROLLING_PATTERN", _))
-
     logFileAppender match {
       case LogFileAppender.Rolling =>
         System.setProperty("LOG_FILE_ROLLING", "true").discard
@@ -118,12 +115,8 @@ final case class Cli(
         System.setProperty("LOG_FILE_FLAT", "true").discard
       case LogFileAppender.Off =>
     }
-    if (logAccess)
-      System.setProperty("LOG_ACCESS", "true").discard
-    logAccessFileName.foreach(System.setProperty("LOG_ACCESS_FILE_NAME", _))
-    if (logAccessErrors)
-      System.setProperty("LOG_ACCESS_ERRORS", "true").discard
-    logAccessErrorsFileName.foreach(System.setProperty("LOG_ACCESS_ERROR_FILE_NAME", _))
+    if (logLastErrors)
+      System.setProperty("LOG_LAST_ERRORS", "true").discard
 
     logEncoder match {
       case LogEncoder.Plain =>
@@ -327,21 +320,9 @@ object Cli {
           }
         )
 
-      opt[Boolean]("log-access")
-        .text("Capture API access logs in a separate file")
-        .action((isEnabled, cli) => cli.copy(logAccess = isEnabled))
-
-      opt[String]("log-access-filename")
-        .text("Name of a file to capture API access logs")
-        .action((filename, cli) => cli.copy(logAccessFileName = Some(filename)))
-
-      opt[Boolean]("log-access-errors")
-        .text("Capture API access errors in a separate file")
-        .action((isEnabled, cli) => cli.copy(logAccessErrors = isEnabled))
-
-      opt[String]("log-access-errors-filename")
-        .text("Name of a file to capture API access error logs")
-        .action((filename, cli) => cli.copy(logAccessErrorsFileName = Some(filename)))
+      opt[Boolean]("log-last-errors")
+        .text("Capture events for logging.last_errors command")
+        .action((isEnabled, cli) => cli.copy(logLastErrors = isEnabled))
 
       note("") // Enforce a newline in the help text
 
@@ -395,9 +376,6 @@ object Cli {
           opt[Unit]("dev")
             .text("Run sandbox with dev version of the protocol")
             .action((_, cli) => cli.copy(devProtocol = true)),
-          opt[Unit]("multi-sync")
-            .text("Run sandbox in a multi-synchronizer constellation")
-            .action((_, cli) => cli.copy(multiSync = true)),
           opt[Int]("ledger-api-port")
             .text("Port for the sandbox Ledger API")
             .action((port, cli) =>
@@ -459,35 +437,35 @@ object Cli {
             .required()
             .withFallback(() => "127.0.0.1"),
           opt[Int]("port")
-            .text("Port for the remote participant Ledger API")
+            .text("Port for the remote participant Ledger API (default 6865)")
             .action((port, cli) =>
               cli ++ ("canton.remote-participants.sandbox.ledger-api.port" -> port.toString)
             )
             .required()
             .withFallback(() => 6865),
           opt[Int]("admin-api-port")
-            .text("Port for the remote participant Admin API")
+            .text("Port for the remote participant Admin API (default 6866)")
             .action((port, cli) =>
               cli ++ ("canton.remote-participants.sandbox.admin-api.port" -> port.toString)
             )
             .required()
             .withFallback(() => 6866),
           opt[Int]("sequencer-public-port")
-            .text("Port for the remote sequencer Public API")
+            .text("Port for the remote sequencer Public API (default 6867)")
             .action((port, cli) =>
               cli ++ ("canton.remote-sequencers.local.public-api.port" -> port.toString)
             )
             .required()
             .withFallback(() => 6867),
           opt[Int]("sequencer-admin-port")
-            .text("Port for the remote sequencer Admin API")
+            .text("Port for the remote sequencer Admin API (default 6868)")
             .action((port, cli) =>
               cli ++ ("canton.remote-sequencers.local.admin-api.port" -> port.toString)
             )
             .required()
             .withFallback(() => 6868),
           opt[Int]("mediator-admin-port")
-            .text("Port for the remote mediator Admin API")
+            .text("Port for the remote mediator Admin API (default 6869)")
             .action((port, cli) =>
               cli ++ ("canton.remote-mediators.mediator1.admin-api.port" -> port.toString)
             )

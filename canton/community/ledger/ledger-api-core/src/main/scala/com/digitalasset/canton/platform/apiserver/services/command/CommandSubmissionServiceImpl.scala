@@ -1,15 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command
 
-import cats.data.EitherT
+import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.timer.Delayed
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
-import com.digitalasset.canton.ledger.api.util.{TimeProvider, TimeProviderType}
+import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.api.{Commands as ApiCommands, SubmissionId}
+import com.digitalasset.canton.ledger.configuration.LedgerTimeModel
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
@@ -29,7 +30,11 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
 }
-import com.digitalasset.canton.platform.apiserver.services.{RejectionGenerators, logging}
+import com.digitalasset.canton.platform.apiserver.services.{
+  RejectionGenerators,
+  TimeProviderType,
+  logging,
+}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -89,9 +94,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
   ): FutureUnlessShutdown[Unit] =
     withEnrichedLoggingContext(logging.commands(request.commands)) { implicit loggingContext =>
       logger.info(
-        show"Phase 1 started: Submitting ${request.commands.commands.commands.length} command(s) for interpretation on behalf of ${request.commands.actAs
-            .limit(5)
-            .toSeq}."
+        show"Phase 1 started: Submitting commands for interpretation: ${request.commands}."
       )
       val cmds = request.commands.commands.commands
       logger.debug(show"Submitted commands are: ${if (cmds.length > 1) "\n  " else ""}${cmds
@@ -156,15 +159,13 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
       .map(FutureUnlessShutdown.pure)
       .getOrElse(
         withSpan("ApiSubmissionService.evaluate") { _ => _ =>
-          for {
-            synchronizerState <- EitherT.liftF(syncService.getRoutingSynchronizerState)
-            result <- commandExecutor.execute(
-              commands = commands,
-              submissionSeed = submissionSeed,
-              routingSynchronizerState = synchronizerState,
-              forExternallySigned = false,
-            )
-          } yield result
+          val synchronizerState = syncService.getRoutingSynchronizerState
+          commandExecutor.execute(
+            commands = commands,
+            submissionSeed = submissionSeed,
+            routingSynchronizerState = synchronizerState,
+            forExternallySigned = false,
+          )
         }
           .semiflatMap(submitTransactionWithDelay)
           .valueOrF { error =>
@@ -185,6 +186,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
         // the submission to the SyncService is delayed.
         val submitAt =
           commandExecutionResult.commandInterpretationResult.transactionMeta.ledgerEffectiveTime.toInstant
+            .minus(LedgerTimeModel.maximumToleranceTimeModel.avgTransactionLatency)
         val submissionDelay = Duration.between(timeProvider.getCurrentTime, submitAt)
         if (submissionDelay.isNegative)
           submitTransaction(commandExecutionResult)
@@ -218,6 +220,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
         result.commandInterpretationResult.globalKeyMapping,
         result.commandInterpretationResult.processedDisclosedContracts,
       )
+      .toScalaUnwrapped
   }
 
   override def close(): Unit = ()

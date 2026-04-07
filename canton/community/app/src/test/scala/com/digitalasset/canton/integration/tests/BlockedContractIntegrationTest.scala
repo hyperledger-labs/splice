@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -6,10 +6,11 @@ package com.digitalasset.canton.integration.tests
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.daml.ledger.javaapi.data.Command
 import com.digitalasset.canton.BigDecimalImplicits.*
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.UnknownInformees
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -17,7 +18,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.ForceFlag.DisablePartyWithActiveContracts
-import com.digitalasset.canton.topology.{ForceFlags, Party}
+import com.digitalasset.canton.topology.{ForceFlags, PartyId}
 
 import scala.jdk.CollectionConverters.*
 
@@ -26,9 +27,9 @@ sealed trait BlockedContractIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
 
-  private var bank: Party = _
-  private var alice: Party = _
-  private var bob: Party = _
+  private var bank: PartyId = _
+  private var alice: PartyId = _
+  private var bob: PartyId = _
 
   private val amount: Amount = new Amount(100.toBigDecimal, "USD")
 
@@ -39,9 +40,9 @@ sealed trait BlockedContractIntegrationTest
       participants.all.synchronizers.connect_local(sequencer1, alias = daName)
       participants.all.dars.upload(CantonExamplesPath)
 
-      bank = participant1.parties.testing.enable("Bank")
-      alice = participant1.parties.testing.enable("Alice")
-      bob = participant2.parties.testing.enable("Bob")
+      bank = participant1.parties.enable("Bank")
+      alice = participant1.parties.enable("Alice")
+      bob = participant2.parties.enable("Bob")
     }
 
   "A contract can be archived if a participant just disconnects" in { implicit env =>
@@ -82,9 +83,9 @@ sealed trait BlockedContractIntegrationTest
 
     val iou = submitAndReturnIou(participant1, bank, createIouWithObserver(bob))
 
-    bob.topology.party_to_participant_mappings
+    participant2.topology.party_to_participant_mappings
       .propose_delta(
-        participant2,
+        bob,
         removes = List(participant2),
         forceFlags = ForceFlags(DisablePartyWithActiveContracts),
         store = daId,
@@ -106,7 +107,7 @@ sealed trait BlockedContractIntegrationTest
     )
   }
 
-  def createIouWithObserver(observer: Party): Command =
+  def createIouWithObserver(observer: PartyId): Command =
     new Iou(
       bank.toProtoPrimitive,
       alice.toProtoPrimitive,
@@ -116,7 +117,7 @@ sealed trait BlockedContractIntegrationTest
 
   def submitAndReturnIou(
       participantRef: ParticipantReference,
-      submitter: Party,
+      submitter: PartyId,
       command: Command,
       autoSync: Boolean = true,
   ): Iou.Contract =
@@ -141,11 +142,10 @@ sealed trait BlockedContractIntegrationTest
 }
 
 //class BlockedContractTestDefault extends BlockedContractTest {
-// 	registerPlugin(new UseH2(loggerFactory))
-//  registerPlugin(new UseBftSequencer(loggerFactory))
+//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 //}
 
 class BlockedContractIntegrationTestPostgres extends BlockedContractIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

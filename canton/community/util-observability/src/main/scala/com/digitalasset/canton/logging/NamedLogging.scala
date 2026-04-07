@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -26,9 +26,7 @@ trait NamedLogging {
 
   private[this] lazy val underlying: slf4j.Logger = theLogger.underlying
 
-  protected def classForLogger: Class[?] = getClass
-
-  private[this] lazy val theLogger: Logger = loggerFactory.getLogger(classForLogger)
+  private[this] lazy val theLogger: Logger = loggerFactory.getLogger(getClass)
 
   private[this] lazy val theLoggerWithContext: TracedLogger =
     Logger.takingImplicit[TraceContext](underlying)

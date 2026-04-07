@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -6,7 +6,7 @@ package com.digitalasset.canton.resource
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.resource.DatabaseStorageError.DatabaseStorageDegradation.DatabaseTaskRejected
-import com.digitalasset.canton.resource.DbStorage.{NoConnectionAvailable, PassiveInstanceException}
+import com.digitalasset.canton.resource.DbStorage.NoConnectionAvailable
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.ErrorKind.*
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
@@ -127,19 +127,4 @@ object DbExceptionRetryPolicy extends ExceptionRetryPolicy {
 
     case _ => None
   }
-}
-
-/** Only retry passive node exception.
-  */
-case object PassiveInstanceExceptionRetryPolicy extends ExceptionRetryPolicy {
-
-  override protected def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(
-      implicit tc: TraceContext
-  ): ErrorKind =
-    exception match {
-      case _: PassiveInstanceException =>
-        TransientErrorKind()
-      case _ => FatalErrorKind
-    }
-
 }

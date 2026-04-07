@@ -90,6 +90,7 @@ Create the application namespace within Kubernetes.
 
     kubectl create ns sv
 
+
 .. _helm-sv-auth:
 
 Configuring Authentication
@@ -547,8 +548,6 @@ you will also need to ensure that `persistence.databaseName` is unique per compo
 
 Installing the Software
 -----------------------
-
-.. include:: ../common/reloader_recommendation.rst
 
 Configuring the Helm Charts
 +++++++++++++++++++++++++++

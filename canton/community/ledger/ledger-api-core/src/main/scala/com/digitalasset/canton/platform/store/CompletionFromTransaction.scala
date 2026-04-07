@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store
@@ -11,6 +11,8 @@ import com.daml.ledger.api.v2.offset_checkpoint.SynchronizerTime
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.util.TimestampConversion.fromInstant
 import com.digitalasset.canton.protocol.UpdateId
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
+import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.duration.Duration
 import com.google.rpc.status.Status as StatusProto
@@ -21,71 +23,68 @@ object CompletionFromTransaction {
   val OkStatus = StatusProto.of(Status.Code.OK.value(), "", Seq.empty)
   private val RejectionUpdateId = ""
 
-  /** Properties defined for both accepted and rejected commands */
-  final case class CommonCompletionProperties(
-      submitters: Set[String],
-      completionOffset: Long,
-      synchronizerTime: Option[SynchronizerTime],
-      commandId: String,
-      userId: String,
-      submissionId: Option[String],
-      traceContext: Option[com.daml.ledger.api.v2.trace_context.TraceContext],
-      deduplicationOffset: Option[Long],
-      deduplicationDurationSeconds: Option[Long],
-      deduplicationDurationNanos: Option[Int],
-  )
-
-  object CommonCompletionProperties {
-    def createFromRecordTimeAndSynchronizerId(
-        submitters: Set[String],
-        recordTime: Timestamp,
-        completionOffset: Offset,
-        commandId: String,
-        userId: String,
-        submissionId: Option[String],
-        synchronizerId: String,
-        traceContext: Option[com.daml.ledger.api.v2.trace_context.TraceContext],
-        deduplicationOffset: Option[Long],
-        deduplicationDurationSeconds: Option[Long],
-        deduplicationDurationNanos: Option[Int],
-    ): CommonCompletionProperties = CommonCompletionProperties(
-      submitters = submitters,
-      completionOffset = completionOffset.unwrap,
-      synchronizerTime = Some(toApiSynchronizerTime(synchronizerId, recordTime)),
-      commandId = commandId,
-      userId = userId,
-      submissionId = submissionId,
-      traceContext = traceContext,
-      deduplicationOffset = deduplicationOffset,
-      deduplicationDurationSeconds = deduplicationDurationSeconds,
-      deduplicationDurationNanos = deduplicationDurationNanos,
-    )
-  }
-
   def acceptedCompletion(
-      commonCompletionProperties: CommonCompletionProperties,
+      submitters: Set[String],
+      recordTime: Timestamp,
+      offset: Offset,
+      commandId: String,
       updateId: UpdateId,
+      userId: String,
+      synchronizerId: String,
+      traceContext: TraceContext,
+      optSubmissionId: Option[String] = None,
+      optDeduplicationOffset: Option[Long] = None,
+      optDeduplicationDurationSeconds: Option[Long] = None,
+      optDeduplicationDurationNanos: Option[Int] = None,
   ): CompletionStreamResponse =
     CompletionStreamResponse.of(
       completionResponse = CompletionResponse.Completion(
         toApiCompletion(
-          commonCompletionProperties,
+          submitters = submitters,
+          commandId = commandId,
           updateId = updateId.toHexString,
+          userId = userId,
+          traceContext = traceContext,
           optStatus = Some(OkStatus),
+          optSubmissionId = optSubmissionId,
+          optDeduplicationOffset = optDeduplicationOffset,
+          optDeduplicationDurationSeconds = optDeduplicationDurationSeconds,
+          optDeduplicationDurationNanos = optDeduplicationDurationNanos,
+          offset = offset.unwrap,
+          synchronizerTime = Some(toApiSynchronizerTime(synchronizerId, recordTime)),
         )
       )
     )
 
   def rejectedCompletion(
-      commonCompletionProperties: CommonCompletionProperties,
+      submitters: Set[String],
+      recordTime: Timestamp,
+      offset: Offset,
+      commandId: String,
       status: StatusProto,
+      userId: String,
+      synchronizerId: String,
+      traceContext: TraceContext,
+      optSubmissionId: Option[String] = None,
+      optDeduplicationOffset: Option[Long] = None,
+      optDeduplicationDurationSeconds: Option[Long] = None,
+      optDeduplicationDurationNanos: Option[Int] = None,
   ): CompletionStreamResponse =
     CompletionStreamResponse.of(
       completionResponse = CompletionResponse.Completion(
         toApiCompletion(
-          commonCompletionProperties = commonCompletionProperties,
+          submitters = submitters,
+          commandId = commandId,
           updateId = RejectionUpdateId,
+          userId = userId,
+          traceContext = traceContext,
           optStatus = Some(status),
+          optSubmissionId = optSubmissionId,
+          optDeduplicationOffset = optDeduplicationOffset,
+          optDeduplicationDurationSeconds = optDeduplicationDurationSeconds,
+          optDeduplicationDurationNanos = optDeduplicationDurationNanos,
+          offset = offset.unwrap,
+          synchronizerTime = Some(toApiSynchronizerTime(synchronizerId, recordTime)),
         )
       )
     )
@@ -100,28 +99,53 @@ object CompletionFromTransaction {
     )
 
   def toApiCompletion(
-      commonCompletionProperties: CommonCompletionProperties,
+      submitters: Set[String],
+      commandId: String,
       updateId: String,
+      userId: String,
+      traceContext: TraceContext,
       optStatus: Option[StatusProto],
+      optSubmissionId: Option[String],
+      optDeduplicationOffset: Option[Long],
+      optDeduplicationDurationSeconds: Option[Long],
+      optDeduplicationDurationNanos: Option[Int],
+      offset: Long,
+      synchronizerTime: Option[SynchronizerTime],
   ): Completion = {
-    val optDeduplicationPeriod = toApiDeduplicationPeriod(
-      optDeduplicationOffset = commonCompletionProperties.deduplicationOffset,
-      optDeduplicationDurationSeconds = commonCompletionProperties.deduplicationDurationSeconds,
-      optDeduplicationDurationNanos = commonCompletionProperties.deduplicationDurationNanos,
-    )
-
-    Completion(
-      commandId = commonCompletionProperties.commandId,
+    val completionWithMandatoryFields = Completion(
+      commandId = commandId,
       status = optStatus,
       updateId = updateId,
-      userId = commonCompletionProperties.userId,
-      actAs = commonCompletionProperties.submitters.toSeq,
-      submissionId = commonCompletionProperties.submissionId.getOrElse(""),
-      deduplicationPeriod = optDeduplicationPeriod.getOrElse(Empty),
-      traceContext = commonCompletionProperties.traceContext,
-      offset = commonCompletionProperties.completionOffset,
-      synchronizerTime = commonCompletionProperties.synchronizerTime,
+      userId = userId,
+      actAs = submitters.toSeq,
+      submissionId = "", // will be adapted later
+      deduplicationPeriod = Empty, // will be adapted later
+      traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
+      offset = offset,
+      synchronizerTime = synchronizerTime,
     )
+    val optDeduplicationPeriod = toApiDeduplicationPeriod(
+      optDeduplicationOffset = optDeduplicationOffset,
+      optDeduplicationDurationSeconds = optDeduplicationDurationSeconds,
+      optDeduplicationDurationNanos = optDeduplicationDurationNanos,
+    )
+    (optSubmissionId, optDeduplicationPeriod) match {
+      case (Some(submissionId), Some(deduplicationPeriod)) =>
+        completionWithMandatoryFields.copy(
+          submissionId = submissionId,
+          deduplicationPeriod = deduplicationPeriod,
+        )
+      case (Some(submissionId), None) =>
+        completionWithMandatoryFields.copy(
+          submissionId = submissionId
+        )
+      case (None, Some(deduplicationPeriod)) =>
+        completionWithMandatoryFields.copy(
+          deduplicationPeriod = deduplicationPeriod
+        )
+      case _ =>
+        completionWithMandatoryFields
+    }
   }
 
   private def toApiDeduplicationPeriod(

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -33,7 +33,7 @@ import org.mockito.ArgumentMatchers.eq as isEq
 
 import java.util.UUID
 
-final class MediatorEventProcessorTest
+class MediatorEventProcessorTest
     extends BaseTestWordSpec
     with HasExecutionContext
     with HasTestCloseContext {
@@ -60,8 +60,6 @@ final class MediatorEventProcessorTest
 
     val processor = new MediatorEventsProcessor(
       identityClientEventHandler =
-        ApplicationHandler.success[UnsignedEnvelopeBox, DefaultOpenEnvelope](),
-      lsuSequencingTestMessageHandler =
         ApplicationHandler.success[UnsignedEnvelopeBox, DefaultOpenEnvelope](),
       eventHandler,
       deduplicator,

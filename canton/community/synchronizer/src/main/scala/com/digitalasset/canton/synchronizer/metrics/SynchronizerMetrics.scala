@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.metrics
 
-import cats.Eval
-import com.daml.metrics.api.HistogramInventory.Item
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.*
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{
@@ -15,12 +14,12 @@ import com.daml.metrics.api.{
   MetricsContext,
 }
 import com.daml.metrics.grpc.{DamlGrpcServerHistograms, DamlGrpcServerMetrics}
-import com.daml.metrics.{CacheMetrics, HealthMetrics}
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.metrics.{
   ActiveRequestsMetrics,
+  CacheMetrics,
   DbStorageHistograms,
   DbStorageMetrics,
   DeclarativeApiMetrics,
@@ -34,7 +33,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 
 import scala.annotation.unused
-import scala.collection.concurrent.TrieMap
 
 class SequencerHistograms(val parent: MetricName)(implicit
     inventory: HistogramInventory
@@ -86,9 +84,6 @@ class SequencerMetrics(
 
   val payloadCache: CacheMetrics =
     new CacheMetrics("payload-cache", openTelemetryMetricsFactory)
-
-  val catchupCache: CacheMetrics =
-    new CacheMetrics("catchup-payload-cache", openTelemetryMetricsFactory)
 
   val memberCache: CacheMetrics =
     new CacheMetrics("member-cache", openTelemetryMetricsFactory)
@@ -151,60 +146,9 @@ class SequencerMetrics(
         qualification = MetricQualification.Debug,
       )
     )
-
-    // Gauges don't support metrics context per update. So instead create a map with a gauge per context.
-    private val subscriptionLastTimestampMetrics: TrieMap[MetricsContext, Eval[Gauge[Long]]] =
-      TrieMap.empty
-
-    def subscriptionLastTimestamp(mc: MetricsContext): Gauge[Long] = {
-      def createSubscriptionLastTimestampGauge: Gauge[Long] =
-        openTelemetryMetricsFactory.gauge[Long](
-          MetricInfo(
-            prefix :+ "subscription-last-timestamp",
-            summary = "Last timestamp read via subscription per member",
-            description =
-              """This metric tracks the last timestamp that was read via a subscription for each member.
-                |The timestamp is reported in microseconds since epoch. This metric is labeled with the
-                |subscriber member to allow tracking per-member progress.""",
-            qualification = MetricQualification.Debug,
-            labelsWithDescription = Map(
-              "subscriber" -> "The member subscribing to sequencer events"
-            ),
-          ),
-          0L,
-        )(mc)
-
-      // Two concurrent calls with the same context may cause getOrElseUpdate to evaluate the new value expression twice,
-      // even though only one of the results will be stored in the map.
-      // Eval.later ensures that we actually create only one instance of the gauge in such a case by delaying the creation
-      // until the getOrElseUpdate call has finished.
-      subscriptionLastTimestampMetrics
-        .getOrElseUpdate(mc, Eval.later(createSubscriptionLastTimestampGauge))
-        .value
-    }
   }
 
   val publicApi = new PublicApiMetrics
-
-  val headTimestamp: Gauge[Long] = openTelemetryMetricsFactory.gauge[Long](
-    MetricInfo(
-      prefix :+ "head_timestamp",
-      summary = "Timestamp of the head (oldest) event in the buffer",
-      description = "The timestamp of the first event in the buffer, or 0 if the buffer is empty",
-      qualification = MetricQualification.Debug,
-    ),
-    0L,
-  )
-
-  val lastTimestamp: Gauge[Long] = openTelemetryMetricsFactory.gauge[Long](
-    MetricInfo(
-      prefix :+ "last_timestamp",
-      summary = "Timestamp of the last (newest) event in the buffer",
-      description = "The timestamp of the last event in the buffer, or 0 if the buffer is empty",
-      qualification = MetricQualification.Debug,
-    ),
-    0L,
-  )
 
   val maxEventAge: Gauge[Long] =
     openTelemetryMetricsFactory.gauge[Long](
@@ -299,6 +243,7 @@ class SequencerMetrics(
         )
       )
   }
+  // TODO(i14580): add testing
   val trafficControl = new TrafficControlMetrics
 }
 
@@ -321,7 +266,6 @@ object SequencerMetrics {
       case SubmissionRequestType.ConfirmationRequest => "send-confirmation-request"
       case SubmissionRequestType.Verdict => "send-verdict"
       case SubmissionRequestType.Commitment => "send-commitment"
-      case SubmissionRequestType.LsuSequencingTest => "send-test-lsu-sequencing"
       case SubmissionRequestType.TopUp => "send-topup"
       case SubmissionRequestType.TopUpMed => "send-topup-med"
       case SubmissionRequestType.TopologyTransaction => "send-topology"
@@ -341,25 +285,12 @@ object SequencerMetrics {
 class MediatorHistograms(val parent: MetricName)(implicit
     inventory: HistogramInventory
 ) {
+
   private[metrics] val prefix = parent :+ "mediator"
   private[metrics] val sequencerClient = new SequencerClientHistograms(parent)
   private[metrics] val dbStorage = new DbStorageHistograms(parent)
 
-  private[metrics] val responseLatencies: Item = Item(
-    prefix :+ "response-latency",
-    summary = "Individual participant response latencies",
-    description =
-      """Provides the time difference between the sequencing time of the given senders response
-                    |and the first response received for a particular request..
-                    |""",
-    labelsWithDescription = Map(
-      "sender" -> "The participant who sent the response"
-    ),
-    qualification = MetricQualification.Latency,
-  )
-
 }
-
 class MediatorMetrics(
     histograms: MediatorHistograms,
     val openTelemetryMetricsFactory: LabeledMetricsFactory,
@@ -403,8 +334,9 @@ class MediatorMetrics(
     MetricInfo(
       prefix :+ "requests",
       summary = "Total number of processed confirmation requests (approved and rejected)",
-      description = """This metric provides the number of processed confirmation requests since the system
-           |has been started. Requests that are rejected because they reuse the request UUID are labelled with `duplicate_reject`.""",
+      description =
+        """This metric provides the number of processed confirmation requests since the system
+           |has been started.""",
       qualification = MetricQualification.Debug,
     )
   )
@@ -436,40 +368,4 @@ class MediatorMetrics(
     )(
       MetricsContext.Empty
     )
-
-  lazy val receivedTestingLsuSequencingMessages: Meter =
-    openTelemetryMetricsFactory.meter(
-      MetricInfo(
-        name = histograms.parent :+ "received-lsu-sequencing-test-messages",
-        summary = "Received testing lsu sequencing messages by sender (sequencer)",
-        description =
-          """The number of received testing lsu sequencing messages by sender (sequencer)""".stripMargin,
-        qualification = MetricQualification.Debug,
-        labelsWithDescription = Map(
-          "sender" -> "The sequencer who sent the message"
-        ),
-      )
-    )(MetricsContext.Empty)
-
-  val responseLatencies: Timer =
-    openTelemetryMetricsFactory.timer(histograms.responseLatencies.info)(MetricsContext.Empty)
-
-  val timeoutNonResponsiveParticipants: Meter = openTelemetryMetricsFactory.meter(
-    MetricInfo(
-      prefix :+ "timeout-non-responsive-participants",
-      summary = "Count of participants that failed to respond for parties before timeout",
-      description =
-        """This metric tracks participant non-responsiveness during confirmation request timeouts.
-          |When a mediator times out a transaction, it increments this counter once for each party
-          |that the participant hosts (with confirmation rights) but did not respond for.
-          |The metric includes labels for both the party and the participant to enable detailed analysis.""",
-      qualification = MetricQualification.Debug,
-    )
-  )
-}
-
-object MediatorMetrics {
-  val duplicateRejectLabel = "duplicate_reject"
-  val duplicateRejectContext: MetricsContext = MetricsContext(duplicateRejectLabel -> "true")
-  val nonduplicateRejectContext: MetricsContext = MetricsContext(duplicateRejectLabel -> "false")
 }

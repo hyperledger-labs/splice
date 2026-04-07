@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -18,9 +18,11 @@ trait RegisteredSynchronizersStoreTest extends FailOnShutdown {
 
   private def alias(a: String): SynchronizerAlias = SynchronizerAlias.tryCreate(a)
   private def id(a: String, serial: Int = 0): PhysicalSynchronizerId = PhysicalSynchronizerId(
-    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive(s"$a::default")),
-    NonNegativeInt.tryCreate(serial),
+    SynchronizerId(
+      UniqueIdentifier.tryFromProtoPrimitive(s"$a::default")
+    ),
     testedProtocolVersion,
+    NonNegativeInt.tryCreate(serial),
   )
 
   def registeredSynchronizersStore(mk: () => RegisteredSynchronizersStore): Unit = {
@@ -50,7 +52,7 @@ trait RegisteredSynchronizersStoreTest extends FailOnShutdown {
 
       val psid0 = id("foo", serial = 0)
       val psid1 = id("foo", serial = 1)
-      val incompatiblePsid = id("incompatible")
+      val incompatiblePSId = id("incompatible")
 
       for {
         _ <- valueOrFail(sut.addMapping(alias("alias"), psid0))("foo 0")
@@ -62,10 +64,10 @@ trait RegisteredSynchronizersStoreTest extends FailOnShutdown {
         )
         _ = queried1 shouldBe expectedResult
 
-        res <- sut.addMapping(alias("alias"), incompatiblePsid).value
+        res <- sut.addMapping(alias("alias"), incompatiblePSId).value
         _ = res.left.value shouldBe InconsistentLogicalSynchronizerIds(
           alias("alias"),
-          incompatiblePsid,
+          incompatiblePSId,
           psid0,
         )
 
@@ -83,8 +85,8 @@ trait RegisteredSynchronizersStoreTest extends FailOnShutdown {
       } yield result shouldBe Left(
         InconsistentLogicalSynchronizerIds(
           alias("alias"),
-          newPsid = id("bar"),
-          existingPsid = id("foo"),
+          newPSId = id("bar"),
+          existingPSId = id("foo"),
         )
       )
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.postgresql
@@ -9,11 +9,11 @@ import java.sql.Connection
 
 private[postgresql] object PGTable {
 
-  private def transposedInsertBase[From](
+  private def transposedInsertBase[FROM](
       insertStatement: String,
-      ordering: Option[Ordering[From]] = None,
-  )(fields: Seq[(String, Field[From, ?, ?])]): Table[From] =
-    new BaseTable[From](fields, ordering) {
+      ordering: Option[Ordering[FROM]] = None,
+  )(fields: Seq[(String, Field[FROM, ?, ?])]): Table[FROM] =
+    new BaseTable[FROM](fields, ordering) {
       override def executeUpdate: Array[Array[?]] => Connection => Unit =
         data =>
           connection =>
@@ -48,15 +48,15 @@ private[postgresql] object PGTable {
        |   ($tableFields)
        | SELECT
        |   $selectFields
-       | From
+       | FROM
        |   unnest($unnestFields)
        | as t($inputFields)
        | $statementSuffix
        |""".stripMargin
   }
 
-  def transposedInsert[From](tableName: String)(
-      fields: (String, Field[From, ?, ?])*
-  ): Table[From] =
+  def transposedInsert[FROM](tableName: String)(
+      fields: (String, Field[FROM, ?, ?])*
+  ): Table[FROM] =
     transposedInsertBase(transposedInsertStatement(tableName, fields))(fields)
 }

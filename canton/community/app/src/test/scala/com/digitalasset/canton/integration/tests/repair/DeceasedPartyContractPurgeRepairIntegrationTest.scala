@@ -1,12 +1,17 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.repair
 
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.FeatureFlag
 import com.digitalasset.canton.examples.java.iou
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
+  UsePostgres,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -66,9 +71,9 @@ trait DeceasedPartyContractPurgeRepairIntegrationTest
     iouCarolOwnedByAlice.set(Some(createContract(participant3, carol, alice)))
 
     assertAcsCounts(
-      (participant1, Map(alice.partyId -> 4, bob.partyId -> 2, carol.partyId -> 2)),
-      (participant2, Map(alice.partyId -> 2, bob.partyId -> 2, carol.partyId -> 0)),
-      (participant3, Map(alice.partyId -> 2, bob.partyId -> 0, carol.partyId -> 2)),
+      (participant1, Map(alice -> 4, bob -> 2, carol -> 2)),
+      (participant2, Map(alice -> 2, bob -> 2, carol -> 0)),
+      (participant3, Map(alice -> 2, bob -> 0, carol -> 2)),
     )
   }
 
@@ -129,6 +134,12 @@ trait DeceasedPartyContractPurgeRepairIntegrationTest
 }
 
 class DeceasedPartyContractPurgeRepairIntegrationTestPostgres
+    extends DeceasedPartyContractPurgeRepairIntegrationTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+}
+
+class DeceasedPartyContractPurgeRepairBftOrderingIntegrationTestPostgres
     extends DeceasedPartyContractPurgeRepairIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseBftSequencer(loggerFactory))

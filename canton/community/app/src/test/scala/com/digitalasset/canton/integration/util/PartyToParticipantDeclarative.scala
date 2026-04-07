@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -9,13 +9,15 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.ConsoleCommandTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.crypto.SigningKeysWithThreshold
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.integration.TestEnvironment
 import com.digitalasset.canton.integration.util.PartyToParticipantDeclarativeCommon.{
+  External,
+  OwningParticipant,
   PartyHostingState,
+  PartyOwner,
   Serial,
 }
-import com.digitalasset.canton.integration.{PartyTopologyUtils, TestEnvironment}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -24,8 +26,8 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyTransaction,
 }
-import com.digitalasset.canton.version.HashingSchemeVersion
 import org.scalatest.Assertions.fail
+import org.scalatest.EitherValues.*
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.math.Ordering.Implicits.*
@@ -40,7 +42,7 @@ There are two classes extending this trait:
   Deals with parties that are already allocated. In particular, parties are designated
   by their id (type parameter P=PartyId).
  */
-sealed trait PartyToParticipantDeclarativeCommon[P] extends PartyTopologyUtils {
+sealed trait PartyToParticipantDeclarativeCommon[P] {
   def participants: Set[ParticipantReference]
   def synchronizerIds: Set[PhysicalSynchronizerId]
   def targetTopology: Map[
@@ -48,13 +50,11 @@ sealed trait PartyToParticipantDeclarativeCommon[P] extends PartyTopologyUtils {
     Map[PhysicalSynchronizerId, PartyHostingState],
   ]
 
-  def externalParties: Set[ExternalParty] = targetTopology.keys.collect {
-    case externalParty: ExternalParty => externalParty
-  }.toSet
+  def externalParties: Set[ExternalParty]
 
   def allRelevantParties: Set[P]
 
-  protected def partyReference: (PartyToParticipant, HashingSchemeVersion) => P
+  protected def partyReference: PartyId => P
 
   protected val participantReferences: Map[ParticipantId, ParticipantReference] =
     participants.map(p => p.id -> p).toMap
@@ -80,33 +80,25 @@ sealed trait PartyToParticipantDeclarativeCommon[P] extends PartyTopologyUtils {
   ): Map[P, Map[PhysicalSynchronizerId, (Serial, PartyHostingState)]] =
     synchronizerIds
       .flatMap { synchronizerId =>
-        val preferredHashingScheme = HashingSchemeVersion
-          .getHashingSchemeVersionsForProtocolVersion(synchronizerId.protocolVersion)
-          .max1
-
         val relevantResults = participant.topology.party_to_participant_mappings
           .list(synchronizerId.logical)
-          .filter(result =>
-            allRelevantParties.contains(partyReference(result.item, preferredHashingScheme))
-          )
+          .filter(result => allRelevantParties.contains(partyReference(result.item.partyId)))
 
         relevantResults.map { result =>
           val ptp = result.item
-          val party = partyReference(ptp, preferredHashingScheme)
 
           (
-            party,
+            partyReference(ptp.partyId),
             synchronizerId,
             result.context.serial,
             ptp.threshold,
             ptp.participants.map(item => (item.participantId, item.permission)).toSet,
-            ptp.partySigningKeysWithThreshold,
           )
         }
       }
-      .groupMap { case (partyRef, _, _, _, _, _) => partyRef } {
-        case (_, synchronizer, serial, threshold, permissions, partySigningKeys) =>
-          synchronizer -> (serial, PartyHostingState(threshold, permissions, partySigningKeys))
+      .groupMap { case (partyRef, _, _, _, _) => partyRef } {
+        case (_, synchronizer, serial, threshold, permissions) =>
+          synchronizer -> (serial, PartyHostingState(threshold, permissions))
       }
       .view
       .mapValues(_.toMap)
@@ -132,8 +124,15 @@ object PartyToParticipantDeclarativeCommon {
   final case class PartyHostingState(
       confirmationThreshold: PositiveInt,
       hosting: Set[(ParticipantId, ParticipantPermission)],
-      partySigningKeys: Option[SigningKeysWithThreshold],
   )
+
+  def wrapIntoPartyHostingState(
+      targetTopology: Map[
+        PartyId,
+        Map[PhysicalSynchronizerId, (PositiveInt, Set[(ParticipantId, ParticipantPermission)])],
+      ]
+  ): Map[PartyId, Map[PhysicalSynchronizerId, PartyHostingState]] =
+    targetTopology.view.mapValues(_.view.mapValues((PartyHostingState.apply _).tupled).toMap).toMap
 }
 
 /** Attempt to allocate the specified parties and try to reach the target topology.
@@ -146,8 +145,6 @@ object PartyToParticipantDeclarativeCommon {
   *   For each party mentioned in the target topology, owning participant
   * @param targetTopology
   *   For each party, the required target state
-  * @param onboarding
-  *   For each added participant in the target state, whether to specify the onboarding flag
   *
   * Preconditions:
   *   - `participants` is non-empty
@@ -160,34 +157,33 @@ class PartyToParticipantDeclarative(
     val synchronizerIds: Set[PhysicalSynchronizerId],
 )(
     owningParticipants: Map[PartyId, ParticipantId],
+    val externalParties: Set[ExternalParty],
     val targetTopology: Map[
-      Party,
+      PartyId,
       Map[PhysicalSynchronizerId, PartyHostingState],
     ],
-    onboarding: Boolean,
 )(implicit executionContext: ExecutionContext, env: TestEnvironment)
-    extends PartyToParticipantDeclarativeCommon[Party] {
+    extends PartyToParticipantDeclarativeCommon[PartyId] {
 
-  override protected def partyReference: (PartyToParticipant, HashingSchemeVersion) => Party =
-    (ptp, hashingSchemeVersion) => {
-      ptp.partySigningKeysWithThreshold match {
-        case Some(SigningKeysWithThreshold(keys, threshold)) =>
-          ExternalParty(ptp.partyId, keys.map(_.fingerprint).toSeq, threshold, hashingSchemeVersion)
-        case None => ptp.partyId
-      }
-    }
+  override protected def partyReference: PartyId => PartyId = identity
 
-  override def allRelevantParties: Set[Party] =
-    owningParticipants.keySet ++ externalParties
+  override def allRelevantParties: Set[PartyId] =
+    owningParticipants.keySet ++ externalParties.map(_.partyId)
 
   private def defaultParticipant: ParticipantReference = participants.headOption.getOrElse(
     throw new IllegalArgumentException("List of participants should not be empty")
   )
 
+  private def getPartyOwner(partyId: PartyId): PartyOwner = externalParties
+    .find(_.partyId == partyId) match {
+    case Some(externalParty) => External(externalParty)
+    case None => OwningParticipant(getOwningParticipantId(partyId))
+  }
+
   private def flattenTarget(
-      topology: Map[Party, Map[PhysicalSynchronizerId, PartyHostingState]]
+      topology: Map[PartyId, Map[PhysicalSynchronizerId, PartyHostingState]]
   ): Map[
-    (Party, PhysicalSynchronizerId),
+    (PartyId, PhysicalSynchronizerId),
     PartyHostingState,
   ] =
     topology.flatMap { case (partyId, topology) =>
@@ -195,13 +191,13 @@ class PartyToParticipantDeclarative(
     }
 
   private def flattenCurrent(
-      topology: Map[Party, Map[PhysicalSynchronizerId, (Serial, PartyHostingState)]]
+      topology: Map[PartyId, Map[PhysicalSynchronizerId, (Serial, PartyHostingState)]]
   ): Map[
-    (Party, PhysicalSynchronizerId),
+    (PartyId, PhysicalSynchronizerId),
     (Serial, PartyHostingState),
   ] =
-    topology.flatMap { case (party, topology) =>
-      topology.map { case (synchronizer, hostingState) => (party, synchronizer) -> hostingState }
+    topology.flatMap { case (partyId, topology) =>
+      topology.map { case (synchronizer, hostingState) => (partyId, synchronizer) -> hostingState }
     }
 
   def run(force: ForceFlags = ForceFlags.none): Unit = {
@@ -215,48 +211,51 @@ class PartyToParticipantDeclarative(
 
     val result: Seq[Future[Unit]] = current.flatMap {
       case (
-            (party, psid),
-            (
-              currentSerialO,
-              PartyHostingState(currentThreshold, currentHosting, currentPartySigningKeys),
-            ),
+            (partyId, psid),
+            (currentSerialO, PartyHostingState(currentThreshold, currentHosting)),
           ) =>
         val currentParticipantToPermission: Map[ParticipantId, ParticipantPermission] =
           currentHosting.toMap
 
-        target.get((party, psid)) match {
-          case Some(PartyHostingState(targetThreshold, targetHosting, targetPartySigningKeys))
-              if targetHosting.nonEmpty =>
+        target.get((partyId, psid)) match {
+          case Some(PartyHostingState(targetThreshold, targetHosting)) if targetHosting.nonEmpty =>
             val changeRequired =
-              currentHosting != targetHosting || currentThreshold != targetThreshold || currentPartySigningKeys != targetPartySigningKeys
+              currentHosting != targetHosting || currentThreshold != targetThreshold
 
             if (changeRequired) {
               authorizeChange(
-                party,
+                partyId,
                 psid,
                 currentParticipantToPermission,
                 targetThreshold,
                 targetHosting = targetHosting,
                 currentSerialO = currentSerialO,
                 forceFlags = force,
-                targetPartySigningKeys = targetPartySigningKeys,
               )
             } else Nil
 
           case _ => // removing the party from the synchronizer
-            Seq(Future {
-              party.topology.party_to_participant_mappings
-                .propose_delta(
-                  owningParticipants
-                    .get(party.partyId)
-                    .map(getParticipantReference)
-                    .getOrElse(defaultParticipant),
-                  removes = currentParticipantToPermission.keySet.toSeq,
-                  store = psid,
-                  forceFlags = force,
-                )
-                .discard
-            })
+            getPartyOwner(partyId) match {
+              case OwningParticipant(owningParticipant) =>
+                Seq(Future {
+                  getParticipantReference(owningParticipant).topology.party_to_participant_mappings
+                    .propose_delta(
+                      partyId,
+                      removes = currentParticipantToPermission.keySet.toSeq,
+                      store = psid,
+                      forceFlags = force,
+                    )
+                    .discard
+                })
+
+              case External(externalParty) =>
+                Seq(Future {
+                  defaultParticipant.topology.party_to_participant_mappings.sign_and_remove(
+                    externalParty,
+                    psid,
+                  )
+                })
+            }
         }
     }.toSeq
 
@@ -266,7 +265,6 @@ class PartyToParticipantDeclarative(
     val expectedTopology =
       targetTopology.view
         .mapValues(_.filter { case (_, hosting) => hosting.hosting.nonEmpty })
-        .filter { case (_, hosting) => hosting.nonEmpty }
         .toMap
 
     participants.toSeq.foreach { p =>
@@ -279,15 +277,15 @@ class PartyToParticipantDeclarative(
   }
 
   private def authorizeChange(
-      party: Party,
+      partyId: PartyId,
       psid: PhysicalSynchronizerId,
       currentParticipantToPermission: Map[ParticipantId, ParticipantPermission],
       targetThreshold: PositiveInt,
       targetHosting: Set[(ParticipantId, ParticipantPermission)],
       currentSerialO: Option[Serial],
       forceFlags: ForceFlags,
-      targetPartySigningKeys: Option[SigningKeysWithThreshold],
   ): Seq[Future[Unit]] = {
+
     val newParticipants: Set[ParticipantId] = targetHosting.collect {
       case (participantId, targetPermissions)
           // permission of the participant is required when upgrading the hosting relationship
@@ -295,13 +293,10 @@ class PartyToParticipantDeclarative(
         participantId
     }
 
-    val owningParticipant = getOwningParticipantIdO(party).toList.toSet
+    val partyOwner = getPartyOwner(partyId)
+    val owningParticipant = partyOwner.toOwningParticipant.toList.toSet
+
     val authorizingParticipants = newParticipants ++ owningParticipant
-    val onboardingParticipants =
-      if (onboarding) (targetHosting.map { case (pid, _) =>
-        pid
-      } -- currentParticipantToPermission.keySet)
-      else Set.empty[ParticipantId]
 
     val participantAuthorizations = authorizingParticipants
       .map(getParticipantReference)
@@ -309,14 +304,12 @@ class PartyToParticipantDeclarative(
         Future {
           participant.topology.party_to_participant_mappings
             .propose(
-              party = party.partyId,
+              party = partyId,
               newParticipants = targetHosting.toSeq,
               threshold = targetThreshold,
               store = psid,
               forceFlags = forceFlags,
               serial = Some(currentSerialO.fold(PositiveInt.one)(_.increment)),
-              partySigningKeys = targetPartySigningKeys,
-              participantsRequiringPartyToBeOnboarded = onboardingParticipants.toSeq,
             )
             .discard
         }
@@ -324,23 +317,13 @@ class PartyToParticipantDeclarative(
       .toSeq
 
     // If the party is external, it needs to authorize the new mapping
-    party match {
-      case externalParty: ExternalParty =>
-        val newPTP = createPTPMapping(
-          externalParty.partyId,
-          psid,
-          targetThreshold,
-          targetHosting,
-          currentSerialO,
-          targetPartySigningKeys,
-          onboardingParticipants,
-        )
+    partyOwner.toExternal.foreach { externalParty =>
+      val newPTP = createPTPMapping(partyId, psid, targetThreshold, targetHosting, currentSerialO)
 
-        defaultParticipant.topology.transactions.load(
-          Seq(env.global_secret.sign(newPTP, externalParty, psid.protocolVersion)),
-          psid,
-        )
-      case _ =>
+      defaultParticipant.topology.transactions.load(
+        Seq(env.global_secret.sign(newPTP, externalParty, psid.protocolVersion)),
+        psid,
+      )
     }
 
     participantAuthorizations
@@ -352,8 +335,6 @@ class PartyToParticipantDeclarative(
       targetThreshold: PositiveInt,
       targetHosting: Set[(ParticipantId, ParticipantPermission)],
       currentSerialO: Option[Serial],
-      signingKeysWithThreshold: Option[SigningKeysWithThreshold],
-      onboardingParticipants: Set[ParticipantId],
   ): TopologyTransaction[TopologyChangeOp.Replace, PartyToParticipant] = TopologyTransaction(
     TopologyChangeOp.Replace,
     serial = currentSerialO.fold(PositiveInt.one)(_.increment),
@@ -362,22 +343,12 @@ class PartyToParticipantDeclarative(
         partyId,
         threshold = targetThreshold,
         targetHosting.map { case (participant, permission) =>
-          HostingParticipant(
-            participant,
-            permission,
-            onboarding = onboardingParticipants.contains(participant),
-          )
+          HostingParticipant(participant, permission, onboarding = false)
         }.toSeq,
-        partySigningKeysWithThreshold = signingKeysWithThreshold,
       )
       .value,
     protocolVersion = psid.protocolVersion,
   )
-
-  private def getOwningParticipantIdO(party: Party): Option[ParticipantId] = party match {
-    case _: ExternalParty => None
-    case partyId: PartyId => Some(getOwningParticipantId(partyId))
-  }
 
   private def getOwningParticipantId(partyId: PartyId): ParticipantId =
     owningParticipants.getOrElse(
@@ -388,15 +359,12 @@ class PartyToParticipantDeclarative(
     )
 
   private def sanityChecks(): Unit =
-    targetTopology.keySet.foreach {
-      case partyId: PartyId =>
-        if (!owningParticipants.isDefinedAt(partyId)) {
-          throw new IllegalArgumentException(
-            s"Local party $partyId should be mentioned in owningParticipants"
-          )
-        }
-      case _ =>
-    }
+    targetTopology.keySet.foreach(partyId =>
+      if (!owningParticipants.isDefinedAt(partyId) && isExternal(partyId).isEmpty)
+        throw new IllegalArgumentException(
+          s"Party $partyId should be mentioned in owningParticipants or should be external"
+        )
+    )
 }
 
 object PartyToParticipantDeclarative {
@@ -406,64 +374,34 @@ object PartyToParticipantDeclarative {
   )(
       owningParticipants: Map[PartyId, ParticipantId],
       targetTopology: Map[
-        Party,
+        PartyId,
         Map[PhysicalSynchronizerId, (PositiveInt, Set[(ParticipantId, ParticipantPermission)])],
       ],
+      externalParties: Set[ExternalParty] = Set.empty,
       forceFlags: ForceFlags = ForceFlags.none,
-      onboarding: Boolean = false, // participants added in target topology are marked as onboarding
-  )(implicit executionContext: ExecutionContext, env: TestEnvironment): Unit = {
-    val participantReference = participants.headOption.getOrElse(
-      fail("No participant set in PartyToParticipantDeclarative")
-    )
-    val signingKeysPerPartyPerSynchronizer = targetTopology.values
-      .flatMap(_.keySet)
-      .map { synchronizer =>
-        synchronizer ->
-          participantReference.topology.party_to_participant_mappings
-            .list(synchronizer)
-            .flatMap(result =>
-              result.item.partySigningKeysWithThreshold.map(result.item.partyId -> _)
-            )
-            .toMap
-      }
-      .toMap
-
+  )(implicit executionContext: ExecutionContext, env: TestEnvironment): Unit =
     new PartyToParticipantDeclarative(participants, synchronizerIds)(
       owningParticipants,
-      targetTopology.map {
-        // For external parties, lookup their signing keys from the synchronizer's topology
-        case (external: ExternalParty, target) =>
-          external -> target.view.map { case (synchronizer, (threshold, hosting)) =>
-            val signingKeys =
-              signingKeysPerPartyPerSynchronizer.get(synchronizer).flatMap(_.get(external.partyId))
-            synchronizer -> PartyHostingState(threshold, hosting, signingKeys)
-          }.toMap
-
-        case (partyId: PartyId, target) =>
-          partyId -> target.view
-            .mapValues { case (threshold, hosting) =>
-              (threshold, hosting, Option.empty[SigningKeysWithThreshold])
-            }
-            .mapValues((PartyHostingState.apply _).tupled)
-            .toMap
-      },
-      onboarding,
+      externalParties,
+      targetTopology.view
+        .mapValues(_.view.mapValues((PartyHostingState.apply _).tupled).toMap)
+        .toMap,
     ).run(forceFlags)
-  }
 
   def forParty(
       participants: Set[ParticipantReference],
       synchronizerId: PhysicalSynchronizerId,
   )(
       owningParticipant: ParticipantId,
-      party: Party,
+      partyId: PartyId,
       threshold: PositiveInt,
       hosting: Set[(ParticipantId, ParticipantPermission)],
       forceFlags: ForceFlags = ForceFlags.none,
   )(implicit executionContext: ExecutionContext, env: TestEnvironment): Unit =
     apply(participants, Set(synchronizerId))(
-      Map(party.partyId -> owningParticipant),
-      Map(party -> Map(synchronizerId -> (threshold, hosting))),
+      Map(partyId -> owningParticipant),
+      Map(partyId -> Map(synchronizerId -> (threshold, hosting))),
+      Set.empty[ExternalParty],
       forceFlags,
     )
 }
@@ -500,8 +438,7 @@ class PartiesAllocator(
 
   override def allRelevantParties: Set[String] = newParties.map { case (name, _) => name }.toSet
 
-  override protected def partyReference: (PartyToParticipant, HashingSchemeVersion) => String =
-    (ptp, _) => ptp.partyId.identifier.str
+  override protected def partyReference: PartyId => String = _.identifier.str
 
   def run(): Seq[PartyId] = {
     val result = for {
@@ -519,8 +456,7 @@ class PartiesAllocator(
         .valueOr(err =>
           throw new RuntimeException(s"Unable to create party id for $partyName: $err")
         )
-      (synchronizerId, PartyHostingState(threshold, hostingParticipants, _partySigningKeys)) <-
-        topology
+      (synchronizerId, PartyHostingState(threshold, hostingParticipants)) <- topology
       hostingParticipantIds = hostingParticipants.map { case (id, _) => id }
       authorizingParticipantsId = hostingParticipantIds + owningParticipantId
       authorizingParticipants = authorizingParticipantsId.map(getParticipantReference)
@@ -577,15 +513,7 @@ object PartiesAllocator {
     new PartiesAllocator(participants)(
       newParties,
       targetTopology.view
-        .mapValues(
-          _.view
-            // TODO(i29008): Support onboarding of external parties by setting SigningKeysWithThreshold
-            .mapValues { case (threshold, hosting) =>
-              (threshold, hosting, Option.empty[SigningKeysWithThreshold])
-            }
-            .mapValues((PartyHostingState.apply _).tupled)
-            .toMap
-        )
+        .mapValues(_.view.mapValues((PartyHostingState.apply _).tupled).toMap)
         .toMap,
     ).run()
 }

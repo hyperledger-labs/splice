@@ -48,7 +48,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
@@ -813,15 +812,6 @@ abstract class ScanAppReference(
       ).map(_.runWith(StreamConverters.fromOutputStream(() => output)).map(_.count))
     }
 
-  @Help.Summary(
-    "Get the current physical synchronizer serial as reported by the SV participant"
-  )
-  def getActivePhysicalSynchronizerSerial(): NonNegativeInt =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpScanAppClient.GetActivePhysicalSynchronizerSerial()
-      )
-    }
 }
 
 final class ScanAppBackendReference(

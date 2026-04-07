@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation
@@ -207,21 +207,6 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
 
       val result =
         validator.validateViewChangeMessage(viewChangeMsg(view1, Seq[ConsensusCertificate](pc, cc)))
-
-      result shouldBe Right(())
-    }
-
-    "successfully validate message with commit certificate from higher (or equal) view" in {
-      val validator =
-        new ViewChangeMessageValidator(Membership.forTesting(myId), blockNumbers)
-
-      val pp1 = prePrepare(epochNumber, 1L, view1)
-
-      val cc =
-        CommitCertificate(pp1, Seq(commit(epochNumber, 1L, pp1.message.hash, viewNumber = 1L)))
-
-      val result =
-        validator.validateViewChangeMessage(viewChangeMsg(view1, Seq[ConsensusCertificate](cc)))
 
       result shouldBe Right(())
     }

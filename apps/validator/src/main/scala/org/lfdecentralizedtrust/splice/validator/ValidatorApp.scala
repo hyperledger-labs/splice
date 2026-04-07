@@ -336,11 +336,7 @@ class ValidatorApp(
                 _ <-
                   MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
                     synchronizerId =>
-                      packageVetting.vetCurrentPackages(
-                        synchronizerId,
-                        amuletRules,
-                        config.additionalPackagesToUnvet,
-                      )
+                      packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
                   }
               } yield ()
             }
@@ -899,15 +895,14 @@ class ValidatorApp(
         config.domainMigrationId,
         retryProvider,
         config.svValidator,
-        config.sequencerRequestAmplificationPatience.toInternal,
-        config.sequencerConnectionPoolDelays.toInternal,
+        config.sequencerRequestAmplificationPatience,
+        config.sequencerConnectionPoolDelays,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
         config.parameters.enabledFeatures,
-        config.additionalPackagesToUnvet,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

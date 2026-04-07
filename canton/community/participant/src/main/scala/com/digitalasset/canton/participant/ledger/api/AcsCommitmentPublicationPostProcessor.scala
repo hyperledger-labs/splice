@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
@@ -6,7 +6,7 @@ package com.digitalasset.canton.participant.ledger.api
 import com.digitalasset.canton.ledger.participant.state.Update.{
   AcsChangeSequencedUpdate,
   EmptyAcsPublicationRequired,
-  LsuTimeReached,
+  LogicalSynchronizerUpgradeTimeReached,
 }
 import com.digitalasset.canton.ledger.participant.state.{
   AcsChangeFactory,
@@ -48,27 +48,31 @@ class AcsCommitmentPublicationPostProcessor(
 
     update match {
       case updateWithAcsChangeFactory: AcsChangeSequencedUpdate =>
+        val (synchronizerId, synchronizerIndex) = updateWithAcsChangeFactory.synchronizerIndex
         publishAcsCommitment(
-          updateWithAcsChangeFactory.synchronizerId,
-          updateWithAcsChangeFactory.synchronizerIndex,
+          synchronizerId,
+          synchronizerIndex,
           Some(updateWithAcsChangeFactory.acsChangeFactory),
         )
 
       case emptyAcsPublicationRequired: EmptyAcsPublicationRequired =>
+        val (synchronizerId, synchronizerIndex) = emptyAcsPublicationRequired.synchronizerIndex
         publishAcsCommitment(
-          emptyAcsPublicationRequired.synchronizerId,
-          emptyAcsPublicationRequired.synchronizerIndex,
+          synchronizerId,
+          synchronizerIndex,
           acsChangeFactoryO = None,
         )
 
-      case upgradeTimeReached: LsuTimeReached =>
+      case upgradeTimeReached: LogicalSynchronizerUpgradeTimeReached =>
+        val (synchronizerId, synchronizerIndex) = upgradeTimeReached.synchronizerIndex
+
         connectedSynchronizersLookupContainer
           // not publishing if not connected to synchronizer: it means subsequent crash recovery will establish consistency again
-          .get(upgradeTimeReached.synchronizerId)
+          .get(synchronizerId)
           // not publishing anything if the AcsCommitmentProcessor initialization succeeded with AbortedDueToShutdown or failed
           .foreach(
             _.acsCommitmentProcessor.publishForUpgradeTime(
-              upgradeTimeReached.synchronizerIndex.recordTime
+              synchronizerIndex.recordTime
             )(
               // The trace context is deliberately generated here instead of continuing the one for the Update
               // to unlink the asynchronous acs commitment processing from message processing trace.

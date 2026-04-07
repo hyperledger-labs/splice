@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.memory
@@ -9,7 +9,6 @@ import com.digitalasset.canton.store.{
   PendingOperationStore,
   PendingOperationStoreTest,
 }
-import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
 import scala.concurrent.Future
@@ -18,17 +17,17 @@ class InMemoryPendingOperationStoreTest
     extends PendingOperationStoreTest[TestPendingOperationMessage] {
 
   override protected def insertCorruptedData(
-      op: PendingOperation[TestPendingOperationMessage, SynchronizerId],
-      store: Option[PendingOperationStore[TestPendingOperationMessage, SynchronizerId]],
+      op: PendingOperation[TestPendingOperationMessage],
+      store: Option[PendingOperationStore[TestPendingOperationMessage]],
       corruptOperationBytes: Option[ByteString] = None,
   ): Future[Unit] = {
     // Cast the store to its concrete type to access its internal state
     val inMemoryStore =
-      store.value
-        .asInstanceOf[InMemoryPendingOperationStore[TestPendingOperationMessage, SynchronizerId]]
+      store.value.asInstanceOf[InMemoryPendingOperationStore[TestPendingOperationMessage]]
 
     val corruptStoredOp = InMemoryPendingOperationStore.StoredPendingOperation(
-      synchronizer = op.synchronizer,
+      trigger = op.trigger.asString,
+      serializedSynchronizerId = op.synchronizerId.toProtoPrimitive,
       key = op.key,
       name = op.name.unwrap,
       serializedOperation = corruptOperationBytes.getOrElse(op.operation.toByteString),

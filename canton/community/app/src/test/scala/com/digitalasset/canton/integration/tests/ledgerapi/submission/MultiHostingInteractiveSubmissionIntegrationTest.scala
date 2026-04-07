@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.submission
@@ -59,7 +59,7 @@ sealed trait MultiHostingInteractiveSubmissionIntegrationTest
 
         // Create a multi hosted party for this test suite
         val (onboardingTransactions, externalParty) =
-          participant1.parties.testing.external
+          participant1.parties.external
             .onboarding_transactions(
               "Alice",
               additionalConfirming = Seq(participant2),
@@ -112,11 +112,7 @@ sealed trait MultiHostingInteractiveSubmissionIntegrationTest
       // Stop one of the 2 CPNs - threshold is 2 so the transaction cannot be committed
       participant2.stop()
       val prepared = ppn.ledger_api.interactive_submission
-        .prepare(
-          Seq(aliceE),
-          Seq(createCycleCommand(aliceE, "test-external-signing")),
-          hashingSchemeVersion = testedApiHashingSchemeVersion,
-        )
+        .prepare(Seq(aliceE), Seq(createCycleCommand(aliceE, "test-external-signing")))
 
       val signatures = global_secret.sign(prepared.preparedTransactionHash, aliceE)
       val (submissionId, ledgerEnd) = exec(prepared, Map(aliceE.partyId -> signatures), epn)

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.services
@@ -33,7 +33,6 @@ object InteractiveSubmissionService {
       verboseHashing: Boolean,
       maxRecordTime: Option[LfTimestamp],
       costEstimationHints: Option[CostEstimationHints],
-      hashingSchemeVersion: HashingSchemeVersion,
   )
 
   final case class ExecuteRequest(
@@ -43,6 +42,7 @@ object InteractiveSubmissionService {
       signatures: Map[PartyId, Seq[Signature]],
       preparedTransaction: PreparedTransaction,
       serializationVersion: HashingSchemeVersion,
+      synchronizerId: SynchronizerId,
       tentativeLedgerEffectiveTime: LfTimestamp,
   )
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
@@ -14,13 +14,13 @@ import scala.concurrent.{ExecutionContext, Future}
 object AsyncSupport {
 
   trait Executor {
-    def execute[Fin, Fout](f: Fin => Fout): Fin => Future[Fout]
+    def execute[FIN, FOUT](f: FIN => FOUT): FIN => Future[FOUT]
   }
 
   object Executor {
     def forExecutionContext(executionContext: ExecutionContext): Executor =
       new Executor {
-        override def execute[Fin, Fout](f: Fin => Fout): Fin => Future[Fout] =
+        override def execute[FIN, FOUT](f: FIN => FOUT): FIN => Future[FOUT] =
           in => Future(f(in))(executionContext)
       }
   }

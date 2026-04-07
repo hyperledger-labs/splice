@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -53,13 +53,14 @@ class EventReaderQueries(stringInterning: StringInterning) {
           witnessIsAcsDelta = true,
           eventIsAcsDeltaForParticipant = true,
         )
-        .querySingleOptRow(
+        .queryMultipleRows(
           queryByInternalContractId(
             tableName = "lapi_events_activate_contract",
             eventType = PersistentEventType.Create,
             ascending = true,
           )
         )(connection)
+        .headOption
 
     def lookupDeactivateArchived: Option[RawArchivedEvent] =
       RowDefs
@@ -68,13 +69,14 @@ class EventReaderQueries(stringInterning: StringInterning) {
           allQueryingPartiesO = requestingParties,
           acsDeltaForParticipant = true,
         )
-        .querySingleOptRow(
+        .queryMultipleRows(
           queryByInternalContractId(
             tableName = "lapi_events_deactivate_contract",
             eventType = PersistentEventType.ConsumingExercise,
             ascending = false,
           )
         )(connection)
+        .headOption
 
     def lookupWitnessedCreated: Option[RawThinCreatedEvent] =
       RowDefs
@@ -84,13 +86,14 @@ class EventReaderQueries(stringInterning: StringInterning) {
           witnessIsAcsDelta = true,
           eventIsAcsDeltaForParticipant = false,
         )
-        .querySingleOptRow(
+        .queryMultipleRows(
           queryByInternalContractId(
             tableName = "lapi_events_various_witnessed",
             eventType = PersistentEventType.WitnessedCreate,
             ascending = true,
           )
         )(connection)
+        .headOption
 
     def lookupTransientArchived(createOffset: Long): Option[RawArchivedEvent] =
       RowDefs
@@ -99,7 +102,7 @@ class EventReaderQueries(stringInterning: StringInterning) {
           allQueryingPartiesO = requestingParties,
           acsDeltaForParticipant = false,
         )
-        .querySingleOptRow(columns => SQL"""
+        .queryMultipleRows(columns => SQL"""
                SELECT $columns
                FROM lapi_events_various_witnessed
                WHERE
@@ -110,6 +113,7 @@ class EventReaderQueries(stringInterning: StringInterning) {
                ORDER BY event_sequential_id
                LIMIT 1
                """)(connection)
+        .headOption
 
     lookupActivateCreated
       .map(create => Some(create) -> lookupDeactivateArchived)

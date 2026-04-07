@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.traffic.store.db
@@ -20,7 +20,6 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.util.{BatchAggregator, ErrorUtil}
 
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 
 class DbTrafficPurchasedStore(
@@ -46,7 +45,7 @@ class DbTrafficPurchasedStore(
       override def executeBatch(items: NonEmpty[Seq[Traced[TrafficPurchased]]])(implicit
           traceContext: TraceContext,
           callerCloseContext: CloseContext,
-      ): FutureUnlessShutdown[immutable.Iterable[Unit]] = {
+      ): FutureUnlessShutdown[Iterable[Unit]] = {
         val uniqueMembers = items.map(_.value.member).distinct
 
         for {
@@ -202,19 +201,5 @@ class DbTrafficPurchasedStore(
       sql"select initial_timestamp from seq_traffic_control_initial_timestamp order by initial_timestamp desc limit 1"
 
     storage.query(query.as[CantonTimestamp].headOption, functionFullName)
-  }
-
-  /** Truncates the entire traffic purchased store. To be used only on sequencer initialization to
-    * clean up partial state.
-    */
-  override def truncate()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    val truncateBalances =
-      sqlu"truncate table seq_traffic_control_balance_updates"
-    val truncateInitialTimestamp =
-      sqlu"truncate table seq_traffic_control_initial_timestamp"
-
-    storage
-      .update(truncateBalances.andThen(truncateInitialTimestamp), functionFullName)
-      .map(_ => ())
   }
 }

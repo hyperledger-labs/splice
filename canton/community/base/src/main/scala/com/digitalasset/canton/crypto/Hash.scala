@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -8,6 +8,8 @@ import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.CryptoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.String68
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
@@ -40,7 +42,8 @@ import slick.jdbc.{GetResult, SetParameter}
   * by increasing the allowed characters for varchar's in the DBs.
   */
 sealed abstract class HashAlgorithm(val name: String, val index: Long, val length: Long)
-    extends PrettyPrinting {
+    extends PrettyPrinting
+    with UniformCantonConfigValidation {
   def toProtoEnum: v30.HashAlgorithm
 
   override protected def pretty: Pretty[HashAlgorithm] = prettyOfString(_.name)
@@ -51,6 +54,9 @@ sealed abstract class HashAlgorithm(val name: String, val index: Long, val lengt
 object HashAlgorithm {
 
   implicit val hashAlgorithmOrder: Order[HashAlgorithm] = Order.by[HashAlgorithm, Long](_.index)
+
+  implicit val hashAlgorithmCantonConfigValidator: CantonConfigValidator[HashAlgorithm] =
+    CantonConfigValidatorDerivation[HashAlgorithm]
 
   val algorithms: Map[Long, HashAlgorithm] = Map {
     0x12L -> Sha256
@@ -125,21 +131,25 @@ final case class Hash private (
 
 object Hash {
 
-  implicit def setParameterHash(implicit
-      setByteString: SetParameter[ByteString]
-  ): SetParameter[Hash] =
-    setByteString.contramap(_.getCryptographicEvidence)
+  implicit val setParameterHash: SetParameter[Hash] = (hash, pp) => {
+    import com.digitalasset.canton.resource.DbStorage.Implicits.setParameterByteString
+    pp.>>(hash.getCryptographicEvidence)
+  }
 
-  implicit def getResultHash(implicit getByteString: GetResult[ByteString]): GetResult[Hash] =
-    getByteString.andThen(tryFromByteString)
+  implicit val getResultHash: GetResult[Hash] = GetResult { r =>
+    import com.digitalasset.canton.resource.DbStorage.Implicits.getResultByteString
+    tryFromByteString(r.<<)
+  }
 
-  implicit def setParameterOptionHash(implicit
-      setByteString: SetParameter[Option[ByteString]]
-  ): SetParameter[Option[Hash]] = setByteString.contramap(_.map(_.getCryptographicEvidence))
+  implicit val setParameterOptionHash: SetParameter[Option[Hash]] = (hash, pp) => {
+    import com.digitalasset.canton.resource.DbStorage.Implicits.setParameterByteStringOption
+    pp.>>(hash.map(_.getCryptographicEvidence))
+  }
 
-  implicit def getResultOptionHash(implicit
-      getByteString: GetResult[Option[ByteString]]
-  ): GetResult[Option[Hash]] = getByteString.andThen(_.map(tryFromByteString))
+  implicit val getResultOptionHash: GetResult[Option[Hash]] = GetResult { r =>
+    import com.digitalasset.canton.resource.DbStorage.Implicits.getResultByteStringOption
+    (r.<<[Option[ByteString]]).map(bytes => tryFromByteString(bytes))
+  }
 
   val getResultHashFromHexString = GetResult[Hash] { r =>
     val hexString = r.<<[String]

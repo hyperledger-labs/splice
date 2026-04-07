@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -6,19 +6,14 @@ package com.digitalasset.canton.data
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, Stakeholders}
-import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.{LfPackageId, ReassignmentCounter}
-import com.digitalasset.daml.lf.data.Ref.{PackageName, TypeConId}
 
 final case class ContractReassignment(
     contract: ContractInstance,
-    sourceValidationPackageId: Source[LfPackageId],
-    targetValidationPackageId: Target[LfPackageId],
     counter: ReassignmentCounter,
 ) {
-  // TODO(#26468): Use source/target validation package ids for vetting checks in phase 3
-  def templateId: TypeConId = contract.inst.templateId
-  def packageName: PackageName = contract.inst.packageName
+  def templateId = contract.inst.templateId
+  def packageName = contract.inst.packageName
 }
 
 final case class ContractsReassignmentBatch private (
@@ -30,15 +25,7 @@ final case class ContractsReassignmentBatch private (
     item => (item.contract.contractId, item.counter)
   }
 
-  // TODO(#29199): Use source/target validation package ids for vetting checks
   def packageIds: Set[LfPackageId] = contracts.view.map(_.templateId.packageId).toSet
-
-  def sourcePackageIds: Source[Set[LfPackageId]] = Source(
-    contracts.view.map(_.sourceValidationPackageId.unwrap).toSet
-  )
-  def targetPackageIds: Target[Set[LfPackageId]] = Target(
-    contracts.view.map(_.targetValidationPackageId.unwrap).toSet
-  )
 
   def stakeholders: Stakeholders = Stakeholders(contracts.head1.contract.metadata)
 }
@@ -51,40 +38,25 @@ object ContractsReassignmentBatch {
 
   def apply(
       contract: ContractInstance,
-      sourceValidationPackageId: Source[LfPackageId],
-      targetValidationPackageId: Target[LfPackageId],
       reassignmentCounter: ReassignmentCounter,
   ): ContractsReassignmentBatch = new ContractsReassignmentBatch(
-    NonEmpty.mk(
-      Seq,
-      ContractReassignment(
-        contract,
-        sourceValidationPackageId,
-        targetValidationPackageId,
-        reassignmentCounter,
-      ),
-    )
+    NonEmpty.mk(Seq, ContractReassignment(contract, reassignmentCounter))
   )
 
   def partition(
-      contractCounters: Seq[
-        (ContractInstance, Source[LfPackageId], Target[LfPackageId], ReassignmentCounter)
-      ]
+      contractCounters: Seq[(ContractInstance, ReassignmentCounter)]
   ): Seq[ContractsReassignmentBatch] =
     contractCounters
-      .groupBy1 { case (contract, _, _, _) => Stakeholders(contract.metadata) }
+      .groupBy1 { case (contract, _) => Stakeholders(contract.metadata) }
       .map { case (_, byStakeholder) =>
-        new ContractsReassignmentBatch(byStakeholder.map {
-          case (contract, sourceValidationId, targetValidationId, counter) =>
-            ContractReassignment(contract, sourceValidationId, targetValidationId, counter)
+        new ContractsReassignmentBatch(byStakeholder.map { case (contract, counter) =>
+          ContractReassignment(contract, counter)
         })
       }
       .toSeq
 
   def create(
-      contractCounters: Seq[
-        (ContractInstance, Source[LfPackageId], Target[LfPackageId], ReassignmentCounter)
-      ]
+      contractCounters: Seq[(ContractInstance, ReassignmentCounter)]
   ): Either[InvalidReassignmentBatch, ContractsReassignmentBatch] =
     partition(contractCounters) match {
       case Nil => Left(EmptyBatch)

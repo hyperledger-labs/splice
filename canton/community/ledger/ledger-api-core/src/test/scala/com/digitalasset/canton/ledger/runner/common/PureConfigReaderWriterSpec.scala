@@ -1,11 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.runner.common
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.digitalasset.canton.config
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.ledger.runner.common.OptConfigValue.{
   optReaderEnabled,
   optWriterEnabled,
@@ -18,7 +16,6 @@ import com.digitalasset.canton.platform.config.{
   UserManagementServiceConfig,
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
-import com.digitalasset.canton.platform.indexer.IndexerConfig.AchsConfig
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
 import com.digitalasset.canton.platform.store.DbSupport.ParticipantDataSourceConfig
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
@@ -77,7 +74,6 @@ class PureConfigReaderWriterSpec
     testReaderWriterIsomorphism(secure, ArbitraryConfig.connectionPoolConfig)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.postgresDataSourceConfig)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.dataSourceProperties)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.achsConfig)
     testReaderWriterIsomorphism(
       secure,
       ArbitraryConfig.rateLimitingConfig,
@@ -250,18 +246,13 @@ class PureConfigReaderWriterSpec
         |  synchronous-commit = on
         |  tcp-keepalives-idle = 9
         |  tcp-keepalives-interval = 99
-        |  tcp-keepalives-count = 999
-        |  client-connection-check-interval = 111ms
-        |  network-timeout = 222s
-        """.stripMargin
+        |  tcp-keepalives-count = 999""".stripMargin
 
     convert(dbConfigPostgresDataSourceConfigConvert, value).value shouldBe PostgresDataSourceConfig(
       synchronousCommit = Some(SynchronousCommitValue.On),
       tcpKeepalivesIdle = Some(9),
       tcpKeepalivesInterval = Some(99),
       tcpKeepalivesCount = Some(999),
-      clientConnectionCheckInterval = Some(config.NonNegativeFiniteDuration.ofMillis(111)),
-      networkTimeout = Some(config.NonNegativeFiniteDuration.ofSeconds(222)),
     )
   }
 
@@ -274,45 +265,9 @@ class PureConfigReaderWriterSpec
     convert(dbConfigPostgresDataSourceConfigConvert, value).value shouldBe PostgresDataSourceConfig(
       synchronousCommit = Some(SynchronousCommitValue.On),
       tcpKeepalivesIdle = Some(9),
+      tcpKeepalivesInterval = PostgresDataSourceConfig().tcpKeepalivesInterval,
+      tcpKeepalivesCount = PostgresDataSourceConfig().tcpKeepalivesCount,
     )
-  }
-
-  behavior of "AchsConfig"
-
-  private val validAchsConfigValue =
-    """
-      |  valid-at-distance-target = 10
-      |  last-populated-distance-target = 500000
-      |  """.stripMargin
-
-  it should "support valid keys" in {
-    val value = validAchsConfigValue
-    convert(
-      achsConfigConvert,
-      value,
-    ).value shouldBe AchsConfig(
-      validAtDistanceTarget = NonNegativeLong.tryCreate(10L),
-      lastPopulatedDistanceTarget = NonNegativeLong.tryCreate(500000L),
-    )
-  }
-
-  it should "not support negative values" in {
-    val value =
-      """
-        |  valid-at-distance-target = -10
-        |  last-populated-distance-target = 500000
-      """.stripMargin
-
-    convert(
-      achsConfigConvert,
-      value,
-    ).left.value.prettyPrint(0) should include("negative")
-  }
-
-  it should "not support invalid keys" in {
-    val value = "unknown-key=yes\n" + validAchsConfigValue
-    convert(achsConfigConvert, value).left.value
-      .prettyPrint(0) should include("Unknown key")
   }
 
   behavior of "CommandServiceConfig"
@@ -422,23 +377,6 @@ class PureConfigReaderWriterSpec
     convert(indexerConfigConvert, value).left.value.prettyPrint(0) should include(
       "Unknown key"
     )
-  }
-
-  it should "support explicit setting of AchsConfig" in {
-    val value =
-      """achs-config {
-        |    valid-at-distance-target = 100
-        |    last-populated-distance-target = 50
-        |}""".stripMargin + validIndexerConfigValue
-    convert(indexerConfigConvert, value).value shouldBe
-      IndexerConfig(achsConfig =
-        Some(
-          AchsConfig(
-            validAtDistanceTarget = NonNegativeLong.tryCreate(100L),
-            lastPopulatedDistanceTarget = NonNegativeLong.tryCreate(50L),
-          )
-        )
-      )
   }
 
   behavior of "IndexServiceConfig"

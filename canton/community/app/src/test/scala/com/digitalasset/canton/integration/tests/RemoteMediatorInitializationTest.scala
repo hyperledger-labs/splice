@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.RemoteMediatorReference
 import com.digitalasset.canton.crypto.{KeyPurpose, SigningPublicKeyWithName}
@@ -10,7 +11,7 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseExternalProcess}
+import com.digitalasset.canton.integration.plugins.{UseExternalProcess, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -45,7 +46,7 @@ class RemoteMediatorInitializationTest extends CommunityIntegrationTest with Sha
     }
 
   registerPlugin(externalPlugin)
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   protected def setup(env: TestConsoleEnvironment): Unit = {
     import env.*

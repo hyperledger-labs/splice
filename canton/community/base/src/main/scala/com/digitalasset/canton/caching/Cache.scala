@@ -1,9 +1,7 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.caching
-
-import scala.collection.concurrent.Map as ConcurrentMap
 
 /** A cache. Used for caching values.
   *
@@ -50,10 +48,6 @@ abstract class Cache[Key, Value] {
   ): Cache[Key, NewValue] =
     new MappedCache(mapAfterReading, mapBeforeWriting)(this)
 
-  /** Removes all cached entries with a key present in the provided collection.
-    */
-  def invalidateAll(items: Iterable[Key]): Unit
-
   /** Removes all cached entries. */
   def invalidateAll(): Unit
 }
@@ -72,14 +66,6 @@ abstract class ConcurrentCache[Key, Value] extends Cache[Key, Value] {
     * using the provided function, writes it to the cache, and returns it.
     */
   def getOrAcquire(key: Key, acquire: Key => Value): Value
-
-  def updateViaMap(updater: ConcurrentMap[Key, Value] => Unit): Unit
-
-  /** Remove those mappings for which the predicate `filter` returns true */
-  def clear(filter: (Key, Value) => Boolean): Unit = updateViaMap {
-    _.filterInPlace((t, v) => !filter(t, v))
-  }
-
 }
 
 object Cache {

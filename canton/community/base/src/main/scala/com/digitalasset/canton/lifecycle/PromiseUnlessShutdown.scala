@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -41,14 +41,6 @@ object PromiseUnlessShutdown {
       new SupervisedPromise[UnlessShutdown[A]](description, futureSupervisor, logAfter, logLevel)
     wrap(supervisedPromise)
   }
-
-  /** Creates a promise that is already completed with the given value as a
-    * [[UnlessShutdown.Outcome]].
-    */
-  def successful[A](value: A): PromiseUnlessShutdown[A] =
-    wrap(Promise.successful(UnlessShutdown.Outcome(value)))
-
-  val unit: PromiseUnlessShutdown[Unit] = successful(())
 
   /** Creates a supervised promise that will be completed with
     * [[UnlessShutdown.AbortedDueToShutdown]] when the `hasRunOnClosing` is closed, unless the

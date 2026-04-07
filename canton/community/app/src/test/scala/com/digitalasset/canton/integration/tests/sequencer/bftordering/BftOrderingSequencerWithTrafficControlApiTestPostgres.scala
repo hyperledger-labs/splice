@@ -1,10 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer.bftordering
 
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase
@@ -65,14 +63,12 @@ class BftOrderingSequencerWithTrafficControlApiTestPostgres
     new BftSequencerFactory(
       BftBlockOrdererConfig(),
       BlockSequencerConfig(),
-      producePostOrderingTopologyTicks = false,
       health = None,
       storage,
       testedProtocolVersion,
       sequencerId,
       params,
       sequencerMetrics,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
       loggerFactory,
       None,
     ) {

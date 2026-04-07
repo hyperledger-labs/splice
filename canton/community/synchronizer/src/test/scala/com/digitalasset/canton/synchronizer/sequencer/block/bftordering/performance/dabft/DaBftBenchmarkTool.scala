@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.performance.dabft
 
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.performance.{
   BftBenchmarkConfig,
   BftBenchmarkTool,
@@ -18,5 +17,5 @@ object DaBftBenchmarkTool extends App {
     .load[BftBenchmarkConfig]
     .getOrElse(throw new RuntimeException("Invalid configuration"))
 
-  new BftBenchmarkTool(DaBftBindingFactory, NamedLoggerFactory.root).run(config)
+  new BftBenchmarkTool(DaBftBindingFactory).run(config)
 }

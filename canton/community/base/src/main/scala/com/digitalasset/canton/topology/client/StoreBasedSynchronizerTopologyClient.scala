@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.client
 
+import cats.data.EitherT
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
@@ -23,12 +24,11 @@ import com.digitalasset.canton.topology.store.{
   TopologyStore,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.common.annotations.VisibleForTesting
+import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.time.Duration as JDuration
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
@@ -111,22 +111,20 @@ trait TopologyAwaiter extends FlagCloseable {
 
 /** The synchronizer topology client that reads data from a topology store
   *
-  * @param staticSynchronizerParameters
-  *   The static synchronizer parameters of the synchronizer
+  * @param synchronizerId
+  *   The synchronizer id corresponding to this store
   * @param store
-  *   The store used by the client
+  *   The store
   */
 class StoreBasedSynchronizerTopologyClient(
     val clock: Clock,
     val staticSynchronizerParameters: StaticSynchronizerParameters,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
-    packageDependencyResolver: PackageDependencyResolver,
+    packageDependenciesResolver: PackageDependencyResolver,
     topologyConfig: TopologyConfig,
     override val timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
     val loggerFactory: NamedLoggerFactory,
-    override val executionOrder: Int =
-      2, // overriding the executionOrder during creation (default is 10)
 )(implicit val executionContext: ExecutionContext)
     extends SynchronizerTopologyClientWithInit
     with TopologyAwaiter
@@ -139,7 +137,7 @@ class StoreBasedSynchronizerTopologyClient(
     new TimeAwaiter(
       getCurrentKnownTime = () => topologyKnownUntilTimestamp,
       timeouts,
-      loggerFactory.append("await", "effective"),
+      loggerFactory,
     )
 
   private val sequencedTimeAwaiter =
@@ -147,7 +145,7 @@ class StoreBasedSynchronizerTopologyClient(
       // waiting for a sequenced time has "inclusive" semantics
       getCurrentKnownTime = () => head.get().sequencedTimestamp.value,
       timeouts,
-      loggerFactory.append("await", "sequenced"),
+      loggerFactory,
     )
 
   private val pendingChanges = new AtomicInteger(0)
@@ -156,15 +154,11 @@ class StoreBasedSynchronizerTopologyClient(
       sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
       approximateTimestamp: ApproximateTime,
-      lastChangeTimestamp: EffectiveTime,
   ) {
     def update(
         newSequencedTimestamp: SequencedTime,
         newEffectiveTimestamp: EffectiveTime,
         newApproximateTimestamp: ApproximateTime,
-        // whether there is a non-proposal, non-rejected topology change
-        // becoming effective at newEffectiveTimestamp
-        topologyChange: Boolean,
     ): HeadTimestamps =
       HeadTimestamps(
         sequencedTimestamp =
@@ -173,13 +167,6 @@ class StoreBasedSynchronizerTopologyClient(
           EffectiveTime(effectiveTimestamp.value.max(newEffectiveTimestamp.value)),
         approximateTimestamp =
           ApproximateTime(approximateTimestamp.value.max(newApproximateTimestamp.value)),
-        lastChangeTimestamp = if (topologyChange) {
-          EffectiveTime(
-            lastChangeTimestamp.value.max(newEffectiveTimestamp.value)
-          )
-        } else {
-          lastChangeTimestamp
-        },
       )
   }
   private val head = new AtomicReference[HeadTimestamps](
@@ -187,7 +174,6 @@ class StoreBasedSynchronizerTopologyClient(
       SequencedTime(CantonTimestamp.MinValue),
       EffectiveTime(CantonTimestamp.MinValue),
       ApproximateTime(CantonTimestamp.MinValue),
-      EffectiveTime(CantonTimestamp.MinValue),
     )
   )
 
@@ -195,36 +181,23 @@ class StoreBasedSynchronizerTopologyClient(
       sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
       approximateTimestamp: ApproximateTime,
-  )(implicit
-      traceContext: TraceContext
-  ): Unit = updateHeadInternal(
-    sequencedTimestamp,
-    effectiveTimestamp,
-    approximateTimestamp,
-    topologyChange = false,
-  )
-
-  private def updateHeadInternal(
-      sequencedTimestamp: SequencedTime,
-      effectiveTimestamp: EffectiveTime,
-      approximateTimestamp: ApproximateTime,
-      topologyChange: Boolean,
+      potentialTopologyChange: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Unit = {
     logger.debug(
-      s"Head update requested: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, approx=$approximateTimestamp, topologyChange=$topologyChange"
+      s"Head update: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, approx=$approximateTimestamp, potentialTopologyChange=$potentialTopologyChange"
     )
     val curHead =
-      head.updateAndGet(
-        _.update(sequencedTimestamp, effectiveTimestamp, approximateTimestamp, topologyChange)
-      )
-    logger.debug(s"New head: $curHead")
+      head.updateAndGet(_.update(sequencedTimestamp, effectiveTimestamp, approximateTimestamp))
     // waiting for a sequenced time has "inclusive" semantics
     sequencedTimeAwaiter.notifyAwaitedFutures(curHead.sequencedTimestamp.value)
     // now notify the futures that wait for this update here. as the update is active at t+epsilon, (see most recent timestamp),
     // we'll need to notify accordingly
     effectiveTimeAwaiter.notifyAwaitedFutures(curHead.effectiveTimestamp.value.immediateSuccessor)
+
+    if (potentialTopologyChange)
+      checkAwaitingConditions()
   }
 
   override def observed(
@@ -234,99 +207,103 @@ class StoreBasedSynchronizerTopologyClient(
       transactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     logger.debug(
-      s"Observed: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, numTransactions=${transactions.size}"
+      s"Observed: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp"
     )
-
-    def updateHeadWithApproximateTime(
-        approximateTime: ApproximateTime,
-        topologyChange: Boolean,
-    ): Unit =
-      updateHeadInternal(
-        sequencedTimestamp,
-        effectiveTimestamp,
-        approximateTime,
-        topologyChange = topologyChange,
-      )
-
-    // Advance the head timestamps; the head approximate timestamp can be advanced to the observed sequenced timestamp.
-    updateHeadWithApproximateTime(
-      sequencedTimestamp.toApproximate,
-      topologyChange = transactions.nonEmpty,
-    )
-
-    checkAwaitingConditions()
-
-    // If needed, use the synchronizer time tracker to asynchronously observe the effective timestamp being reached
-    //  on the synchronizer, and advance the head approximate timestamp to the head effective timestamp.
-    if (effectiveTimestamp.value > sequencedTimestamp.value) {
-      pendingChanges.incrementAndGet()
-
-      synchronizerTimeTracker.get.fold {
-        logger.warn(
-          "Not advancing approximate time to effective time using the time tracker as it's unavailable"
-        )
-      } { timeTracker =>
-        // TODO(#28010): replace time proofs with a more scalable mechanism
-        // This currently sequences time proofs to observe reaching the effective timestamp,
-        //  so it does not scale well, as many members may trigger time proofs around the same time
-        //  and may thus flood sequencers.
-        //  However, as a mitigation, the time tracker sends a time proof only if it's not cancelled,
-        //  the observation time has elapsed, and the time-advancing broadcast was ineffective
-        //  (e.g., was triggered too early).
-
-        // When the effective timestamp is reached on the synchronizer,
-        // only the head approximate timestamp is actually advanced,
-        // because the head sequenced and effective timestamps
-        // have already been advanced synchronously above.
-        def advanceApproximateTimeToEffectiveTime(): Unit = {
-          updateHeadWithApproximateTime(effectiveTimestamp.toApproximate, topologyChange = false)
-          if (pendingChanges.decrementAndGet() == 0) {
-            logger.debug(
-              s"Effective at $effectiveTimestamp, there are no more pending topology changes (last were from $sequencedTimestamp)"
-            )
-          }
-          checkAwaitingConditions()
-        }
-
-        val awaitFO =
-          if (topologyConfig.useTimeProofsToObserveEffectiveTime)
-            timeTracker.awaitTick(effectiveTimestamp.value).map(FutureUnlessShutdown.outcomeF)
-          else sequencedTimeAwaiter.awaitKnownTimestamp(effectiveTimestamp.value)
-        awaitFO
-          // if the effective timestamp has already been witnessed, run immediately
-          .getOrElse(FutureUnlessShutdown.unit)
-          .unwrap
-          .foreach(_ => advanceApproximateTimeToEffectiveTime())
-      }
-    }
+    observedInternal(sequencedTimestamp, effectiveTimestamp)
     FutureUnlessShutdown.unit
   }
 
   override def numPendingChanges: Int = pendingChanges.get()
 
+  private def observedInternal(
+      sequencedTimestamp: SequencedTime,
+      effectiveTimestamp: EffectiveTime,
+  )(implicit traceContext: TraceContext): Unit = {
+    // we update the head timestamp approximation with the current sequenced timestamp, right now
+    updateHead(
+      sequencedTimestamp,
+      effectiveTimestamp,
+      ApproximateTime(sequencedTimestamp.value),
+      potentialTopologyChange = false,
+    )
+    // notify anyone who is waiting on some condition
+    checkAwaitingConditions()
+    // and we use the synchronizer time tracker to advance the time to the effective time in due time so that we start using the
+    // right keys at the right time.
+    if (effectiveTimestamp.value > sequencedTimestamp.value) {
+      pendingChanges.incrementAndGet()
+
+      // As a last resort, use the time tracker for precise time calculation. This solution does not scale well
+      //  on its own, as all members can trigger time proofs and flood sequencers. Note that the time tracker sends
+      //  a time proof if it's not cancelled, the observation time has elapsed, and the time-advancing broadcast was
+      //  ineffective (e.g., was triggered too early).
+      awaitEffectiveTime(effectiveTimestamp, sequencedTimestamp)
+    }
+  }
+
+  private def awaitEffectiveTime(
+      effectiveTimestamp: EffectiveTime,
+      sequencedTimestamp: SequencedTime,
+  )(implicit traceContext: TraceContext): Unit = {
+    def logIfNoPendingTopologyChanges(): Unit =
+      if (pendingChanges.decrementAndGet() == 0) {
+        logger.debug(
+          s"Effective at $effectiveTimestamp, there are no more pending topology changes (last were from $sequencedTimestamp)"
+        )
+      }
+
+    synchronizerTimeTracker.get match {
+      case Some(timeTracker) =>
+        if (topologyConfig.useTimeProofsToObserveEffectiveTime)
+          timeTracker.awaitTick(effectiveTimestamp.value) match {
+            case Some(future) =>
+              future.foreach { _ =>
+                updateHead(
+                  sequencedTimestamp,
+                  effectiveTimestamp,
+                  ApproximateTime(effectiveTimestamp.value),
+                  potentialTopologyChange = true,
+                )
+                logIfNoPendingTopologyChanges()
+              }
+            case None =>
+              // the effective timestamp has already been witnessed
+              updateHead(
+                sequencedTimestamp,
+                effectiveTimestamp,
+                ApproximateTime(effectiveTimestamp.value),
+                potentialTopologyChange = true,
+              )
+              logIfNoPendingTopologyChanges()
+          }
+      case None =>
+        logger.warn("Not advancing the time using the time tracker as it's unavailable")
+    }
+  }
+
   /** Returns whether a snapshot for the given timestamp is available. */
   override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
     topologyKnownUntilTimestamp >= timestamp
 
-  private[client] def trySnapshot(
+  override def trySnapshot(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): StoreBasedTopologySnapshot = {
     ErrorUtil.requireArgument(
       timestamp <= topologyKnownUntilTimestamp,
       s"requested snapshot=$timestamp, topology known until=$topologyKnownUntilTimestamp",
     )
-    new StoreBasedTopologySnapshot(psid, timestamp, store, packageDependencyResolver, loggerFactory)
+    new StoreBasedTopologySnapshot(
+      timestamp,
+      store,
+      packageDependenciesResolver,
+      loggerFactory,
+    )
   }
 
-  override def snapshot(
-      timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
-    waitForTimestampWithLogging(timestamp).map(_ => trySnapshot(timestamp))
-
-  override def hypotheticalSnapshot(
+  override def tryHypotheticalSnapshot(
       timestamp: CantonTimestamp,
       desiredTimestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[StoreBasedTopologySnapshot] =
+  )(implicit traceContext: TraceContext): StoreBasedTopologySnapshot =
     ErrorUtil.internalError(
       new UnsupportedOperationException(
         "tryHypotheticalSnapshot is not " +
@@ -340,22 +317,6 @@ class StoreBasedSynchronizerTopologyClient(
     */
   override def topologyKnownUntilTimestamp: CantonTimestamp =
     head.get().effectiveTimestamp.value.immediateSuccessor
-
-  override def latestTopologyChangeTimestamp: CantonTimestamp =
-    head.get().lastChangeTimestamp.value.immediateSuccessor
-
-  @VisibleForTesting
-  private[client] def latestSequencedTimestamp: CantonTimestamp =
-    head.get().sequencedTimestamp.value
-
-  /** return both values above consistently */
-  def knownUntilAndLatestChangeTimestamps: (CantonTimestamp, CantonTimestamp) = {
-    val tmp = head.get()
-    (
-      tmp.effectiveTimestamp.value.immediateSuccessor,
-      tmp.lastChangeTimestamp.value.immediateSuccessor,
-    )
-  }
 
   /** returns the current approximate timestamp
     *
@@ -399,12 +360,7 @@ class StoreBasedSynchronizerTopologyClient(
   override def await(condition: TopologySnapshot => Future[Boolean], timeout: Duration)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
-    scheduleAwait(
-      currentSnapshotApproximation.flatMap(snapshot =>
-        FutureUnlessShutdown.outcomeF(condition(snapshot))
-      ),
-      timeout,
-    )
+    scheduleAwait(FutureUnlessShutdown.outcomeF(condition(currentSnapshotApproximation)), timeout)
 
   override def awaitUS(
       condition: TopologySnapshot => FutureUnlessShutdown[Boolean],
@@ -412,90 +368,18 @@ class StoreBasedSynchronizerTopologyClient(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
-    scheduleAwait(
-      currentSnapshotApproximation.flatMap(condition),
-      timeout,
-    )
+    scheduleAwait(condition(currentSnapshotApproximation), timeout)
 
-  override def initialize(
-      sequencerSnapshotTimestamp: Option[EffectiveTime],
-      synchronizerUpgradeTime: Option[SequencedTime],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    logger.debug("Initializing topology client head from the store")
-    for {
-      // Note: this must exclude rejections & proposals
-      storeLatestTopologyChangeTimestamp <- store.latestTopologyChangeTimestamp()
-      // Note: this includes rejections & proposals
-      storeMaxTimestamp <- store.maxTimestamp(
-        SequencedTime(CantonTimestamp.MaxValue),
-        includeRejected = true,
+}
+
+object StoreBasedSynchronizerTopologyClient {
+
+  object NoPackageDependencies extends PackageDependencyResolver {
+    override def packageDependencies(packagesId: PackageId)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]] =
+      EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]](
+        FutureUnlessShutdown.pure(Right(Set.empty[PackageId]))
       )
-      adjustedStoreMaxTimestamp = storeMaxTimestamp.map { case (sequencingTime, effectiveTime) =>
-        if (
-          sequencingTime.value == SignedTopologyTransaction.InitialTopologySequencingTime &&
-          effectiveTime.value == SignedTopologyTransaction.InitialTopologySequencingTime
-        ) {
-          (
-            sequencingTime,
-            EffectiveTime(
-              SignedTopologyTransaction.InitialTopologySequencingTime
-            ) + staticSynchronizerParameters.topologyChangeDelay,
-          )
-        } else (sequencingTime, effectiveTime)
-      }
-    } yield {
-      adjustedStoreMaxTimestamp.foreach { case (sequencingTime, effectiveTime) =>
-        logger.debug(
-          s"Taking into account adjusted store max timestamp $sequencingTime, $effectiveTime"
-        )
-      }
-      val upgradeTimes = synchronizerUpgradeTime.map { sequencedTime =>
-        logger.debug(s"Taking into account synchronizer upgrade at $sequencedTime")
-        (
-          sequencedTime,
-          EffectiveTime(sequencedTime.value) + staticSynchronizerParameters.topologyChangeDelay,
-        )
-      }
-      val sequencerSnapshotTimes = sequencerSnapshotTimestamp.map { effectiveTime =>
-        logger.debug(s"Taking into account sequencer snapshot at $effectiveTime")
-        (SequencedTime(effectiveTime.value), effectiveTime)
-      }
-      // Exclude the sequencer snapshot times from the selection by max effective time,
-      //  so that the head sequencer time is correctly set to a sequencer snapshot's `lastTs`.
-      val initialHeadTimestamps =
-        (adjustedStoreMaxTimestamp.toList ++ upgradeTimes.toList).maxByOption {
-          case (_, effectiveTime: EffectiveTime) =>
-            effectiveTime
-        }.toList
-      storeLatestTopologyChangeTimestamp.foreach { case (sequencedTime, effectiveTime) =>
-        logger.debug(
-          s"Taking into account latest topology change at $sequencedTime, $effectiveTime"
-        )
-        updateHeadInternal(
-          sequencedTime,
-          effectiveTime,
-          sequencedTime.toApproximate,
-          topologyChange = true,
-        )
-      }
-      initialHeadTimestamps.foreach { case (sequencedTime, effectiveTime) =>
-        // do not let the approximate time be higher than the provided timestamp from
-        // sequencerSnapshotTimestamp, which is the highest sequenced timestamp
-        val approximateTime = sequencerSnapshotTimestamp.fold(effectiveTime.toApproximate) {
-          maxSequencedTs => ApproximateTime(maxSequencedTs.value.min(effectiveTime.value))
-        }
-        updateHead(sequencedTime, effectiveTime, approximateTime)
-      }
-      sequencerSnapshotTimes.toList.foreach { case (sequencedTime, effectiveTime) =>
-        updateHead(
-          sequencedTime,
-          effectiveTime,
-          sequencedTime.toApproximate,
-        )
-      }
-    }
   }
-
-  override def headSnapshot(implicit traceContext: TraceContext): TopologySnapshot =
-    trySnapshot(latestTopologyChangeTimestamp)
 }

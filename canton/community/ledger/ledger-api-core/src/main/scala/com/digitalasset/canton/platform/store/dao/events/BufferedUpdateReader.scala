@@ -1,12 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
 
+import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
 import com.daml.ledger.api.v2.update_service.{GetUpdateResponse, GetUpdatesResponse}
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.{AcsContinuationToken, GetActiveContractsResponseFactory}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
@@ -42,7 +42,6 @@ private[events] class BufferedUpdateReader(
       startInclusive: Offset,
       endInclusive: Offset,
       internalUpdateFormat: InternalUpdateFormat,
-      descendingOrder: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdatesResponse), NotUsed] =
@@ -58,7 +57,6 @@ private[events] class BufferedUpdateReader(
             loggingContext,
             directEC,
           ),
-        descendingOrder = descendingOrder,
       )
 
   def lookupUpdateBy(
@@ -71,16 +69,10 @@ private[events] class BufferedUpdateReader(
       activeAt: Option[Offset],
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
-      continuationToken: Option[AcsContinuationToken],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[GetActiveContractsResponseFactory, NotUsed] =
-    delegate.getActiveContracts(
-      activeAt,
-      filter,
-      eventProjectionProperties,
-      continuationToken,
-    )
+  ): Source[GetActiveContractsResponse, NotUsed] =
+    delegate.getActiveContracts(activeAt, filter, eventProjectionProperties)
 }
 
 private[platform] object BufferedUpdateReader {
@@ -105,7 +97,6 @@ private[platform] object BufferedUpdateReader {
           override def apply(
               startInclusive: Offset,
               endInclusive: Offset,
-              descendingOrder: Boolean,
               filter: InternalUpdateFormat,
           )(implicit
               loggingContext: LoggingContextWithTrace
@@ -115,7 +106,6 @@ private[platform] object BufferedUpdateReader {
                 startInclusive = startInclusive,
                 endInclusive = endInclusive,
                 internalUpdateFormat = filter,
-                descendingOrder = descendingOrder,
               )
         },
         bufferedStreamEventsProcessingParallelism = eventProcessingParallelism,

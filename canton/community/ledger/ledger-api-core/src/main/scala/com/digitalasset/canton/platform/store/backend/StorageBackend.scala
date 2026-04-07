@@ -1,27 +1,19 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
-import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.indexer.parallel.PostPublishData
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.*
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
-  AchsAddActivationsParams,
-  AchsLastPointers,
-  AchsRemoveDeactivatedParams,
-  AchsState,
-  PruneUptoInclusiveAndLedgerEnd,
-}
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.PruneUptoInclusiveAndLedgerEnd
 import com.digitalasset.canton.platform.store.backend.common.{
   EventPayloadSourceForUpdatesAcsDelta,
   EventPayloadSourceForUpdatesLedgerEffects,
@@ -30,7 +22,7 @@ import com.digitalasset.canton.platform.store.backend.common.{
   UpdateStreamingQueries,
 }
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPageQuery
+import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.PaginationInput
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -58,7 +50,7 @@ trait ResetStorageBackend {
   def resetAll(connection: Connection): Unit
 }
 
-trait IngestionStorageBackend[DbBatch] {
+trait IngestionStorageBackend[DB_BATCH] {
 
   /** The CPU intensive batching operation hides the batching logic, and the mapping to the database
     * specific representation of the inserted data. This should be pure CPU logic without IO.
@@ -70,7 +62,7 @@ trait IngestionStorageBackend[DbBatch] {
     * @return
     *   the database-specific batch DTO, which can be inserted via insertBatch
     */
-  def batch(dbDtos: Vector[DbDto], stringInterning: StringInterning): DbBatch
+  def batch(dbDtos: Vector[DbDto], stringInterning: StringInterning): DB_BATCH
 
   /** Using a JDBC connection, a batch will be inserted into the database. No significant CPU load,
     * mostly blocking JDBC communication with the database backend.
@@ -80,7 +72,7 @@ trait IngestionStorageBackend[DbBatch] {
     * @param batch
     *   to be inserted
     */
-  def insertBatch(connection: Connection, batch: DbBatch): Unit
+  def insertBatch(connection: Connection, batch: DB_BATCH): Unit
 
   /** Deletes all partially ingested data, written during a non-graceful stop of previous indexing.
     * No significant CPU load, mostly blocking JDBC communication with the database backend.
@@ -161,29 +153,6 @@ trait ParameterStorageBackend {
   /** Returns the ledger identity parameters, or None if the database hasn't been initialized yet.
     */
   def ledgerIdentity(connection: Connection): Option[ParameterStorageBackend.IdentityParams]
-
-  /** Fetches the current state of the Active Contracts Head Snapshot (ACHS) from the database, or
-    * None if it hasn't been initialized yet.
-    */
-  def fetchACHSState(connection: Connection): Option[AchsState]
-
-  /** Inserts the state of the Active Contracts Head Snapshot (ACHS) in the database. Assumes that
-    * the ACHS state is not yet present.
-    */
-  def insertACHSState(achsState: AchsState)(connection: Connection): Unit
-
-  /** Updates the validAt of the state of the Active Contracts Head Snapshot (ACHS) in the database.
-    * Throws an IllegalStateException if the update was not successful.
-    */
-  def updateACHSValidAt(validAt: Long)(connection: Connection): Unit
-
-  /** Updates the lastRemoved and the lastPopulated of the state of the Active Contracts Head
-    * Snapshot (ACHS) in the database. Throws an IllegalStateException if the update was not
-    * successful.
-    */
-  def updateACHSLastPointers(pointers: AchsLastPointers)(connection: Connection): Unit
-
-  def clearACHSState(connection: Connection): Unit
 }
 
 object ParameterStorageBackend {
@@ -203,78 +172,11 @@ object ParameterStorageBackend {
       pruneUptoInclusive: Option[Offset],
       ledgerEnd: Option[Offset],
   )
-
-  /** Represents the state of the Active Contracts Head Snapshot (ACHS) in the database. The ACHS is
-    * a snapshot of the active contracts at a specific event sequential ID. However, due to the
-    * nature of contract activations and deactivations, the ACHS may not be fully populated up to
-    * that event sequential ID and be populated only partially. The fields in this case class help
-    * track the state of the ACHS and keep it updated.
-    *
-    * @param validAt
-    *   The event sequential ID at which the ACHS is valid.
-    * @param lastRemoved
-    *   The last event sequential ID for which deactivations were looked up and the corresponding
-    *   activation was removed from the ACHS. At the end of the update of the ACHS this should be
-    *   equal to validAt.
-    * @param lastPopulated
-    *   The last event sequential ID that was populated into the ACHS.
-    */
-  final case class AchsState(
-      validAt: Long,
-      lastPointers: AchsLastPointers,
-  ) extends PrettyPrinting {
-
-    override def pretty: Pretty[AchsState] = prettyOfClass(
-      param("validAt", _.validAt),
-      param("lastRemoved", _.lastPointers.lastRemoved),
-      param("lastPopulated", _.lastPointers.lastPopulated),
-    )
-  }
-
-  final case class AchsLastPointers(
-      lastRemoved: Long,
-      lastPopulated: Long,
-  ) extends PrettyPrinting {
-
-    override def pretty: Pretty[AchsLastPointers] = prettyOfClass(
-      param("lastRemoved", _.lastRemoved),
-      param("lastPopulated", _.lastPopulated),
-    )
-  }
-
-  /** The parameters for removing activations from the Active Contracts Head Snapshot (ACHS) that
-    * have been deactivated at a specified range of event sequential IDs.
-    *
-    * @param startExclusive
-    *   The starting event sequential ID (exclusive).
-    * @param endInclusive
-    *   The ending event sequential ID (inclusive).
-    */
-  final case class AchsRemoveDeactivatedParams(
-      startExclusive: Long,
-      endInclusive: Long,
-  )
-
-  /** The parameters for adding activations to the Active Contracts Head Snapshot (ACHS) for a
-    * specified range of event sequential IDs that are still active at a given event sequential ID.
-    *
-    * @param startExclusive
-    *   The starting event sequential ID (exclusive).
-    * @param endInclusive
-    *   The ending event sequential ID (inclusive).
-    * @param activeAt
-    *   The event sequential ID at which the contracts are still active.
-    */
-  final case class AchsAddActivationsParams(
-      startExclusive: Long,
-      endInclusive: Long,
-      activeAt: Long,
-  )
 }
 
 trait PartyStorageBackend {
   def parties(parties: Seq[Party])(connection: Connection): List[IndexerPartyDetails]
-  def knownParties(fromExcl: Option[Party], filterString: Option[String185], maxResults: Int)(
+  def knownParties(fromExcl: Option[Party], maxResults: Int)(
       connection: Connection
   ): List[IndexerPartyDetails]
 }
@@ -323,31 +225,6 @@ trait ContractStorageBackend {
 
   /** Returns true if the batch lookup is implemented */
   def supportsBatchKeyStateLookups: Boolean
-
-  def nonUniqueContractKey(keyPageQuery: ContractStorageBackend.KeysPageQuery)(
-      connection: Connection
-  ): ContractStorageBackend.KeysPageResult
-}
-
-object ContractStorageBackend {
-  final case class KeysPageQuery(
-      key: Key,
-      limit: Int,
-      nextPageToken: Option[Long],
-      validAtEventSeqId: Long,
-  )
-
-  /** @param internalContractIds
-    *   in reverse event sequential ID order starting from nextPageToken (exclusive) or
-    *   validAtEventSeqId (inclusive) from the KeysPageQuery
-    * @param nextPageToken
-    *   If available, this is the event sequential ID of the last (earliest) contract If not
-    *   available, this is the last page from the page-sequence
-    */
-  final case class KeysPageResult(
-      internalContractIds: Vector[Long],
-      nextPageToken: Option[Long],
-  )
 }
 
 trait EventStorageBackend {
@@ -374,11 +251,11 @@ trait EventStorageBackend {
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[RawThinActiveContract]
 
-  def lookupActivationSequentialIdByOffset(
+  def lookupAssignSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long]
 
-  def lookupDeactivationSequentialIdByOffset(
+  def lookupUnassignSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long]
 
@@ -410,12 +287,7 @@ trait EventStorageBackend {
   def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
       beforeOrAtRecordTimeInclusive: Timestamp,
-  )(connection: Connection)(implicit traceContext: TraceContext): Option[SynchronizerOffset]
-
-  def lastRecordTimeBeforeOrAtSynchronizerOffset(
-      synchronizerId: SynchronizerId,
-      beforeOrAtOffsetInclusive: Offset,
-  )(connection: Connection): Option[CantonTimestamp]
+  )(connection: Connection): Option[SynchronizerOffset]
 
   /** The contracts which were archived or participant-divulged in the specified range. These are
     * the contracts in the ContractStore, which can be pruned in a single-synchronizer setup.
@@ -424,7 +296,9 @@ trait EventStorageBackend {
       connection: Connection
   ): Set[Long]
 
-  def fetchTopologyPartyEventIds(party: Option[Party]): IdPageQuery
+  def fetchTopologyPartyEventIds(party: Option[Party])(
+      connection: Connection
+  ): PaginationInput => Vector[Long]
 
   def topologyPartyEventBatch(
       eventSequentialIds: SequentialIdBatch
@@ -446,35 +320,6 @@ trait EventStorageBackend {
       requestingPartiesForTx: Option[Set[Party]],
       requestingPartiesForReassignment: Option[Set[Party]],
   )(connection: Connection): Vector[RawThinLedgerEffectsEvent]
-
-  /** Adds activations to the Active Contracts Head Snapshot (ACHS) for a specified range of event
-    * sequential IDs that are still active at a given event sequential ID.
-    *
-    * @param params
-    *   The parameters for adding activations to the ACHS. It includes::
-    *   - startExclusive: The starting event sequential ID (exclusive).
-    *   - endInclusive: The ending event sequential ID (inclusive).
-    *   - activeAt: The event sequential ID at which the contracts are still active.
-    * @param connection
-    *   The database connection to be used for the operation.
-    */
-  def addActivationsToACHS(
-      params: AchsAddActivationsParams
-  )(connection: Connection): Unit
-
-  /** Removes activations from the Active Contracts Head Snapshot (ACHS) looking at a specified
-    * range of event sequential IDs in the deactivations table.
-    *
-    * @param params
-    *   The parameters for removing activations from the ACHS. It includes:
-    *   - startExclusive: The starting event sequential ID (exclusive).
-    *   - endInclusive: The ending event sequential ID (inclusive).
-    * @param connection
-    *   The database connection to be used for the operation.
-    */
-  def removeDeactivatedFromACHS(
-      params: AchsRemoveDeactivatedParams
-  )(connection: Connection): Unit
 }
 
 object EventStorageBackend {
@@ -747,7 +592,13 @@ object EventStorageBackend {
       authorizationEvent: AuthorizationEvent,
       recordTime: Timestamp,
       synchronizerId: String,
-      traceContext: Array[Byte],
+      traceContext: Option[Array[Byte]],
+  )
+
+  final case class UnassignProperties(
+      contractId: ContractId,
+      synchronizerId: String,
+      sequentialId: Long,
   )
 
   sealed trait SequentialIdBatch

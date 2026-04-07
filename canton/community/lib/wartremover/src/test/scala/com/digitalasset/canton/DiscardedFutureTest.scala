@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import com.digitalasset.canton.DiscardedFutureTest.{
+  TraitWithFuture,
   Transformer0,
   Transformer1,
   WannabeFuture,
@@ -19,7 +20,7 @@ import org.wartremover.test.WartTestTraverser
 
 import scala.concurrent.Future
 
-class DiscardedFutureTest extends AnyWordSpec with Matchers with DiscardedFutureTestWithMockito {
+class DiscardedFutureTest extends AnyWordSpec with Matchers with org.mockito.MockitoSugar {
 
   "DiscardedFuture" should {
     "detect statements in blocks that discard a future" in {
@@ -43,6 +44,20 @@ class DiscardedFutureTest extends AnyWordSpec with Matchers with DiscardedFuture
     "allow explicit discard calls" in {
       val result = WartTestTraverser(DiscardedFuture) {
         val _ = Future.unit
+      }
+      assertErrors(result, 0)
+    }
+
+    "allow Mockito verify calls" in {
+      val result = WartTestTraverser(DiscardedFuture) {
+        val mocked = mock[TraitWithFuture]
+        verify(mocked).returnsFuture
+        verify(mocked).returnsFutureNoArgs()
+        verify(mocked).returnsFutureOneArg(0)
+        verify(mocked).returnsFutureTwoArgs(1)("")
+        verify(mocked).returnsFutureThreeArgs(2)("string")(new Object)
+        verify(mocked).returnsFutureTypeArgs("string")
+        ()
       }
       assertErrors(result, 0)
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -10,14 +10,13 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
 }
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.util.Mutex
 import io.grpc.stub.{AbstractStub, StreamObserver}
 import io.grpc.{Context, ManagedChannel, Status, StatusException, StatusRuntimeException}
 
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
 
 trait AdminCommand[Req, Res, Result] {
 
@@ -105,10 +104,9 @@ object GrpcAdminCommand {
   ): Future[Seq[Result]] = {
     val promise = Promise[Seq[Result]]()
     val buffer = ListBuffer[Result]()
-    val lock = new Mutex()
     val context = Context.ROOT.withCancellation()
 
-    def success(): Unit = (lock.exclusive {
+    def success(): Unit = blocking(buffer.synchronized {
       promise.trySuccess(buffer.toList).discard[Boolean]
       context.close()
     })
@@ -119,7 +117,7 @@ object GrpcAdminCommand {
         new StreamObserver[Response]() {
           override def onNext(value: Response): Unit = {
             val extracted = extract(value)
-            (lock.exclusive {
+            blocking(buffer.synchronized {
               if (buffer.lengthCompare(expected) < 0) {
                 buffer ++= extracted
                 if (buffer.lengthCompare(expected) >= 0) {

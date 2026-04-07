@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -14,12 +14,11 @@ import com.digitalasset.canton.participant.protocol.RequestJournal.{RequestData,
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.util.TimeOfRequest
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Try}
 
 class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactory)
@@ -30,13 +29,12 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
     DirectExecutionContext(noTracingLogger)
 
   private val requestTable = new TrieMap[RequestCounter, RequestData]
-  private val lock = new Mutex()
 
   override def insert(
       data: RequestData
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    val result: Try[Unit] =
-      lock.exclusive({
+    val result: Try[Unit] = blocking {
+      this.synchronized({
         val isInvalidChange = requestTable.values
           .exists(rd => rd.rc != data.rc && rd.requestTimestamp == data.requestTimestamp)
         if (isInvalidChange) {
@@ -49,6 +47,7 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
           Try(MapsUtil.tryPutIdempotent(requestTable, data.rc, data))
         }
       })
+    }
     FutureUnlessShutdown.outcomeF(Future.fromTry(result))
   }
 
@@ -112,7 +111,6 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
   }
 
   @VisibleForTesting
-  @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
   private[store] override def pruneInternal(
       beforeInclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {

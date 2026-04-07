@@ -227,12 +227,9 @@ function backup_component() {
   local requested_component=$3
   local migration_id=$4
   local hyperdisk_enabled=$5
-  local logical_synchronizer_mode=${6:-false}
 
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
-
-  echo "Backing up $component in namespace $namespace with migration_id $migration_id and lsu $logical_synchronizer_mode"
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
     if [ "$component" == "cometbft-$migration_id" ]; then
@@ -245,7 +242,7 @@ function backup_component() {
       backup_pvc "cometBFT" "$namespace" "$cometbft_pvc_name" "$migration_id"
     else
       local db_name
-      db_name=$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
+      db_name=$(create_component_instance "$component" "$migration_id" "$namespace")
       SPLICE_SV=$namespace SPLICE_MIGRATION_ID=$migration_id backup_postgres "$component" "$namespace" "$db_name-pg" "$migration_id" "$stack" "$hyperdisk_enabled"
     fi
   else
@@ -259,10 +256,9 @@ function wait_for_backup() {
   local requested_component=$3
   local migration_id=$4
   local hyperdisk_enabled=$5
-  local logical_synchronizer_mode=${6:-false}
 
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
     if [ "$component" == "cometbft-$migration_id" ]; then
@@ -274,8 +270,7 @@ function wait_for_backup() {
       fi
       wait_for_pvc_backup "cometBFT" "$namespace" "$cometbft_pvc_name"
     else
-      local instance
-      instance=$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
+      instance=$(create_component_instance "$component" "$migration_id" "$namespace")
       wait_for_postgres_backup "$component" "$namespace" "$instance-pg" "$migration_id" "$stack" "$hyperdisk_enabled"
     fi
   else
@@ -302,11 +297,6 @@ function main() {
   config=$(get_resolved_config)
   local hyperdisk_enabled
   hyperdisk_enabled=$(echo "$config" | yq '.cluster.hyperdiskSupport.enabled // false')
-  local logical_synchronizer_mode="false"
-  logical_synchronizer_mode=$(echo "$config" | yq ".synchronizerMigration[]? | select(.id == ${migration_id}) | .enableLogicalSynchronizerDeploymentMode // false")
-  if [ -z "$logical_synchronizer_mode" ]; then
-    logical_synchronizer_mode="false"
-  fi
 
   # TODO(#9361): support multiple domains / non-default-ID'd ones
   if [ "$1" == "validator" ]; then
@@ -314,8 +304,8 @@ function main() {
     backup_component "$namespace" "validator" "$requested_component" "$migration_id" "$hyperdisk_enabled"
     wait_for_backup "$namespace" "validator" "$requested_component" "$migration_id" "$hyperdisk_enabled"
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled" "$logical_synchronizer_mode"
-    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled" "$logical_synchronizer_mode"
+    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled"
+    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled"
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
@@ -327,9 +317,9 @@ function main() {
     wait_for_backup "$namespace" "cn-apps" "$requested_component" "$migration_id" "$hyperdisk_enabled"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled" "$logical_synchronizer_mode"
+    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled"
 
-    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled" "$logical_synchronizer_mode"
+    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "$hyperdisk_enabled"
     wait_for_backup "$namespace" "mediator" "$requested_component" "$migration_id" "$hyperdisk_enabled"
     wait_for_backup "$namespace" "sequencer" "$requested_component" "$migration_id" "$hyperdisk_enabled"
     wait_for_backup "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id" "$hyperdisk_enabled"

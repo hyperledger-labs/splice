@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -40,8 +40,8 @@ final case class UnassignmentValidationResult(
 ) extends ReassignmentValidationResult {
   val submitterMetadata: ReassignmentSubmitterMetadata = unassignmentData.submitterMetadata
   val sourceSynchronizer: ReassignmentTag.Source[PhysicalSynchronizerId] =
-    unassignmentData.sourcePsid
-  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetPsid
+    unassignmentData.sourcePSId
+  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetPSId
   val stakeholders: Set[LfPartyId] = unassignmentData.stakeholders.all
   val targetTimestamp: Target[CantonTimestamp] = unassignmentData.targetTimestamp
 
@@ -93,7 +93,7 @@ final case class UnassignmentValidationResult(
         )
       )
     (acsChangeFactory: AcsChangeFactory) =>
-      (_: InternalContractIds) =>
+      (internalContractIds: InternalContractIds) =>
         Update.SequencedReassignmentAccepted(
           optCompletionInfo = completionInfo,
           workflowId = submitterMetadata.workflowId,
@@ -120,6 +120,7 @@ final case class UnassignmentValidationResult(
           recordTime = recordTime,
           synchronizerId = sourceSynchronizer.unwrap.logical,
           acsChangeFactory = acsChangeFactory,
+          internalContractIds = internalContractIds,
         )
   }
 }

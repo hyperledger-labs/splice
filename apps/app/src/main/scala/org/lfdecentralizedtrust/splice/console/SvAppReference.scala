@@ -3,19 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.console
 
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BuildInfo,
@@ -34,18 +30,18 @@ import org.lfdecentralizedtrust.splice.sv.automation.{
   SvDsoAutomationService,
   SvSvAutomationService,
 }
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvAppBackendConfig,
-  SvSynchronizerNodeConfig,
-  SvSynchronizerNodesConfig,
-}
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.util.Contract
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 
+import scala.jdk.OptionConverters.*
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.OptionConverters.*
 
 abstract class SvAppReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
@@ -140,12 +136,6 @@ abstract class SvAppReference(
   def unpauseDecentralizedSynchronizer(): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.UnpauseDecentralizedSynchronizer())
-    }
-
-  @Help.Summary("Cancel a running logical synchronizer upgrade by removing its LSU announcement")
-  def cancelLogicalSynchronizerUpgrade(): Unit =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.CancelLogicalSynchronizerUpgrade())
     }
 
   @Help.Summary("Dump all the required data for domain migration to the configured location")
@@ -425,31 +415,21 @@ class SvAppBackendReference(
       config.participantClient.participantClientConfigWithAdminToken,
     )
 
-  lazy val sequencerClient: SequencerClientReference =
-    sequencerClientFor(_.current)
+  private def localSynchronizerNode = config.localSynchronizerNode.getOrElse(
+    throw new RuntimeException("No synchronizer node configured for SV app")
+  )
 
-  def sequencerClientFor(
-      node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig
-  ): SequencerClientReference = {
+  lazy val sequencerClient: SequencerClientReference =
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name",
-      node(config.localSynchronizerNodes).sequencer.toCantonConfig,
+      localSynchronizerNode.sequencer.toCantonConfig,
     )
-  }
 
   lazy val mediatorClient: MediatorClientReference =
-    mediatorClientFor(_.current)
-
-  def mediatorClientFor(
-      node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig
-  ): MediatorClientReference = {
     new MediatorClientReference(
       consoleEnvironment,
       s"mediator client for $name",
-      node(
-        config.localSynchronizerNodes
-      ).mediator.toCantonConfig,
+      localSynchronizerNode.mediator.toCantonConfig,
     )
-  }
 }

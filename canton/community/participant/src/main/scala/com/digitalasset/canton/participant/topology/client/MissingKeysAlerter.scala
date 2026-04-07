@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.topology.client
@@ -32,9 +32,8 @@ class MissingKeysAlerter(
 
   def init()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     for {
-      approximateSnapshot <- client.currentSnapshotApproximation
-      encryptionKeys <- approximateSnapshot.encryptionKeys(participantId)
-      signingKeys <- approximateSnapshot.signingKeys(
+      encryptionKeys <- client.currentSnapshotApproximation.encryptionKeys(participantId)
+      signingKeys <- client.currentSnapshotApproximation.signingKeys(
         participantId,
         SigningKeyUsage.All,
       )

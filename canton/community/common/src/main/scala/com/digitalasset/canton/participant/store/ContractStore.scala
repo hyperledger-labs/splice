@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -10,7 +10,6 @@ import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, Processin
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.store.ContractStore.InternalContractId
 import com.digitalasset.canton.participant.store.db.DbContractStore
 import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
@@ -33,17 +32,23 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[PersistedContractInstance]]
 
-  def lookupBatchedNonReadThrough(internalContractIds: Iterable[InternalContractId])(implicit
+  def lookupBatchedNonCached(internalContractIds: Iterable[Long])(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[InternalContractId, PersistedContractInstance]]
+  ): FutureUnlessShutdown[Map[Long, PersistedContractInstance]]
 
-  def lookupBatchedInternalIdsNonReadThrough(contractIds: Iterable[LfContractId])(implicit
+  def lookupBatchedNonCachedInternalIds(contractIds: Iterable[LfContractId])(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfContractId, InternalContractId]]
+  ): FutureUnlessShutdown[Map[LfContractId, Long]]
 
-  def lookupBatchedContractIdsNonReadThrough(internalContractIds: Iterable[InternalContractId])(
-      implicit traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[InternalContractId, LfContractId]]
+  // TODO(#27996): This lookup mechanism most probably can be removed/work form cache.
+  def lookupBatchedNonCachedContractIds(internalContractIds: Iterable[Long])(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[Long, LfContractId]]
+
+// TODO(#27996): this query supposed to be used for LAPI streaming to leverage the contract cache. As getting internal contract ID is not possible ATM, this optimization will be implemented later
+//  def lookupPersistedIfCached(internalContractId: Long)(implicit
+//                                       traceContext: TraceContext
+//  ): Option[Option[PersistedContractInstance]]
 
   override type ContractsCreatedAtTime = CreationTime.CreatedAt
 
@@ -51,17 +56,14 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
     *
     * @param contracts
     *   The created contracts to be stored
-    *
-    * @return
-    *   A map from contract IDs to internal contract IDs of the stored contracts
     */
   def storeContracts(contracts: Seq[ContractInstance])(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfContractId, InternalContractId]]
+  ): FutureUnlessShutdown[Unit]
 
   def storeContract(contract: ContractInstance)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = storeContracts(Seq(contract)).map(_ => ())
+  ): FutureUnlessShutdown[Unit] = storeContracts(Seq(contract))
 
   /** Debug find utility to search pcs
     */
@@ -137,8 +139,6 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
 }
 
 object ContractStore {
-  type InternalContractId = Long
-
   def create(
       storage: Storage,
       processingTimeouts: ProcessingTimeout,
@@ -163,8 +163,8 @@ object ContractStore {
 }
 
 final case class PersistedContractInstance(
-    internalContractId: InternalContractId,
-    inst: FatContractInstance { type CreatedAtTime <: CreationTime.CreatedAt },
+    // internalContractId: Long, TODO(#27996): getting the internal contract ID with DbBulkUpdateProcessor is not possible without major rewrite there
+    inst: FatContractInstance { type CreatedAtTime <: CreationTime.CreatedAt }
 ) {
   def asContractInstance: ContractInstance = ContractInstance.create(inst) match {
     case Right(contract) => contract

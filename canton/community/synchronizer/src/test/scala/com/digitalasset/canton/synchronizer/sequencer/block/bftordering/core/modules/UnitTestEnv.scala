@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules
@@ -451,18 +451,11 @@ final class ProgrammableUnitTestContext[MessageT](resolveAwaits: Boolean = false
     var shouldContinue = true
     while (shouldContinue) {
       val messages = runPipedMessages()
-      if (messages.isEmpty && pipedQueue.isEmpty) {
+      if (messages.isEmpty) {
         shouldContinue = false
       }
       messages.foreach(message => module.receive(message)(this, traceContext))
     }
-  }
-
-  def runOneDelayedMessage(
-      module: Module[ProgrammableUnitTestEnv, MessageT]
-  )(implicit traceContext: TraceContext): Unit = {
-    val msg = delayedQueue.dequeue()
-    module.receive(msg)(this, traceContext)
   }
 
   def selfMessages: Seq[MessageT] = selfQueue.toSeq.map(_._1)

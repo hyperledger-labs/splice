@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -10,7 +10,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.wartremover.test.WartTestTraverser
 import scalapb.GeneratedMessage
 
-class ProtobufToByteStringTest extends AnyWordSpec with Matchers {
+class ProtobufToByteStringTest extends AnyWordSpec with Matchers with org.mockito.MockitoSugar {
   import ProtobufToByteStringTest.*
 
   private def assertErrors(result: WartTestTraverser.Result, expectedErrors: Int): Assertion = {
@@ -41,15 +41,16 @@ class ProtobufToByteStringTest extends AnyWordSpec with Matchers {
       assertErrors(result, 0)
     }
 
-    "can detect renamed calls to toByteString on generated protobuf messages (fails on Scala 2)" in {
+    // Limitations follow
+
+    "not detect renamed calls to toByteString on generated protobuf messages" in {
       val result = WartTestTraverser(ProtobufToByteString) {
         val x = ??? : MyGeneratedMessage
         import x.toByteString as foo
         foo
         ()
       }
-      if (ScalaVersion.isScala3) assertErrors(result, 1)
-      else assertErrors(result, 0) // Limitations on Scala 2
+      assertErrors(result, 0)
     }
   }
 }

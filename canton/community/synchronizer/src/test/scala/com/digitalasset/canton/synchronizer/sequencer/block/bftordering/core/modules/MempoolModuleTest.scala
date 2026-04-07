@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules
@@ -6,7 +6,6 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.WriteReadiness
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.UnitTestContext.DelayCount
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.mempool.{
@@ -40,7 +39,7 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
   import MempoolModuleTest.*
 
   private val AnOrderRequest = Mempool.OrderRequest(
-    Traced(OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.copyFromUtf8("b")))
+    Traced(OrderingRequest(BlockFormat.SendTag, ByteString.copyFromUtf8("b")))
   )
 
   private val requestRefusedHandler = Some(new ModuleRef[SequencerNode.Message] {
@@ -65,7 +64,7 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           createMempool[UnitTestEnv](fakeModuleExpectingSilence, maxMempoolQueueSize = 0)
         mempool.receiveInternal(
           Mempool.OrderRequest(
-            Traced(OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.EMPTY)),
+            Traced(OrderingRequest(BlockFormat.SendTag, ByteString.EMPTY)),
             requestRefusedHandler,
           )
         )
@@ -80,9 +79,7 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
         suppressProblemLogs(
           mempool.receiveInternal(
             Mempool.OrderRequest(
-              Traced(
-                OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.copyFromUtf8("c"))
-              ),
+              Traced(OrderingRequest(BlockFormat.SendTag, ByteString.copyFromUtf8("c"))),
               requestRefusedHandler,
             )
           )
@@ -98,7 +95,7 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
         suppressProblemLogs(
           mempool.receiveInternal(
             Mempool.OrderRequest(
-              Traced(OrderingRequest("invalidTag", messageId = "", ByteString.copyFromUtf8("c"))),
+              Traced(OrderingRequest("invalidTag", ByteString.copyFromUtf8("c"))),
               requestRefusedHandler,
             )
           )
@@ -117,9 +114,7 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
 
         mempool.receiveInternal(
           Mempool.OrderRequest(
-            Traced(
-              OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.copyFromUtf8("c"))
-            ),
+            Traced(OrderingRequest(BlockFormat.SendTag, ByteString.copyFromUtf8("c"))),
             requestRefusedHandler,
           )
         )
@@ -337,43 +332,6 @@ class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
     }
   }
 
-  "it receives a send service readiness inquiry" should {
-    "reply with the current readiness" in {
-      val mempoolState = createMempoolState()
-      val mempool =
-        createMempool[UnitTestEnv](fakeModuleExpectingSilence, mempoolState = mempoolState)
-      mempool.receiveInternal(AP2PConnectivityUpdate)
-
-      val readinessCell = new AtomicReference[Option[WriteReadiness]](None)
-      mempool.receiveInternal(
-        Mempool.Admin.GetWriteReadiness(readiness => readinessCell.set(Some(readiness)))
-      )
-
-      {
-        val readiness = readinessCell
-          .get()
-          .getOrElse(fail("No readiness reply received"))
-        readiness shouldBe WriteReadiness.P2PNotReady(
-          WriteReadiness.P2P(authenticatedPeersCount = 2, requiredQuorum = 3)
-        )
-      }
-
-      mempool.receiveInternal(AnotherP2PConnectivityUpdate)
-      mempool.receiveInternal(
-        Mempool.Admin.GetWriteReadiness(readiness => readinessCell.set(Some(readiness)))
-      )
-
-      {
-        val readiness = readinessCell
-          .get()
-          .getOrElse(fail("No readiness reply received"))
-        readiness shouldBe WriteReadiness.Ready(
-          WriteReadiness.P2P(authenticatedPeersCount = 3, requiredQuorum = 3)
-        )
-      }
-    }
-  }
-
   private def createMempool[E <: Env[E]](
       availability: ModuleRef[Availability.Message[E]],
       mempoolState: MempoolState = createMempoolState(),
@@ -415,10 +373,5 @@ private object MempoolModuleTest {
     Mempool.P2PConnectivityUpdate(
       Membership.forTesting(BftNodeId("myself"), (1 to 7).map(i => BftNodeId(i.toString)).toSet),
       2,
-    )
-  val AnotherP2PConnectivityUpdate =
-    Mempool.P2PConnectivityUpdate(
-      Membership.forTesting(BftNodeId("myself"), (1 to 7).map(i => BftNodeId(i.toString)).toSet),
-      3,
     )
 }

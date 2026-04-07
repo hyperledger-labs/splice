@@ -122,7 +122,7 @@ export class MultiValidator extends MultiNodeDeployment {
             },
             {
               name: 'SPLICE_APP_VALIDATOR_MIGRATION_ID',
-              value: decentralizedSynchronizerUpgradeConfig.activeMigrationId.toString(),
+              value: decentralizedSynchronizerUpgradeConfig.active.id.toString(),
             },
             {
               name: 'SPLICE_APP_CONTACT_POINT',

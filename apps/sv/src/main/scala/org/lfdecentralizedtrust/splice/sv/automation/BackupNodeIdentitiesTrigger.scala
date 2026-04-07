@@ -7,7 +7,6 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.syntax.*
 import io.opentelemetry.api.trace.Tracer
-
 import java.nio.file.Paths
 import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.stream.Materializer
@@ -18,10 +17,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  SynchronizerNodeService,
-}
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.migration.SynchronizerNodeIdentities
@@ -34,7 +30,7 @@ final class BackupNodeIdentitiesTrigger(
     dsoStore: SvDsoStore,
     backupConfig: BackupDumpConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
+    localSynchronizerNode: LocalSynchronizerNode,
     protected val context: TriggerContext,
 )(implicit ec: ExecutionContextExecutor, override val tracer: Tracer, mat: Materializer)
     extends PollingParallelTaskExecutionTrigger[Unit] {
@@ -50,7 +46,7 @@ final class BackupNodeIdentitiesTrigger(
   protected def completeTask(task: Unit)(implicit tc: TraceContext): Future[TaskOutcome] = {
     val now = context.clock.now.toInstant
     val filename = Paths.get(
-      s"sv_identities_$now.json"
+      s"sv_identities_${now}.json"
     )
     val fileDesc =
       s"node identities to ${backupConfig.locationDescription} at path: $filename"
@@ -58,10 +54,9 @@ final class BackupNodeIdentitiesTrigger(
       s"Attempting to write $fileDesc"
     )
     for {
-      node <- synchronizerNodeService.activeSynchronizerNode()
       identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
         participantAdminConnection,
-        node,
+        localSynchronizerNode,
         dsoStore,
         synchronizerAlias,
         loggerFactory,

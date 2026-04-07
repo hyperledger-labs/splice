@@ -1,23 +1,17 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.grpc
 
 import com.daml.grpc.GrpcException
 import com.daml.grpc.adapter.server.rs.MockServerCallStreamObserver
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.scalautil.Statement.discard
-import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.health.{
-  HealthChecks,
-  HealthStatus,
-  Healthy,
-  ReportsHealth,
-  Unhealthy,
-}
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthServiceSpec.*
+import com.digitalasset.canton.ledger.api.health.*
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthCheckResponse}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Second, Span}

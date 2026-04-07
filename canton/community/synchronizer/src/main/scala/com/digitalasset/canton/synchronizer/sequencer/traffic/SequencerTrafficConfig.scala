@@ -1,10 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.traffic
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{BatchAggregatorConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  BatchAggregatorConfig,
+  CantonConfigValidator,
+  NonNegativeFiniteDuration,
+  UniformCantonConfigValidation,
+}
 
 /** Configuration for the traffic purchased entry manager.
   * @param trafficPurchasedCacheSizePerMember
@@ -34,4 +40,12 @@ final case class SequencerTrafficConfig(
     maximumTrafficConsumedCacheSize: PositiveInt = PositiveInt.tryCreate(1000),
     submissionTimestampInFutureTolerance: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(5),
-)
+) extends UniformCantonConfigValidation
+
+object SequencerTrafficConfig {
+  implicit val sequencerTrafficConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerTrafficConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[SequencerTrafficConfig]
+  }
+}

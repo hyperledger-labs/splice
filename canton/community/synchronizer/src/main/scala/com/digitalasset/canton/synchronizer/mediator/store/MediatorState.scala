@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -31,9 +31,8 @@ import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
+import java.util.concurrent.ConcurrentSkipListMap
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ConcurrentSkipListMap, ConcurrentSkipListSet}
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
@@ -62,14 +61,6 @@ private[mediator] class MediatorState(
   private val pendingRequests =
     new ConcurrentSkipListMap[RequestId, ResponseAggregation[?]](implicitly[Ordering[RequestId]])
 
-  // The participant response timeout for requests. This extra data structure facilitates fully asynchronous
-  // request processing. MultiDict, because multiple requests could have the same response timeout.
-  private val participantResponseTimeouts = mutable.SortedMultiDict[CantonTimestamp, RequestId]()
-
-  // Ideally we would like a bidirectional map from ResponseTimeout to RequestIds. But for simplicity's sake,
-  // we'll use an extra set instead.
-  private val registeredRequests = new ConcurrentSkipListSet[RequestId](RequestId.requestIdOrdering)
-
   // tracks the highest record time that is safe to query for verdicts, in case there are no pending requests
   // consider the following scenario:
   // 1. pending requests: t0, t1, t2
@@ -82,7 +73,7 @@ private[mediator] class MediatorState(
   // returns either the predecessor of the oldest pending request (because the request itself is not yet finalized),
   // or the youngest finalized request in case there are no pending requests.
   private def oldestPendingOrYoungestFinalized: CantonTimestamp =
-    Option(registeredRequests.ceiling(RequestId(CantonTimestamp.MinValue)))
+    Option(pendingRequests.ceilingKey(RequestId(CantonTimestamp.MinValue)))
       // the oldest request itself is still pending, therefore we can only query up to the predecessor
       .map(_.unwrap.immediatePredecessor)
       .getOrElse(youngestFinalizedRequest.get())
@@ -134,33 +125,27 @@ private[mediator] class MediatorState(
       )
     }
 
-  def registerTimeoutForRequest(requestId: RequestId, participantResponseTimeout: CantonTimestamp)(
-      implicit traceContext: TraceContext
-  ): Unit = {
-    participantResponseTimeouts.addOne(participantResponseTimeout -> requestId)
-    ErrorUtil.requireState(
-      registeredRequests.add(requestId),
-      s"Unexpectedly registering the already registered request $requestId",
-    )
-    ErrorUtil.requireState(
-      !pendingRequests.containsKey(requestId),
-      s"Unexpectedly setting the participant response timeout for the already pending request $requestId",
-    )
-  }
-
-  /** Registers an incoming ResponseAggregation as pending request */
-  def registerPendingRequest(
+  /** Adds an incoming ResponseAggregation */
+  def add(
       responseAggregation: ResponseAggregation[?]
-  )(implicit traceContext: TraceContext): Unit = {
+  )(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): FutureUnlessShutdown[Unit] = {
     requireInitialized()
-    val requestId = responseAggregation.requestId
-    ErrorUtil.requireState(
-      pendingRequests.putIfAbsent(requestId, responseAggregation) eq null,
-      s"Unexpected pre-existing request for $requestId",
-    )
+    responseAggregation.asFinalized(protocolVersion) match {
+      case None =>
+        val requestId = responseAggregation.requestId
+        ErrorUtil.requireState(
+          Option(pendingRequests.putIfAbsent(requestId, responseAggregation)).isEmpty,
+          s"Unexpected pre-existing request for $requestId",
+        )
 
-    metrics.requests.mark()(MediatorMetrics.nonduplicateRejectContext)
-    updateNumRequests(1)
+        metrics.requests.mark()
+        updateNumRequests(1)
+        FutureUnlessShutdown.unit
+      case Some(finalizedResponse) => add(finalizedResponse)
+    }
   }
 
   def add(
@@ -170,33 +155,19 @@ private[mediator] class MediatorState(
       callerCloseContext: CloseContext,
   ): FutureUnlessShutdown[Unit] = {
     requireInitialized()
-    storeFinalized(finalizedResponse)
+    finalizedResponseStore
+      .store(finalizedResponse)
+      .map(_ => checkAndPublishNewRecordTime(finalizedResponse.requestId))
   }
 
   def fetch(requestId: RequestId)(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
   ): OptionT[FutureUnlessShutdown, ResponseAggregator] =
-    OptionT
-      .fromOption[FutureUnlessShutdown][ResponseAggregator](getPending(requestId))
-      .orElse(finalizedResponseStore.fetch(requestId).widen[ResponseAggregator])
-
-  /** Stores the finalized response, performs housekeeping of the internal state, and publishes a
-    * new finalized record time if appropriate.
-    */
-  private def storeFinalized(finalizedResponse: FinalizedResponse)(implicit
-      traceContext: TraceContext,
-      callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Unit] = {
-    val requestId = finalizedResponse.requestId
-    finalizedResponseStore.store(finalizedResponse) map { _ =>
-      Option(pendingRequests.remove(requestId)) foreach { _ =>
-        updateNumRequests(-1)
-      }
-      registeredRequests.remove(requestId)
-      checkAndPublishNewRecordTime(requestId)
+    Option(pendingRequests.get(requestId)) match {
+      case Some(response) => OptionT.pure[FutureUnlessShutdown](response)
+      case None => finalizedResponseStore.fetch(requestId).widen[ResponseAggregator]
     }
-  }
 
   /** Replaces a [[ResponseAggregation]] for the `requestId` if the stored version matches
     * `currentVersion`. You can only use this to update non-finalized aggregations
@@ -216,6 +187,14 @@ private[mediator] class MediatorState(
     ErrorUtil.requireArgument(!oldValue.isFinalized, s"Already finalized ${oldValue.requestId}")
 
     val requestId = oldValue.requestId
+
+    def storeFinalized(finalizedResponse: FinalizedResponse): FutureUnlessShutdown[Unit] =
+      finalizedResponseStore.store(finalizedResponse) map { _ =>
+        Option(pendingRequests.remove(requestId)) foreach { _ =>
+          updateNumRequests(-1)
+        }
+        checkAndPublishNewRecordTime(requestId)
+      }
 
     (for {
       // I'm not really sure about these validations or errors...
@@ -250,9 +229,6 @@ private[mediator] class MediatorState(
     } yield true).getOrElse(false)
   }
 
-  def allRequestsFinalizedTo(ts: CantonTimestamp)(implicit traceContext: TraceContext): Unit =
-    checkAndPublishNewRecordTime(RequestId(ts))
-
   private def checkAndPublishNewRecordTime(
       requestId: RequestId
   )(implicit traceContext: TraceContext): Unit = {
@@ -266,17 +242,16 @@ private[mediator] class MediatorState(
 
   /** Fetch pending requests that have a timestamp below the provided `cutoff` */
   def pendingRequestIdsBefore(cutoff: CantonTimestamp): List[RequestId] =
-    registeredRequests.headSet(RequestId(cutoff)).asScala.toList
+    pendingRequests.keySet().headSet(RequestId(cutoff)).asScala.toList
 
   /** Fetch pending requests that have a timeout below the provided `cutoff` */
-  def pendingTimedoutRequest(cutoff: CantonTimestamp): List[RequestId] = {
-    val range = participantResponseTimeouts.rangeUntil(cutoff)
-    // `range` is "connected" to `participantResponseTimeouts. Therefore extract
-    // the request ids first, before removing the range from the original map.
-    val requestsToTimeOut = range.values.toList
-    range.keySet.foreach(participantResponseTimeouts.removeKey)
-    requestsToTimeOut
-  }
+  def pendingTimedoutRequest(cutoff: CantonTimestamp): List[RequestId] =
+    pendingRequests
+      .values()
+      .asScala
+      .filter(resp => resp.responseTimeout < cutoff)
+      .map(resp => resp.requestId)
+      .toList
 
   /** Fetch a response aggregation from the pending requests collection. */
   def getPending(requestId: RequestId): Option[ResponseAggregation[?]] = Option(

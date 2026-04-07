@@ -41,7 +41,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          cache_version: 8
+          cache_version: 7
           test_name: ui_tests
           target: 'oss'
 
@@ -63,7 +63,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
         with:
-          cache_version: 8
+          cache_version: 7
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Upload logs

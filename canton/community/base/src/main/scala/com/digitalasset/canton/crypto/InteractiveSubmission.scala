@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -6,27 +6,30 @@ package com.digitalasset.canton.crypto
 import cats.data.EitherT
 import cats.syntax.alternative.*
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.LedgerTimeBoundaries
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.hash.TransactionHash.NodeHashingError
-import com.digitalasset.canton.protocol.hash.{HashTracer, TransactionHash}
-import com.digitalasset.canton.protocol.{LfContractId, LfHash}
+import com.digitalasset.canton.protocol.hash.{
+  HashTracer,
+  TransactionHash,
+  TransactionMetadataHashBuilder,
+}
+import com.digitalasset.canton.protocol.{LfContractId, LfHash, SerializableContract}
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{PartyId, Synchronizer}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
-import com.digitalasset.daml.lf.data.{Ref, Time}
+import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
 import com.digitalasset.daml.lf.transaction.{FatContractInstance, NodeId, VersionedTransaction}
 import com.digitalasset.daml.lf.value.Value.ContractId
 
 import java.util.UUID
 import scala.collection.immutable.{SortedMap, SortedSet}
 import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success, Try}
 
 object InteractiveSubmission {
   implicit val contractIdOrdering: Ordering[LfContractId] = Ordering.by(_.coid)
@@ -54,22 +57,55 @@ object InteractiveSubmission {
         commandId: Ref.CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        synchronizer: Synchronizer,
+        synchronizerId: SynchronizerId,
         timeBoundaries: LedgerTimeBoundaries,
         preparationTime: Time.Timestamp,
-        maxRecordTime: Option[Time.Timestamp],
         disclosedContracts: Map[ContractId, FatContractInstance],
     ) = new TransactionMetadataForHashing(
       actAs = SortedSet.from(actAs),
       commandId = commandId,
       transactionUUID = transactionUUID,
       mediatorGroup = mediatorGroup,
-      synchronizer = synchronizer,
+      synchronizerId = synchronizerId,
       timeBoundaries = timeBoundaries,
       preparationTime = preparationTime,
-      maxRecordTime = maxRecordTime,
       disclosedContracts = SortedMap.from(disclosedContracts),
     )
+
+    def saltFromSerializedContract(serializedNode: SerializableContract): Bytes =
+      serializedNode.authenticationData.toLfBytes
+
+    def apply(
+        actAs: Set[Ref.Party],
+        commandId: Ref.CommandId,
+        transactionUUID: UUID,
+        mediatorGroup: Int,
+        synchronizerId: SynchronizerId,
+        timeBoundaries: LedgerTimeBoundaries,
+        preparationTime: Time.Timestamp,
+        disclosedContracts: Map[ContractId, SerializableContract],
+    ): TransactionMetadataForHashing = {
+
+      val asFatContracts = disclosedContracts
+        .map { case (contractId, serializedNode) =>
+          contractId -> FatContractInstance.fromCreateNode(
+            serializedNode.toLf,
+            serializedNode.ledgerCreateTime,
+            saltFromSerializedContract(serializedNode),
+          )
+        }
+
+      new TransactionMetadataForHashing(
+        SortedSet.from(actAs),
+        commandId,
+        transactionUUID,
+        mediatorGroup,
+        synchronizerId,
+        timeBoundaries,
+        preparationTime,
+        SortedMap.from(asFatContracts),
+      )
+    }
   }
 
   final case class TransactionMetadataForHashing private (
@@ -77,37 +113,48 @@ object InteractiveSubmission {
       commandId: Ref.CommandId,
       transactionUUID: UUID,
       mediatorGroup: Int,
-      synchronizer: Synchronizer,
+      synchronizerId: SynchronizerId,
       timeBoundaries: LedgerTimeBoundaries,
       preparationTime: Time.Timestamp,
-      maxRecordTime: Option[Time.Timestamp],
       disclosedContracts: SortedMap[ContractId, FatContractInstance],
   )
 
-  private def tryComputeHash(
-      hashVersion: HashingSchemeVersion,
+  private def computeHashV2(
       transaction: VersionedTransaction,
       metadata: TransactionMetadataForHashing,
       nodeSeeds: Map[NodeId, LfHash],
       hashTracer: HashTracer,
-  ): Hash =
-    TransactionHash.tryHashTransactionWithMetadata(
-      hashVersion,
-      transaction,
-      nodeSeeds,
-      metadata,
-      hashTracer,
-    )
-
-  private def catchHashingErrors(f: => Hash): Either[HashError, Hash] =
-    Try(f) match {
-      case Success(value) => Right(value)
-      case Failure(err) =>
-        Left(HashingFailed(err match {
+  ): Either[HashError, Hash] = {
+    def catchHashingErrors[T](f: => T): Either[HashError, T] =
+      scala.util
+        .Try(f)
+        .toEither
+        .leftMap {
           case nodeHashErr: NodeHashingError => nodeHashErr.msg
           case err => err.getMessage
-        }))
-    }
+        }
+        .leftMap(HashingFailed.apply)
+
+    val v1Metadata = TransactionMetadataHashBuilder.MetadataV1(
+      metadata.actAs,
+      metadata.commandId,
+      metadata.transactionUUID,
+      metadata.mediatorGroup,
+      metadata.synchronizerId.toProtoPrimitive,
+      metadata.timeBoundaries,
+      metadata.preparationTime,
+      metadata.disclosedContracts,
+    )
+
+    catchHashingErrors(
+      TransactionHash.tryHashTransactionWithMetadataV1(
+        transaction,
+        nodeSeeds,
+        v1Metadata,
+        hashTracer,
+      )
+    )
+  }
 
   def computeVersionedHash(
       hashVersion: HashingSchemeVersion,
@@ -129,9 +176,9 @@ object InteractiveSubmission {
         )
       )
     } else {
-      catchHashingErrors(
-        tryComputeHash(hashVersion, transaction, metadata, nodeSeeds, hashTracer)
-      )
+      hashVersion match {
+        case HashingSchemeVersion.V2 => computeHashV2(transaction, metadata, nodeSeeds, hashTracer)
+      }
     }
   }
 
@@ -140,9 +187,7 @@ object InteractiveSubmission {
     *   hash of the transaction
     * @param signatures
     *   signatures provided in the request
-    * @param cryptoPureApi
-    *   crypto pure api to use to verify signatures
-    * @param topologySnapshot
+    * @param cryptoSnapshot
     *   topology snapshot to use to validate signatures
     * @param actAs
     *   actAs parties that should be covered by the signatures

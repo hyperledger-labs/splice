@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -43,6 +43,7 @@ import com.digitalasset.canton.protocol.{ExternalAuthorization, RequestId}
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
@@ -98,9 +99,10 @@ private[protocol] object AuthenticationValidator {
             viewTree = rootView,
             submitterMetadata = submitterMetadata,
             topology = parsedRequest.snapshot,
+            protocolVersion = synchronizerId.protocolVersion,
             reInterpretationET = reInterpretationET,
             requestId = parsedRequest.requestId,
-            physicalSynchronizerId = synchronizerId,
+            synchronizerId = synchronizerId,
             transactionEnricher = transactionEnricher,
             createNodeEnricher = createNodeEnricher,
             logger = logger,
@@ -263,8 +265,9 @@ private[protocol] object AuthenticationValidator {
       viewTree: FullTransactionViewTree,
       submitterMetadata: SubmitterMetadata,
       topology: SynchronizerSnapshotSyncCryptoApi,
+      protocolVersion: ProtocolVersion,
       reInterpretationET: LazyAsyncReInterpretation,
-      physicalSynchronizerId: PhysicalSynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       transactionEnricher: TransactionEnricher,
       createNodeEnricher: ContractEnricher,
       requestId: RequestId,
@@ -299,16 +302,16 @@ private[protocol] object AuthenticationValidator {
 
           reInterpretedTopLevelView
             .computeHash(
-              hashingSchemeVersion = externalAuthorization.hashingSchemeVersion,
-              actAs = submitterMetadata.actAs,
-              commandId = submitterMetadata.commandId.unwrap,
-              transactionUUID = viewTree.transactionUuid,
-              mediatorGroup = viewTree.mediator.group.value,
-              physicalSynchronizerId = physicalSynchronizerId,
-              maxRecordTime = externalAuthorization.maxRecordTime,
-              transactionEnricher = transactionEnricher,
-              contractEnricher = createNodeEnricher,
-              hashTracer = hashTracer.getOrElse[HashTracer](HashTracer.NoOp),
+              externalAuthorization.hashingSchemeVersion,
+              submitterMetadata.actAs,
+              submitterMetadata.commandId.unwrap,
+              viewTree.transactionUuid,
+              viewTree.mediator.group.value,
+              synchronizerId.logical,
+              protocolVersion,
+              transactionEnricher,
+              createNodeEnricher,
+              hashTracer.getOrElse[HashTracer](HashTracer.NoOp),
             )
             // If Hash computation is successful, verify the signature is valid
             .flatMap { hash =>

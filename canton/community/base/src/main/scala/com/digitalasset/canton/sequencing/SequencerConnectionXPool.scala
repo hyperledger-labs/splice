@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -7,12 +7,9 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.health.{
-  AtomicHealthComponent,
-  ComponentHealthState,
-  HealthQuasiComponent,
-}
+import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -24,7 +21,6 @@ import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.ConnectionX.ConnectionXConfig
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.MonadUtil
@@ -101,9 +97,6 @@ trait SequencerConnectionXPool extends FlagCloseable with NamedLogging {
 
   def health: SequencerConnectionXPoolHealth
 
-  /** Return the health status of the connections. */
-  def getConnectionsHealthStatus: Seq[HealthQuasiComponent]
-
   /** Return the number of different sequencerIds present in the pool (connections for the same
     * sequencerId count for 1).
     */
@@ -169,7 +162,7 @@ object SequencerConnectionXPool {
     *   The maximum duration after which a failed connection is restarted.
     * @param warnConnectionValidationDelay
     *   The duration after which a warning is issued if a started connection still fails validation.
-    * @param expectedPsidO
+    * @param expectedPSIdO
     *   If provided, defines the synchronizer to which the connections are expected to connect. If
     *   empty, the synchronizer will be determined as soon as [[trustThreshold]]-many connections
     *   are validated and agree on bootstrap information.
@@ -177,10 +170,10 @@ object SequencerConnectionXPool {
   final case class SequencerConnectionXPoolConfig(
       connections: NonEmpty[Seq[ConnectionXConfig]],
       trustThreshold: PositiveInt,
-      minRestartConnectionDelay: NonNegativeFiniteDuration,
-      maxRestartConnectionDelay: NonNegativeFiniteDuration,
-      warnConnectionValidationDelay: NonNegativeFiniteDuration,
-      expectedPsidO: Option[PhysicalSynchronizerId] = None,
+      minRestartConnectionDelay: config.NonNegativeFiniteDuration,
+      maxRestartConnectionDelay: config.NonNegativeFiniteDuration,
+      warnConnectionValidationDelay: config.NonNegativeFiniteDuration,
+      expectedPSIdO: Option[PhysicalSynchronizerId] = None,
   ) extends PrettyPrinting {
     // TODO(i24780): when persisting, use com.digitalasset.canton.version.Invariant machinery for validation
     import SequencerConnectionXPoolConfig.*
@@ -191,7 +184,7 @@ object SequencerConnectionXPool {
       param("minRestartConnectionDelay", _.minRestartConnectionDelay),
       param("maxRestartConnectionDelay", _.maxRestartConnectionDelay),
       param("warnConnectionValidationDelay", _.warnConnectionValidationDelay),
-      paramIfDefined("expectedPsidO", _.expectedPsidO),
+      paramIfDefined("expectedPSIdO", _.expectedPSIdO),
     )
 
     def validate: Either[SequencerConnectionXPoolError, Unit] = {
@@ -218,7 +211,7 @@ object SequencerConnectionXPool {
           s"Trust threshold ($trustThreshold) must not exceed the number of connections (${connections.size})",
         )
         _ <- Either.cond(
-          minRestartConnectionDelay <= maxRestartConnectionDelay,
+          minRestartConnectionDelay.duration <= maxRestartConnectionDelay.duration,
           (),
           s"Minimum restart connection delay ($minRestartConnectionDelay) must not exceed the maximum ($maxRestartConnectionDelay)",
         )
@@ -258,7 +251,7 @@ object SequencerConnectionXPool {
     def fromSequencerConnections(
         sequencerConnections: SequencerConnections,
         tracingConfig: TracingConfig,
-        expectedPsidO: Option[PhysicalSynchronizerId],
+        expectedPSIdO: Option[PhysicalSynchronizerId],
     ): SequencerConnectionXPoolConfig = {
       val connectionsConfig = sequencerConnections.aliasToConnection.flatMap {
         case (
@@ -292,7 +285,7 @@ object SequencerConnectionXPool {
       new SequencerConnectionXPoolConfig(
         connectionsConfig,
         trustThreshold = sequencerConnections.sequencerTrustThreshold,
-        expectedPsidO = expectedPsidO,
+        expectedPSIdO = expectedPSIdO,
         minRestartConnectionDelay =
           sequencerConnections.sequencerConnectionPoolDelays.minRestartDelay,
         maxRestartConnectionDelay =
@@ -351,7 +344,7 @@ trait SequencerConnectionXPoolFactory {
   // TODO(i27260): remove when no longer needed
   def createFromOldConfig(
       sequencerConnections: SequencerConnections,
-      expectedPsidO: Option[PhysicalSynchronizerId],
+      expectedPSIdO: Option[PhysicalSynchronizerId],
       tracingConfig: TracingConfig,
       name: String,
   )(implicit

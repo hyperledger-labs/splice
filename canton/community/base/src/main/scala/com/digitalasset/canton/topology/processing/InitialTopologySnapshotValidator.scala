@@ -1,15 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
 
 import cats.data.EitherT
-import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.topology.TopologyStateProcessor
 import com.digitalasset.canton.topology.processing.InitialTopologySnapshotValidator.MergeTx
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
@@ -20,7 +20,10 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
-import com.digitalasset.canton.topology.transaction.checks.RequiredTopologyMappingChecks
+import com.digitalasset.canton.topology.transaction.checks.{
+  MaybeEmptyTopologyStore,
+  RequiredTopologyMappingChecks,
+}
 import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
@@ -50,6 +53,10 @@ import scala.concurrent.ExecutionContext
   *
   * Any inconsistency between the topology snapshot and the outcome of the validation is reported.
   *
+  * @param validateInitialSnapshot
+  *   if false, the validation is skipped and the snapshot is directly imported. this is risky as it
+  *   might create a fork if the validation was changed. therefore, we only use this with great
+  *   care. the proper solution is to make validation so fast that it doesn't impact performance.
   * @param cleanupTopologySnapshot
   *   if true, then we will clean up the topology snapshot (used for hard migration to clean up the
   *   genesis state)
@@ -57,29 +64,27 @@ import scala.concurrent.ExecutionContext
 class InitialTopologySnapshotValidator(
     pureCrypto: CryptoPureApi,
     store: TopologyStore[TopologyStoreId],
-    topologyCacheAggregatorConfig: BatchAggregatorConfig,
-    topologyConfig: TopologyConfig,
     staticSynchronizerParameters: Option[StaticSynchronizerParameters],
-    timeouts: ProcessingTimeout,
+    validateInitialSnapshot: Boolean,
     override val loggerFactory: NamedLoggerFactory,
     cleanupTopologySnapshot: Boolean = false,
 )(implicit ec: ExecutionContext, materializer: Materializer)
     extends NamedLogging {
 
   private val storeIsEmpty = new AtomicBoolean(false)
+  private val maybeEmptyStore = new MaybeEmptyTopologyStore {
+    override def store: TopologyStore[TopologyStoreId] = InitialTopologySnapshotValidator.this.store
+    override def skipLoadingFromStore: Boolean = storeIsEmpty.get()
+  }
   protected val stateProcessor: TopologyStateProcessor =
     TopologyStateProcessor.forInitialSnapshotValidation(
       store,
-      topologyCacheAggregatorConfig,
-      topologyConfig,
-      lookup =>
-        new RequiredTopologyMappingChecks(
-          staticSynchronizerParameters,
-          lookup,
-          loggerFactory,
-        ),
+      new RequiredTopologyMappingChecks(
+        maybeEmptyStore,
+        staticSynchronizerParameters,
+        loggerFactory,
+      ),
       pureCrypto,
-      timeouts,
       loggerFactory,
     )
 
@@ -97,7 +102,7 @@ class InitialTopologySnapshotValidator(
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
     val finalSnapshot =
       if (cleanupTopologySnapshot) preprocessInitialSnapshot(initialSnapshot) else initialSnapshot
-    if (!topologyConfig.validateInitialTopologySnapshot) {
+    if (!validateInitialSnapshot) {
       logger.info("Skipping initial topology snapshot validation")
       EitherT.right(store.bulkInsert(finalSnapshot))
     } else {
@@ -146,10 +151,9 @@ class InitialTopologySnapshotValidator(
                 .zipWithIndex
                 .dropWhile { case ((fromInitial, fromStore), _) =>
                   // we don't do a complete == comparison, because the snapshot might contain transactions with superfluous
-                  // signatures that are now filtered out. As long as the hash, validFrom, validUntil, isProposal and rejection status
-                  // (i.e. just checking whether both transactions are rejected or not without looking at the concrete reasons)
+                  // signatures that are now filtered out. As long as the hash, validFrom, validUntil, isProposal and rejection reason
                   // agree between initial and stored topology transaction, we accept the result.
-                  equalIgnoringSignaturesAndRejectionReasonDetails(fromInitial, fromStore)
+                  StoredTopologyTransaction.equalIgnoringSignatures(fromInitial, fromStore)
                 }
                 runWith (Sink.headOption)
             )
@@ -171,31 +175,6 @@ class InitialTopologySnapshotValidator(
     }
   }
 
-  /** @return
-    *   `true` if both transactions are the same without comparing the signatures and without
-    *   comparing the content of the rejection reason. `false` otherwise.
-    */
-  private def equalIgnoringSignaturesAndRejectionReasonDetails(
-      a: GenericStoredTopologyTransaction,
-      b: GenericStoredTopologyTransaction,
-  ): Boolean = a match {
-    case StoredTopologyTransaction(
-          b.sequenced,
-          b.validFrom,
-          b.validUntil,
-          SignedTopologyTransaction(
-            b.transaction.transaction,
-            _ignoreSignatures,
-            b.transaction.isProposal,
-          ),
-          _ignoreRejectionReason,
-        ) =>
-      // two transactions are considered equal, if all of the fields above are the same,
-      // and if both transactions have been rejected (for whatever reason) or neither has been rejected.
-      a.rejectionReason.isEmpty == b.rejectionReason.isEmpty
-    case _ => false
-  }
-
   /** Fix the initial snapshot from mainnet
     *
     * In the older times, we had to deduplicate and merge transactions here as they were merged in
@@ -215,6 +194,7 @@ class InitialTopologySnapshotValidator(
     val previous = mutable.Map.empty[TxHash, MergeTx]
     initialSnapshot.result.zipWithIndex
       .filter { case (tx, idx) =>
+        // TODO should we clean this up?
         if (tx.transaction.isProposal && tx.validUntil.nonEmpty) {
           logger.info(s"Dropping completed proposal at idx=$idx $tx")
           false

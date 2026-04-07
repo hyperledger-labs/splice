@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -31,24 +31,17 @@ import com.daml.ledger.api.v2.{
 import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
-import com.digitalasset.canton.http.json.v2.Endpoints.{
-  CallerContext,
-  TracedInput,
-  createProtoRef,
-  v2Endpoint,
-}
+import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput, v2Endpoint}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsCantonError,
   JsReassignment,
   JsTransaction,
   JsTransactionTree,
-  OneOfSchemaExtension,
 }
 import com.digitalasset.canton.http.json.v2.LegacyDTOs.toTransactionTree
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf
@@ -64,11 +57,9 @@ import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, webSocketBody}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsCommandService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
-    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -136,8 +127,8 @@ class JsCommandService(
     command_completion_service.CompletionStreamRequest,
     command_completion_service.CompletionStreamResponse,
     NotUsed,
-  ] = _ => {
-    implicit val tc: TraceContext = caller.traceContext()
+  ] = req => {
+    implicit val tc: TraceContext = req.traceContext
     prepareSingleWsStream(
       commandCompletionServiceClient(caller.token()).completionStream,
       Future.successful[command_completion_service.CompletionStreamResponse],
@@ -147,7 +138,7 @@ class JsCommandService(
   def submitAndWait(callerContext: CallerContext): TracedInput[JsCommands] => Future[
     Either[JsCantonError, SubmitAndWaitResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
+    implicit val tc: TraceContext = req.traceContext
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitAndWaitRequest =
@@ -163,8 +154,9 @@ class JsCommandService(
   ): TracedInput[JsCommands] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionTreeResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
+    implicit val tc: TraceContext = req.traceContext
     for {
+
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitAndWaitForTransactionRequest =
         SubmitAndWaitForTransactionRequest(
@@ -213,7 +205,7 @@ class JsCommandService(
   ): TracedInput[JsSubmitAndWaitForTransactionRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
+    implicit val tc: TraceContext = req.traceContext
     for {
       submitAndWaitRequest <- protocolConverters.SubmitAndWaitForTransactionRequest.fromJson(req.in)
       result <- commandServiceClient(callerContext.token())
@@ -228,7 +220,7 @@ class JsCommandService(
   ): TracedInput[command_service.SubmitAndWaitForReassignmentRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForReassignmentResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
+    implicit val tc: TraceContext = req.traceContext
     for {
       result <- commandServiceClient(callerContext.token())
         .submitAndWaitForReassignment(req.in)
@@ -240,7 +232,7 @@ class JsCommandService(
   private def submitAsync(callerContext: CallerContext): TracedInput[JsCommands] => Future[
     Either[JsCantonError, command_submission_service.SubmitResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
+    implicit val tc: TraceContext = req.traceContext
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitRequest =
@@ -256,8 +248,7 @@ class JsCommandService(
   ): TracedInput[command_submission_service.SubmitReassignmentRequest] => Future[
     Either[JsCantonError, command_submission_service.SubmitReassignmentResponse]
   ] = req => {
-    implicit val tc: TraceContext = callerContext.traceContext()
-    commandSubmissionServiceClient(callerContext.token())
+    commandSubmissionServiceClient(callerContext.token())(req.traceContext)
       .submitReassignment(req.in)
       .resultToRight
   }
@@ -324,7 +315,6 @@ final case class JsCommands(
     synchronizerId: Option[String] = None,
     packageIdSelectionPreference: Seq[String] = Seq.empty,
     prefetchContractKeys: Seq[js.PrefetchContractKey] = Seq.empty,
-    tapsMaxPasses: Option[Int] = None,
 )
 
 object JsCommandService extends DocumentationEndpoints {
@@ -337,13 +327,13 @@ object JsCommandService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction"))
     .in(jsonBody[JsSubmitAndWaitForTransactionRequest])
     .out(jsonBody[JsSubmitAndWaitForTransactionResponse])
-    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT_FOR_TRANSACTION)
+    .description("Submit a batch of commands and wait for the transaction response")
 
   val submitAndWaitForReassignmentEndpoint = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-reassignment"))
     .in(jsonBody[command_service.SubmitAndWaitForReassignmentRequest])
     .out(jsonBody[JsSubmitAndWaitForReassignmentResponse])
-    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT_FOR_REASSIGNMENT)
+    .description("Submit a batch of reassignment commands and wait for the reassignment response")
 
   val submitAndWaitForTransactionTree = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction-tree"))
@@ -358,14 +348,14 @@ object JsCommandService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("submit-and-wait"))
     .in(jsonBody[JsCommands])
     .out(jsonBody[SubmitAndWaitResponse])
-    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT)
+    .description("Submit a batch of commands and wait for the completion details")
 
   val submitAsyncEndpoint = commands.post
     .in(sttp.tapir.stringToPath("async"))
     .in(sttp.tapir.stringToPath("submit"))
     .in(jsonBody[JsCommands])
     .out(jsonBody[command_submission_service.SubmitResponse])
-    .protoRef(command_submission_service.CommandSubmissionServiceGrpc.METHOD_SUBMIT)
+    .description("Submit a command asynchronously")
 
   val submitReassignmentAsyncEndpoint =
     commands.post
@@ -373,7 +363,7 @@ object JsCommandService extends DocumentationEndpoints {
       .in(sttp.tapir.stringToPath("submit-reassignment"))
       .in(jsonBody[command_submission_service.SubmitReassignmentRequest])
       .out(jsonBody[command_submission_service.SubmitReassignmentResponse])
-      .protoRef(command_submission_service.CommandSubmissionServiceGrpc.METHOD_SUBMIT_REASSIGNMENT)
+      .description("Submit reassignment command asynchronously")
 
   val completionStreamEndpoint =
     commands.get
@@ -386,20 +376,14 @@ object JsCommandService extends DocumentationEndpoints {
           CodecFormat.Json,
         ](PekkoStreams)
       )
-      .protoRef(command_completion_service.CommandCompletionServiceGrpc.METHOD_COMPLETION_STREAM)
+      .description("Get completions stream")
 
   val completionListEndpoint =
     commands.post
       .in(sttp.tapir.stringToPath("completions"))
       .in(jsonBody[command_completion_service.CompletionStreamRequest])
       .out(jsonBody[Seq[command_completion_service.CompletionStreamResponse]])
-      .description(s"""|
-           |Query completions list (blocking call)
-           |
-           |${createProtoRef(
-          command_completion_service.CommandCompletionServiceGrpc.METHOD_COMPLETION_STREAM
-        )}
-       """.stripMargin.trim)
+      .description("Query completions list (blocking call)")
       .inStreamListParamsAndDescription()
 
   override def documentation: Seq[AnyEndpoint] = Seq(
@@ -519,59 +503,23 @@ object JsCommandServiceCodecs {
     commands.DisclosedContract
   ] = deriveRelaxedCodec
 
-  // Normally tapir first decodes right value if that fails then left
-  // As long as we do not use strict decoding it can happen that JsCantonError is
-  // interpreted as an empty CommandCompletionResponse
-  // to prevent that we switch decoding logic for that case
-  // It is possible that same trick should be applied for other WS endpoints
-  // TODO (i30190) generalize or remove this fix when possible
-  implicit val fixForCompletionStreamWSFrameCodec
-      : Codec[Either[JsCantonError, command_completion_service.CompletionStreamResponse]] = {
-
-    val completionStreamWSFrameDecoder
-        : Decoder[Either[JsCantonError, command_completion_service.CompletionStreamResponse]] =
-      Decoder[JsCantonError].either(
-        Decoder[command_completion_service.CompletionStreamResponse]
-      )
-
-    val completionStreamWSFrameEncoder =
-      new Encoder[Either[JsCantonError, command_completion_service.CompletionStreamResponse]] {
-        override def apply(
-            value: Either[JsCantonError, command_completion_service.CompletionStreamResponse]
-        ): Json =
-          value match {
-            case Left(err) => Encoder[JsCantonError].apply(err)
-            case Right(resp) =>
-              Encoder[command_completion_service.CompletionStreamResponse].apply(resp)
-          }
-      }
-
-    Codec.from(
-      completionStreamWSFrameDecoder,
-      completionStreamWSFrameEncoder,
-    )
-  }
-
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
   implicit val reassignmentCommandCommandSchema
-      : Schema[reassignment_commands.ReassignmentCommand.Command] =
-    Schema.oneOfWrapped[reassignment_commands.ReassignmentCommand.Command].oneOfExtension()
+      : Schema[reassignment_commands.ReassignmentCommand.Command] = Schema.oneOfWrapped
 
   implicit val deduplicationPeriodSchema: Schema[DeduplicationPeriod] =
-    Schema.oneOfWrapped[DeduplicationPeriod].oneOfExtension()
+    Schema.oneOfWrapped
 
   implicit val completionDeduplicationPeriodSchema
       : Schema[completion.Completion.DeduplicationPeriod] =
-    Schema.oneOfWrapped[completion.Completion.DeduplicationPeriod].oneOfExtension()
+    Schema.oneOfWrapped
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   implicit val jsCommandSchema: Schema[JsCommand.Command] =
-    Schema.oneOfWrapped[JsCommand.Command].oneOfExtension()
+    Schema.oneOfWrapped
 
   implicit val completionStreamResponseSchema
       : Schema[command_completion_service.CompletionStreamResponse.CompletionResponse] =
-    Schema
-      .oneOfWrapped[command_completion_service.CompletionStreamResponse.CompletionResponse]
-      .oneOfExtension()
+    Schema.oneOfWrapped
 
 }

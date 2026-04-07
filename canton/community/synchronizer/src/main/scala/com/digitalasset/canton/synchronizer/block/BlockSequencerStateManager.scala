@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block
@@ -43,7 +43,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SequencerIntegration,
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficConsumedStore
-import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, Traced}
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -83,7 +83,7 @@ trait BlockSequencerStateManagerBase extends FlagCloseable {
     */
   def processBlock(
       bug: BlockUpdateGenerator
-  ): Flow[Traced[BlockEvents], Traced[OrderedBlockUpdate], NotUsed]
+  ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed]
 
   /** Persists the [[update.BlockUpdate]]s and completes the waiting RPC calls as necessary.
     */
@@ -99,6 +99,8 @@ trait BlockSequencerStateManagerBase extends FlagCloseable {
 
 /** Async block sequencer writer control parameters
   *
+  * @param enabled
+  *   if true then the async writer is enabled
   * @param trafficBatchSize
   *   the maximum number of traffic events to batch in a single write
   * @param aggregationBatchSize
@@ -107,6 +109,7 @@ trait BlockSequencerStateManagerBase extends FlagCloseable {
   *   the maximum number of block info updates to batch in a single write
   */
 final case class AsyncWriterParameters(
+    enabled: Boolean = true,
     trafficBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
     aggregationBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
     blockInfoBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
@@ -466,7 +469,7 @@ private class BlockSequencerStateAsyncWriter(
         EitherT.right(transformSync(backpressureF1, backpressureF2))
     }
 
-  def finalizeBlockUpdate(newBlock: BlockInfo): FutureUnlessShutdown[Unit] =
+  def finalizeBlockUpate(newBlock: BlockInfo): FutureUnlessShutdown[Unit] =
     observedError.get() match {
       // forward any background error
       case Some(err) => FutureUnlessShutdown.failed(err)
@@ -501,7 +504,7 @@ class BlockSequencerStateManager(
 
   import BlockSequencerStateManager.*
 
-  private val asyncWriter =
+  private val asyncWriter = Option.when(asyncWriterParameters.enabled)(
     new BlockSequencerStateAsyncWriter(
       store = store,
       trafficConsumedStore = trafficConsumedStore,
@@ -509,6 +512,7 @@ class BlockSequencerStateManager(
       asyncWriterParameters,
       loggerFactory,
     )
+  )
 
   private val memberAcknowledgementPromises =
     TrieMap[Member, NonEmpty[SortedMap[CantonTimestamp, Traced[Promise[Unit]]]]]()
@@ -517,7 +521,7 @@ class BlockSequencerStateManager(
 
   override def processBlock(
       bug: BlockUpdateGenerator
-  ): Flow[Traced[BlockEvents], Traced[OrderedBlockUpdate], NotUsed] = {
+  ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed] = {
     val head = getHeadState
     val bugState = {
       import TraceContext.Implicits.Empty.*
@@ -535,7 +539,7 @@ class BlockSequencerStateManager(
         )(MetricsContext("element" -> flowName))
       else original
 
-    Flow[Traced[BlockEvents]]
+    Flow[BlockEvents]
       .via(
         finalFlow(checkBlockHeight(head.block.height), "check_block_height")
       )
@@ -549,14 +553,12 @@ class BlockSequencerStateManager(
 
   private def checkBlockHeight(
       initialHeight: Long
-  ): Flow[Traced[BlockEvents], Traced[BlockEvents], NotUsed] =
-    Flow[Traced[BlockEvents]].statefulMapConcat { () =>
+  ): Flow[BlockEvents, Traced[BlockEvents], NotUsed] =
+    Flow[BlockEvents].statefulMapConcat { () =>
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var currentBlockHeight = initialHeight
-      tracedBlockEvents => {
+      blockEvents => {
 
-        implicit val traceContext = tracedBlockEvents.traceContext
-        val blockEvents = tracedBlockEvents.value
         val height = blockEvents.height
 
         // TODO(M98 Tech-Debt Collection): consider validating that blocks with the same block height have the same contents
@@ -576,6 +578,8 @@ class BlockSequencerStateManager(
           noTracingLogger.error(msg)
           throw new SequencerUnexpectedStateChange(msg)
         } else {
+          implicit val traceContext: TraceContext =
+            TraceContext.ofBatch("check_block_height")(blockEvents.events)(logger)
           // Set the current block height to the new block's height instead of + 1 of the previous value
           // so that we support starting from an arbitrary block height
           logger.debug(
@@ -696,30 +700,68 @@ class BlockSequencerStateManager(
       case _ => None
     }
 
-    val acknowledgementsET = EitherT.right[String](
-      dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
-    )
-    // the return value is just there to abort errors
-    val asyncErrorET = asyncWriter.append(
-      trafficConsumedUpdates,
-      update.inFlightAggregationUpdates,
-      acknowledgementsET,
-    )
-    (for {
-      // note: these writes are non-blocking. they will just be put into a queue but backpressure if the queue is full
-      _ <- dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes)
-      _ <- asyncErrorET
-    } yield {
-      val newHead = priorHead.copy(chunk = newState)
-      updateHeadState(priorHead, newHead)
-      update.acknowledgements.foreach { case (member, timestamp) =>
-        resolveAcknowledgements(member, timestamp)
+    def writeSequential() = {
+      val trafficConsumedFUS = EitherT.right[String](
+        synchronizeWithClosing("trafficConsumedStore.store")(
+          trafficConsumedStore.store(trafficConsumedUpdates)
+        )
+      )
+      val blockSequencerWritesFUS =
+        dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes)
+      val blockSequencerAcknowledgementsFUS = EitherT.right[String](
+        dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
+      )
+      val inFlightAggregationUpdatesFUS = EitherT.right[String](
+        synchronizeWithClosing("storeInflightAggregations")(
+          store.storeInflightAggregations(inFlightAggregationUpdates =
+            update.inFlightAggregationUpdates
+          )
+        )
+      )
+      (for {
+        _ <- trafficConsumedFUS
+        _ <- blockSequencerWritesFUS
+        _ <- blockSequencerAcknowledgementsFUS
+        _ <- inFlightAggregationUpdatesFUS
+      } yield ())
+    }
+
+    def writeAsync(asyncWriter: BlockSequencerStateAsyncWriter) = {
+      val acknowledgementsET = EitherT.right[String](
+        dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
+      )
+      // the return value is just there to abort errors
+      val asyncErrorET = asyncWriter.append(
+        trafficConsumedUpdates,
+        update.inFlightAggregationUpdates,
+        acknowledgementsET,
+      )
+      (for {
+        // note: these writes are non-blocking. they will just be put into a queue but backpressure if the queue is full
+        _ <- dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes)
+        _ <- asyncErrorET
+      } yield ())
+    }
+
+    val writeET = asyncWriter match {
+      case None =>
+        writeSequential()
+      case Some(asyncWriter) =>
+        writeAsync(asyncWriter)
+    }
+
+    writeET
+      .map { _ =>
+        val newHead = priorHead.copy(chunk = newState)
+        updateHeadState(priorHead, newHead)
+        update.acknowledgements.foreach { case (member, timestamp) =>
+          resolveAcknowledgements(member, timestamp)
+        }
+        update.invalidAcknowledgements.foreach { case (member, timestamp, error) =>
+          invalidAcknowledgement(member, timestamp, error)
+        }
+        newHead
       }
-      update.invalidAcknowledgements.foreach { case (member, timestamp, error) =>
-        invalidAcknowledgement(member, timestamp, error)
-      }
-      newHead
-    })
       .valueOr(e =>
         ErrorUtil.internalError(new RuntimeException(s"handleChunkUpdate failed with error: $e"))
       )
@@ -745,13 +787,16 @@ class BlockSequencerStateManager(
     checkInvariantIfEnabled(newState)
     val newHead = HeadState.fullyProcessed(newState)
 
-    // write is async. future only forwarded to inject future failed in case we are unable to write
-    asyncWriter
-      .finalizeBlockUpdate(newBlock)
-      .map { _ =>
-        updateHeadState(priorHead, newHead)
-        newHead
-      }
+    (asyncWriter match {
+      case Some(asyncWriter) =>
+        // write is async. future only forwarded to inject future failed in case we are unable to write
+        asyncWriter.finalizeBlockUpate(newBlock)
+      case None =>
+        store.finalizeBlockUpdates(Seq(newBlock))
+    }).map { _ =>
+      updateHeadState(priorHead, newHead)
+      newHead
+    }
 
   }
 
@@ -848,7 +893,7 @@ class BlockSequencerStateManager(
 object BlockSequencerStateManager {
 
   def create(
-      initialHeadBlockO: Option[BlockEphemeralState],
+      synchronizerId: PhysicalSynchronizerId,
       store: SequencerBlockStore,
       trafficConsumedStore: TrafficConsumedStore,
       asyncWriterParameters: AsyncWriterParameters,
@@ -861,27 +906,35 @@ object BlockSequencerStateManager {
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): BlockSequencerStateManager = {
+  ): UnlessShutdown[BlockSequencerStateManager] = {
     val logger = loggerFactory.getTracedLogger(getClass)
-    val headBlock = initialHeadBlockO.getOrElse(BlockEphemeralState.empty)
-    val headState = new AtomicReference[HeadState]({
-      logger.debug(
-        s"Initialized the block sequencer with head block ${headBlock.latestBlock}"
-      )
-      HeadState.fullyProcessed(headBlock)
-    })
-    new BlockSequencerStateManager(
-      store = store,
-      trafficConsumedStore = trafficConsumedStore,
-      asyncWriterParameters = asyncWriterParameters,
-      enableInvariantCheck = enableInvariantCheck,
-      timeouts = timeouts,
-      futureSupervisor = futureSupervisor,
-      loggerFactory = loggerFactory,
-      headState = headState,
-      streamInstrumentationConfig = streamInstrumentationConfig,
-      blockMetrics = blockMetrics,
-    )
+    implicit val errorLoggingContext: ErrorLoggingContext =
+      ErrorLoggingContext.fromTracedLogger(logger)
+    timeouts.unbounded
+      .awaitUS(s"Reading the head of the $synchronizerId sequencer state")(store.readHead)
+      .map { headBlockO =>
+        val headBlock = headBlockO.getOrElse(BlockEphemeralState.empty)
+        new AtomicReference[HeadState]({
+          logger.debug(
+            s"Initialized the block sequencer with head block ${headBlock.latestBlock}"
+          )
+          HeadState.fullyProcessed(headBlock)
+        })
+      }
+      .map { headState =>
+        new BlockSequencerStateManager(
+          store = store,
+          trafficConsumedStore = trafficConsumedStore,
+          asyncWriterParameters = asyncWriterParameters,
+          enableInvariantCheck = enableInvariantCheck,
+          timeouts = timeouts,
+          futureSupervisor = futureSupervisor,
+          loggerFactory = loggerFactory,
+          headState = headState,
+          streamInstrumentationConfig = streamInstrumentationConfig,
+          blockMetrics = blockMetrics,
+        )
+      }
   }
 
   /** Keeps track of the accumulated state changes by processing chunks of updates from a block

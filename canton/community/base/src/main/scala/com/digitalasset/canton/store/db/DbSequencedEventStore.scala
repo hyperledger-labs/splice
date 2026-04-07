@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.db
@@ -21,8 +21,7 @@ import com.digitalasset.canton.store.*
 import com.digitalasset.canton.store.SequencedEventStore.CounterAndTimestamp
 import com.digitalasset.canton.store.db.DbSequencedEventStore.*
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
-import com.digitalasset.canton.util.{EitherTUtil, MaxBytesToDecompress}
-import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.util.EitherTUtil
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.concurrent.ExecutionContext
@@ -41,7 +40,7 @@ class DbSequencedEventStore(
       : SetParameter[IndexedPhysicalSynchronizer] = IndexedString.setParameterIndexedString
   override protected[this] def partitionColumn: String = "physical_synchronizer_idx"
 
-  private val protocolVersion = physicalSynchronizerIdx.psid.protocolVersion
+  private val protocolVersion = physicalSynchronizerIdx.synchronizerId.protocolVersion
   override protected[this] val partitionKey: IndexedPhysicalSynchronizer = physicalSynchronizerIdx
 
   override protected[this] def pruning_status_table: String = "common_sequenced_event_store_pruning"
@@ -68,13 +67,7 @@ class DbSequencedEventStore(
           val signedEvent = SignedContent
             .fromTrustedByteArray(eventBytes)
             .flatMap(
-              _.deserializeContent(
-                SequencedEvent.fromByteString(
-                  ProtocolVersionValidation.PV(protocolVersion),
-                  MaxBytesToDecompress.MaxValueUnsafe,
-                  _,
-                )
-              )
+              _.deserializeContent(SequencedEvent.fromByteString(protocolVersion, _))
             )
             .valueOr(err =>
               throw new DbDeserializationException(s"Failed to deserialize sequenced event: $err")

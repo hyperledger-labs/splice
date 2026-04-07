@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -44,7 +44,7 @@ class CantonDynamicSynchronizerParameterGetter(
           syncCrypto.ips.forSynchronizer(synchronizerId),
           s"Cannot get topology client for synchronizer $synchronizerId",
         )
-        snapshot <- EitherT.liftF(topoClient.currentSnapshotApproximation)
+        snapshot = topoClient.currentSnapshotApproximation
         params <- EitherT.right(
           snapshot.findDynamicSynchronizerParametersOrDefault(
             synchronizerId.protocolVersion,
@@ -68,7 +68,7 @@ class CantonDynamicSynchronizerParameterGetter(
         ): FutureUnlessShutdown[Option[NonNegativeFiniteDuration]] =
           synchronizerConnectionConfigStore
             .getActive(alias)
-            .map(_.configuredPsid) match {
+            .map(_.configuredPSId) match {
             case Left(err) =>
               logger.info(
                 s"Failed to get ledger time tolerance for synchronizer $alias: ${err.message}"

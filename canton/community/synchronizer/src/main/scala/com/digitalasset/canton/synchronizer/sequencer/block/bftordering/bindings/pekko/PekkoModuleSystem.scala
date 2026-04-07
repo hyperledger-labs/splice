@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko
@@ -41,7 +41,7 @@ import scala.util.Try
 object PekkoModuleSystem {
 
   // Should be a few millis, but giving it a good margin to be safe.
-  private val PekkoActorSystemStartupMaxDuration = 15.seconds
+  private val PekkoActorSystemStartupMaxDuration = 5.seconds
 
   private val BlockingOperationTimeout = 30.seconds
 
@@ -570,8 +570,6 @@ object PekkoModuleSystem {
   )(implicit
       executionContext: ExecutionContext
   ): PekkoModuleSystemInitResult[InputMessageT] = {
-    val logger = loggerFactory.getTracedLogger(getClass)
-    implicit val tracedContext: TraceContext = TraceContext.createNew("dabft_pekko_module_system")
     val resultPromise =
       Promise[SystemInitializationResult[
         PekkoEnv,
@@ -585,6 +583,7 @@ object PekkoModuleSystem {
         Behaviors
           .supervise {
             Behaviors.setup[ModuleControl[PekkoEnv, Unit]] { actorContext =>
+              val logger = loggerFactory.getLogger(getClass)
               val moduleSystem =
                 new PekkoModuleSystem(
                   actorContext,

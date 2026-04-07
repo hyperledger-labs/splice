@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.replica
@@ -74,16 +74,13 @@ abstract class ReplicaManager(
 
   private def changeState[A](newState: ReplicaState, setNewStateEagerly: Boolean)(
       body: => FutureUnlessShutdown[A]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[A]] = {
     logger.info(s"Transitioning replica state to $newState")
     execQueue.executeUS(
       synchronizeWithClosing(functionFullName) {
         if (replicaStateRef.get().contains(newState)) {
           logger.debug(s"Replica already in state $newState, ignoring replica state change")
-          FutureUnlessShutdown.unit
-        } else if (replicaStateRef.get().isEmpty) {
-          logger.info(s"Replica not yet initialized, ignoring replica state change to $newState")
-          FutureUnlessShutdown.unit
+          FutureUnlessShutdown.pure(None)
         } else {
           if (setNewStateEagerly) {
             // Set the state to transition from one state to another before running the body
@@ -96,10 +93,11 @@ abstract class ReplicaManager(
               body,
               s"Failed to run replica state transition to $newState",
             )
-            .map { _ =>
+            .map { res =>
               if (!setNewStateEagerly)
                 setState(newState)
               logger.info(s"Successfully performed replica state change to $newState")
+              Some(res)
             }
         }
       },
@@ -134,13 +132,14 @@ abstract class ReplicaManager(
           _ <- transitionToActive()
         } yield ()
       }
+        .map(_ => ())
         .recover {
           case exception if exitOnFatalFailures =>
             FatalError.exitOnFatalError("Failed to transition node to active", exception, logger)
         }
   }
 
-  def setPassive(): FutureUnlessShutdown[Unit] =
+  def setPassive(): FutureUnlessShutdown[Option[CloseContext]] =
     withNewTraceContext("passive_replica") { implicit traceContext =>
       // Close the session context first but then don't wait for the close to be done before transitioning to passive.
       // Once transition is complete, make sure the session context has closed.
@@ -150,20 +149,16 @@ abstract class ReplicaManager(
       // and try to perform more DB queries.
       // But we also want the session context to be closing while we transition to passive to stop any DB retries.
       changeState(ReplicaState.Passive, setNewStateEagerly = true) {
-        val oldContext = sessionCloseContext.get
+        val newContext = makeCloseContext
+        val oldContext = sessionCloseContext.getAndSet(newContext)
         val sessionContextIsClosed =
           FutureUnlessShutdown.outcomeF(Future(oldContext.close()))
         logger.debug("Starting transition to passive")
         for {
           _ <- transitionToPassive()
-          _ = logger.debug("Passivation complete. Waiting for old session context to be closed")
+          _ = logger.debug("Waiting for session context to be closed")
           _ <- sessionContextIsClosed
-          _ = if (!sessionCloseContext.compareAndSet(oldContext, makeCloseContext)) {
-            logger.debug("Lost race to update context to another thread")
-          }
-        } yield {
-          logger.debug("Successfully transitioned node to passive")
-        }
+        } yield CloseContext(newContext)
       }.recover {
         case exception if exitOnFatalFailures =>
           FatalError.exitOnFatalError("Failed to transition node to passive", exception, logger)
@@ -185,7 +180,4 @@ sealed trait ReplicaState extends Product with Serializable
 object ReplicaState {
   case object Active extends ReplicaState
   case object Passive extends ReplicaState
-
-  /** An explicit initialization state from which we can trigger a transition to active */
-  case object Init extends ReplicaState
 }

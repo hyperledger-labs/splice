@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
   DsoRules_SetConfig,
-  LogicalSynchronizerUpgradeSchedule,
   SynchronizerUpgradeSchedule,
   VoteRequest,
 }
@@ -195,99 +194,6 @@ trait SvTestUtil extends TestCommon {
     )
   }
 
-  def scheduleLogicalSynchronizerUpgrade(
-      svToCreateVoteRequest: SvAppReference,
-      svsToCastVotes: Seq[SvAppReference],
-      schedule: LogicalSynchronizerUpgradeSchedule,
-  )(implicit
-      ec: ExecutionContextExecutor
-  ): Unit = {
-    val dsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
-    val action = new ARC_DsoRules(
-      new SRARC_SetConfig(
-        new DsoRules_SetConfig(
-          updateNextScheduledLogicalSynchronizerUpgrade(dsoRules.payload.config, Some(schedule)),
-          Optional.empty(),
-        )
-      )
-    )
-
-    actAndCheck(timeUntilSuccess = 60.seconds)(
-      "Voting on an DsoRules config change for scheduled logical synchronizer upgrade", {
-        def onlySetConfigVoteRequests(
-            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-        ) =
-          voteRequests.filter {
-            _.payload.action match {
-              case action: ARC_DsoRules =>
-                action.dsoAction match {
-                  case _: SRARC_SetConfig => true
-                  case _ => false
-                }
-              case _ => false
-            }
-          }
-
-        val (_, voteRequest) = actAndCheck(
-          "Creating vote request",
-          eventuallySucceeds() {
-            svToCreateVoteRequest.createVoteRequest(
-              svToCreateVoteRequest.getDsoInfo().svParty.toProtoPrimitive,
-              action,
-              "url",
-              "description",
-              // We give everyone 30 seconds to vote. Hopefully that is a good sweet spot between
-              // the vote failing because of a timeout and the test taking too long.
-              new RelTime(30 * 1000 * 1000),
-              None,
-            )
-          },
-        )(
-          "vote request has been created",
-          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
-        )
-
-        // Concurrent uses of log suppression don't work so we suppress here instead of within eventually succeeds
-        loggerFactory.suppressErrors {
-          MonadUtil
-            .parTraverseWithLimit(PositiveInt.four)(svsToCastVotes) { sv =>
-              Future {
-                clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
-                  val svVoteRequest = eventually() {
-                    onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
-                  }
-                  getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
-                }
-                clue(s"${sv.name} accepts vote") {
-                  eventually() {
-                    try {
-                      sv.castVote(
-                        voteRequest.contractId,
-                        true,
-                        "url",
-                        "description",
-                      )
-                    } catch {
-                      case NonFatal(e) => fail(e)
-                    }
-                  }
-                }
-              }
-            }
-            .futureValue
-        }
-      },
-    )(
-      "observing DsoRules with changed config",
-      _ => {
-        val newDsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
-        newDsoRules.payload.config.nextScheduledLogicalSynchronizerUpgrade.toScala shouldBe Some(
-          schedule
-        )
-      },
-    )
-  }
-
   private def confirmAction(
       participantClient: ParticipantClientReference,
       svPartyId: PartyId,
@@ -327,26 +233,6 @@ trait SvTestUtil extends TestCommon {
     dsoRulesConfig.decentralizedSynchronizer,
     domainUpgradeSchedule.toJava,
     dsoRulesConfig.voteCooldownTime,
-    dsoRulesConfig.nextScheduledLogicalSynchronizerUpgrade,
-  )
-
-  private def updateNextScheduledLogicalSynchronizerUpgrade(
-      dsoRulesConfig: DsoRulesConfig,
-      schedule: Option[LogicalSynchronizerUpgradeSchedule],
-  ) = new DsoRulesConfig(
-    dsoRulesConfig.numUnclaimedRewardsThreshold,
-    dsoRulesConfig.numMemberTrafficContractsThreshold,
-    dsoRulesConfig.actionConfirmationTimeout,
-    dsoRulesConfig.svOnboardingRequestTimeout,
-    dsoRulesConfig.svOnboardingConfirmedTimeout,
-    dsoRulesConfig.voteRequestTimeout,
-    dsoRulesConfig.dsoDelegateInactiveTimeout,
-    dsoRulesConfig.synchronizerNodeConfigLimits,
-    dsoRulesConfig.maxTextLength,
-    dsoRulesConfig.decentralizedSynchronizer,
-    dsoRulesConfig.nextScheduledSynchronizerUpgrade,
-    dsoRulesConfig.voteCooldownTime,
-    schedule.toJava,
   )
 
   def computeAmuletsToIssueToSvs(

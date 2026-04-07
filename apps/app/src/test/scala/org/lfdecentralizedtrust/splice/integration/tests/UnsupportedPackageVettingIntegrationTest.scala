@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResource,
   DarResources,
@@ -18,13 +19,13 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
-import org.lfdecentralizedtrust.splice.util.{PackageUnvettingUtil, UploadablePackage}
+import org.lfdecentralizedtrust.splice.util.UploadablePackage
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.concurrent.PatienceConfiguration
 
 import scala.concurrent.duration.FiniteDuration
 
-class UnsupportedPackageVettingIntegrationTest extends IntegrationTest with PackageUnvettingUtil {
+class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -98,18 +99,20 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest with Pack
     )(
       s"the unsupported packages are vetted on $name",
       _ =>
-        getVettedPackageIds(
-          participantAdminConnection,
-          synchronizerId,
-        ) should contain allElementsOf unsupportedDarsToVet.map(_.packageId),
+        participantAdminConnection
+          .listVettedPackages(participantId, synchronizerId, AuthorizedState)
+          .futureValue
+          .flatMap(_.mapping.packages)
+          .map(_.packageId) should contain allElementsOf unsupportedDarsToVet.map(_.packageId),
     )
     clue(s"the unsupported packages are then removed by the package vetting trigger from $name") {
       vettingTrigger.resume()
       eventually() {
-        getVettedPackageIds(
-          participantAdminConnection,
-          synchronizerId,
-        ) should contain noElementsOf darsUnvettedByAutomation.map(_.packageId)
+        participantAdminConnection
+          .listVettedPackages(participantId, synchronizerId, AuthorizedState)
+          .futureValue
+          .flatMap(_.mapping.packages)
+          .map(_.packageId) should contain noElementsOf darsUnvettedByAutomation.map(_.packageId)
       }
     }
   }

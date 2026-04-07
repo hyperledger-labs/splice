@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package slick.util
@@ -316,7 +316,6 @@ object QueryCostTrackerImpl {
       "com.daml.executors",
       "com.digitalasset.canton.store.db.DbBulkUpdateProcessor",
       "com.digitalasset.canton.lifecycle",
-      "com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous",
       LoggerUtil.getClass.getName.dropRight(1), // Drop Scala's trailing $
       MonadUtil.getClass.getName.dropRight(1), // Drop Scala's trailing $
     )

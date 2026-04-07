@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.grpc
@@ -11,7 +11,7 @@ import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{Mutex, TryUtil}
+import com.digitalasset.canton.util.TryUtil
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
@@ -20,20 +20,19 @@ import org.apache.pekko.{Done, NotUsed}
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, blocking}
 
 trait StreamingServiceLifecycleManagement extends AutoCloseable with NamedLogging {
 
   private val directEc = DirectExecutionContext(noTracingLogger)
   private val StreamAbortTimeout = Duration(10, "seconds")
-  private val lock = new Mutex()
 
   @volatile private var _closed = false
   private val _killSwitches = TrieMap.empty[KillSwitch, (TraceContext, Future[Done])]
 
   def close(): Unit = {
     implicit val ec = directEc
-    val completions = (lock.exclusive {
+    val completions = blocking(synchronized {
       if (!_closed) {
         _closed = true
         val completionFs = _killSwitches.map { case (killSwitch, (traceContext, completeF)) =>
@@ -83,8 +82,8 @@ trait StreamingServiceLifecycleManagement extends AutoCloseable with NamedLoggin
       // Force evaluation before synchronized block
       val source = createSource
 
-      {
-        lock.exclusive {
+      blocking {
+        synchronized {
           ifNotClosed { () =>
             val (killSwitch, doneF) = source
               .viaMat(KillSwitches.single)(Keep.right)

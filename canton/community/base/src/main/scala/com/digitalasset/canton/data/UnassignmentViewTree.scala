@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -389,14 +389,7 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
           ContractInstance
             .decodeWithCreatedAt(contractP)
             .leftMap(err => ContractDeserializationError(err))
-            .map(c =>
-              (
-                c,
-                Source(c.templateId.packageId),
-                Target(c.templateId.packageId),
-                ReassignmentCounter(reassignmentCounterP),
-              )
-            )
+            .map(_ -> ReassignmentCounter(reassignmentCounterP))
         }
         .flatMap(
           ContractsReassignmentBatch

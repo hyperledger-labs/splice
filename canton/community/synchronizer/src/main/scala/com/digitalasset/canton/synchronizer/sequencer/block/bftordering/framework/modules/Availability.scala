@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules
@@ -13,7 +13,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
-  BlockNumber,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.{
@@ -21,7 +20,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   ProofOfAvailability,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.OrderedBlockForOutput
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
   MessageFrom,
   OrderingRequest,
@@ -42,8 +41,6 @@ object Availability {
   final case object NoOp extends Message[Nothing]
 
   final case object Start extends Message[Nothing]
-
-  final case object DelayedProposalResponse extends Message[Nothing]
 
   sealed trait RemoteProtocolMessage
       extends Message[Nothing]
@@ -94,7 +91,6 @@ object Availability {
         batchId: BatchId,
         epochNumber: EpochNumber,
         from: BftNodeId,
-        addedToStore: Boolean,
     ) extends LocalDissemination
 
     final case class RemoteBatchStoredSigned(
@@ -137,7 +133,7 @@ object Availability {
 
       override def name: String = "RemoteBatch"
 
-      override val versioningTable: VersioningTable =
+      override def versioningTable: VersioningTable =
         VersioningTable(
           SupportedVersions.ProtoData -> {
             VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.AvailabilityMessage)(
@@ -214,7 +210,7 @@ object Availability {
 
       override def name: String = "RemoteBatchAcknowledged"
 
-      override val versioningTable: VersioningTable = VersioningTable(
+      override def versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.AvailabilityMessage)(
             supportedProtoVersionMemoized(_)(RemoteBatchAcknowledged.fromAvailabilityMessage),
@@ -328,7 +324,7 @@ object Availability {
 
       override def name: String = "FetchRemoteBatchData"
 
-      override val versioningTable: VersioningTable = VersioningTable(
+      override def versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.AvailabilityMessage)(
             supportedProtoVersionMemoized(_)(
@@ -403,7 +399,7 @@ object Availability {
 
       override def name: String = "RemoteBatchDataFetched"
 
-      override val versioningTable: VersioningTable =
+      override def versioningTable: VersioningTable =
         VersioningTable(
           SupportedVersions.ProtoData ->
             VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.AvailabilityMessage)(
@@ -454,16 +450,15 @@ object Availability {
   sealed trait Consensus[+E] extends LocalProtocolMessage[E]
   object Consensus {
     final case class CreateProposal[E <: Env[E]](
-        forBlock: BlockNumber,
-        currentEpochNumber: EpochNumber,
-        currentMembership: Membership,
-        currentCryptoProvider: CryptoProvider[E],
+        orderingTopology: OrderingTopology,
+        cryptoProvider: CryptoProvider[E],
+        epochNumber: EpochNumber,
         orderedBatchIds: Seq[BatchId] = Seq.empty,
     ) extends Consensus[E]
 
     final case class UpdateTopologyDuringStateTransfer[E <: Env[E]](
-        currentMembership: Membership,
-        currentCryptoProvider: CryptoProvider[E],
+        orderingTopology: OrderingTopology,
+        cryptoProvider: CryptoProvider[E],
     ) extends Consensus[E]
 
     final case class Ordered(batchIds: Seq[BatchId]) extends Consensus[Nothing]

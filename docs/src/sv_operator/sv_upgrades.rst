@@ -22,11 +22,7 @@ about changes you may need to make as part of the upgrade.
 Major upgrades require a more complex :ref:`procedure <sv-upgrades>`
 procedure with network-wide coordination and downtime.
 
-:ref:`Logical synchronizer upgrades <sv-logical-synchronizer-upgrades>` are the upcoming replacement for the major upgrade procedure to roll out protocol upgrades with
-significantly reduced operational overhead and downtime.
-
 .. toctree::
    :hidden:
 
    sv_major_upgrade
-   sv_logical_synchronizer_upgrade

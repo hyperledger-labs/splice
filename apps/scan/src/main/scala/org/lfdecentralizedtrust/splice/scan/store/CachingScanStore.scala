@@ -363,9 +363,7 @@ class CachingScanStore(
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
 
-  @SuppressWarnings(
-    Array("org.wartremover.warts.AsInstanceOf", "com.digitalasset.canton.RequireBlocking")
-  )
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def getCache[Key, Value](
       cacheName: String,
       cacheConfig: CacheConfig,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p
@@ -247,9 +247,6 @@ final class P2PNetworkOutModule[
           callback(false)
         }
       case Admin.GetStatus(callback, p2pEndpointIds) =>
-        logger.info(
-          s"Operator requested P2P status for endpoints ${p2pEndpointIds.getOrElse("<all>")}"
-        )
         callback(getStatus(p2pEndpointIds))
     }
 
@@ -273,28 +270,34 @@ final class P2PNetworkOutModule[
         .sorted // For output determinism and easier testing
         .map { case (maybeP2PEndpointId, maybeBftNodeId) =>
           (
-            maybeP2PEndpointId,
-            maybeP2PEndpointId.exists(p2pConnectionState.isOutgoing),
             maybeBftNodeId,
+            maybeP2PEndpointId,
+            maybeP2PEndpointId.exists(p2pConnectionState.isDefined),
             maybeP2PEndpointId.exists(connectedP2PEndpointIds.contains),
-            p2pEndpointIds.isEmpty || maybeP2PEndpointId.exists(p2pConnectionState.isDefined),
+            maybeP2PEndpointId.exists(p2pConnectionState.isOutgoing),
           )
         }
         .map {
           case (
-                maybeP2PEndpointId,
-                isEndpointOutgoing,
                 maybeBftNodeId,
-                isEndpointConnected,
+                maybeP2PEndpointId,
                 isEndpointDefined,
+                isEndpointConnected,
+                isEndpointOutgoing,
               ) =>
             maybeP2PEndpointId match {
               case Some(p2pEndpointId) =>
                 PeerConnectionStatus.PeerEndpointStatus(
                   p2pEndpointId,
                   isEndpointOutgoing,
-                  health = (maybeBftNodeId, isEndpointConnected, isEndpointDefined) match {
-                    case (Some(nodeId), _, _) =>
+                  health = (isEndpointDefined, isEndpointConnected, maybeBftNodeId) match {
+                    case (false, _, _) =>
+                      PeerEndpointHealth(PeerEndpointHealthStatus.UnknownEndpoint, None)
+                    case (_, false, _) =>
+                      PeerEndpointHealth(PeerEndpointHealthStatus.Disconnected, None)
+                    case (_, _, None) =>
+                      PeerEndpointHealth(PeerEndpointHealthStatus.Unauthenticated, None)
+                    case (_, _, Some(nodeId)) =>
                       PeerEndpointHealth(
                         PeerEndpointHealthStatus.Authenticated(
                           SequencerNodeId
@@ -303,16 +306,10 @@ final class P2PNetworkOutModule[
                         ),
                         None,
                       )
-                    case (None, true, _) =>
-                      PeerEndpointHealth(PeerEndpointHealthStatus.Unauthenticated, None)
-                    case (None, false, true) =>
-                      PeerEndpointHealth(PeerEndpointHealthStatus.Disconnected, None)
-                    case _ =>
-                      PeerEndpointHealth(PeerEndpointHealthStatus.UnknownEndpoint, None)
                   },
                 )
               case _ =>
-                // Only reported for incoming connections without a known endpoint, which are considered authenticated
+                // Only reported for incoming connections without a known endpoint
                 PeerConnectionStatus.PeerIncomingConnection(
                   SequencerNodeId
                     .fromBftNodeId(

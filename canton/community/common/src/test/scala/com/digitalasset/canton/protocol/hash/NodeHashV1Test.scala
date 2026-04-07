@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -8,8 +8,6 @@ import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.protocol.hash.TransactionHash.NodeHashingError
 import com.digitalasset.canton.protocol.hash.TransactionHash.NodeHashingError.IncompleteTransactionTree
 import com.digitalasset.canton.protocol.{LfHash, LfSerializationVersion}
-import com.digitalasset.canton.version.HashingSchemeVersion
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.*
 import com.digitalasset.daml.lf.data.Ref.{ChoiceName, PackageName, Party}
 import com.digitalasset.daml.lf.transaction.*
@@ -23,9 +21,8 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
   private val globalKey = GlobalKeyWithMaintainers(
     GlobalKey.assertBuild(
       defRef("module_key", "name"),
-      PackageName.assertFromString("package_name_key"),
       VA.text.inj("hello"),
-      crypto.Hash.hashPrivateKey("dummy-hello-key-hash"),
+      PackageName.assertFromString("package_name_key"),
     ),
     Set[Party](Ref.Party.assertFromString("david")),
   )
@@ -33,9 +30,8 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
   private val globalKey2 = GlobalKeyWithMaintainers(
     GlobalKey.assertBuild(
       defRef("module_key", "name"),
-      PackageName.assertFromString("package_name_key"),
       VA.text.inj("bye"),
-      crypto.Hash.hashPrivateKey("dummy-bye-key-hash"),
+      PackageName.assertFromString("package_name_key"),
     ),
     Set[Party](Ref.Party.assertFromString("david")),
   )
@@ -236,7 +232,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
       nodeSeed: Option[LfHash],
       subNodes: Map[NodeId, Node] = subNodesMap,
       hashTracer: HashTracer,
-  ): Hash = tryHashNodeV1(
+  ) = TransactionHash.tryHashNodeV1(
     node,
     defaultNodeSeedsMap,
     nodeSeed,
@@ -263,25 +259,25 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
   "V1Encoding" should {
     "not encode lookup nodes" in {
       a[NodeHashingError.UnsupportedFeature] shouldBe thrownBy {
-        tryHashNodeV1(lookupNode)
+        TransactionHash.tryHashNodeV1(lookupNode)
       }
     }
 
     "not encode create nodes without node seed" in {
       a[NodeHashingError.MissingNodeSeed] shouldBe thrownBy {
-        tryHashNodeV1(createNode, enforceNodeSeedForCreateNodes = true)
+        TransactionHash.tryHashNodeV1(createNode, enforceNodeSeedForCreateNodes = true)
       }
     }
 
     "not encode exercise nodes without node seed" in {
       a[NodeHashingError.MissingNodeSeed] shouldBe thrownBy {
-        tryHashNodeV1(exerciseNode, enforceNodeSeedForCreateNodes = true)
+        TransactionHash.tryHashNodeV1(exerciseNode, enforceNodeSeedForCreateNodes = true)
       }
     }
 
     "encode create nodes without node seed if explicitly allowed" in {
       scala.util
-        .Try(tryHashNodeV1(createNode, enforceNodeSeedForCreateNodes = false))
+        .Try(TransactionHash.tryHashNodeV1(createNode, enforceNodeSeedForCreateNodes = false))
         .isSuccess shouldBe true
     }
   }
@@ -372,7 +368,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
       .fromHexStringRaw(fetchNodeHash)
       .getOrElse(fail("Invalid hash"))
 
-    def hashFetchNode(node: Node.Fetch, hashTracer: HashTracer = HashTracer.NoOp): Hash =
+    def hashFetchNode(node: Node.Fetch, hashTracer: HashTracer = HashTracer.NoOp) =
       hashNodeV1(node, nodeSeed = Some(nodeSeedFetch), hashTracer = hashTracer)
 
     "be stable" in {
@@ -506,7 +502,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
     }
 
     "not hash NodeIds" in {
-      tryHashNodeV1(
+      TransactionHash.tryHashNodeV1(
         exerciseNode
           // Shift all node ids by one and expect it to have no impact
           .copy(children = shiftNodeIds(exerciseNode.children)),
@@ -688,7 +684,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
         subNodes: Map[NodeId, Node] = subNodesMap,
         hashTracer: HashTracer = HashTracer.NoOp,
     ) =
-      tryHashNodeV1(
+      TransactionHash.tryHashNodeV1(
         node,
         nodeSeed = Some(nodeSeedRollback),
         nodeSeeds = defaultNodeSeedsMap,
@@ -707,7 +703,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
     }
 
     "not hash NodeIds" in {
-      tryHashNodeV1(
+      TransactionHash.tryHashNodeV1(
         rollbackNode
           // Change the node Ids values but not the nodes
           .copy(children = shiftNodeIds(rollbackNode.children)),
@@ -755,15 +751,14 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
       .getOrElse(fail("Invalid hash"))
 
     "be stable" in {
-      VersionedTransactionHasher
-        .tryHashTransaction(HashingSchemeVersion.V2, transaction, defaultNodeSeedsMap)
+      TransactionHash
+        .tryHashTransactionV1(transaction, defaultNodeSeedsMap)
         .toHexString shouldBe defaultHash.toHexString
     }
 
     "throw if some nodes are missing" in {
       an[IncompleteTransactionTree] shouldBe thrownBy {
-        VersionedTransactionHasher.tryHashTransaction(
-          HashingSchemeVersion.V2,
+        TransactionHash.tryHashTransactionV1(
           VersionedTransaction(
             version = LfSerializationVersion.V1,
             roots = roots,
@@ -775,8 +770,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
     }
 
     "not hash NodeIds" in {
-      VersionedTransactionHasher.tryHashTransaction(
-        HashingSchemeVersion.V2,
+      TransactionHash.tryHashTransactionV1(
         VersionedTransaction(
           version = LfSerializationVersion.V1,
           roots = shiftNodeIds(roots),
@@ -787,8 +781,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
     }
 
     "not produce collision in children" in {
-      VersionedTransactionHasher.tryHashTransaction(
-        HashingSchemeVersion.V2,
+      TransactionHash.tryHashTransactionV1(
         VersionedTransaction(
           version = LfSerializationVersion.V1,
           roots = roots.reverse,
@@ -800,8 +793,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
 
     "explain encoding" in {
       val hashTracer = HashTracer.StringHashTracer()
-      val hash = VersionedTransactionHasher.tryHashTransaction(
-        HashingSchemeVersion.V2,
+      val hash = TransactionHash.tryHashTransactionV1(
         transaction,
         defaultNodeSeedsMap,
         hashTracer = hashTracer,
@@ -828,24 +820,18 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
     )
 
     val defaultHash = Hash
-      .fromHexStringRaw("8c311c848db25d36b36fbd59f9483714a11688c2214e3c7cae3e028763520250")
+      .fromHexStringRaw("adcef14ae479ab5b9424a89d5bf28ee666f336a5463f65b097d587120123d019")
       .getOrElse(fail("Invalid hash"))
 
     "be stable" in {
       TransactionHash
-        .tryHashTransactionWithMetadata(
-          HashingSchemeVersion.V2,
-          transaction,
-          defaultNodeSeedsMap,
-          metadata,
-        )
+        .tryHashTransactionWithMetadataV1(transaction, defaultNodeSeedsMap, metadata)
         .toHexString shouldBe defaultHash.toHexString
     }
 
     "explain encoding" in {
       val hashTracer = HashTracer.StringHashTracer()
-      val hash = TransactionHash.tryHashTransactionWithMetadata(
-        HashingSchemeVersion.V2,
+      val hash = TransactionHash.tryHashTransactionWithMetadataV1(
         transaction,
         defaultNodeSeedsMap,
         metadata,
@@ -854,7 +840,7 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
       hashTracer.result shouldBe s"""'00000030' # Hash Purpose
                                       |'02' # 02 (Hashing Scheme Version)
                                       |'154f334d24a8a5e4d0ce51ac87d93821b3256f885f21d3f779a1640abf481983' # Transaction
-                                      |'6e89fcbcc9605179a47919b5e65a864e470e7a133f4f9f39b1e4545b223db769' # Metadata
+                                      |'2a0690693367f70fbe83e5e99df6930dbd2336618a3a0721bb6fa3bcc88d5a53' # Metadata
                                       |""".stripMargin
       assertStringTracer(hashTracer, hash)
     }

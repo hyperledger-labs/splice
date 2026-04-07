@@ -12,9 +12,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.http.HttpClientMetrics
-import io.circe.parser
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 object AuthToken {
   /* Creates a token that never expires */
@@ -31,13 +31,14 @@ object AuthToken {
     *  and returns the user the token is associated with, if the token is associated with exactly one user.
     */
   def guessLedgerApiUser(accessToken: String): Option[String] = {
+    import spray.json.*
     for {
       decoded <- JwtDecoder.decode(Jwt(accessToken)).toOption
-      json <- parser.parse(decoded.payload).toOption
+      json <- Try(decoded.payload.parseJson).toOption
       // Note: Splice only uses audience-based tokens (i.e., the standard JWT format).
       // AuthServiceJWTCodec.readPayload() guesses the token format, but only works if audience-based tokens
       // use the default ledger API audience prefix.
-      payload <- AuthServiceJWTCodec.readAudienceBasedToken(json).toOption
+      payload <- Try(AuthServiceJWTCodec.readAudienceBasedToken(json)).toOption
     } yield {
       payload match {
         case standard: StandardJWTPayload => standard.userId

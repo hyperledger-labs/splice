@@ -46,9 +46,6 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
 
   const upgradeTime = getValue('nextScheduledSynchronizerUpgradeTime');
   const upgradeMigrationId = getValue('nextScheduledSynchronizerUpgradeMigrationId');
-  const logicalSyncUpgradeTopologyFreezeTime = getValue(
-    'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
-  );
   const voteCooldownTime = getValue('voteCooldownTime');
 
   const dsoConfig: DsoRulesConfig = {
@@ -88,19 +85,6 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
     nextScheduledSynchronizerUpgrade:
       upgradeTime && upgradeTime !== ''
         ? { time: upgradeTime, migrationId: upgradeMigrationId }
-        : null,
-    nextScheduledLogicalSynchronizerUpgrade:
-      logicalSyncUpgradeTopologyFreezeTime && logicalSyncUpgradeTopologyFreezeTime !== ''
-        ? {
-            topologyFreezeTime: logicalSyncUpgradeTopologyFreezeTime,
-            upgradeTime: getValue('nextScheduledLogicalSynchronizerUpgradeUpgradeTime'),
-            newPhysicalSynchronizerSerial: getValue(
-              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial'
-            ),
-            newPhysicalSynchronizerProtocolVersion: getValue(
-              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion'
-            ),
-          }
         : null,
     voteCooldownTime:
       voteCooldownTime && voteCooldownTime !== '' ? { microseconds: voteCooldownTime } : null,

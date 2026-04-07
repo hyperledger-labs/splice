@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -242,7 +242,6 @@ final case class SequencerInitialState(
     //  even though this should not happen during a normal protocol run.
     latestSequencerEventTimestamp: Option[CantonTimestamp],
     initialTopologyEffectiveTimestamp: Option[CantonTimestamp],
-    latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
 )
 
 object SequencerInitialState {
@@ -250,7 +249,6 @@ object SequencerInitialState {
       synchronizerId: PhysicalSynchronizerId,
       snapshot: SequencerSnapshot,
       times: SeqView[(CantonTimestamp, CantonTimestamp)],
-      latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
   ): SequencerInitialState = {
     // TODO(#14504) Update since we now also need to look at top-ups
     /* Take the sequencing time of the last topology update for the latest topology client timestamp.
@@ -269,7 +267,6 @@ object SequencerInitialState {
       snapshot,
       sequencedTimes.maxOption,
       effectiveTimes.maxOption,
-      latestPendingTopologyTransactionTimestamp,
     )
   }
 }

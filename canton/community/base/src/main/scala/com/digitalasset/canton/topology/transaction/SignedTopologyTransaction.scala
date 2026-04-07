@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.transaction
@@ -96,9 +96,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     val builder = Hash.build(HashPurpose.TopologyTransactionSignature, HashAlgorithm.Sha256)
     signatures.toList
       .sortBy(_.authorizingLongTermKey.toProtoPrimitive)
-      .foreach(signature =>
-        builder.addByteString(signature.signature.toByteString(protocolVersion))
-      )
+      .foreach(signature => builder.add(signature.signature.toByteString(protocolVersion)))
     builder.finish()
   }
 
@@ -242,6 +240,8 @@ object SignedTopologyTransaction
       _.toProtoV30,
     )
   )
+
+  import com.digitalasset.canton.resource.DbStorage.Implicits.*
 
   def withTopologySignatures[Op <: TopologyChangeOp, M <: TopologyMapping](
       transaction: TopologyTransaction[Op, M],
@@ -490,9 +490,7 @@ object SignedTopologyTransaction
     } yield SignedTopologyTransaction(transaction, allSignaturesWithoutDuplicates, isProposal)(rpv)
   }
 
-  def createGetResultSynchronizerTopologyTransaction(implicit
-      getByteString: GetResult[ByteString]
-  ): GetResult[GenericSignedTopologyTransaction] =
+  def createGetResultSynchronizerTopologyTransaction: GetResult[GenericSignedTopologyTransaction] =
     GetResult { r =>
       fromTrustedByteStringPVV(r.<<[ByteString]).valueOr(err =>
         throw new DbSerializationException(
@@ -503,8 +501,10 @@ object SignedTopologyTransaction
 
   implicit def setParameterTopologyTransaction(implicit
       setParameterByteArray: SetParameter[Array[Byte]]
-  ): SetParameter[GenericSignedTopologyTransaction] =
-    (d: GenericSignedTopologyTransaction, pp: PositionedParameters) => pp >> d.toByteArray
+  ): SetParameter[GenericSignedTopologyTransaction] = {
+    (d: GenericSignedTopologyTransaction, pp: PositionedParameters) =>
+      pp >> d.toByteArray
+  }
 }
 
 final case class SignedTopologyTransactions[

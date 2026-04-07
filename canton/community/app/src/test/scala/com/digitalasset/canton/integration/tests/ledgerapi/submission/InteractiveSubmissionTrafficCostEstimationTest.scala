@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.submission
@@ -10,11 +10,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId as CodeGenCID
 import com.daml.ledger.javaapi.data.{Command, DisclosedContract, Identifier}
-import com.digitalasset.canton.admin.api.client.data.{
-  SequencerConnections,
-  SynchronizerConnectionConfig,
-  TrafficControlParameters,
-}
+import com.digitalasset.canton.admin.api.client.data.TrafficControlParameters
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
@@ -30,8 +26,10 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.synchronizer.sequencer.HasProgrammableSequencer
-import com.digitalasset.canton.topology.{ExternalParty, Member, Party}
+import com.digitalasset.canton.topology.{ExternalParty, Member, Party, PartyId}
 
 import java.util.UUID
 import scala.jdk.CollectionConverters.*
@@ -48,14 +46,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
   private var bobE: ExternalParty = _
   private var danE: ExternalParty = _
   private var bankE: ExternalParty = _
-  private var localEmily: Party = _
-
-  // Update the traffic parameters to set base event cost and base traffic rate to 0
-  // This allows for easier assertions over traffic consumed
-  private val trafficControlParams = TrafficControlParameters.default.copy(
-    maxBaseTrafficAmount = NonNegativeLong.zero,
-    baseEventCost = NonNegativeLong.zero,
-  )
+  private var localEmily: PartyId = _
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
@@ -74,21 +65,28 @@ final class InteractiveSubmissionTrafficCostEstimationTest
         )
         participants.all.dars.upload(CantonExamplesPath)
         participants.all.dars.upload(CantonTestsPath)
-        aliceE = cpn.parties.testing.external.enable(
+        aliceE = cpn.parties.external.enable(
           "Alice",
           keysCount = PositiveInt.three,
           keysThreshold = PositiveInt.one,
         )
-        bobE = epn.parties.testing.external.enable("Bob")
-        danE = cpn.parties.testing.external.enable(
+        bobE = epn.parties.external.enable("Bob")
+        danE = cpn.parties.external.enable(
           "Dan",
           keysCount = PositiveInt.three,
           keysThreshold = PositiveInt.three,
         )
-        bankE = ppn.parties.testing.external.enable("Bank")
+        bankE = ppn.parties.external.enable("Bank")
         localEmily = participant1.parties.enable("Emily")
       }
-      .withTrafficControl(trafficControlParams)
+      .withTrafficControl(
+        // Update the traffic parameters to set base event cost and base traffic rate to 0
+        // This allows for easier assertions over traffic consumed
+        TrafficControlParameters.default.copy(
+          maxBaseTrafficAmount = NonNegativeLong.zero,
+          baseEventCost = NonNegativeLong.zero,
+        )
+      )
       .withSetup { implicit env =>
         import env.*
         // Top up all members with max traffic
@@ -127,20 +125,18 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       expectedPrecision: Double,
       preparingPn: LocalParticipantReference,
       submittingPn: LocalParticipantReference,
-      partyId: Party,
+      partyId: PartyId,
       commands: Seq[Command],
       submit: PrepareSubmissionResponse => Unit,
       disclosedContracts: Seq[DisclosedContract] = Seq.empty,
   )(implicit env: FixtureParam) = {
     import env.*
-    participant1
     val prepared = preparingPn.ledger_api.javaapi.interactive_submission.prepare(
       Seq(partyId),
       commands,
       commandId = UUID.randomUUID().toString,
       estimateTrafficCost = hints,
       disclosedContracts = disclosedContracts,
-      hashingSchemeVersion = testedApiHashingSchemeVersion,
     )
     logger.debug(s"Estimated traffic cost: ${prepared.costEstimation.value}")
     val estimatedTrafficCost = prepared.costEstimation.value.totalTrafficCostEstimation
@@ -155,7 +151,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
     )
   }
 
-  def createCycleCmdFromParty(party: Party): Command =
+  def createCycleCmdFromParty(party: Party) =
     createCycleCommandJava(party, UUID.randomUUID().toString)
 
   private def runCostEstimateOnAllNodeCombinations(
@@ -164,7 +160,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       disclosedContracts: Seq[DisclosedContract] = Seq.empty,
   )(implicit
       env: TestConsoleEnvironment
-  ): Unit =
+  ) =
     // Try all combinations of ppn / epn.
     // The accuracy will vary because of how hosting relationships affect view decomposition
     // and confirmation responses but it at least allows to check that the estimation is bounded
@@ -314,13 +310,13 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       estimateTrafficCost(
         None,
         // Expect less than 1% error when all nodes align
-        0.01,
+        0.01d,
         preparingPn = cpn,
         submittingPn = cpn,
-        bobE.partyId,
-        commands = Seq(createCycleCmdFromParty(bobE)),
+        aliceE.partyId,
+        commands = Seq(createCycleCmdFromParty(aliceE)),
         prepared => {
-          cpn.ledger_api.commands.external.submit_prepared(bobE, prepared)
+          cpn.ledger_api.commands.external.submit_prepared(aliceE, prepared)
         },
       )
     }
@@ -342,30 +338,6 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       )
     }
 
-    "estimate accurately when not charging for confirmation responses" in { implicit env =>
-      import env.*
-      sequencer1.topology.synchronizer_parameters.propose_update(
-        synchronizerId = synchronizer1Id,
-        _.update(trafficControl =
-          Some(trafficControlParams.copy(freeConfirmationResponses = true))
-        ),
-        synchronize = Some(environmentTimeouts.default),
-      )
-      estimateTrafficCost(
-        None,
-        0.05,
-        preparingPn = cpn,
-        submittingPn = cpn,
-        aliceE.partyId,
-        commands = Seq(createCycleCmdFromParty(aliceE)),
-        prepared => {
-          // Expect the confirmation response cost to be 0
-          prepared.costEstimation.value.confirmationResponseTrafficCostEstimation shouldBe 0L
-          cpn.ledger_api.commands.external.submit_prepared(aliceE, prepared)
-        },
-      )
-    }
-
     "disable traffic cost estimation" in { implicit env =>
       ppn(env).ledger_api.javaapi.interactive_submission
         .prepare(
@@ -373,7 +345,6 @@ final class InteractiveSubmissionTrafficCostEstimationTest
           Seq(createCycleCmdFromParty(aliceE)),
           commandId = UUID.randomUUID().toString,
           estimateTrafficCost = Some(CostEstimationHints.defaultInstance.withDisabled(true)),
-          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
         .costEstimation shouldBe empty
     }
@@ -390,7 +361,6 @@ final class InteractiveSubmissionTrafficCostEstimationTest
           Seq(aliceE.partyId),
           Seq(createCycleCmdFromParty(aliceE)),
           commandId = UUID.randomUUID().toString,
-          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
         .costEstimation
         .value

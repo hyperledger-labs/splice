@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
-import anorm.SqlParser.scalar
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
   Added,
   ChangedTo,
@@ -15,7 +14,6 @@ import com.digitalasset.canton.platform.store.backend.DbDto.{
   EventDeactivate,
   EventVariousWitnessed,
 }
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.AchsAddActivationsParams
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -39,10 +37,10 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
   behavior of "IntegrityStorageBackend"
 
-  it should "find duplicate offsets" in {
+  it should "find duplicate event ids" in {
     val updates = Vector(
-      dtosCreate(event_offset = 7, event_sequential_id = 6L)(),
-      dtosCreate(event_offset = 7, event_sequential_id = 7L)(), // duplicate offset
+      dtosCreate(event_offset = 7, event_sequential_id = 7L)(),
+      dtosCreate(event_offset = 7, event_sequential_id = 7L)(), // duplicate id
     ).flatten
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -52,10 +50,10 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
       intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
 
     // Error message should contain the duplicate event sequential id
-    failure.getMessage should include regex "duplicate offsets.* 7"
+    failure.getMessage should include("7")
   }
 
-  it should "find duplicate event ids" in {
+  it should "find duplicate event ids with different offsets" in {
     val updates = Vector(
       dtosCreate(event_offset = 6, event_sequential_id = 7L)(),
       dtosCreate(event_offset = 7, event_sequential_id = 7L)(), // duplicate id
@@ -68,70 +66,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
       intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
 
     // Error message should contain the duplicate event sequential id
-    failure.getMessage should include regex "duplicate event sequential ids.* 7"
-  }
-
-  it should "find duplicate entries for lapi_filter_achs_stakeholder filter table" in {
-    val updates = Vector(
-      dtosCreate(event_offset = 7, event_sequential_id = 7L)()
-    ).flatten
-
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(ingest(updates, _))
-    executeSql(
-      backend.event
-        .addActivationsToACHS(
-          AchsAddActivationsParams(startExclusive = 0, endInclusive = 10, activeAt = 10)
-        )
-    )
-    executeSql(
-      backend.event
-        .addActivationsToACHS(
-          AchsAddActivationsParams(startExclusive = 0, endInclusive = 10, activeAt = 10)
-        )
-    )
-    executeSql(updateLedgerEnd(offset(10), 10L))
-    val failure =
-      intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
-
-    failure.getMessage should include regex "duplicate entries found .* in filter table lapi_filter_achs_stakeholder.* at event sequential id 7"
-  }
-
-  it should "find lapi_filter_achs_stakeholder's entries not present in lapi_filter_activate_stakeholder" in {
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-
-    executeSql { connection =>
-      SQL"""
-        INSERT INTO lapi_filter_achs_stakeholder (event_sequential_id, template_id, party_id) VALUES (42, 2, 3), (999, 4, 5)
-      """.execute()(connection)
-    }
-
-    val failure =
-      intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
-
-    failure.getMessage should include regex
-      "lapi_filter_achs_stakeholder contains entries not present in lapi_filter_activate_stakeholder at event sequential ids.*: 42, 999"
-  }
-
-  it should "verify lapi_achs_state contains at most one row" in {
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-
-    // Insert multiple rows into lapi_achs_state to simulate the error
-    executeSql { connection =>
-      SQL"""
-        INSERT INTO lapi_achs_state (valid_at, last_removed, last_populated) VALUES (1, 2, 3)
-      """.execute()(connection)
-    }
-    executeSql { connection =>
-      SQL"""
-        INSERT INTO lapi_achs_state (valid_at, last_removed, last_populated) VALUES (4, 5, 6)
-      """.execute()(connection)
-    }
-
-    val failure =
-      intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
-
-    failure.getMessage should include("lapi_achs_state table contains more than one row")
+    failure.getMessage should include("7")
   }
 
   it should "find non-consecutive event ids" in {
@@ -151,25 +86,20 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
   }
 
   it should "not find non-consecutive event ids if those gaps are before the pruning offset" in {
-    val internalContractId = insertParContracts() // making sure internal_contract_id = 1L exists
     val updates = Vector(
-      dtosCreate(
-        event_offset = 1,
-        event_sequential_id = 1L,
-        internal_contract_id = internalContractId,
-      )(),
+      dtosCreate(event_offset = 1, event_sequential_id = 1L, internal_contract_id = 1)(),
       dtosCreate(
         event_offset = 3,
         event_sequential_id = 3L,
         internal_contract_id = 1,
       )(), // non-consecutive id but after pruning offset
-      dtosCreate(
-        event_offset = 4,
-        event_sequential_id = 4L,
-        internal_contract_id = internalContractId,
-      )(),
+      dtosCreate(event_offset = 4, event_sequential_id = 4L, internal_contract_id = 1)(),
     ).flatten
 
+    executeSql(
+      SQL"INSERT INTO par_contracts (contract_id, instance, package_id, template_id) VALUES (${"a".getBytes}, ${"b".getBytes}, 'pid', 'tid')"
+        .execute()(_)
+    ) // making sure internal_contract_id = 1L exists
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(backend.parameter.updatePrunedUptoInclusive(offset(2)))
     executeSql(ingest(updates, _))
@@ -407,7 +337,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(1),
         1L,
         someParty,
-        someParticipantId,
+        someParticipantId.toString,
         Added(AuthorizationLevel.Submission),
         synchronizerId = someSynchronizerId,
         recordTime = time5,
@@ -416,7 +346,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(2),
         2L,
         someParty,
-        someParticipantId,
+        someParticipantId.toString,
         ChangedTo(AuthorizationLevel.Confirmation),
         synchronizerId = someSynchronizerId2,
         recordTime = time1,
@@ -425,7 +355,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(3),
         3L,
         someParty,
-        someParticipantId,
+        someParticipantId.toString,
         ChangedTo(AuthorizationLevel.Observation),
         synchronizerId = someSynchronizerId,
         recordTime = time7,
@@ -434,7 +364,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(4),
         4L,
         someParty,
-        someParticipantId,
+        someParticipantId.toString,
         Revoked,
         synchronizerId = someSynchronizerId2,
         recordTime = time3,
@@ -443,7 +373,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         offset(5),
         5L,
         someParty,
-        someParticipantId,
+        someParticipantId.toString,
         Added(AuthorizationLevel.Submission),
         synchronizerId = someSynchronizerId,
         recordTime = time6,
@@ -610,35 +540,30 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
   }
 
   it should "not find errors beyond the ledger end" in {
-    val internalContractId = insertParContracts()
     val updates = Vector(
-      dtosCreate(
-        event_offset = 1,
-        event_sequential_id = 1L,
-        internal_contract_id = internalContractId,
-      )(),
-      dtosCreate(
-        event_offset = 2,
-        event_sequential_id = 2L,
-        internal_contract_id = internalContractId,
-      )(),
+      dtosCreate(event_offset = 1, event_sequential_id = 1L, internal_contract_id = 1)(),
+      dtosCreate(event_offset = 2, event_sequential_id = 2L, internal_contract_id = 1)(),
       dtosCreate(
         event_offset = 7,
         event_sequential_id = 7L,
-        internal_contract_id = internalContractId,
+        internal_contract_id = 1,
       )(), // beyond the ledger end
       dtosCreate(
         event_offset = 7,
         event_sequential_id = 7L,
-        internal_contract_id = internalContractId,
+        internal_contract_id = 1,
       )(), // duplicate id (beyond ledger end)
       dtosCreate(
         event_offset = 9,
         event_sequential_id = 9L,
-        internal_contract_id = internalContractId,
+        internal_contract_id = 1,
       )(), // non-consecutive id (beyond ledger end)
     ).flatten
 
+    executeSql(
+      SQL"INSERT INTO par_contracts (contract_id, instance, package_id, template_id) VALUES (${"c".getBytes}, ${"d".getBytes}, 'pid', 'tid')"
+        .execute()(_)
+    ) // making sure internal_contract_id = 1L exists
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(updates, _))
     executeSql(updateLedgerEnd(offset(2), 2L))
@@ -649,6 +574,12 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
   }
 
   private def prepareMissingReferencedParContracts(): Unit = {
+    // setting up started_up_to_inclusive = 10
+    executeSql(
+      SQL"INSERT INTO par_pruning_operation (name, started_up_to_inclusive) VALUES ('n', 10)"
+        .execute()(_)
+    )
+
     val updates = Vector(
       dtosCreate(
         event_offset = 1,
@@ -701,7 +632,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         consuming = false,
       ),
       dtosConsumingExercise(
-        event_offset = 14,
+        event_offset = 13,
         event_sequential_id = 8L,
         deactivated_event_sequential_id = Some(4L),
         internal_contract_id = Some(4L),
@@ -710,22 +641,23 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(updates, _))
-    executeSql(updateLedgerEnd(offset(14), 8L))
+    executeSql(updateLedgerEnd(offset(12), 13L))
   }
 
   it should "find missing referenced par_contracts" in {
     prepareMissingReferencedParContracts()
-    insertPruningOperationUpTo(10L)
-    val failure = intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
+    val failure =
+      intercept[RuntimeException](executeSql(backend.integrity.verifyIntegrity()))
+    executeSql(SQL"DELETE FROM par_pruning_operation".execute()(_))
     failure.getMessage should include(
-      "some internal_contract_id-s in events tables are not present in par_contracts (first 10 shown with offsets) [(4,4), (4,14), (5,11), (6,12), (7,13)]"
+      "some internal_contract_id-s in events tables are not present in par_contracts (first 10 shown with offsets) [(4,4), (4,13), (5,11), (6,12), (7,13)]"
     )
   }
 
   it should "not report error for missing referenced par_contracts when inMemory" in {
     prepareMissingReferencedParContracts()
-    insertPruningOperationUpTo(0L)
     executeSql(backend.integrity.verifyIntegrity(inMemoryCantonStore = true))
+    executeSql(SQL"DELETE FROM par_pruning_operation".execute()(_))
     succeed
   }
 
@@ -757,15 +689,10 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
         deactivated_event_sequential_id = Some(6L),
         internal_contract_id = Some(1L),
       ),
-      dtosConsumingExercise( // deactivated_event_sequential_id is NULL - not reported
+      dtosCreate(
         event_offset = 6,
         event_sequential_id = 6L,
-        deactivated_event_sequential_id = None,
-      ),
-      dtosCreate(
-        event_offset = 7,
-        event_sequential_id = 7L,
-        notPersistedContractId = hashCid("#7"),
+        notPersistedContractId = hashCid("#6"),
         internal_contract_id = 2L,
       )(
         stakeholders = Set(someParty)
@@ -779,7 +706,7 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(updates, _))
-    executeSql(updateLedgerEnd(offset(7), 7L))
+    executeSql(updateLedgerEnd(offset(6), 6L))
 
     // using inMemoryCantonStore = true to skip the par_contracts check
     val failure =
@@ -790,145 +717,6 @@ private[backend] trait StorageBackendTestsIntegrity extends Matchers with Storag
       "some deactivation events do not have a preceding activation event, deactivated_event_sequential_id-s with offsets (first 10 shown) [(1,4), (6,5)]"
     )
   }
-
-  it should "report leftover witnessed events after pruning" in {
-    val updates = Vector(
-      dtosWitnessedExercised(
-        event_offset = 2,
-        event_sequential_id = 2L,
-        consuming = false,
-        internal_contract_id = None,
-      ),
-      dtosWitnessedExercised(
-        event_offset = 5,
-        event_sequential_id = 3L,
-        consuming = false,
-        internal_contract_id = None,
-      ),
-    ).flatten
-
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(backend.parameter.updatePrunedUptoInclusive(offset(3)))
-    executeSql(ingest(updates, _))
-    executeSql(updateLedgerEnd(offset(5), 3L))
-
-    // using inMemoryCantonStore = true to skip the par_contracts check
-    val failure = intercept[RuntimeException](
-      executeSql(backend.integrity.verifyIntegrity(inMemoryCantonStore = true))
-    )
-
-    failure.getMessage should include(
-      "some events in various_witnessed have not been pruned, offsets (first 10 shown) [2]"
-    )
-  }
-
-  it should "report leftover activate events after pruning" in {
-    val updates = Vector(
-      dtosCreate(
-        event_offset = 1,
-        event_sequential_id = 1L, // deactivated by 3L
-      )(),
-      dtosCreate(
-        event_offset = 2,
-        event_sequential_id = 2L, // not deactivated
-      )(),
-      dtosConsumingExercise(
-        event_offset = 3,
-        event_sequential_id = 3L,
-        deactivated_event_sequential_id = Some(1L),
-      ),
-      // incomplete reassignment 1
-      dtosCreate(
-        event_offset = 4,
-        event_sequential_id = 4L, // deactivated by 5L
-      )(),
-      dtosUnassign(
-        event_offset = 5,
-        event_sequential_id = 5L,
-        deactivated_event_sequential_id = Some(4L),
-      ),
-      // incomplete reassignment 2
-      dtosAssign(
-        event_offset = 6,
-        event_sequential_id = 6L, // deactivated by 7L
-      )(),
-      dtosConsumingExercise(
-        event_offset = 7,
-        event_sequential_id = 7L,
-        deactivated_event_sequential_id = Some(6L),
-      ),
-      // incomplete reassignment 3
-      dtosAssign(
-        event_offset = 8,
-        event_sequential_id = 8L, // deactivated by 9L
-      )(),
-      dtosUnassign(
-        event_offset = 9,
-        event_sequential_id = 9L,
-        deactivated_event_sequential_id = Some(8L),
-      ),
-      // after pruning offset
-      dtosCreate(
-        event_offset = 10,
-        event_sequential_id = 10L,
-      )(),
-    ).flatten
-
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(backend.parameter.updatePrunedUptoInclusive(offset(9)))
-    executeSql(ingest(updates, _))
-    executeSql(updateLedgerEnd(offset(10), 10L))
-
-    // using inMemoryCantonStore = true to skip the par_contracts check
-    val failure = intercept[RuntimeException](
-      executeSql(backend.integrity.verifyIntegrity(inMemoryCantonStore = true))
-    )
-
-    failure.getMessage should include(
-      "some events in activate have not been pruned, offsets (first 10 shown) [1]"
-    )
-  }
-
-  it should "report leftover deactivate events after pruning" in {
-    val updates = Vector(
-      dtosConsumingExercise(
-        event_offset = 2,
-        event_sequential_id = 2L,
-        deactivated_event_sequential_id = None,
-      ),
-      dtosConsumingExercise(
-        event_offset = 5,
-        event_sequential_id = 3L,
-        deactivated_event_sequential_id = None,
-      ),
-    ).flatten
-
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(backend.parameter.updatePrunedUptoInclusive(offset(3)))
-    executeSql(ingest(updates, _))
-    executeSql(updateLedgerEnd(offset(2), 2L))
-
-    // using inMemoryCantonStore = true to skip the par_contracts check
-    val failure = intercept[RuntimeException](
-      executeSql(backend.integrity.verifyIntegrity(inMemoryCantonStore = true))
-    )
-
-    failure.getMessage should include(
-      "some events in deactivate have not been pruned, offsets (first 10 shown) [2]"
-    )
-  }
-
-  private def insertParContracts(): Long =
-    executeSql(
-      SQL"INSERT INTO par_contracts (contract_id, instance, package_id, template_id) VALUES (${"c".getBytes}, ${"d".getBytes}, 'pid', 'tid')"
-        .executeInsert(scalar[Long].single)(_)
-    )
-
-  def insertPruningOperationUpTo[A](offset: Long): Unit =
-    executeSql(
-      SQL"INSERT INTO par_pruning_operation (name, started_up_to_inclusive) VALUES ('n', $offset)"
-        .execute()(_)
-    )
 
   private def performMissingMandatoryFieldCheck(updates: Seq[DbDto]) = {
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))

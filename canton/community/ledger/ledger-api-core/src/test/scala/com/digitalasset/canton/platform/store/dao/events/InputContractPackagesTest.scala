@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -12,7 +12,6 @@ import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
 import com.digitalasset.canton.protocol.{ExampleContractFactory, LfGlobalKey, LfTemplateId}
 import com.digitalasset.canton.util.LfTransactionBuilder.defaultPackageName
 import com.digitalasset.canton.{BaseTest, LfPackageId}
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.transaction.test.TestIdFactory
 import com.digitalasset.daml.lf.transaction.test.TreeTransactionBuilder.{
   NodeOps,
@@ -35,9 +34,8 @@ class InputContractPackagesTest extends AnyWordSpec with BaseTest with TestIdFac
 
       val globalKey = LfGlobalKey.assertBuild(
         t(p2),
-        defaultPackageName,
         Value.ValueUnit,
-        crypto.Hash.hashPrivateKey("dummy-key-hash"),
+        defaultPackageName,
       )
 
       val example = toVersionedTransaction(

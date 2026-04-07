@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -13,7 +13,6 @@ import com.digitalasset.canton.{
   LfValue,
   LfVersioned,
 }
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Node}
 import com.digitalasset.daml.lf.value.Value
@@ -46,9 +45,8 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
               LfGlobalKey
                 .build(
                   templateId,
-                  LfPackageName.assertFromString("package-name"),
                   Value.ValueUnit,
-                  crypto.Hash.hashPrivateKey("dummy-key-hash"),
+                  LfPackageName.assertFromString("package-name"),
                 )
                 .value,
               Set(alice),
@@ -82,7 +80,7 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
 
     val contractIdDiscriminator = ExampleTransactionFactory.lfHash(0)
     val contractIdSuffix =
-      Unicum(Hash.build(TestHash.testHashPurpose, HashAlgorithm.Sha256).addInt(0).finish())
+      Unicum(Hash.build(TestHash.testHashPurpose, HashAlgorithm.Sha256).add(0).finish())
 
     val invalidFormatContractId = LfContractId.assertFromString("00" * 34)
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -14,7 +14,6 @@ import com.digitalasset.canton.protocol.{
   LfNodeRollback,
   LfVersionedTransaction,
 }
-import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 
 /** Pretty printing implicits for use by tests only. These enable showing readable multiline diffs
   * when expected and actual transactions differ unexpectedly.
@@ -80,7 +79,7 @@ trait PrettyTestInstances {
   )
 
   implicit lazy val prettyLfNodeLookupByKey: Pretty[LfNodeLookupByKey] = prettyOfClass(
-    param("result", _.result.asCidOption.showValueOrNone),
+    param("result", _.result.showValueOrNone),
     param("templateId", _.templateId),
     param("version", _.version),
     param("key", _.key),

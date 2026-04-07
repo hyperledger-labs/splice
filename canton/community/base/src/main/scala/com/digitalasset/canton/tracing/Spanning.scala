@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -32,7 +32,7 @@ trait Spanning {
   protected def withSpan[A](
       description: String
   )(f: TraceContext => SpanWrapper => A)(implicit traceContext: TraceContext, tracer: Tracer): A = {
-    val (currentSpan, childContext) = startSpan(description)
+    val currentSpan = startSpan(description)
 
     def closeSpan(value: Any): Unit = value match {
       case future: Future[?] =>
@@ -71,6 +71,7 @@ trait Spanning {
 
     val result: A =
       try {
+        val childContext = TraceContext(currentSpan.storeInContext(traceContext.context))
         f(childContext)(new SpanWrapper(currentSpan))
       } catch {
         case NonFatal(exception) =>
@@ -84,14 +85,13 @@ trait Spanning {
 
   protected def startSpan(
       description: String
-  )(implicit parentTraceContext: TraceContext, tracer: Tracer): (Span, TraceContext) = {
+  )(implicit parentTraceContext: TraceContext, tracer: Tracer): Span = {
     val currentSpan = tracer
       .spanBuilder(description)
       .setParent(parentTraceContext.context)
       .startSpan()
     currentSpan.setAttribute("canton.class", getClass.getName)
-    val childContext = TraceContext(currentSpan.storeInContext(parentTraceContext.context))
-    (currentSpan, childContext)
+    currentSpan
   }
 }
 

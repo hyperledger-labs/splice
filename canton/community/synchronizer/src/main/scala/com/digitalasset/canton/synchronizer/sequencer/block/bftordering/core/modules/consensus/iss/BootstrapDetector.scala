@@ -1,10 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
 
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap.BootstrapEpochNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.SequencerSnapshotAdditionalInfo
@@ -34,7 +34,7 @@ object BootstrapDetector {
   )(abort: String => Nothing): BootstrapKind =
     snapshotAdditionalInfo match {
       case Some(additionalInfo)
-          if latestCompletedEpoch.info.number == BootstrapEpochNumber && membership.otherNodes.sizeIs > 0 =>
+          if latestCompletedEpoch == GenesisEpoch && membership.otherNodes.sizeIs > 0 =>
         val activeAt = additionalInfo.nodeActiveAt
           .getOrElse(
             membership.myId,

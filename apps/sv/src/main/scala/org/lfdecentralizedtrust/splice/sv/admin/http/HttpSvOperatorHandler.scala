@@ -16,7 +16,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.{ErrorUtil, Mutex}
+import com.digitalasset.canton.util.ErrorUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -44,15 +44,16 @@ import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 
 import java.util.Optional
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 class HttpSvOperatorHandler(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     config: SvAppBackendConfig,
     clock: Clock,
-    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
+    cometBftClient: Option[CometBftClient],
     override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -77,7 +78,6 @@ class HttpSvOperatorHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
-  private val mutex = Mutex()
   override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val validatorLicensesStore: AppStore = dsoStore
 
@@ -98,7 +98,7 @@ class HttpSvOperatorHandler(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var scanConnectionV: Option[Future[ScanConnection]] = None
   private def scanConnectionF: Future[ScanConnection] = blocking {
-    mutex.exclusive {
+    this.synchronized {
       scanConnectionV match {
         case Some(f) => f
         case None =>
@@ -390,7 +390,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
-      withSequencerConnection(
+      withSequencerConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -403,7 +403,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
-      withMediatorConnection(
+      withMediatorConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -477,33 +477,34 @@ class HttpSvOperatorHandler(
 
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
-    synchronizerNodeService.activeSynchronizerNode().flatMap { node =>
-      node.cometbftNode.map(_.cometBftClient) match {
-        case None =>
-          notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
-        case Some(client) => call(client)
-      }
+  )(call: CometBftClient => Future[T]) = cometBftClient
+    .fold {
+      notFound(definitions.ErrorResponse("CometBFT is not configured."))
+        .pure[Future]
+    } {
+      call
     }
 
-  private def withSequencerConnection[T](
-      call: SequencerAdminConnection => Future[T]
-  )(implicit tc: TraceContext) = {
-    synchronizerNodeService
-      .activeSynchronizerNode()
-      .flatMap(node => call(node.sequencerAdminConnection))
-  }
+  private def withSequencerConnectionOrNotFound[T](
+      notFound: definitions.ErrorResponse => T
+  )(call: SequencerAdminConnection => Future[T]) = localSynchronizerNode
+    .map(_.sequencerAdminConnection)
+    .fold {
+      notFound(definitions.ErrorResponse("Sequencer is not configured."))
+        .pure[Future]
+    } { call }
 
-  private def withMediatorConnection[T](
-      call: MediatorAdminConnection => Future[T]
-  )(implicit tc: TraceContext) = {
-    synchronizerNodeService
-      .activeSynchronizerNode()
-      .flatMap(node => call(node.mediatorAdminConnection))
-  }
+  private def withMediatorConnectionOrNotFound[T](
+      notFound: definitions.ErrorResponse => T
+  )(call: MediatorAdminConnection => Future[T]) = localSynchronizerNode
+    .map(_.mediatorAdminConnection)
+    .fold {
+      notFound(definitions.ErrorResponse("Mediator is not configured."))
+        .pure[Future]
+    } { call }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
-    mutex.exclusive {
+    this.synchronized {
       Seq[AsyncOrSyncCloseable](
         AsyncCloseable(
           "scanConnection",

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.driver.v1
@@ -6,7 +6,6 @@ package com.digitalasset.canton.crypto.kms.driver.v1
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import com.daml.metrics.ExecutorServiceMetrics
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.{ExecutorServiceExtensions, FutureSupervisor, Threading}
@@ -84,21 +83,17 @@ class DriverKms(
 
     val requestF =
       try {
-        synchronizeWithClosing(functionFullName) {
-          FutureUnlessShutdown.recoverFromAbortException {
-            futureSupervisor.supervised(s"KMS Driver: $operation") {
-              driverMethod(traceContext.context)
-            }
-          }
+        futureSupervisor.supervised(s"KMS Driver: $operation") {
+          driverMethod(traceContext.context)
         }
       } catch {
         case NonFatal(e) =>
           // Catch any exception thrown by the driver outside of a failed future and return a failed future
-          FutureUnlessShutdown.failed(e)
+          Future.failed(e)
       }
 
     EitherTUtil
-      .fromFuture(requestF, mapErr)
+      .fromFuture(FutureUnlessShutdown.recoverFromAbortException(requestF), mapErr)
       .thereafter {
         case Success(Outcome(Right(_))) =>
           logger.trace(s"KMS driver operation $operation succeeded")
@@ -465,16 +460,11 @@ object DriverKms {
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
       executionContext: ExecutionContext,
-      executorServiceMetrics: ExecutorServiceMetrics,
   ): Either[KmsError, DriverKms] = {
 
     val driverLogger = loggerFactory.append("kms-driver", config.name).getLogger(classOf[DriverKms])
     val driverExecutionContext =
-      Threading.newExecutionContext(
-        s"kms-driver-${config.name}",
-        driverLogger,
-        executorServiceMetrics,
-      )
+      Threading.newExecutionContext(s"kms-driver-${config.name}", driverLogger)
 
     for {
       driver <- DriverLoader

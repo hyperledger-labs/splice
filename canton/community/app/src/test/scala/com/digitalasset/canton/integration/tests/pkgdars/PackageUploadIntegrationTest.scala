@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pkgdars
@@ -6,11 +6,12 @@ package com.digitalasset.canton.integration.tests.pkgdars
 import better.files.File
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.String255
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference, SequencerReference}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -229,38 +230,13 @@ trait PackageUploadIntegrationTest
   }
 
   "dar inspection" should {
-    "show the content of a DAR if it was uploaded via the Admin API" in { implicit env =>
+    "show content of dars" in { implicit env =>
       import env.*
 
       participant3.synchronizers.connect_local(sequencer1, alias = daName)
-      participant3.dars.list(filterName = "CantonExamples") shouldBe empty
-
       participant3.dars.upload(CantonExamplesPath)
 
       val items = participant3.dars.list(filterName = "CantonExamples")
-      items should have length (1)
-
-      val dar = items.loneElement
-
-      // list contents
-      val content = participant3.dars.get_contents(dar.mainPackageId)
-      content.description.name shouldBe dar.name
-
-      // packages should exist ...
-      val allPackages = participant3.packages.list().map(_.packageId).toSet
-      forAll((content.packages)) { pkg =>
-        allPackages contains pkg.packageId
-      }
-    }
-
-    "show the content of a DAR if it was uploaded via the Ledger API" in { implicit env =>
-      import env.*
-
-      participant3.synchronizers.connect_local(sequencer1, alias = daName)
-      participant3.dars.list(filterName = "CantonTests") shouldBe empty
-      participant3.ledger_api.packages.upload_dar(CantonTestsPath)
-
-      val items = participant3.dars.list(filterName = "CantonTests")
       items should have length (1)
 
       val dar = items.loneElement
@@ -544,9 +520,9 @@ trait PackageUploadIntegrationTest
           PackageRemovalErrorCode.code,
           s"The DAR ${DarDescription(
               DarMainPackageId.tryCreate(cantonTestsMainPackageId),
-              String255.tryCreate("CantonTests-1.0.0"),
+              String255.tryCreate("CantonTests-3.4.0"),
               String255.tryCreate("CantonTests"),
-              String255.tryCreate("1.0.0"),
+              String255.tryCreate("3.4.0"),
             )} cannot be removed because its main package $cantonTestsMainPackageId is in-use",
         ),
       )
@@ -654,5 +630,5 @@ trait PackageUploadIntegrationTest
 
 class PackageUploadIntegrationTestPostgres extends PackageUploadIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

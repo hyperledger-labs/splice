@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -33,7 +33,6 @@ import scala.concurrent.{ExecutionContext, Future}
   * current participant.
   */
 trait PackageMetadataView extends AutoCloseable {
-  def packageStore: DamlPackageStore
   def getSnapshot(implicit errorLoggingContext: ErrorLoggingContext): PackageMetadata
   val packageUpgradeValidator: PackageUpgradeValidator
 }
@@ -42,7 +41,6 @@ trait PackageMetadataView extends AutoCloseable {
   * initialization and on new package uploads.
   */
 trait MutablePackageMetadataView extends PackageMetadataView {
-  def packageStore: DamlPackageStore
 
   /** Update the current package metadata view by merging the series of `newPackageMetadata` into
     * it.
@@ -57,7 +55,7 @@ trait MutablePackageMetadataView extends PackageMetadataView {
 
 class MutablePackageMetadataViewImpl(
     clock: Clock,
-    val packageStore: DamlPackageStore,
+    damlPackageStore: DamlPackageStore,
     val packageUpgradeValidator: PackageUpgradeValidator,
     val loggerFactory: NamedLoggerFactory,
     packageMetadataViewConfig: PackageMetadataViewConfig,
@@ -112,7 +110,7 @@ class MutablePackageMetadataViewImpl(
     def elapsedDurationMillis(): Long = (clock.now - startedTime).toMillis
 
     val initializationFUS =
-      packageStore
+      damlPackageStore
         .listPackages()
         .flatMap(packages =>
           FutureUnlessShutdown.outcomeF(
@@ -159,10 +157,8 @@ class MutablePackageMetadataViewImpl(
           .asGrpcError
       )
 
-  override def onClosed(): Unit = {
+  override def onClosed(): Unit =
     LifeCycle.close(mutatePackageMetadataExecutionQueue)(logger)
-    LifeCycle.close(packageStore)(logger)
-  }
 
   private def decodePackageMetadata(
       archive: DamlLf.Archive
@@ -177,7 +173,7 @@ class MutablePackageMetadataViewImpl(
   private def fetchPackage(
       packageId: LfPackageId
   )(implicit tc: TraceContext): FutureUnlessShutdown[DamlLf.Archive] =
-    packageStore
+    damlPackageStore
       .getPackage(packageId)
       .flatMap {
         case Some(pkg) => FutureUnlessShutdown.pure(pkg)

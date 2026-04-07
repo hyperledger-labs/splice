@@ -74,6 +74,11 @@
   </if>
 
   <if condition='isDefined("LOG_FILE_FLAT")'>
+    <if condition='isDefined("LOG_LAST_ERRORS")'>
+      <then><variable name="log_last_errors_filter" value="com.digitalasset.canton.logging.CantonFilterEvaluator"/></then>
+      <!-- dummy filter which will have no effect, to reduce code replication -->
+      <else><variable name="log_last_errors_filter" value="ch.qos.logback.classic.filter.ThresholdFilter"/></else>
+    </if>
     <then>
       <if condition='isDefined("LOG_FORMAT_JSON")'>
         <then>
@@ -88,6 +93,7 @@
                 <levelValue>[ignore]</levelValue>
               </fieldNames>
             </encoder>
+            <filter class="${log_last_errors_filter}" />
           </appender>
         </then>
         <else>
@@ -100,6 +106,7 @@
               <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
               <pattern>%date [%thread] %-5level %logger{10} &entityCorrelationIdTrailingSpaceReplace;</pattern>
             </encoder>
+            <filter class="${log_last_errors_filter}" />
           </appender>
 
           <!-- Appender for KMS logs -->
@@ -160,6 +167,7 @@
                     <levelValue>[ignore]</levelValue>
                   </fieldNames>
                 </encoder>
+                <filter class="${log_last_errors_filter}" />
               </appender>
             </then>
             <else>
@@ -178,6 +186,7 @@
                   <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
                   <pattern>%date [%thread] %-5level %logger{35} &entityCorrelationIdTrailingSpaceReplace;</pattern>
                 </encoder>
+                <filter class="${log_last_errors_filter}" />
               </appender>
 
 

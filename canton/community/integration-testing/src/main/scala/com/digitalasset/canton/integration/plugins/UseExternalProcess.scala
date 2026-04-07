@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -99,7 +99,7 @@ class UseExternalProcess(
       case _ =>
         Seq(
           "java"
-        ) ++ classpathProps ++ threadingProps ++ loggingProps :+ "com.digitalasset.canton.CantonCommunityApp"
+        ) ++ classpathProps ++ threadingProps ++ loggingProps :+ "com.digitalasset.canton.CantonEnterpriseApp"
     }
     command ++ cantonInvocationArgs(
       logFile(name, config).toString,
@@ -284,12 +284,7 @@ class UseExternalProcess(
     newConfig
   }
 
-  /** Start with additional environment variables
-    */
-  def start(instanceName: String, addEnvironment: Map[String, String] = Map.empty): Unit = {
-    handler.addEnvironmentIfNotStarted(instanceName, addEnvironment)
-    handler.tryStart(instanceName)
-  }
+  def start(instanceName: String): Unit = handler.tryStart(instanceName)
 
   /** Start a specific Canton version */
   def start(instanceName: String, cantonVersion: RunVersion): Unit = {

@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.SqlParser.{bool, str}
 import anorm.{RowParser, ~}
-import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
 import com.digitalasset.canton.platform.Party
 import com.digitalasset.canton.platform.store.backend.PartyStorageBackend
@@ -58,27 +57,17 @@ class PartyStorageBackendTemplate(ledgerEndCache: LedgerEndCache) extends PartyS
     queryParties(partyFilter, cSQL"", connection).toList
   }
 
-  override def knownParties(
-      fromExcl: Option[Party],
-      filterString: Option[String185],
-      maxResults: Int,
-  )(
+  override def knownParties(fromExcl: Option[Party], maxResults: Int)(
       connection: Connection
   ): List[IndexerPartyDetails] = {
-
-    val offsetPartyFilter = fromExcl match {
+    val partyFilter = fromExcl match {
       case Some(id: String) => cSQL"lapi_party_entries.party > $id AND"
       case None => cSQL""
     }
-    val partyFilter = filterString match {
-      case Some(filter) =>
-        cSQL"$offsetPartyFilter lapi_party_entries.party LIKE ${filter.str + "%"} AND"
-      case None => offsetPartyFilter
-    }
     queryParties(
-      partyFilter = partyFilter,
-      limitClause = QueryStrategy.limitClause(Some(maxResults)),
-      connection = connection,
+      partyFilter,
+      cSQL"fetch next $maxResults rows only",
+      connection,
     ).toList
   }
 

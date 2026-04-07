@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -49,9 +49,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       activeContractsAfter <- activeContractsOf(
         ledgerDao.updateReader
@@ -61,9 +59,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = activeContractsAfter.toSet.diff(activeContractsBefore.toSet)
@@ -88,9 +84,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       (_, _) <- store(singleCreate)
       (_, c) <- store(singleCreate)
@@ -106,9 +100,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       activeContractsAfter.toSet.diff(activeContractsBefore.toSet) should have size 0
@@ -141,11 +133,9 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections =
-                Map(Some(party1) -> Map(Some(otherTemplateIdFull.toNameTypeConRef) -> Projection())),
+                Map(Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection())),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val create = result.loneElement
@@ -182,13 +172,11 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(otherTemplateIdFull.toNameTypeConRef) -> Projection()),
-                Some(party2) -> Map(Some(otherTemplateIdFull.toNameTypeConRef) -> Projection()),
+                Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -232,13 +220,11 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(otherTemplateId2Full.toNameTypeConRef) -> Projection()),
-                Some(party2) -> Map(Some(otherTemplateId2Full.toNameTypeConRef) -> Projection()),
+                Some(party1) -> Map(otherTemplateId2Full.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateId2Full.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -283,13 +269,11 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(otherTemplateIdFull.toNameTypeConRef) -> Projection()),
-                Some(party2) -> Map(Some(otherTemplateIdFull.toNameTypeConRef) -> Projection()),
+                Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -334,9 +318,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = false
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -380,12 +362,10 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(someTemplateIdFull.toNameTypeConRef) -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -429,12 +409,10 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(otherTemplateId5Full.toNameTypeConRef) -> Projection())
+                Some(party1) -> Map(otherTemplateId5Full.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContracts = result.toArray
@@ -486,12 +464,10 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(someTemplateIdFull.toNameTypeConRef) -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       resultUnknownParty <- activeContractsOf(
         ledgerDao.updateReader
@@ -506,12 +482,10 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(Some(someTemplateIdFull.toNameTypeConRef) -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       resultUnknownTemplate <- activeContractsOf(
         ledgerDao.updateReader
@@ -528,14 +502,12 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  Some(someTemplateIdFull.toNameTypeConRef) -> Projection(),
-                  Some(unknownTemplateFull.toNameTypeConRef) -> Projection(),
+                  someTemplateIdFull.toNameTypeConRef -> Projection(),
+                  unknownTemplateFull.toNameTypeConRef -> Projection(),
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       resultUnknownTemplatePartyWildcard <- activeContractsOf(
         ledgerDao.updateReader
@@ -552,16 +524,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  Some(someTemplateIdFull.toNameTypeConRef) -> Projection()
+                  someTemplateIdFull.toNameTypeConRef -> Projection()
                 ),
                 None -> Map(
-                  Some(unknownTemplateFull.toNameTypeConRef) -> Projection()
+                  unknownTemplateFull.toNameTypeConRef -> Projection()
                 ),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       resultUnknownPartyAndTemplate <- activeContractsOf(
         ledgerDao.updateReader
@@ -578,14 +548,12 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  Some(someTemplateIdFull.toNameTypeConRef) -> Projection(),
-                  Some(unknownTemplateFull.toNameTypeConRef) -> Projection(),
+                  someTemplateIdFull.toNameTypeConRef -> Projection(),
+                  unknownTemplateFull.toNameTypeConRef -> Projection(),
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       resultUnknownsOnly <- activeContractsOf(
         ledgerDao.updateReader
@@ -601,13 +569,11 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(unknownParty) -> Map(
-                  Some(unknownTemplateFull.toNameTypeConRef) -> Projection()
+                  unknownTemplateFull.toNameTypeConRef -> Projection()
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       result should have length 2
@@ -632,9 +598,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
           eventProjectionProperties = EventProjectionProperties(
             verbose = true
           )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-          continuationToken = None,
         )
-        .map(_.withEmptyChecksum)
         .runWith(Sink.seq)
 
     } yield {
@@ -655,9 +619,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
       activeContractsAfter <- activeContractsOf(
         ledgerDao.updateReader
@@ -667,9 +629,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             eventProjectionProperties = EventProjectionProperties(
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
-            continuationToken = None,
           )
-          .map(_.withEmptyChecksum)
       )
     } yield {
       val activeContract = activeContractsAfter.toSet.diff(activeContractsBefore.toSet).loneElement

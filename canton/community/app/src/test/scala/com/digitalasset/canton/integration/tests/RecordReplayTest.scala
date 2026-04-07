@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -6,13 +6,15 @@ package com.digitalasset.canton.integration.tests
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.HasTempDirectory
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.plugins.{
   PostgresDumpRestore,
-  UseBftSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   HasCycleUtils,
   SharedEnvironment,
@@ -35,7 +37,7 @@ final class RecordReplayIntegrationTest
 
   private val postgresPlugin = new UsePostgres(loggerFactory)
   registerPlugin(postgresPlugin)
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   private val postgresDumpRestore = PostgresDumpRestore(postgresPlugin, forceLocal = false)
 
@@ -52,7 +54,11 @@ final class RecordReplayIntegrationTest
   // how many send requests should we permit sending in parallel when replaying
   private val SendReplayParallelism = 10
 
-  override def environmentDefinition: EnvironmentDefinition = EnvironmentDefinition.P1_S1M1
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition.P1_S1M1.addConfigTransform(
+      // TODO(i26481): Enable new connection pool (test uses replay subscriptions)
+      ConfigTransforms.disableConnectionPool
+    )
 
   "replaying events and submission requests is functionally working" in { implicit env =>
     import env.*
@@ -199,23 +205,23 @@ final class RecordReplayIntegrationTest
       }
 
       // wait for the nodes to fully initialize and publish the transport for us to manipulate
-      val replayClients = List(mediatorSendReplayConfig, participantSendReplayConfig)
-        .parTraverse(_.replayClient)
+      val transports = List(mediatorSendReplayConfig, participantSendReplayConfig)
+        .parTraverse(_.transport)
         .futureValue(SequencerReplayTimeout)
 
       // read all events that were previously sent
-      val startingtimestamps = replayClients
+      val startingtimestamps = transports
         .parTraverse(_.waitForIdle(SequencerReplayIdleDuration).map(_.finishedAtTimestamp))
         .futureValue(SequencerReplayTimeout)
 
       // start an idleness monitor now before we've started replaying any events
       val idlenessMonitorsF =
-        replayClients.zip(startingtimestamps).map { case (transport, startingTimestamp) =>
+        transports.zip(startingtimestamps).map { case (transport, startingTimestamp) =>
           transport.waitForIdle(SequencerReplayIdleDuration, startingTimestamp)
         }
 
       // replay sends and wait for events to stop being received
-      val eventsReceived = replayClients
+      val eventsReceived = transports
         .zip(idlenessMonitorsF)
         .parTraverse { case (transport, idlenessMonitorF) =>
           for {

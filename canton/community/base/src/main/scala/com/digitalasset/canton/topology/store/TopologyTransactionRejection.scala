@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.store
@@ -36,14 +36,11 @@ object TopologyTransactionRejection {
     final case class SerialMismatch(actual: PositiveInt, expected: PositiveInt)
         extends TopologyTransactionRejection {
       override def asString: String =
-        show"The actual serial $actual does not match the expected serial $expected"
+        show"The given serial $expected does not match the actual serial $expected"
       override protected def pretty: Pretty[SerialMismatch] =
         prettyOfClass(param("expected", _.expected), param("actual", _.actual))
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.SerialMismatch.Failure(
-          actual = Some(actual),
-          expected = Some(expected),
-        )
+        TopologyManagerError.SerialMismatch.Failure(Some(actual), Some(expected))
     }
     final case class InternalError(message: String) extends TopologyTransactionRejection {
       override def asString: String = message
@@ -119,6 +116,7 @@ object TopologyTransactionRejection {
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
         TopologyManagerError.InvalidSynchronizer.Failure(synchronizerId)
     }
+
   }
 
   /** list of rejections which are created due to invariants on the topology state */
@@ -292,26 +290,26 @@ object TopologyTransactionRejection {
         TopologyManagerError.MediatorsAlreadyInOtherGroups.Reject(group, mediators)
     }
 
-    final case class AnnouncedLsuTopologyFreeze(synchronizerId: SynchronizerId)
+    final case class OngoingSynchronizerUpgrade(synchronizerId: SynchronizerId)
         extends TopologyTransactionRejection {
       override def asString: String =
-        s"The topology state of synchronizer $synchronizerId is frozen due to an announced LSU and no more topology changes are allowed."
+        s"The topology state of synchronizer $synchronizerId is frozen due to an ongoing synchronizer migration and no more topology changes are allowed."
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.AnnouncedLsuTopologyFreeze.Reject(synchronizerId)
+        TopologyManagerError.OngoingSynchronizerUpgrade.Reject(synchronizerId)
     }
 
     final case class InvalidSynchronizerSuccessor(
+        currentSynchronizerId: PhysicalSynchronizerId,
         successorSynchronizerId: PhysicalSynchronizerId,
-        inStoreSuccessorSynchronizerId: PhysicalSynchronizerId,
     ) extends TopologyTransactionRejection {
       override def asString: String =
-        s"The declared successor $successorSynchronizerId is not greater than prior synchronizer $inStoreSuccessorSynchronizerId."
+        s"The declared successor $successorSynchronizerId of synchronizer $currentSynchronizerId is not valid."
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.InvalidSynchronizerSuccessor.Reject.conflictWithPreviousAnnouncement(
+        TopologyManagerError.InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPSId(
+          currentSynchronizerId,
           successorSynchronizerId,
-          inStoreSuccessorSynchronizerId,
         )
     }
 
@@ -325,31 +323,6 @@ object TopologyTransactionRejection {
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
         TopologyManagerError.InvalidUpgradeTime.Reject(synchronizerId, effective, upgradeTime)
-    }
-
-    final case class NoLsuAnnounced(
-    ) extends TopologyTransactionRejection {
-      override def asString: String =
-        "The operation cannot be performed because no LSU is announced"
-
-      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.NoLsuAnnounced.Failure()
-    }
-
-    final case class LsuSequencerSuccessorInvalidSuccessorPsid(
-        sequencerId: SequencerId,
-        successorPsid: PhysicalSynchronizerId,
-        expectedSuccessorPsid: PhysicalSynchronizerId,
-    ) extends TopologyTransactionRejection {
-      override def asString: String =
-        s"Lsu sequencer successor for sequencer $sequencerId is invalid because it mentions successor $successorPsid but the current LSU announcement mentions $expectedSuccessorPsid"
-
-      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.LsuSequencerSuccessorInvalidSuccessorPsid.Reject(
-          sequencerId,
-          successorPsid,
-          expectedSuccessorPsid,
-        )
     }
 
     final case class ParticipantCannotRejoinSynchronizer(participantId: ParticipantId)

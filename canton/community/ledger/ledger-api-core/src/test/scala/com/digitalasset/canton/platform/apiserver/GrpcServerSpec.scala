@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
@@ -6,15 +6,14 @@ package com.digitalasset.canton.platform.apiserver
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
 import com.daml.metrics.api.{HistogramInventory, MetricName}
-import com.daml.testing.utils.TestResourceContext
 import com.digitalasset.base.error.{ErrorGenerator, RpcError}
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.ServerConfig
 import com.digitalasset.canton.grpc.sampleservice.HelloServiceReferenceImplementation
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.ledger.resources.TestResourceContext
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   LoggingContextWithTrace,
@@ -29,10 +28,22 @@ import com.digitalasset.canton.platform.apiserver.ratelimiting.RateLimitingInter
 import com.digitalasset.canton.protobuf.Hello
 import com.digitalasset.canton.protobuf.HelloServiceGrpc.HelloService
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, protobuf}
-import io.grpc.*
 import io.grpc.ClientCall.Listener
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
+import io.grpc.{
+  BindableService,
+  CallOptions,
+  Channel,
+  ClientCall,
+  ClientInterceptor,
+  ClientInterceptors,
+  Metadata,
+  MethodDescriptor,
+  ServerInterceptor,
+  Status,
+  StatusRuntimeException,
+}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -276,8 +287,6 @@ object GrpcServerSpec {
         desiredPort = Port.Dynamic,
         maxInboundMessageSize = maxInboundMessageSize,
         maxInboundMetadataSize = maxInboundMetadataSize.getOrElse(8 * 1024),
-        maxConcurrentStreamsPerConnection =
-          ServerConfig.defaultMaxConcurrentStreamsPerConnection.unwrap,
         metrics = metrics,
         servicesExecutor = executor,
         services = Seq(helloService(ec)),

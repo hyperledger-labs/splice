@@ -40,7 +40,6 @@ export const SingleResourceSchema = z
   .object({
     memory: z.string().optional(),
     cpu: z.string().optional(),
-    ephemeralStorage: z.string().optional(),
   })
   .optional();
 

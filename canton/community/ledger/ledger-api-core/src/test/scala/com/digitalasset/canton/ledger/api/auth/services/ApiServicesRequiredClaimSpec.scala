@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth.services
@@ -135,7 +135,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
             verbose = true,
           )
         ),
-        streamContinuationToken = None,
       )
     ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
       RequiredClaim.ReadAs("a"),
@@ -160,7 +159,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
             verbose = true,
           )
         ),
-        streamContinuationToken = None,
       )
     ) should contain theSameElementsAs RequiredClaims[GetActiveContractsRequest](
       RequiredClaim.ReadAs("a"),
@@ -180,7 +178,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
             verbose = true,
           )
         ),
-        streamContinuationToken = None,
       )
     ) shouldBe Nil
   }
@@ -190,7 +187,6 @@ class ApiServicesRequiredClaimSpec extends AsyncFlatSpec with BaseTest with Matc
       GetActiveContractsRequest(
         activeAtOffset = 15,
         eventFormat = None,
-        streamContinuationToken = None,
       )
     ) shouldBe Nil
   }
@@ -689,8 +685,6 @@ object ApiServicesRequiredClaimSpec {
       prefetchContractKeys = Seq.empty,
       maxRecordTime = Option.empty,
       estimateTrafficCost = None,
-      tapsMaxPasses = None,
-      hashingSchemeVersion = None,
     )
 
   val preparedTransaction = PreparedTransaction(

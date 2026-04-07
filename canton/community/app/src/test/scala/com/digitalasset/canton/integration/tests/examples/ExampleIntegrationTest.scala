@@ -1,13 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.examples
 
 import better.files.*
 import com.digitalasset.canton.ConsoleScriptRunner
-import com.digitalasset.canton.console.BufferedProcessLogger
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   BaseIntegrationTest,
   ConfigTransform,
@@ -15,8 +15,10 @@ import com.digitalasset.canton.integration.{
   IsolatedEnvironments,
 }
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.util.Mutex
+import com.digitalasset.canton.util.ConcurrentBufferedLogger
 import com.digitalasset.canton.util.ShowUtil.*
+
+import scala.concurrent.blocking
 
 abstract class ExampleIntegrationTest(configPaths: File*)
     extends BaseIntegrationTest
@@ -25,7 +27,7 @@ abstract class ExampleIntegrationTest(configPaths: File*)
 
   protected def runAndAssertCommandSuccess(
       pb: scala.sys.process.ProcessBuilder,
-      processLogger: BufferedProcessLogger,
+      processLogger: ConcurrentBufferedLogger,
   ): Unit = {
     val exitCode = pb.!(processLogger)
     if (exitCode != 0) {
@@ -35,7 +37,7 @@ abstract class ExampleIntegrationTest(configPaths: File*)
 
   protected def runAndAssertCommandFailure(
       pb: scala.sys.process.ProcessBuilder,
-      processLogger: BufferedProcessLogger,
+      processLogger: ConcurrentBufferedLogger,
       expectedFailure: String,
   ): Unit = {
     val exitCode = pb.!(processLogger)
@@ -58,32 +60,23 @@ abstract class ExampleIntegrationTest(configPaths: File*)
 trait HasConsoleScriptRunner { this: NamedLogging =>
   import org.scalatest.EitherValues.*
 
-  def runScript(scriptPath: File)(implicit env: Environment): Unit =
+  def runScript(scriptPath: File)(implicit env: CantonEnvironment): Unit =
     ConsoleScriptRunner.run(env, scriptPath.toJava, logger = logger).value.discard
 }
 
 object `ExampleIntegrationTest` {
-  private val lock = new Mutex()
-  lazy val communityApp = "community" / "app"
-  lazy val communityAppSrc = "community" / "app" / "src"
   lazy val dockerImagesPath: File = "docker" / "canton" / "images"
-  lazy val examplesPath: File = communityAppSrc / "pack" / "examples"
+  lazy val examplesPath: File = "community" / "app" / "src" / "pack" / "examples"
   lazy val simpleTopology: File = examplesPath / "01-simple-topology"
-  lazy val referenceConfiguration: File = communityAppSrc / "pack" / "config"
+  lazy val referenceConfiguration: File = "community" / "app" / "src" / "pack" / "config"
   lazy val composabilityConfiguration: File = examplesPath / "05-composability"
   lazy val repairConfiguration: File = examplesPath / "07-repair"
-  lazy val interactiveSubmissionFolder: File = examplesPath / "08-interactive-submission"
-
-  object JsonApiExample {
-    lazy val path = examplesPath / "09-json-api"
-    lazy val codegenOutput = communityApp / "target" / "test-daml-codegen-ts"
-  }
-
+  lazy val interactiveSubmissionFolder: File =
+    examplesPath / "08-interactive-submission"
   lazy val advancedConfTestEnv: File =
-    communityAppSrc / "test" / "resources" / "advancedConfDef.env"
+    "community" / "app" / "src" / "test" / "resources" / "advancedConfDef.env"
   lazy val bftSequencerConfigurationFolder: File = examplesPath / "11-bft-sequencer"
-
-  def ensureSystemProperties(kvs: (String, String)*): Unit = (lock.exclusive {
+  def ensureSystemProperties(kvs: (String, String)*): Unit = blocking(synchronized {
     kvs.foreach { case (key, value) =>
       Option(System.getProperty(key)) match {
         case Some(oldValue) =>

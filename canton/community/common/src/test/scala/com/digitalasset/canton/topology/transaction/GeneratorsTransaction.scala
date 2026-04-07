@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.transaction
@@ -105,13 +105,11 @@ final class GeneratorsTransaction(
     } yield HostingParticipant(pid, permission, onboarding)
   )
 
-  implicit val synchronizerUpgradeAnnouncementArb: Arbitrary[LsuAnnouncement] =
+  implicit val synchronizerUpgradeAnnouncementArb: Arbitrary[SynchronizerUpgradeAnnouncement] =
     Arbitrary(for {
       psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       upgradeTime <- Arbitrary.arbitrary[CantonTimestamp]
-    } yield LsuAnnouncement(psid, upgradeTime))
-
-  implicit val keyMappingArb: Arbitrary[KeyMapping] = genArbitrary
+    } yield SynchronizerUpgradeAnnouncement(psid, upgradeTime))
 
   implicit val topologyMappingArb: Arbitrary[TopologyMapping] = genArbitrary
 

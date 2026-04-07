@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
@@ -15,11 +15,12 @@ import com.digitalasset.canton.auth.{
 }
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.*
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.NamedLoggerFactory
 
 import scala.concurrent.duration.Duration
 
-sealed trait AuthServiceConfig {
+sealed trait AuthServiceConfig extends UniformCantonConfigValidation {
 
   def create(
       jwksCacheConfig: JwksCacheConfig,
@@ -36,6 +37,11 @@ sealed trait AuthServiceConfig {
 
 object AuthServiceConfig {
   import NonNegativeDurationConverter.*
+
+  implicit val authServiceConfigCantonConfigValidator: CantonConfigValidator[AuthServiceConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[AuthServiceConfig]
+  }
 
   /** [default] Allows everything */
   case object Wildcard extends AuthServiceConfig {

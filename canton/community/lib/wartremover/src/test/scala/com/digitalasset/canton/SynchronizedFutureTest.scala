@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -15,8 +15,8 @@ import scala.concurrent.{Future, Promise}
 class SynchronizedFutureTest extends AnyWordSpec with Matchers {
   import SynchronizedFutureTest.*
 
-  def assertIsErrorSynchronized(result: WartTestTraverser.Result, count: Int = 1): Assertion = {
-    result.errors.length shouldBe count
+  def assertIsErrorSynchronized(result: WartTestTraverser.Result): Assertion = {
+    result.errors.length shouldBe 1
     result.errors.foreach(_ should include(SynchronizedFuture.messageSynchronized))
     succeed
   }
@@ -44,10 +44,7 @@ class SynchronizedFutureTest extends AnyWordSpec with Matchers {
           }
         }
       }
-      assertIsErrorSynchronized(
-        result,
-        count = if (ScalaVersion.isScala3) 2 else 1,
-      )
+      assertIsErrorSynchronized(result)
     }
 
     "detect nested synchronized statements in the receiver" in {

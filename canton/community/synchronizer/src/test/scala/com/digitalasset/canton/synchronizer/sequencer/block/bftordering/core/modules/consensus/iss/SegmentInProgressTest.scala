@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -199,20 +199,6 @@ class SegmentInProgressTest extends AsyncWordSpec with BftSequencerBaseTest {
           p2View0AnotherSegment,
         )
       ) shouldBe RehydrationMessages(Seq(), Seq(), Seq())
-    }
-
-    "should include the highest know new-view message (even if we have a higher view change)" in {
-      rehydrationMessages(
-        Seq[SignedMessage[PbftNetworkMessage]](
-          newView1,
-          viewChange1, // this will not be used
-          viewChange2,
-        )
-      ) shouldBe RehydrationMessages(
-        prepares = Seq(),
-        oldViewsMessages = Seq(newView1),
-        currentViewMessages = Seq(viewChange2),
-      )
     }
   }
 }

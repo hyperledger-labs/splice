@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -8,7 +8,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
-import com.digitalasset.canton.health.ReportsHealth
+import com.digitalasset.canton.ledger.api.health.ReportsHealth
 import com.digitalasset.canton.ledger.participant.state.SyncService.{
   ConnectedSynchronizerRequest,
   ConnectedSynchronizerResponse,
@@ -176,9 +176,7 @@ trait SyncService
   // temporary implementation, will be removed with the refactoring of the SyncService interface
   /** Constructs and fetches the current synchronizer state, to be used throughout command execution
     */
-  def getRoutingSynchronizerState(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[RoutingSynchronizerState]
+  def getRoutingSynchronizerState(implicit traceContext: TraceContext): RoutingSynchronizerState
 
   /** Estimate the associated traffic cost to submitting and confirming a transaction
     */

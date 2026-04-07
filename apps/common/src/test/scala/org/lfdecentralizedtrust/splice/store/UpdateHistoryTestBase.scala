@@ -354,12 +354,6 @@ object UpdateHistoryTestBase {
         nodeId.intValue() -> tree.getChildNodeIds(event).asScala.toSeq.map(_.intValue())
       case (nodeId, _) => nodeId.intValue() -> Seq.empty
     }.toMap
-    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      tree.getEventsById.asScala.collect { case (nodeId, _: ExercisedEvent) =>
-        nodeId.intValue()
-      }.toSeq,
-      nodesWithChildren,
-    )
     new Transaction(
       /*updateId = */ tree.getUpdateId,
       /*commandId = */ if (mode == LostInScanApi) { "" }
@@ -369,7 +363,7 @@ object UpdateHistoryTestBase {
       /*workflowId = */ tree.getWorkflowId,
       /*effectiveAt = */ tree.getEffectiveAt,
       /*events = */ tree.getEvents.asScala
-        .map(withoutLostData(lastDescendantNodes, _))
+        .map(withoutLostData(nodesWithChildren, _))
         .asJava,
       /*offset = */ tree.getOffset,
       /*synchronizerId = */ tree.getSynchronizerId,
@@ -383,14 +377,14 @@ object UpdateHistoryTestBase {
   }
 
   private def withoutLostData(
-      lastDescendantNodes: Map[Int, Int],
+      nodesWithChildren: Map[Int, Seq[Int]],
       event: Event,
   ): Event = {
     event match {
       case created: CreatedEvent =>
         withoutLostData(created)
       case exercised: ExercisedEvent =>
-        withoutLostData(lastDescendantNodes, exercised)
+        withoutLostData(nodesWithChildren, exercised)
       case _ => throw new RuntimeException("Invalid event type")
     }
   }
@@ -429,7 +423,7 @@ object UpdateHistoryTestBase {
   }
 
   private def withoutLostData(
-      lastDescendantNodes: Map[Int, Int],
+      nodesWithChildren: Map[Int, Seq[Int]],
       exercised: ExercisedEvent,
   ): ExercisedEvent = {
     new ExercisedEvent(
@@ -448,11 +442,9 @@ object UpdateHistoryTestBase {
       /*choiceArgument = */ exercised.getChoiceArgument,
       /*actingParties = */ exercised.getActingParties,
       /*consuming = */ exercised.isConsuming,
-      /*lastDescendedNodeid = */ lastDescendantNodes.getOrElse(
+      /*lastDescendedNodeid = */ EventId.lastDescendedNodeFromChildNodeIds(
         exercised.getNodeId.intValue(),
-        throw new IllegalStateException(
-          s"Node ${exercised.getNodeId.intValue()} was not in lastDescendantNodes"
-        ),
+        nodesWithChildren,
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
       /*implementedInterfaces = */ exercised.getImplementedInterfaces,

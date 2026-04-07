@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.traffic.store.db
@@ -236,10 +236,7 @@ class DbTrafficConsumedStore(
           FutureUnlessShutdown.pure(0)
         } else {
           MonadUtil
-            .batchedSequentialTraverse(
-              batchingConfig.pruningParallelism,
-              batchingConfig.maxItemsInBatch,
-            )(
+            .batchedSequentialTraverse(batchingConfig.parallelism, batchingConfig.maxItemsInBatch)(
               membersTimestamps
             ) { membersTimestampsChunk =>
               val bulkDelete = DbStorage
@@ -301,16 +298,5 @@ class DbTrafficConsumedStore(
           s"Deleted $deletedCount traffic consumed with timestamps > $timestampExclusive"
         )
       }
-  }
-
-  /** Truncates the entire traffic consumed store. To be used only on sequencer initialization to
-    * clean up partial state.
-    */
-  override def truncate()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    val truncateQuery =
-      sqlu"""truncate table seq_traffic_control_consumed_journal"""
-    storage
-      .queryAndUpdate(truncateQuery, functionFullName)
-      .map(_ => logger.debug("Truncated traffic consumed store"))
   }
 }

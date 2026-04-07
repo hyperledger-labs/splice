@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
 
-import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
-import com.digitalasset.canton.crypto.{HashBuilderFromMessageDigest, HashPurpose}
+import com.digitalasset.canton.crypto.{HashPurpose, PrimitiveHashBuilder}
 import com.digitalasset.canton.protocol.hash.LfValueHashBuilder.TypeTag
 import com.digitalasset.canton.protocol.hash.LfValueHashBuilder.TypeTag.*
 import com.digitalasset.daml.lf.data.Ref
@@ -16,7 +15,7 @@ object LfValueHashBuilder {
   /** To avoid hash collision with values of different types which would result in an insecure hash,
     * we prefix each value with a unique tag corresponding to its type.
     *
-    * e.g. we want to avoid h(Some(42)) == h(4294967338)
+    * e.g we want to avoid h(Some(42)) == h(4294967338)
     */
   private[hash] object TypeTag {
     case object UnitTag extends TypeTag(0, "Unit")
@@ -40,7 +39,7 @@ object LfValueHashBuilder {
   // For testing only
   private[hash] def valueBuilderForV1Node(
       hashTracer: HashTracer = HashTracer.NoOp
-  ): LfValueHashBuilder =
+  ): LfValueBuilder =
     new NodeBuilderV1(
       HashPurpose.PreparedSubmission,
       hashTracer,
@@ -48,22 +47,22 @@ object LfValueHashBuilder {
     )
 }
 
-/** Hash Builder with additional methods to encode LF Values.
+/** Hash Builder with additional methods to encode LF Values
   */
-private[hash] class LfValueHashBuilder(purpose: HashPurpose, hashTracer: HashTracer)
-    extends HashBuilderFromMessageDigest(Sha256, purpose, hashTracer) {
+private[hash] class LfValueBuilder(purpose: HashPurpose, hashTracer: HashTracer)
+    extends PrimitiveHashBuilder(purpose, hashTracer) {
   protected def formatByteToHexString(byte: Byte): String = String.format("%02X", byte)
 
-  private def addDottedName(name: Ref.DottedName): this.type =
-    addArray(name.segments)(_ addString _)
+  final def addDottedName(name: Ref.DottedName): this.type =
+    iterateOver(name.segments)(_ add _)
 
-  private def addQualifiedName(name: Ref.QualifiedName): this.type =
+  final def addQualifiedName(name: Ref.QualifiedName): this.type =
     addDottedName(name.module).addDottedName(name.name)
 
   final def addIdentifier(id: Ref.Identifier): this.type =
-    addString(id.packageId).addQualifiedName(id.qualifiedName)
+    add(id.packageId).addQualifiedName(id.qualifiedName)
 
-  private def addTypeTag(typeTag: TypeTag): this.type =
+  def addTypeTag(typeTag: TypeTag): this.type =
     addByte(typeTag.tag, _ => s"${typeTag.name} Type Tag")
 
   def addTypedValue(value: Value): this.type =
@@ -73,22 +72,19 @@ private[hash] class LfValueHashBuilder(purpose: HashPurpose, hashTracer: HashTra
       case Value.ValueBool(b) =>
         addTypeTag(BoolTag).addBool(b)
       case Value.ValueInt64(v) =>
-        addTypeTag(Int64Tag).addLong(v)
+        addTypeTag(Int64Tag).add(v)
       case Value.ValueNumeric(v) =>
         addTypeTag(NumericTag).addNumeric(v)
       case Value.ValueTimestamp(v) =>
-        addTypeTag(TimestampTag).addLong(v.micros)
+        addTypeTag(TimestampTag).add(v.micros)
       case Value.ValueDate(v) =>
-        addTypeTag(DateTag).addInt(v.days)
+        addTypeTag(DateTag).add(v.days)
       case Value.ValueParty(v) =>
-        addTypeTag(PartyTag).addString(v)
+        addTypeTag(PartyTag).add(v)
       case Value.ValueText(v) =>
-        addTypeTag(TextTag).addString(v)
+        addTypeTag(TextTag).add(v)
       case Value.ValueContractId(cid) =>
-        addTypeTag(ContractIdTag).addByteString(
-          cid.toBytes.toByteString,
-          s"${cid.coid} (contractId)",
-        )
+        addTypeTag(ContractIdTag).add(cid.toBytes.toByteString, s"${cid.coid} (contractId)")
       case Value.ValueOptional(opt) =>
         opt match {
           case Some(value) =>
@@ -97,34 +93,34 @@ private[hash] class LfValueHashBuilder(purpose: HashPurpose, hashTracer: HashTra
             addTypeTag(OptionalTag).addByte(0.toByte, _ => "None")
         }
       case Value.ValueList(xs) =>
-        addTypeTag(ListTag).addArray(xs.toImmArray)(_ addTypedValue _)
+        addTypeTag(ListTag).iterateOver(xs.toImmArray)(_ addTypedValue _)
       case Value.ValueTextMap(xs) =>
-        addTypeTag(TextMapTag).addArray(xs.toImmArray)((acc, x) =>
-          acc.addString(x._1).addTypedValue(x._2)
+        addTypeTag(TextMapTag).iterateOver(xs.toImmArray)((acc, x) =>
+          acc.add(x._1).addTypedValue(x._2)
         )
       case Value.ValueRecord(identifier, fs) =>
         addTypeTag(RecordTag)
           .addOptional(identifier, _.addIdentifier)
-          .addArray(fs)((builder, recordEntry) =>
+          .iterateOver(fs)((builder, recordEntry) =>
             builder
-              .addOptional(recordEntry._1, builder => (value: String) => builder.addString(value))
+              .addOptional(recordEntry._1, builder => (value: String) => builder.add(value))
               .addTypedValue(recordEntry._2)
           )
       case Value.ValueVariant(identifier, variant, v) =>
         addTypeTag(VariantTag)
           .addOptional(identifier, _.addIdentifier)
-          .addString(variant)
+          .add(variant)
           .addTypedValue(v)
       case Value.ValueEnum(identifier, v) =>
         addTypeTag(EnumTag)
           .addOptional(identifier, _.addIdentifier)
-          .addString(v)
+          .add(v)
       case Value.ValueGenMap(entries) =>
-        addTypeTag(GenMapTag).addIterator(entries.iterator, entries.length)((acc, x) =>
+        addTypeTag(GenMapTag).iterateOver(entries.iterator, entries.length)((acc, x) =>
           acc.addTypedValue(x._1).addTypedValue(x._2)
         )
     }
 
   def addCid(cid: Value.ContractId): this.type =
-    addByteString(cid.toBytes.toByteString, s"${cid.coid} (contractId)")
+    add(cid.toBytes.toByteString, s"${cid.coid} (contractId)")
 }

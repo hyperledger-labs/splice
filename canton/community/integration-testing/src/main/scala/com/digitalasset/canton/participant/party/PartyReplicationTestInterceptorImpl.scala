@@ -1,13 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.party
 
-import com.digitalasset.canton.participant.admin.party.{
-  PartyReplicationStatus,
-  PartyReplicationTestInterceptor,
+import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
+import com.digitalasset.canton.participant.protocol.party.{
+  SourceParticipantStore,
+  TargetParticipantStore,
 }
-import com.digitalasset.canton.participant.protocol.party.SourceParticipantStore
 import com.digitalasset.canton.tracing.TraceContext
 
 class PartyReplicationTestInterceptorImpl extends PartyReplicationTestInterceptor {
@@ -16,8 +16,8 @@ class PartyReplicationTestInterceptorImpl extends PartyReplicationTestIntercepto
       traceContext: TraceContext
   ): PartyReplicationTestInterceptor.ProceedOrWait = PartyReplicationTestInterceptor.Proceed
 
-  override def onTargetParticipantProgress(progress: PartyReplicationStatus.AcsReplicationProgress)(
-      implicit traceContext: TraceContext
+  override def onTargetParticipantProgress(store: TargetParticipantStore)(implicit
+      traceContext: TraceContext
   ): PartyReplicationTestInterceptor.ProceedOrWait = PartyReplicationTestInterceptor.Proceed
 }
 
@@ -39,14 +39,12 @@ object PartyReplicationTestInterceptorImpl {
     * of the target participant store).
     */
   def targetParticipantProceedsIf(
-      canProceed: PartyReplicationStatus.AcsReplicationProgress => Boolean
+      canProceed: TargetParticipantStore => Boolean
   ): PartyReplicationTestInterceptorImpl =
     new PartyReplicationTestInterceptorImpl {
-      override def onTargetParticipantProgress(
-          progress: PartyReplicationStatus.AcsReplicationProgress
-      )(implicit
+      override def onTargetParticipantProgress(store: TargetParticipantStore)(implicit
           traceContext: TraceContext
-      ): PartyReplicationTestInterceptor.ProceedOrWait = proceedIf(canProceed(progress))
+      ): PartyReplicationTestInterceptor.ProceedOrWait = proceedIf(canProceed(store))
     }
 
   private def proceedIf(canProceed: Boolean): PartyReplicationTestInterceptor.ProceedOrWait =

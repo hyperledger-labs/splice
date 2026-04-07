@@ -64,7 +64,7 @@ class ScanVerdictStoreIngestion(
 
   private val mediatorClient =
     new MediatorVerdictsClient(
-      config.synchronizerNodes.current.mediator,
+      config.mediatorAdminClient,
       this,
       grpcClientMetrics,
       context.loggerFactory,
@@ -72,25 +72,17 @@ class ScanVerdictStoreIngestion(
 
   override protected def source(implicit tc: TraceContext): Source[Seq[v30.Verdict], NotUsed] = {
 
-    // Completes when all stores are ready to serve data.
-    def waitForStores(): Future[Unit] =
-      for {
-        _ <- store.waitUntilInitialized
-        _ <- appActivityComputationO match {
-          case Some(appActivityComputation) => appActivityComputation.waitUntilInitialized
-          case None => Future.unit
-        }
-      } yield ()
-
     def mediatorClientSource
         : Source[Seq[v30.Verdict], (KillSwitch, scala.concurrent.Future[Done])] = {
       val base: Source[Seq[v30.Verdict], NotUsed] =
         Source
-          .future(waitForStores().flatMap { _ =>
-            store
-              .maxVerdictRecordTime(migrationId)
-              .map(_.getOrElse(CantonTimestamp.MinValue))
-          })
+          .future(
+            store.waitUntilInitialized.flatMap(_ =>
+              store
+                .maxVerdictRecordTime(migrationId)
+                .map(_.getOrElse(CantonTimestamp.MinValue))
+            )
+          )
           .map { ts =>
             logger.info(s"Streaming verdicts starting from $ts")
             Some(ts)

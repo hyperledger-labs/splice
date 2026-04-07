@@ -556,7 +556,6 @@ object MultiDomainAcsStore extends StoreErrors {
           )
         ),
         filtersForAnyParty = None,
-        verbose = false,
       )
   }
 

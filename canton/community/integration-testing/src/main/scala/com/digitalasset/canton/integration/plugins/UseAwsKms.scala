@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -27,6 +27,7 @@ class UseAwsKms(
     protected val keyId: Option[KmsKeyId] = Some(UseAwsKms.DefaultCantonTestKeyId),
     protected val multiRegion: Boolean = false,
     protected val nodes: Set[String],
+    protected val nodesWithSessionSigningKeysDisabled: Set[String] = Set.empty,
     protected val enableEncryptedPrivateStore: EncryptedPrivateStoreStatus =
       EncryptedPrivateStoreStatus.Enable,
     protected val timeouts: ProcessingTimeout,

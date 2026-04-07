@@ -1,11 +1,17 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security.kms
 
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CryptoProvider, KmsConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{
+  CryptoConfig,
+  CryptoProvider,
+  KmsConfig,
+  NonNegativeFiniteDuration,
+  PrivateKeyStoreConfig,
+}
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
@@ -23,6 +29,9 @@ trait KmsCryptoIntegrationTestBase extends TopologyManagementHelper {
 
   // Defines which nodes will run an external KMS.
   protected lazy val protectedNodes: Set[String] = Set("participant1")
+
+  // Defines which nodes will not use session signing keys.
+  protected lazy val nodesWithSessionSigningKeysDisabled: Set[String] = Set.empty
 
   protected def otherConfigTransforms: Seq[ConfigTransform] = Seq.empty
 
@@ -62,6 +71,16 @@ trait KmsCryptoIntegrationTestBase extends TopologyManagementHelper {
   override lazy val environmentDefinition: EnvironmentDefinition =
     environmentBaseConfig
       .addConfigTransforms(otherConfigTransforms*)
+      .addConfigTransform(
+        ConfigTransforms.setCrypto(
+          CryptoConfig(
+            provider = CryptoProvider.Kms,
+            kms = Some(kmsConfig),
+            privateKeyStore = PrivateKeyStoreConfig(None),
+          ),
+          (name: String) => protectedNodes.contains(name),
+        )
+      )
       .withSetup { implicit env =>
         import env.*
 

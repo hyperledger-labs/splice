@@ -1,10 +1,14 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseProgrammableSequencer}
+import com.digitalasset.canton.integration.plugins.{
+  UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -103,7 +107,7 @@ sealed trait Phase4SendAsyncIntegrationTest
   }
 }
 
-class Phase4SendAsyncBftOrderingIntegrationTestPostgres extends Phase4SendAsyncIntegrationTest {
-  registerPlugin(new UseBftSequencer(loggerFactory))
+class Phase4SendAsyncReferenceIntegrationTestPostgres extends Phase4SendAsyncIntegrationTest {
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

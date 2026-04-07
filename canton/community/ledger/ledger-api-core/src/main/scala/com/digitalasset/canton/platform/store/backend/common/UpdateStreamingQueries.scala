@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.SqlParser.long
-import anorm.~
 import com.digitalasset.canton.platform.Party
 import com.digitalasset.canton.platform.store.backend.PersistentEventType
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
@@ -12,17 +11,11 @@ import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   SqlStringInterpolation,
 }
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
-import com.digitalasset.canton.platform.store.backend.common.UpdateStreamingQueries.{
-  UpdateIdPageQueryBuilder,
-  eventNotDeactivated,
-}
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.{
-  IdFilterPageQuery,
-  IdPage,
-  IdPageBounds,
-  IdPageQuery,
-  PaginationFromTo,
+  IdFilterInput,
+  IdFilterPaginationInput,
   PaginationInput,
+  PaginationLastOnlyInput,
 }
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.daml.lf.data.Ref
@@ -30,6 +23,14 @@ import com.digitalasset.daml.lf.data.Ref.NameTypeConRef
 
 import java.sql.Connection
 
+sealed trait EventIdSource
+object EventIdSource {
+  object ActivateStakeholder extends EventIdSource
+  object ActivateWitnesses extends EventIdSource
+  object DeactivateStakeholder extends EventIdSource
+  object DeactivateWitnesses extends EventIdSource
+  object VariousWitnesses extends EventIdSource
+}
 sealed trait EventPayloadSourceForUpdatesAcsDelta
 object EventPayloadSourceForUpdatesAcsDelta {
   object Activate extends EventPayloadSourceForUpdatesAcsDelta
@@ -47,113 +48,13 @@ class UpdateStreamingQueries(
     queryStrategy: QueryStrategy,
 ) {
 
-  def activateStakeholderIds(
+  def fetchEventIds(target: EventIdSource)(
       witnessO: Option[Party],
       templateIdO: Option[NameTypeConRef],
-  ): UpdateIdPageQueryBuilder =
-    new UpdateIdPageQueryBuilder(
-      eventTypeFilter = idFilter("lapi_events_activate_contract"),
-      idPageQueryBuilder = UpdateStreamingQueries.fetchEventIds(
-        tableName = "lapi_filter_activate_stakeholder",
-        witnessO = witnessO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      ),
-    )
-
-  def activateWitnessesIds(
-      witnessO: Option[Party],
-      templateIdO: Option[NameTypeConRef],
-  ): UpdateIdPageQueryBuilder =
-    new UpdateIdPageQueryBuilder(
-      eventTypeFilter = idFilter("lapi_events_activate_contract"),
-      idPageQueryBuilder = UpdateStreamingQueries.fetchEventIds(
-        tableName = "lapi_filter_activate_witness",
-        witnessO = witnessO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      ),
-    )
-
-  def deactivateStakeholderIds(
-      witnessO: Option[Party],
-      templateIdO: Option[NameTypeConRef],
-  ): UpdateIdPageQueryBuilder =
-    new UpdateIdPageQueryBuilder(
-      eventTypeFilter = idFilter("lapi_events_deactivate_contract"),
-      idPageQueryBuilder = UpdateStreamingQueries.fetchEventIds(
-        tableName = "lapi_filter_deactivate_stakeholder",
-        witnessO = witnessO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      ),
-    )
-
-  def deactivateWitnessesIds(
-      witnessO: Option[Party],
-      templateIdO: Option[NameTypeConRef],
-  ): UpdateIdPageQueryBuilder =
-    new UpdateIdPageQueryBuilder(
-      eventTypeFilter = idFilter("lapi_events_deactivate_contract"),
-      idPageQueryBuilder = UpdateStreamingQueries.fetchEventIds(
-        tableName = "lapi_filter_deactivate_witness",
-        witnessO = witnessO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      ),
-    )
-
-  def variousWitnessIds(
-      witnessO: Option[Party],
-      templateIdO: Option[NameTypeConRef],
-  ): UpdateIdPageQueryBuilder =
-    new UpdateIdPageQueryBuilder(
-      eventTypeFilter = idFilter("lapi_events_various_witnessed"),
-      idPageQueryBuilder = UpdateStreamingQueries.fetchEventIds(
-        tableName = "lapi_filter_various_witness",
-        witnessO = witnessO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      ),
-    )
-
-  def fetchActiveIds(
-      stakeholderO: Option[Ref.Party],
-      templateIdO: Option[NameTypeConRef],
-      activeAtEventSeqId: Long,
-  ): IdFilterPageQuery =
-    UpdateStreamingQueries
-      .fetchEventIds(
-        tableName = "lapi_filter_activate_stakeholder",
-        witnessO = stakeholderO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      )
-      .toFiltered(eventNotDeactivated(activeAtEventSeqId))
-
-  def fetchACHSIds(
-      stakeholderO: Option[Ref.Party],
-      templateIdO: Option[NameTypeConRef],
-      activeAtEventSeqId: Long,
-  ): IdFilterPageQuery =
-    UpdateStreamingQueries
-      .fetchEventIds(
-        tableName = "lapi_filter_achs_stakeholder",
-        witnessO = stakeholderO,
-        templateIdO = templateIdO,
-        stringInterning = stringInterning,
-        hasFirstPerSequentialId = true,
-      )
-      .toFiltered(eventNotDeactivated(activeAtEventSeqId))
-
-  private def idFilter(tableName: String)(eventTypes: Set[PersistentEventType]): CompositeSql =
-    cSQL"""
+      eventTypes: Set[PersistentEventType],
+  )(connection: Connection): IdFilterPaginationInput => Vector[Long] = {
+    def idFilter(tableName: String): Option[CompositeSql] = Option.when(eventTypes.nonEmpty)(
+      cSQL"""
           EXISTS (
             SELECT 1
             FROM #$tableName data_table
@@ -161,6 +62,78 @@ class UpdateStreamingQueries(
               filters.event_sequential_id = data_table.event_sequential_id
               AND data_table.event_type ${queryStrategy.anyOfSmallInts(eventTypes.map(_.asInt))}
           )"""
+    )
+    target match {
+      case EventIdSource.ActivateStakeholder =>
+        UpdateStreamingQueries.fetchEventIds(
+          tableName = "lapi_filter_activate_stakeholder",
+          witnessO = witnessO,
+          templateIdO = templateIdO,
+          idFilter = idFilter("lapi_events_activate_contract"),
+          stringInterning = stringInterning,
+          hasFirstPerSequentialId = true,
+        )(connection)
+      case EventIdSource.ActivateWitnesses =>
+        UpdateStreamingQueries.fetchEventIds(
+          tableName = "lapi_filter_activate_witness",
+          witnessO = witnessO,
+          templateIdO = templateIdO,
+          idFilter = idFilter("lapi_events_activate_contract"),
+          stringInterning = stringInterning,
+          hasFirstPerSequentialId = true,
+        )(connection)
+      case EventIdSource.DeactivateStakeholder =>
+        UpdateStreamingQueries.fetchEventIds(
+          tableName = "lapi_filter_deactivate_stakeholder",
+          witnessO = witnessO,
+          templateIdO = templateIdO,
+          idFilter = idFilter("lapi_events_deactivate_contract"),
+          stringInterning = stringInterning,
+          hasFirstPerSequentialId = true,
+        )(connection)
+      case EventIdSource.DeactivateWitnesses =>
+        UpdateStreamingQueries.fetchEventIds(
+          tableName = "lapi_filter_deactivate_witness",
+          witnessO = witnessO,
+          templateIdO = templateIdO,
+          idFilter = idFilter("lapi_events_deactivate_contract"),
+          stringInterning = stringInterning,
+          hasFirstPerSequentialId = true,
+        )(connection)
+      case EventIdSource.VariousWitnesses =>
+        UpdateStreamingQueries.fetchEventIds(
+          tableName = "lapi_filter_various_witness",
+          witnessO = witnessO,
+          templateIdO = templateIdO,
+          idFilter = idFilter("lapi_events_various_witnessed"),
+          stringInterning = stringInterning,
+          hasFirstPerSequentialId = true,
+        )(connection)
+    }
+  }
+
+  def fetchActiveIds(
+      stakeholderO: Option[Ref.Party],
+      templateIdO: Option[NameTypeConRef],
+      activeAtEventSeqId: Long,
+  )(connection: Connection): IdFilterPaginationInput => Vector[Long] =
+    UpdateStreamingQueries.fetchEventIds(
+      tableName = "lapi_filter_activate_stakeholder",
+      witnessO = stakeholderO,
+      templateIdO = templateIdO,
+      idFilter = Some(
+        cSQL"""
+          NOT EXISTS (
+            SELECT 1
+            FROM lapi_events_deactivate_contract deactivate_evs
+            WHERE
+              filters.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
+              AND deactivate_evs.event_sequential_id <= $activeAtEventSeqId
+          )"""
+      ),
+      stringInterning = stringInterning,
+      hasFirstPerSequentialId = true,
+    )(connection)
 }
 
 object UpdateStreamingQueries {
@@ -173,6 +146,10 @@ object UpdateStreamingQueries {
     *   be fetched
     * @param templateIdO
     *   NOTE: this parameter is not applicable for tree tx stream only oriented filters
+    * @param idFilter
+    *   Inside of the composable SQL the event_sequential_id-s of the candidates need to be referred
+    *   as ''filters.event_sequential_id''. EXISTS and NOT EXISTS expressions suggested to trigger
+    *   pointwise iteration on target indexes.
     * @param stringInterning
     *   the string interning instance to use for internalizing the party and template id
     * @param hasFirstPerSequentialId
@@ -184,27 +161,10 @@ object UpdateStreamingQueries {
       tableName: String,
       witnessO: Option[Ref.Party],
       templateIdO: Option[NameTypeConRef],
+      idFilter: Option[CompositeSql],
       stringInterning: StringInterning,
       hasFirstPerSequentialId: Boolean,
-  ): IdPageQueryBuilder =
-    filterTableClauses(
-      witnessO = witnessO,
-      templateIdO = templateIdO,
-      stringInterning = stringInterning,
-      hasFirstPerSequentialId = hasFirstPerSequentialId,
-    ).map(clauses =>
-      new IdPageQueryImpl(
-        tableName = tableName,
-        filterTableClauses = clauses,
-      )
-    ).getOrElse(new EmptyIdPageQuery)
-
-  private def filterTableClauses(
-      witnessO: Option[Ref.Party],
-      templateIdO: Option[NameTypeConRef],
-      stringInterning: StringInterning,
-      hasFirstPerSequentialId: Boolean,
-  ): Option[FilterTableClauses] = {
+  )(connection: Connection): IdFilterPaginationInput => Vector[Long] = {
     val partyIdFilterO = witnessO match {
       case Some(witness) =>
         stringInterning.party
@@ -240,185 +200,82 @@ object UpdateStreamingQueries {
       case _ => cSQL""
     }
 
-    for {
-      (partyIdFilterClause, partyIdOrderingClause) <- partyIdFilterO
-      (templateIdFilterClause, templateIdOrderingClause) <- templateIdFilterO
-    } yield FilterTableClauses(
-      partyIdFilterClause = partyIdFilterClause,
-      partyIdOrderingClause = partyIdOrderingClause,
-      templateIdFilterClause = templateIdFilterClause,
-      templateIdOrderingClause = templateIdOrderingClause,
-      firstPerSequentialIdClause = firstPerSequentialIdClause,
-    )
-  }
-
-  final case class FilterTableClauses(
-      partyIdFilterClause: CompositeSql,
-      partyIdOrderingClause: CompositeSql,
-      templateIdFilterClause: CompositeSql,
-      templateIdOrderingClause: CompositeSql,
-      firstPerSequentialIdClause: CompositeSql,
-  )
-
-  private def filterTableSelect(
-      tableName: String,
-      filterTableClauses: FilterTableClauses,
-      paginationFromTo: PaginationFromTo,
-      limit: Option[Int],
-      idFilter: Option[CompositeSql],
-  ): CompositeSql = {
-    val idBoundsSQL =
-      if (paginationFromTo.descending)
-        cSQL"${paginationFromTo.toInclusive} <= filters.event_sequential_id AND filters.event_sequential_id < ${paginationFromTo.fromExclusive}"
-      else
-        cSQL"${paginationFromTo.fromExclusive} < filters.event_sequential_id AND filters.event_sequential_id <= ${paginationFromTo.toInclusive}"
-    val idOrderDirectionSQL = if (paginationFromTo.descending) cSQL"DESC" else cSQL"ASC"
-    cSQL"""
+    (partyIdFilterO, templateIdFilterO) match {
+      case (
+            Some((partyIdFilterClause, partyIdOrderingClause)),
+            Some((templateIdFilterClause, templateIdOrderingClause)),
+          ) =>
+        def filterTableSelect(
+            startExclusive: Long,
+            endInclusive: Long,
+            limit: Option[Int],
+            idFilter: Option[CompositeSql],
+        ): CompositeSql =
+          cSQL"""
             SELECT filters.event_sequential_id event_sequential_id
             FROM
               #$tableName filters
             WHERE
-              $idBoundsSQL
-              ${filterTableClauses.partyIdFilterClause}
-              ${filterTableClauses.templateIdFilterClause}
-              ${filterTableClauses.firstPerSequentialIdClause}
+              $startExclusive < filters.event_sequential_id
+              AND filters.event_sequential_id <= $endInclusive
+              $partyIdFilterClause
+              $templateIdFilterClause
+              $firstPerSequentialIdClause
               ${idFilter.map(f => cSQL"AND $f").getOrElse(cSQL"")}
             ORDER BY
-              ${filterTableClauses.partyIdOrderingClause}
-              ${filterTableClauses.templateIdOrderingClause}
-              filters.event_sequential_id $idOrderDirectionSQL -- deliver in index order
+              $partyIdOrderingClause
+              $templateIdOrderingClause
+              filters.event_sequential_id -- deliver in index order
             ${limit.map(l => cSQL"LIMIT $l").getOrElse(cSQL"")}"""
-  }
-
-  class UpdateIdPageQueryBuilder(
-      eventTypeFilter: Set[PersistentEventType] => CompositeSql,
-      idPageQueryBuilder: IdPageQueryBuilder,
-  ) extends IdPageQuery {
-    override def fetchPage(connection: Connection)(input: PaginationInput): IdPage =
-      idPageQueryBuilder.fetchPage(connection)(input)
-
-    def filteredForEventTypes(eventTypes: Set[PersistentEventType]): IdFilterPageQuery =
-      idPageQueryBuilder.toFiltered(eventTypeFilter(eventTypes))
-  }
-
-  trait IdPageQueryBuilder extends IdPageQuery {
-    def toFiltered(idFilter: CompositeSql): IdFilterPageQuery
-  }
-
-  class EmptyIdPageQuery extends IdPageQueryBuilder {
-    override def fetchPage(connection: Connection)(input: PaginationInput): IdPage =
-      IdPage(Vector.empty, lastPage = true)
-
-    override def toFiltered(idFilter: CompositeSql): IdFilterPageQuery = new EmptyIdFilterPageQuery
-  }
-
-  class IdPageQueryImpl(
-      tableName: String,
-      filterTableClauses: FilterTableClauses,
-  ) extends IdPageQueryBuilder {
-    override def fetchPage(connection: Connection)(input: PaginationInput): IdPage = {
-      val sql = filterTableSelect(
-        tableName = tableName,
-        filterTableClauses = filterTableClauses,
-        paginationFromTo = input.fromTo,
-        limit = Some(input.limit + 1),
-        idFilter =
-          None, // disable regardless - this is the case where we reuse the query for a no-ID-filter population case
-      )
-      val ids = SQL"$sql".asVectorOf(long("event_sequential_id"))(connection)
-      val lastPage = ids.sizeIs < input.limit + 1
-      IdPage(
-        ids = if (lastPage) ids else ids.dropRight(1),
-        lastPage = lastPage,
-      )
-    }
-
-    override def toFiltered(idFilter: CompositeSql): IdFilterPageQuery =
-      new IdFilterPageQueryImpl(
-        tableName = tableName,
-        filterTableClauses = filterTableClauses,
-        idFilter = idFilter,
-      )
-  }
-
-  class EmptyIdFilterPageQuery extends IdFilterPageQuery {
-    override def fetchPageBounds(connection: Connection)(
-        input: PaginationInput
-    ): Option[IdPageBounds] = None
-    override def fetchPage(connection: Connection)(fromTo: PaginationFromTo): Vector[Long] =
-      Vector.empty
-  }
-
-  class IdFilterPageQueryImpl(
-      tableName: String,
-      filterTableClauses: FilterTableClauses,
-      idFilter: CompositeSql,
-  ) extends IdFilterPageQuery {
-    override def fetchPageBounds(
-        connection: Connection
-    )(input: PaginationInput): Option[IdPageBounds] = {
-      val filterTableSQL = filterTableSelect(
-        tableName = tableName,
-        filterTableClauses = filterTableClauses,
-        paginationFromTo = input.fromTo,
-        limit = Some(input.limit + 1),
-        idFilter =
-          None, // disable regardless - this is the case where we reuse the query for a ID-filter population: the paginated query
-      )
-      val lastElement = if (input.fromTo.descending) cSQL"min" else cSQL"max"
-      SQL"""
-              WITH unfiltered_ids AS (
-              $filterTableSQL
+        idPaginationInput =>
+          val sql = idPaginationInput match {
+            case PaginationInput(startExclusive, endInclusive, limit) =>
+              filterTableSelect(
+                startExclusive = startExclusive,
+                endInclusive = endInclusive,
+                limit = Some(limit),
+                idFilter =
+                  None, // disable regardless - this is the case where we reuse the query for a no-ID-filter population case
               )
-              SELECT
-                $lastElement(unfiltered_ids.event_sequential_id) last_event_sequential_id,
-                count(*) page_size
-              FROM unfiltered_ids
-              """
-        .asSingle(long("last_event_sequential_id").? ~ long("page_size") map {
-          case lastIdO ~ pageSize =>
-            lastIdO.map { lastId =>
-              val lastPage = pageSize < input.limit + 1
-              IdPageBounds(
-                fromTo =
-                  if (lastPage)
-                    input.fromTo // the whole input range is returned as this is the last page
-                  else
-                    input.fromTo.copy(
-                      toInclusive =
-                        // as the page queried for limit+1, the last ID represents the toExclusive now
-                        if (input.fromTo.descending) lastId + 1
-                        else lastId - 1
-                    ),
-                lastPage = lastPage,
-              )
-            }
-        })(connection)
-    }
 
-    override def fetchPage(connection: Connection)(fromTo: PaginationFromTo): Vector[Long] = {
-      val sql = filterTableSelect(
-        tableName = tableName,
-        filterTableClauses = filterTableClauses,
-        paginationFromTo = fromTo,
-        limit = None,
-        idFilter = Some(idFilter),
-      )
-      SQL"$sql".asVectorOf(long("event_sequential_id"))(connection)
+            case IdFilterInput(_, _) if idFilter.isEmpty =>
+              throw new IllegalStateException(
+                "Using non-id-filter compliant query for ID filtration. In this case the ID filter needs to be defined"
+              )
+
+            case IdFilterInput(startExclusive, endInclusive) =>
+              filterTableSelect(
+                startExclusive = startExclusive,
+                endInclusive = endInclusive,
+                limit = None,
+                idFilter = idFilter,
+              )
+
+            case PaginationLastOnlyInput(_, _, _) if idFilter.isEmpty =>
+              throw new IllegalStateException(
+                "Using non-id-filter compliant query for ID filtration. In this case the ID filter needs to be defined"
+              )
+
+            case PaginationLastOnlyInput(startExclusive, endInclusive, limit) =>
+              val filterTableSQL = filterTableSelect(
+                startExclusive = startExclusive,
+                endInclusive = endInclusive,
+                limit = Some(limit),
+                idFilter =
+                  None, // disable regardless - this is the case where we reuse the query for a ID-filter population: the paginated query
+              )
+              cSQL"""
+                WITH unfiltered_ids AS (
+                $filterTableSQL
+                )
+                SELECT unfiltered_ids.event_sequential_id event_sequential_id
+                FROM unfiltered_ids
+                ORDER BY event_sequential_id DESC
+                LIMIT 1"""
+          }
+          SQL"$sql".asVectorOf(long("event_sequential_id"))(connection)
+
+      case _ => _ => Vector.empty
     }
   }
-
-  /** Checks if an event is not deactivated. It requires that the table with the activations is
-    * called "filters" in the query that will be called.
-    */
-  def eventNotDeactivated(activeAtEventSeqId: Long): CompositeSql =
-    cSQL"""
-      NOT EXISTS (
-        SELECT 1
-        FROM lapi_events_deactivate_contract deactivate_evs
-        WHERE
-          filters.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
-          AND deactivate_evs.event_sequential_id <= $activeAtEventSeqId
-      )
-    """
 }

@@ -10,6 +10,7 @@ import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
+import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -496,6 +497,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
           s"Remove the topology mapping for ${aliceValidatorWalletParty} and stop the validator", {
             aliceValidatorBackend.appState.participantAdminConnection
               .ensurePartyToParticipantRemoved(
+                RetryFor.WaitingOnInitDependency,
                 decentralizedSynchronizerId,
                 aliceValidatorWalletParty,
                 aliceParticipantId,

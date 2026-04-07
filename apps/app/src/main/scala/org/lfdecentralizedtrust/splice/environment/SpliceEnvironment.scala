@@ -4,13 +4,13 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.{TestingConfigInternal}
+import com.digitalasset.canton.config.{CommunityCantonEdition, TestingConfigInternal}
 import com.digitalasset.canton.console.ConsoleOutput
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.ParticipantNodeBootstrapFactoryImpl
-import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrapFactoryImpl
-import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrapFactoryImpl
+import com.digitalasset.canton.participant.CommunityParticipantNodeBootstrapFactory
+import com.digitalasset.canton.synchronizer.mediator.CommunityMediatorNodeBootstrapFactory
+import com.digitalasset.canton.synchronizer.sequencer.CommunitySequencerNodeBootstrapFactory
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.metrics.SpliceMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.ScanAppBootstrap
@@ -28,10 +28,11 @@ class SpliceEnvironment(
     loggerFactory: NamedLoggerFactory,
 ) extends Environment[SpliceConfig](
       config,
+      CommunityCantonEdition,
       testingConfig,
-      ParticipantNodeBootstrapFactoryImpl,
-      SequencerNodeBootstrapFactoryImpl,
-      MediatorNodeBootstrapFactoryImpl,
+      CommunityParticipantNodeBootstrapFactory,
+      CommunitySequencerNodeBootstrapFactory,
+      CommunityMediatorNodeBootstrapFactory,
       loggerFactory,
     ) {
 

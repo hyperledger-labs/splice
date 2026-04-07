@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import cats.syntax.option.*
 import com.digitalasset.canton.admin.time.v30
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -15,7 +16,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
   *   latency for an event to be delivered (storage, transmission, processing). If the current host
   *   time exceeds the next expected timestamp by this observation latency then we will request a
   *   time proof (unless we have received a recent event within the patience duration described
-  *   below). This parameter will be ignored, if the underlying node uses a SimClock.
+  *   below).
   * @param patienceDuration
   *   We will only request a time proof if this given duration has elapsed since we last received an
   *   event (measured using the host clock). This prevents requesting timestamps when we are
@@ -38,7 +39,8 @@ final case class SynchronizerTimeTrackerConfig(
     minObservationDuration: NonNegativeFiniteDuration =
       SynchronizerTimeTrackerConfig.defaultMinObservationDuration,
     timeRequest: TimeProofRequestConfig = TimeProofRequestConfig(),
-) extends PrettyPrinting {
+) extends PrettyPrinting
+    with UniformCantonConfigValidation {
   def toProtoV30: v30.SynchronizerTimeTrackerConfig = v30.SynchronizerTimeTrackerConfig(
     observationLatency.toProtoPrimitive.some,
     patienceDuration.toProtoPrimitive.some,
@@ -68,6 +70,10 @@ final case class SynchronizerTimeTrackerConfig(
 }
 
 object SynchronizerTimeTrackerConfig {
+
+  implicit val synchronizerTimeTrackerConfigCantonConfigValidator
+      : CantonConfigValidator[SynchronizerTimeTrackerConfig] =
+    CantonConfigValidatorDerivation[SynchronizerTimeTrackerConfig]
 
   private val defaultObservationLatency: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMillis(250)

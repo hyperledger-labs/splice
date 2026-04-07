@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
@@ -16,7 +17,6 @@ import com.digitalasset.canton.synchronizer.block.{
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.DatabaseSequencerConfig.TestingInterceptor
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
-import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.synchronizer.sequencer.{
   AuthenticationServices,
@@ -34,7 +34,7 @@ import org.apache.pekko.stream.Materializer
 import pureconfig.ConfigCursor
 
 import java.util.ServiceLoader
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 import BlockSequencerFactory.OrderingTimeFixMode
@@ -43,7 +43,6 @@ class DriverBlockSequencerFactory[C](
     sequencerDriverFactory: SequencerDriverFactory { type ConfigType = C },
     config: C,
     blockSequencerConfig: BlockSequencerConfig,
-    producePostOrderingTopologyTicks: Boolean,
     health: Option[SequencerHealthConfig],
     storage: Storage,
     protocolVersion: ProtocolVersion,
@@ -52,7 +51,7 @@ class DriverBlockSequencerFactory[C](
     metrics: SequencerMetrics,
     override val loggerFactory: NamedLoggerFactory,
     testingInterceptor: Option[TestingInterceptor],
-)(implicit ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContext)
     extends BlockSequencerFactory(
       health: Option[SequencerHealthConfig],
       blockSequencerConfig,
@@ -77,11 +76,7 @@ class DriverBlockSequencerFactory[C](
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
       synchronizerLoggerFactory: NamedLoggerFactory,
-  )(implicit
-      ec: ExecutionContextExecutor,
-      materializer: Materializer,
-      tracer: Tracer,
-  ): BlockOrderer =
+  )(implicit ec: ExecutionContext, materializer: Materializer, tracer: Tracer): BlockOrderer =
     new DriverBlockOrderer(
       sequencerDriverFactory.create(
         config,
@@ -108,8 +103,8 @@ class DriverBlockSequencerFactory[C](
       clock: Clock,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       synchronizerLoggerFactory: NamedLoggerFactory,
-      lsuSequencingBounds: Option[LsuSequencingBounds],
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
@@ -125,7 +120,6 @@ class DriverBlockSequencerFactory[C](
       store,
       sequencerStore,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       balanceStore,
       storage,
       futureSupervisor,
@@ -133,12 +127,11 @@ class DriverBlockSequencerFactory[C](
       clock,
       rateLimitManager,
       orderingTimeFixMode,
-      lsuSequencingBounds,
+      sequencingTimeLowerBoundExclusive,
       nodeParameters.processingTimeouts,
       nodeParameters.loggingConfig.eventDetails,
       nodeParameters.loggingConfig.api.printer,
       metrics,
-      nodeParameters.batchingConfig,
       synchronizerLoggerFactory,
       exitOnFatalFailures = nodeParameters.exitOnFatalFailures,
       runtimeReady = runtimeReady,
@@ -152,7 +145,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverVersion: Int,
       rawConfig: ConfigCursor,
       blockSequencerConfig: BlockSequencerConfig,
-      producePostOrderingTopologyTicks: Boolean,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -161,7 +153,7 @@ object DriverBlockSequencerFactory extends LazyLogging {
       metrics: SequencerMetrics,
       loggerFactory: NamedLoggerFactory,
       testingInterceptor: Option[TestingInterceptor],
-  )(implicit ec: ExecutionContextExecutor): DriverBlockSequencerFactory[C] = {
+  )(implicit ec: ExecutionContext): DriverBlockSequencerFactory[C] = {
     val driverFactory: SequencerDriverFactory { type ConfigType = C } = getSequencerDriverFactory(
       driverName,
       driverVersion,
@@ -177,7 +169,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverFactory,
       config,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       health,
       storage,
       protocolVersion,
@@ -195,7 +186,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverVersion: Int,
       config: C,
       blockSequencerConfig: BlockSequencerConfig,
-      producePostOrderingTopologyTicks: Boolean,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -203,12 +193,11 @@ object DriverBlockSequencerFactory extends LazyLogging {
       nodeParameters: SequencerNodeParameters,
       metrics: SequencerMetrics,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContextExecutor): DriverBlockSequencerFactory[C] =
+  )(implicit ec: ExecutionContext): DriverBlockSequencerFactory[C] =
     new DriverBlockSequencerFactory[C](
       getSequencerDriverFactory(driverName, driverVersion),
       config,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       health,
       storage,
       protocolVersion,

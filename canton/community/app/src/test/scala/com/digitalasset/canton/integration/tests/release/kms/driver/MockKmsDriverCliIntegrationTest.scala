@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release.kms.driver
@@ -25,7 +25,7 @@ class MockKmsDriverCliIntegrationTest extends KmsCliIntegrationTest {
     Seq("EXTRA_CLASSPATH" -> driverJar)
 
   override protected def bootstrapScript: String =
-    "community/app/src/test/resources/scripts/mock_kms_participant1.canton"
+    "enterprise/app/src/test/resources/scripts/mock_kms_participant1.canton"
 
   override lazy val testName: String = s"mock-kms-$packageName"
 }

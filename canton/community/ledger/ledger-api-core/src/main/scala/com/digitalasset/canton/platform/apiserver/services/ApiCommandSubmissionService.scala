@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -12,6 +12,7 @@ import com.daml.ledger.api.v2.command_submission_service.{
 }
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.metrics.Timed
+import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.Telemetry
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
@@ -95,7 +96,6 @@ final class ApiCommandSubmissionService(
               synchronizerId,
               packageIdSelectionPreference,
               prefetchKeys,
-              tapsMaxPasses,
             ) =>
           tracker.registerCommand(
             commandId,
@@ -183,6 +183,7 @@ final class ApiCommandSubmissionService(
                     )
                 },
               )
+              .toScalaUnwrapped
               .transform(handleSubmissionResult)
               .thereafter(logger.logErrorsOnCall[SubmitReassignmentResponse])
           ),

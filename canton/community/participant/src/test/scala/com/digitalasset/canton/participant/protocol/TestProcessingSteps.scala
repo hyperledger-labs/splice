@@ -1,9 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.syntax.bifunctor.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.DecryptionError.FailedToDecrypt
@@ -18,11 +18,16 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewPosition.MerkleSeqIndex
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
+import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
-import com.digitalasset.canton.participant.protocol.ProcessingSteps.*
+import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
+  ParsedRequest,
+  PendingRequestData,
+  RequestType,
+  WrapsProcessorError,
+}
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.NoMediatorError
 import com.digitalasset.canton.participant.protocol.TestProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -31,7 +36,6 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
 }
 import com.digitalasset.canton.participant.store.ReassignmentLookup
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
 import com.digitalasset.canton.protocol.{
@@ -56,7 +60,7 @@ import com.digitalasset.canton.{BaseTest, LfPartyId, RequestCounter, SequencerCo
 import com.google.protobuf.ByteString
 
 import scala.collection.concurrent
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class TestProcessingSteps(
     pendingSubmissionMap: concurrent.Map[Int, Unit],
@@ -122,29 +126,18 @@ class TestProcessingSteps(
       mediator: MediatorGroupRecipient,
       ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      generateMaxSequencingTime: CantonTimestamp => CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[
-    FutureUnlessShutdown,
-    TestProcessingError,
-    (Submission, PendingSubmissionData),
-  ] = {
+  ): EitherT[FutureUnlessShutdown, TestProcessingError, (Submission, PendingSubmissionData)] = {
     pendingSubmissionMap.put(submissionParam, ())
 
     val envelope: ProtocolMessage = mock[ProtocolMessage]
     val recipient: Member = ParticipantId("participant1")
-
-    val now = wallClock.now
-    generateMaxSequencingTime(now)
-
     val submission = new UntrackedSubmission {
       override def batch: Batch[DefaultOpenEnvelope] =
         Batch.of(testedProtocolVersion, (envelope, Recipients.cc(recipient)))
       override def pendingSubmissionId: Int = submissionParam
-
-      override val approximateTimestampForSigning: CantonTimestamp = now
-      override val maxSequencingTime: CantonTimestamp = generateMaxSequencingTime(now)
+      override def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp] = OptionT.none
 
       override def embedSubmissionError(
           err: ProtocolProcessor.SubmissionProcessingError
@@ -172,7 +165,7 @@ class TestProcessingSteps(
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TestProcessingError, DecryptedViews[DecryptedView]] = {
+  ): EitherT[FutureUnlessShutdown, TestProcessingError, DecryptedViews] = {
     def treeFor(viewHash: ViewHash, hash: Hash): TestViewTree = {
       val rootHash = RootHash(hash)
       val informees = informeesOfView(viewHash)
@@ -261,7 +254,6 @@ class TestProcessingSteps(
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
-      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -278,7 +270,6 @@ class TestProcessingSteps(
           locallyRejectedF = FutureUnlessShutdown.pure(false),
           abortEngine = _ => (),
           engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
-          publishUpdate,
         )
       ),
       EitherT.pure[FutureUnlessShutdown, RequestError](None),
@@ -304,14 +295,12 @@ class TestProcessingSteps(
       rootHash: RootHash,
       freshOwnTimelyTx: Boolean,
       error: TransactionError,
-  )(implicit
-      traceContext: TraceContext
-  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId]) =
+  )(implicit traceContext: TraceContext): (Option[SequencedUpdate], Option[PendingSubmissionId]) =
     (None, None)
 
   override def createRejectionEvent(rejectionArgs: Unit)(implicit
       traceContext: TraceContext
-  ): Either[TestProcessingError, Option[SequencedEventUpdate]] =
+  ): Either[TestProcessingError, Option[SequencedUpdate]] =
     Right(None)
 
   override def getCommitSetAndContractsToBeStoredAndEventFactory(
@@ -335,6 +324,13 @@ class TestProcessingSteps(
   override def postProcessResult(verdict: Verdict, pendingSubmissionO: Some[Unit])(implicit
       traceContext: TraceContext
   ): Unit = ()
+
+  override def authenticateInputContracts(
+      parsedRequest: ParsedRequestType
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, TestProcessingError, Unit] =
+    EitherT.rightT(())
 
   override def handleTimeout(parsedRequest: TestParsedRequest)(implicit
       traceContext: TraceContext
@@ -391,16 +387,13 @@ object TestProcessingSteps {
       override val locallyRejectedF: FutureUnlessShutdown[Boolean],
       override val abortEngine: String => Unit,
       override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
-      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   ) extends PendingRequestData {
 
     override def rootHashO: Option[RootHash] = None
 
-    override def cancelDecisionTimeTickRequest(): Unit = ()
+    override def isCleanReplay: Boolean = false
 
-    override def publishUpdateO
-        : Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]] =
-      Some(publishUpdate)
+    override def cancelDecisionTimeTickRequest(): Unit = ()
   }
 
   case object TestPendingRequestDataType extends RequestType {

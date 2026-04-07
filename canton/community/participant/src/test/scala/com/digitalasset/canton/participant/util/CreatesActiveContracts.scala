@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.util
@@ -8,14 +8,13 @@ import com.digitalasset.canton.crypto.TestSalt
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.cycle as M
-import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.participant.admin.data.{ActiveContractOld, RepairContract}
 import com.digitalasset.canton.platform.apiserver.FatContractInstanceHelper
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.{DefaultTestIdentities, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.TestContractHasher
 import com.digitalasset.canton.{BaseTest, NeedsNewLfContractIds, ReassignmentCounter}
 import com.digitalasset.daml.lf
-import com.google.protobuf.ByteString
 
 /** Helper that allows unit tests to create active contracts for testing.
   */
@@ -25,7 +24,7 @@ private[participant] trait CreatesActiveContracts {
   protected def psid: PhysicalSynchronizerId
   protected def testSymbolicCrypto: SymbolicPureCrypto
 
-  protected def createActiveContract(): ActiveContract = {
+  protected def createActiveContract(): ledger.api.v2.state_service.ActiveContract = {
 
     // 1. Create the prerequisites for coming up with an authenticated LAPI active contract.
     val cidUnauthenticated = newLfContractId()
@@ -70,7 +69,7 @@ private[participant] trait CreatesActiveContracts {
     )("serialize contract instance")
 
     // 2. Create LAPI active contract
-    val lapiActiveContract = ledger.api.v2.state_service.ActiveContract(
+    ledger.api.v2.state_service.ActiveContract(
       createdEvent = Some(
         ledger.api.v2.event.CreatedEvent(
           offset = 0L,
@@ -78,7 +77,6 @@ private[participant] trait CreatesActiveContracts {
           contractId = contractId.coid,
           templateId = Some(ledger.api.v2.value.Identifier(M.Cycle.PACKAGE_ID, "Cycle", "Cycle")),
           contractKey = None,
-          contractKeyHash = ByteString.EMPTY,
           createArguments = None,
           createdEventBlob = serialization,
           interfaceViews = Seq.empty,
@@ -94,7 +92,26 @@ private[participant] trait CreatesActiveContracts {
       synchronizerId = psid.logical.toProtoPrimitive,
       reassignmentCounter = ReassignmentCounter.Genesis.unwrap,
     )
-
-    ActiveContract.create(lapiActiveContract)(testedProtocolVersion)
   }
+
+  // TODO(#24326): Remove once OnPR is based on LAPI active contracts
+  protected def createActiveContractOld(): ActiveContractOld = {
+    val lapiContract: ledger.api.v2.state_service.ActiveContract = createActiveContract()
+
+    // Convert LAPI active contract to ActiveContractOld.
+    val repairContract = valueOrFail(RepairContract.toRepairContract(lapiContract))(
+      "convert to lapi to repair contract"
+    )
+    val serializableContract =
+      valueOrFail(SerializableContract.fromLfFatContractInst(repairContract.contract))(
+        "convert repair contract to serializable contract"
+      )
+    ActiveContractOld
+      .create(
+        synchronizerId = psid.logical,
+        contract = serializableContract,
+        reassignmentCounter = repairContract.reassignmentCounter,
+      )(testedProtocolVersion)
+  }
+
 }

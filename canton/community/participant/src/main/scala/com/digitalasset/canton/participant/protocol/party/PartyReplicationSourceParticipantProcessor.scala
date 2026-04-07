@@ -1,35 +1,29 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
-import com.digitalasset.canton.RepairCounter
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.participant.state.InternalIndexService
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.EphemeralSequencerChannelProgress
-import com.digitalasset.canton.participant.admin.party.{
-  LapiAcsHelper,
-  PartyReplicationTestInterceptor,
-}
-import com.digitalasset.canton.participant.store.AcsReplicationProgress
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld
+import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
+import com.digitalasset.canton.participant.store.AcsInspection
+import com.digitalasset.canton.participant.store.AcsInspectionError.SerializationIssue
+import com.digitalasset.canton.participant.util.TimeOfChange
+import com.digitalasset.canton.protocol.SerializableContract
 import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.google.protobuf.ByteString
-import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.ExecutionContext
 
@@ -48,10 +42,18 @@ import scala.concurrent.ExecutionContext
   *
   * @param psid
   *   The synchronizer id of the synchronizer to replicate active contracts within.
-  * @param createLedgerApiAcsSource
-  *   Creates the ledger Api ACS pekko source.
-  * @param replicationProgressState
-  *   Interface for processor to read and update ACS replication progress.
+  * @param partyId
+  *   The party id of the party to replicate active contracts for.
+  * @param activeAfter
+  *   The timestamp immediately after which the ACS snapshot is based, i.e. the time immediately
+  *   after which the contract to be sent are active.
+  * @param otherPartiesHostedByTargetParticipant
+  *   The set of parties already hosted by the target participant (TP) other than the party being
+  *   replicated. Used to skip over shared contracts already hosted on TP.
+  * @param acsInspection
+  *   Interface to inspect the ACS.
+  * @param onAcsFullyReplicated
+  *   Callback notification that the source participant has sent the entire ACS.
   * @param onError
   *   Callback notification that the source participant has encountered an error.
   * @param onDisconnect
@@ -60,10 +62,14 @@ import scala.concurrent.ExecutionContext
   *   Test interceptor only alters behavior in integration tests.
   */
 final class PartyReplicationSourceParticipantProcessor private (
-    requestId: Hash,
     val psid: PhysicalSynchronizerId,
-    createLedgerApiAcsSource: TraceContext => Source[ActiveContract, NotUsed],
-    protected val replicationProgressState: AcsReplicationProgress,
+    partyId: PartyId,
+    activeAfter: CantonTimestamp,
+    // TODO(#23097): Revisit mechanism to consider "other parties" once we support support multiple concurrent OnPRs
+    //  as the set of other parties would change dynamically.
+    otherPartiesHostedByTargetParticipant: Set[LfPartyId],
+    acsInspection: AcsInspection, // TODO(#24326): Stream the ACS via the Ledger Api instead.
+    protected val onAcsFullyReplicated: TraceContext => Unit,
     protected val onError: String => Unit,
     protected val onDisconnect: (String, TraceContext) => Unit,
     protected val futureSupervisor: FutureSupervisor,
@@ -71,10 +77,9 @@ final class PartyReplicationSourceParticipantProcessor private (
     protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
     protected val testOnlyInterceptor: PartyReplicationTestInterceptor,
-)(implicit override val executionContext: ExecutionContext, actorSystem: ActorSystem)
+)(implicit override val executionContext: ExecutionContext)
     extends PartyReplicationProcessor {
-  protected val processorStore: SourceParticipantStore =
-    InMemoryProcessorStore.sourceParticipant(loggerFactory, timeouts)
+  protected val processorStore: SourceParticipantStore = InMemoryProcessorStore.sourceParticipant()
 
   // TODO(#22251): Make this configurable.
   private val contractsPerBatch = PositiveInt.two
@@ -88,7 +93,7 @@ final class PartyReplicationSourceParticipantProcessor private (
   override def onConnected()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] = execute("handle connect to TP") {
-    super.onConnected().map(_ => processorStore.resetConnection())
+    super.onConnected().map(_ => processorStore.clearInitialContractOrdinalInclusive())
   }
 
   /** Handle instructions from the target participant
@@ -145,16 +150,16 @@ final class PartyReplicationSourceParticipantProcessor private (
     logger.info(
       s"Source participant has received instruction initialize starting with contract $initialContractOrdinalInclusive"
     )
-    EitherT.fromEither[FutureUnlessShutdown](
-      processorStore.initializeSourceParticipantState(
-        initialContractOrdinalInclusive,
-        new PartyReplicationAcsReader(
-          createLedgerApiAcsSource,
-          _,
-          _,
-          timeouts,
-        ),
-      )
+    val previousO = processorStore.getAndSetInitialContractOrdinalInclusive(
+      initialContractOrdinalInclusive
+    )
+    // Reset the contract count and ordinal to clear what might have been requested in a previous connection.
+    processorStore.setContractOrdinalToSendUpToExclusive(initialContractOrdinalInclusive)
+    processorStore.resetContractsCount(initialContractOrdinalInclusive)
+    EitherT.cond[FutureUnlessShutdown](
+      previousO.isEmpty,
+      (),
+      s"Source participant has already been initialized with contract ordinal $previousO, asked to initialize again with $initialContractOrdinalInclusive",
     )
   }
 
@@ -189,54 +194,74 @@ final class PartyReplicationSourceParticipantProcessor private (
       logger.debug(
         s"Source participant looking up contract ordinals [${fromInclusive.unwrap},${toInclusive.unwrap}]"
       )
-
-      val maxNumActiveContractsToProcess =
-        PositiveInt.tryCreate(
-          processorStore.contractOrdinalToSendUpToExclusive.unwrap - fromInclusive.unwrap
-        )
-
       for {
-        acsReader <- EitherT.fromEither[FutureUnlessShutdown](
-          processorStore.acsReaderO.toRight("ACS reader not initialized")
+        contracts <- readContracts(fromInclusive, toInclusive)
+        numContractsSending = contracts.flatten.size
+        _ <- sendContracts(contracts, fromInclusive, numContractsSending)
+        numSentInTotal = processorStore.increaseSentContractsCount(
+          NonNegativeInt.tryCreate(numContractsSending)
         )
-
-        (haveReachedEndOfAcs, contracts) = acsReader.readContracts(maxNumActiveContractsToProcess)
-        numContractsSending = contracts.size
-
-        _ <- EitherTUtil.ifThenET(numContractsSending > 0) {
-          val contractBatches = contracts
-            .grouped(contractsPerBatch.unwrap)
-            .toSeq
-            .map(NonEmptyUtil.fromUnsafe)
-          sendContracts(contractBatches, fromInclusive, numContractsSending).map(_ =>
-            processorStore
-              .increaseSentContractsCount(NonNegativeInt.tryCreate(numContractsSending))
-              .discard
+        // If there aren't enough contracts, send that we have reached the end of the ACS.
+        _ <- EitherTUtil.ifThenET(numSentInTotal < toInclusive) {
+          sendEndOfAcs(s"End of ACS after $numSentInTotal contracts").map(_ =>
+            // Let the PartyReplicator know the SP is done, but let the TP, the channel owner, close the channel.
+            onAcsFullyReplicated(traceContext)
           )
         }
-
-        sentContractCount = processorStore.sentContractsCount
-
-        // If there aren't enough contracts, send that we have reached the end of the ACS.
-        _ <- EitherTUtil.ifThenET(haveReachedEndOfAcs)(
-          sendEndOfAcs(s"End of ACS after $sentContractCount contracts")
-        )
-
-        _ <- replicationProgressState.updateAcsReplicationProgress(
-          requestId,
-          EphemeralSequencerChannelProgress(
-            sentContractCount,
-            RepairCounter.Genesis, // write-persistence not used by SP
-            // Let the PartyReplicator know the SP is done, but let the TP, the channel owner, close the channel.
-            fullyProcessedAcs = haveReachedEndOfAcs,
-            this,
-          ),
-        )
       } yield ()
     }
 
+  /** Reads contract batches from the ACS in a brute-force fashion via AcsInspection until
+    * TODO(#24326) reads the ACS via the Ledger API.
+    */
+  private def readContracts(fromInclusive: NonNegativeInt, toInclusive: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Seq[NonEmpty[Seq[ActiveContractOld]]]] = {
+    val contracts = List.newBuilder[ActiveContractOld]
+    synchronizeWithClosing(s"Read ACS from ${fromInclusive.unwrap} to $toInclusive")(
+      acsInspection
+        .forEachVisibleActiveContract(
+          psid.logical,
+          Set(partyId.toLf),
+          Some(TimeOfChange(activeAfter.immediateSuccessor)),
+        ) { case (contractInst, reassignmentCounter) =>
+          SerializableContract
+            .fromLfFatContractInst(contractInst.inst)
+            .bimap(
+              err => SerializationIssue(psid.logical, contractInst.contractId, err),
+              contract => {
+                val stakeholdersHostedByTargetParticipant =
+                  contract.metadata.stakeholders.intersect(otherPartiesHostedByTargetParticipant)
+                if (stakeholdersHostedByTargetParticipant.isEmpty) {
+                  contracts += ActiveContractOld
+                    .create(psid.logical, contract, reassignmentCounter)(
+                      protocolVersion
+                    )
+                } else {
+                  // Skip contracts already hosted by the target participant.
+                  logger.debug(
+                    s"Skipping contract ${contract.contractId} as it is already hosted by ${stakeholdersHostedByTargetParticipant
+                        .mkString(", ")} on the target participant between contract ordinals $fromInclusive and $toInclusive}"
+                  )
+                }
+              },
+            )
+        }(traceContext, executionContext)
+        .bimap(
+          _.toString,
+          _ =>
+            contracts
+              .result()
+              .slice(fromInclusive.unwrap, toInclusive.unwrap + 1)
+              .grouped(contractsPerBatch.unwrap)
+              .toSeq
+              .map(NonEmpty.from(_).getOrElse(throw new IllegalStateException("Grouping failed"))),
+        )
+    )
+  }
+
   private def sendContracts(
-      contractBatches: Seq[NonEmpty[Seq[ActiveContract]]],
+      contractBatches: Seq[NonEmpty[Seq[ActiveContractOld]]],
       firstContractOrdinal: NonNegativeInt,
       numContractsSending: Int,
   )(implicit
@@ -282,11 +307,6 @@ final class PartyReplicationSourceParticipantProcessor private (
   }
 
   override protected def hasEndOfACSBeenReached: Boolean = processorStore.hasEndOfACSBeenReached
-
-  override def onClosed(): Unit = {
-    processorStore.resetConnection()
-    super.onClosed()
-  }
 }
 
 object PartyReplicationSourceParticipantProcessor {
@@ -294,12 +314,10 @@ object PartyReplicationSourceParticipantProcessor {
       psid: PhysicalSynchronizerId,
       partyId: PartyId,
       requestId: Hash,
-      effectiveAtLapiOffset: Offset,
-      // TODO(#23097): Revisit mechanism to consider "other parties" once we support support multiple concurrent OnPRs
-      //  as the set of other parties would change dynamically.
-      partiesHostedByTargetParticipant: Set[PartyId],
-      lapiIndexService: InternalIndexService,
-      replicationProgressState: AcsReplicationProgress,
+      activeAt: CantonTimestamp,
+      partiesHostedByTargetParticipant: Set[LfPartyId],
+      acsInspection: AcsInspection,
+      onAcsFullyReplicated: TraceContext => Unit,
       onError: String => Unit,
       onDisconnect: (String, TraceContext) => Unit,
       futureSupervisor: FutureSupervisor,
@@ -308,21 +326,14 @@ object PartyReplicationSourceParticipantProcessor {
       loggerFactory: NamedLoggerFactory,
       testInterceptor: PartyReplicationTestInterceptor =
         PartyReplicationTestInterceptor.AlwaysProceed,
-  )(implicit
-      executionContext: ExecutionContext,
-      actorSystem: ActorSystem,
-  ): PartyReplicationSourceParticipantProcessor =
+  )(implicit executionContext: ExecutionContext): PartyReplicationSourceParticipantProcessor =
     new PartyReplicationSourceParticipantProcessor(
-      requestId,
       psid,
-      createLedgerApiAcsSource = LapiAcsHelper.ledgerApiAcsSource(
-        lapiIndexService,
-        Set(partyId),
-        effectiveAtLapiOffset,
-        partiesHostedByTargetParticipant,
-        Some(psid.logical),
-      )(_),
-      replicationProgressState,
+      partyId,
+      activeAt,
+      partiesHostedByTargetParticipant,
+      acsInspection,
+      onAcsFullyReplicated,
       onError,
       onDisconnect,
       futureSupervisor,

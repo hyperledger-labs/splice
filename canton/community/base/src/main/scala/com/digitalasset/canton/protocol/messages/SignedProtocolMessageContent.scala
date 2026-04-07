@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -21,7 +21,7 @@ trait SignedProtocolMessageContent
     * [[com.digitalasset.canton.protocol.v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage]]
     * constructor.
     */
-  protected[messages] def toProtoTypedSomeSignedProtocolMessageV30
+  protected[messages] def toProtoTypedSomeSignedProtocolMessage
       : v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage
 
   /** The timestamp of the [[com.digitalasset.canton.crypto.SyncCryptoApi]] used for signing this

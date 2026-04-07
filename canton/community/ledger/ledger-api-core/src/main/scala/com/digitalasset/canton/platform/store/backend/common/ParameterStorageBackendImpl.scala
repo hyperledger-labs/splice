@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -9,13 +9,13 @@ import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
-import com.digitalasset.canton.ledger.participant.state.{RepairIndex, SynchronizerIndex}
+import com.digitalasset.canton.ledger.participant.state.{
+  RepairIndex,
+  SequencerIndex,
+  SynchronizerIndex,
+}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.platform.store.backend.Conversions.offset
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
-  AchsLastPointers,
-  AchsState,
-}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.{Conversions, ParameterStorageBackend}
 import com.digitalasset.canton.platform.store.interning.StringInterning
@@ -74,7 +74,7 @@ private[backend] class ParameterStorageBackendImpl(
             synchronizerId
           ),
           "sequencerTimestampMicros" -> synchronizerIndex.sequencerIndex.map(
-            _.toMicros
+            _.sequencerTimestamp.toMicros
           ),
           "repairTimestampMicros" -> synchronizerIndex.repairIndex.map(_.timestamp.toMicros),
           "repairCounter" -> synchronizerIndex.repairIndex.map(_.counter.unwrap),
@@ -249,17 +249,13 @@ private[backend] class ParameterStorageBackendImpl(
   override def cleanSynchronizerIndex(synchronizerId: SynchronizerId)(
       connection: Connection
   ): Option[SynchronizerIndex] =
-    stringInterning.synchronizerId
-      .tryInternalize(synchronizerId)
-      .orElse(
-        // allow fallback to stringInterning persistence here to allow broader usage with tricky state inspection integration tests
-        SQL"""
-          SELECT internal_id
-          FROM lapi_string_interning
-          WHERE external_string = ${"d|" + synchronizerId.toProtoPrimitive}
-          """
-          .asSingleOpt(int("internal_id"))(connection)
-      )
+    // not using stringInterning here to allow broader usage with tricky state inspection integration tests
+    SQL"""
+      SELECT internal_id
+      FROM lapi_string_interning
+      WHERE external_string = ${"d|" + synchronizerId.toProtoPrimitive}
+      """
+      .asSingleOpt(int("internal_id"))(connection)
       .flatMap(internedSynchronizerId =>
         SQL"""
             SELECT
@@ -282,7 +278,7 @@ private[backend] class ParameterStorageBackendImpl(
               val repairIndex = (repairTimestampO, repairCounterO) match {
                 case (Some(repairTimestamp), Some(repairCounter)) =>
                   List(
-                    SynchronizerIndex.forRepairUpdate(
+                    SynchronizerIndex.of(
                       RepairIndex(
                         timestamp = CantonTimestamp.ofEpochMicro(repairTimestamp),
                         counter = RepairCounter(repairCounter),
@@ -300,9 +296,10 @@ private[backend] class ParameterStorageBackendImpl(
               }
               val sequencerIndex = sequencerTimestampO
                 .map(CantonTimestamp.ofEpochMicro)
-                .map(SynchronizerIndex.forSequencedUpdate)
+                .map(SequencerIndex.apply)
+                .map(SynchronizerIndex.of)
                 .toList
-              val recordTimeSynchronizerIndex = SynchronizerIndex.forFloatingUpdate(
+              val recordTimeSynchronizerIndex = SynchronizerIndex.of(
                 CantonTimestamp.ofEpochMicro(recordTime)
               )
               (recordTimeSynchronizerIndex :: repairIndex ::: sequencerIndex)
@@ -335,63 +332,6 @@ private[backend] class ParameterStorageBackendImpl(
         offset("post_processing_end").?
       )(connection)
       .flatten
-
-  def fetchACHSState(connection: Connection): Option[AchsState] =
-    SQL"select valid_at, last_removed, last_populated from lapi_achs_state"
-      .asSingleOpt(
-        for {
-          validAt <- long("valid_at")
-          lastRemoved <- long("last_removed")
-          lastPopulated <- long("last_populated")
-        } yield AchsState(
-          validAt = validAt,
-          lastPointers = AchsLastPointers(
-            lastRemoved = lastRemoved,
-            lastPopulated = lastPopulated,
-          ),
-        )
-      )(connection)
-
-  def insertACHSState(achsState: AchsState)(
-      connection: Connection
-  ): Unit =
-    discard(
-      SQL"""
-          insert into lapi_achs_state (valid_at, last_removed, last_populated)
-          values (
-              ${achsState.validAt},
-              ${achsState.lastPointers.lastRemoved},
-              ${achsState.lastPointers.lastPopulated}
-          )
-          """.execute()(connection)
-    )
-
-  def updateACHSValidAt(validAt: Long)(
-      connection: Connection
-  ): Unit = {
-    val updatedRows =
-      SQL"update lapi_achs_state set valid_at = $validAt".executeUpdate()(connection)
-
-    if (updatedRows == 0) {
-      throw new IllegalStateException("Failed to update valid_at in lapi_achs_state table.")
-    }
-  }
-
-  def updateACHSLastPointers(pointers: AchsLastPointers)(
-      connection: Connection
-  ): Unit = {
-    val updatedRows =
-      SQL"update lapi_achs_state set last_removed = ${pointers.lastRemoved}, last_populated = ${pointers.lastPopulated}"
-        .executeUpdate()(connection)
-
-    if (updatedRows == 0) {
-      throw new IllegalStateException("Failed to update lapi_achs_state table.")
-    }
-  }
-  def clearACHSState(connection: Connection): Unit =
-    discard(
-      SQL"delete from lapi_achs_state".execute()(connection)
-    )
 
   private def batchSql(
       sqlWithNamedParams: String,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -80,15 +80,6 @@ class BackgroundRunnerHandler[ProcessInfo](
     external.put(instanceName, if (!manualStart) configured.start() else configured).discard
   }
 
-  def addEnvironmentIfNotStarted(instanceName: String, addEnvironment: Map[String, String]): Unit =
-    external
-      .updateWith(instanceName) {
-        case Some(configured: Configured) =>
-          Some(configured.copy(addEnvironment = configured.addEnvironment ++ addEnvironment))
-        case other => other
-      }
-      .discard
-
   /** Stop and remove a background process. Idempotent as it doesn't require that the background
     * process was previously added.
     */
@@ -107,12 +98,6 @@ class BackgroundRunnerHandler[ProcessInfo](
       case None =>
         ErrorUtil.internalError(new IllegalStateException(s"$instanceName is not registered"))
     }
-
-  def processHasCrashed(instanceName: String): Boolean = external.get(instanceName) match {
-    case Some(r: Running) =>
-      r.runner.processHasCrashed()
-    case _ => false
-  }
 
   def tryStart(instanceName: String): Unit =
     perform(
@@ -297,8 +282,6 @@ class BackgroundRunner(
       noTracingLogger.debug("Shutting down external process")
       rt.destroy()
     }
-
-  def processHasCrashed(): Boolean = !rt.isAlive
 
 }
 

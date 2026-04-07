@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security.kms.aws
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.plugins.*
 import com.digitalasset.canton.integration.tests.security.kms.MigrationEncryptedToClearStoreIntegrationTest
 
@@ -23,7 +24,7 @@ class AwsMigrationEncryptedToClearStoreReferenceIntegrationTestPostgres
   setupPlugins(
     protectedNodes,
     storagePlugin = Some(new UsePostgres(loggerFactory)),
-    sequencerPlugin = new UseBftSequencer(loggerFactory),
+    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
   )
 
 }

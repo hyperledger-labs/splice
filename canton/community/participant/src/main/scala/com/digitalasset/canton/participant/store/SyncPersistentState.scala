@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -10,7 +10,6 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
-import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation.PendingOnboardingClearanceStore
 import com.digitalasset.canton.participant.store.db.{
   DbLogicalSyncPersistentState,
   DbPhysicalSyncPersistentState,
@@ -18,13 +17,21 @@ import com.digitalasset.canton.participant.store.db.{
 import com.digitalasset.canton.participant.store.memory.{
   InMemoryLogicalSyncPersistentState,
   InMemoryPhysicalSyncPersistentState,
+  PackageMetadataView,
 }
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.*
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  SynchronizerOutboxQueue,
+  SynchronizerTopologyManager,
+}
 
 import scala.concurrent.ExecutionContext
 
@@ -47,10 +54,6 @@ class SyncPersistentState(
   override def acsInspection: AcsInspection = logical.acsInspection
   override def acsCommitmentStore: AcsCommitmentStore = logical.acsCommitmentStore
   override def reassignmentStore: ReassignmentStore = logical.reassignmentStore
-  override def pendingOnboardingClearanceStore: PendingOnboardingClearanceStore =
-    logical.pendingOnboardingClearanceStore
-  override def partyReplicationIndexingStoreIfOnPREnabled: Option[PartyReplicationIndexingStore] =
-    logical.partyReplicationIndexingStoreIfOnPREnabled
 
   override def pureCryptoApi: CryptoPureApi = physical.pureCryptoApi
 
@@ -65,6 +68,8 @@ class SyncPersistentState(
   override def submissionTrackerStore: SubmissionTrackerStore = physical.submissionTrackerStore
   override def isMemory: Boolean = physical.isMemory
   override def topologyStore: TopologyStore[SynchronizerStore] = physical.topologyStore
+  override def topologyManager: SynchronizerTopologyManager = physical.topologyManager
+  override def synchronizerOutboxQueue: SynchronizerOutboxQueue = physical.synchronizerOutboxQueue
 
   override def close(): Unit =
     LifeCycle.close(
@@ -87,9 +92,7 @@ trait LogicalSyncPersistentState extends NamedLogging with AutoCloseable {
   def acsInspection: AcsInspection
   def acsCommitmentStore: AcsCommitmentStore
   def reassignmentStore: ReassignmentStore
-  def pendingOnboardingClearanceStore: PendingOnboardingClearanceStore
 
-  def partyReplicationIndexingStoreIfOnPREnabled: Option[PartyReplicationIndexingStore]
 }
 
 /** Stores that tied to a specific physical synchronizer. */
@@ -109,8 +112,10 @@ trait PhysicalSyncPersistentState extends NamedLogging with AutoCloseable {
   def isMemory: Boolean
 
   def topologyStore: TopologyStore[SynchronizerStore]
+  def topologyManager: SynchronizerTopologyManager
+  def synchronizerOutboxQueue: SynchronizerOutboxQueue
 
-  lazy val psid: PhysicalSynchronizerId = physicalSynchronizerIdx.psid
+  lazy val psid: PhysicalSynchronizerId = physicalSynchronizerIdx.synchronizerId
 }
 
 object LogicalSyncPersistentState {
@@ -129,7 +134,7 @@ object LogicalSyncPersistentState {
       case _: MemoryStorage =>
         new InMemoryLogicalSyncPersistentState(
           synchronizerIdx,
-          parameters,
+          parameters.enableAdditionalConsistencyChecks,
           indexedStringStore,
           contractStore.value,
           acsCounterParticipantConfigStore,
@@ -154,33 +159,49 @@ object LogicalSyncPersistentState {
 
 object PhysicalSyncPersistentState {
   def create(
+      participantId: ParticipantId,
       storage: Storage,
       physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
       indexedTopologyStoreId: IndexedTopologyStoreId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
+      clock: Clock,
       crypto: SynchronizerCrypto,
       parameters: ParticipantNodeParameters,
+      packageMetadataView: PackageMetadataView,
+      ledgerApiStore: Eval[LedgerApiStore],
+      logicalSyncPersistentState: LogicalSyncPersistentState,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): PhysicalSyncPersistentState =
     storage match {
       case _: MemoryStorage =>
         new InMemoryPhysicalSyncPersistentState(
+          participantId,
+          clock,
           crypto,
           physicalSynchronizerIdx,
           staticSynchronizerParameters,
+          parameters,
+          packageMetadataView,
+          ledgerApiStore,
+          logicalSyncPersistentState,
           loggerFactory,
           parameters.processingTimeouts,
           futureSupervisor,
         )
       case db: DbStorage =>
         new DbPhysicalSyncPersistentState(
+          participantId,
           physicalSynchronizerIdx,
           indexedTopologyStoreId,
           staticSynchronizerParameters,
+          clock,
           db,
           crypto,
           parameters,
+          packageMetadataView,
+          ledgerApiStore,
+          logicalSyncPersistentState,
           loggerFactory,
           futureSupervisor,
         )

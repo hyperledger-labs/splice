@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -80,7 +80,7 @@ final class TopologyTransactionPointwiseReader(
       requestingParties = requestingParties,
       toResponse = (topologyEvents: Vector[RawParticipantAuthorization]) =>
         Future.successful(
-          TransactionConversions.toTopologyTransaction(noTracingLogger)(topologyEvents).map(_._2)
+          TransactionConversions.toTopologyTransaction(topologyEvents).map(_._2)
         ),
     )
   }

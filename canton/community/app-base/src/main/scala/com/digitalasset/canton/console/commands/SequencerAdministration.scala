@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -6,9 +6,9 @@ package com.digitalasset.canton.console.commands
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.{
   InitializeFromGenesisState,
   InitializeFromGenesisStateV2,
-  InitializeFromLsuPredecessor,
   InitializeFromOnboardingState,
   InitializeFromOnboardingStateV2,
+  InitializeFromSynchronizerPredecessor,
 }
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, SequencerAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.{
@@ -33,11 +33,9 @@ import com.digitalasset.canton.sequencer.admin.v30.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
-import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
 
-import java.io.BufferedInputStream
 import scala.concurrent.ExecutionContext
 
 class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGroup.Impl(node) {
@@ -118,15 +116,9 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     }
 
   @Help.Summary(
-    "Initialize a sequencer from the beginning of the event stream"
-  )
-  @Help.Description(
-    """This should only be called for sequencer nodes being initialized at the same time as the
-      |corresponding synchronizer node.
-      |
-      |This is called as part of the synchronizer.setup.bootstrap command, so you are unlikely
-      |to need to call this directly.
-      """"
+    "Initialize a sequencer from the beginning of the event stream. This should only be called for " +
+      "sequencer nodes being initialized at the same time as the corresponding synchronizer node. " +
+      "This is called as part of the synchronizer.setup.bootstrap command, so you are unlikely to need to call this directly."
   )
   def assign_from_genesis_state(
       genesisState: ByteString,
@@ -146,15 +138,9 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Initialize a sequencer from the beginning of the event stream"
-  )
-  @Help.Description(
-    """This should only be called for sequencer nodes being initialized at the same time as the
-      |corresponding synchronizer node.
-      |
-      |This is called as part of the synchronizer.setup.bootstrap command, so you are unlikely
-      |to need to call this directly.
-      """"
+    "Initialize a sequencer from the beginning of the event stream. This should only be called for " +
+      "sequencer nodes being initialized at the same time as the corresponding synchronizer node. " +
+      "This is called as part of the synchronizer.setup.bootstrap command, so you are unlikely to need to call this directly."
   )
   def assign_from_genesis_stateV2(
       genesisState: ByteString,
@@ -174,40 +160,27 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Initialize a sequencer for the logical upgrade from the state of its predecessor, streaming the state from a file"
+    "Initialize a sequencer for the logical upgrade from the state of its predecessor"
   )
-  @Help.Description("""
-      |Parameters:
-      |- predecessorState: Retrieved using sequencer.topology.transactions.sequencer_lsu_state
-      |- synchronizerParameters: Synchronizer parameters of the node
-      |- ignorePsidCheck:
-      |    If true, it will not be checked that that current physical synchronizer id matches
-      |    the successor in the topology state. Should be used *only* in disaster
-      |    recovery scenarios (roll forward).
-      |""")
-  def initialize_from_lsu_predecessor(
-      inputFile: String,
+  def initialize_from_synchronizer_predecessor(
+      predecessorState: ByteString,
       synchronizerParameters: StaticSynchronizerParameters,
-      ignorePsidCheck: Boolean = false,
       waitForReady: Boolean = true,
   ): Unit = {
     if (waitForReady) node.health.wait_for_ready_for_initialization()
 
     consoleEnvironment.run {
       runner.adminCommand(
-        InitializeFromLsuPredecessor(
-          new BufferedInputStream(
-            new java.io.FileInputStream(inputFile)
-          ),
+        InitializeFromSynchronizerPredecessor(
+          predecessorState,
           synchronizerParameters.toInternal,
-          ignorePsidCheck = ignorePsidCheck,
         )
       )
     }
   }
 
   @Help.Summary(
-    "Dynamically initialize a sequencer from a point later than the beginning of the event stream"
+    "Dynamically initialize a sequencer from a point later than the beginning of the event stream."
   )
   def assign_from_onboarding_state(
       onboardingState: ByteString,
@@ -224,7 +197,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Dynamically initialize a sequencer from a point later than the beginning of the event stream"
+    "Dynamically initialize a sequencer from a point later than the beginning of the event stream."
   )
   def assign_from_onboarding_stateV2(
       onboardingState: ByteString,
@@ -240,18 +213,6 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     }
   }
 
-  @Help.Summary("Test sequencing around LSU upgrade")
-  @Help.Description(
-    """Allows to test sequencing on the successor synchronizer by sequencing a message.
-      |
-      |Parameters:
-      |- recipientMediatorGroup: Recipient group that will receive the message.
-      |"""
-  )
-  def test_lsu_sequencing(recipientMediatorGroup: MediatorGroupIndex): Unit =
-    consoleEnvironment.run(
-      runner.adminCommand(SequencerAdminCommands.PerformLsuSequencingTest(recipientMediatorGroup))
-    )
 }
 
 class SequencerHealthAdministration(

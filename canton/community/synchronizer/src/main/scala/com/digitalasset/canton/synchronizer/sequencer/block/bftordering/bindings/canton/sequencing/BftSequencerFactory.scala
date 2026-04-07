@@ -1,11 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing
 
-import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
@@ -21,7 +21,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.{
   BlockSequencerFactory,
 }
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
-import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.synchronizer.sequencer.{
   AuthenticationServices,
@@ -37,22 +36,20 @@ import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 
 class BftSequencerFactory(
     config: BftBlockOrdererConfig,
     blockSequencerConfig: BlockSequencerConfig,
-    producePostOrderingTopologyTicks: Boolean,
     health: Option[SequencerHealthConfig],
     storage: Storage,
     protocolVersion: ProtocolVersion,
     sequencerId: SequencerId,
     nodeParameters: SequencerNodeParameters,
     metrics: SequencerMetrics,
-    executorServiceMetrics: ExecutorServiceMetrics,
     override val loggerFactory: NamedLoggerFactory,
     testingInterceptor: Option[TestingInterceptor],
-)(implicit ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContext)
     extends BlockSequencerFactory(
       health,
       blockSequencerConfig,
@@ -80,7 +77,7 @@ class BftSequencerFactory(
       authenticationServices: Option[AuthenticationServices],
       synchronizerLoggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContextExecutor,
+      ec: ExecutionContext,
       materializer: Materializer,
       tracer: Tracer,
   ): BlockOrderer = {
@@ -98,10 +95,8 @@ class BftSequencerFactory(
       sequencerSnapshot.flatMap(_.additional),
       nodeParameters.exitOnFatalFailures,
       metrics.bftOrdering,
-      executorServiceMetrics,
       synchronizerLoggerFactory,
       nodeParameters.loggingConfig.queryCost,
-      ec,
     )
   }
 
@@ -118,8 +113,8 @@ class BftSequencerFactory(
       clock: Clock,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       synchronizerLoggerFactory: NamedLoggerFactory,
-      lsuSequencingBounds: Option[LsuSequencingBounds],
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
@@ -135,7 +130,6 @@ class BftSequencerFactory(
       store,
       sequencerStore,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       balanceStore,
       storage,
       futureSupervisor,
@@ -143,12 +137,11 @@ class BftSequencerFactory(
       clock,
       rateLimitManager,
       orderingTimeFixMode,
-      lsuSequencingBounds,
+      sequencingTimeLowerBoundExclusive,
       nodeParameters.processingTimeouts,
       nodeParameters.loggingConfig.eventDetails,
       nodeParameters.loggingConfig.api.printer,
       metrics,
-      nodeParameters.batchingConfig,
       synchronizerLoggerFactory,
       exitOnFatalFailures = nodeParameters.exitOnFatalFailures,
       runtimeReady = runtimeReady,

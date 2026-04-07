@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
 
 import com.digitalasset.canton.LfPackageId
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.damltests.upgrade.v1.java.upgrade.SigStakeInf as SigStakeInfV1
@@ -11,7 +12,7 @@ import com.digitalasset.canton.damltests.upgrade.v2.java.upgrade.{
   SigStakeInf,
   SigStakeInf as SigStakeInfV2,
 }
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.util.PartiesAllocator
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -29,8 +30,7 @@ import scala.util.chaining.scalaUtilChainingOps
 class CreationPackageUnvettingUpgradingIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 
   @volatile private var signatory, nonStakeholder, observer: PartyId = _
 

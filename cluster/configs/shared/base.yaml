@@ -124,10 +124,6 @@ monitoring:
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5
-      walletSweep:
-        # Multiplier applied to a wallet sweep's configured maxBalance to set the alert threshold.
-        # 1.5 means the alert fires if the balance is 50% higher than expected.
-        tolerance: 1.5
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')

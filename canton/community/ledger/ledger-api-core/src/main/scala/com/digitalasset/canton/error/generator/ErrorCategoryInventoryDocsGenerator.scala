@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator
@@ -22,9 +22,7 @@ object ErrorCategoryInventoryDocsGenerator {
       val resolution: String = annotations.resolution.getOrElse("").replace("\n", " ")
       val retryStrategy: String = annotations.retryStrategy.getOrElse("").replace("\n", " ")
 
-      s""".. _error-categories-inventory_$name:
-         |
-         |$name
+      s"""$name
          |${"=" * 120}
          |    **Category id**: $categoryId
          |

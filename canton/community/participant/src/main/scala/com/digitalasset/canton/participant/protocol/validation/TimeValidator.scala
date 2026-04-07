@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -17,7 +17,6 @@ object TimeValidator {
       sequencerTimestamp: CantonTimestamp,
       ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,
       preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration,
-      maxRecordTime: Option[CantonTimestamp],
       amSubmitter: Boolean,
       logger: TracedLogger,
   )(implicit tc: TraceContext): Either[TimeCheckFailure, Unit] = {
@@ -64,16 +63,8 @@ object TimeValidator {
         )
       )
 
-    } else {
-      maxRecordTime match {
-        case Some(maxTime) if sequencerTimestamp > maxTime =>
-          log(
-            s"The record time $sequencerTimestamp exceeds the maximum record time $maxTime}"
-          )
-          Left(ExternallySignedRecordTimeExceedsMaximum(sequencerTimestamp, maxTime))
-        case _ => Either.unit
-      }
-    }
+    } else Either.unit
+
   }
 
   sealed trait TimeCheckFailure extends Product with Serializable
@@ -88,11 +79,6 @@ object TimeValidator {
       preparationTime: CantonTimestamp,
       recordTime: CantonTimestamp,
       maxDelta: NonNegativeFiniteDuration,
-  ) extends TimeCheckFailure
-
-  final case class ExternallySignedRecordTimeExceedsMaximum(
-      recordTime: CantonTimestamp,
-      maxRecordTime: CantonTimestamp,
   ) extends TimeCheckFailure
 
 }

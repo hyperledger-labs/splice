@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -9,10 +9,9 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.{Eval, Monad}
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata}
@@ -32,7 +31,6 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageService
-import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.protocol.*
@@ -41,8 +39,6 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
   TransactionSubmissionError,
   TransactionSubmissionResult,
 }
-import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation
-import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation.PendingOnboardingClearanceStore
 import com.digitalasset.canton.participant.protocol.reassignment.*
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
   ReassignmentProcessorError,
@@ -74,6 +70,7 @@ import com.digitalasset.canton.participant.traffic.{
   ParticipantTrafficControlSubscriber,
   TrafficCostEstimator,
 }
+import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.CostEstimationHints
@@ -97,29 +94,16 @@ import com.digitalasset.canton.topology.processing.{
   SequencedTime,
   TopologyTransactionProcessor,
 }
-import com.digitalasset.canton.topology.store.NoPackageDependencies
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions.PositiveStoredTopologyTransactions
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
-import com.digitalasset.canton.topology.transaction.{
-  SynchronizerTrustCertificate,
-  TopologyChangeOp,
-  TopologyMapping,
-  TopologyTransaction,
-}
-import com.digitalasset.canton.topology.{
-  ForceFlags,
-  ParticipantId,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-  SynchronizerTopologyManager,
-  TopologyManagerError,
-}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.*
-import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.version.{EngineMode, ParticipantProtocolFeatureFlags}
+import com.digitalasset.canton.util.{
+  ContractHasher,
+  ContractValidator,
+  ErrorUtil,
+  FutureUnlessShutdownUtil,
+  MonadUtil,
+}
 import com.digitalasset.daml.lf.engine.Engine
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -129,6 +113,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** A connected synchronizer from the synchronization service.
   *
+  * @param synchronizerId
+  *   The identifier of the connected synchronizer.
   * @param synchronizerHandle
   *   A synchronizer handle providing sequencer clients.
   * @param participantId
@@ -155,9 +141,8 @@ class ConnectedSynchronizer(
     contractValidator: ContractValidator,
     identityPusher: ParticipantTopologyDispatcher,
     topologyProcessor: TopologyTransactionProcessor,
-    val topologyManager: SynchronizerTopologyManager,
     missingKeysAlerter: MissingKeysAlerter,
-    val sequencerConnectionListener: SequencerConnectionSuccessorListener,
+    sequencerConnectionListener: SequencerConnectionSuccessorListener,
     reassignmentCoordination: ReassignmentCoordination,
     commandProgressTracker: CommandProgressTracker,
     messageDispatcherFactory: MessageDispatcher.Factory[MessageDispatcher],
@@ -174,8 +159,7 @@ class ConnectedSynchronizer(
     with FlagCloseableAsync
     with ReassignmentSubmissionHandle
     with CloseableHealthComponent
-    with AtomicHealthComponent
-    with HasCloseContext {
+    with AtomicHealthComponent {
 
   val psid: PhysicalSynchronizerId = synchronizerHandle.psid
 
@@ -198,9 +182,10 @@ class ConnectedSynchronizer(
   private val seedGenerator =
     new SeedGenerator(synchronizerCrypto.crypto.pureCrypto)
 
-  private val packageResolver: PackageResolver = packageService.packageResolver
+  private val packageResolver: PackageResolver = pkgId =>
+    traceContext => packageService.getPackage(pkgId)(traceContext)
 
-  private val contractHasher: ContractHasher = ContractHasher(engine, packageResolver)
+  private val contractHasher = ContractHasher(engine, packageResolver)
 
   private[canton] val requestGenerator =
     TransactionConfirmationRequestFactory(
@@ -231,8 +216,6 @@ class ConnectedSynchronizer(
       psid,
       participantId,
       trafficStateController,
-      parameters.sequencerClient.defaultMaxSequencingTimeOffset,
-      clock,
       loggerFactory,
     )
   }
@@ -258,10 +241,9 @@ class ConnectedSynchronizer(
 
   private val damle =
     new DAMLe(
-      participantId,
       packageResolver,
       engine,
-      EngineMode.forProtocolVersion(staticSynchronizerParameters.protocolVersion),
+      parameters.engine.validationPhaseLogging,
       loggerFactory,
     )
 
@@ -278,7 +260,6 @@ class ConnectedSynchronizer(
     ephemeral,
     commandProgressTracker,
     metrics.transactionProcessing,
-    clock,
     timeouts,
     loggerFactory,
     futureSupervisor,
@@ -299,7 +280,6 @@ class ConnectedSynchronizer(
     contractValidator,
     seedGenerator,
     sequencerClient,
-    clock,
     timeouts,
     Source(staticSynchronizerParameters.protocolVersion),
     loggerFactory,
@@ -319,7 +299,6 @@ class ConnectedSynchronizer(
     contractValidator,
     seedGenerator,
     sequencerClient,
-    clock,
     timeouts,
     Target(staticSynchronizerParameters.protocolVersion),
     loggerFactory,
@@ -352,7 +331,6 @@ class ConnectedSynchronizer(
       synchronizerCrypto,
       sequencerClient,
       participantId,
-      clock,
       timeouts,
       loggerFactory,
     )
@@ -381,7 +359,6 @@ class ConnectedSynchronizer(
       ephemeral.inFlightSubmissionSynchronizerTracker,
       loggerFactory,
       metrics,
-      promiseFactory = this,
     )
 
   def addJournalGarageCollectionLock()(implicit
@@ -433,7 +410,9 @@ class ConnectedSynchronizer(
             chunkSize = PositiveInt.tryCreate(500),
           )(
             change.deactivations.keySet.toSeq
-          )(withMetadataSeq)
+          )(
+            withMetadataSeq
+          )
       } yield {
         AcsChange(
           activations = storedActivatedContracts
@@ -479,23 +458,15 @@ class ConnectedSynchronizer(
       } yield ()
     }
 
-    def loadAcsChanges(
-        fromExclusive: TimeOfChange,
-        toInclusive: TimeOfChange,
-        batchSize: PositiveInt,
-    )(implicit
+    def replayAcsChanges(fromExclusive: TimeOfChange, toInclusive: TimeOfChange)(implicit
         traceContext: TraceContext
-    ): EitherT[
-      FutureUnlessShutdown,
-      ConnectedSynchronizerInitializationError,
-      (Seq[(RecordTime, AcsChange)], Int), // (changes, number of changes)
-    ] =
+    ): EitherT[FutureUnlessShutdown, ConnectedSynchronizerInitializationError, LazyList[
+      (RecordTime, AcsChange)
+    ]] =
       liftF(for {
-        (contractIdChanges, count) <- persistent.activeContractStore
-          .changesBetween(fromExclusive, toInclusive, batchSize)
-        changes <- MonadUtil.parTraverseWithLimit(parameters.batchingConfig.parallelism)(
-          contractIdChanges
-        ) { case (toc, change) =>
+        contractIdChanges <- persistent.activeContractStore
+          .changesBetween(fromExclusive, toInclusive)
+        changes <- contractIdChanges.parTraverse { case (toc, change) =>
           val changeWithAdjustedReassignmentCountersForUnassignments = ActiveContractIdsChange(
             change.activations,
             change.deactivations.fmap {
@@ -521,58 +492,8 @@ class ConnectedSynchronizer(
                 .force
                 .mkString(", ")}"
         )
-        (changes, count)
+        changes
       })
-
-    def replayAcsChangesInBatches(
-        acsChangesReplayStartRt: RecordTime,
-        lastSequencerTimestamp: CantonTimestamp,
-        nextRepairCounter: RepairCounter,
-        batchSize: PositiveInt,
-    ): EitherT[FutureUnlessShutdown, ConnectedSynchronizerInitializationError, Unit] = {
-
-      val endToc = TimeOfChange(lastSequencerTimestamp, Some(nextRepairCounter))
-      logger.info(
-        s"Looking for ACS changes to replay between ${acsChangesReplayStartRt.timestamp} and $endToc in batches of $batchSize"
-      )
-
-      def iterateInBatches(from: TimeOfChange): EitherT[
-        FutureUnlessShutdown,
-        ConnectedSynchronizerInitializationError,
-        Unit,
-      ] =
-        if (lastSequencerTimestamp >= acsChangesReplayStartRt.timestamp) {
-          for {
-            res <- loadAcsChanges(from, endToc, batchSize)
-            (acsChangesToConsume, count) = res
-
-            _ <- NonEmpty.from(acsChangesToConsume) match {
-              case Some(nonEmptyBatch) => // publish ACS changes
-                EitherT.liftF[FutureUnlessShutdown, ConnectedSynchronizerInitializationError, Unit](
-                  acsCommitmentProcessor.publish(nonEmptyBatch)
-                )
-              case None => EitherTUtil.unitUS[ConnectedSynchronizerInitializationError]
-            }
-
-            // decide whether to continue: if we got a "full" batch, there might be more
-            _ <- NonEmpty.from(acsChangesToConsume) match {
-              // more acs changes might exist; continue from the last TimeOfChange
-              case Some(fullBatch) if count >= batchSize.value =>
-                val (lastChange, _) = fullBatch.last1
-                val lastRt = lastChange.toTimeOfChange
-                iterateInBatches(lastRt)
-              //  count < batchSize.value
-              case Some(_) => EitherTUtil.unitUS[ConnectedSynchronizerInitializationError]
-              // batch is empty
-              case None => EitherTUtil.unitUS[ConnectedSynchronizerInitializationError]
-            }
-          } yield ()
-        } else
-          EitherTUtil.unitUS[ConnectedSynchronizerInitializationError]
-
-      // start looping from the original start
-      iterateInBatches(acsChangesReplayStartRt.toTimeOfChange)
-    }
 
     def initializeClientAtCleanHead(): Unit = {
       // generally, the topology client will be initialised by the topology processor. however,
@@ -587,6 +508,7 @@ class ConnectedSynchronizer(
         SequencedTime(resubscriptionTs),
         EffectiveTime(resubscriptionTs),
         ApproximateTime(resubscriptionTs),
+        potentialTopologyChange = true,
       )
       // now, compute epsilon at resubscriptionTs and update client
       topologyClient.updateHead(
@@ -595,10 +517,12 @@ class ConnectedSynchronizer(
           resubscriptionTs.plus(staticSynchronizerParameters.topologyChangeDelay.duration)
         ),
         ApproximateTime(resubscriptionTs),
+        potentialTopologyChange = true,
       )
     }
 
     val startingPoints = ephemeral.startingPoints
+    val nextRequestCounter = startingPoints.processing.nextRequestCounter
     val nextRepairCounter = startingPoints.processing.nextRepairCounter
     val lastSequencerTimestamp = startingPoints.processing.lastSequencerTimestamp
 
@@ -622,13 +546,22 @@ class ConnectedSynchronizer(
       )
 
       _ <- loadPendingEffectiveTimesFromTopologyStore(acsChangesReplayStartRt.timestamp)
-
-      _ <- replayAcsChangesInBatches(
-        acsChangesReplayStartRt,
-        lastSequencerTimestamp,
-        nextRepairCounter,
-        parameters.batchingConfig.maxItemsInBatch,
-      )
+      acsChangesToReplay <-
+        if (
+          lastSequencerTimestamp >= acsChangesReplayStartRt.timestamp && (nextRequestCounter > RequestCounter.Genesis || nextRepairCounter > RepairCounter.Genesis)
+        ) {
+          logger.info(
+            s"Looking for ACS changes to replay between ${acsChangesReplayStartRt.timestamp} and $lastSequencerTimestamp"
+          )
+          replayAcsChanges(
+            acsChangesReplayStartRt.toTimeOfChange,
+            TimeOfChange(lastSequencerTimestamp, Some(nextRepairCounter)),
+          )
+        } else
+          EitherT.pure[FutureUnlessShutdown, ConnectedSynchronizerInitializationError](Seq.empty)
+      _ = acsChangesToReplay.foreach { case (toc, change) =>
+        acsCommitmentProcessor.publish(toc, change)
+      }
     } yield ()
   }
 
@@ -680,91 +613,6 @@ class ConnectedSynchronizer(
               )
             )
         )
-
-      // Update the synchronizer trust certificate if the feature flags are out of sync
-      def synchronizeFeatureFlagsAsync(implicit initializationTraceContext: TraceContext): Unit = {
-        val synchronizerId = synchronizerHandle.psid.logical
-        val protocolVersion =
-          synchronizerHandle.staticParameters.protocolVersion
-
-        val featureFlagsForPV: Set[ParticipantTopologyFeatureFlag] =
-          ParticipantProtocolFeatureFlags.supportedFeatureFlagsByPV.getOrElse(
-            protocolVersion,
-            Set.empty,
-          )
-
-        def updateSTCWithFeatureFlags(
-            existingSynchronizerTrustCertificate: TopologyTransaction[
-              TopologyChangeOp.Replace,
-              SynchronizerTrustCertificate,
-            ]
-        ): EitherT[FutureUnlessShutdown, TopologyManagerError, GenericSignedTopologyTransaction] =
-          synchronizeWithClosing("updating STC for feature flags auto sync")(
-            topologyManager.proposeAndAuthorize(
-              op = TopologyChangeOp.Replace,
-              mapping = existingSynchronizerTrustCertificate.mapping.copy(
-                featureFlags = featureFlagsForPV.toSeq
-              ),
-              serial = Some(existingSynchronizerTrustCertificate.serial.increment),
-              signingKeys = Seq.empty,
-              protocolVersion = protocolVersion,
-              expectFullAuthorization = false,
-              forceChanges = ForceFlags.none,
-              waitToBecomeEffective = None,
-            )
-          )
-
-        val result = for {
-          // Lookup the existing STCs for the node
-          stcTransactions <- EitherT.liftF[
-            FutureUnlessShutdown,
-            TopologyManagerError,
-            PositiveStoredTopologyTransactions,
-          ](
-            topologyManager.store
-              .findPositiveTransactions(
-                // We want the current effective STC
-                asOf = CantonTimestamp.MaxValue,
-                asOfInclusive = true,
-                isProposal = false,
-                types = Seq(TopologyMapping.Code.SynchronizerTrustCertificate),
-                filterUid = Some(NonEmpty.mk(Seq, participantId.uid)),
-                filterNamespace = None,
-              )
-          )
-          currentStcO = stcTransactions.result
-            .maxByOption(_.validFrom)
-            .flatMap(
-              _.transaction
-                .select[TopologyChangeOp.Replace, SynchronizerTrustCertificate]
-            )
-          _ <- currentStcO match {
-            // There should already be an STC present, so we only update if the feature flags differ
-            case Some(currentStc) if currentStc.mapping.featureFlags.toSet != featureFlagsForPV =>
-              logger.info(
-                s"Synchronizer Trust Certificate in the synchronizer store $synchronizerId for $participantId does not have the expected set of feature flags, they will be updated. " +
-                  s"Current: ${currentStc.mapping.featureFlags.toSet}. Expected: $featureFlagsForPV"
-              )
-              updateSTCWithFeatureFlags(currentStc.transaction)
-            case Some(_) =>
-              EitherT.pure[FutureUnlessShutdown, TopologyManagerError](
-                logger.debug(
-                  s"Synchronizer Trust Certificate in the synchronizer store $synchronizerId for $participantId already has the correct feature flags $featureFlagsForPV. No update necessary."
-                )
-              )
-            // This is unexpected as the node is connected to the synchronizer, so it should have an STC in the synchronizer store
-            // (unless it was revoked concurrently but that's very unlikely and still worth logging a warning)
-            case None =>
-              EitherT.pure[FutureUnlessShutdown, TopologyManagerError](
-                logger.warn(
-                  s"Expected a Synchronizer Trust Certificate to be present in the synchronizer store $synchronizerId for $participantId but none was found. Feature flags will not be updated"
-                )
-              )
-          }
-        } yield ()
-
-        EitherTUtil.doNotAwaitUS(result, "Feature flag synchronization")
-      }
 
       // Initialize, replay and process stored events, then subscribe to new events
       (for {
@@ -832,7 +680,7 @@ class ConnectedSynchronizer(
               tc =>
                 participantNodePersistentState.value.ledgerApiStore
                   .cleanSynchronizerIndex(psid.logical)(tc, ec)
-                  .map(_.flatMap(_.sequencerIndex)),
+                  .map(_.flatMap(_.sequencerIndex).map(_.sequencerTimestamp)),
             )(initializationTraceContext)
           )
 
@@ -844,8 +692,6 @@ class ConnectedSynchronizer(
         // wait for initial topology transactions to be sequenced and received before we start computing pending
         // topology transactions to push for IDM approval
         _ <- waitForParticipantToBeInTopology(initializationTraceContext)
-        _ = if (parameters.autoSyncProtocolFeatureFlags)
-          synchronizeFeatureFlagsAsync(initializationTraceContext)
         _ <-
           registerIdentityTransactionHandle
             .synchronizerConnected()(initializationTraceContext)
@@ -857,15 +703,6 @@ class ConnectedSynchronizer(
         ephemeral.markAsRecovered()
         logger.debug("Sync synchronizer is ready.")(initializationTraceContext)
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-          schedulePendingOnboardingClearances(
-            ephemeral.onboardingClearanceScheduler,
-            persistent.pendingOnboardingClearanceStore,
-          )(
-            initializationTraceContext
-          ),
-          "Pending onboarding flag clearances scheduling",
-        )
-        FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
           completeAssignment,
           "Failed to complete outstanding assignments on startup. " +
             "You may have to complete the assignments manually.",
@@ -873,76 +710,6 @@ class ConnectedSynchronizer(
         ()
       }).value
     }
-
-  private def schedulePendingOnboardingClearances(
-      onboardingClearanceScheduler: OnboardingClearanceScheduler,
-      pendingOnboardingClearanceStore: PendingOnboardingClearanceStore,
-  )(implicit
-      initializationTraceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = {
-    val processAndSchedule = synchronizeWithClosing("schedulePendingOnboardingClearances") {
-      for {
-        pendingOperations <- EitherT.right(
-          pendingOnboardingClearanceStore.getAll(
-            operationName = OnboardingClearanceOperation.operationName,
-            synchronizerId = Some(psid.logical),
-          )
-        )
-
-        // Extract PartyId from the key and effective time from the operation
-        pendingClearances = pendingOperations.flatMap { pending =>
-          val partyId = OnboardingClearanceOperation.partyIdFromKey(pending.key)
-          val effectiveTimeO = pending.operation.onboardingEffectiveAt
-
-          (partyId, effectiveTimeO) match {
-            case (Right(partyId), Some(effectiveTime)) =>
-              Some(partyId -> effectiveTime)
-
-            case (Right(partyId), None) =>
-              // A missing effective time can happen for two reasons:
-              // 1. Expected (Offline Party Replication): The operator ran a party ACS import.
-              //    Because there is no effective PTP mapping transaction yet, the effective time cannot be stored.
-              //    It will only be known after reconnecting to the synchronizer.
-              // 2. Crash: Topology terminate processor processed an onboarding event, but the participant crashed
-              //    just before updating the pending operation record with the effective time.
-              //    This self-heals if the transaction is re-processed upon reconnecting. Otherwise, it results in
-              //    a dangling record requiring manual clearance.
-              logger.info(
-                s"Skipping clearance scheduling for party $partyId (missing effective time). " +
-                  s"This will self-heal upon synchronizer reconnect if due to offline party replication. " +
-                  s"Otherwise (for example after a crash), please manually call the onboarding flag clearance endpoint " +
-                  s"after (re)connecting to the synchronizer."
-              )
-              None
-
-            case (Left(error), _) =>
-              logger.error(
-                s"Failed to parse party ID from pending operation key '${pending.key}'. Skipping clearance scheduling. Error: $error"
-              )
-              None
-          }
-        }
-
-        _ = if (pendingClearances.nonEmpty) {
-          logger.info(
-            s"Scheduling ${pendingClearances.size} pending onboarding clearances upon synchronizer connection."
-          )
-        }
-
-        _ <- MonadUtil.sequentialTraverse_(pendingClearances) { case (party, activationTs) =>
-          onboardingClearanceScheduler
-            .requestClearance(party, activationTs, maxInitialRetries = NonNegativeInt.three)
-            .leftMap { err =>
-              // Log the error but don't fail the whole traversal
-              logger.warn(s"Failed to schedule onboarding clearance for party $party: $err")
-              err
-            }
-        }
-      } yield ()
-    }
-
-    processAndSchedule.value.map(_ => ())
-  }
 
   private def completeAssignment(implicit tc: TraceContext): FutureUnlessShutdown[Unit] = {
 
@@ -989,7 +756,7 @@ class ConnectedSynchronizer(
           case Right(()) => ()
         }
 
-        pendingReassignments.lastOption.map(t => t.unassignmentTs -> t.sourcePsid.map(_.logical))
+        pendingReassignments.lastOption.map(t => t.unassignmentTs -> t.sourcePSId.map(_.logical))
       }
 
       resF.map {
@@ -1008,9 +775,9 @@ class ConnectedSynchronizer(
       _waitForReplay <- FutureUnlessShutdown.outcomeF(
         timeTracker.awaitTick(clock.now).getOrElse(Future.unit)
       )
-      approximateSnapshot <- topologyClient.currentSnapshotApproximation
+
       _params <- synchronizeWithClosing(functionFullName)(
-        approximateSnapshot.findDynamicSynchronizerParametersOrDefault(
+        topologyClient.currentSnapshotApproximation.findDynamicSynchronizerParametersOrDefault(
           staticSynchronizerParameters.protocolVersion
         )
       )
@@ -1106,8 +873,6 @@ class ConnectedSynchronizer(
                 submitterMetadata,
                 contractIds,
                 targetSynchronizer,
-                overrideSourceValidationPkgIds = Map.empty,
-                overrideTargetValidationPkgIds = Map.empty,
               ),
             sourceTopology.unwrap,
           )
@@ -1294,7 +1059,7 @@ object ConnectedSynchronizer {
       val journalGarbageCollector = new JournalGarbageCollector(
         persistentState.requestJournalStore,
         tc =>
-          participantNodePersistentState.value.ledgerApiStore
+          ephemeralState.ledgerApiIndexer.ledgerApiStore.value
             .cleanSynchronizerIndex(synchronizerHandle.psid.logical)(tc, ec),
         sortedReconciliationIntervalsProvider,
         persistentState.acsCommitmentStore,
@@ -1311,10 +1076,6 @@ object ConnectedSynchronizer {
           participantId,
           synchronizerHandle.sequencerClient,
           synchronizerCrypto,
-          Option.when(parameters.commitmentUseDbSnapshotForParticipantLookup)(
-            synchronizerHandle.topologyFactory
-              .createTopologySnapshot(_, NoPackageDependencies, preferCaching = false)
-          ),
           sortedReconciliationIntervalsProvider,
           persistentState.acsCommitmentStore,
           journalGarbageCollector.observer,
@@ -1330,37 +1091,21 @@ object ConnectedSynchronizer {
           clock,
           exitOnFatalFailures = parameters.exitOnFatalFailures,
           parameters.batchingConfig,
-          asynchronousInitialization = parameters.commitmentAsynchronousInitialization,
           doNotAwaitOnCheckingIncomingCommitments =
             parameters.doNotAwaitOnCheckingIncomingCommitments,
           commitmentCheckpointInterval = parameters.commitmentCheckpointInterval,
           commitmentMismatchDebugging = parameters.commitmentMismatchDebugging,
           commitmentProcessorNrAcsChangesBehindToTriggerCatchUp =
             parameters.commitmentProcessorNrAcsChangesBehindToTriggerCatchUp,
-          commitmentReduceParallelism = parameters.commitmentReduceParallelism,
-          stringInterning = participantNodePersistentState.value.ledgerApiStore.stringInterningView,
         )
         topologyProcessor <- topologyProcessorFactory.create(
           acsCommitmentProcessor.scheduleTopologyTick
         )
-
-        topologyManager = synchronizerHandle.topologyFactory.createTopologyManager(
-          participantId,
-          persistentState,
-          ledgerApiStore = participantNodePersistentState.map(_.ledgerApiStore),
-          packageMetadataView = packageService.getPackageMetadataView,
-          crypto = synchronizerCrypto.crypto,
-          synchronizerLoggerFactory = loggerFactory,
-          disableOptionalTopologyChecks = parameters.disableOptionalTopologyChecks,
-          dispatchQueueBackpressureLimit = parameters.general.dispatchQueueBackpressureLimit,
-          disableUpgradeValidation = parameters.disableUpgradeValidation,
-        )
-
       } yield {
         val contractValidator = ContractValidator(
           synchronizerCrypto.pureCrypto,
           engine,
-          packageService.packageResolver,
+          packageId => traceContext => packageService.getPackage(packageId)(traceContext),
         )
         new ConnectedSynchronizer(
           synchronizerHandle,
@@ -1375,7 +1120,6 @@ object ConnectedSynchronizer {
           contractValidator,
           identityPusher,
           topologyProcessor,
-          topologyManager,
           missingKeysAlerter,
           sequencerConnectionSuccessorListener,
           reassignmentCoordination,

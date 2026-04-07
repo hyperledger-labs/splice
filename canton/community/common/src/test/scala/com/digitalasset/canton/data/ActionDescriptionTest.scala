@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -9,7 +9,6 @@ import com.digitalasset.canton.util.LfTransactionBuilder
 import com.digitalasset.canton.util.LfTransactionBuilder.{defaultPackageId, defaultTemplateId}
 import com.digitalasset.canton.version.RepresentativeProtocolVersion
 import com.digitalasset.canton.{BaseTest, LfPackageName, LfPartyId, LfVersioned}
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
@@ -22,9 +21,8 @@ class ActionDescriptionTest extends AnyWordSpec with BaseTest {
     LfGlobalKey
       .build(
         LfTransactionBuilder.defaultTemplateId,
-        LfPackageName.assertFromString("package-name"),
         Value.ValueInt64(10L),
-        crypto.Hash.hashPrivateKey("dummy-key-hash"),
+        LfPackageName.assertFromString("package-name"),
       )
       .value
   private val choiceName: LfChoiceName = LfChoiceName.assertFromString("choice")
@@ -96,9 +94,8 @@ class ActionDescriptionTest extends AnyWordSpec with BaseTest {
             LfGlobalKey
               .build(
                 LfTransactionBuilder.defaultTemplateId,
-                ExampleTransactionFactory.packageName,
                 ExampleTransactionFactory.veryDeepValue,
-                crypto.Hash.hashPrivateKey(ExampleTransactionFactory.veryDeepValue.toString),
+                ExampleTransactionFactory.packageName,
               )
               .value,
           ),

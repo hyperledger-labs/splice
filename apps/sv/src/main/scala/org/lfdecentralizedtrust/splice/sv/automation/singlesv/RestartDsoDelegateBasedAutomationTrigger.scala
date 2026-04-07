@@ -102,7 +102,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = Future {
     blocking {
 
-      mutex.exclusive {
+      synchronized {
         val currentEpoch = dsoRules.payload.epoch
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 

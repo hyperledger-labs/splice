@@ -1,10 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
-import com.digitalasset.canton.protocol.{v30, v31}
+import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
@@ -35,10 +35,6 @@ final case class TopologyTransactionsBroadcast(
   override protected[messages] def toProtoSomeEnvelopeContentV30
       : v30.EnvelopeContent.SomeEnvelopeContent =
     v30.EnvelopeContent.SomeEnvelopeContent.TopologyTransactionsBroadcast(toProtoV30)
-
-  override protected[messages] def toProtoSomeEnvelopeContentV31
-      : v31.EnvelopeContent.SomeEnvelopeContent =
-    v31.EnvelopeContent.SomeEnvelopeContent.TopologyTransactionsBroadcast(toProtoV30)
 
   def toProtoV30: v30.TopologyTransactionsBroadcast = v30.TopologyTransactionsBroadcast(
     psid.toProtoPrimitive,
@@ -88,9 +84,9 @@ object TopologyTransactionsBroadcast
       expectedProtocolVersion: ProtocolVersion,
       message: v30.TopologyTransactionsBroadcast,
   ): ParsingResult[TopologyTransactionsBroadcast] = {
-    val v30.TopologyTransactionsBroadcast(psidP, signedTopologyTransactionsP) = message
+    val v30.TopologyTransactionsBroadcast(synchronizerP, signedTopologyTransactionsP) = message
     for {
-      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(psidP, "physical_synchronizer_id")
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(synchronizerP, "synchronizer_id")
 
       signedTopologyTransactions <- ProtoConverter.parseRequired(
         SignedTopologyTransactions

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.memory
@@ -21,11 +21,10 @@ import com.digitalasset.canton.store.{
   SequencedEventStore,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, blocking}
 
 /** In memory implementation of a [[SequencedEventStore]].
   */
@@ -38,7 +37,7 @@ class InMemorySequencedEventStore(
     with NamedLogging
     with InMemoryPrunableByTime {
 
-  private val lock = new Mutex()
+  private val lock = new Object()
 
   /** Invariant: The sequenced event stored at timestamp `ts` has timestamp `ts`.
     */
@@ -71,7 +70,7 @@ class InMemorySequencedEventStore(
   ): EitherT[FutureUnlessShutdown, SequencedEventNotFoundError, PossiblyIgnoredSerializedEvent] = {
 
     logger.debug(s"Looking to retrieve delivery event $criterion")
-    val resO = (lock.exclusive {
+    val resO = blocking(lock.synchronized {
       criterion match {
         case ByTimestamp(timestamp) =>
           eventByTimestamp.get(timestamp)
@@ -88,7 +87,7 @@ class InMemorySequencedEventStore(
     PossiblyIgnoredSerializedEvent
   ]] = {
     logger.debug(s"Looking to retrieve delivery event $criterion")
-    val res = (lock.exclusive {
+    val res = blocking(lock.synchronized {
       criterion match {
         case ByTimestampRange(lowerInclusive, upperInclusive) =>
           val valuesInRangeIterable =
@@ -112,7 +111,7 @@ class InMemorySequencedEventStore(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[PossiblyIgnoredSerializedEvent]] =
-    FutureUnlessShutdown.pure((lock.exclusive {
+    FutureUnlessShutdown.pure(blocking(lock.synchronized {
       // Always copy the elements, as the returned iterator will otherwise explode if the underlying collection is modified.
       eventByTimestamp.values.take(limit.getOrElse(Int.MaxValue)).toList
     }))
@@ -122,7 +121,7 @@ class InMemorySequencedEventStore(
       lastPruning: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Int] = FutureUnlessShutdown.pure {
     val counter = new AtomicInteger(0)
-    (lock.exclusive {
+    blocking(lock.synchronized {
       eventByTimestamp.rangeTo(beforeAndIncluding).foreach { case (ts, e) =>
         counter.incrementAndGet()
         eventByTimestamp.remove(ts).discard
@@ -139,7 +138,7 @@ class InMemorySequencedEventStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ChangeWouldResultInGap, Unit] =
     EitherT.fromEither {
-      (lock.exclusive {
+      blocking(lock.synchronized {
         for {
           _ <- appendEmptyIgnoredEvents(fromInclusive, toInclusive)
         } yield {
@@ -200,7 +199,7 @@ class InMemorySequencedEventStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ChangeWouldResultInGap, Unit] =
     EitherT.fromEither {
-      (lock.exclusive {
+      blocking(lock.synchronized {
         for {
           _ <- deleteEmptyIgnoredEvents(fromInclusive, toInclusive)
         } yield setIgnoreStatus(fromInclusive, toInclusive, ignore = false)
@@ -211,8 +210,8 @@ class InMemorySequencedEventStore(
       sequencedTimestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[TraceContext]] =
     FutureUnlessShutdown.pure(
-      (
-        lock.exclusive(
+      blocking(
+        lock.synchronized(
           eventByTimestamp.get(sequencedTimestamp).map(_.traceContext)
         )
       )
@@ -262,8 +261,8 @@ class InMemorySequencedEventStore(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[CounterAndTimestamp]] =
     FutureUnlessShutdown.pure(
-      (
-        lock.exclusive(
+      blocking(
+        lock.synchronized(
           timestampOfCounter.lastOption.map((CounterAndTimestamp.apply _).tupled)
         )
       )

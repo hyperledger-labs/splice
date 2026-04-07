@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering
@@ -43,20 +43,8 @@ class IssClient[E <: Env[E]](
       context: E#ActorContextT[Unit],
       traceContext: TraceContext,
   ): Unit = {
-    (0 until simSettings.clientSettings.numberOfRequestsPerInterval.value).foreach(_ => sendRequest)
-
-    simSettings.clientSettings.requestInterval.foreach(interval =>
-      context.delayedEvent(interval, ())
-    )
-  }
-
-  private def sendRequest(implicit
-      context: E#ActorContextT[Unit],
-      traceContext: TraceContext,
-  ): Unit = {
-
     val additionalPayload =
-      simSettings.clientSettings.requestApproximateByteSize
+      simSettings.clientRequestApproximateByteSize
         .map(bytes =>
           ByteString.copyFromUtf8("-").concat(ByteString.copyFrom(random.nextBytes(bytes.value)))
         )
@@ -66,7 +54,6 @@ class IssClient[E <: Env[E]](
         Traced(
           OrderingRequest(
             BlockFormat.SendTag,
-            s"$name-submission-$submissionNumber",
             ByteString.copyFromUtf8(s"$name-submission-$submissionNumber").concat(additionalPayload),
           )
         )
@@ -75,6 +62,8 @@ class IssClient[E <: Env[E]](
     submissionNumber += 1
 
     mempool.asyncSend(request)
+
+    simSettings.clientRequestInterval.foreach(interval => context.delayedEvent(interval, ()))
   }
 }
 
@@ -96,7 +85,7 @@ object IssClient {
       override def init(context: E#ActorContextT[Unit]): Unit =
         // If the interval is None, the progress of the simulation time will solely depend on other delayed events
         // across the BFT Ordering Service (e.g., clock tick events from the Availability module).
-        simSettings.clientSettings.requestInterval.foreach(interval =>
+        simSettings.clientRequestInterval.foreach(interval =>
           context.delayedEventNoTrace(interval, ())
         )
     }

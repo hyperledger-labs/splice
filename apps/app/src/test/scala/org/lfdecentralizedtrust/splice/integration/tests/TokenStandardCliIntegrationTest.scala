@@ -322,10 +322,8 @@ class TokenStandardCliIntegrationTest
             includeTransactions = Some(
               TransactionFormat(
                 eventFormat = Some(
-                  EventFormat(
-                    filtersByParty = Map(checkingPartyId.toProtoPrimitive -> Filters(Nil)),
-                    filtersForAnyParty = None,
-                    verbose = false,
+                  EventFormat(filtersByParty =
+                    Map(checkingPartyId.toProtoPrimitive -> Filters(Nil))
                   )
                 ),
                 transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,

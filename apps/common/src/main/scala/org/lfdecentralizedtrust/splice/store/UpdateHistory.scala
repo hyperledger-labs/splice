@@ -1644,10 +1644,6 @@ class UpdateHistory(
           .map(EventId.nodeIdFromEventId)
       )
       .toMap
-    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      exerciseRows.map(r => EventId.nodeIdFromEventId(r.eventId)),
-      nodesWithChildren,
-    )
     val exerciseEvents = exerciseRows.map { row =>
       val nodeId = EventId.nodeIdFromEventId(row.eventId)
       new ExercisedEvent(
@@ -1671,10 +1667,7 @@ class UpdateHistory(
         /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
         /*consuming = */ row.consuming,
         /*lastDescendedNodeId = */ Integer.valueOf(
-          lastDescendantNodes.getOrElse(
-            nodeId,
-            throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
-          )
+          EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
         ),
         /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
         /*implementedInterfaces = */ java.util.Collections.emptyList(),

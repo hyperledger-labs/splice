@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
@@ -25,12 +25,12 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   InitializeSequencerFromGenesisStateResponse,
   InitializeSequencerFromGenesisStateV2Request,
   InitializeSequencerFromGenesisStateV2Response,
-  InitializeSequencerFromLsuPredecessorRequest,
-  InitializeSequencerFromLsuPredecessorResponse,
   InitializeSequencerFromOnboardingStateRequest,
   InitializeSequencerFromOnboardingStateResponse,
   InitializeSequencerFromOnboardingStateV2Request,
   InitializeSequencerFromOnboardingStateV2Response,
+  InitializeSequencerFromPredecessorRequest,
+  InitializeSequencerFromPredecessorResponse,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.synchronizer.Synchronizer.FailedToInitialiseSynchronizerNode
@@ -43,6 +43,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   OnboardingStateForSequencerV2,
   SequencerSnapshot,
 }
+import com.digitalasset.canton.topology.TopologyManagerError
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
@@ -51,13 +52,10 @@ import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactions,
 }
 import com.digitalasset.canton.topology.transaction.{
-  LsuAnnouncement,
-  SequencerSynchronizerState,
   SignedTopologyTransaction,
   TopologyChangeOp,
   TopologyMapping,
 }
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, TopologyManagerError}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils}
 import com.google.protobuf.ByteString
@@ -89,57 +87,42 @@ class GrpcSequencerInitializationService(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = true,
-          ignoreLsuPsidCheck = false,
         ).map(InitializeSequencerFromGenesisStateResponse(_)),
       responseObserver,
     )
   }
 
-  override def initializeSequencerFromLsuPredecessor(
-      responseObserver: StreamObserver[InitializeSequencerFromLsuPredecessorResponse]
-  ): StreamObserver[InitializeSequencerFromLsuPredecessorRequest] = {
+  override def initializeSequencerFromPredecessor(
+      responseObserver: StreamObserver[InitializeSequencerFromPredecessorResponse]
+  ): StreamObserver[InitializeSequencerFromPredecessorRequest] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     GrpcStreamingUtils.streamFromClient(
       _.topologySnapshot,
-      req => (req.synchronizerParameters, req.ignorePsidCheck),
+      _.synchronizerParameters,
       (
           topologySnapshot: ByteString,
-          ctx: (Option[v30.StaticSynchronizerParameters], Boolean),
-      ) => {
-        val (synchronizerParams, ignoreLsuPsidCheck) = ctx
-
+          synchronizerParams: Option[v30.StaticSynchronizerParameters],
+      ) =>
         initializeSequencerFromGenesisStateV2(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = false,
-          ignoreLsuPsidCheck = ignoreLsuPsidCheck,
-        ).map(_ => InitializeSequencerFromLsuPredecessorResponse())
-      },
+        ).map(_ => InitializeSequencerFromPredecessorResponse()),
       responseObserver,
     )
   }
 
-  /** Initializes the sequencer from a topology state snapshot.
-    *
-    * Used for major upgrades, logical upgrades, and initializing from an LSU predecessor.
+  /** Use for major upgrades and logical upgrades
     *
     * @param doResetTimes
-    *   Determines whether sequenced and effective times should be reset to MinValue. Use `true` for
-    *   genesis states (brand-new networks) to start a new timeline. Use `false` when initializing
-    *   from an LSU predecessor to preserve historical timestamps and maintain continuity.
-    *
-    * @param ignoreLsuPsidCheck
-    *   Only matters after LSU. If true, it will not be checked that that current PSId matches the
-    *   successor in the topology state. Should be used *only* in disaster recovery scenarios (roll
-    *   forward).
+    *   If sequenced and effective time should be set to MinValue Use true for major upgrades
     * @return
-    *   True if the sequencer is replicated.
+    *   True if the sequencer is replicated
     */
   private def initializeSequencerFromState(
       topologySnapshot: ByteString,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
-      ignoreLsuPsidCheck: Boolean,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     val res: EitherT[Future, RpcError, Boolean] = for {
       topologyState <- EitherT.fromEither[Future](
@@ -150,8 +133,7 @@ class GrpcSequencerInitializationService(
       replicated <- initializeSequencerFromGenesisStateInternal(
         topologyState,
         synchronizerParameters,
-        doResetTimes = doResetTimes,
-        ignoreLsuPsidCheck = ignoreLsuPsidCheck,
+        doResetTimes,
       )
     } yield replicated
     mapErrNew(res)
@@ -172,7 +154,6 @@ class GrpcSequencerInitializationService(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = true,
-          ignoreLsuPsidCheck = false,
         ).map(InitializeSequencerFromGenesisStateV2Response(_)),
       responseObserver,
     )
@@ -182,7 +163,6 @@ class GrpcSequencerInitializationService(
       topologySnapshot: ByteString,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
-      ignoreLsuPsidCheck: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Boolean] = {
@@ -202,31 +182,16 @@ class GrpcSequencerInitializationService(
       replicated <- initializeSequencerFromGenesisStateInternal(
         topologyState,
         synchronizerParameters,
-        doResetTimes = doResetTimes,
-        ignoreLsuPsidCheck = ignoreLsuPsidCheck,
+        doResetTimes,
       )
     } yield replicated
     mapErrNew(res)
   }
 
-  /** @param topologyState
-    *   Topology state the sequencer should be initialized with.
-    * @param synchronizerParameters
-    *   Static synchronizer parameters
-    * @param doResetTimes
-    *   Determines whether sequenced and effective times should be reset to MinValue. Use `true` for
-    *   genesis states (brand-new networks) to start a new timeline. Use `false` when initializing
-    *   from an LSU predecessor to preserve historical timestamps and maintain continuity.
-    * @param ignoreLsuPsidCheck
-    *   Only matters after LSU. If true, it will not be checked that that current PSId matches the
-    *   successor in the topology state. Should be used *only* in disaster recovery scenarios (roll
-    *   forward).
-    */
   private def initializeSequencerFromGenesisStateInternal(
       topologyState: GenericStoredTopologyTransactions,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
-      ignoreLsuPsidCheck: Boolean,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, RpcError, Boolean] =
@@ -243,51 +208,6 @@ class GrpcSequencerInitializationService(
       // reset effective time and sequenced time if we are initializing the sequencer from the beginning
       genesisState: StoredTopologyTransactions[TopologyChangeOp, TopologyMapping] =
         if (doResetTimes) resetTimes(topologyState) else topologyState
-
-      synchronizerIds = genesisState
-        .collectOfMapping[SequencerSynchronizerState]
-        .collectLatestByUniqueKey
-        .result
-        .map(_.mapping.synchronizerId)
-        .toSet
-
-      _ <- EitherTUtil.condUnitET[Future](
-        synchronizerIds.sizeIs <= 1,
-        TopologyManagerError.InconsistentTopologySnapshot.MultipleLogicalSynchronizerIds(
-          synchronizerIds
-        ),
-      )
-
-      synchronizerId <- EitherT.fromEither[Future](
-        synchronizerIds.headOption.toRight[RpcError](
-          TopologyManagerError.InconsistentTopologySnapshot.MissingSynchronizerSequencerState()
-        )
-      )
-
-      physicalSynchronizerId = PhysicalSynchronizerId(synchronizerId, synchronizerParameters)
-      expectedUpgradePsidO = genesisState
-        .collectOfMapping[LsuAnnouncement]
-        .collectLatestByUniqueKey
-        .collectOfType[
-          TopologyChangeOp.Replace
-        ] // must happen after collectLatestByUniqueKey, not to miss a possible LSU cancellation
-        .result
-        .map(_.mapping.successorSynchronizerId)
-        .headOption
-
-      // If there's an announcement in the topology snapshot, we expect that the sequencer being initialized is the successor
-      _ <- EitherT.fromEither[Future](
-        expectedUpgradePsidO.fold(Right(()): Either[RpcError, Unit])(expectedUpgradePsid =>
-          Either.cond(
-            ignoreLsuPsidCheck || expectedUpgradePsid == physicalSynchronizerId,
-            (),
-            TopologyManagerError.InconsistentTopologySnapshot.UnexpectedPhysicalSynchronizerId(
-              physicalSynchronizerId,
-              expectedUpgradePsid,
-            ),
-          )
-        )
-      )
 
       // check that the snapshot is consistent with respect to effective proposals and effective fully authorized transactions
       multipleEffectivePerUniqueKey = genesisState.result

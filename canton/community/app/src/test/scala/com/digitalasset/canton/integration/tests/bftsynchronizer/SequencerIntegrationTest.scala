@@ -1,16 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.bftsynchronizer
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{InstanceReference, LocalParticipantReference}
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.error.MediatorError.MalformedMessage
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -103,8 +103,8 @@ trait SequencerIntegrationTest
     import env.*
     onboardNewSequencer(
       synchronizerId,
-      newSequencer = sequencer2,
-      existingSequencer = sequencer1,
+      newSequencerReference = sequencer2,
+      existingSequencerReference = sequencer1,
       synchronizerOwners = synchronizerOwners.toSet,
     )
   }
@@ -287,17 +287,10 @@ trait SequencerIntegrationTest
 
 // TODO(#18401): Re-enable the following tests when SequencerStore creation has been moved to the factory
 //class SequencerIntegrationTestDefault extends SequencerIntegrationTest {
-//  registerPlugin(new UseH2(loggerFactory))
-//  registerPlugin(new UseBftSequencer(loggerFactory))
+//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 //}
 
 class SequencerIntegrationTestPostgres extends SequencerIntegrationTest {
-  val plugin = new UseBftSequencer(
-    loggerFactory,
-    dynamicallyOnboardedSequencerNames = Seq(InstanceName.tryCreate("sequencer2")),
-  )
-  override val bftSequencerPlugin: Option[UseBftSequencer] = Some(plugin)
-
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(plugin)
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

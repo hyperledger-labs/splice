@@ -64,8 +64,6 @@ class DbScanRewardsReferenceStore(
     )
     with ScanRewardsReferenceStore {
 
-  override def waitUntilInitialized: Future[Unit] = multiDomainAcsStore.waitUntilAcsIngested()
-
   private val tcsStore = new DbTcsStore(
     multiDomainAcsStore,
     descriptor => SynchronizerId.tryFromString(descriptor.key("synchronizerId")),

@@ -18,7 +18,6 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
@@ -88,7 +87,6 @@ case class EnvironmentDefinition(
     this
       .withAllocatedUsers()
       .withInitializedNodes()
-      .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
       .withEagerAppActivityMarkerConversion
@@ -172,54 +170,6 @@ case class EnvironmentDefinition(
       EnvironmentDefinition.waitForNodeInitialization(env)
     })
 
-  def withMultiSyncFeatureFlag(): EnvironmentDefinition =
-    copy(setup = implicit env => {
-      this.setup(env)
-      env.validators.local.foreach { validator =>
-        val connectedSynchronizers = validator.participantClient.synchronizers.list_connected()
-        if (connectedSynchronizers.length <= 1) {
-          logger.info(
-            s"Participant ${validator.participantClient.id} is connected to ${connectedSynchronizers.length}, not enabling multi-synchronizer feature flag"
-          )(TraceContext.empty)
-        } else {
-          connectedSynchronizers.foreach { sync =>
-            val existingEntries: Seq[
-              com.digitalasset.canton.admin.api.client.data.topology.ListSynchronizerTrustCertificateResult
-            ] = validator.participantClient.topology.synchronizer_trust_certificates.list(
-              Some(sync.synchronizerId),
-              filterUid = validator.participantClient.id.filterString,
-            )
-            val existing = existingEntries match {
-              case Seq(e) => e
-              case _ =>
-                sys.error(
-                  s"Expected exactly one trust certificate for ${validator.participantClient.id} on ${sync.synchronizerId} but got $existingEntries"
-                )
-            }
-            if (
-              existing.item.featureFlags
-                .contains(ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer)
-            ) {
-              logger.info(
-                s"Participant ${validator.participantClient.id} already has multi synchronizer feature flag enabled for ${sync.synchronizerId}"
-              )(TraceContext.empty)
-            } else {
-              logger.info(
-                s"Enabling multi-synchronizer feature flag for ${validator.participantClient.id} on ${sync.synchronizerId}"
-              )(TraceContext.empty)
-              validator.participantClient.topology.synchronizer_trust_certificates.propose(
-                validator.participantClient.id,
-                sync.synchronizerId,
-                featureFlags = Seq(
-                  ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer
-                ),
-              )
-            }
-          }
-        }
-      }
-    })
-
   def withPreSetup(preSetup: SpliceTestConsoleEnvironment => Unit): EnvironmentDefinition =
     copy(preSetup = preSetup)
 
@@ -279,6 +229,23 @@ case class EnvironmentDefinition(
       )(config)
     )
 
+  def withHttpSettingsForHigherThroughput: EnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      config.copy(pekkoConfig =
+        Some(
+          ConfigFactory.parseString(
+            """
+              |pekko.http.host-connection-pool {
+              |  max-connections = 1000
+              |  min-connections = 20
+              |  max-open-requests = 1024
+              |}
+              |""".stripMargin
+          )
+        )
+      )
+    )
+
   def withTrafficTopupsEnabled: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
@@ -327,13 +294,8 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withBftSequencers(namePredicate: String => Boolean = _ => true): EnvironmentDefinition =
-    addConfigTransformToFront((_, config) =>
-      ConfigTransforms.withBftSequencers(namePredicate)(config)
-    )
-
-  def withBftSequencersSuccessor: EnvironmentDefinition =
-    addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
+  def withBftSequencers: EnvironmentDefinition =
+    addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
 
   def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
     addConfigTransforms((_, conf) =>
@@ -359,10 +321,12 @@ case class EnvironmentDefinition(
   ): EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllSvAppConfigs_(
-        _.focus(_.localSynchronizerNodes.current)
+        _.focus(_.localSynchronizerNode)
           .modify(
-            _.focus(_.sequencer.sequencerAvailabilityDelay)
-              .replace(duration)
+            _.map(d =>
+              d.focus(_.sequencer.sequencerAvailabilityDelay)
+                .replace(duration)
+            )
           )
       )(config)
     )
@@ -498,12 +462,9 @@ case class EnvironmentDefinition(
       .addConfigTransform((_, conf) =>
         ConfigTransforms
           .updateAllSvAppConfigs_(
-            _.focus(_.localSynchronizerNodes.current)
-              .modify(
-                _.focus(_.topologyChangeDelayDuration)
-                  // same as canton for sim time
-                  .replace(NonNegativeFiniteDuration.Zero)
-              )
+            _.focus(_.topologyChangeDelayDuration)
+              // same as canton for sim time
+              .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
       .withSequencerConnectionsFromScanDisabled(10_000)

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -11,8 +11,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.BootstrapDetector.BootstrapKind
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
-  Bootstrap,
   EpochStore,
+  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -26,7 +26,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SequencerSnapshotAdditionalInfo,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import org.scalatest.wordspec.AnyWordSpec
 
 class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
@@ -46,14 +45,14 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
         (
           None,
           aMembershipWith2Nodes,
-          aBootstrapEpoch,
+          Genesis.GenesisEpoch,
           BootstrapKind.RegularStartup,
         ),
         // Only 1 node
         (
           Some(aSequencerSnapshot),
           Membership.forTesting(myId),
-          aBootstrapEpoch,
+          Genesis.GenesisEpoch,
           BootstrapKind.RegularStartup,
         ),
         // Non-zero starting epoch
@@ -61,10 +60,11 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
           Some(aSequencerSnapshot),
           aMembershipWith2Nodes,
           Epoch(
-            EpochInfo.forTesting(
+            EpochInfo(
               EpochNumber(7L),
               BlockNumber(70L),
               EpochLength(10L),
+              Genesis.GenesisTopologyActivationTime,
             ),
             lastBlockCommits = Seq.empty,
           ),
@@ -74,12 +74,13 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
         (
           Some(aSequencerSnapshot),
           aMembershipWith2Nodes,
-          aBootstrapEpoch,
+          Genesis.GenesisEpoch,
           BootstrapKind.Onboarding(
-            EpochInfo.forTesting(
+            EpochInfo(
               EpochNumber(1500L),
               BlockNumber(15000L),
               DefaultEpochLength,
+              topologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue),
             )
           ),
         ),
@@ -100,7 +101,7 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
         DefaultEpochLength,
         Some(SequencerSnapshotAdditionalInfo(Map.empty /* boom! */ )),
         aMembershipWith2Nodes,
-        aBootstrapEpoch,
+        Genesis.GenesisEpoch,
       )(_ => throw new RuntimeException("aborted"))
     )
   }
@@ -110,7 +111,6 @@ object BootstrapDetectorTest extends TestEssentials {
 
   private val myId = BftNodeId("self")
   private val otherId = BftNodeId("other")
-  private val aBootstrapEpoch = Bootstrap.bootstrapEpoch(TestBootstrapTopologyActivationTime)
   private val aMembershipWith2Nodes =
     Membership.forTesting(myId, Set(otherId))
   private val aSequencerSnapshot = SequencerSnapshotAdditionalInfo(
@@ -120,7 +120,7 @@ object BootstrapDetectorTest extends TestEssentials {
         TopologyActivationTime(CantonTimestamp.Epoch),
         Some(EpochNumber(1500L)),
         firstBlockNumberInStartEpoch = Some(BlockNumber(15000L)),
-        startEpochTopologyQueryTimestamp = Some(TestBootstrapTopologyActivationTime),
+        startEpochTopologyQueryTimestamp = Some(TopologyActivationTime(CantonTimestamp.MinValue)),
         startEpochCouldAlterOrderingTopology = None,
         previousBftTime = None,
         previousEpochTopologyQueryTimestamp = None,

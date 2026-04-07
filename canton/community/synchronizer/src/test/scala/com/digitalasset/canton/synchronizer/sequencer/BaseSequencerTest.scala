@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -13,11 +13,10 @@ import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
-import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
-import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
+import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
@@ -28,10 +27,8 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
   SequencerError,
 }
-import com.digitalasset.canton.synchronizer.sequencer.store.PayloadId
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
-  LsuTrafficState,
   SequencerRateLimitError,
   SequencerTrafficStatus,
 }
@@ -45,7 +42,6 @@ import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.{Member, SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
 import com.google.protobuf.ByteString
 import org.apache.pekko.Done
@@ -59,7 +55,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
   val messageId = MessageId.tryCreate("test-message-id")
   def mkBatch(recipients: Set[Member]): Batch[ClosedEnvelope] =
     Batch[ClosedEnvelope](
-      ClosedUncompressedEnvelope.create(
+      ClosedEnvelope.create(
         ByteString.EMPTY,
         Recipients.ofSet(recipients).value,
         Seq.empty,
@@ -85,29 +81,17 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
         None,
         new SimClock(CantonTimestamp.Epoch, loggerFactory),
         new SignatureVerifier {
-          override def verifySubmissionRequestSignature(
-              signedSubmissionRequest: SignedContent[SubmissionRequest],
+          override def verifySignature[A <: ProtocolVersionedMemoizedEvidence](
+              signedContent: SignedContent[A],
               hashPurpose: HashPurpose,
-              estimatedSequencingTimestamp: CantonTimestamp,
+              sender: A => Member,
           )(implicit
               traceContext: TraceContext
-          ): EitherT[FutureUnlessShutdown, String, SignedContent[SubmissionRequest]] =
-            EitherT.rightT(signedSubmissionRequest)
-
-          override def verifyAcknowledgeRequestSignature(
-              signedAcknowledgeRequest: SignedContent[AcknowledgeRequest],
-              hashPurpose: HashPurpose,
-              timestampToVerify: Option[CantonTimestamp],
-              protocolVersion: ProtocolVersion,
-          )(implicit
-              traceContext: TraceContext
-          ): EitherT[FutureUnlessShutdown, String, SignedContent[AcknowledgeRequest]] =
-            EitherT.rightT(signedAcknowledgeRequest)
+          ): EitherT[FutureUnlessShutdown, String, SignedContent[A]] =
+            EitherT.rightT(signedContent)
         },
-        testedProtocolVersion,
       )
       with FlagCloseable {
-
     val newlyRegisteredMembers =
       mutable
         .Set[Member]() // we're using the scalatest serial execution context so don't need a concurrent collection
@@ -116,8 +100,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
     ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
       EitherTUtil.unitUS
     override protected def sendAsyncSignedInternal(
-        signedSubmission: SignedContent[SubmissionRequest],
-        skipLsuChecks: Boolean = false,
+        signedSubmission: SignedContent[SubmissionRequest]
     )(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
@@ -181,7 +164,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
 
     override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus] = ???
+    ): FutureUnlessShutdown[SequencerTrafficStatus] = ???
 
     override protected def timeouts: ProcessingTimeout = ProcessingTimeout()
     override def setTrafficPurchased(
@@ -218,37 +201,16 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp] = ???
 
-    override private[sequencer] def updateLsuSuccessor(
+    override private[sequencer] def updateSynchronizerSuccessor(
         successorO: Option[SynchronizerSuccessor],
         announcementEffectiveTime: EffectiveTime,
     )(implicit traceContext: TraceContext): Unit = ???
 
     override def sequencingTime(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[Option[CantonTimestamp]] =
-      FutureUnlessShutdown.pure(None)
+    ): FutureUnlessShutdown[Option[CantonTimestamp]] = ???
 
     override private[canton] def orderer: Option[BlockOrderer] = ???
-
-    override protected def readPayloadsFromTimestampsInternal(timestamps: Seq[CantonTimestamp])(
-        implicit traceContext: TraceContext
-    ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] = ???
-
-    override def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
-        traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]] = ???
-
-    override def getLsuTrafficControlState(implicit
-        traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] = ???
-
-    override def setLsuTrafficControlState(state: LsuTrafficState)(implicit
-        traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = ???
-
-    override def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
-        traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = ???
   }
 
   "sendAsyncSigned" should {

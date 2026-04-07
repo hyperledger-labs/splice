@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output
@@ -7,9 +7,10 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.sequencer.admin.v30
+import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.block.BlockFormat
-import com.digitalasset.canton.synchronizer.block.BlockFormat.Block.TickTopology
 import com.digitalasset.canton.synchronizer.block.BlockFormat.OrderedRequest
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
@@ -22,8 +23,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory.GenericInMemoryEpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
-  Bootstrap,
   EpochStoreReader,
+  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.OutputModule.{
   DefaultRequestInspector,
@@ -99,8 +100,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   fakeIgnoringModule,
   fakeModuleExpectingSilence,
 }
-import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, Traced}
-import com.digitalasset.canton.util.MaxBytesToDecompress
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
@@ -476,7 +476,7 @@ class OutputModuleTest
           initialBlock,
           batches = Seq(
             OrderingRequestBatch.create(
-              Seq(Traced(OrderingRequest(aTag, messageId = "", ByteString.EMPTY))),
+              Seq(Traced(OrderingRequest(aTag, ByteString.EMPTY))),
               EpochNumber.First,
             )
           ).map(x => BatchId.from(x) -> x),
@@ -504,15 +504,15 @@ class OutputModuleTest
 
       blockSubscription.subscription().take(2).runWith(Sink.seq).map { blocks =>
         blocks.size shouldBe 2
-        val initialBlock = blocks.head.value
+        val initialBlock = blocks.head
         initialBlock.blockHeight shouldBe BlockNumber.First
         initialBlock.requests.size shouldBe 1
         initialBlock.requests.head shouldBe Traced(
           OrderedRequest(aTimestamp.toMicros, aTag, ByteString.EMPTY, BftNodeId.Empty)
         )
         val nextBlock = blocks(1)
-        nextBlock.value.blockHeight shouldBe secondBlockNumber
-        nextBlock.value.requests should be(empty)
+        nextBlock.blockHeight shouldBe secondBlockNumber
+        nextBlock.requests should be(empty)
       }
     }
 
@@ -556,8 +556,8 @@ class OutputModuleTest
       )
 
       blockSubscription.subscription().runWith(Sink.head).map { block =>
-        block.value.blockHeight shouldBe secondBlockNumber
-        block.value.requests should be(empty)
+        block.blockHeight shouldBe secondBlockNumber
+        block.requests should be(empty)
       }
     }
 
@@ -599,8 +599,8 @@ class OutputModuleTest
       )
 
       blockSubscription.subscription().runWith(Sink.head).map { block =>
-        block.value.blockHeight shouldBe initialHeight
-        block.value.requests should be(empty)
+        block.blockHeight shouldBe initialHeight
+        block.requests should be(empty)
       }
     }
 
@@ -640,17 +640,12 @@ class OutputModuleTest
                 nodes = Set(BftNodeId("node1")),
                 SequencingParameters.Default,
                 topologyActivationTime,
-                areTherePendingCantonTopologyChanges = Some(pendingChanges),
+                areTherePendingCantonTopologyChanges = pendingChanges,
               )
             val newCryptoProvider = failingCryptoProvider[ProgrammableUnitTestEnv]
-            when(
-              topologyProviderMock.getOrderingTopologyAt(
-                Some(topologyActivationTime),
-                checkPendingChanges = true,
-              )
-            )
+            when(topologyProviderMock.getOrderingTopologyAt(topologyActivationTime))
               .thenReturn(() => Some((newOrderingTopology, newCryptoProvider)))
-            val subscriptionBlocks = mutable.Queue.empty[Traced[BlockFormat.Block]]
+            val subscriptionBlocks = mutable.Queue.empty[BlockFormat.Block]
             implicit val context
                 : ProgrammableUnitTestContext[Output.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext(resolveAwaits = true)
@@ -725,18 +720,15 @@ class OutputModuleTest
 
             // All blocks have now been output to the subscription
             subscriptionBlocks should have size 2
-            val block1 = subscriptionBlocks.dequeue().value
+            val block1 = subscriptionBlocks.dequeue()
             block1.blockHeight shouldBe BlockNumber.First
-            block1.tickTopology shouldBe None
-            val block2 = subscriptionBlocks.dequeue().value
+            block1.tickTopologyAtMicrosFromEpoch shouldBe None
+            val block2 = subscriptionBlocks.dequeue()
             block2.blockHeight shouldBe BlockNumber(1)
             // We should tick even during state transfer if the epoch has potential sequencer topology changes
-            block2.tickTopology shouldBe Some(
-              TickTopology(anotherTimestamp.toMicros, broadcast = false)
-            )
+            block2.tickTopologyAtMicrosFromEpoch shouldBe Some(anotherTimestamp.toMicros)
 
-            verify(topologyProviderMock, times(1))
-              .getOrderingTopologyAt(Some(topologyActivationTime), checkPendingChanges = true)
+            verify(topologyProviderMock, times(1)).getOrderingTopologyAt(topologyActivationTime)
             // Update the last block if needed and set up the new topology
             piped3.foreach(output.receive)
 
@@ -790,10 +782,12 @@ class OutputModuleTest
         )
 
         // the behavior will always be the same across block modes, so the chosen one is irrelevant
+        val aTopologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue)
         val anOrderingTopology =
           OrderingTopology.forTesting(
             nodes = Set(BftNodeId("node1")),
             SequencingParameters.Default,
+            aTopologyActivationTime,
           )
         val aNewMembership =
           Membership(BftNodeId("node1"), anOrderingTopology, Seq(BftNodeId("node1")))
@@ -854,7 +848,7 @@ class OutputModuleTest
 
     "not process a block from a future epoch" when {
       "receiving multiple state-transferred blocks" in {
-        val subscriptionBlocks = mutable.Queue.empty[Traced[BlockFormat.Block]]
+        val subscriptionBlocks = mutable.Queue.empty[BlockFormat.Block]
         val output =
           createOutputModule[ProgrammableUnitTestEnv](requestInspector =
             new FixedResultRequestInspector(true)
@@ -1081,10 +1075,7 @@ class OutputModuleTest
 
         context.runPipedMessages() shouldBe Seq.empty
 
-        verify(topologyProviderSpy, never).getOrderingTopologyAt(
-          any[Option[TopologyActivationTime]],
-          checkPendingChanges = any[Boolean],
-        )(
+        verify(topologyProviderSpy, never).getOrderingTopologyAt(any[TopologyActivationTime])(
           any[TraceContext]
         )
         verify(consensusRef, times(1)).asyncSend(
@@ -1107,32 +1098,35 @@ class OutputModuleTest
       val sequencerNodeRef = mock[ModuleRef[SequencerNode.SnapshotMessage]]
       val node1 = BftNodeId("node1")
       val node2 = BftNodeId("node2")
-      val node1ActivationTime = TopologyActivationTime(aTimestamp.minusMillis(2))
-      val node2ActivationTime = TopologyActivationTime(aTimestamp)
+      val node2TopologyInfo = nodeTopologyInfo(TopologyActivationTime(aTimestamp))
+      val node1TopologyInfo = nodeTopologyInfo(
+        TopologyActivationTime(node2TopologyInfo.activationTime.value.minusMillis(2))
+      )
       val topologyActivationTime =
-        TopologyActivationTime(aTimestamp.plusMillis(2))
+        TopologyActivationTime(node2TopologyInfo.activationTime.value.plusMillis(2))
       val previousTopologyActivationTime =
         TopologyActivationTime(topologyActivationTime.value.minusSeconds(1L))
       val topology = OrderingTopology(
         nodesTopologyInfo = Map(
-          node1 -> nodeTopologyInfo(),
-          node2 -> nodeTopologyInfo(),
-          BftNodeId("node from the future") -> nodeTopologyInfo(),
+          node1 -> node1TopologyInfo,
+          node2 -> node2TopologyInfo,
+          BftNodeId("node from the future") ->
+            nodeTopologyInfo(
+              TopologyActivationTime(
+                node2TopologyInfo.activationTime.value.plusMillis(1)
+              )
+            ),
         ),
-        DefaultEpochLength,
         SequencingParameters.Default,
-        defaultMaxBytesToDecompress, // irrelevant for this test
+        MaxRequestSizeToDeserialize.Limit(
+          DynamicSynchronizerParameters.defaultMaxRequestSize.value
+        ), // irrelevant for this test
         topologyActivationTime,
-        areTherePendingCantonTopologyChanges = Some(false),
-      )
-      val firstKnownAt = Map(
-        node1 -> node1ActivationTime,
-        node2 -> node2ActivationTime,
-        BftNodeId("node from the future") -> TopologyActivationTime(aTimestamp.plusMillis(1)),
+        areTherePendingCantonTopologyChanges = false,
       )
 
       def bftTimeForBlockInFirstEpoch(blockNumber: Long) =
-        node2ActivationTime.value.minusSeconds(1).plusMillis(blockNumber)
+        node2TopologyInfo.activationTime.value.minusSeconds(1).plusMillis(blockNumber)
 
       // Store the "previous epoch"
       epochStore
@@ -1168,7 +1162,6 @@ class OutputModuleTest
           initialOrderingTopology = topology,
           store = store,
           epochStoreReader = epochStore,
-          orderingTopologyProvider = new FakeOrderingTopologyProvider(Some(firstKnownAt)),
           consensusRef = mock[ModuleRef[Consensus.Message[ProgrammableUnitTestEnv]]],
         )()
       output.receive(Output.Start)
@@ -1202,7 +1195,7 @@ class OutputModuleTest
             anOrderedBlockForOutput(
               epochNumber = 1L,
               blockNumber = DefaultEpochLength,
-              commitTimestamp = node2ActivationTime.value,
+              commitTimestamp = node2TopologyInfo.activationTime.value,
             ),
             batches = Seq.empty,
           )
@@ -1212,10 +1205,13 @@ class OutputModuleTest
 
       output.receive(
         Output.SequencerSnapshotMessage
-          .GetAdditionalInfo(timestamp = node2ActivationTime.value, sequencerNodeRef)
+          .GetAdditionalInfo(timestamp = node2TopologyInfo.activationTime.value, sequencerNodeRef)
       )
 
-      context.runPipedMessagesUntilNoMorePiped(output)
+      // run the first set of queries
+      context.runPipedMessages()
+      // run other queries and receive the return message
+      context.runPipedMessagesAndReceiveOnModule(output)
 
       verify(sequencerNodeRef, times(1)).asyncSend(
         eqTo(
@@ -1225,7 +1221,7 @@ class OutputModuleTest
                 node1 ->
                   v30.BftSequencerSnapshotAdditionalInfo
                     .SequencerActiveAt(
-                      timestamp = node1ActivationTime.value.toMicros,
+                      timestamp = node1TopologyInfo.activationTime.value.toMicros,
                       startEpochNumber = Some(EpochNumber.First),
                       firstBlockNumberInStartEpoch = Some(BlockNumber.First),
                       startEpochTopologyQueryTimestamp =
@@ -1238,7 +1234,7 @@ class OutputModuleTest
                 node2 ->
                   v30.BftSequencerSnapshotAdditionalInfo
                     .SequencerActiveAt(
-                      timestamp = node2ActivationTime.value.toMicros,
+                      timestamp = node2TopologyInfo.activationTime.value.toMicros,
                       startEpochNumber = Some(EpochNumber(1L)),
                       firstBlockNumberInStartEpoch = Some(BlockNumber(DefaultEpochLength)),
                       startEpochTopologyQueryTimestamp =
@@ -1331,7 +1327,7 @@ class OutputModuleTest
       ),
       batches = Seq(
         OrderingRequestBatch.create(
-          Seq(Traced(OrderingRequest(aTag, messageId = "", ByteString.EMPTY))),
+          Seq(Traced(OrderingRequest(aTag, ByteString.EMPTY))),
           epochNumber,
         )
       ).map(x => BatchId.from(x) -> x),
@@ -1348,7 +1344,7 @@ class OutputModuleTest
 
   private def createOutputModule[E <: BaseIgnoringUnitTestEnv[E]](
       initialHeight: Long = BlockNumber.First,
-      initialEpochForTopology: Long = Bootstrap.BootstrapEpochNumber,
+      initialEpochForTopology: Long = Genesis.GenesisEpochNumber,
       initialOrderingTopology: OrderingTopology = OrderingTopology.forTesting(nodes = Set.empty),
       availabilityRef: ModuleRef[Availability.Message[E]] = fakeModuleExpectingSilence,
       consensusRef: ModuleRef[Consensus.Message[E]] = fakeModuleExpectingSilence,
@@ -1385,12 +1381,7 @@ class OutputModuleTest
       loggerFactory,
       timeouts,
       requestInspector,
-    )(
-      new BftBlockOrdererConfig(),
-      synchronizerProtocolVersion,
-      MetricsContext.Empty,
-      NoReportingTracerProvider.tracer,
-    )
+    )(new BftBlockOrdererConfig(), synchronizerProtocolVersion, MetricsContext.Empty)
   }
 
   private def createOutputMetadataStore[E <: BaseIgnoringUnitTestEnv[E]] =
@@ -1414,10 +1405,8 @@ object OutputModuleTest {
     private var outcome = true
 
     override def isRequestToAllMembersOfSynchronizer(
-        blockMetadata: BlockMetadata,
-        requestNumber: Int,
         _request: OrderingRequest,
-        _maxBytesToDecompress: MaxBytesToDecompress,
+        _maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
         _logger: TracedLogger,
         _traceContext: TraceContext,
     )(implicit _synchronizerProtocolVersion: ProtocolVersion): Boolean = {
@@ -1442,34 +1431,23 @@ object OutputModuleTest {
   }
 
   private class EnqueueingBlockSubscription(
-      subscriptionBlocks: mutable.Queue[Traced[BlockFormat.Block]]
+      subscriptionBlocks: mutable.Queue[BlockFormat.Block]
   ) extends EmptyBlockSubscription {
 
     override def receiveBlock(block: BlockFormat.Block)(implicit
         traceContext: TraceContext
     ): Unit =
-      subscriptionBlocks.enqueue(Traced(block))
+      subscriptionBlocks.enqueue(block)
   }
 
-  private class FakeOrderingTopologyProvider[E <: BaseIgnoringUnitTestEnv[E]](
-      firstKnownAtAnswer: Option[Map[BftNodeId, TopologyActivationTime]] = None
-  ) extends OrderingTopologyProvider[E] {
+  private class FakeOrderingTopologyProvider[E <: BaseIgnoringUnitTestEnv[E]]
+      extends OrderingTopologyProvider[E] {
 
-    override def getOrderingTopologyAt(
-        activationTime: Option[TopologyActivationTime],
-        checkPendingChanges: Boolean,
-    )(implicit
+    override def getOrderingTopologyAt(activationTime: TopologyActivationTime)(implicit
         traceContext: TraceContext
-    ): E#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[E])]] =
-      createFuture(None)
+    ): E#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[E])]] = createFuture(None)
 
-    override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
-        traceContext: TraceContext
-    ): () => Option[Map[BftNodeId, TopologyActivationTime]] =
-      createFuture(firstKnownAtAnswer)
-
-    private def createFuture[A](a: A): E#FutureUnlessShutdownT[A] =
-      () => a
+    private def createFuture[A](a: A): E#FutureUnlessShutdownT[A] = () => a
   }
 
   private val aTag = BlockFormat.SendTag
@@ -1483,9 +1461,10 @@ object OutputModuleTest {
   private val secondEpochNumber = EpochNumber(1L)
   private val secondBlockNumber = BlockNumber(1L)
 
-  private def nodeTopologyInfo() =
+  private def nodeTopologyInfo(time: TopologyActivationTime) =
     NodeTopologyInfo(
-      keyIds = Set.empty
+      activationTime = time,
+      keyIds = Set.empty,
     )
 
   def anOrderedBlockForOutput(

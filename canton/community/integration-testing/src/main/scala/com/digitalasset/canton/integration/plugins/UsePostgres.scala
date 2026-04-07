@@ -1,11 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
 
 import cats.syntax.parallel.*
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -20,7 +18,6 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentSetupPlugin}
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.parallelInstanceFutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.CommonMockMetrics
 import com.digitalasset.canton.resource.{DbStorage, DbStorageSingle}
@@ -49,8 +46,8 @@ import scala.util.{Random, Success}
   * POSTGRES_DB=postgres
   * }}}
   *
-  * Please note that you need to create in this case two databases: $$POSTGRES_DB AND
-  * "$${POSTGRES_DB}_dev"
+  * Please note that you need to create in this case two databases: $POSTGRES_DB AND
+  * "${POSTGRES_DB}_dev"
   *
   * On the database, you need to create the user as follows:
   *
@@ -68,18 +65,12 @@ import scala.util.{Random, Success}
   * @param customDbNames
   *   optionally defines a mapping from identifier to db name (String => String) and a suffix to add
   *   to the db name
-  * @param dropDatabaseAfterTest
-  *   default true, otherwise preserve the database after the test
-  * @param nodeDbMapping
-  *   Allow nodes to share the DB: if `node1` maps to `node2`, then `node1` will use `node2` DB.
   */
 class UsePostgres(
     protected val loggerFactory: NamedLoggerFactory,
     customDbNames: Option[(String => String, String)] = None,
-    nodeDbMapping: String => String = identity,
     customMaxConnectionsByNode: Option[String => Option[PositiveInt]] = None,
     forceTestContainer: Boolean = false,
-    dropDatabaseAfterTest: Boolean = true,
 ) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
     with FlagCloseable
     with HasCloseContext
@@ -90,7 +81,6 @@ class UsePostgres(
     Threading.newExecutionContext(
       loggerFactory.threadName + "-db-execution-context",
       noTracingLogger,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
 
   private[plugins] def dbSetupExecutionContext: ExecutionContext = dbSetupExecutorService
@@ -101,11 +91,10 @@ class UsePostgres(
 
   lazy val applicationName: String = loggerFactory.name
 
-  def generateDbName(nodeName: String): String =
-    customDbNames match {
-      case Some((dbNames, suffix)) => dbNames(nodeName) + suffix
-      case None => s"${dbPrefix}_${nodeDbMapping(nodeName)}"
-    }
+  def generateDbName(nodeName: String): String = customDbNames match {
+    case Some((dbNames, suffix)) => dbNames(nodeName) + suffix
+    case None => s"${dbPrefix}_$nodeName"
+  }
 
   // we have to keep the storage instance alive for the duration of the test as this could be
   // managing an external docker container and other resources
@@ -127,10 +116,8 @@ class UsePostgres(
       ExecutorServiceExtensions(dbSetupExecutorService)(logger, DefaultProcessingTimeouts.testing),
     )(logger)
 
-  override def afterTests(): Unit = {
-    dbSetup.analyzeDatabaseStatistics()
+  override def afterTests(): Unit =
     close()
-  }
 
   def generateDbConfig(
       name: String,
@@ -167,6 +154,7 @@ class UsePostgres(
   }
 
   override def beforeEnvironmentCreated(config: CantonConfig): CantonConfig = {
+    implicit val ec: ExecutionContext = dbSetupExecutionContext
     val transformedConfig = {
       val storageChange = ConfigTransforms.modifyAllStorageConfigs((_, name, storage) =>
         generateDbConfig(name, storage.parameters, storage.config)
@@ -181,7 +169,10 @@ class UsePostgres(
     }
 
     Await.result(
-      recreateDatabases(transformedConfig),
+      nodeNamesOfConfig(transformedConfig)
+        .map(generateDbName)
+        .distinct
+        .parTraverse_(dbName => recreateDatabase(dbName)),
       config.parameters.timeouts.processing.io.duration,
     )
     transformedConfig
@@ -190,13 +181,8 @@ class UsePostgres(
   // Comment out to keep the databases after tests
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit = {
     val nodes = nodeNamesOfConfig(config)
-    if (dropDatabaseAfterTest) {
-      val drops = dropDatabases(nodes)
-      Await.result(drops, config.parameters.timeouts.processing.io.duration)
-    } else {
-      val dbNames = nodes.map(generateDbName).distinct
-      logger.info(s"Preserving the following database names:\n  ${dbNames.mkString("\n  ")}")
-    }
+    val drops = dropDatabases(nodes)
+    Await.result(drops, config.parameters.timeouts.processing.io.duration)
   }
 
   private def logOpenQueries(storage: DbStorage): FutureUnlessShutdown[Unit] = {
@@ -212,9 +198,6 @@ class UsePostgres(
         logger.info(s"Running queries: ${queries.mkString("\n")}")
       }
   }
-
-  def dropDatabases(config: CantonConfig): FutureUnlessShutdown[Unit] =
-    dropDatabases(nodeNamesOfConfig(config))
 
   def dropDatabases(nodes: Seq[String]): FutureUnlessShutdown[Unit] = {
     implicit val ec = dbSetupExecutionContext
@@ -238,14 +221,6 @@ class UsePostgres(
         logOpenQueries(storage).discard
         UnlessShutdown.Outcome(())
       }
-  }
-
-  def recreateDatabases(config: CantonConfig): FutureUnlessShutdown[Unit] = {
-    implicit val ec = dbSetupExecutionContext
-    nodeNamesOfConfig(config)
-      .map(generateDbName)
-      .distinct
-      .parTraverse_(dbName => recreateDatabase(dbName))
   }
 
   def recreateDatabase(node: InstanceReference): FutureUnlessShutdown[Unit] =

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -9,7 +9,6 @@ import com.digitalasset.canton.protocol.LfNodeCreate
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PackageConsumer.{ContinueOnInterruption, PackageResolver}
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.engine.Engine
 
 import scala.concurrent.ExecutionContext
@@ -19,7 +18,6 @@ trait ContractHasher {
   def hash(
       create: LfNodeCreate,
       hashingMethod: Hash.HashingMethod,
-      onMissingPackage: PackageId => FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -41,12 +39,11 @@ object ContractHasher {
     override def hash(
         create: LfNodeCreate,
         hashingMethod: Hash.HashingMethod,
-        onMissingPackage: PackageId => FutureUnlessShutdown[Unit],
     )(implicit
         ec: ExecutionContext,
         traceContext: TraceContext,
     ): EitherT[FutureUnlessShutdown, String, Hash] =
-      consume(delegate.hashCreateNode(create, identity, hashingMethod), onMissingPackage)
+      consume(delegate.hashCreateNode(create, identity, hashingMethod))
   }
 
 }

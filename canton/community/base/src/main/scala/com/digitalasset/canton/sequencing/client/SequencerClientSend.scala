@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -8,9 +8,7 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.protocol.{AggregationRule, Batch, MessageId}
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
@@ -66,91 +64,52 @@ trait SequencerClientSend {
     *   [[com.digitalasset.canton.sequencing.SequencerConnections]]. If the sequencer client plans
     *   to send the submission request to multiple sequencers, it adds a suitable
     *   [[com.digitalasset.canton.sequencing.protocol.AggregationRule]] to the request for
-    *   deduplication, unless one is already present. False disables amplification for this request
+    *   deduplication, unless one is already present. False disables amplificaton for this request
     *   independent of the configuration.
-    * @param timestamps
-    *   Aggregated timestamps needed for sending a request.
     */
   def sendAsync(
       batch: Batch[DefaultOpenEnvelope],
-      timestamps: SendRequestTimestamps = defaultSendRequestTimestamps,
+      topologyTimestamp: Option[CantonTimestamp] = None,
+      maxSequencingTime: CantonTimestamp = generateMaxSequencingTime,
       messageId: MessageId = generateMessageId,
       aggregationRule: Option[AggregationRule] = None,
       callback: SendCallback = SendCallback.empty,
       amplify: Boolean = false,
-      useConfirmationResponseAmplificationParameters: Boolean = false,
   )(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): SendAsyncResult
 
-  protected[canton] def clock: Clock
-
   /** Flattened version of [[sendAsync]]
     */
   def send(
       batch: Batch[DefaultOpenEnvelope],
-      timestamps: SendRequestTimestamps = defaultSendRequestTimestamps,
+      topologyTimestamp: Option[CantonTimestamp] = None,
+      maxSequencingTime: CantonTimestamp = generateMaxSequencingTime,
       messageId: MessageId = generateMessageId,
       aggregationRule: Option[AggregationRule] = None,
       callback: SendCallback = SendCallback.empty,
       amplify: Boolean = false,
-      useConfirmationResponseAmplificationParameters: Boolean = false,
   )(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = sendAsync(
     batch = batch,
-    timestamps = timestamps,
+    topologyTimestamp = topologyTimestamp,
+    maxSequencingTime = maxSequencingTime,
     messageId = messageId,
     aggregationRule = aggregationRule,
     callback = callback,
     amplify = amplify,
-    useConfirmationResponseAmplificationParameters = useConfirmationResponseAmplificationParameters,
   ).value.flatMap(identity)
 
-  private def defaultSendRequestTimestamps: SendRequestTimestamps = {
-    val now = clock.now
-    SendRequestTimestamps(
-      topologyTimestamp = None,
-      approximateTimestampForSigning = now,
-      maxSequencingTime = generateMaxSequencingTime(now),
-    )
-  }
-
-  /** Provides a value for max-sequencing-time to use with `sendAsync` if no better application-
-    * provided timeout is available. Currently, this is a configurable offset from our clock. If
-    * `referenceTimestamp` is provided, it is used as the reference timestamp to calculate the max
-    * sequencing time.
+  /** Provides a value for max-sequencing-time to use for `sendAsync` if no better application
+    * provided timeout is available. Is currently a configurable offset from our clock.
     */
-  def generateMaxSequencingTime(referenceTimestamp: CantonTimestamp): CantonTimestamp
+  def generateMaxSequencingTime: CantonTimestamp
 
   /** Generates a message id. The message id is only for correlation within this client and does not
     * need to be globally unique.
     */
   def generateMessageId: MessageId = MessageId.randomMessageId()
-
-}
-
-object SequencerClientSend {
-
-  /** Aggregates all the timestamps needed when sending a request.
-    *
-    * @param topologyTimestamp
-    *   An optional timestamp specifying the topology state to reference for this request.
-    * @param approximateTimestampForSigning
-    *   Defines a timestamp used for signing a request, overriding the timestamp of the selected
-    *   topology. For submission requests (e.g., encrypted view messages), the topology is not yet
-    *   fixed and only an approximate snapshot is available. Therefore, we use an approximate
-    *   timestamp to better reflect the signer’s current time when determining which session signing
-    *   key to use. The current local clock is typically a suitable choice.
-    * @param maxSequencingTime
-    *   The max sequencing time for the request.
-    */
-  final case class SendRequestTimestamps(
-      topologyTimestamp: Option[CantonTimestamp],
-      approximateTimestampForSigning: CantonTimestamp,
-      maxSequencingTime: CantonTimestamp,
-  )
-
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -31,13 +31,12 @@ import com.digitalasset.canton.networking.grpc.{
   GrpcManagedChannel,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.Mutex
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 /** Attempt to run a grpc admin-api command against whatever is pointed at in the config
   * @param commandTimeouts
@@ -70,7 +69,6 @@ class GrpcAdminCommandRunner(
     loggerFactory,
   )
   private val channels = TrieMap[(String, String, Port), GrpcManagedChannel]()
-  private val lock = new Mutex()
 
   def runCommandAsync[Result](
       instanceName: String,
@@ -165,7 +163,7 @@ class GrpcAdminCommandRunner(
       instanceName: String,
       clientConfig: ClientConfig,
   ): GrpcManagedChannel =
-    (lock.exclusive {
+    blocking(synchronized {
       val addr = (instanceName, clientConfig.address, clientConfig.port)
       channels.getOrElseUpdate(
         addr,
@@ -182,7 +180,7 @@ class GrpcAdminCommandRunner(
   override def onFirstClose(): Unit =
     closeChannels()
 
-  def closeChannels(): Unit = (lock.exclusive {
+  def closeChannels(): Unit = blocking(synchronized {
     channels.values.foreach(_.close())
     channels.clear()
   })

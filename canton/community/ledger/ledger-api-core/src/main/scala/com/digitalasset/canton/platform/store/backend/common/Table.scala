@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -7,17 +7,17 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 
 import java.sql.Connection
 
-private[backend] trait Table[From] {
-  def prepareData(in: Vector[From], stringInterning: StringInterning): Array[Array[?]]
+private[backend] trait Table[FROM] {
+  def prepareData(in: Vector[FROM], stringInterning: StringInterning): Array[Array[?]]
   def executeUpdate: Array[Array[?]] => Connection => Unit
 }
 
-private[backend] abstract class BaseTable[From](
-    fields: Seq[(String, Field[From, ?, ?])],
-    ordering: Option[Ordering[From]] = None,
-) extends Table[From] {
+private[backend] abstract class BaseTable[FROM](
+    fields: Seq[(String, Field[FROM, ?, ?])],
+    ordering: Option[Ordering[FROM]] = None,
+) extends Table[FROM] {
   override def prepareData(
-      in: Vector[From],
+      in: Vector[FROM],
       stringInterning: StringInterning,
   ): Array[Array[?]] = {
     val sortedIn = ordering.map(in.sorted(_)).getOrElse(in)
@@ -33,10 +33,10 @@ private[backend] object Table {
       ()
     }
 
-  private def batchedInsertBase[From](
+  private def batchedInsertBase[FROM](
       insertStatement: String
-  )(fields: Seq[(String, Field[From, ?, ?])]): Table[From] =
-    new BaseTable[From](fields) {
+  )(fields: Seq[(String, Field[FROM, ?, ?])]): Table[FROM] =
+    new BaseTable[FROM](fields) {
       override def executeUpdate: Array[Array[?]] => Connection => Unit =
         data =>
           connection =>
@@ -77,8 +77,8 @@ private[backend] object Table {
        |""".stripMargin
   }
 
-  def batchedInsert[From](tableName: String)(
-      fields: (String, Field[From, ?, ?])*
-  ): Table[From] =
+  def batchedInsert[FROM](tableName: String)(
+      fields: (String, Field[FROM, ?, ?])*
+  ): Table[FROM] =
     batchedInsertBase(batchedInsertStatement(tableName, fields))(fields)
 }

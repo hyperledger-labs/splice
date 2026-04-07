@@ -1,9 +1,7 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.config
-
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 /** Ledger API topology-aware package selection specific configurations
   *
@@ -11,9 +9,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
   *   whether to enable topology-aware package selection in command interpretation
   */
 final case class TopologyAwarePackageSelectionConfig(
-    enabled: Boolean = true,
-    maxPassesDefault: PositiveInt = PositiveInt.three,
-    maxPassesLimit: PositiveInt = PositiveInt.four,
+    enabled: Boolean = true
 )
 
 object TopologyAwarePackageSelectionConfig {

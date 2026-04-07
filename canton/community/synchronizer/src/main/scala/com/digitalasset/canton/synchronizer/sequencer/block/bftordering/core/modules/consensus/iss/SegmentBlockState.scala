@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -23,7 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PreparesStored,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.mutable
 
@@ -53,13 +53,11 @@ class SegmentBlockState(
   def blockCommitMessages: Seq[SignedMessage[Commit]] =
     commitCertificate.toList.flatMap(_.commits)
 
-  def completeBlock(
-      cc: CommitCertificate
-  )(implicit traceContext: TraceContext): Seq[ProcessResult] =
+  def completeBlock(cc: CommitCertificate): Seq[ProcessResult] =
     if (isComplete || unconfirmedStorageCommitCertificate.isDefined) Seq.empty
     else {
       unconfirmedStorageCommitCertificate = Some(cc)
-      Seq(CompletedBlock(cc, traceContext))
+      Seq(CompletedBlock(cc, currentViewNumber))
     }
 
   def confirmCompleteBlockStored(): Unit = unconfirmedStorageCommitCertificate match {
@@ -110,14 +108,16 @@ class SegmentBlockState(
     if (isComplete) {
       discardedMessageCount += 1
       Seq.empty
-    } else if (views(currentViewNumber).processMessage(msg)) {
+    } else if (views(currentViewNumber).processMessage(msg))
       advance()
-    } else {
+    else {
       discardedMessageCount += 1
       Seq.empty
     }
 
-  def processMessagesStored(pbftMessagesStored: PbftMessagesStored): Seq[ProcessResult] =
+  def processMessagesStored(pbftMessagesStored: PbftMessagesStored)(implicit
+      traceContext: TraceContext
+  ): Seq[ProcessResult] =
     if (!isComplete && pbftMessagesStored.viewNumber == currentViewNumber) {
       val block = views(currentViewNumber)
       pbftMessagesStored match {
@@ -136,12 +136,12 @@ class SegmentBlockState(
       }
     } else Seq.empty
 
-  private def advance(): Seq[ProcessResult] = {
+  private def advance()(implicit traceContext: TraceContext): Seq[ProcessResult] = {
     val blockState = views(currentViewNumber)
     val results = blockState.advance()
     blockState.commitCertificate match {
-      case Some(commitCertificate: Traced[CommitCertificate]) =>
-        results ++ completeBlock(commitCertificate.value)(commitCertificate.traceContext)
+      case Some(commitCertificate: CommitCertificate) =>
+        results ++ completeBlock(commitCertificate)
       case None => results
     }
   }

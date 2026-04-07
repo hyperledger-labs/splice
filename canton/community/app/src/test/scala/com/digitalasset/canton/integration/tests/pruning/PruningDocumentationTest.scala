@@ -1,12 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
 
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.commands.PruningSchedulerAdministration
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -112,13 +113,14 @@ abstract class PruningDocumentationIntegrationTest
 }
 
 class PruningDocumentationIntegrationTestH2 extends PruningDocumentationIntegrationTest {
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory)
+  )
 }
 
 //class PruningDocumentationIntegrationTestPostgres extends PruningDocumentationIntegrationTest {
 //  registerPlugin(new UsePostgres(loggerFactory))
 //  registerPlugin(
-//    new UseBftSequencer(loggerFactory)
+//    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
 //  )
 //}

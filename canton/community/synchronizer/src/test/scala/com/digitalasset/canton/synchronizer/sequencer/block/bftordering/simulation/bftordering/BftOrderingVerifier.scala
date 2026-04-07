@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering
@@ -12,15 +12,15 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   BlockNumber,
+  EpochLength,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.{
   SimulationSettings,
   SimulationVerifier,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.BftOrderingSimulationTest.SimEpochChecker
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.data.StorageHelpers
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.mutable
@@ -30,13 +30,13 @@ import scala.jdk.DurationConverters.ScalaDurationOps
 import BftOrderingVerifier.{LivenessState, OffboardingStatus}
 
 final class BftOrderingVerifier(
-    queue: mutable.Queue[(BftNodeId, Traced[BlockFormat.Block])],
+    queue: mutable.Queue[(BftNodeId, BlockFormat.Block)],
     stores: Map[BftNodeId, OutputMetadataStore[SimulationEnv]],
     onboardingTimes: Map[BftNodeId, TopologyActivationTime],
     offboardingTimes: Map[BftNodeId, CantonTimestamp],
     initialNodes: Seq[BftNodeId],
     simSettings: SimulationSettings,
-    simEpochChecker: SimEpochChecker,
+    epochLength: EpochLength,
     override val loggerFactory: NamedLoggerFactory,
 ) extends SimulationVerifier
     with Matchers
@@ -116,7 +116,7 @@ final class BftOrderingVerifier(
         newOffboardingTimes,
         Seq.empty,
         simulationSettings,
-        simEpochChecker,
+        epochLength,
         loggerFactory,
       )
     newVerifier.currentLog ++= currentLog
@@ -189,7 +189,7 @@ final class BftOrderingVerifier(
               block.requests.exists(_.value.microsecondsSinceEpoch >= offboardingTime.toMicros)
 
             if (blockPartOfLastEpoch) {
-              val lastBlockInEpoch = simEpochChecker.getLastBlockOfSameEpoch(blockNumber)
+              val lastBlockInEpoch = computeLastBlockInEpoch(blockNumber)
               if (blockNumber == lastBlockInEpoch) {
                 offboardingProgress(node) = OffboardingStatus.FinishedOffboarding
               } else {
@@ -201,17 +201,20 @@ final class BftOrderingVerifier(
       case None =>
     }
 
+  // TODO(#19289) this assumes an ever static epoch length
+  private def computeLastBlockInEpoch(blockNumber: BlockNumber): BlockNumber = BlockNumber(
+    epochLength * ((blockNumber / epochLength) + 1) - 1
+  )
+
   private def checkStores(): Unit = {
     implicit val traceContext: TraceContext = TraceContext.empty
     queue.foreach { case (sequencer, block) =>
-      logger.debug(
-        s"Simulation verifier: got block ${block.value.blockHeight} from sequencer $sequencer"
-      )
+      logger.debug(s"Simulation verifier: got block ${block.blockHeight} from sequencer $sequencer")
       val peanoQueue = peanoQueues.getOrElse(
         sequencer,
         throw new RuntimeException(s"Sequencer $sequencer not onboarded"),
       )
-      peanoQueue.insert(BlockNumber(block.value.blockHeight), block.value)
+      peanoQueue.insert(BlockNumber(block.blockHeight), block)
       val newBlocks = peanoQueue.pollAvailable()
       newBlocks.foreach { blockToInsert =>
         logger.debug(

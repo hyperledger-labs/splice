@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.daml.test.evidence.scalatest.OperabilityTestHelpers
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{
   CommandFailure,
@@ -21,9 +22,8 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkTopologyDescription,
 }
 import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UseH2,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -181,8 +181,7 @@ class MultipleMediatorsIntegrationTest
     with MultipleMediatorsBaseTest
     with OperabilityTestHelpers {
 
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
   // we need to register the ProgrammableSequencer after the ReferenceBlockSequencer
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 
@@ -271,9 +270,8 @@ class MultipleMediatorsIntegrationTest
                 }
 
               val mediator = submissionRequest.batch.envelopes.collectFirst {
-                case closedEnvelope: ClosedEnvelope
-                    if findMediator(closedEnvelope.recipients).nonEmpty =>
-                  findMediator(closedEnvelope.recipients).value
+                case ClosedEnvelope(_bytes, recipients, _) if findMediator(recipients).nonEmpty =>
+                  findMediator(recipients).value
               }
               mediator match {
                 case Some(MediatorGroupRecipient(MediatorGroupIndex.zero)) =>

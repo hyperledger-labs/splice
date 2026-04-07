@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import scala.collection.mutable
-
 object EventId {
 
   /*
@@ -40,31 +38,14 @@ object EventId {
   }
 
   // TODO(#640) - remove this conversion as it's costly
-  def lastDescendantNodesFromChildNodeIds(
-      nodeIds: Seq[Int],
+  def lastDescendedNodeFromChildNodeIds(
+      nodeId: Int,
       nodesWithChildren: Map[Int, Seq[Int]],
-  ): Map[Int, Int] = {
-    // Local cache to store results for any node encountered during traversal
-    val cache = mutable.Map.empty[Int, Int]
-
-    def getOrCompute(id: Int): Int = {
-      // If we've seen this node before, return the cached result
-      cache.getOrElseUpdate(
-        id, {
-          nodesWithChildren.get(id).flatMap(_.maxOption) match {
-            case Some(lastChildId) =>
-              // Recurse to find the descendant of the rightmost child
-              getOrCompute(lastChildId)
-            case None =>
-              // Leaf node: the last descended node is itself
-              id
-          }
-        },
-      )
-    }
-
-    // Process the input list and map each original ID to its last descendant
-    nodeIds.map(id => id -> getOrCompute(id)).toMap
-  }
+  ): Int =
+    nodesWithChildren
+      .getOrElse(nodeId, Seq.empty)
+      .maxOption
+      .map(lastChildId => lastDescendedNodeFromChildNodeIds(lastChildId, nodesWithChildren))
+      .getOrElse(nodeId)
 
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.integrations.state
@@ -9,7 +9,7 @@ import com.digitalasset.canton.topology.{DefaultTestIdentities, SequencerId}
 
 class SequencerStateManagerStoreTestInMemory extends SequencerStateManagerStoreTest {
   "InMemorySequencerStateManagerStore" should {
-    behave like sequencerStateManagerStore() { () =>
+    behave like sequencerStateManagerStore(() =>
       (
         new InMemorySequencerStateManagerStore(loggerFactory),
         new InMemorySequencerStore(
@@ -17,10 +17,9 @@ class SequencerStateManagerStoreTestInMemory extends SequencerStateManagerStoreT
           SequencerId(DefaultTestIdentities.physicalSynchronizerId.uid),
           true,
           loggerFactory,
-          timeouts,
           SequencerMetrics.noop(getClass.getName),
         ),
       )
-    }
+    )
   }
 }

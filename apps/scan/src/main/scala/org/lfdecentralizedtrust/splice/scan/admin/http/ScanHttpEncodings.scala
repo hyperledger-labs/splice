@@ -288,12 +288,6 @@ sealed trait ScanHttpEncodings {
           EventId.nodeIdFromEventId
         )
     }
-    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      http.eventsById.collect { case (eventId, _: httpApi.TreeEvent.members.ExercisedEvent) =>
-        EventId.nodeIdFromEventId(eventId)
-      }.toSeq,
-      nodesWithChildren,
-    )
     TreeUpdateWithMigrationId(
       UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
@@ -305,7 +299,7 @@ sealed trait ScanHttpEncodings {
             http.eventsById
               .map { case (eventId, treeEventHttp) =>
                 Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                  lastDescendantNodes,
+                  nodesWithChildren,
                   treeEventHttp,
                 )
               }
@@ -378,12 +372,12 @@ sealed trait ScanHttpEncodings {
     }
 
   private def httpToJavaEvent(
-      lastDescendantNodes: Map[Int, Int],
+      nodesWithChildren: Map[Int, Seq[Int]],
       http: httpApi.TreeEvent,
   ): javaApi.Event = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToJavaExercisedEvent(lastDescendantNodes, exercisedHttp)
+      httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
   }
 
   def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
@@ -409,7 +403,7 @@ sealed trait ScanHttpEncodings {
   }
 
   private def httpToJavaExercisedEvent(
-      lastDescendantNodes: Map[Int, Int],
+      nodesWithChildren: Map[Int, Seq[Int]],
       http: httpApi.ExercisedEvent,
   ): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
@@ -427,9 +421,9 @@ sealed trait ScanHttpEncodings {
       decodeChoiceArgument(templateId, interfaceId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
-      lastDescendantNodes.getOrElse(
+      EventId.lastDescendedNodeFromChildNodeIds(
         nodeId,
-        throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
+        nodesWithChildren,
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
@@ -779,13 +773,7 @@ object ScanHttpEncodings {
           .map(_.intValue())
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
-    }.toMap
-    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      tree.getEventsById.asScala.collect { case (_, exercised: javaApi.ExercisedEvent) =>
-        mapping(exercised.getNodeId)
-      }.toSeq,
-      nodesWithChildren,
-    )
+    }
     val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
@@ -820,9 +808,9 @@ object ScanHttpEncodings {
           exercised.getChoiceArgument,
           exercised.getActingParties,
           exercised.isConsuming,
-          lastDescendantNodes.getOrElse(
+          EventId.lastDescendedNodeFromChildNodeIds(
             newNodeId,
-            throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
+            nodesWithChildren.toMap,
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,

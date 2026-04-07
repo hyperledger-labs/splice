@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -77,13 +77,6 @@ trait DamlPackageStore extends AutoCloseable { this: NamedLogging =>
   def getPackage(packageId: PackageId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[DamlLf.Archive]]
-
-  /** @return
-    *   those ids in `packageIds` that correspond to a package in the store
-    */
-  def filterExisting(packageIds: Set[PackageId])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Set[PackageId]]
 
   def getPackageDescription(packageId: PackageId)(implicit
       traceContext: TraceContext

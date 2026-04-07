@@ -22,6 +22,7 @@ class SvBftSequencerPeerOnboardingTrigger(
     store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -29,7 +30,6 @@ class SvBftSequencerPeerOnboardingTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[BftPeerDifference](
       baseContext,
       store,
-      None,
     ) {
 
   // Don't pause when the synchronizer is paused or lagging;
@@ -43,7 +43,7 @@ class SvBftSequencerPeerOnboardingTrigger(
       sequencerAdminConnection,
       loggerFactory,
       scanConnection,
-      baseContext.retryProvider,
+      migrationId,
     )
 
 }

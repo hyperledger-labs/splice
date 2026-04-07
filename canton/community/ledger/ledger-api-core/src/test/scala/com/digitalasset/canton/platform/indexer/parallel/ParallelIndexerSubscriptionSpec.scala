@@ -1,18 +1,21 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
 
+import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
 import com.daml.metrics.DatabaseMetrics
+import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
 import com.digitalasset.canton.ledger.participant.state.Update.{
   RepairTransactionAccepted,
   TopologyTransactionEffective,
-  TransactionAccepted,
 }
 import com.digitalasset.canton.ledger.participant.state.{
   RepairIndex,
+  SequencerIndex,
   SynchronizerIndex,
   TransactionMeta,
   Update,
@@ -31,6 +34,7 @@ import com.digitalasset.canton.platform.indexer.ha.TestConnection
 import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.{
   ActivationRef,
   Batch,
+  EmptyActiveContracts,
   SynCon,
   ZeroLedgerEnd,
 }
@@ -47,7 +51,6 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
-import com.digitalasset.canton.{HasExecutionContext, RepairCounter}
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Ref, Time}
@@ -66,25 +69,19 @@ import org.slf4j.event.Level
 
 import java.sql.Connection
 import java.time.Instant
-import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.annotation.unused
-import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 class ParallelIndexerSubscriptionSpec
     extends AnyFlatSpec
     with ScalaFutures
     with Matchers
-    with HasExecutionContext
     with NamedLogging {
-
-  private lazy val executionContext = implicitly[ExecutionContext]
 
   implicit private val DbDtoEqual: org.scalactic.Equality[DbDto] = ScalatestEqualityHelpers.DbDtoEq
   implicit val traceContext: TraceContext = TraceContext.empty
   private val serializableTraceContext =
-    SerializableTraceContext(traceContext).toSerializedDamlProto
+    SerializableTraceContext(traceContext).toDamlProto.toByteArray
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   implicit val actorSystem: ActorSystem = ActorSystem(
     classOf[ParallelIndexerSubscriptionSpec].getSimpleName
@@ -96,7 +93,7 @@ class ParallelIndexerSubscriptionSpec
     ledger_offset = 1,
     recorded_at = 0,
     submission_id = null,
-    party = Some(Ref.Party.assertFromString("party")),
+    party = Some("party"),
     typ = "accept",
     rejection_reason = None,
     is_local = Some(true),
@@ -110,19 +107,11 @@ class ParallelIndexerSubscriptionSpec
 
   private val someTime = Instant.now
 
-  private val somePartyAllocation = state.Update.TopologyTransactionEffective(
-    updateId = TestUpdateId(UUID.randomUUID().toString),
-    events = Set(
-      TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization(
-        party = Ref.Party.assertFromString("party"),
-        participant = Ref.ParticipantId.assertFromString("participant"),
-        authorizationEvent = TopologyTransactionEffective.AuthorizationEvent.Added(
-          TopologyTransactionEffective.AuthorizationLevel.Confirmation
-        ),
-      )
-    ),
-    synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
-    effectiveTime = CantonTimestamp.assertFromInstant(someTime),
+  private val somePartyAllocation = state.Update.PartyAddedToParticipant(
+    party = Ref.Party.assertFromString("party"),
+    participantId = Ref.ParticipantId.assertFromString("participant"),
+    recordTime = CantonTimestamp.assertFromInstant(someTime),
+    submissionId = Some(Ref.SubmissionId.assertFromString("abc")),
   )
 
   private val updateId = TestUpdateId("mock_hash")
@@ -151,7 +140,7 @@ class ParallelIndexerSubscriptionSpec
     source_synchronizer_id = None,
     reassignment_counter = None,
     reassignment_id = None,
-    representative_package_id = Ref.PackageId.assertFromString("p"),
+    representative_package_id = "",
     notPersistedContractId = hashCid("1"),
     internal_contract_id = 1,
     create_key_hash = None,
@@ -186,8 +175,8 @@ class ParallelIndexerSubscriptionSpec
     reassignment_counter = None,
     contract_id = hashCid("1"),
     internal_contract_id = None,
-    template_id = Ref.NameTypeConRef.assertFromString("#p:m:t"),
-    package_id = Ref.PackageId.assertFromString("p"),
+    template_id = "",
+    package_id = "",
     stakeholders = Set.empty,
     ledger_effective_time = None,
   )
@@ -227,7 +216,7 @@ class ParallelIndexerSubscriptionSpec
     completion_offset = 1,
     record_time = 0,
     publication_time = 0,
-    user_id = Ref.UserId.assertFromString("user"),
+    user_id = "",
     submitters = Set.empty,
     command_id = "",
     update_id = None,
@@ -250,22 +239,10 @@ class ParallelIndexerSubscriptionSpec
       .zip(
         Vector(
           somePartyAllocation,
-          somePartyAllocation.copy(effectiveTime = somePartyAllocation.recordTime.addMicros(1000)),
-          somePartyAllocation.copy(effectiveTime = somePartyAllocation.recordTime.addMicros(2000)),
+          somePartyAllocation.copy(recordTime = somePartyAllocation.recordTime.addMicros(1000)),
+          somePartyAllocation.copy(recordTime = somePartyAllocation.recordTime.addMicros(2000)),
         )
       )
-
-  private def mockDbDispatcher(connection: Connection): DbDispatcher = new DbDispatcher {
-    override def executeSql[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
-        loggingContext: LoggingContextWithTrace
-    ): Future[T] =
-      Future.successful(sql(connection))
-
-    override def executeSqlUS[T](databaseMetrics: DatabaseMetrics)(
-        sql: Connection => T
-    )(implicit loggingContext: LoggingContextWithTrace): FutureUnlessShutdown[T] =
-      FutureUnlessShutdown.pure(sql(connection))
-  }
 
   behavior of "inputMapper"
 
@@ -274,7 +251,6 @@ class ParallelIndexerSubscriptionSpec
       metrics = metrics,
       toDbDto = _ => _ => Iterator(someParty, someParty),
       eventMetricsUpdater = _ => (),
-      _ => Vector("1", "2"),
       logger,
     )(
       List(
@@ -302,10 +278,10 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 3,
       offsetsUpdates = offsetsAndUpdates,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Vector("1", "2"),
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
     actual.copy(batchTraceContext = TraceContext.empty) shouldBe expected
+    actual.activeContracts eq ParallelIndexerSubscription.EmptyActiveContracts
   }
 
   behavior of "seqMapperZero"
@@ -326,9 +302,9 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 0,
       offsetsUpdates = Vector.empty,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
+    result.activeContracts eq ParallelIndexerSubscription.EmptyActiveContracts
   }
 
   it should "provide required Batch in case starting from scratch" in {
@@ -339,78 +315,8 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 0,
       offsetsUpdates = Vector.empty,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
-  }
-
-  behavior of "mutableDropWhile"
-
-  it should "drop elements correctly happy case" in {
-    val map = mutable.LinkedHashMap[String, Int](
-      "x" -> 1,
-      "a" -> 1,
-      "y" -> 2,
-      "b" -> 3,
-      "z" -> 3,
-      "c" -> 4,
-      "u" -> 4,
-      "f" -> 5,
-    )
-    ParallelIndexerSubscription.mutableDropWhile(map)(_ <= 3)
-
-    map.toList shouldBe List(
-      "c" -> 4,
-      "u" -> 4,
-      "f" -> 5,
-    )
-  }
-
-  it should "drop elements correctly early" in {
-    val map = mutable.LinkedHashMap[String, Int](
-      "x" -> 1,
-      "a" -> 1,
-      "y" -> 2,
-      "b" -> 3,
-      "z" -> 3,
-      "c" -> 4,
-      "u" -> 4,
-      "f" -> 5,
-    )
-    ParallelIndexerSubscription.mutableDropWhile(map)(_ <= -3)
-
-    map.toList shouldBe List(
-      "x" -> 1,
-      "a" -> 1,
-      "y" -> 2,
-      "b" -> 3,
-      "z" -> 3,
-      "c" -> 4,
-      "u" -> 4,
-      "f" -> 5,
-    )
-  }
-
-  it should "drop elements correctly late" in {
-    val map = mutable.LinkedHashMap[String, Int](
-      "x" -> 1,
-      "a" -> 1,
-      "y" -> 2,
-      "b" -> 3,
-      "z" -> 3,
-      "c" -> 4,
-      "u" -> 4,
-      "f" -> 5,
-    )
-    ParallelIndexerSubscription.mutableDropWhile(map)(_ <= 150)
-
-    map.toList shouldBe Nil
-  }
-
-  it should "drop elements correctly empty" in {
-    val map = mutable.LinkedHashMap[String, Int]()
-    ParallelIndexerSubscription.mutableDropWhile(map)(_ <= 150)
-    map.toList shouldBe Nil
   }
 
   behavior of "seqMapper"
@@ -428,51 +334,43 @@ class ParallelIndexerSubscriptionSpec
       lastStringInterningId = 26,
       lastPublicationTime = previousPublicationTime,
     )
-    val filter = DbDto.IdFilter(
-      0,
-      Ref.NameTypeConRef.assertFromString("#p:m:t"),
-      Ref.Party.assertFromString("party"),
-      first_per_sequential_id = false,
-    )
     val ledgerEndCache = MutableLedgerEndCache()
     val result = ParallelIndexerSubscription.seqMapper(
       internize = _.zipWithIndex.map(x => x._2 -> x._2.toString).take(2),
-      metrics = metrics,
-      clock = simClock,
-      logger = logger,
-      ledgerEndCache = ledgerEndCache,
-      activeContracts = mutable.LinkedHashMap.empty,
+      metrics,
+      simClock,
+      logger,
+      ledgerEndCache,
     )(
-      ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
-      Batch(
+      previous = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
+      current = Batch(
         ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
         batchTraceContext = TraceContext.empty,
         batch = Vector(
           someParty,
           someEventActivate,
-          filter.activateStakeholder,
-          filter.activateWitness,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).activateStakeholder,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).activateWitness,
           DbDto.TransactionMeta(emptyByteArray, 1, 0L, 0L, someSynchronizerId, 0L, 0L),
           someCompletion,
           someParty,
           someEventDeactivate,
-          filter.deactivateStakeholder,
-          filter.deactivateWitness,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).deactivateStakeholder,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).deactivateWitness,
           someEventDeactivate,
-          filter.deactivateStakeholder,
-          filter.deactivateWitness,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).deactivateStakeholder,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).deactivateWitness,
           DbDto.TransactionMeta(emptyByteArray, 1, 0L, 0L, someSynchronizerId, 0L, 0L),
           someParty,
           someEventWitnessed,
-          filter.variousWitness,
+          DbDto.IdFilter(0, "", "", first_per_sequential_id = false).variousWitness,
           DbDto.TransactionMeta(emptyByteArray, 1, 0L, 0L, someSynchronizerId, 0L, 0L),
           someParty,
         ),
         batchSize = 3,
         offsetsUpdates = offsetsAndUpdates,
         missingDeactivatedActivations = Map.empty,
-        eventCount = 0L,
-        distinctRawStrings = Vector("1", "2"),
+        activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
       ),
     )
     import scala.util.chaining.*
@@ -481,8 +379,6 @@ class ParallelIndexerSubscriptionSpec
     result.ledgerEnd.lastStringInterningId shouldBe 1
     result.ledgerEnd.lastPublicationTime shouldBe currentPublicationTime
     result.ledgerEnd.lastOffset shouldBe offset(2)
-    result.eventCount shouldBe 4L
-    result.distinctRawStrings shouldBe Nil
     result.batch(1).asInstanceOf[DbDto.EventActivate].event_sequential_id shouldBe 16
     result
       .batch(2)
@@ -556,12 +452,11 @@ class ParallelIndexerSubscriptionSpec
     )
     val simClock = new SimClock(loggerFactory = loggerFactory)
     val result = ParallelIndexerSubscription.seqMapper(
-      internize = _ => Nil,
-      metrics = metrics,
-      clock = simClock,
-      logger = logger,
-      ledgerEndCache = MutableLedgerEndCache(),
-      activeContracts = mutable.LinkedHashMap.empty,
+      _ => Nil,
+      metrics,
+      simClock,
+      logger,
+      MutableLedgerEndCache(),
     )(
       ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
       Batch(
@@ -576,14 +471,12 @@ class ParallelIndexerSubscriptionSpec
         batchSize = 3,
         offsetsUpdates = offsetsAndUpdates,
         missingDeactivatedActivations = Map.empty,
-        eventCount = 0L,
-        distinctRawStrings = Nil,
+        activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
       ),
     )
     result.ledgerEnd.lastEventSeqId shouldBe 15
     result.ledgerEnd.lastStringInterningId shouldBe 25
     result.ledgerEnd.lastOffset shouldBe offset(2)
-    result.eventCount shouldBe 0L
   }
 
   private val now = CantonTimestamp.now()
@@ -601,14 +494,7 @@ class ParallelIndexerSubscriptionSpec
       LoggerNameContains("ParallelIndexerSubscription") && SuppressionRule.Level(Level.INFO)
     )(
       ParallelIndexerSubscription
-        .seqMapper(
-          internize = _ => Nil,
-          metrics = metrics,
-          clock = simClock,
-          logger = logger,
-          ledgerEndCache = MutableLedgerEndCache(),
-          activeContracts = mutable.LinkedHashMap.empty,
-        )(
+        .seqMapper(_ => Nil, metrics, simClock, logger, MutableLedgerEndCache())(
           ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
           Batch(
             ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -622,8 +508,7 @@ class ParallelIndexerSubscriptionSpec
             batchSize = 3,
             offsetsUpdates = offsetsAndUpdates,
             missingDeactivatedActivations = Map.empty,
-            eventCount = 0L,
-            distinctRawStrings = Nil,
+            activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
           ),
         )
         .ledgerEnd
@@ -636,16 +521,8 @@ class ParallelIndexerSubscriptionSpec
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val zeroBatch = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd))
     val ledgerEndCache = MutableLedgerEndCache()
-    val activeContracts = mutable.LinkedHashMap.empty[SynCon, ActivationRef]
     val result = ParallelIndexerSubscription
-      .seqMapper(
-        internize = _ => Nil,
-        metrics = metrics,
-        clock = simClock,
-        logger = logger,
-        ledgerEndCache = ledgerEndCache,
-        activeContracts = activeContracts,
-      )(
+      .seqMapper(_ => Nil, metrics, simClock, logger, ledgerEndCache)(
         zeroBatch,
         Batch(
           ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -659,23 +536,20 @@ class ParallelIndexerSubscriptionSpec
           batchSize = 10,
           offsetsUpdates = offsetsAndUpdates,
           missingDeactivatedActivations = Map.empty,
-          eventCount = 0L,
-          distinctRawStrings = Nil,
+          activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
         ),
       )
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId2, hashCid("C")) -> ActivationRef(16L, 1L)
     )
     result.missingDeactivatedActivations shouldBe Map.empty
-    result.eventCount shouldBe 1L
   }
 
   it should "double activations are reported as warnings" in {
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val zeroBatch = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd))
     val ledgerEndCache = MutableLedgerEndCache()
-    val activeContracts = mutable.LinkedHashMap.empty[SynCon, ActivationRef]
-    activeContracts.addAll(
+    zeroBatch.activeContracts.addAll(
       Seq(
         SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(1L, 1L),
         SynCon(someSynchronizerId2, hashCid("B")) -> ActivationRef(2L, 2L),
@@ -685,14 +559,7 @@ class ParallelIndexerSubscriptionSpec
       LoggerNameContains("ParallelIndexerSubscription") && SuppressionRule.Level(Level.WARN)
     )(
       ParallelIndexerSubscription
-        .seqMapper(
-          internize = _ => Nil,
-          metrics = metrics,
-          clock = simClock,
-          logger = logger,
-          ledgerEndCache = ledgerEndCache,
-          activeContracts = activeContracts,
-        )(
+        .seqMapper(_ => Nil, metrics, simClock, logger, ledgerEndCache)(
           zeroBatch,
           Batch(
             ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -712,8 +579,7 @@ class ParallelIndexerSubscriptionSpec
             batchSize = 10,
             offsetsUpdates = offsetsAndUpdates,
             missingDeactivatedActivations = Map.empty,
-            eventCount = 0L,
-            distinctRawStrings = Nil,
+            activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
           ),
         ),
       _.warningMessage should include(
@@ -723,7 +589,7 @@ class ParallelIndexerSubscriptionSpec
         "Double activation at eventSeqId: 17. Previous at Some(2) This should not happen"
       ),
     )
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(16L, 10L),
       SynCon(someSynchronizerId2, hashCid("B")) -> ActivationRef(17L, 20L),
     )
@@ -734,16 +600,8 @@ class ParallelIndexerSubscriptionSpec
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val zeroBatch = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd))
     val ledgerEndCache = MutableLedgerEndCache()
-    val activeContracts = mutable.LinkedHashMap.empty[SynCon, ActivationRef]
     val result = ParallelIndexerSubscription
-      .seqMapper(
-        internize = _ => Nil,
-        metrics = metrics,
-        clock = simClock,
-        logger = logger,
-        ledgerEndCache = ledgerEndCache,
-        activeContracts = activeContracts,
-      )(
+      .seqMapper(_ => Nil, metrics, simClock, logger, ledgerEndCache)(
         zeroBatch,
         Batch(
           ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -774,11 +632,10 @@ class ParallelIndexerSubscriptionSpec
           batchSize = 10,
           offsetsUpdates = offsetsAndUpdates,
           missingDeactivatedActivations = Map.empty,
-          eventCount = 0L,
-          distinctRawStrings = Nil,
+          activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
         ),
       )
-    activeContracts shouldBe Map.empty
+    zeroBatch.activeContracts shouldBe Map.empty
     result.missingDeactivatedActivations shouldBe Map(
       SynCon(someSynchronizerId, hashCid("A")) -> None,
       SynCon(someSynchronizerId, hashCid("B")) -> None,
@@ -801,8 +658,7 @@ class ParallelIndexerSubscriptionSpec
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val zeroBatch = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd))
     val ledgerEndCache = MutableLedgerEndCache()
-    val activeContracts = mutable.LinkedHashMap.empty[SynCon, ActivationRef]
-    activeContracts
+    zeroBatch.activeContracts
       .addAll(
         Seq(
           SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(1L, 100L),
@@ -814,14 +670,7 @@ class ParallelIndexerSubscriptionSpec
         )
       )
     val result = ParallelIndexerSubscription
-      .seqMapper(
-        internize = _ => Nil,
-        metrics = metrics,
-        clock = simClock,
-        logger = logger,
-        ledgerEndCache = ledgerEndCache,
-        activeContracts = activeContracts,
-      )(
+      .seqMapper(_ => Nil, metrics, simClock, logger, ledgerEndCache)(
         zeroBatch,
         Batch(
           ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -855,11 +704,10 @@ class ParallelIndexerSubscriptionSpec
           batchSize = 10,
           offsetsUpdates = offsetsAndUpdates,
           missingDeactivatedActivations = Map.empty,
-          eventCount = 0L,
-          distinctRawStrings = Nil,
+          activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
         ),
       )
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId3, hashCid("A")) -> ActivationRef(3L, 300L),
       SynCon(someSynchronizerId3, hashCid("B")) -> ActivationRef(4L, 400L),
       SynCon(someSynchronizerId, hashCid("C")) -> ActivationRef(6L, 600L),
@@ -889,8 +737,7 @@ class ParallelIndexerSubscriptionSpec
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val zeroBatch = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd))
     val ledgerEndCache = MutableLedgerEndCache()
-    val activeContracts = mutable.LinkedHashMap.empty[SynCon, ActivationRef]
-    activeContracts
+    zeroBatch.activeContracts
       .addAll(
         Seq(
           SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(100L, 1L),
@@ -900,14 +747,7 @@ class ParallelIndexerSubscriptionSpec
         )
       )
     def processSeqMapper() = ParallelIndexerSubscription
-      .seqMapper(
-        internize = _ => Nil,
-        metrics = metrics,
-        clock = simClock,
-        logger = logger,
-        ledgerEndCache = ledgerEndCache,
-        activeContracts = activeContracts,
-      )(
+      .seqMapper(_ => Nil, metrics, simClock, logger, ledgerEndCache)(
         zeroBatch,
         Batch(
           ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -918,11 +758,10 @@ class ParallelIndexerSubscriptionSpec
           batchSize = 10,
           offsetsUpdates = offsetsAndUpdates,
           missingDeactivatedActivations = Map.empty,
-          eventCount = 0L,
-          distinctRawStrings = Nil,
+          activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
         ),
       )
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(100L, 1L),
       SynCon(someSynchronizerId2, hashCid("B")) -> ActivationRef(110L, 2L),
       SynCon(someSynchronizerId3, hashCid("A")) -> ActivationRef(120L, 3L),
@@ -938,7 +777,7 @@ class ParallelIndexerSubscriptionSpec
       )
     )
     processSeqMapper()
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId, hashCid("A")) -> ActivationRef(100L, 1L),
       SynCon(someSynchronizerId2, hashCid("B")) -> ActivationRef(110L, 2L),
       SynCon(someSynchronizerId3, hashCid("A")) -> ActivationRef(120L, 3L),
@@ -954,7 +793,7 @@ class ParallelIndexerSubscriptionSpec
       )
     )
     processSeqMapper()
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId2, hashCid("B")) -> ActivationRef(110L, 2L),
       SynCon(someSynchronizerId3, hashCid("A")) -> ActivationRef(120L, 3L),
       SynCon(someSynchronizerId3, hashCid("B")) -> ActivationRef(130L, 4L),
@@ -969,7 +808,7 @@ class ParallelIndexerSubscriptionSpec
       )
     )
     processSeqMapper()
-    activeContracts shouldBe Map(
+    zeroBatch.activeContracts shouldBe Map(
       SynCon(someSynchronizerId3, hashCid("B")) -> ActivationRef(130L, 4L)
     )
   }
@@ -978,7 +817,7 @@ class ParallelIndexerSubscriptionSpec
 
   it should "correctly refill the missing activations" in {
     ParallelIndexerSubscription
-      .refillMissingDeactivatedActivations(LedgerApiServerMetrics.ForTesting, logger)(
+      .refillMissingDeactivatedActivations(logger)(
         Batch(
           ledgerEnd = previousLedgerEnd,
           batch = Vector(
@@ -1003,14 +842,13 @@ class ParallelIndexerSubscriptionSpec
           ),
           batchSize = 1,
           offsetsUpdates = Vector.empty,
+          activeContracts = EmptyActiveContracts,
           missingDeactivatedActivations = Map(
             SynCon(someSynchronizerId2, hashCid("A")) -> Some(ActivationRef(123, 1230)),
             SynCon(someSynchronizerId, hashCid("B")) -> Some(ActivationRef(1234, 12340)),
             SynCon(someSynchronizerId, hashCid("C")) -> Some(ActivationRef(12345, 123450)),
           ),
-          eventCount = 0L,
           batchTraceContext = TraceContext.empty,
-          distinctRawStrings = Nil,
         )
       )
       .batch should contain theSameElementsInOrderAs Vector(
@@ -1046,7 +884,7 @@ class ParallelIndexerSubscriptionSpec
       LoggerNameContains("ParallelIndexerSubscription") && SuppressionRule.Level(Level.WARN)
     )(
       ParallelIndexerSubscription
-        .refillMissingDeactivatedActivations(LedgerApiServerMetrics.ForTesting, logger)(
+        .refillMissingDeactivatedActivations(logger)(
           Batch(
             ledgerEnd = previousLedgerEnd,
             batch = Vector(
@@ -1059,13 +897,12 @@ class ParallelIndexerSubscriptionSpec
             ),
             batchSize = 1,
             offsetsUpdates = Vector.empty,
+            activeContracts = EmptyActiveContracts,
             missingDeactivatedActivations = Map(
               SynCon(someSynchronizerId2, hashCid("A")) -> None,
               SynCon(someSynchronizerId, hashCid("B")) -> Some(ActivationRef(1234, 12340)),
             ),
-            eventCount = 0L,
             batchTraceContext = TraceContext.empty,
-            distinctRawStrings = Nil,
           )
         )
         .batch should contain theSameElementsInOrderAs Vector(
@@ -1085,10 +922,7 @@ class ParallelIndexerSubscriptionSpec
 
   it should "report error and fail, if activation was not even requested" in {
     loggerFactory.assertInternalError[IllegalStateException](
-      ParallelIndexerSubscription.refillMissingDeactivatedActivations(
-        LedgerApiServerMetrics.ForTesting,
-        logger,
-      )(
+      ParallelIndexerSubscription.refillMissingDeactivatedActivations(logger)(
         Batch(
           ledgerEnd = previousLedgerEnd,
           batch = Vector(
@@ -1101,12 +935,11 @@ class ParallelIndexerSubscriptionSpec
           ),
           batchSize = 1,
           offsetsUpdates = Vector.empty,
+          activeContracts = EmptyActiveContracts,
           missingDeactivatedActivations = Map(
             SynCon(someSynchronizerId, hashCid("B")) -> Some(ActivationRef(1234, 12340))
           ),
-          eventCount = 0L,
           batchTraceContext = TraceContext.empty,
-          distinctRawStrings = Nil,
         )
       ),
       _.getMessage should include(
@@ -1115,73 +948,7 @@ class ParallelIndexerSubscriptionSpec
     )
   }
 
-  behavior of "dbPrepare"
-
-  it should "apply missing deactivated activations" in {
-    def lastActivations(@unused _synchronizerContracts: Iterable[(SynchronizerId, Long)])(
-        @unused _connection: Connection
-    ): Map[(SynchronizerId, Long), Long] = Map(
-      (someSynchronizerId, 5L) -> 2L,
-      (someSynchronizerId2, 15L) -> 4L,
-    )
-
-    def resolveInternalContractIds(@unused _tc: TraceContext)(
-        @unused _contractIds: Iterable[ContractId]
-    ): Future[Map[ContractId, Long]] = Future.successful {
-      Map(
-        hashCid("#1") -> 5L,
-        hashCid("#2") -> 7L,
-        hashCid("#3") -> 15L,
-      )
-    }
-
-    val dtos = Vector(someEventActivate)
-    val ledgerEnd = LedgerEnd(
-      lastOffset = offset(2),
-      lastEventSeqId = 2000,
-      lastStringInterningId = 300,
-      lastPublicationTime = CantonTimestamp.MinValue,
-    )
-    val inBatch = Batch(
-      ledgerEnd = ledgerEnd,
-      batchTraceContext = TraceContext.empty,
-      batch = dtos,
-      batchSize = dtos.size,
-      offsetsUpdates = Vector.empty,
-      missingDeactivatedActivations = Map(
-        SynCon(someSynchronizerId, hashCid("#1")) -> None,
-        SynCon(someSynchronizerId, hashCid("#2")) -> None, // not in last activations
-        SynCon(someSynchronizerId2, hashCid("#3")) -> None,
-      ),
-      eventCount = 0L,
-      distinctRawStrings = Nil,
-    )
-
-    val outBatchF = ParallelIndexerSubscription.dbPrepare(
-      lastActivations,
-      mockDbDispatcher(new TestConnection),
-      resolveInternalContractIds,
-      executionContext,
-      metrics,
-      logger,
-    )(inBatch)
-
-    outBatchF.futureValue shouldBe
-      Batch(
-        ledgerEnd = ledgerEnd,
-        batchTraceContext = TraceContext.empty,
-        batch = dtos,
-        batchSize = dtos.size,
-        offsetsUpdates = Vector.empty,
-        missingDeactivatedActivations = Map(
-          SynCon(someSynchronizerId, hashCid("#1")) -> Some(ActivationRef(2L, 5L)),
-          SynCon(someSynchronizerId, hashCid("#2")) -> None,
-          SynCon(someSynchronizerId2, hashCid("#3")) -> Some(ActivationRef(4L, 15L)),
-        ),
-        eventCount = 0L,
-        distinctRawStrings = Nil,
-      )
-  }
+  // TODO(i25857) add unit tests for dbPrepare
 
   behavior of "batcher"
 
@@ -1189,7 +956,6 @@ class ParallelIndexerSubscriptionSpec
     val result = ParallelIndexerSubscription.batcher(
       batchF = _ => "bumm",
       logger = logger,
-      metrics = LedgerApiServerMetrics.ForTesting,
     )(
       Batch(
         ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
@@ -1203,8 +969,7 @@ class ParallelIndexerSubscriptionSpec
         batchSize = 3,
         offsetsUpdates = offsetsAndUpdates,
         missingDeactivatedActivations = Map.empty,
-        eventCount = 0L,
-        distinctRawStrings = Nil,
+        activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
       )
     )
     result shouldBe Batch(
@@ -1214,8 +979,7 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 3,
       offsetsUpdates = offsetsAndUpdates,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
   }
 
@@ -1223,6 +987,24 @@ class ParallelIndexerSubscriptionSpec
 
   it should "apply ingestFunction and cleanUnusedBatch" in {
     val connection = new TestConnection
+    val dbDispatcher = new DbDispatcher {
+      override def executeSql[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
+          loggingContext: LoggingContextWithTrace
+      ): Future[T] =
+        Future.successful(sql(connection))
+
+      override val executor: QueueAwareExecutor & NamedExecutor = new QueueAwareExecutor
+        with NamedExecutor {
+        override def queueSize: Long = 0
+        override def name: String = "test"
+      }
+
+      override def executeSqlUS[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
+          loggingContext: LoggingContextWithTrace,
+          ec: ExecutionContext,
+      ): FutureUnlessShutdown[T] =
+        FutureUnlessShutdown.pure(sql(connection))
+    }
 
     val batchPayload = "Some batch payload"
 
@@ -1244,16 +1026,15 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 0,
       offsetsUpdates = Vector.empty,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
 
     val persistedTransferOffsets = new AtomicBoolean(false)
     val zeroDbBatch = "zero"
     val outBatchF =
       ParallelIndexerSubscription.ingester(
-        ingestFunction = ingestFunction,
-        reassignmentOffsetPersistence = new ReassignmentOffsetPersistence {
+        ingestFunction,
+        new ReassignmentOffsetPersistence {
           override def persist(updates: Seq[(Offset, Update)], tracedLogger: TracedLogger)(implicit
               traceContext: TraceContext
           ): Future[Unit] = {
@@ -1261,11 +1042,10 @@ class ParallelIndexerSubscriptionSpec
             Future.unit
           }
         },
-        zeroDbBatch = "zero",
-        dbDispatcher = mockDbDispatcher(connection),
-        executionContext = executionContext,
-        metrics = metrics,
-        logger = logger,
+        "zero",
+        dbDispatcher,
+        metrics,
+        logger,
       )(inBatch)
 
     val outBatch = Await.result(outBatchF, 10.seconds)
@@ -1278,8 +1058,7 @@ class ParallelIndexerSubscriptionSpec
         batchSize = 0,
         offsetsUpdates = Vector.empty,
         missingDeactivatedActivations = Map.empty,
-        eventCount = 0L,
-        distinctRawStrings = Nil,
+        activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
       )
     persistedTransferOffsets.get() shouldBe true
   }
@@ -1313,8 +1092,7 @@ class ParallelIndexerSubscriptionSpec
       batchSize = 0,
       offsetsUpdates = Vector.empty,
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     )
 
     val batchOfBatches = Vector(
@@ -1324,9 +1102,8 @@ class ParallelIndexerSubscriptionSpec
 
     val outBatchF =
       ParallelIndexerSubscription.ingestTail(
-        storeLedgerEnd = storeLedgerEndF,
-        executionContext = executionContext,
-        logger = logger,
+        storeLedgerEndF,
+        logger,
       )(
         traceContext
       )(batchOfBatches)
@@ -1337,8 +1114,12 @@ class ParallelIndexerSubscriptionSpec
 
   behavior of "synchronizerLedgerEndFromBatch"
 
-  private val someSequencerIndex1 = CantonTimestamp.ofEpochMicro(123)
-  private val someSequencerIndex2 = CantonTimestamp.ofEpochMicro(256)
+  private val someSequencerIndex1 = SequencerIndex(
+    sequencerTimestamp = CantonTimestamp.ofEpochMicro(123)
+  )
+  private val someSequencerIndex2 = SequencerIndex(
+    sequencerTimestamp = CantonTimestamp.ofEpochMicro(256)
+  )
   private val someRepairIndex1 = RepairIndex(
     timestamp = CantonTimestamp.ofEpochMicro(153),
     counter = RepairCounter(15),
@@ -1353,37 +1134,37 @@ class ParallelIndexerSubscriptionSpec
 
   it should "populate correct ledger-end from batches for a sequencer counter moved" in {
     ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
-      Vector(someSynchronizerId -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1))
+      Vector(someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1))
     ) shouldBe Map(
-      someSynchronizerId -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1)
+      someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1)
     )
   }
 
   it should "populate correct ledger-end from batches for a repair counter moved" in {
     ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
-      Vector(someSynchronizerId -> SynchronizerIndex.forRepairUpdate(someRepairIndex1))
+      Vector(someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1))
     ) shouldBe Map(
-      someSynchronizerId -> SynchronizerIndex.forRepairUpdate(someRepairIndex1)
+      someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1)
     )
   }
 
   it should "populate correct ledger-end from batches for a mixed batch" in {
     ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
       Vector(
-        someSynchronizerId -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1),
-        someSynchronizerId -> SynchronizerIndex.forRepairUpdate(
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(
           RepairIndex(someRecordTime1, someRepairCounter1)
         ),
-        someSynchronizerId -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex2),
-        someSynchronizerId2 -> SynchronizerIndex.forRepairUpdate(someRepairIndex1),
-        someSynchronizerId2 -> SynchronizerIndex.forRepairUpdate(someRepairIndex2),
-        someSynchronizerId2 -> SynchronizerIndex.forFloatingUpdate(someRecordTime1),
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex1),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRecordTime1),
       )
     ) shouldBe Map(
       someSynchronizerId -> SynchronizerIndex(
         Some(RepairIndex(someRecordTime1, someRepairCounter1)),
         Some(someSequencerIndex2),
-        someSequencerIndex2,
+        someSequencerIndex2.sequencerTimestamp,
       ),
       someSynchronizerId2 -> SynchronizerIndex(
         Some(someRepairIndex2),
@@ -1396,14 +1177,14 @@ class ParallelIndexerSubscriptionSpec
   it should "populate correct ledger-end from batches for a mixed batch 2" in {
     ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
       Vector(
-        someSynchronizerId -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1),
-        someSynchronizerId -> SynchronizerIndex.forRepairUpdate(someRepairIndex1),
-        someSynchronizerId -> SynchronizerIndex.forFloatingUpdate(someRecordTime2),
-        someSynchronizerId2 -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1),
-        someSynchronizerId2 -> SynchronizerIndex.forRepairUpdate(someRepairIndex2),
-        someSynchronizerId3 -> SynchronizerIndex.forSequencedUpdate(someSequencerIndex1),
-        someSynchronizerId3 -> SynchronizerIndex.forRepairUpdate(
-          RepairIndex(someSequencerIndex1, RepairCounter.Genesis)
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(someRecordTime2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex2),
+        someSynchronizerId3 -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId3 -> SynchronizerIndex.of(
+          RepairIndex(someSequencerIndex1.sequencerTimestamp, RepairCounter.Genesis)
         ),
       )
     ) shouldBe Map(
@@ -1418,9 +1199,9 @@ class ParallelIndexerSubscriptionSpec
         someRepairIndex2.timestamp,
       ),
       someSynchronizerId3 -> SynchronizerIndex(
-        Some(RepairIndex(someSequencerIndex1, RepairCounter.Genesis)),
+        Some(RepairIndex(someSequencerIndex1.sequencerTimestamp, RepairCounter.Genesis)),
         Some(someSequencerIndex1),
-        someSequencerIndex1,
+        someSequencerIndex1.sequencerTimestamp,
       ),
     )
   }
@@ -1438,12 +1219,20 @@ class ParallelIndexerSubscriptionSpec
       ) -> Map(
         someSynchronizerId -> SynchronizerIndex(
           None,
-          Some(CantonTimestamp.ofEpochMicro(5)),
+          Some(
+            SequencerIndex(
+              sequencerTimestamp = CantonTimestamp.ofEpochMicro(5)
+            )
+          ),
           CantonTimestamp.ofEpochMicro(5),
         ),
         someSynchronizerId2 -> SynchronizerIndex(
           Some(someRepairIndex2),
-          Some(CantonTimestamp.ofEpochMicro(4)),
+          Some(
+            SequencerIndex(
+              sequencerTimestamp = CantonTimestamp.ofEpochMicro(4)
+            )
+          ),
           CantonTimestamp.ofEpochMicro(4),
         ),
       )
@@ -1464,17 +1253,16 @@ class ParallelIndexerSubscriptionSpec
         offset(9) ->
           Update.SequencerIndexMoved(
             synchronizerId = someSynchronizerId,
-            recordTime = someSequencerIndex1,
+            recordTime = someSequencerIndex1.sequencerTimestamp,
           ),
         offset(10) ->
           Update.SequencerIndexMoved(
             synchronizerId = someSynchronizerId2,
-            recordTime = someSequencerIndex1,
+            recordTime = someSequencerIndex1.sequencerTimestamp,
           ),
       ),
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     ),
     Batch(
       ledgerEnd = LedgerEnd(
@@ -1490,17 +1278,16 @@ class ParallelIndexerSubscriptionSpec
         offset(19) ->
           Update.SequencerIndexMoved(
             synchronizerId = someSynchronizerId,
-            recordTime = someSequencerIndex2,
+            recordTime = someSequencerIndex2.sequencerTimestamp,
           ),
         offset(20) ->
           Update.SequencerIndexMoved(
             synchronizerId = someSynchronizerId2,
-            recordTime = someSequencerIndex2,
+            recordTime = someSequencerIndex2.sequencerTimestamp,
           ),
       ),
       missingDeactivatedActivations = Map.empty,
-      eventCount = 0L,
-      distinctRawStrings = Nil,
+      activeContracts = ParallelIndexerSubscription.EmptyActiveContracts,
     ),
   )
 
@@ -1532,12 +1319,12 @@ class ParallelIndexerSubscriptionSpec
           someSynchronizerId -> SynchronizerIndex(
             None,
             Some(someSequencerIndex2),
-            someSequencerIndex2,
+            someSequencerIndex2.sequencerTimestamp,
           ),
           someSynchronizerId2 -> SynchronizerIndex(
             None,
             Some(someSequencerIndex2),
-            someSequencerIndex2,
+            someSequencerIndex2.sequencerTimestamp,
           ),
         )
       )
@@ -1562,29 +1349,18 @@ class ParallelIndexerSubscriptionSpec
           someSynchronizerId -> SynchronizerIndex(
             None,
             Some(someSequencerIndex2),
-            someSequencerIndex2,
+            someSequencerIndex2.sequencerTimestamp,
           ),
           someSynchronizerId2 -> SynchronizerIndex(
             Some(someRepairIndex2),
             Some(someSequencerIndex2),
-            someSequencerIndex2,
+            someSequencerIndex2.sequencerTimestamp,
           ),
         )
       )
   }
 
   behavior of "commitRepair"
-
-  def toBatch(offsetsUpdates: Vector[(Offset, Update)]) = Batch(
-    ledgerEnd = ZeroLedgerEnd,
-    batchTraceContext = TraceContext.empty,
-    batch = (),
-    batchSize = 0,
-    offsetsUpdates = offsetsUpdates,
-    missingDeactivatedActivations = Map.empty,
-    eventCount = 0L,
-    distinctRawStrings = Nil,
-  )
 
   it should "trigger storing ledger-end on CommitRepair" in {
     val ledgerEndStoredPromise = Promise[Unit]()
@@ -1602,12 +1378,10 @@ class ParallelIndexerSubscriptionSpec
             -> Map.empty
         )
       )
-    val input = toBatch(
-      Vector(
-        offset(13) -> update,
-        offset(14) -> update,
-        offset(15) -> Update.CommitRepair(),
-      )
+    val input = Vector(
+      offset(13) -> update,
+      offset(14) -> update,
+      offset(15) -> Update.CommitRepair(),
     )
     ParallelIndexerSubscription
       .commitRepair(
@@ -1622,7 +1396,6 @@ class ParallelIndexerSubscriptionSpec
         updateInMemoryState = _ => updateInMemoryStatePromise.success(()),
         aggregatedLedgerEnd = aggregatedLedgerEnd,
         logger = loggerFactory.getTracedLogger(this.getClass),
-        executionContext = executionContext,
       )(implicitly)(input)
       .futureValue shouldBe input
     ledgerEndStoredPromise.future.isCompleted shouldBe true
@@ -1645,11 +1418,9 @@ class ParallelIndexerSubscriptionSpec
           ) -> Map.empty
         )
       )
-    val input = toBatch(
-      Vector(
-        offset(13) -> update,
-        offset(14) -> update,
-      )
+    val input = Vector(
+      offset(13) -> update,
+      offset(14) -> update,
     )
     ParallelIndexerSubscription
       .commitRepair(
@@ -1664,7 +1435,6 @@ class ParallelIndexerSubscriptionSpec
         updateInMemoryState = _ => updateInMemoryStatePromise.success(()),
         aggregatedLedgerEnd = aggregatedLedgerEnd,
         logger = loggerFactory.getTracedLogger(this.getClass),
-        executionContext = executionContext,
       )(implicitly)(input)
       .futureValue shouldBe input
     ledgerEndStoredPromise.future.isCompleted shouldBe false
@@ -1697,7 +1467,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = None,
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe)
@@ -1725,7 +1494,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = Some(Offset.tryFromLong(2)),
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe)
@@ -1755,7 +1523,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = None,
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1785,12 +1552,13 @@ class ParallelIndexerSubscriptionSpec
               loadPreviousState = _ =>
                 Future.successful(
                   Some(
-                    SynchronizerIndex.forSequencedUpdate(
-                      CantonTimestamp.ofEpochSecond(10)
+                    SynchronizerIndex.of(
+                      SequencerIndex(
+                        sequencerTimestamp = CantonTimestamp.ofEpochSecond(10)
+                      )
                     )
                   )
                 ),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1820,7 +1588,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = None,
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1850,12 +1617,13 @@ class ParallelIndexerSubscriptionSpec
               loadPreviousState = _ =>
                 Future.successful(
                   Some(
-                    SynchronizerIndex.forSequencedUpdate(
-                      CantonTimestamp.ofEpochSecond(1)
+                    SynchronizerIndex.of(
+                      SequencerIndex(
+                        sequencerTimestamp = CantonTimestamp.ofEpochSecond(1)
+                      )
                     )
                   )
                 ),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1879,7 +1647,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = None,
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1890,34 +1657,7 @@ class ParallelIndexerSubscriptionSpec
         throw testSink.expectError()
       },
       _.getMessage should include regex
-        raw"Monotonicity violation detected: repair index did not increase from .* to .* at offset Offset\(2\)",
-    )
-
-  it should "throw if repair counters are the same" in
-    loggerFactory.assertInternalError[IllegalStateException](
-      {
-        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-          offset(1L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(15L)),
-          offset(2L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(15L)),
-        )
-
-        val testSink = Source(offsetsUpdates)
-          .via(
-            ParallelIndexerSubscription.monotonicityValidator(
-              initialOffset = None,
-              loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
-            )(logger)
-          )
-          .runWith(TestSink.probe[(Offset, Update)])
-
-        testSink.request(2)
-        testSink.expectNextN(offsetsUpdates.take(1))
-
-        throw testSink.expectError()
-      },
-      _.getMessage should include regex
-        raw"Monotonicity violation detected: repair index did not increase from .* to .* at offset Offset\(2\)",
+        raw"Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(2\)",
     )
 
   it should "throw if repair counters decrease compared to clean synchronizer index" in
@@ -1926,6 +1666,7 @@ class ParallelIndexerSubscriptionSpec
         val offsetsUpdates: Vector[(Offset, Update)] = Vector(
           offset(1L) -> repairUpdate(CantonTimestamp.ofEpochSecond(10), RepairCounter(15L))
         )
+
         val testSink = Source(offsetsUpdates)
           .via(
             ParallelIndexerSubscription.monotonicityValidator(
@@ -1933,7 +1674,7 @@ class ParallelIndexerSubscriptionSpec
               loadPreviousState = _ =>
                 Future.successful(
                   Some(
-                    SynchronizerIndex.forRepairUpdate(
+                    SynchronizerIndex.of(
                       RepairIndex(
                         counter = RepairCounter(20L),
                         timestamp = CantonTimestamp.ofEpochSecond(10),
@@ -1941,7 +1682,6 @@ class ParallelIndexerSubscriptionSpec
                     )
                   )
                 ),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -1950,40 +1690,7 @@ class ParallelIndexerSubscriptionSpec
         throw testSink.expectError()
       },
       _.getMessage should include regex
-        raw"Monotonicity violation detected: repair index did not increase from .* to .* at offset Offset\(1\)",
-    )
-
-  it should "throw if repair counters are the same compared to clean synchronizer index" in
-    loggerFactory.assertInternalError[IllegalStateException](
-      {
-        val offsetsUpdates: Vector[(Offset, Update)] = Vector(
-          offset(1L) -> repairUpdate(CantonTimestamp.ofEpochSecond(10), RepairCounter(15L))
-        )
-        val testSink = Source(offsetsUpdates)
-          .via(
-            ParallelIndexerSubscription.monotonicityValidator(
-              initialOffset = None,
-              loadPreviousState = _ =>
-                Future.successful(
-                  Some(
-                    SynchronizerIndex.forRepairUpdate(
-                      RepairIndex(
-                        counter = RepairCounter(15L),
-                        timestamp = CantonTimestamp.ofEpochSecond(10),
-                      )
-                    )
-                  )
-                ),
-              executionContext = executionContext,
-            )(logger)
-          )
-          .runWith(TestSink.probe[(Offset, Update)])
-
-        testSink.request(1)
-        throw testSink.expectError()
-      },
-      _.getMessage should include regex
-        raw"Monotonicity violation detected: repair index did not increase from .* to .* at offset Offset\(1\)",
+        raw"Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(1\)",
     )
 
   it should "throw if record time decreases for floating events" in
@@ -2000,7 +1707,6 @@ class ParallelIndexerSubscriptionSpec
             ParallelIndexerSubscription.monotonicityValidator(
               initialOffset = None,
               loadPreviousState = _ => Future.successful(None),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -2020,6 +1726,7 @@ class ParallelIndexerSubscriptionSpec
         val offsetsUpdates: Vector[(Offset, Update)] = Vector(
           offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10))
         )
+
         val testSink = Source(offsetsUpdates)
           .via(
             ParallelIndexerSubscription.monotonicityValidator(
@@ -2027,12 +1734,11 @@ class ParallelIndexerSubscriptionSpec
               loadPreviousState = _ =>
                 Future.successful(
                   Some(
-                    SynchronizerIndex.forFloatingUpdate(
+                    SynchronizerIndex.of(
                       CantonTimestamp.ofEpochSecond(11)
                     )
                   )
                 ),
-              executionContext = executionContext,
             )(logger)
           )
           .runWith(TestSink.probe[(Offset, Update)])
@@ -2064,13 +1770,14 @@ class ParallelIndexerSubscriptionSpec
         optNodeSeeds = None,
         optByKeyNodes = None,
       ),
-      transactionInfo =
-        TransactionAccepted.TransactionInfo(CommittedTransaction(TransactionBuilder.Empty)),
+      transaction = CommittedTransaction(TransactionBuilder.Empty),
       updateId = TestUpdateId("15000"),
+      contractAuthenticationData = Map.empty,
+      representativePackageIds = RepresentativePackageIds.Empty,
       synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
       repairCounter = repairCounter,
       recordTime = recordTime,
-      contractInfos = Map.empty,
+      internalContractIds = Map.empty,
     )(TraceContext.empty)
 
   def floatingUpdate(recordTime: CantonTimestamp): Update =

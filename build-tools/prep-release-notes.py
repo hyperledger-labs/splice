@@ -48,23 +48,7 @@ def print_release_notes_and_git_log():
 
     release_notes_md = pypandoc.convert_text(release_notes, 'md', format='rst')
 
-    release_branch = f"release-line-{prev_version}"
-    origin_ref = f"origin/{release_branch}"
-
-    # Verify local branch (if it exists) matches origin
-    if release_branch in repo.refs:
-        if origin_ref not in repo.refs:
-            raise RuntimeError(
-                f"Local branch '{release_branch}' exists but remote tracking branch '{origin_ref}' does not"
-            )
-        if repo.refs[release_branch].commit != repo.refs[origin_ref].commit:
-            raise RuntimeError(
-                f"Local branch '{release_branch}' ({repo.refs[release_branch].commit}) "
-                f"differs from '{origin_ref}' ({repo.refs[origin_ref].commit}). "
-                f"Please reconcile them before proceeding."
-            )
-
-    log_entries = [f" * {c.summary}" for c in repo.iter_commits(f"{origin_ref}..")]
+    log_entries = [f" * {c.summary}" for c in repo.iter_commits(f"release-line-{prev_version}..")]
     log_text = "\n".join(log_entries)
 
     layout_grid = Table.grid(expand=True)
@@ -94,9 +78,6 @@ def move_upcoming_notes():
 
     upcoming_header = lines_upcoming[:split_index_upcoming]
     upcoming_content = lines_upcoming[split_index_upcoming:]
-
-    # comment out Upcoming section
-    upcoming_header[-1] = '.. ' + upcoming_header[-1]
 
     with open(release_notes_filename, 'r') as f:
         lines_release_notes = f.readlines()

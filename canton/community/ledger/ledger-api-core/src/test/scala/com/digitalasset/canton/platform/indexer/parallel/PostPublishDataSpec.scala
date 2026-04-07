@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
@@ -6,11 +6,11 @@ package com.digitalasset.canton.platform.indexer.parallel
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
 import com.digitalasset.canton.ledger.participant.state.Update.{
   RepairTransactionAccepted,
   SequencedCommandRejected,
   SequencedTransactionAccepted,
-  TransactionAccepted,
   UnSequencedCommandRejected,
 }
 import com.digitalasset.canton.ledger.participant.state.{
@@ -62,29 +62,27 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
 
   behavior of "from"
 
-  it should "populate post PostPublishData correctly for sequenced TransactionAccepted" in {
-    val update = SequencedTransactionAccepted(
-      completionInfoO = Some(
-        CompletionInfo(
-          actAs = List(party),
-          userId = userId,
-          commandId = commandId,
-          optDeduplicationPeriod = None,
-          submissionId = submissionId,
-        )
-      ),
-      transactionMeta = transactionMeta,
-      transactionInfo =
-        TransactionAccepted.TransactionInfo(CommittedTransaction(TransactionBuilder.Empty)),
-      updateId = updateId,
-      synchronizerId = synchronizerId,
-      recordTime = cantonTime2,
-      acsChangeFactory = TestAcsChangeFactory(),
-      contractInfos = Map.empty,
-    )(TraceContext.empty)
-
+  it should "populate post PostPublishData correctly for TransactionAccepted" in {
     PostPublishData.from(
-      update = update,
+      update = SequencedTransactionAccepted(
+        completionInfoO = Some(
+          CompletionInfo(
+            actAs = List(party),
+            userId = userId,
+            commandId = commandId,
+            optDeduplicationPeriod = None,
+            submissionId = submissionId,
+          )
+        ),
+        transactionMeta = transactionMeta,
+        transaction = CommittedTransaction(TransactionBuilder.Empty),
+        updateId = updateId,
+        contractAuthenticationData = Map.empty,
+        synchronizerId = synchronizerId,
+        recordTime = cantonTime2,
+        acsChangeFactory = TestAcsChangeFactory(),
+        internalContractIds = Map.empty,
+      )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
     ) shouldBe Some(
@@ -103,48 +101,58 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         traceContext = TraceContext.empty,
       )
     )
-
-    PostPublishData.from(
-      update = update.copy(completionInfoO = None)(TraceContext.empty),
-      offset = offset,
-      publicationTime = cantonTime1,
-    ) shouldBe None
   }
 
-  it should "populate no post PostPublishData for repair transactions" in {
+  it should "not populate post PostPublishData correctly for TransactionAccepted without completion info" in {
     PostPublishData.from(
-      update = RepairTransactionAccepted(
+      update = SequencedTransactionAccepted(
+        completionInfoO = None,
         transactionMeta = transactionMeta,
-        transactionInfo =
-          TransactionAccepted.TransactionInfo(CommittedTransaction(TransactionBuilder.Empty)),
+        transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
+        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
-        repairCounter = RepairCounter(65),
         recordTime = cantonTime2,
-        contractInfos = Map.empty,
+        acsChangeFactory = TestAcsChangeFactory(),
+        internalContractIds = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
     ) shouldBe None
   }
 
-  it should "populate post PostPublishData correctly for SequencedCommandRejected" in {
-    val update = SequencedCommandRejected(
-      completionInfo = CompletionInfo(
-        actAs = List(party),
-        userId = userId,
-        commandId = commandId,
-        optDeduplicationPeriod = None,
-        submissionId = submissionId,
-      ),
-      reasonTemplate = FinalReason(status),
-      synchronizerId = synchronizerId,
-      recordTime = cantonTime2,
-      isTransaction = true,
-    )(TraceContext.empty)
-
+  it should "populate no post PostPublishData for TransactionAccepted without request sequencer counter" in {
     PostPublishData.from(
-      update = update,
+      update = RepairTransactionAccepted(
+        transactionMeta = transactionMeta,
+        transaction = CommittedTransaction(TransactionBuilder.Empty),
+        updateId = updateId,
+        contractAuthenticationData = Map.empty,
+        representativePackageIds = RepresentativePackageIds.Empty,
+        synchronizerId = synchronizerId,
+        repairCounter = RepairCounter(65),
+        recordTime = cantonTime2,
+        internalContractIds = Map.empty,
+      )(TraceContext.empty),
+      offset = offset,
+      publicationTime = cantonTime1,
+    ) shouldBe None
+  }
+
+  it should "populate post PostPublishData correctly for CommandRejected for sequenced" in {
+    PostPublishData.from(
+      update = SequencedCommandRejected(
+        completionInfo = CompletionInfo(
+          actAs = List(party),
+          userId = userId,
+          commandId = commandId,
+          optDeduplicationPeriod = None,
+          submissionId = submissionId,
+        ),
+        reasonTemplate = FinalReason(status),
+        synchronizerId = synchronizerId,
+        recordTime = cantonTime2,
+      )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
     ) shouldBe Some(
@@ -163,32 +171,23 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         traceContext = TraceContext.empty,
       )
     )
-
-    PostPublishData.from(
-      update = update.copy(isTransaction = false)(TraceContext.empty),
-      offset = offset,
-      publicationTime = cantonTime1,
-    ) shouldBe None
   }
 
-  it should "populate post PostPublishData correctly for UnSequencedCommandRejected" in {
-    val update = UnSequencedCommandRejected(
-      completionInfo = CompletionInfo(
-        actAs = List(party),
-        userId = userId,
-        commandId = commandId,
-        optDeduplicationPeriod = None,
-        submissionId = submissionId,
-      ),
-      reasonTemplate = FinalReason(status),
-      synchronizerId = synchronizerId,
-      recordTime = cantonTime2,
-      messageUuid = messageUuid,
-      isTransaction = true,
-    )(TraceContext.empty)
-
+  it should "populate post PostPublishData correctly for CommandRejected for non-sequenced" in {
     PostPublishData.from(
-      update = update,
+      update = UnSequencedCommandRejected(
+        completionInfo = CompletionInfo(
+          actAs = List(party),
+          userId = userId,
+          commandId = commandId,
+          optDeduplicationPeriod = None,
+          submissionId = submissionId,
+        ),
+        reasonTemplate = FinalReason(status),
+        synchronizerId = synchronizerId,
+        recordTime = cantonTime2,
+        messageUuid = messageUuid,
+      )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
     ) shouldBe Some(
@@ -205,10 +204,6 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         traceContext = TraceContext.empty,
       )
     )
-    PostPublishData.from(
-      update = update.copy(isTransaction = false)(TraceContext.empty),
-      offset = offset,
-      publicationTime = cantonTime1,
-    ) shouldBe None
   }
+
 }

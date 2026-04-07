@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins.toxiproxy
@@ -62,11 +62,4 @@ final case class SequencerPostgresInstanceConfig(
     dbName: String,
     postgres: DbConfig.Postgres,
     dbTimeoutMillis: Long = 10000L,
-) extends ProxyInstanceConfig
-
-final case class BftSequencerPeerToPeerInstanceConfig(
-    name: String,
-    upstreamHost: String,
-    upstreamPort: Port,
-    from: BftSequencerPeerToPeer,
 ) extends ProxyInstanceConfig

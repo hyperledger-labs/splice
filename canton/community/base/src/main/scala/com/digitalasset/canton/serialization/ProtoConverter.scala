@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.serialization
@@ -80,19 +80,15 @@ object ProtoConverter {
     */
   def protoParser[A](parseFrom: CodedInputStream => A): ByteString => Either[BufferException, A] =
     bytes =>
-      try {
-        Right(parseFrom(bytes.newCodedInput))
-      } catch {
-        case e: InvalidProtocolBufferException => Left(BufferException(e))
-      }
+      Either
+        .catchOnly[InvalidProtocolBufferException](parseFrom(bytes.newCodedInput))
+        .leftMap(BufferException.apply)
 
   def protoParserArray[A](parseFrom: Array[Byte] => A): Array[Byte] => Either[BufferException, A] =
     bytes =>
-      try {
-        Right(parseFrom(bytes))
-      } catch {
-        case e: InvalidProtocolBufferException => Left(BufferException(e))
-      }
+      Either
+        .catchOnly[InvalidProtocolBufferException](parseFrom(bytes))
+        .leftMap(BufferException.apply)
 
   /** Helper for extracting an optional field where the value is required
     * @param field

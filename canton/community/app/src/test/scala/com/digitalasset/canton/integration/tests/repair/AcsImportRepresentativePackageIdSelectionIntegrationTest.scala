@@ -1,14 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.repair
 
 import better.files.File
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.{state_service, transaction_filter, value as apiValue}
-import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.http.json.tests.upgrades
@@ -18,7 +19,7 @@ import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.{
   getActiveContractsRequestRW,
   jsGetActiveContractsResponseRW,
 }
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.PartyToParticipantDeclarative
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -32,9 +33,8 @@ import com.digitalasset.canton.participant.admin.data.{
 }
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError.ImportAcsError
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.time.PositiveSeconds
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{
   HasExecutionContext,
@@ -67,25 +67,17 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
   private val FooV2PkgId = upgrades.v2.java.foo.Foo.PACKAGE_ID
   private val FooV3PkgId = upgrades.v3.java.foo.Foo.PACKAGE_ID
 
-  // TODO(#27707) - Remove when ACS commitments consider the onboarding flag
-  // Alice's replication to the target participant may trigger ACS commitment mismatch warnings.
-  // This is expected behavior. To reduce the frequency of these warnings and avoid associated
-  // test flakes, `reconciliationInterval` is set to ten years.
-  private val reconciliationInterval = PositiveSeconds.tryOfDays(365 * 10)
-
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
       .prependConfigTransforms(ConfigTransforms.enableHttpLedgerApi)
       .withSetup { implicit env =>
         import env.*
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
-        sequencer1.topology.synchronizer_parameters
-          .propose_update(daId, _.update(reconciliationInterval = reconciliationInterval.toConfig))
         participant1.dars.upload(FooV1Path)
       }
 
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 
   protected def importAcs(
       importParticipant: ParticipantReference,
@@ -94,7 +86,6 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
       packageNameOverride: Map[LfPackageName, LfPackageId],
       contractImportMode: ContractImportMode,
       file: File,
-      synchronizerId: SynchronizerId,
   ): Unit
 
   private def createUniqueParty(
@@ -251,7 +242,7 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
                 entry.shouldBeCantonErrorCode(ImportAcsError)
                 entry.message should include(
                   show"Contract import mode is 'Accept' but the selected representative package-id ${LfPackageId
-                      .assertFromString(FooV1PkgId)} for contract with id $contractId differs from the exported representative package-id ${LfPackageId.assertFromString(FooV2PkgId)}. Please use contract import mode 'Validation' to change the representative package-id."
+                      .assertFromString(FooV1PkgId)} for contract with id $contractId differs from the exported representative package-id ${LfPackageId.assertFromString(FooV2PkgId)}. Please use contract import mode 'Validation' or 'Recomputation' to change the representative package-id."
                 )
               },
             ),
@@ -470,7 +461,6 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
       .GetActiveContractsRequest(
         activeAtOffset = ledgerEndOffset,
         eventFormat = Some(queryEventFormat),
-        streamContinuationToken = None,
       )
       .asJson
       .toString()
@@ -520,7 +510,7 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
         parties = Set(party),
         exportFilePath = file.canonicalPath,
         synchronizerId = Some(env.daId),
-        ledgerOffset = participant1.ledger_api.state.end(),
+        ledgerOffset = NonNegativeLong.tryCreate(participant1.ledger_api.state.end()),
       )
 
       importParticipant.synchronizers.disconnect_all()
@@ -534,7 +524,6 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
             packageNameOverride,
             contractImportMode,
             file,
-            daId,
           )
         } finally {
           importParticipant.synchronizers.reconnect_all()
@@ -582,12 +571,10 @@ trait WithRepairServiceImportAcs {
       packageNameOverride: Map[LfPackageName, LfPackageId],
       contractImportMode: ContractImportMode,
       file: File,
-      synchronizerId: SynchronizerId,
   ): Unit =
     importParticipant.repair
       .import_acs(
         importFilePath = file.canonicalPath,
-        synchronizerId = synchronizerId,
         representativePackageIdOverride = RepresentativePackageIdOverride(
           contractOverride = contractRpIdOverride,
           packageIdOverride = packageIdOverride,
@@ -608,23 +595,17 @@ trait WithImportPartyAcs {
       packageNameOverride: Map[LfPackageName, LfPackageId],
       contractImportMode: ContractImportMode,
       file: File,
-      synchronizerId: SynchronizerId,
-  ): Unit =
-    // Using the repair import ACS endpoing as the offline party replication specific
-    // behaviour of the parties.import_party_acs is irrelevant for the representative
-    // PackageId selection test.
-    importParticipant.repair
-      .import_acs(
-        importFilePath = file.canonicalPath,
-        synchronizerId = synchronizerId,
-        representativePackageIdOverride = RepresentativePackageIdOverride(
-          contractOverride = contractRpIdOverride,
-          packageIdOverride = packageIdOverride,
-          packageNameOverride = packageNameOverride,
-        ),
-        contractImportMode = contractImportMode,
-      )
-      .discard
+  ): Unit = importParticipant.parties
+    .import_party_acs(
+      importFilePath = file.canonicalPath,
+      representativePackageIdOverride = RepresentativePackageIdOverride(
+        contractOverride = contractRpIdOverride,
+        packageIdOverride = packageIdOverride,
+        packageNameOverride = packageNameOverride,
+      ),
+      contractImportMode = contractImportMode,
+    )
+    .discard
 }
 
 // TODO(#25385): This test should be a variation in the conformance test suites

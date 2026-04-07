@@ -35,7 +35,6 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -285,11 +284,6 @@ trait ScanConnection
       ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
     ]
   ]
-
-  def getActivePhysicalSynchronizerSerial()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[NonNegativeInt]
 
 }
 

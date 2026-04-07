@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.crypto.{
   CryptoKeyFormat,
   EncryptionAlgorithmSpec,
@@ -48,7 +49,10 @@ sealed trait CryptoProvider extends PrettyPrinting {
 
 object CryptoProvider {
 
-  case object Jce extends CryptoProvider {
+  implicit val cryptoProviderCantonConfigValidator: CantonConfigValidator[CryptoProvider] =
+    CantonConfigValidatorDerivation[CryptoProvider]
+
+  case object Jce extends CryptoProvider with UniformCantonConfigValidation {
     override def name: String = "JCE"
 
     override def signingAlgorithms: CryptoProviderScheme[SigningAlgorithmSpec] =
@@ -154,7 +158,7 @@ object CryptoProvider {
     * applies to the key specifications. However, if the chosen KMS supports any of these
     * algorithms, the default scheme can be configured accordingly.
     */
-  case object Kms extends CryptoProvider {
+  case object Kms extends CryptoProvider with UniformCantonConfigValidation {
     override def name: String = "KMS"
 
     override def signingAlgorithms: CryptoProviderScheme[SigningAlgorithmSpec] =

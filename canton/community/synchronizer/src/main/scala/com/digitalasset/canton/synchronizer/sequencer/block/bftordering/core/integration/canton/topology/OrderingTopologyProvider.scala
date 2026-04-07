@@ -1,12 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology
 
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 
 trait OrderingTopologyProvider[E <: Env[E]] {
@@ -17,25 +17,25 @@ trait OrderingTopologyProvider[E <: Env[E]] {
     * @param activationTime
     *   The timestamp with which to query the topology client for a topology snapshot. See
     *   [[com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime]]
-    *   for details. If `None`, the head snapshot is returned as a bootstrap topology and pending
-    *   topology changes are assumed absent without checking.
-    * @param checkPendingChanges
-    *   Whether to check if there are pending topology changes that have not yet been activated.
+    *   for details.
+    * @param traceContext
+    *   The trace context.
     * @return
     *   A future that completes and yields the requested topology only if at least the immediate
     *   predecessor has been successfully sequenced and is visible to the sequencer's topology
     *   processor.
     */
   def getOrderingTopologyAt(
-      activationTime: Option[TopologyActivationTime],
-      checkPendingChanges: Boolean,
-  )(implicit
-      traceContext: TraceContext
-  ): E#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[E])]]
-
-  def getFirstKnownAt(
       activationTime: TopologyActivationTime
   )(implicit
       traceContext: TraceContext
-  ): E#FutureUnlessShutdownT[Option[Map[BftNodeId, TopologyActivationTime]]]
+  ): E#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[E])]]
+}
+
+object OrderingTopologyProvider {
+
+  val InitialOrderingTopologyActivationTime: TopologyActivationTime =
+    TopologyActivationTime(
+      SignedTopologyTransaction.InitialTopologySequencingTime.immediateSuccessor
+    )
 }

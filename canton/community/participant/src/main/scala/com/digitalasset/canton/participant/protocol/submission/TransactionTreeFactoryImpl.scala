@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -21,6 +21,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactoryImpl.*
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.RollbackContext.RollbackScope
 import com.digitalasset.canton.protocol.WellFormedTransaction.{
   WithAbsoluteSuffixes,
@@ -30,12 +31,11 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.util.{ContractHasher, ErrorUtil, LfTransactionUtil, MonadUtil}
 import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.digitalasset.daml.lf.transaction.LegacyContractStateMachine.KeyInactive
+import com.digitalasset.daml.lf.transaction.ContractStateMachine.KeyInactive
 import com.digitalasset.daml.lf.transaction.Transaction.{
   KeyActive,
   KeyCreate,
@@ -43,14 +43,15 @@ import com.digitalasset.daml.lf.transaction.Transaction.{
   NegativeKeyLookup,
 }
 import com.digitalasset.daml.lf.transaction.{
+  ContractKeyUniquenessMode,
+  ContractStateMachine,
   CreationTime,
-  LegacyContractKeyUniquenessMode as ContractKeyUniquenessMode,
-  LegacyContractStateMachine as ContractStateMachine,
 }
 import io.scalaland.chimney.dsl.*
 
 import java.util.UUID
 import scala.annotation.{nowarn, tailrec}
+import scala.collection.immutable.SortedSet
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
@@ -66,7 +67,7 @@ import scala.concurrent.ExecutionContext
   */
 class TransactionTreeFactoryImpl(
     participantId: ParticipantId,
-    psid: PhysicalSynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     override val cantonContractIdVersion: CantonContractIdVersion,
     cryptoOps: HashOps & HmacOps,
     hasher: ContractHasher,
@@ -75,7 +76,7 @@ class TransactionTreeFactoryImpl(
     extends TransactionTreeFactory
     with NamedLogging {
 
-  private val protocolVersion = psid.protocolVersion
+  private val protocolVersion = synchronizerId.protocolVersion
   private val contractIdSuffixer: ContractIdSuffixer =
     new ContractIdSuffixer(cryptoOps, cantonContractIdVersion)
   private val transactionViewDecompositionFactory = TransactionViewDecompositionFactory
@@ -89,7 +90,7 @@ class TransactionTreeFactoryImpl(
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
-      keyResolver: ContractStateMachine.KeyResolver,
+      keyResolver: LfKeyResolver,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
   )(implicit
@@ -128,7 +129,7 @@ class TransactionTreeFactoryImpl(
 
     val commonMetadata = CommonMetadata
       .create(cryptoOps)(
-        psid,
+        synchronizerId,
         mediator,
         commonMetadataSalt,
         transactionUuid,
@@ -146,12 +147,7 @@ class TransactionTreeFactoryImpl(
           salt = submitterMetadataSalt,
           maxSequencingTime,
           externalAuthorization = submitterInfo.externallySignedSubmission.map(s =>
-            ExternalAuthorization.create(
-              s.signatures,
-              s.version,
-              s.maxRecordTime.map(CantonTimestamp(_)),
-              protocolVersion,
-            )
+            ExternalAuthorization.create(s.signatures, s.version, protocolVersion)
           ),
           protocolVersion = protocolVersion,
         )
@@ -169,14 +165,14 @@ class TransactionTreeFactoryImpl(
         )
       }
 
-      rootViews <- createRootViews(rootViewDecompositions, state, contractOfId, topologySnapshot)
+      rootViews <- createRootViews(rootViewDecompositions, state, contractOfId)
 
       _ <-
         if (validatePackageVettings) {
           val requiredPackageByParty = requiredPackagesByParty(rootViewDecompositions)
           UsableSynchronizers
             .checkPackagesVetted(
-              synchronizerId = psid,
+              synchronizerId = synchronizerId,
               snapshot = topologySnapshot,
               requiredPackagesByParty = requiredPackageByParty,
               ledgerTime = metadata.ledgerTime,
@@ -199,7 +195,7 @@ class TransactionTreeFactoryImpl(
       mediator: MediatorGroupRecipient,
       transactionUUID: UUID,
       ledgerTime: CantonTimestamp,
-      keyResolver: ContractStateMachine.KeyResolver,
+      keyResolver: LfKeyResolver,
   ): State = {
     val salts = LazyList
       .from(0)
@@ -244,7 +240,6 @@ class TransactionTreeFactoryImpl(
       decompositions: Seq[TransactionViewDecomposition.NewView],
       state: State,
       contractOfId: ContractInstanceOfId,
-      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, Seq[TransactionView]] = {
@@ -291,7 +286,7 @@ class TransactionTreeFactoryImpl(
         MonadUtil.sequentialTraverse(
           decompositions.zip(MerkleSeq.indicesFromSeq(decompositions.size))
         ) { case (rootView, index) =>
-          createView(rootView, index +: ViewPosition.root, state, fromPreloaded, topologySnapshot)
+          createView(rootView, index +: ViewPosition.root, state, fromPreloaded)
         }
       }
   }
@@ -301,7 +296,6 @@ class TransactionTreeFactoryImpl(
       viewPosition: ViewPosition,
       state: State,
       contractOfId: ContractInstanceOfId,
-      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, TransactionView] = {
@@ -340,13 +334,7 @@ class TransactionTreeFactoryImpl(
       _ <- MonadUtil.sequentialTraverse_(view.allNodes) {
         case childView: TransactionViewDecomposition.NewView =>
           // Compute subviews, recursively
-          createView(
-            childView,
-            subviewIndex.next() +: viewPosition,
-            state,
-            contractOfId,
-            topologySnapshot,
-          )
+          createView(childView, subviewIndex.next() +: viewPosition, state, contractOfId)
             .map { v =>
               childViewsBuilder += v
               val createdInSubview = state.createdContractsInView
@@ -372,7 +360,6 @@ class TransactionTreeFactoryImpl(
                   viewPosition,
                   createIndex,
                   state,
-                  topologySnapshot,
                 ).map { suffixedNode =>
                   coreCreatedBuilder += (suffixedNode -> rbScope)
                   createdInView += suffixedNode.coid
@@ -498,7 +485,6 @@ class TransactionTreeFactoryImpl(
       viewPosition: ViewPosition,
       createIndex: Int,
       state: State,
-      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, LfNodeCreate] = {
@@ -518,7 +504,7 @@ class TransactionTreeFactoryImpl(
       case _: CantonContractIdV1Version =>
         ContractSalt.createV1(cryptoOps)(
           state.transactionUUID,
-          psid,
+          synchronizerId,
           state.mediator,
           viewParticipantDataSalt,
           createIndex,
@@ -538,11 +524,7 @@ class TransactionTreeFactoryImpl(
         CreationTime.Now
     }
     hasher
-      .hash(
-        createNodeWithSuffixedArg,
-        contractIdSuffixer.contractHashingMethod,
-        PackageResolver.crashOnMissingPackage(topologySnapshot, participantId, state.ledgerTime),
-      )
+      .hash(createNodeWithSuffixedArg, contractIdSuffixer.contractHashingMethod)
       .map { contractHash =>
         val ContractIdSuffixer.RelativeSuffixResult(
           suffixedCreateNode,
@@ -763,13 +745,12 @@ class TransactionTreeFactoryImpl(
     } yield createdContract.contract.contractId
 
     val createdInSubviews = createdInSubviewsSeq.toSet
-    val createdInSameViewOrSubviews = createdInSubviews ++ created.map(_.contract.contractId)
+    val createdInSameViewOrSubviews = createdInSubviewsSeq ++ created.map(_.contract.contractId)
 
-    val coreInputs = coreOtherNodes.view
-      .flatMap { case (node, _) =>
-        LfTransactionUtil.usedContractId(node)
-      }
-      .filterNot(createdInSameViewOrSubviews.contains)
+    val usedCore = SortedSet.from(coreOtherNodes.flatMap { case (node, _) =>
+      LfTransactionUtil.usedContractId(node)
+    })
+    val coreInputs = usedCore -- createdInSameViewOrSubviews
     val createdInSubviewArchivedInCore = consumedInCore intersect createdInSubviews
 
     def withInstance(
@@ -847,7 +828,7 @@ class TransactionTreeFactoryImpl(
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
-      keyResolver: ContractStateMachine.KeyResolver,
+      keyResolver: LfKeyResolver,
       absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,
@@ -885,7 +866,7 @@ class TransactionTreeFactoryImpl(
     for {
       decompositions <- EitherT.right(decompositionsF)
       decomposition = checked(decompositions.head)
-      view <- createView(decomposition, rootPosition, state, contractOfId, topologySnapshot)
+      view <- createView(decomposition, rootPosition, state, contractOfId)
       suffixedNodes = state.suffixedNodes() transform {
         // Recover the children
         case (nodeId, ne: LfNodeExercises) =>
@@ -925,7 +906,7 @@ class TransactionTreeFactoryImpl(
       transactionUUID: UUID,
       ledgerTime: CantonTimestamp,
       salts: Iterable[Salt],
-      keyResolver: ContractStateMachine.KeyResolver,
+      keyResolver: LfKeyResolver,
   ): State = new State(mediator, transactionUUID, ledgerTime, salts.iterator, keyResolver)
 
   override def saltsFromView(view: TransactionView): Iterable[Salt] = {
@@ -983,7 +964,7 @@ object TransactionTreeFactoryImpl {
       val transactionUUID: UUID,
       val ledgerTime: CantonTimestamp,
       val salts: Iterator[Salt],
-      initialResolver: ContractStateMachine.KeyResolver,
+      initialResolver: LfKeyResolver,
   ) {
 
     def nextSalt(): Either[TransactionTreeFactory.TooFewSalts, Salt] =
@@ -1064,7 +1045,7 @@ object TransactionTreeFactoryImpl {
       * [[com.digitalasset.daml.lf.transaction.ContractStateMachine.State.handleLookupWith]].
       */
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    var currentResolver: ContractStateMachine.KeyResolver = initialResolver
+    var currentResolver: LfKeyResolver = initialResolver
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     private var rollbackScope: RollbackScope = RollbackScope.empty

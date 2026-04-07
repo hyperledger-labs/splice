@@ -22,6 +22,7 @@ class SvBftSequencerPeerOffboardingTrigger(
     store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -29,7 +30,6 @@ class SvBftSequencerPeerOffboardingTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[BftPeerDifference](
       baseContext,
       store,
-      None,
     ) {
 
   override val reconciler: SequencerBftPeerRemoveReconciler =
@@ -38,7 +38,7 @@ class SvBftSequencerPeerOffboardingTrigger(
       sequencerAdminConnection,
       loggerFactory,
       scanConnection,
-      baseContext.retryProvider,
+      migrationId,
     )
 
 }

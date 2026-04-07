@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -40,8 +40,6 @@ import com.digitalasset.canton.{
 }
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
-import monocle.Lens
-import monocle.macros.GenLens
 
 /** Information concerning every '''participant''' involved in processing the underlying view.
   *
@@ -65,8 +63,7 @@ import monocle.macros.GenLens
   *   view's global key inputs [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]] and
   *   the aggregated global key inputs from the subviews (see
   *   [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]] for the aggregation
-  *   algorithm). In
-  *   [[com.digitalasset.daml.lf.transaction.ContractStateMachine.Mode.UCKWithRollback]], the
+  *   algorithm). In [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Strict]], the
   *   [[com.digitalasset.canton.data.FreeKey]] resolutions must be checked during conflict
   *   detection.
   * @param actionDescription
@@ -510,18 +507,4 @@ object ViewParticipantData
 
   /** Indicates an attempt to create an invalid [[ViewParticipantData]]. */
   final case class InvalidViewParticipantData(message: String) extends RuntimeException(message)
-
-  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
-  @VisibleForTesting
-  object Optics {
-    val coreInputsUnsafe: Lens[ViewParticipantData, Map[LfContractId, InputContract]] =
-      GenLens[ViewParticipantData](_.coreInputs)
-    val createdCoreUnsafe: Lens[ViewParticipantData, Seq[CreatedContract]] =
-      GenLens[ViewParticipantData](_.createdCore)
-    val actionDescriptionUnsafe: Lens[ViewParticipantData, ActionDescription] =
-      GenLens[ViewParticipantData](_.actionDescription)
-    val saltUnsafe: Lens[ViewParticipantData, Salt] =
-      GenLens[ViewParticipantData](_.salt)
-  }
-
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -10,15 +10,16 @@ import com.daml.ledger.api.v2.reassignment.{
   ReassignmentEvent,
   UnassignedEvent,
 }
+import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
 import com.daml.ledger.api.v2.trace_context.TraceContext as DamlTraceContext
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.update_service.{GetUpdateResponse, GetUpdatesResponse}
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
-import com.digitalasset.canton.ledger.api.{AcsContinuationToken, GetActiveContractsResponseFactory}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, LoggingContextWithTrace}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.store.LedgerApiContractStore
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   FatCreatedEventProperties,
@@ -81,7 +82,6 @@ private[dao] final class UpdateReader(
       startInclusive: Offset,
       endInclusive: Offset,
       internalUpdateFormat: InternalUpdateFormat,
-      descendingOrder: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdatesResponse), NotUsed] = {
@@ -91,7 +91,6 @@ private[dao] final class UpdateReader(
           updatesStreamReader.streamUpdates(
             queryRange = queryRange,
             internalUpdateFormat = internalUpdateFormat,
-            descendingOrder = descendingOrder,
           )
         )
     Source
@@ -112,10 +111,9 @@ private[dao] final class UpdateReader(
       activeAt: Option[Offset],
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
-      continuationToken: Option[AcsContinuationToken],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[GetActiveContractsResponseFactory, NotUsed] =
+  ): Source[GetActiveContractsResponse, NotUsed] =
     activeAt match {
       case None => Source.empty
       case Some(offset) =>
@@ -125,7 +123,6 @@ private[dao] final class UpdateReader(
               filteringConstraints = filter,
               activeAt = offset -> maxSeqId,
               eventProjectionProperties = eventProjectionProperties,
-              continuationToken = continuationToken,
             )
           )
         Source
@@ -561,14 +558,15 @@ private[dao] object UpdateReader {
     )
   )
 
-  def withFatContractIfNeeded(contractStore: LedgerApiContractStore)(
+  def withFatContractIfNeeded(contractStore: ContractStore)(
       rawEvents: Vector[RawThinEvent]
   )(implicit
       ec: ExecutionContext,
       ecl: ErrorLoggingContext,
   ): Future[Vector[(RawThinEvent, Option[FatContract])]] =
     contractStore
-      .lookupBatchedNonReadThrough(rawEvents.flatMap(getInternalContractIdO))(ecl.traceContext)
+      .lookupBatchedNonCached(rawEvents.flatMap(getInternalContractIdO))(ecl.traceContext)
+      .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
       .map(contracts =>
         rawEvents.map(event =>
           event -> getInternalContractIdO(event)

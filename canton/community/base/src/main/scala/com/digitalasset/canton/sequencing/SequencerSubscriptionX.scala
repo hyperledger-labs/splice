@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -7,9 +7,8 @@ import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState, HealthComponent}
-import com.digitalasset.canton.lifecycle.{HasRunOnClosing, HasUnlessClosing}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.lifecycle.HasUnlessClosing
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.{
   ApplicationHandlerException,
   ApplicationHandlerPassive,
@@ -33,19 +32,7 @@ import org.apache.pekko.stream.AbruptStageTerminationException
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
-/** A subscription to a sequencer. */
-trait SequencerSubscriptionX[HandlerError]
-    extends InternallyCompletedSequencerSubscription[HandlerError]
-    with NamedLogging {
-
-  def connection: SequencerConnectionX
-
-  def start()(implicit traceContext: TraceContext): Either[String, Unit]
-
-  private[sequencing] def health: HealthComponent
-}
-
-/** Regular subscription to a sequencer.
+/** A subscription to a sequencer.
   *
   * @param connection
   *   the underlying connection to the sequencer
@@ -59,8 +46,8 @@ trait SequencerSubscriptionX[HandlerError]
   *   component whose closing indicates the subscriptions will be closed soon; used to shortcut
   *   errors and avoid warning logs when shutting down
   */
-class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
-    override val connection: SequencerConnectionX,
+class SequencerSubscriptionX[HandlerError] private[sequencing] (
+    val connection: SequencerConnectionX,
     member: Member,
     startingTimestampO: Option[CantonTimestamp],
     handler: SequencedEventHandler[HandlerError],
@@ -68,22 +55,11 @@ class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
     protected override val timeouts: ProcessingTimeout,
     protected override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
-    extends SequencerSubscriptionX[HandlerError] {
+    extends InternallyCompletedSequencerSubscription[HandlerError]
+    with NamedLogging {
   private val retryPolicy = connection.subscriptionRetryPolicy
 
-  override private[sequencing] val health: AtomicHealthComponent = new AtomicHealthComponent() {
-    override def name: String = s"subscription-${connection.name}"
-
-    override protected def initialHealthState: ComponentHealthState =
-      ComponentHealthState.Failed()
-
-    override protected def associatedHasRunOnClosing: HasRunOnClosing =
-      SequencerSubscriptionXImpl.this
-
-    override protected def logger: TracedLogger = SequencerSubscriptionXImpl.this.logger
-  }
-
-  override def start()(implicit traceContext: TraceContext): Either[String, Unit] = {
+  def start()(implicit traceContext: TraceContext): Either[String, Unit] = {
     val startingTimestampStringO = startingTimestampO
       .map(timestamp => s"the timestamp $timestamp")
       .getOrElse("the beginning")
@@ -96,14 +72,11 @@ class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
 
     connection
       .subscribe(request, wrappedHandler, timeouts.network.duration)
-      .map { newSubscription =>
+      .map(newSubscription =>
         newSubscription.closeReason.onComplete {
           case Success(SubscriptionCloseReason.TransportChange) =>
             ErrorUtil
               .invalidState(s"Close reason 'TransportChange' cannot happen on a pool connection")
-
-          case reason @ Success(SubscriptionCloseReason.TokenExpiration) =>
-            giveUp(reason)
 
           case Success(_: SubscriptionCloseReason.SubscriptionError) if parent.isClosing =>
             giveUp(Success(SubscriptionCloseReason.Shutdown))
@@ -140,9 +113,7 @@ class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
             // Permanently close the connection to this sequencer
             giveUp(unrecoverableReason)
         }
-
-        health.resolveUnhealthy()
-      }
+      )
   }
 
   private def restartConnection(connection: SequencerConnectionX, reason: String)(implicit
@@ -153,7 +124,7 @@ class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
   // TODO(i28761): Warn after some delay or number of failures
   // LostSequencerSubscription.Warn(connection.attributes.sequencerId).discard
 
-  // stop the current subscription, do not retry, and propagate the reason upstream
+  // stop the current subscription, do not retry, and propagate the failure upstream
   private def giveUp(
       reason: Try[SubscriptionCloseReason[HandlerError]]
   )(implicit traceContext: TraceContext): Unit = {
@@ -180,9 +151,6 @@ class SequencerSubscriptionXImpl[HandlerError] private[sequencing] (
         logger.info("Closing sequencer subscription due to handler shutdown")
       // If we reach here, it is due to a concurrent closing of the subscription (see above) and a subscription
       // error. Again, we don't need to explicitly close the connection.
-
-      case Success(SubscriptionCloseReason.TokenExpiration) =>
-        logger.debug("Sequencer subscription was closed by the server due to a token expiration")
 
       case Success(SubscriptionCloseReason.HandlerError(exception: ApplicationHandlerException)) =>
         logger.error(
@@ -264,7 +232,7 @@ class SequencerSubscriptionXFactoryImpl(
       loggerWithConnection,
     )
 
-    new SequencerSubscriptionXImpl(
+    new SequencerSubscriptionX(
       connection = connection,
       member = member,
       startingTimestampO = startingTimestampO,

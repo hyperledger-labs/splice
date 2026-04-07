@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
@@ -12,7 +12,6 @@ import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.SequencerTestUtils.MockMessageContent
 import com.digitalasset.canton.sequencing.client.SequencerSubscription
 import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.SequencedEventError
-import com.digitalasset.canton.sequencing.client.transports.ServerSubscriptionCloseReason
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
@@ -25,9 +24,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.SerializableTraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
-import io.grpc.Status.Code
-import io.grpc.StatusException
-import org.mockito.ArgumentCaptor
+import io.grpc.stub.ServerCallStreamObserver
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.Await
@@ -43,7 +40,7 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
     ).toPhysical
     var handler: Option[SequencedEventOrErrorHandler[SequencedEventError]] = None
     val member = ParticipantId(DefaultTestIdentities.uid)
-    val observer = mock[GrpcObserverHandle[v30.SubscriptionResponse]]
+    val observer = mock[ServerCallStreamObserver[v30.SubscriptionResponse]]
 
     def createSequencerSubscription(
         newHandler: SequencedEventOrErrorHandler[SequencedEventError]
@@ -64,7 +61,7 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
           Some(MessageId.tryCreate("test-deliver")),
           Batch(
             List(
-              ClosedUncompressedEnvelope
+              ClosedEnvelope
                 .create(message, Recipients.cc(member), Seq.empty, testedProtocolVersion)
             ),
             testedProtocolVersion,
@@ -105,7 +102,6 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
   "GrpcManagedSubscription" should {
     "send received events" in new Env {
       createManagedSubscription()
-      when(observer.onNext(any[v30.SubscriptionResponse])).thenReturn(FutureUnlessShutdown.unit)
       deliver()
       verify(observer).onNext(any[v30.SubscriptionResponse])
     }
@@ -115,21 +111,6 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
       subscription.close()
       verify(sequencerSubscription).close()
       verify(observer).onCompleted()
-    }
-
-    "if the close is transient, the observer receives an UNAVAILABLE status with the transient reason, the subscription is closed, but the closed callback is not called" in new Env {
-      val subscription = createManagedSubscription()
-      val closeReason = ServerSubscriptionCloseReason.TokenExpired
-      subscription.transientClose(closeReason)
-
-      verify(sequencerSubscription).close()
-      val argCapture = ArgumentCaptor.forClass(classOf[Throwable])
-      verify(observer).onError(argCapture.capture())
-      inside(argCapture.getValue) { case exc: StatusException =>
-        val status = exc.getStatus
-        status.getCode shouldBe Code.UNAVAILABLE
-        status.getDescription shouldBe closeReason.description
-      }
     }
   }
 }

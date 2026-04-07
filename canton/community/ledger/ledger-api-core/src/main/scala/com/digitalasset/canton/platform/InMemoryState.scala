@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
@@ -14,9 +14,8 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.{
   StreamTracker,
   SubmissionTracker,
 }
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{AchsState, LedgerEnd}
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.cache.{
-  AchsStateCache,
   ContractStateCaches,
   InMemoryFanoutBuffer,
   MutableLedgerEndCache,
@@ -37,7 +36,6 @@ class InMemoryState(
     val ledgerEndCache: MutableLedgerEndCache,
     val contractStateCaches: ContractStateCaches,
     val offsetCheckpointCache: OffsetCheckpointCache,
-    val achsStateCache: AchsStateCache, // TODO(#30241) take care of the initialization of the ACHS state cache
     val inMemoryFanoutBuffer: InMemoryFanoutBuffer,
     val stringInterningView: StringInterningView,
     val dispatcherState: DispatcherState,
@@ -59,15 +57,8 @@ class InMemoryState(
     * NOTE: This method is not thread-safe. Calling it concurrently leads to undefined behavior.
     */
   final def initializeTo(
-      ledgerEndO: Option[LedgerEnd],
-      achsState: AchsState,
+      ledgerEndO: Option[LedgerEnd]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    def clearCaches(): Unit = {
-      contractStateCaches.reset(ledgerEndO)
-      inMemoryFanoutBuffer.flush()
-      ledgerEndCache.set(ledgerEndO)
-      achsStateCache.set(achsState)
-    }
     def resetInMemoryState(): Future[Unit] =
       for {
         // First stop the active dispatcher (if exists) to ensure
@@ -77,7 +68,9 @@ class InMemoryState(
         _ <- dispatcherState.stopDispatcher()
         // Reset the Ledger API caches to the latest ledger end
         _ <- Future {
-          clearCaches()
+          contractStateCaches.reset(ledgerEndO)
+          inMemoryFanoutBuffer.flush()
+          ledgerEndCache.set(ledgerEndO)
           transactionSubmissionTracker.close()
           reassignmentSubmissionTracker.close()
         }
@@ -85,37 +78,28 @@ class InMemoryState(
         _ = dispatcherState.startDispatcher(ledgerEndO.map(_.lastOffset))
       } yield ()
 
-    // TODO(#30241) verify the initialization of the ACHS state cache and test it
     def inMemoryStateIsUptodate: Boolean =
       ledgerEndCache() == ledgerEndO &&
         dispatcherState.getDispatcher.getHead() == ledgerEndO.map(_.lastOffset) &&
-        cachesUpdatedUpto.get() == ledgerEndO.map(_.lastOffset) &&
-        achsStateCache.get() == achsState
+        cachesUpdatedUpto.get() == ledgerEndO.map(_.lastOffset)
 
     def ledgerEndComparisonLog: String =
-      s"inMemoryLedgerEnd:$ledgerEndCache persistedLedgerEnd:$ledgerEndO dispatcher-head:${dispatcherState.getDispatcher
-          .getHead()} cachesAreUpdateUpto:${cachesUpdatedUpto.get()} achsState:${achsStateCache
-          .get()} persistedAchsState:$achsState"
+      s"inMemoryLedgerEnd:$ledgerEndCache} persistedLedgerEnd:$ledgerEndO dispatcher-head:${dispatcherState.getDispatcher
+          .getHead()} cachesAreUpdateUpto:${cachesUpdatedUpto.get()}"
 
     if (!dispatcherState.isRunning) {
       logger.info(s"Initializing participant in-memory state to ledger end: $ledgerEndO")
       resetInMemoryState()
-    } else if (!inMemoryStateIsUptodate) {
+    } else if (inMemoryStateIsUptodate) {
       logger.info(
-        s"Participant in-memory state/persisted ledger end mismatch: resetting in-memory state. $ledgerEndComparisonLog"
-      )
-      resetInMemoryState()
-    } else if (cachesUpdatedUpto.get().isEmpty) {
-      // cachesUpdatedUpto can signal an incomplete cache state update, therefore we clear the caches
-      logger.info(
-        s"Participant in-memory state with empty cachesUpdatedUpTo: resetting caches. $ledgerEndComparisonLog"
-      )
-      Future(clearCaches())
-    } else {
-      logger.info(
-        s"Participant in-memory state is up-to-date, continue without reset. $ledgerEndComparisonLog"
+        s"Participant in-memory state is uptodate, continue without reset. $ledgerEndComparisonLog"
       )
       Future.unit
+    } else {
+      logger.info(
+        s"Participant in-memory state/persisted ledger end mismatch: reseting in-memory state. $ledgerEndComparisonLog"
+      )
+      resetInMemoryState()
     }
   }
 }
@@ -164,7 +148,6 @@ object InMemoryState {
     } yield new InMemoryState(
       participantId = participantId,
       ledgerEndCache = mutableLedgerEndCache,
-      achsStateCache = new AchsStateCache(loggerFactory),
       dispatcherState = dispatcherState,
       contractStateCaches = ContractStateCaches.build(
         initialLedgerEnd.map(_.lastEventSeqId).getOrElse(0L),

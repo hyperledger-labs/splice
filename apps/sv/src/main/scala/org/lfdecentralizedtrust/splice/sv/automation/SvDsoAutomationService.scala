@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
-import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,13 +11,13 @@ import com.digitalasset.canton.topology.SynchronizerId
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
+  TriggerClass,
+  aTrigger,
+}
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-}
-import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  aTrigger,
-  TriggerClass,
 }
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
@@ -27,12 +26,11 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -46,16 +44,11 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeAnnouncementTrigger,
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-  LogicalSynchronizerUpgradeTrigger,
-  LogicalSyncUpgradeTransferTrafficTrigger,
-}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
-import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
@@ -71,14 +64,14 @@ class SvDsoAutomationService(
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
-    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
+    cometBft: Option[CometBftNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     upgradesConfig: UpgradesConfig,
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
     synchronizerId: SynchronizerId,
     enabledFeatures: EnabledFeaturesConfig,
-    val synchronizerNodeReconciler: SynchronizerNodeReconciler,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -153,22 +146,24 @@ class SvDsoAutomationService(
       )
     )
     // Register optional BFT triggers
-    if (triggerContext.config.enableCometbftReconciliation) {
-      registerTrigger(
-        new PublishLocalCometBftNodeConfigTrigger(
-          triggerContext,
-          dsoStore,
-          connection(SpliceLedgerConnectionPriority.High),
-          synchronizerNodeService,
+    cometBft.foreach { node =>
+      if (triggerContext.config.enableCometbftReconciliation) {
+        registerTrigger(
+          new PublishLocalCometBftNodeConfigTrigger(
+            triggerContext,
+            dsoStore,
+            connection(SpliceLedgerConnectionPriority.High),
+            node,
+          )
         )
-      )
-      registerTrigger(
-        new ReconcileCometBftNetworkConfigWithDsoRulesTrigger(
-          triggerContext,
-          dsoStore,
-          synchronizerNodeService,
+        registerTrigger(
+          new ReconcileCometBftNetworkConfigWithDsoRulesTrigger(
+            triggerContext,
+            dsoStore,
+            node,
+          )
         )
-      )
+      }
     }
     registerTrigger(
       new SvOffboardingPartyToParticipantProposalTrigger(
@@ -229,71 +224,30 @@ class SvDsoAutomationService(
       )
     )
 
-    config.domainMigrationDumpPath match {
-      case Some(dumpPath) =>
+    (localSynchronizerNode, config.domainMigrationDumpPath) match {
+      case (Some(synchronizerNode), Some(dumpPath)) =>
         registerTrigger(
           new DecentralizedSynchronizerMigrationTrigger(
             config.domainMigrationId,
             triggerContext,
             config.domains.global.alias,
-            synchronizerNodeService.nodes.current,
+            synchronizerNode,
             dsoStore,
             connection(SpliceLedgerConnectionPriority.High),
             participantAdminConnection,
+            synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
             enabledFeatures,
           )
         )
       case _ => ()
     }
-
-    synchronizerNodeService.nodes.successor match {
-      case Some(successorSynchronizerNode) =>
-        registerTrigger(
-          new LogicalSynchronizerUpgradeTrigger(
-            triggerContext,
-            synchronizerNodeReconciler,
-            synchronizerNodeService.nodes,
-            successorSynchronizerNode,
-            store,
-            config.domainMigrationDumpPath.getOrElse(
-              throw new IllegalArgumentException("Domain migration dump path must be set for LSU")
-            ),
-          )
-        )
-        registerTrigger(
-          new LogicalSyncUpgradeTransferTrafficTrigger(
-            triggerContext,
-            synchronizerNodeService.nodes.current,
-            successorSynchronizerNode,
-          )
-        )
-        registerTrigger(
-          new LogicalSynchronizerUpgradeSequencingTestTrigger(
-            config,
-            triggerContext,
-            synchronizerNodeService.nodes.current,
-            successorSynchronizerNode,
-          )
-        )
-      case _ => ()
-    }
-
     registerTrigger(
       new ReconcileDynamicSynchronizerParametersTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
         config,
-      )
-    )
-
-    registerTrigger(
-      new LogicalSynchronizerUpgradeAnnouncementTrigger(
-        triggerContext,
-        dsoStore,
-        participantAdminConnection,
-        config.domains.global.alias,
       )
     )
 
@@ -304,31 +258,30 @@ class SvDsoAutomationService(
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
     )
-    def registerTriggersForSynchronizers(node: LocalSynchronizerNode): Unit = {
-      node.sequencerConfig match {
+    localSynchronizerNode.foreach { synchronizerNode =>
+      synchronizerNode.sequencerConfig match {
         case BftSequencerConfig() =>
           registerTrigger(
             new SvBftSequencerPeerOffboardingTrigger(
               triggerContext,
               dsoStore,
-              node.sequencerAdminConnection,
+              synchronizerNode.sequencerAdminConnection,
               aggregatingScanConnection,
+              config.domainMigrationId,
             )
           )
           registerTrigger(
             new SvBftSequencerPeerOnboardingTrigger(
               triggerContext,
               dsoStore,
-              node.sequencerAdminConnection,
+              synchronizerNode.sequencerAdminConnection,
               aggregatingScanConnection,
+              config.domainMigrationId,
             )
           )
         case _ =>
       }
     }
-
-    registerTriggersForSynchronizers(synchronizerNodeService.nodes.current)
-    synchronizerNodeService.nodes.successor.foreach(registerTriggersForSynchronizers)
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
@@ -336,7 +289,7 @@ class SvDsoAutomationService(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
         dsoStore,
-        synchronizerNodeService,
+        localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -344,7 +297,7 @@ class SvDsoAutomationService(
       new SvOnboardingUnlimitedTrafficTrigger(
         onboardingTriggerContext,
         dsoStore,
-        synchronizerNodeService,
+        localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -393,8 +346,7 @@ class SvDsoAutomationService(
         triggerContext,
         config.maxVettingDelay,
         config.latestPackagesOnly,
-        config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
-        config.additionalPackagesToUnvet,
+        enabledFeatures.enableUnsupportedDarsUnvetting,
       )
     )
 
@@ -405,7 +357,8 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection(SpliceLedgerConnectionPriority.Medium),
-        synchronizerNodeService,
+        cometBft,
+        localSynchronizerNode.map(_.mediatorAdminConnection),
         participantAdminConnection,
       )
     )
@@ -413,7 +366,7 @@ class SvDsoAutomationService(
       new ReportSvStatusMetricsExportTrigger(
         triggerContext,
         dsoStore,
-        synchronizerNodeService,
+        cometBft,
       )
     )
     registerTrigger(
@@ -456,58 +409,47 @@ class SvDsoAutomationService(
         )
       )
     }
+  }
 
-    config.copyVotesFrom.foreach { svName =>
+  private val localSequencerClientContext: Option[LocalSequencerClientContext] =
+    localSynchronizerNode.map(cfg =>
+      LocalSequencerClientContext(
+        cfg.sequencerAdminConnection,
+        cfg.mediatorAdminConnection,
+        Some(
+          LocalSequencerClientConfig(
+            cfg.sequencerInternalConfig,
+            config.domains.global.alias,
+          )
+        ),
+        cfg.sequencerPruningConfig.map(pruningConfig =>
+          SequencerPruningConfig(
+            pruningConfig.pruningInterval,
+            pruningConfig.retentionPeriod,
+          )
+        ),
+      )
+    )
+
+  if (!config.bftSequencerConnection) {
+    localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
       registerTrigger(
-        new CopyVotesTrigger(
+        new LocalSequencerConnectionsTrigger(
           triggerContext,
+          participantAdminConnection,
+          internalClientConfig.decentralizedSynchronizerAlias,
           dsoStore,
-          connection(SpliceLedgerConnectionPriority.Low),
-          svName,
+          internalClientConfig.sequencerInternalConfig,
+          config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerConnectionPoolDelays,
+          config.domainMigrationId,
+          reconnectOnSynchronizerConfigurationChange =
+            enabledFeatures.reconnectOnSynchronizerConfigurationChange,
         )
       )
     }
   }
 
-  private val localSequencerClientContext: Option[LocalSequencerClientContext] =
-    synchronizerNodeService.nodes.current.some
-      .map(cfg =>
-        LocalSequencerClientContext(
-          cfg.sequencerAdminConnection,
-          cfg.mediatorAdminConnection,
-          Some(
-            LocalSequencerClientConfig(
-              cfg.sequencerInternalConfig,
-              config.domains.global.alias,
-            )
-          ),
-          cfg.sequencerPruningConfig.map(pruningConfig =>
-            SequencerPruningConfig(
-              pruningConfig.pruningInterval,
-              pruningConfig.retentionPeriod,
-            )
-          ),
-        )
-      )
-
-  if (!config.bftSequencerConnection) {
-    registerTrigger(
-      new LocalSequencerConnectionsTrigger(
-        triggerContext,
-        participantAdminConnection,
-        config.domains.global.alias,
-        dsoStore,
-        synchronizerNodeService,
-        config.participantClient.sequencerRequestAmplification.toInternal,
-        config.participantClient.sequencerConnectionPoolDelays.toInternal,
-        config.domainMigrationId,
-        reconnectOnSynchronizerConfigurationChange =
-          enabledFeatures.reconnectOnSynchronizerConfigurationChange,
-      )
-    )
-  }
-
-  // fine to run the trigger only for the current sync as after a LSU we don't have anything to prune yet
   localSequencerClientContext.foreach { sequencerContext =>
     sequencerContext.pruningConfig.foreach { pruningConfig =>
       val contextWithSpecificPolling = triggerContext.copy(
@@ -590,12 +532,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
-      aTrigger[CopyVotesTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[CreateBootstrapExternalPartyConfigStateInstructionTrigger],
-      aTrigger[LogicalSynchronizerUpgradeTrigger],
-      aTrigger[LogicalSynchronizerUpgradeAnnouncementTrigger],
-      aTrigger[LogicalSyncUpgradeTransferTrafficTrigger],
-      aTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger],
     )
 }
