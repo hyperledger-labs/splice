@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+
+"""
+TODO: execute the command
+
+skopeo list-tags --override-os linux --override-arch amd64 docker://europe-docker.pkg.dev/da-images/public-all/docker/canton-participant
+
+yields the JSON output
+
+{
+    "Repository": "europe-docker.pkg.dev/da-images/public-all/docker/canton-participant",
+    "Tags": [
+        "3.4",
+        "3.4.10",
+        "3.4.11",
+        "3.4.11-snapshot.20260206.17558.0.v8c896100",
+        "3.4.11-snapshot.20260210.17569.0.vc93485bd",
+        "3.4.11-snapshot.20260211.17570.0.v590b2a1c",
+        "3.4.11-snapshot.20260212.17572.0.v287ea4cc",
+        "3.4.12-snapshot.20260217.17583.0.v89d49cd0",
+        "3.4.12-snapshot.20260219.17585.0.vafbb9123",
+        "3.4.12-snapshot.20260219.17586.0.v27714de0",
+        "3.4.12-snapshot.20260219.17587.0.v2278eced",
+        "3.4.12-snapshot.20260220.17588.0.vbd76aac5",
+        "3.4.12-snapshot.20260223.17591.0.v9e0bcee5",
+        "3.4.12-snapshot.20260224.17597.0.v06735c0c",
+        "3.4.12-snapshot.20260225.17600.0.vcb53ca58",
+        "3.4.12-snapshot.20260226.17603.0.v11a7b5ed",
+        "3.4.12-snapshot.20260302.17606.0.v32062524",
+        "3.4.12-snapshot.20260303.17608.0.v972d0d58",
+        "3.4.12-snapshot.20260304.17610.0.vc052e3d4",
+        "3.4.12-snapshot.20260310.17618.0.v7b321d0f",
+        "3.4.12-snapshot.20260313.17621.0.v5c5d13d2",
+        "3.4.12-snapshot.20260317.17625.0.v93e6c2fc",
+        "3.4.12-snapshot.20260317.17626.0.v261e57fb",
+        "3.4.12-snapshot.20260318.17629.0.v212d8420",
+        "3.4.12-snapshot.20260323.17636.0.v677c7a07",
+        "3.4.12-snapshot.20260325.17637.0.v3298c13b",
+        "3.4.12-snapshot.20260327.17640.0.vfcf0c6e9",
+        "3.4.12-snapshot.20260331.17644.0.v82050917",
+        "3.4.12-snapshot.20260402.17647.0.v8f5238eb",
+        "3.4.8",
+        "3.4.9",
+        "3.5",
+        "3.5.0-ad-hoc.20260216.18050.0.v9951f9de",
+        "3.5.0-ad-hoc.20260216.18052.0.v2456e292",
+        "3.5.0-ad-hoc.20260216.18052.0.va415e19b",
+        "3.5.0-ad-hoc.20260217.18063.0.vf90231a4",
+        "3.5.0-ad-hoc.20260218.18076.0.v0067710d",
+        "3.5.0-ad-hoc.20260219.18102.0.v2f4d93ff",
+        "3.5.0-ad-hoc.20260223.18121.0.v11725549",
+        "3.5.0-ad-hoc.20260224.18141.0.vaa80262d",
+        "3.5.0-ad-hoc.20260225.17802.0.v747ef0e2",
+        "3.5.0-ad-hoc.20260303.18205.0.v64423a17",
+        "3.5.0-ad-hoc.20260311.18303.0.vb0828494",
+        "3.5.0-ad-hoc.20260313.18317.0.v60ef1fa0",
+        "3.5.0-ad-hoc.20260316.18330.0.v9af5f189",
+        "3.5.0-ad-hoc.20260316.18335.0.v3c487c87",
+        "3.5.0-ad-hoc.20260317.18377.0.v075cd013",
+        "3.5.0-ad-hoc.20260318.18356.0.v35025d79",
+        "3.5.0-ad-hoc.20260318.18402.0.v632c0a14",
+        "3.5.0-ad-hoc.20260319.18373.0.v87997559",
+        "3.5.0-ad-hoc.20260319.18377.0.vca0af7e1",
+        "3.5.0-ad-hoc.20260319.18394.0.v10dee136",
+        "3.5.0-ad-hoc.20260319.18429.0.v0eafe8dc",
+        "3.5.0-ad-hoc.20260320.18388.0.v952f6d48",
+        "3.5.0-ad-hoc.20260320.18390.0.vd311a797",
+        "3.5.0-ad-hoc.20260320.18399.0.v68668382",
+        "3.5.0-ad-hoc.20260320.18405.0.v5206f42b",
+        "3.5.0-ad-hoc.20260331.18482.0.vd41e5791",
+        "3.5.0-ad-hoc.20260331.18483.0.vbfe6a976",
+        "3.5.0-ad-hoc.20260401.18484.0.v60b23776",
+        "3.5.0-ad-hoc.20260401.18486.0.vb1471297",
+        "3.5.0-snapshot.20260206.17966.0.va5798b31",
+        "3.5.0-snapshot.20260207.17977.0.vb6cd5536",
+        "3.5.0-snapshot.20260210.17997.0.v6bb5119e",
+        "3.5.0-snapshot.20260213.18040.0.vf2cfbbe2",
+        "3.5.0-snapshot.20260216.18045.0.v487397c6",
+        "3.5.0-snapshot.20260216.18051.0.v7b5714a0",
+        "3.5.0-snapshot.20260217.18073.0.v9adbc4b5",
+        "3.5.0-snapshot.20260219.18091.0.vd7246bbc",
+        "3.5.0-snapshot.20260219.18100.0.v35f928fd",
+        "3.5.0-snapshot.20260219.18102.0.vcff65785",
+        "3.5.0-snapshot.20260220.18106.0.v2d132884",
+        "3.5.0-snapshot.20260223.18120.0.v70a1eff4",
+        "3.5.0-snapshot.20260224.18127.0.vfe99cacb",
+        "3.5.0-snapshot.20260224.18132.0.vdb228c09",
+        "3.5.0-snapshot.20260225.18138.0.v9153c049",
+        "3.5.0-snapshot.20260225.18145.0.v2f4502df",
+        "3.5.0-snapshot.20260225.18149.0.vc28e7872",
+        "3.5.0-snapshot.20260303.18184.0.v3f5357d3",
+        "3.5.0-snapshot.20260303.18190.0.v37b65e09",
+        "3.5.0-snapshot.20260305.18215.0.vc072f113",
+        "3.5.0-snapshot.20260310.18260.0.vcd8feade",
+        "3.5.0-snapshot.20260310.18268.0.vb003e4e1",
+        "3.5.0-snapshot.20260316.18327.0.vb16cc74d",
+        "3.5.0-snapshot.20260317.18335.0.vcc81077f",
+        "3.5.0-snapshot.20260317.18347.0.vcb0bc246",
+        "3.5.0-snapshot.20260318.18351.0.v5ca94c9e",
+        "3.5.0-snapshot.20260319.18366.0.vfd7483a9",
+        "3.5.0-snapshot.20260320.18396.0.v62828ef1",
+        "3.5.0-snapshot.20260323.18416.0.va0d42fd5",
+        "3.5.0-snapshot.20260324.18425.0.v65b1ee1f",
+        "3.5.0-snapshot.20260324.18434.0.vc79957ed",
+        "3.5.0-snapshot.20260325.18439.0.ve8ff4a15",
+        "3.5.0-snapshot.20260326.18453.0.ve7a888ff",
+        "3.5.0-snapshot.20260327.18464.0.veb7e6b4d",
+        "3.5.0-snapshot.20260327.18467.0.ved5cb1a4",
+        "3.5.0-snapshot.20260327.18475.0.ve0c7851d",
+        "3.5.0-snapshot.20260330.18493.0.vf47ae022",
+        "3.5.0-snapshot.20260331.18507.0.v8907db71",
+        "3.5.0-snapshot.20260331.18514.0.v0aa87074",
+        "3.5.0-snapshot.20260401.18526.0.v684b83e8",
+        "3.5.0-snapshot.20260402.18542.0.v82b6c013",
+        "3.5.0-snapshot.20260402.18549.0.v867695e7",
+        "3.5.0-snapshot.20260407.18556.0.va2bdc7be",
+        "3.5.0-snapshot.20260407.18559.0.vb6fb1fc6"
+    ]
+}
+
+The 'vb6fb1fc6' is 'v' followed by the first part of a git sha.
+Write a script that takes a git sha of any length and looks in this list.
+
+It should use the output of skopeo with not just canton-participant,
+but canton-base, canton-mediator, and canton-sequencer.
+
+If a sha has any matching tags that is exactly the same for all four tag lists, just print the tags and write to stderr that Canton snapshot found.
+However, unless the script option --allow-multiple is passed, fail the script if more than one tag returned.
+If it matches different tags, or there are some images with no matching tag, report those details too and fail the script.
+Include a --help stating that the argument is a CANTON_SHA.
+"""
