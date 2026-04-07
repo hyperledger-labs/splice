@@ -201,42 +201,9 @@
       ]
     },
     {
-      "title": "GC Time",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 17 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "color": { "mode": "fixed", "fixedColor": "yellow" },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "pointSize": 6,
-            "showPoints": "always",
-            "fillOpacity": 5,
-            "spanNulls": false
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_gc_time_ms{test=\"${test}\"}",
-          "legendFormat": "GC Time (ms)",
-          "range": true, "refId": "A"
-        }
-      ]
-    },
-    {
       "title": "Peak Heap Memory",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 17 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {

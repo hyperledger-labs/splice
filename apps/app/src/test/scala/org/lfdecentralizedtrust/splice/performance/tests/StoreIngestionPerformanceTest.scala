@@ -27,22 +27,21 @@ import io.circe.Json
 import java.lang.management.ManagementFactory
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 final case class StoreIngestionPerfMetrics(
     totalItems: Long,
     totalBatches: Long,
     totalTimeNs: BigDecimal,
     processCpuTimeNs: BigDecimal,
-    gcTimeMs: BigDecimal,
     peakHeapBytes: BigDecimal,
 ) {
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
 
   /** Ratio of process CPU time to wall-clock time.
-    * > 1.0 → CPU-bound: burned more CPU than wall-clock elapsed.
-    * < 1.0 → I/O-bound: CPU idle during DB writes, network, OS scheduling.
+    * > 0.7 : CPU-bound
+    * 0.25 - 0.7: Standard
+    * < 0.25 : I/O-bound
     */
   def cpuToWallClockRatio: BigDecimal =
     if (totalTimeNs > 0) processCpuTimeNs / totalTimeNs else BigDecimal(0)
@@ -149,7 +148,6 @@ abstract class StoreIngestionPerformanceTest(
     var totalItems = 0L
     var totalBatches = 0L
     var totalCpuNs = BigDecimal(0)
-    var totalGcMs = BigDecimal(0)
     var maxHeapBytes = BigDecimal(0)
 
     Source
@@ -167,18 +165,15 @@ abstract class StoreIngestionPerformanceTest(
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val wallBefore = System.nanoTime()
         val cpuSnapshotBefore = captureCpuSnapshot()
-        val gcBefore = getTotalGcTimeMs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val wallAfter = System.nanoTime()
             val cpuSnapshotAfter = captureCpuSnapshot()
-            val gcAfter = getTotalGcTimeMs
             val duration = wallAfter - wallBefore
             val cpuDeltaNs = cpuDelta(cpuSnapshotBefore, cpuSnapshotAfter)
             totalTimeNs += duration
             totalCpuNs += cpuDeltaNs
-            totalGcMs += (gcAfter - gcBefore)
             val heapNow = getHeapUsedBytes
             maxHeapBytes = maxHeapBytes.max(heapNow)
             totalItems += batch.length
@@ -192,7 +187,7 @@ abstract class StoreIngestionPerformanceTest(
       })
       .map { _ =>
         println(
-          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms, GC time=$totalGcMs ms, peak heap=$maxHeapBytes bytes"
+          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms, peak heap=$maxHeapBytes bytes"
         )
 
         StoreIngestionPerfMetrics(
@@ -200,7 +195,6 @@ abstract class StoreIngestionPerformanceTest(
           totalBatches = totalBatches,
           totalTimeNs = totalTimeNs,
           processCpuTimeNs = totalCpuNs,
-          gcTimeMs = totalGcMs,
           peakHeapBytes = maxHeapBytes,
         )
       }
@@ -245,15 +239,6 @@ abstract class StoreIngestionPerformanceTest(
     BigDecimal(delta)
   }
 
-  /** Total GC collection time across all collectors in milliseconds. */
-  private def getTotalGcTimeMs: BigDecimal = {
-    BigDecimal(
-      ManagementFactory.getGarbageCollectorMXBeans.asScala
-        .map(_.getCollectionTime)
-        .filter(_ >= 0)
-        .sum
-    )
-  }
 
   /** Process-wide current heap memory usage in bytes (point-in-time snapshot). */
   private def getHeapUsedBytes: BigDecimal = {
@@ -303,18 +288,13 @@ abstract class StoreIngestionPerformanceTest(
             metrics.processCpuTimeNs,
           ),
           metric(
-            "gc_time_ms",
-            "Total garbage collection time in milliseconds",
-            metrics.gcTimeMs,
-          ),
-          metric(
             "peak_heap_bytes",
             "Peak JVM heap memory usage in bytes observed across all ingestion batches",
             metrics.peakHeapBytes,
           ),
           metric(
             "cpu_to_wall_clock_ratio",
-            "Ratio of process CPU time to wall-clock time (>1=CPU-bound, ~1=saturated, <1=I/O-bound)",
+            "Ratio of process CPU time to wall-clock time (>0.7=CPU-bound, 0.25~0.7=standard, <0.25=I/O-bound)",
             metrics.cpuToWallClockRatio,
           ),
         ),
