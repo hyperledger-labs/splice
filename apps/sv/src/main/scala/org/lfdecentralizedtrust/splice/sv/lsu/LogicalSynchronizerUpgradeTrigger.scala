@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.lsu
 
-import cats.implicits.{showInterpolator, toTraverseOps}
+import cats.implicits.{catsSyntaxOptionId, showInterpolator, toTraverseOps}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchro
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import java.nio.file.Path
@@ -61,7 +62,6 @@ class LogicalSynchronizerUpgradeTrigger(
     new LsuNodeInitializer(
       localSynchronizerNodes,
       successorSynchronizerNode,
-      Some(reconciler),
       loggerFactory,
       context.retryProvider,
     )
@@ -144,6 +144,11 @@ class LogicalSynchronizerUpgradeTrigger(
         task.readyAt,
         currentPsid,
         Seq(task.work.announcement),
+      )
+      _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
+        localSynchronizerNodes.some,
+        currentPsid.logical,
+        OnboardedImmediately,
       )
       _ <-
         if (needsManualLsu) {
