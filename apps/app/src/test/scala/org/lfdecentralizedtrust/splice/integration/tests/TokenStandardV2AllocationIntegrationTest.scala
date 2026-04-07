@@ -591,7 +591,8 @@ class TokenStandardV2AllocationIntegrationTest
         settleBatch
       )
 
-    val extraAuthorizers = otcTrade.data.autoReceiptAuthorizers.asScala.filterNot(_.startsWith("splitwell")).asJava
+    val extraAuthorizers =
+      otcTrade.data.autoReceiptAuthorizers.asScala.filterNot(_.startsWith("splitwell")).asJava
     val otcTradeSettleArgs = new tradingappv2.OTCTrade_Settle(
       Map(
         dsoParty.toProtoPrimitive -> new tradingappv2.SettlementBatch(

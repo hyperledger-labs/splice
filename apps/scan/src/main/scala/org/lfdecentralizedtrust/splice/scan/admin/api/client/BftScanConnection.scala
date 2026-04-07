@@ -633,8 +633,8 @@ class BftScanConnection(
   ] =
     bftCall(_.getAllocationFactory(choiceArgs))
 
-
-  def getAllocationFactoryV2(choiceArgs: allocationinstructionv2.AllocationFactory_Allocate)(implicit
+  def getAllocationFactoryV2(choiceArgs: allocationinstructionv2.AllocationFactory_Allocate)(
+      implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[
