@@ -272,7 +272,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     eventuallyClickOn(id("navlink-transfer"))
 
     if (shouldDisableTokenStandardSwitch) {
-      click on "toggle-token-standard-transfer"
+      eventuallyClickOn(id("toggle-token-standard-transfer"))
     }
 
     eventuallyClickOn(id("create-offer-receiver"))
