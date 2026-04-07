@@ -34,20 +34,18 @@ final case class StoreIngestionPerfMetrics(
     totalBatches: Long,
     totalTimeNs: BigDecimal,
     processCpuTimeNs: BigDecimal,
-    userCpuTimeNs: BigDecimal,
-    kernelCpuTimeNs: BigDecimal,
     gcTimeMs: BigDecimal,
     peakHeapBytes: BigDecimal,
 ) {
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
 
-  /** Wall-clock time minus process CPU time.
-    * Negative        → CPU-bound: multiple cores burned more CPU than wall-clock elapsed.
-    * Positive < CPU  → mixed: some I/O wait, but CPU work still dominates.
-    * Positive >= CPU → I/O-bound: wait time dominates (DB writes, network, OS scheduling).
+  /** Ratio of process CPU time to wall-clock time.
+    * > 1.0 → CPU-bound: burned more CPU than wall-clock elapsed.
+    * < 1.0 → I/O-bound: CPU idle during DB writes, network, OS scheduling.
     */
-  def waitTimeNs: BigDecimal = totalTimeNs - processCpuTimeNs
+  def cpuToWallClockRatio: BigDecimal =
+    if (totalTimeNs > 0) processCpuTimeNs / totalTimeNs else BigDecimal(0)
 }
 
 abstract class StoreIngestionPerformanceTest(
@@ -151,8 +149,6 @@ abstract class StoreIngestionPerformanceTest(
     var totalItems = 0L
     var totalBatches = 0L
     var totalCpuNs = BigDecimal(0)
-    var totalUserCpuNs = BigDecimal(0)
-    var totalKernelCpuNs = BigDecimal(0)
     var totalGcMs = BigDecimal(0)
     var maxHeapBytes = BigDecimal(0)
 
@@ -179,11 +175,9 @@ abstract class StoreIngestionPerformanceTest(
             val cpuSnapshotAfter = captureCpuSnapshot()
             val gcAfter = getTotalGcTimeMs
             val duration = wallAfter - wallBefore
-            val (userDelta, kernelDelta) = cpuDelta(cpuSnapshotBefore, cpuSnapshotAfter)
+            val cpuDeltaNs = cpuDelta(cpuSnapshotBefore, cpuSnapshotAfter)
             totalTimeNs += duration
-            totalUserCpuNs += userDelta
-            totalKernelCpuNs += kernelDelta
-            totalCpuNs += (userDelta + kernelDelta)
+            totalCpuNs += cpuDeltaNs
             totalGcMs += (gcAfter - gcBefore)
             val heapNow = getHeapUsedBytes
             maxHeapBytes = maxHeapBytes.max(heapNow)
@@ -198,7 +192,7 @@ abstract class StoreIngestionPerformanceTest(
       })
       .map { _ =>
         println(
-          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms (user=${totalUserCpuNs / 1e6}%.2f ms, kernel=${totalKernelCpuNs / 1e6}%.2f ms), GC time=$totalGcMs ms, peak heap=$maxHeapBytes bytes"
+          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms, GC time=$totalGcMs ms, peak heap=$maxHeapBytes bytes"
         )
 
         StoreIngestionPerfMetrics(
@@ -206,37 +200,29 @@ abstract class StoreIngestionPerformanceTest(
           totalBatches = totalBatches,
           totalTimeNs = totalTimeNs,
           processCpuTimeNs = totalCpuNs,
-          userCpuTimeNs = totalUserCpuNs,
-          kernelCpuTimeNs = totalKernelCpuNs,
           gcTimeMs = totalGcMs,
           peakHeapBytes = maxHeapBytes,
         )
       }
   }
 
-  /** Per-thread CPU time snapshot: threadId -> (userNs, kernelNs). */
-  private type CpuSnapshot = Map[Long, (Long, Long)]
+  /** Per-thread CPU time snapshot: threadId -> cpuTimeNs. */
+  private type CpuSnapshot = Map[Long, Long]
 
-  /** Capture per-thread user and kernel CPU time for all live threads.
-    * Kernel time per thread = max(cpuTime - userTime, 0).
-    */
+  /** Capture per-thread total CPU time for all live threads. */
   private def captureCpuSnapshot(): CpuSnapshot = {
     val threadBean = ManagementFactory.getThreadMXBean
     if (threadBean.isThreadCpuTimeSupported && threadBean.isThreadCpuTimeEnabled) {
       threadBean.getAllThreadIds.flatMap { id =>
         val cpuNs = threadBean.getThreadCpuTime(id)
-        val userNs = threadBean.getThreadUserTime(id)
-        if (cpuNs >= 0 && userNs >= 0)
-          Some(id -> (userNs, math.max(cpuNs - userNs, 0L)))
-        else
-          None
+        if (cpuNs >= 0) Some(id -> cpuNs) else None
       }.toMap
     } else {
       Map.empty
     }
   }
 
-  /** Compute (userDelta, kernelDelta) between two snapshots, considering only threads
+  /** Compute total CPU delta between two snapshots, considering only threads
     * present in both.
     *
     * Background threads (GC, Pekko dispatchers, timers) can start or stop between
@@ -249,16 +235,14 @@ abstract class StoreIngestionPerformanceTest(
     * within the runner thread before and after the ingestion of each batch,
     * so we are guaranteed to capture its CPU time deltas accurately.
     */
-  private def cpuDelta(before: CpuSnapshot, after: CpuSnapshot): (BigDecimal, BigDecimal) = {
-    var userDelta = 0L
-    var kernelDelta = 0L
-    after.foreach { case (id, (userAfter, kernelAfter)) =>
-      before.get(id).foreach { case (userBefore, kernelBefore) =>
-        userDelta += math.max(userAfter - userBefore, 0L)
-        kernelDelta += math.max(kernelAfter - kernelBefore, 0L)
+  private def cpuDelta(before: CpuSnapshot, after: CpuSnapshot): BigDecimal = {
+    var delta = 0L
+    after.foreach { case (id, cpuAfter) =>
+      before.get(id).foreach { cpuBefore =>
+        delta += math.max(cpuAfter - cpuBefore, 0L)
       }
     }
-    (BigDecimal(userDelta), BigDecimal(kernelDelta))
+    BigDecimal(delta)
   }
 
   /** Total GC collection time across all collectors in milliseconds. */
@@ -319,16 +303,6 @@ abstract class StoreIngestionPerformanceTest(
             metrics.processCpuTimeNs,
           ),
           metric(
-            "user_cpu_time_ns",
-            "User-mode CPU time in nanoseconds (all threads combined)",
-            metrics.userCpuTimeNs,
-          ),
-          metric(
-            "kernel_cpu_time_ns",
-            "Kernel CPU time in nanoseconds (process CPU minus user CPU)",
-            metrics.kernelCpuTimeNs,
-          ),
-          metric(
             "gc_time_ms",
             "Total garbage collection time in milliseconds",
             metrics.gcTimeMs,
@@ -339,9 +313,9 @@ abstract class StoreIngestionPerformanceTest(
             metrics.peakHeapBytes,
           ),
           metric(
-            "wait_time_ns",
-            "Wall-clock minus CPU time in nanoseconds (negative=CPU-bound, positive<CPU=mixed, positive>=CPU=I/O-bound)",
-            metrics.waitTimeNs,
+            "cpu_to_wall_clock_ratio",
+            "Ratio of process CPU time to wall-clock time (>1=CPU-bound, ~1=saturated, <1=I/O-bound)",
+            metrics.cpuToWallClockRatio,
           ),
         ),
       )

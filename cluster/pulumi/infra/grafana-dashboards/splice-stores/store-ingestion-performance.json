@@ -160,13 +160,13 @@
       ]
     },
     {
-      "title": "CPU Time Breakdown",
+      "title": "CPU-to-Wall-Clock Ratio",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "none",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -174,38 +174,29 @@
             "showPoints": "always",
             "fillOpacity": 5,
             "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 0.5 },
+              { "color": "orange", "value": 1.0 },
+              { "color": "red", "value": 2.0 }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
         "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "tooltip": { "mode": "single", "sort": "none" }
       },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_process_cpu_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "Total CPU (s)",
+          "expr": "splice_perf_ingestion_cpu_to_wall_clock_ratio{test=\"${test}\"}",
+          "legendFormat": "CPU/Wall-clock Ratio (>1=CPU-bound, <1=I/O-bound)",
           "range": true, "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_user_cpu_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "User CPU (s)",
-          "range": true, "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_kernel_cpu_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "Kernel CPU (s)",
-          "range": true, "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_wait_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "Wait/IO Time (s)",
-          "range": true, "refId": "D"
         }
       ]
     },
