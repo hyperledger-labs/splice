@@ -58,12 +58,9 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
 
       def sv2CopyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
 
-      def resumeSv2TriggerAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
+      def withSv2TriggerResumed[T](block: => T): T = {
         sv2CopyVotesTrigger.resume()
-        try
-          eventually() {
-            assertion
-          }
+        try block
         finally sv2CopyVotesTrigger.pause().futureValue
       }
 
@@ -105,13 +102,13 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )
       val acceptTrackingId = getTrackingId(acceptVoteRequest)
 
-      actAndCheck(
-        "resume CopyVotesTrigger on sv2 for the initial accept vote",
-        (),
-      )(
-        "sv2 copies sv1's accept vote",
-        _ =>
-          resumeSv2TriggerAndCheck {
+      withSv2TriggerResumed {
+        actAndCheck(
+          "resume CopyVotesTrigger on sv2 for the initial accept vote",
+          (),
+        )(
+          "sv2 copies sv1's accept vote",
+          _ => {
             val vr = voteRequestOnSv2(acceptTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 2
@@ -119,19 +116,21 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
             sv2Vote.accept shouldBe true
             sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
           },
-      )
+        )
+      }
 
-      actAndCheck(
-        "resume CopyVotesTrigger again on sv2 for the same vote",
-        (),
-      )(
-        "sv2 does not create a duplicate vote",
-        _ =>
-          resumeSv2TriggerAndCheck {
+      withSv2TriggerResumed {
+        actAndCheck(
+          "resume CopyVotesTrigger again on sv2 for the same vote",
+          (),
+        )(
+          "sv2 does not create a duplicate vote",
+          _ => {
             val vr = voteRequestOnSv2(acceptTrackingId)
             vr.payload.votes.asScala should have size 2
           },
-      )
+        )
+      }
 
       val (_, rejectVoteRequest) = actAndCheck(
         "sv3 creates a second vote request",
@@ -169,13 +168,13 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         },
       )
 
-      actAndCheck(
-        "resume CopyVotesTrigger on sv2 for the reject vote",
-        (),
-      )(
-        "sv2 copies sv1's reject vote",
-        _ =>
-          resumeSv2TriggerAndCheck {
+      withSv2TriggerResumed {
+        actAndCheck(
+          "resume CopyVotesTrigger on sv2 for the reject vote",
+          (),
+        )(
+          "sv2 copies sv1's reject vote",
+          _ => {
             val vr = voteRequestOnSv2(rejectTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 3
@@ -184,7 +183,8 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
             sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
             sv2Vote.reason.body should include("I disagree")
           },
-      )
+        )
+      }
 
       actAndCheck(
         "sv1 changes its vote on the second request to accept",
@@ -204,13 +204,13 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         },
       )
 
-      actAndCheck(
-        "resume CopyVotesTrigger on sv2 again for the updated vote",
-        (),
-      )(
-        "sv2 updates its copied vote to match sv1",
-        _ =>
-          resumeSv2TriggerAndCheck {
+      withSv2TriggerResumed {
+        actAndCheck(
+          "resume CopyVotesTrigger on sv2 again for the updated vote",
+          (),
+        )(
+          "sv2 updates its copied vote to match sv1",
+          _ => {
             val vr = voteRequestOnSv2(rejectTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 3
@@ -220,7 +220,8 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
             sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
             sv2Vote.reason.body should include("I changed my mind")
           },
-      )
+        )
+      }
 
       val (_, noVoteRequest) = actAndCheck(
         "sv3 creates a third vote request that sv1 has not voted on",
@@ -242,18 +243,19 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )
       val noVoteTrackingId = getTrackingId(noVoteRequest)
 
-      actAndCheck(
-        "resume CopyVotesTrigger on sv2 when sv1 has not voted",
-        (),
-      )(
-        "sv2 does not create a vote for the third request",
-        _ =>
-          resumeSv2TriggerAndCheck {
+      withSv2TriggerResumed {
+        actAndCheck(
+          "resume CopyVotesTrigger on sv2 when sv1 has not voted",
+          (),
+        )(
+          "sv2 does not create a vote for the third request",
+          _ => {
             val vr = voteRequestOnSv2(noVoteTrackingId)
             vr.payload.votes.asScala should have size 1
             vr.payload.votes.asScala.contains("Digital-Asset-Eng-2") shouldBe false
           },
-      )
+        )
+      }
   }
 
   "CopyVotesTrigger does not loop when sv1 and sv2 copy votes from each other" in { implicit env =>
@@ -262,13 +264,10 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
     def sv1CopyVotesTrigger = sv1Backend.dsoAutomation.trigger[CopyVotesTrigger]
     def sv2CopyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
 
-    def resumeMutualCopyTriggersAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
+    def withMutualCopyTriggersResumed[T](block: => T): T = {
       sv1CopyVotesTrigger.resume()
       sv2CopyVotesTrigger.resume()
-      try
-        eventually() {
-          assertion
-        }
+      try block
       finally {
         sv1CopyVotesTrigger.pause().futureValue
         sv2CopyVotesTrigger.pause().futureValue
@@ -318,13 +317,13 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
     val initialSourceVoteReason =
       voteRequest.payload.votes.asScala("Digital-Asset-2").reason.body
 
-    actAndCheck(
-      "resume both copy triggers after sv1 votes",
-      (),
-    )(
-      "sv2 copies sv1's vote without sv1 rewriting itself",
-      _ =>
-        resumeMutualCopyTriggersAndCheck {
+    withMutualCopyTriggersResumed {
+      actAndCheck(
+        "resume both copy triggers after sv1 votes",
+        (),
+      )(
+        "sv2 copies sv1's vote without sv1 rewriting itself",
+        _ => {
           val sv1Votes = voteRequestOnSv1(trackingId).payload.votes.asScala
           val sv2Votes = voteRequestOnSv2(trackingId).payload.votes.asScala
 
@@ -339,7 +338,8 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
             s"Automatically Copied from Digital-Asset-2: $initialSourceVoteReason"
           )
         },
-    )
+      )
+    }
 
     actAndCheck(
       "sv2 updates its own vote to reject",
@@ -358,13 +358,13 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       },
     )
 
-    actAndCheck(
-      "resume both copy triggers after sv2 changes its vote",
-      (),
-    )(
-      "sv1 copies the new decision without sv2 being overwritten",
-      _ =>
-        resumeMutualCopyTriggersAndCheck {
+    withMutualCopyTriggersResumed {
+      actAndCheck(
+        "resume both copy triggers after sv2 changes its vote",
+        (),
+      )(
+        "sv1 copies the new decision without sv2 being overwritten",
+        _ => {
           val sv1Votes = voteRequestOnSv1(trackingId).payload.votes.asScala
           val sv2Votes = voteRequestOnSv2(trackingId).payload.votes.asScala
 
@@ -379,6 +379,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
           sv2Votes("Digital-Asset-Eng-2").accept shouldBe false
           sv2Votes("Digital-Asset-Eng-2").reason.body shouldBe "sv2 changed its mind"
         },
-    )
+      )
+    }
   }
 }
