@@ -145,11 +145,6 @@ class LogicalSynchronizerUpgradeTrigger(
         currentPsid,
         Seq(task.work.announcement),
       )
-      _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
-        localSynchronizerNodes.some,
-        currentPsid.logical,
-        OnboardedImmediately,
-      )
       _ <-
         if (needsManualLsu) {
           logger.info(
@@ -173,6 +168,11 @@ class LogicalSynchronizerUpgradeTrigger(
         } else {
           Future.unit
         }
+      _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
+        localSynchronizerNodes.some,
+        currentPsid.logical,
+        OnboardedImmediately,
+      )
     } yield {
       TaskSuccess(
         show"Initialized new synchronizer with parameters $parameters"

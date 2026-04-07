@@ -128,7 +128,7 @@ class SequencerAdminConnection(
           .SequencerLsuState(
             store = None,
             ts = ts,
-          observer = observer,
+            observer = observer,
           )
       ).map(_ => ())
 
