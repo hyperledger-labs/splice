@@ -16,7 +16,7 @@ on:
         description: "Canton protocol version"
         type: string
         required: false
-        default: ""
+        default: "35"
       oss_only:
         description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (skips tests that do not support running in OSS)"
         required: false
