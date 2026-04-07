@@ -18,8 +18,9 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 // import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
+import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvOnboardingConfig,
@@ -31,12 +32,12 @@ import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
-import monocle.macros.syntax.lens.*
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class RollForwardLsuIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil

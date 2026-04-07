@@ -47,6 +47,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
