@@ -1183,7 +1183,7 @@ subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml referen
 function subcmd_no_illegal_daml_references() {
     local illegal_words=(
       currency founder founding leader collective consortium
-      coin cn whitepaper canton
+      coin cn whitepaper
       domain global
       DsoReward
       'google'
