@@ -308,11 +308,20 @@ export function installGcpQuotaAlerts(
   const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
   const excludedMetrics = gcpQuotasConfig.excludedMetrics;
 
-  // Build exclusion fragments for threshold filters and PromQL queries
+  // Build exclusion fragments for threshold filters and PromQL queries.
+  // excludedMetrics applies to all alerts; excludedApproachingMetrics only to the >90% alerts.
   const exclusionRegex = excludedMetrics.length > 0 ? excludedMetrics.join('|') : null;
   const thresholdExclusion =
     exclusionRegex !== null ? ` AND metric.label.quota_metric !~ "${exclusionRegex}"` : '';
-  const promqlExclusion = exclusionRegex !== null ? `, quota_metric!~"${exclusionRegex}"` : '';
+
+  const approachingExcluded = [
+    ...excludedMetrics,
+    ...gcpQuotasConfig.excludedApproachingMetrics,
+  ];
+  const approachingExclusionRegex =
+    approachingExcluded.length > 0 ? approachingExcluded.join('|') : null;
+  const promqlExclusion =
+    approachingExclusionRegex !== null ? `, quota_metric!~"${approachingExclusionRegex}"` : '';
 
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,

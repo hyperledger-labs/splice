@@ -24,6 +24,9 @@ const GcpQuotasConfigSchema = z.object({
   excludedMetrics: z
     .array(z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters'))
     .default([]),
+  excludedApproachingMetrics: z
+    .array(z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters'))
+    .default([]),
 });
 
 const MonitoringConfigSchema = z

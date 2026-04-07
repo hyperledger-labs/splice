@@ -136,11 +136,14 @@ monitoring:
         # 1.5 means the alert fires if the balance is 50% higher than expected.
         tolerance: 1.5
       gcpQuotas:
-        # Quota metric names to exclude from GCP quota alerts.
+        # Quota metric names to exclude from all GCP quota alerts.
         # Each entry is matched as a substring against the quota_metric label
         # (regex not-match in threshold filters, !~ in PromQL).
         # Example: "hsm_asymmetric_usage" excludes HSM asymmetric signing quotas.
         excludedMetrics: []
+        # Quota metric names to exclude only from the "approaching limit" (>90%) alerts.
+        # These metrics will still trigger the "quota exceeded" alert.
+        excludedApproachingMetrics: []
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
