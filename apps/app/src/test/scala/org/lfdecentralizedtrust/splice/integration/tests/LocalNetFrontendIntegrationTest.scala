@@ -11,7 +11,14 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.*
 import com.daml.ledger.api.v2.state_service.GetConnectedSynchronizersResponse
+import com.daml.grpc.AuthCallCredentials
+import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, LedgerApiCommands}
 import org.apache.pekko.stream.scaladsl.FileIO
+import com.daml.ledger.api.v2.commands.{Command, CreateCommand, ExerciseByKeyCommand}
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape
+import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
+import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.config.NonNegativeDuration
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -120,11 +127,12 @@ class LocalNetFrontendIntegrationTest
       }
     }
 
+  private val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
+
   private def testTokenStandardApi(implicit env: FixtureParam): Unit =
     clue("Test token standard APIs") {
       val registryInfo = scancl("scanClient").getRegistryInfo()
       registryInfo.adminId should startWith("DSO::")
-      val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
       val userRegistryInfo =
         vc("userValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
       val providerRegistryInfo =
@@ -144,7 +152,7 @@ class LocalNetFrontendIntegrationTest
           registerHttpConnectionPoolsCleanup(env)
           val host = "json-ledger-api.localhost"
           val url = s"http://$host:$port"
-          val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
+
           val response =
             Http()
               .singleRequest(
@@ -188,7 +196,6 @@ class LocalNetFrontendIntegrationTest
       val host = "json-ledger-api.localhost"
       val port = 3000 // JSON API of app provider
       val url = s"http://$host:$port"
-      val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
       val filePath = Paths.get("apps/app/src/test/resources/nuck-example-main-0.0.1.dar")
       val entity = HttpEntity(
         ContentTypes.`application/octet-stream`,
@@ -203,6 +210,128 @@ class LocalNetFrontendIntegrationTest
           )
           .futureValue
       response.status should be(StatusCodes.OK)
+
+      val grpcHost = "grpc-ledger-api.localhost"
+      val channel = io.grpc.ManagedChannelBuilder.forAddress(grpcHost, port).usePlaintext().build()
+
+      def runGrpcCommand[Req, Res, Result](command: GrpcAdminCommand[Req, Res, Result]): Result = {
+        val service = command.createServiceInternal(channel)
+          .withCallCredentials(new AuthCallCredentials(token))
+        val request = command.createRequestInternal().value
+        val response = command.submitRequestInternal(service, request).futureValue
+        command.handleResponseInternal(response).value
+      }
+
+      runGrpcCommand(LedgerApiCommands.PackageManagementService.UploadDarFile(
+        darPath = filePath.toAbsolutePath.toString,
+        synchronizerId = None,
+      ))
+
+      val alice = runGrpcCommand(LedgerApiCommands.PartyManagementService.AllocateParty(
+        partyIdHint = "alice",
+        annotations = Map.empty,
+        identityProviderId = "",
+        synchronizerId = None,
+        userId = "ledger-api-user",
+      )).party
+
+      val bob = runGrpcCommand(LedgerApiCommands.PartyManagementService.AllocateParty(
+        partyIdHint = "bob",
+        annotations = Map.empty,
+        identityProviderId = "",
+        synchronizerId = None,
+        userId = "ledger-api-user",
+      )).party
+      println(s"bob party ID: $bob")
+
+      val createCommand = Command.of(
+        Command.Command.Create(
+          CreateCommand(
+            templateId = Some(Identifier(
+              packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+              moduleName = "Main",
+              entityName = "Asset",
+            )),
+            createArguments = Some(Record(
+              recordId = Some(Identifier(
+                packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+                moduleName = "Main",
+                entityName = "Asset",
+              )),
+              fields = Seq(
+                RecordField("issuer", Some(Value(Value.Sum.Party(alice)))),
+                RecordField("owner", Some(Value(Value.Sum.Party(alice)))),
+                RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
+              ),
+            )),
+          )
+        )
+      )
+      runGrpcCommand(LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
+        actAs = Seq(LfPartyId.fromString(alice).value),
+        readAs = Seq.empty,
+        commands = Seq(createCommand),
+        workflowId = "",
+        commandId = "",
+        deduplicationPeriod = None,
+        submissionId = "",
+        minLedgerTimeAbs = None,
+        disclosedContracts = Seq.empty,
+        synchronizerId = None,
+        userId = "ledger-api-user",
+        packageIdSelectionPreference = Seq.empty,
+        transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+        includeCreatedEventBlob = false,
+        tapsMaxPasses = None,
+        optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
+      ))
+
+      //   bobTVId <- submit alice do
+      //    exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
+      val newOwnerCmd = Command.of(
+        Command.Command.ExerciseByKey(
+          ExerciseByKeyCommand(
+            templateId = Some(Identifier(
+              packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+              moduleName = "Main",
+              entityName = "Asset",
+            )),
+            contractKey = Some(Value(Value.Sum.List(com.daml.ledger.api.v2.value.List(Seq(
+              Value(Value.Sum.Party(alice)),
+              Value(Value.Sum.Text("Sofa")),
+            ))))),
+            choice = "Give",
+            choiceArgument = Some(Value(Value.Sum.Record(Record(
+              recordId = Some(Identifier(
+                packageId = "22ce2c5b30d288f6aa48094d9775618851fec952c86cf1b7904a2eaaac27190d",
+                moduleName = "Main",
+                entityName = "Give",
+              )),
+              fields = Seq(
+                RecordField("newOwner", Some(Value(Value.Sum.Party(bob)))),
+              ),
+            )))),
+          )
+        ))
+      runGrpcCommand(LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
+        actAs = Seq(LfPartyId.fromString(alice).value),
+        readAs = Seq.empty,
+        commands = Seq(newOwnerCmd),
+        workflowId = "",
+        commandId = "",
+        deduplicationPeriod = None,
+        submissionId = "",
+        minLedgerTimeAbs = None,
+        disclosedContracts = Seq.empty,
+        synchronizerId = None,
+        userId = "ledger-api-user",
+        packageIdSelectionPreference = Seq.empty,
+        transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+        includeCreatedEventBlob = false,
+        tapsMaxPasses = None,
+        optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
+      ))
+
     }
   }
 }
