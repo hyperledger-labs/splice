@@ -140,16 +140,13 @@ class LogicalSynchronizerUpgradeTrigger(
       participantPsid <- participantAdminConnection.getPhysicalSynchronizerId(
         currentPsid.logical
       )
-      sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
-      hasNoSuccessor <- currentSynchronizerNode.sequencerAdminConnection
-        .lookupSequencerSuccessors(currentPsid.logical, sequencerId)
-        .map(_.isEmpty)
+      needsManualLsu <- participantNeedsManualLsu(
+        task.readyAt,
+        currentPsid,
+        Seq(task.work.announcement),
+      )
       _ <-
-        if (
-          task.readyAt.isAfter(
-            task.work.announcement.upgradeTime
-          ) && hasNoSuccessor && !hasBftSequencerConnections && participantPsid != task.work.announcement.successorSynchronizerId
-        ) {
+        if (needsManualLsu) {
           logger.info(
             s"Participant is on physical synchronizer id $participantPsid, past upgrade time with no sequencer successor and BFT disabled, initiating manual LSU"
           )
@@ -198,20 +195,23 @@ class LogicalSynchronizerUpgradeTrigger(
       currentPsid: PhysicalSynchronizerId,
       announcements: Seq[LsuAnnouncement],
   )(implicit tc: TraceContext): Future[Boolean] = {
-    announcements.find(a => now.isAfter(a.upgradeTime)) match {
-      case Some(announcement) =>
-        for {
-          sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
-          hasNoSuccessor <- currentSynchronizerNode.sequencerAdminConnection
-            .lookupSequencerSuccessors(currentPsid.logical, sequencerId)
-            .map(_.isEmpty)
-          participantPsid <- participantAdminConnection
-            .getPhysicalSynchronizerId(currentPsid.logical)
-        } yield {
-          hasNoSuccessor && !hasBftSequencerConnections && participantPsid != announcement.successorSynchronizerId
-        }
-      case None => Future.successful(false)
-    }
+    if (hasBftSequencerConnections) {
+      Future.successful(false)
+    } else
+      announcements.find(a => now.isAfter(a.upgradeTime)) match {
+        case Some(announcement) =>
+          for {
+            sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
+            hasNoSuccessor <- currentSynchronizerNode.sequencerAdminConnection
+              .lookupSequencerSuccessors(currentPsid.logical, sequencerId)
+              .map(_.isEmpty)
+            participantPsid <- participantAdminConnection
+              .getPhysicalSynchronizerId(currentPsid.logical)
+          } yield {
+            hasNoSuccessor && !hasBftSequencerConnections && participantPsid != announcement.successorSynchronizerId
+          }
+        case None => Future.successful(false)
+      }
   }
 }
 
