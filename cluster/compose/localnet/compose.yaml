@@ -147,7 +147,6 @@ services:
       - *app-provider-auth-env
       - *app-user-auth-env
       - *sv-auth-env
-      - *alpha-protocol-version-env
     volumes:
       - ${LOCALNET_DIR}/docker/splice/health-check.sh:/app/health-check.sh
       - ${LOCALNET_DIR}/conf/splice/app.conf:/app/app.conf

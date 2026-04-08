@@ -21,6 +21,10 @@ export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
 
+# let docker assign a port to postgres. In CI, we have another postgres instance running, so can't use the default 5432
+DB_PORT=""
+export DB_PORT
+
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
