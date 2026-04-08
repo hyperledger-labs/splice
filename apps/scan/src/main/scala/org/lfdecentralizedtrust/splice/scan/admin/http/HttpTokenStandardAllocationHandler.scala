@@ -146,30 +146,12 @@ class HttpTokenStandardAllocationHandler(
         ) { lockedAmuletCid =>
           contractFetcher.lookupContractById(LockedAmulet.COMPANION)(lockedAmuletCid)
         }
-        // TODO
-//        // pre-approval and featured app rights are only provided if they exist and are required
-//        receiver = PartyId.tryFromProtoPrimitive(settleBatch.transfer.receiver)
-//        isSelfTransfer = transferInstr.transfer.receiver == transferInstr.transfer.sender
-//        optTransferPreapproval <-
-//          if (isSelfTransfer) Future.successful(None) // no pre-approval required for self-transfers
-//          else
-//            store.lookupTransferPreapprovalByParty(receiver)
-//        optFeaturedAppRight <- optTransferPreapproval match {
-//          case None => Future.successful(None)
-//          case Some(preapproval) =>
-//            store.lookupFeaturedAppRight(
-//              PartyId.tryFromProtoPrimitive(preapproval.payload.provider)
-//            )
-//        }
+        // TODO (#4916): Put TransferPreapproval & FeaturedAppRight in the right place
       } yield v2.Resource.GetSettlementFactoryResponseOK(
         v2.definitions
           .FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             choiceContextBuilder
-//              .addOptionalContracts(
-//                "featured-app-right" -> optFeaturedAppRight,
-//                "transfer-preapproval" -> optTransferPreapproval,
-//              )
               .disclose(externalPartyAmuletRules.contract)
               .discloseAll(lockedAmulets.flatten)
               .build(),
