@@ -135,17 +135,12 @@ class HttpTokenStandardAllocationHandler(
           body.excludeDebugFields.getOrElse(false)
         )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
-        // TODO: don't do N queries but just one with =ANY()
-        allocations <- Future.traverse(settleBatch.allocationCids.asScala) { allocationCid =>
-          contractFetcher.lookupContractById(amuletallocationv2.AmuletAllocationV2.COMPANION)(
-            allocationCid
-          )
-        }
-        lockedAmulets <- Future.traverse(
-          allocations.flatten.flatMap(_.payload.lockedAmulet.toScala)
-        ) { lockedAmuletCid =>
-          contractFetcher.lookupContractById(LockedAmulet.COMPANION)(lockedAmuletCid)
-        }
+        allocations <- contractFetcher.lookupContractsById(
+          amuletallocationv2.AmuletAllocationV2.COMPANION
+        )(settleBatch.allocationCids.asScala.toSeq)
+        lockedAmulets <- contractFetcher.lookupContractsById(LockedAmulet.COMPANION)(
+          allocations.flatMap(_.payload.lockedAmulet.toScala)
+        )
         // TODO (#4916): Put TransferPreapproval & FeaturedAppRight in the right place
       } yield v2.Resource.GetSettlementFactoryResponseOK(
         v2.definitions
@@ -153,7 +148,7 @@ class HttpTokenStandardAllocationHandler(
             externalPartyAmuletRules.contractId.contractId,
             choiceContextBuilder
               .disclose(externalPartyAmuletRules.contract)
-              .discloseAll(lockedAmulets.flatten)
+              .discloseAll(lockedAmulets)
               .build(),
           )
       )
