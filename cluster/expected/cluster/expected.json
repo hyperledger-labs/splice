@@ -28,7 +28,7 @@
         ]
       },
       "nodeLocations": [
-        "europe-west6-z"
+        "europe-west6}-z"
       ]
     },
     "name": "cn-apps-node-pool-hd",
@@ -64,7 +64,7 @@
         ]
       },
       "nodeLocations": [
-        "europe-west6-z"
+        "europe-west6}-z"
       ]
     },
     "name": "cn-apps-node-pool-hd",
