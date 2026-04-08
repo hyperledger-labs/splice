@@ -65,39 +65,6 @@ class TokenStandardV2AllocationIntegrationTest
   val feesReserveMultiplier = 1.1 // fee reserves are 4 x the fees required for the transfer
   val feesUpperBound = walletUsdToAmulet(1.15)
 
-  def createAllocation(
-      walletClient: WalletAppClientReference,
-      request: allocationrequestv2.AllocationRequestView,
-      senderParty: PartyId,
-  ): allocationv2.Allocation.ContractId = {
-    val senderTransferLegs =
-      request.transferLegs.asScala.filter(_.sender.owner == senderParty.toProtoPrimitive)
-    val (_, allocation) = actAndCheck(
-      show"Create allocation for legs of sender $senderParty", {
-        walletClient.allocateAmulet(
-          new allocationv2.AllocationSpecification(
-            request.settlement,
-            senderTransferLegs.asJava,
-            new holdingv2.Account(
-              java.util.Optional.empty,
-              java.util.Optional.empty,
-              senderParty.toProtoPrimitive,
-            ),
-          )
-        )
-      },
-    )(
-      show"There exists an allocation from $senderParty",
-      _ => {
-        // TODO: this doesn't work, it's only returning V1
-        val allocations = walletClient.listAmuletAllocations()
-        allocations should have size 1 withClue "AmuletAllocations"
-        allocations.head
-      },
-    )
-    new allocationv2.Allocation.ContractId(allocation.contractId.contractId)
-  }
-
   "Settle a DvP using allocations" in { implicit env =>
     val allocatedOtcTrade = setupAllocatedOtcTrade()
 //    actAndCheck(
