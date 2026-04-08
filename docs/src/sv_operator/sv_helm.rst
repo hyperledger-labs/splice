@@ -437,7 +437,7 @@ Step 1. In ``sv-validator-values.yaml``, add the following ``synchronizer`` conf
 
     synchronizer:
       connectionType: "trust-single"
-        url: "SEQUENCER_PUBLIC_URI" # synchronizers.current.sequencerPublicUrl from sv-values.yaml
+      url: "SEQUENCER_PUBLIC_URI" # synchronizers.current.sequencerPublicUrl from sv-values.yaml
 
 Step 2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
 
