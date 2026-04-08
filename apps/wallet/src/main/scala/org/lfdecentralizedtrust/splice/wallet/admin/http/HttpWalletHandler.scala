@@ -1088,7 +1088,7 @@ class HttpWalletHandler(
       val commandId = CommandId(
         "org.lfdecentralizedtrust.splice.wallet.allocateAmulet",
         Seq(authorizer),
-        Seq( // TODO: revisit this
+        Seq(
           body.settlement.settlementRef.id,
           body.settlement.settlementRef.cid.getOrElse(""),
         ) ++ body.settlement.executors,

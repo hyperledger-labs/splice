@@ -626,7 +626,6 @@ class TokenStandardV2AllocationIntegrationTest
       // settleAt:
       // - Allocations should be made before this time.
       // Settlement happens at any point after this time.
-      // TODO: so do we need to wait for that to happen?
       Instant.now().plusSeconds(30L),
       java.util.Optional.empty,
       /*autoReceiptAuthorizers=*/ java.util.List.of(),

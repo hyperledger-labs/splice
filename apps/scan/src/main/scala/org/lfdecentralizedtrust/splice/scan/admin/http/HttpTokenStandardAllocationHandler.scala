@@ -33,7 +33,6 @@ class HttpTokenStandardAllocationHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    // TODO: v2.Handler and see where we go from there
 ) extends v1.Handler[TraceContext]
     with v2.Handler[TraceContext]
     with Spanning
