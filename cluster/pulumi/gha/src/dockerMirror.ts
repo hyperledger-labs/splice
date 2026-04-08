@@ -19,7 +19,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
     {
       name: 'docker-registry-mirror',
       chart: 'docker-registry',
-      version: '2.3.0',
+      version: '3.0.0',
       namespace: namespace.metadata.name,
       repositoryOpts: {
         repo: 'https://twuni.github.io/docker-registry.helm',
@@ -35,6 +35,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           storageClass: standardStorageClassName,
           enabled: true,
           size: '20Gi',
+          accessMode: 'ReadWriteMany', // needed so that GC pod can work in parallel
         },
         configData: {
           // Enable blob/manifest deletion so the proxy's built-in TTL-based
