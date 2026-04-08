@@ -10,12 +10,22 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { slackAlertNotificationChannel, slackToken } from './alertings';
-import { monitoringConfig } from './config';
+import { type GcpQuotaAlertsConfig, monitoringConfig } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
 function ensureTrailingNewline(s: string): string {
   return s.endsWith('\n') ? s : `${s}\n`;
+}
+
+// Monitoring filter limited to 2048 chars: https://cloud.google.com/monitoring/api/v3/filters
+function assertFilterLength(filter: string): string {
+  if (filter.length > 2048) {
+    throw new Error(
+      `${CLUSTER_BASENAME} monitoring filter is ${filter.length} chars; >2048 char limit`
+    );
+  }
+  return filter;
 }
 
 export function getNotificationChannel(
@@ -291,10 +301,25 @@ resource.type="cloudsql_database"
 }
 
 export function installGcpQuotaAlerts(
-  notificationChannel: gcp.monitoring.NotificationChannel
+  notificationChannel: gcp.monitoring.NotificationChannel,
+  gcpQuotasConfig: GcpQuotaAlertsConfig
 ): void {
   const quotaUsageThreshold = 0.9;
   const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
+  const excludedMetrics = gcpQuotasConfig.excludedMetrics;
+
+  // Build exclusion fragments for threshold filters and PromQL queries.
+  // excludedMetrics applies to all alerts; excludedApproachingMetrics only to the >90% alerts.
+  // Cloud Monitoring filters only support = and != (no regex), so we use one != per metric.
+  const thresholdExclusion = excludedMetrics
+    .map(m => ` AND metric.label.quota_metric != "${m}"`)
+    .join('');
+
+  const approachingExcluded = [...excludedMetrics, ...gcpQuotasConfig.excludedApproachingMetrics];
+  const approachingExclusionRegex =
+    approachingExcluded.length > 0 ? approachingExcluded.join('|') : null;
+  const promqlExclusion =
+    approachingExclusionRegex !== null ? `, quota_metric!~"${approachingExclusionRegex}"` : '';
 
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,
@@ -309,6 +334,11 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
     ...baseArgs,
     displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Quota \${metric.label.quota_metric} exceeded in ${CLUSTER_BASENAME}`,
+      content: `The quota "\${metric.display_name}" (\${metric.label.quota_metric}) has been exceeded in cluster ${CLUSTER_BASENAME}.`,
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // "Quota Full" (Exceeded right now)
@@ -324,8 +354,9 @@ export function installGcpQuotaAlerts(
           ],
           comparison: 'COMPARISON_GT',
           duration: '60s',
-          filter:
-            'resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"',
+          filter: assertFilterLength(
+            `resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"${thresholdExclusion}`
+          ),
           trigger: {
             count: 1,
           },
@@ -342,15 +373,23 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
     ...baseArgs,
     displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Allocation quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+      content: [
+        `An allocation quota (CPUs, Static IPs, Disk Space, etc.) is >${quotaUsageThresholdPercent}% utilized in **${CLUSTER_BASENAME}**.`,
+        'Check the incident details, chart under "Alert Metrics", for the specific quota.',
+      ].join('\n\n'),
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // Tracks resources like CPUs, Static IPs, Disk Space
         displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
+            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"${promqlExclusion}}
             / ignoring(limit_name) group_right()
-            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
@@ -362,15 +401,23 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaRateAlert', {
     ...baseArgs,
     displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Rate quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+      content: [
+        `A rate quota (API requests per minute, HSM operations, etc.) is >${quotaUsageThresholdPercent}% utilized in **${CLUSTER_BASENAME}**.`,
+        'Check the incident details, chart under "Alert Metrics", for the specific quota.',
+      ].join('\n\n'),
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // Tracks API requests, HSM operations per minute, etc.
         displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
+            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"${promqlExclusion}}
             / ignoring(limit_name) group_right()
-            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
           duration: '300s',

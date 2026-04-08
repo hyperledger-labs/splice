@@ -84,7 +84,7 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     if (monitoringConfig.alerting.loggedSecretsFilter) {
       installLoggedSecretsAlerts(notificationChannel);
     }
-    installGcpQuotaAlerts(notificationChannel);
+    installGcpQuotaAlerts(notificationChannel, monitoringConfig.alerting.alerts.gcpQuotas);
     installCloudSqlTxIdUtilizationAlert(notificationChannel);
   }
 }
