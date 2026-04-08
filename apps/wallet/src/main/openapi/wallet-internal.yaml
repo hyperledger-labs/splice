@@ -1832,10 +1832,13 @@ components:
       type: object
       required:
         - transfer_leg_id
+        - sender
         - receiver
         - amount
       properties:
         transfer_leg_id:
+          type: string
+        sender:
           type: string
         receiver:
           type: string

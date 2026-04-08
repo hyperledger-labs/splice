@@ -1260,7 +1260,8 @@ object HttpWalletAppClient {
             spec.transferLegs.asScala.map { transferLegs =>
               definitions.TransferLegV2(
                 transferLegs.transferLegId,
-                transferLegs.receiver.owner,
+                sender = transferLegs.sender.owner,
+                receiver = transferLegs.receiver.owner,
                 Codec.JavaBigDecimal.instance.encode(transferLegs.amount),
                 Some(transferLegs.meta.values.asScala.toMap),
               )
