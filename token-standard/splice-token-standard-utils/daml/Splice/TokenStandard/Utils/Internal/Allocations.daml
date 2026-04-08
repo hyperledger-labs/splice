@@ -7,10 +7,11 @@
 module Splice.TokenStandard.Utils.Internal.Allocations (
 
   -- * Allocation utilities
-  netAllocationCreditAmount,
+  allocationAdmin,
+  netAllocationCreditAmounts,
   splitLegsByAdmin,
-  splitLegsByTradingAccount,
-
+  splitLegsByAuthorizer,
+  filterLegsForAccount,
 
   -- * Allocation template implementations
 
@@ -24,6 +25,9 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   -- ** Available actions
   allocationV1_availableActionsDefault,
   allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
   upcast_v1_v2_Allocation,
 
   -- ** Choice implementations
@@ -90,22 +94,41 @@ import Splice.TokenStandard.Utils.Internal.Choices
 -- Allocation utilities
 ------------------------
 
-splitLegsByTradingAccount : [AllocationV2.TransferLeg] -> Map.Map HoldingV2.Account [AllocationV2.TransferLeg]
-splitLegsByTradingAccount legs = Map.fromListWithR (++) $ do
-  leg <- legs
-  [(leg.sender, [leg]), (leg.receiver, [leg])]
+allocationAdmin : AllocationV2.AllocationSpecification -> Party
+allocationAdmin AllocationV2.AllocationSpecification{..} =
+  case transferLegs of
+    [] -> error "No transfer legs in allocation"
+    (leg ::_) -> leg.instrumentId.admin
 
+-- | Filter transfer legs to the ones affecting the given account.
+filterLegsForAccount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> [AllocationV2.TransferLeg]
+filterLegsForAccount account transferLegs =
+  filter (\tl -> account == tl.sender || account == tl.receiver) transferLegs
+
+-- | Group transfer legs by the account that needs to authorize them.
+splitLegsByAuthorizer : [AllocationV2.TransferLeg] -> Map.Map HoldingV2.Account [AllocationV2.TransferLeg]
+splitLegsByAuthorizer legs = Map.fromListWithR (++) $ do
+  leg <- legs
+  if leg.sender == leg.receiver
+    then [(leg.sender, [leg])] -- self-transfers are authorized only once
+    else [(leg.sender, [leg]), (leg.receiver, [leg])]
+
+-- | Group transfer legs by the admin of their instrument.
+--
+-- Use this to group them into batches for settlement, which is done on a per-admin basis.
 splitLegsByAdmin : [AllocationV2.TransferLeg] -> Map.Map Party [AllocationV2.TransferLeg]
 splitLegsByAdmin legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId.admin, [leg])) legs
 
--- | Net credit of an allocation. Positive for a credit and negative for a debit.
-netAllocationCreditAmount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> Decimal
-netAllocationCreditAmount authorizer transferLegs =
-    sum $ map legAmount transferLegs
+-- | Net amounts of credit from an allocation's transfer legs.
+netAllocationCreditAmounts : HoldingV2.Account -> [AllocationV2.TransferLeg] -> Map.Map HoldingV2.InstrumentId Decimal
+netAllocationCreditAmounts authorizer transferLegs =
+    Map.fromListWithR (+) $ map legAmount transferLegs
   where
     legAmount leg =
-      (if leg.sender == authorizer then negate leg.amount else 0.0) +
-      (if leg.receiver == authorizer then leg.amount else 0.0)
+      ( leg.instrumentId
+      , (if leg.sender == authorizer then negate leg.amount else 0.0) +
+        (if leg.receiver == authorizer then leg.amount else 0.0)
+      )
 
 -- | Check basic invariants of a `V1.SettlementInfo`.
 isValidSettlementInfoV1 : AllocationV1.SettlementInfo -> Bool
@@ -190,7 +213,7 @@ allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{
     legs -> abort $ "expected exactly one transfer leg for allocation settlement, but got: " <> show legs
   let reason = "V2 allocation settlement for leg '" <> leg.transferLegId <> "' using V1.Allocation_ExecuteTransfer"
   pure AllocationV2.Allocation_SettleResult with
-    authorizerHoldingCids = map upcast result.senderHoldingCids
+    authorizerHoldingCids = TextMap.fromList [ (leg.instrumentId.id, map upcast result.senderHoldingCids) ]
     -- TODO(#4597): revisit this metadata as part of revisiting history parsing
     meta = Metadata with
       values = TextMap.fromList
@@ -218,13 +241,15 @@ allocationV2_withdrawDefaultImplUsingV1
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
 allocationV2_withdrawDefaultImplUsingV1 this self (AllocationV2.Allocation_Withdraw{..}) = do
+  let thisView = view this
   -- no archive of self, as the V1 choice is consuming
   checkActors actors [[(view this).allocation.transferLeg.sender]]
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
   pure AllocationV2.Allocation_WithdrawResult with
-    authorizerHoldingCids = map upcast result.senderHoldingCids
+    authorizerHoldingCids = TextMap.fromList
+      [ (thisView.allocation.transferLeg.instrumentId.id, map upcast result.senderHoldingCids) ]
     meta = emptyMetadata -- empty to avoid duplicating the metadata
 
 -- | Default implementation for the `V2.Allocation_Cancel` for a template that
@@ -238,13 +263,15 @@ allocationV2_cancelDefaultImplUsingV1
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
 allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{..}) = do
+  let thisView = view this
   -- no archive of self, as the V1 choice is consuming
-  checkActors actors [AllocationV1.allocationControllers (view this)]
+  checkActors actors [AllocationV1.allocationControllers thisView]
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
   pure AllocationV2.Allocation_CancelResult with
-    authorizerHoldingCids = map upcast result.senderHoldingCids
+    authorizerHoldingCids = TextMap.fromList
+      [ (thisView.allocation.transferLeg.instrumentId.id, map upcast result.senderHoldingCids) ]
     meta = emptyMetadata -- empty to avoid duplicating the metadata
 
 
@@ -303,7 +330,7 @@ settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFac
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with
-    newHoldingCids = Map.fromListWithR (++) newHoldingCidss
+    newHoldingCids = Map.fromListWithR (textMapUnionWith (++)) newHoldingCidss
     meta = emptyMetadata
 
 
@@ -518,14 +545,6 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult_
     AllocationInstructionV2.AllocationInstructionResult_Failed
 
 
-instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult AllocationInstructionV2.AllocationInstructionResult where
-  upcast (AllocationInstructionV1.AllocationInstructionResult with output, senderChangeCids, meta) =
-    AllocationInstructionV2.AllocationInstructionResult with
-      output = upcast output
-      senderChangeCids = map upcast senderChangeCids
-      meta
-
-
 -- Allocation requests
 ----------------------
 
@@ -670,7 +689,11 @@ allocationRequestV2_withdrawDefaultImplV2Only this self arg = do
   pure AllocationRequestV2.AllocationRequest_WithdrawResult with meta = emptyMetadata
 
 -- | Note we are not offering the upcast from V1 to V2 for the allocation request views,
--- as the authorizers on V2 are lost this way.
+-- as the authorizer on V2 is lost this way. The downcast is still useful, as it
+-- simplifies implementing dual version V1/V2 allocation requests.
+--
+-- V1 wallets will create one V1 allocation per transfer leg with their wallet party as the
+-- sender. Their authorizer will thus be set to the `sender.owner` of each individual transfer leg.
 instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationRequestV2.AllocationRequestView where
   downcast (AllocationRequestV2.AllocationRequestView with settlement, transferLegs, meta) =
     AllocationRequestV1.AllocationRequestView with
@@ -695,9 +718,10 @@ allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl arg =
 -- observers of the allocation choice itself if no funding is required.
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl arg
-  | netAllocationCreditAmount allocation.authorizer allocation.transferLegs >= 0.0 =
-      allocation.settlement.executors
+  | all (>= 0.0) (Map.values creditAmounts) = allocation.settlement.executors
   | otherwise = []
   where
     allocation = arg.allocation
+    creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
+
 

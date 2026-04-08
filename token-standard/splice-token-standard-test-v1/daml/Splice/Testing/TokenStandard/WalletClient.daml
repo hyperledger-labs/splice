@@ -148,10 +148,11 @@ listAllocationRequests p = do
   reqs <- queryInterface @V1.AllocationRequest p
   return [ reqView | (_, Some reqView) <- reqs ]
 
--- | Accept the allocation request by authorizing the transfer of all its requested legs
--- for the admin of the given requestr
+-- | Simulate a V1 wallet accepting an allocation request from a V1 or V2 app
+-- for assets of a specific admin.
 --
--- TODO(#4517): add multi-registry support once we have private assets
+-- Use `WalletClientV2.acceptAllocationRequestV1` to simulate doing this acceptance in a single
+-- batch across many admins.
 acceptAllocationRequest
   :  RegistryApi registry => Party -> registry -> Party -> V1.AllocationRequestView -> Script ()
 acceptAllocationRequest admin registry sender req = do

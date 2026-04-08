@@ -9,6 +9,10 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   BackwardCompatible(..),
   ForwardCompatible(..),
 
+  -- * AnyContractId conversion
+  fromAnyContractId,
+  toAnyContractId,
+
   -- * Metadata conversion
   timeToMeta,
   timeFromMeta,
@@ -65,6 +69,15 @@ decodeTime t = case T.parseInt t of
   None -> error ("Cannot parse time " <> t)
 
 
+-- AnyContractId conversion
+------------------------------
+
+fromAnyContractId : AnyContractId -> ContractId t
+fromAnyContractId = coerceContractId
+
+toAnyContractId : ContractId t -> AnyContractId
+toAnyContractId = coerceContractId
+
 
 -- Metadata utils
 -------------------------
@@ -92,7 +105,7 @@ timeFromMeta field meta =
 --------------------------
 
 basicAccount : Party -> HoldingV2.Account
-basicAccount p = HoldingV2.Account None None p
+basicAccount p = HoldingV2.Account p None None
 
 -- | True if the account is a basic account.
 isBasicAccount : HoldingV2.Account -> Bool

@@ -5,6 +5,7 @@
 module Splice.Api.Token.AllocationInstructionV2 where
 
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -122,14 +123,10 @@ interface AllocationFactory where
       requestedAt : Time
         -- ^ The time at which the allocation was requested.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings matching the instrument of the legs that SHOULD be used to fund the allocation.
+        -- ^ The holdings to use to fund the allocation.
         --
-        -- MUST be empty for allocations that do not require funding.
-        --
-        -- For allocations that require funding,, implementations MUST consume
-        -- all provided holdings as part of creating the allocation. Thereby
-        -- enabling the authorizer's wallet to use contention on these holdings to
-        -- prevent creating duplicate allocations.
+        -- Implementations MUST return change and all input holdings not used for funding
+        -- in the `authorizerChangeCids` field of the `AllocationInstructionResult`.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
       actors : [Party]
@@ -161,10 +158,10 @@ interface AllocationFactory where
 data AllocationInstructionResult = AllocationInstructionResult with
     output : AllocationInstructionResult_Output
      -- ^ The output of the step.
-    senderChangeCids : [ContractId Holding]
-      -- ^ New holdings owned by the sender created to return "change". Can be used
-      -- by callers to batch creating or updating multiple allocation instructions
-      -- in a single Daml transaction.
+    authorizerChangeCids : TextMap.TextMap [ContractId Holding]
+      -- ^ New holdings owned by the authorizer created to return "change", keyed
+      -- by `instrumentId.id`. Can be used by callers to batch creating or
+      -- updating multiple allocation instructions in a single Daml transaction.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., fees charged.
   deriving (Show, Eq)

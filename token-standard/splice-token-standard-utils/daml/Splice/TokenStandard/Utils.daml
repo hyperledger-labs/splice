@@ -15,6 +15,7 @@ module Splice.TokenStandard.Utils (
   ensureNoAccountMeta,
 
   -- ** Requirements checking
+  require,
   require',
   isMemberR,
   isEqualR,
@@ -22,6 +23,10 @@ module Splice.TokenStandard.Utils (
   isSubsetOfR,
   oneOfR,
   notR,
+  isGreaterOrEqualR,
+  isGreaterR,
+  isLessR,
+  isLessOrEqualR,
 
   requireMatchExpected,
   requireUnique,
@@ -34,6 +39,21 @@ module Splice.TokenStandard.Utils (
   -- ** Public fetch implementation
   publicFetchDefaultImpl,
 
+  -- * AnyContractId conversion
+  fromAnyContractId,
+  toAnyContractId,
+
+  -- * Missing TextMap utilities
+
+  -- TODO(#4865): upstream these to the Daml stdlib
+  textMapUnionWith,
+  textMapSingleton,
+  textMapValues,
+  textMapKeys,
+  textMapZip,
+  textMapZipWithDefault,
+  textMapTraverseWithKey,
+
   -- * API type conversions
   BackwardCompatible(..),
   ForwardCompatible(..),
@@ -42,9 +62,11 @@ module Splice.TokenStandard.Utils (
   -- * Allocation workflows
 
   -- ** Utilities for allocations
-  netAllocationCreditAmount,
+  allocationAdmin,
+  netAllocationCreditAmounts,
+  filterLegsForAccount,
   splitLegsByAdmin,
-  splitLegsByTradingAccount,
+  splitLegsByAuthorizer,
 
   -- ** Allocation implementation
 
@@ -58,6 +80,9 @@ module Splice.TokenStandard.Utils (
   -- *** Available actions
   allocationV1_availableActionsDefault,
   allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
   upcast_v1_v2_Allocation,
 
   -- *** Choices
