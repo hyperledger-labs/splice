@@ -21,10 +21,6 @@ export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
 
-# the port will be assigned by docker
-TEST_PORT=""
-export TEST_PORT
-
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
