@@ -1,5 +1,6 @@
 {
   "usersPerValidator": 10,
+  "featuredUsersPerValidator": 1,
   "isDevNet": "$IS_DEVNET",
   "validators": [
     {

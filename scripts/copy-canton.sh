@@ -19,6 +19,11 @@ rsync -av --delete --exclude version.sbt --exclude community-build.sbt --exclude
     --exclude 'base/contextualized-logging' --exclude 'base/crypto' \
     --exclude 'community/bindings-java' --exclude "*/community/transcode" \
     --exclude '*/community/ledger-api-scala' --exclude "*/ledger-api-proto" \
-    --exclude '*/canton-community-app/test/scala/*/integration/tests' "$1/" canton/
+    --exclude '*/canton-community-app/test/scala/*/integration/tests' \
+    --exclude '*/canton/community/model-based-testing-drivers' \
+    --exclude '*/canton/community/model-based-testing-generators' \
+    --exclude '*/canton/community/model-based-testing-integration-tests' \
+    "$1/" \
+    canton/
 # remove any broken symlinks after the copy
 find -L canton/ -type l -exec rm {} +

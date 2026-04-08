@@ -25,6 +25,8 @@ data InstrumentId = InstrumentId
 -- a provider to perform some services.
 data Account = Account
   with
+    owner: Party
+      -- ^ The party that owns the account.
     provider : Optional Party
       -- ^ The provider of the account.
       --
@@ -36,8 +38,6 @@ data Account = Account
     id : Optional Text
       -- ^ Account number or similar.
       -- MUST be a non-empty string if set.
-    owner: Party
-      -- ^ The party that owns the account.
   deriving (Eq, Show, Ord)
 
 -- | Details of a lock.

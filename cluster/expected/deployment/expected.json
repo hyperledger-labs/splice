@@ -943,7 +943,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -973,7 +973,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-runbook/Pulumi.sv-runbook.mock.yaml",
@@ -1061,7 +1061,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -1091,7 +1091,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-1.mock.yaml",
@@ -1144,7 +1144,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -1174,7 +1174,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-2.mock.yaml",
@@ -1227,7 +1227,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -1257,7 +1257,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-3.mock.yaml",
@@ -1310,7 +1310,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -1340,7 +1340,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-4.mock.yaml",

@@ -493,42 +493,40 @@ class ScanApp(
                 )
             }
 
-            requestLogger(traceContext) {
-              concat(
-                ScanResource.routes(
-                  scanHandler,
-                  buildRouteForOperation(_, "scan"),
-                ),
-                ScanStreamResource.routes(
-                  scanStreamHandler,
-                  buildRouteForOperation(_, "scan_stream"),
-                ),
-                TokenStandardTransferInstructionResource.routes(
-                  tokenStandardTransferInstructionHandler,
-                  buildRouteForOperation(_, "token_standard_transfer_instruction"),
-                ),
-                TokenStandardAllocationInstructionV1Resource.routes(
+            concat(
+              ScanResource.routes(
+                scanHandler,
+                buildRouteForOperation(_, "scan"),
+              ),
+              ScanStreamResource.routes(
+                scanStreamHandler,
+                buildRouteForOperation(_, "scan_stream"),
+              ),
+              TokenStandardTransferInstructionResource.routes(
+                tokenStandardTransferInstructionHandler,
+                buildRouteForOperation(_, "token_standard_transfer_instruction"),
+              ),
+              TokenStandardAllocationInstructionV1Resource.routes(
                   tokenStandardAllocationInstructionHandler,
                   buildRouteForOperation(_, "token_standard_allocation_instruction_v1"),
                 ),
                 TokenStandardAllocationInstructionV2Resource.routes(
-                  tokenStandardAllocationInstructionHandler,
-                  buildRouteForOperation(_, "token_standard_allocation_instruction_v2"),
-                ),
-                TokenStandardMetadataResource.routes(
-                  tokenStandardMetadataHandler,
-                  buildRouteForOperation(_, "token_standard_metadata"),
-                ),
-                TokenStandardAllocationV1Resource.routes(
+                tokenStandardAllocationInstructionHandler,
+                buildRouteForOperation(_, "token_standard_allocation_instruction_v2"),
+              ),
+              TokenStandardMetadataResource.routes(
+                tokenStandardMetadataHandler,
+                buildRouteForOperation(_, "token_standard_metadata"),
+              ),
+              TokenStandardAllocationV1Resource.routes(
                   tokenStandardAllocationHandler,
                   buildRouteForOperation(_, "token_standard_allocation_v1"),
                 ),
                 TokenStandardAllocationV2Resource.routes(
-                  tokenStandardAllocationHandler,
-                  buildRouteForOperation(_, "token_standard_allocation_v2"),
-                ),
-              )
-            }
+                tokenStandardAllocationHandler,
+                buildRouteForOperation(_, "token_standard_allocation_v2"),
+              ),
+            )
           }
         }
       }

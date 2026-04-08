@@ -20,20 +20,20 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "bignumber.js": "^9.2.1",
     "@lfdecentralizedtrust/canton-json-api-v2-openapi": "file:../dependencies/canton-json-api-v2/openapi-ts-client",
+    "@lfdecentralizedtrust/transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client",
+    "bignumber.js": "^9.2.1",
     "commander": "^13.1.0",
-    "dayjs": "^1.11.13",
-    "@lfdecentralizedtrust/transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client"
+    "dayjs": "^1.11.13"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "@typescript-eslint/eslint-plugin": "^7.7.1",
+    "eslint": "8.57.0",
     "msw": "^2.7.3",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.4",
-    "eslint": "8.57.0",
-    "@typescript-eslint/eslint-plugin": "^7.7.1",
-    "prettier": "^3.5.3"
+    "vitest": "^4.1.1"
   }
 }

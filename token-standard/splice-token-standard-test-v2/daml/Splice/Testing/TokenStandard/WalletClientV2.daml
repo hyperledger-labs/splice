@@ -1,14 +1,14 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Daml script test utilities for simulating the actions of wallet client
--- based on the token standard.
+-- | Daml script test utilities for simulating the actions of token standard V2 wallet.
 --
 -- NOTE: there are likely more functions that could/should be added to this module. PRs welcome.
 module Splice.Testing.TokenStandard.WalletClientV2
   (
     -- * Reading/checking holdings
     listHoldings,
+    listHoldings',
     listHoldingCids,
     listLockedHoldings,
     listUnlockedHoldingCidsFor,
@@ -29,38 +29,86 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listAllocationRequestsV2,
     listAllocationsV2,
 
+    listAllocationRequestsV1,
+
+    acceptAllocationRequestV1,
     acceptAllocationRequestV2,
+
+    -- * Batching utility usage
+    TSABatch(..),
+    executeTSABatch,
+
+    createBatchingUtility,
+
+    -- ** Allocations
+    mkAllocationFactory_AllocateV1,
+    mkAllocationFactory_AllocateV2,
+    mkAllocationRequest_AcceptV2,
+    mkAcceptAllocationRequestV1,
+    mkAcceptAllocationRequestV2,
+
+    -- ** Transfers
+    mkTransferFactory_TransferV1,
+    mkTransferInstruction_AcceptV1,
+
+    -- *** Transfer test utility
+
+    SimpleTransfer(..),
+    mkTransferFactory_TransferV1',
 
   ) where
 
 import DA.Action (unless)
-import DA.Foldable (foldMap, forA_)
+import DA.List (dedupSort)
 import DA.Map qualified as Map
 import DA.Optional (isSome, isNone)
+import DA.Time
+import DA.TextMap qualified as TextMap
+import DA.Set qualified as Set
 
+import Splice.Api.Token.MetadataV1 as MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.AllocationInstructionV1 qualified as V1
+import Splice.Api.Token.AllocationRequestV1 qualified as V1
+import Splice.Api.Token.AllocationV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationRequestV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
-import Splice.TokenStandard.Utils (netAllocationCreditAmount)
+import Splice.TokenStandard.Utils qualified as TSU
+import Splice.Util.Token.Wallet.BatchingUtilityV2 qualified as BatchingUtilityV2
 
+import Splice.Testing.TokenStandard.RegistryApi qualified as V1
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
-import Splice.Testing.UtilsV2 qualified as V2
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
+import Splice.Testing.Utils
 
 import Daml.Script
 
 -- | List the holdings of a party of a specific instrument.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listHoldings p instrumentId = do
-  holdings <- queryInterface @V2.Holding p
-  let instrumentHoldings = do
-        (cid, Some holding) <- holdings
-        guard (holding.instrumentId == instrumentId)
+  filter (\(_, holding) -> holding.instrumentId == instrumentId) <$> listHoldings' p
+
+-- | List the holdings of a party of a specific instrument.
+listHoldings' : Party -> Script [(ContractId V2.Holding, V2.HoldingView)]
+listHoldings' p = do
+  holdingsV2 <- queryInterface @V2.Holding p
+  let instrumentHoldingsV2 = Map.fromList $ do
+        (cid, Some holding) <- holdingsV2
         guard (holding.account.owner == p)
         pure (cid, holding)
-  pure instrumentHoldings
+  -- enrich with V1 only holdings
+  holdingsV1 <- queryInterface @V1.Holding p
+  let instrumentHoldingsV1 = do
+        (cidV1, Some holding) <- holdingsV1
+        let cid = TSU.upcast cidV1
+        guard (holding.owner == p && not (Map.member cid instrumentHoldingsV2))
+        pure (cid, TSU.upcast holding)
+  pure $ instrumentHoldingsV1 ++ Map.toList instrumentHoldingsV2
 
 listLockedHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listLockedHoldings p instrumentId =
@@ -154,55 +202,238 @@ listAllocationsV2 tradingAccount actor = do
   allocs <- queryInterface @V2.Allocation actor
   pure [ (allocCid, allocView) | (allocCid, Some allocView) <- allocs, tradingAccount == allocView.allocation.authorizer ]
 
+listAllocationRequestsV1 : Party -> Script [(ContractId V1.AllocationRequest, V1.AllocationRequestView)]
+listAllocationRequestsV1 actor = do
+  reqs <- queryInterface @V1.AllocationRequest actor
+  return [(reqCid, reqView) | (reqCid, Some reqView) <- reqs]
 
 listAllocationRequestsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationRequest, V2.AllocationRequestView)]
 listAllocationRequestsV2 tradingAccount actor = do
   reqs <- queryInterface @V2.AllocationRequest actor
   return [ (reqCid, reqView) | (reqCid, Some reqView) <- reqs, tradingAccount == reqView.authorizer ]
 
-splitLegsByInstrumentId : [V2.TransferLeg] -> Map.Map V2.InstrumentId [V2.TransferLeg]
-splitLegsByInstrumentId legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId, [leg])) legs
+-- | Simulate a V2 wallet accepting an allocation request from a V1 app.
+acceptAllocationRequestV1
+  :  MultiRegistry.MultiRegistry -> Party -> V1.AllocationRequestView
+  -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+acceptAllocationRequestV1 registries actor req = do
+  batch <- mkAcceptAllocationRequestV1 registries actor req
+  executeTSABatch actor batch
 
--- | Accept the allocation request by authorizing the transfer of all its requested legs.
+-- | Simulate a V2 wallet accepting an allocation request from a V2 app.
 acceptAllocationRequestV2
-  :  V2.MultiRegistry -> V2.Account -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
-acceptAllocationRequestV2 registries tradingAccount actor (reqCid, req) = do
-  unless (tradingAccount == req.authorizer) $
-    fail $ "Trading account " <> show tradingAccount <> " is not an authorizer for this allocation request."
-  let relevantLegs = filterLegsForAccount tradingAccount req.transferLegs
-  -- TODO(#4515): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
-  let legsByInstrument = splitLegsByInstrumentId relevantLegs
-  -- Allocate the legs grouped by instrument.
-  choices <- forA (Map.toList legsByInstrument) $ \(instrumentId, legs) -> do
-    let allocation = V2.AllocationSpecification with
-          authorizer = tradingAccount
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView)
+  -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+acceptAllocationRequestV2 registries actor (reqCid, req) = do
+  batch <- mkAcceptAllocationRequestV2 registries actor (reqCid, req)
+  executeTSABatch actor batch
+
+-- | Execute a batch of token standard actions.
+executeTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+executeTSABatch actor batch = do
+  inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
+  [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
+  submitWithDisclosures' actor batch.disclosures $
+    exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
+        actions = batch.actions
+        inputHoldingMap
+        archiveAfterExecution = False
+
+-- | Get a map of unlocked holding cids for the given accounts and instruments.
+getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
+getHoldingMap actor accountAndInstruments0 = do
+  taggedHoldings <- forA (dedupSort accountAndInstruments0) $ \(account, instrumentId) -> do
+    holdings <- listHoldings actor instrumentId
+    let scopedAccount = BatchingUtilityV2.ScopedAccount instrumentId.admin account
+    pure [ (scopedAccount, TextMap.fromList [(instrumentId.id, [holdingCid])])
+         | (holdingCid, holding) <- holdings, holding.account == account, isNone holding.lock ]
+  pure $ BatchingUtilityV2.holdingMapFromList (concat taggedHoldings)
+
+
+-- Batching utility functions
+---------------------------------
+
+data TSABatch = TSABatch with
+  actions : [BatchingUtilityV2.TokenStandardAction]
+  accountsAndInstruments : Set.Set (V2.Account, V2.InstrumentId)
+  disclosures : Disclosures'
+
+instance Semigroup TSABatch where
+  TSABatch actions1 accountsAndInstruments1 ds1 <> TSABatch actions2 accountsAndInstruments2 ds2 =
+    TSABatch (actions1 <> actions2) (accountsAndInstruments1 <> accountsAndInstruments2) (ds1 <> ds2)
+
+instance Monoid TSABatch where
+  mempty = TSABatch mempty mempty mempty
+
+-- | Create the batching utility for the given party.
+createBatchingUtility : Party -> Script (ContractId BatchingUtilityV2.BatchingUtility)
+createBatchingUtility p =
+  submit p $ createCmd BatchingUtilityV2.BatchingUtility with user = p
+
+
+-- | Create the batch of actions for issuing a transfer from a V1 factory
+mkTransferFactory_TransferV1
+  : MultiRegistry.MultiRegistry -> V1.TransferFactory_Transfer -> Script TSABatch
+mkTransferFactory_TransferV1 registries arg = do
+  registry <- MultiRegistry.getRegistryApiV1 registries arg.transfer.instrumentId.admin
+  enrichedChoice <- V1.getTransferFactory registry arg
+  pure $ TSABatch with
+    actions =
+      [ BatchingUtilityV2.TSA_TransferFactory_TransferV1 BatchingUtilityV2.ChoiceCall with
+          cid = TSU.toAnyContractId enrichedChoice.factoryCid
+          arg = enrichedChoice.arg
+      ]
+    disclosures = enrichedChoice.disclosures
+    accountsAndInstruments = Set.singleton
+      ( TSU.basicAccount arg.transfer.sender
+      , TSU.upcast arg.transfer.instrumentId
+      )
+
+mkTransferInstruction_AcceptV1
+  : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script TSABatch
+mkTransferInstruction_AcceptV1 registries actor cid = do
+  Some instrView <- queryInterfaceContractId @V1.TransferInstruction actor cid
+  registry <- MultiRegistry.getRegistryApiV1 registries (instrView.transfer.instrumentId.admin)
+  context <- V1.getTransferInstruction_AcceptContext registry cid emptyMetadata
+  pure $ TSABatch with
+    actions =
+      [ BatchingUtilityV2.TSA_TransferInstruction_AcceptV1 BatchingUtilityV2.ChoiceCall with
+          cid = TSU.toAnyContractId cid
+          arg = V1.TransferInstruction_Accept with
+            extraArgs = ExtraArgs with
+              context = context.choiceContext
+              meta = emptyMetadata
+      ]
+    disclosures = context.disclosures
+    accountsAndInstruments = Set.empty
+
+mkAllocationFactory_AllocateV1
+  : V1.RegistryApi api => api -> Party -> V1.AllocationSpecification -> Script TSABatch
+mkAllocationFactory_AllocateV1 registry actor allocation = do
+    now <- getTime
+    enrichedChoice <- V1.getAllocationFactory registry V1.AllocationFactory_Allocate with
+      expectedAdmin = admin
+      allocation
+      inputHoldingCids = []
+      requestedAt = now
+      extraArgs = emptyExtraArgs
+    let action = BatchingUtilityV2.TSA_AllocationFactory_AllocateV1 BatchingUtilityV2.ChoiceCall with
+          cid = coerceContractId enrichedChoice.factoryCid
+          arg = enrichedChoice.arg
+    pure TSABatch with
+      actions = [action]
+      accountsAndInstruments = Set.singleton (senderAccount, instrumentId)
+      disclosures = enrichedChoice.disclosures
+  where
+    instrumentId = TSU.upcast allocation.transferLeg.instrumentId
+    admin = instrumentId.admin
+    senderAccount = TSU.basicAccount actor
+
+mkAllocationFactory_AllocateV2
+  : V2.RegistryApi api => api -> Party -> V2.AllocationSpecification -> Script TSABatch
+mkAllocationFactory_AllocateV2 registryV2 actor allocation = do
+  now <- getTime
+  enrichedChoice <- V2.getAllocationFactory registryV2 V2.AllocationFactory_Allocate with
+    allocation
+    inputHoldingCids = []
+    requestedAt = now
+    extraArgs = emptyExtraArgs
+    actors = [actor]
+  let action = BatchingUtilityV2.TSA_AllocationFactory_AllocateV2 BatchingUtilityV2.ChoiceCall with
+        cid = TSU.toAnyContractId enrichedChoice.factoryCid
+        arg = enrichedChoice.arg
+  pure TSABatch with
+    actions = [action]
+    accountsAndInstruments = Set.fromList
+      [ (allocation.authorizer, leg.instrumentId) | leg <- allocation.transferLegs ]
+    disclosures = enrichedChoice.disclosures
+
+mkAllocationRequest_AcceptV2 : Party -> ContractId V2.AllocationRequest -> Script TSABatch
+mkAllocationRequest_AcceptV2 actor reqCid = do
+  let acceptRequest = BatchingUtilityV2.TSA_AllocationRequestV2_Accept BatchingUtilityV2.ChoiceCall with
+        cid = TSU.toAnyContractId reqCid
+        arg = V2.AllocationRequest_Accept with
+          extraArgs = emptyExtraArgs
+          actors = [actor]
+  pure TSABatch with
+    actions = [acceptRequest]
+    accountsAndInstruments = mempty
+    disclosures = mempty
+
+-- | Combined acceptance of all allocations required to be created by an actor
+-- for a V1 allocation request.
+mkAcceptAllocationRequestV1 :  MultiRegistry.MultiRegistry -> Party -> V1.AllocationRequestView -> Script TSABatch
+mkAcceptAllocationRequestV1 registries actor req = do
+  batches <- forA (TextMap.toList req.transferLegs) $ \(legId, leg) -> do
+    let admin = leg.instrumentId.admin
+    registry <- MultiRegistry.getRegistryApiV1 registries admin
+    if actor == leg.sender
+      then do
+        mkAllocationFactory_AllocateV1 registry actor V1.AllocationSpecification with
+          settlement = req.settlement
+          transferLegId = legId
+          transferLeg = leg
+      else pure mempty -- in V1, receivers do not create allocations
+
+  pure $ mconcat batches
+
+-- | Combined acceptance and creation of allocaitons for V2 allocation requests.
+mkAcceptAllocationRequestV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script TSABatch
+mkAcceptAllocationRequestV2 registries actor (reqCid, req) = do
+  acceptRequestBatch <- mkAllocationRequest_AcceptV2 actor reqCid
+  let legsByAdmin = TSU.splitLegsByAdmin req.transferLegs
+  batches <- forA (Map.toList legsByAdmin) $ \(admin, legs) -> do
+    apis <- MultiRegistry.getRegistryApis registries admin
+    case (apis.v2Api, apis.v1Api) of
+      (Some registryV2, _) -> do
+        -- when possible use the V2 factory
+        mkAllocationFactory_AllocateV2 registryV2 actor V2.AllocationSpecification with
+          authorizer = req.authorizer
           settlement = req.settlement
           transferLegs = legs
-    registry <- V2.getRegistryFor' registries instrumentId
-    inputHoldingCids <-
-      if netAllocationCreditAmount tradingAccount legs > 0.0
-        then pure []
-        else listUnlockedHoldingCidsFor tradingAccount actor instrumentId
-    now <- getTime
-    V2.getAllocationFactory registry V2.AllocationFactory_Allocate with
-      allocation
-      inputHoldingCids
+
+      (None, Some _) -> do
+        -- allocate legs for V1-only admins via their V1 factory
+        let reqV1 = V1.AllocationRequestView with
+              settlement = TSU.downcast req.settlement
+              transferLegs = TextMap.fromList [(leg.transferLegId, TSU.downcast leg) | leg <- legs]
+              meta = emptyMetadata
+        mkAcceptAllocationRequestV1 registries actor reqV1
+
+      (None, None) -> fail $ "unknown registry admin " <> show admin
+
+  pure (acceptRequestBatch <> mconcat batches)
+
+
+-- Simplified transfers specifications
+--------------------------------------
+
+-- | Simple transfer spec for testing purposes.
+data SimpleTransfer = SimpleTransfer with
+    sender : Party
+    receiver : Party
+    amount : Decimal
+    instrumentId : V1.InstrumentId
+    offerTime : RelTime
+  deriving (Eq, Show)
+
+-- | Create a simplified transfer.
+mkTransferFactory_TransferV1' : MultiRegistry.MultiRegistry -> SimpleTransfer -> Script TSABatch
+mkTransferFactory_TransferV1' registries t = do
+  now <- getTime
+  mkTransferFactory_TransferV1 registries V1.TransferFactory_Transfer with
+    expectedAdmin = t.instrumentId.admin
+    transfer = V1.Transfer with
+      sender = t.sender
+      receiver = t.receiver
+      amount = t.amount
+      instrumentId = t.instrumentId
       requestedAt = now
-      extraArgs = V2.emptyExtraArgs
-      actors = [actor]
+      executeBefore = now `addRelTime` t.offerTime
+      inputHoldingCids = []
+      meta = emptyMetadata
+    extraArgs = emptyExtraArgs
 
-  -- Create all the allocations in a single transaction together with accepting the allocation request
-  -- to ensure deduplication via the requests' consumption.
-  V2.submitWithDisclosures' actor (foldMap (.disclosures) choices) $
-    ( exerciseCmd reqCid V2.AllocationRequest_Accept with
-        actors = [actor]
-        extraArgs = V2.emptyExtraArgs
-    ) *>
-    forA_ choices (\ch -> do exerciseCmd ch.factoryCid ch.arg)
-
-  pure ()
-
-
-filterLegsForAccount : V2.Account -> [V2.TransferLeg] -> [V2.TransferLeg]
-filterLegsForAccount account transferLegs =
-  filter (\tl -> account.owner == tl.sender.owner || account.owner == tl.receiver.owner) transferLegs
+-- TODO(#4813): add missing transfer instruction actions
+-- TODO(#4838): add support for allocaiton instruction actions

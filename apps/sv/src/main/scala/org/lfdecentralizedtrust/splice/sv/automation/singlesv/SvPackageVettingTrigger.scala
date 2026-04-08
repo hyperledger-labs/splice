@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, Trigge
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.util.Contract
@@ -22,6 +23,7 @@ class SvPackageVettingTrigger(
     maxVettingDelay: NonNegativeFiniteDuration,
     latestPackagesOnly: Boolean,
     enableUnsupportedDarsUnvetting: Boolean,
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -31,6 +33,7 @@ class SvPackageVettingTrigger(
       latestPackagesOnly,
       true,
       enableUnsupportedDarsUnvetting,
+      additionalPackagesToUnvet,
     ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =

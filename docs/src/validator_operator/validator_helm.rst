@@ -352,6 +352,8 @@ is `administrator`.
 Installing the Software
 -----------------------
 
+.. include:: ../common/reloader_recommendation.rst
+
 Configuring the Helm Charts
 +++++++++++++++++++++++++++
 

@@ -28,6 +28,10 @@
         sha256 = "5690cb9e4a9f4b5374554a73be06d5c95df06642028f56e28343bbaee056f810";
       }
       {
+        url = "https://github.com/pulumi/pulumi-command/releases/download/v1.2.1/pulumi-resource-command-v1.2.1-linux-amd64.tar.gz";
+        sha256 = "71377999d1da39f54e94d9fe2950f6bb9a0a090a577094866373397dcad2e800";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v8.32.1/pulumi-resource-gcp-v8.32.1-linux-amd64.tar.gz";
         sha256 = "7dc23d7e94a727fe119a7a8d68a26cbaa9c7a3bf02567d3c574ec0026f4b71a7";
       }
@@ -38,6 +42,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.13.0/pulumi-resource-gcp-v9.13.0-linux-amd64.tar.gz";
         sha256 = "fd3ca228c609ebb457919b91aec6fff7552c7363e09c7ae24739f9cd3c7ca414";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.15.0/pulumi-resource-gcp-v9.15.0-linux-amd64.tar.gz";
+        sha256 = "0a77e1160ad85f76b809cfe771ddb4efb65843e80627e2b4c544197133bd3474";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.16.3/pulumi-resource-grafana-v0.16.3-linux-amd64.tar.gz";
@@ -58,6 +66,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.26.0/pulumi-resource-kubernetes-v4.26.0-linux-amd64.tar.gz";
         sha256 = "da269dac5a8191f0fd3c64819a5204b98c9b287164ca9d6ecf3f45c8228fc1a4";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.28.0/pulumi-resource-kubernetes-v4.28.0-linux-amd64.tar.gz";
+        sha256 = "59ad235dd20ca6f9cc4119e35c7feb7687563d5f5c448e386d8f8e1643044a69";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes-cert-manager/releases/download/v0.2.0/pulumi-resource-kubernetes-cert-manager-v0.2.0-linux-amd64.tar.gz";
@@ -110,6 +122,10 @@
         sha256 = "ab2580fb785e81a474e1d7562c4824bfadb8378f85be5881a7181a54a152da1f";
       }
       {
+        url = "https://github.com/pulumi/pulumi-command/releases/download/v1.2.1/pulumi-resource-command-v1.2.1-darwin-amd64.tar.gz";
+        sha256 = "27d46196895697a363a2cee96e6a3691eda70cd529fcb183e3b3e8c5cfd73617";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v8.32.1/pulumi-resource-gcp-v8.32.1-darwin-amd64.tar.gz";
         sha256 = "07b3bb39210a66dbdda0f211acd4bdc8b12e696ce630efbe1633f176286d7378";
       }
@@ -120,6 +136,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.13.0/pulumi-resource-gcp-v9.13.0-darwin-amd64.tar.gz";
         sha256 = "7612edb02af487000c1140d1e03efcaa20770e91eb944a77ba59be26604f5601";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.15.0/pulumi-resource-gcp-v9.15.0-darwin-amd64.tar.gz";
+        sha256 = "155ed8154b881ce7f4b8f681610e3b37df40a08c30b4a30c5275026e5fb612b8";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.16.3/pulumi-resource-grafana-v0.16.3-darwin-amd64.tar.gz";
@@ -140,6 +160,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.26.0/pulumi-resource-kubernetes-v4.26.0-darwin-amd64.tar.gz";
         sha256 = "6ee979b472eaa8a8887d70bd00ff5161f53f47b50f0a8e52b57fc6ad6321b36e";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.28.0/pulumi-resource-kubernetes-v4.28.0-darwin-amd64.tar.gz";
+        sha256 = "bf19238cdb0b21d3e62331894e36b112a91ef283a80a1a3e2682998f6db9edef";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes-cert-manager/releases/download/v0.2.0/pulumi-resource-kubernetes-cert-manager-v0.2.0-darwin-amd64.tar.gz";
@@ -192,6 +216,10 @@
         sha256 = "dc9f1a03e7e6e731b977d93450831f4558021f586780d1b3bb94d080320404a9";
       }
       {
+        url = "https://github.com/pulumi/pulumi-command/releases/download/v1.2.1/pulumi-resource-command-v1.2.1-linux-arm64.tar.gz";
+        sha256 = "d294ee36cc97499bc8c5d7905c6affeb4b768af50c26d6aeaa9a8f38d06fa558";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v8.32.1/pulumi-resource-gcp-v8.32.1-linux-arm64.tar.gz";
         sha256 = "29ba7aa1eebfb5b3d67d9eaf57a9f870f34d51ab578eab42b7fb5627dbde4563";
       }
@@ -202,6 +230,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.13.0/pulumi-resource-gcp-v9.13.0-linux-arm64.tar.gz";
         sha256 = "becec6f20ec7567e6cf743c57d0ae2c9f0da919e0d7f536e3227ce8e1829398c";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.15.0/pulumi-resource-gcp-v9.15.0-linux-arm64.tar.gz";
+        sha256 = "57d260144900ce4aa01a903ce6f0adfe7e63463777cbc36e4ca12ce1fcfd6339";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.16.3/pulumi-resource-grafana-v0.16.3-linux-arm64.tar.gz";
@@ -222,6 +254,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.26.0/pulumi-resource-kubernetes-v4.26.0-linux-arm64.tar.gz";
         sha256 = "333b3584e0db6522f01273243af527e27d09345415cde2c51f3087a4512d774b";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.28.0/pulumi-resource-kubernetes-v4.28.0-linux-arm64.tar.gz";
+        sha256 = "8712ece90af895304ffafb2c8c60da63b68b8a97d4961cc1cf44d4a85c84624c";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes-cert-manager/releases/download/v0.2.0/pulumi-resource-kubernetes-cert-manager-v0.2.0-linux-arm64.tar.gz";
@@ -274,6 +310,10 @@
         sha256 = "894925be985e72a621d01e3826b512f9ecd3fe678b032364c7ae27cce763ca31";
       }
       {
+        url = "https://github.com/pulumi/pulumi-command/releases/download/v1.2.1/pulumi-resource-command-v1.2.1-darwin-arm64.tar.gz";
+        sha256 = "23818e0f6e20e4ac54ae4f69fbc80665fe35a197485dcb677303cb4185d4a6e0";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v8.32.1/pulumi-resource-gcp-v8.32.1-darwin-arm64.tar.gz";
         sha256 = "bab0b7128d74953e57d505ca0e31366c7aa5b411d463330f7e83e22d32d6fc1e";
       }
@@ -284,6 +324,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.13.0/pulumi-resource-gcp-v9.13.0-darwin-arm64.tar.gz";
         sha256 = "c4511d0f49755516a8468609da3559083753135d936bceccf33d67d1c5b9a2cb";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v9.15.0/pulumi-resource-gcp-v9.15.0-darwin-arm64.tar.gz";
+        sha256 = "f4bf4b2caf921c9a3bc0529af4d1b7143aacc6b9110294c5abe26908beea5da0";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.16.3/pulumi-resource-grafana-v0.16.3-darwin-arm64.tar.gz";
@@ -304,6 +348,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.26.0/pulumi-resource-kubernetes-v4.26.0-darwin-arm64.tar.gz";
         sha256 = "6b26f1b45677ac77125aeda12127118f91734feb0d53cb8ba624b777d4732704";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.28.0/pulumi-resource-kubernetes-v4.28.0-darwin-arm64.tar.gz";
+        sha256 = "0a2c100b300e47ca739fd823148b7ac5fce4725452487c996b8e3842f23af270";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes-cert-manager/releases/download/v0.2.0/pulumi-resource-kubernetes-cert-manager-v0.2.0-darwin-arm64.tar.gz";

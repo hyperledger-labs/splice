@@ -376,11 +376,37 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         )
       )(metricsContext)
 
+    def updatesCount: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = bulkStoragePrefix :+ "updates-count",
+          summary =
+            "The number of updates processed for bulk storage since the last application restart",
+          Traffic,
+        )
+      )(metricsContext)
+
+    def contractsCount: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = bulkStoragePrefix :+ "contracts-count",
+          summary =
+            "The number of active contracts processed for bulk storage since the last application restart",
+          Traffic,
+        )
+      )(metricsContext)
+
     def incAcsSnapshotObjects(): Unit =
       objectsCount.inc()(MetricsContext("object_type" -> "ACS_snapshots"))
 
     def incUpdateObjects(): Unit =
       objectsCount.inc()(MetricsContext("object_type" -> "updates"))
+
+    def incUpdatesCount(count: Int): Unit =
+      updatesCount.inc(count.toLong)(MetricsContext.Empty)
+
+    def incContractsCount(count: Int): Unit =
+      contractsCount.inc(count.toLong)(MetricsContext.Empty)
   }
 
   def metricsContextFromUpdate(

@@ -13,7 +13,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as Api.TransferInstructionV2
 
-import Splice.TokenStandard.Utils
+import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer

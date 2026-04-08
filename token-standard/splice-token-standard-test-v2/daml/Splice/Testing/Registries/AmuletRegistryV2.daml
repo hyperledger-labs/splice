@@ -11,7 +11,6 @@ module Splice.Testing.Registries.AmuletRegistryV2
 
   , AmuletRegistry(..)
   , initialize
-  , amuletToMultiRegistry
 
     -- * Amulet registry specific functions
   , tapFaucet
@@ -38,7 +37,6 @@ import DA.Foldable (forA_)
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
-import DA.Map qualified as Map
 import DA.Time
 import DA.Text qualified as T
 
@@ -61,7 +59,7 @@ import Splice.Schedule
 import Splice.Round
 import Splice.ValidatorLicense
 
-import Splice.Testing.UtilsV2
+import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.TokenStandard.RegistryApiV2
 
@@ -88,15 +86,12 @@ instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
   getSettlementFactory = registryApi_getSettlementFactory
-  getAllocation_WithdrawContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
+  getAllocation_WithdrawContext app cid _meta =
+    registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
   getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
   getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
-
--- | Convert the single registry to a multi-registry.
-amuletToMultiRegistry : AmuletRegistry -> MultiRegistry
-amuletToMultiRegistry registry = Map.singleton registry.dso (mkGenericRegistry registry)
 
 
 -- Registry initialization

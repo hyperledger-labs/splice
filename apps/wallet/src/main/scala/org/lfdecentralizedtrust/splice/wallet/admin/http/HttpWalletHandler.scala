@@ -462,16 +462,52 @@ class HttpWalletHandler(
       retryProvider.retryForClientCalls(
         "accept_app_payment",
         "Accept app payment request",
-        exerciseWalletAmuletAction(
-          new amuletoperation.CO_AppPayment(requestCid),
-          userWallet,
-          (outcome: COO_AcceptedAppPayment) =>
-            r0.AcceptAppPaymentRequestResponse.OK(
-              d0.AcceptAppPaymentRequestResponse(
-                Codec.encodeContractId(outcome.contractIdValue)
+        for {
+          requestOpt <- userWallet.store.multiDomainAcsStore
+            .getContractById(walletCodegen.AppPaymentRequest.COMPANION)(requestCid)
+            .map(Some(_))
+            .recover {
+              case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                None
+            }
+
+          response <- requestOpt match {
+            case Some(_) =>
+              exerciseWalletAmuletAction(
+                new amuletoperation.CO_AppPayment(requestCid),
+                userWallet,
+                (outcome: COO_AcceptedAppPayment) =>
+                  r0.AcceptAppPaymentRequestResponse.OK(
+                    d0.AcceptAppPaymentRequestResponse(
+                      Codec.encodeContractId(outcome.contractIdValue)
+                    )
+                  ),
               )
-            ),
-        ),
+            case None =>
+              for {
+                acceptedPayments <- userWallet.store.multiDomainAcsStore
+                  .listContracts(walletCodegen.AcceptedAppPayment.COMPANION)
+              } yield {
+                acceptedPayments.find(_.payload.reference.contractId == contractId) match {
+                  case Some(acceptedPayment) =>
+                    logger.info(
+                      s"Recovered from previous timeout: AppPaymentRequest $contractId was already accepted as ${acceptedPayment.contractId}"
+                    )
+                    r0.AcceptAppPaymentRequestResponse.OK(
+                      d0.AcceptAppPaymentRequestResponse(
+                        Codec.encodeContractId(acceptedPayment.contractId)
+                      )
+                    )
+                  case None =>
+                    throw Status.NOT_FOUND
+                      .withDescription(
+                        s"AppPaymentRequest $contractId not found, and no matching AcceptedAppPayment could be located."
+                      )
+                      .asRuntimeException()
+                }
+              }
+          }
+        } yield response,
         logger,
       )
     }

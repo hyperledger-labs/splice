@@ -42,9 +42,10 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
-  ListBulkAcsSnapshotObjectsResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
+  ListBulkAcsSnapshotObjectsResponse,
+  ListBulkUpdateHistoryObjectsResponse,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
@@ -2724,6 +2725,42 @@ object HttpScanAppClient {
       case http.ListBulkAcsSnapshotObjectsResponse.NotImplemented(err) =>
         Left(err.error)
 
+    }
+  }
+
+  case class GetBulkUpdateHistory(
+      startRecordTime: CantonTimestamp,
+      endRecordTime: CantonTimestamp,
+      nextPageToken: Option[String],
+      limit: Int,
+  ) extends InternalBaseCommand[
+        http.ListBulkUpdateHistoryObjectsResponse,
+        definitions.ListBulkUpdateHistoryObjectsResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkUpdateHistoryObjectsResponse] =
+      client.listBulkUpdateHistoryObjects(
+        definitions.ListBulkUpdateHistoryObjectsRequest(
+          startRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          endRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          nextPageToken,
+          limit,
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ListBulkUpdateHistoryObjectsResponse, Either[
+      String,
+      definitions.ListBulkUpdateHistoryObjectsResponse,
+    ]] = {
+      case http.ListBulkUpdateHistoryObjectsResponse.OK(response) => Right(response)
+      case http.ListBulkUpdateHistoryObjectsResponse.NotFound(err) => Left(err.error)
+      case http.ListBulkUpdateHistoryObjectsResponse.BadRequest(err) => Left(err.error)
+      case http.ListBulkUpdateHistoryObjectsResponse.NotImplemented(err) => Left(err.error)
     }
   }
 

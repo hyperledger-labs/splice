@@ -16,11 +16,12 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -224,10 +225,17 @@ object SvOnboardingConfig {
     }
   }
 
-  case class RollForwardLsu(
+  final case class RollForwardLsuTimestampConfig(
+      topologyExportTime: CantonTimestamp,
+      trafficExportTime: CantonTimestamp,
+  )
+
+  final case class RollForwardLsu(
       name: String,
       newPhysicalSynchronizerSerial: NonNegativeInt,
-      newPhysicalSynchronizerprotocolVersion: ProtocolVersion,
+      newPhysicalSynchronizerProtocolVersion: ProtocolVersion,
+      // If unset, we assume there is an LsuAnnouncement.
+      exportTimes: Option[RollForwardLsuTimestampConfig],
   ) extends SvOnboardingConfig
 }
 
@@ -356,6 +364,7 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
@@ -375,7 +384,12 @@ case class SvAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    // Map of package name -> set of versions that should be explicitly unvetted
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
+    // If set, automatically copies governance votes (VoteRequests) from the named SV.
+    // The value is the SV name as it appears in DsoRules.svs (e.g. "Digital-Asset-2").
+    copyVotesFrom: Option[String] = None,
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,

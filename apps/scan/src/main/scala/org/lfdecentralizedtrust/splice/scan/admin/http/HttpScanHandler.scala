@@ -69,12 +69,11 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   EventHistoryRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
+  ListBulkUpdateHistoryObjectsRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItem,
-  UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
-  UpdateHistoryTransactionV2,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
@@ -84,6 +83,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
+import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -92,12 +92,14 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
-import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
-import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
-  AcsSnapshotObjects,
-  ObjectKeyAndChecksum,
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  AcsSnapshotBulkStorage,
+  BulkStorage,
+  UpdateHistoryBulkStorage,
 }
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.UpdateHistoryObjectsResponse
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
@@ -109,6 +111,7 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
   VotesStore,
 }
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
@@ -126,7 +129,6 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.collection.concurrent
-import scala.collection.immutable.SortedMap
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -155,7 +157,7 @@ class HttpScanHandler(
     initialRound: String,
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
-    publicUrl: Option[Uri],
+    publicUrlO: Option[Uri],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -165,6 +167,7 @@ class HttpScanHandler(
     with HttpFeatureSupportHandler {
 
   import HttpScanHandler.*
+
   private val store = storeWithIngestion.store
 
   override protected val workflowId: String = this.getClass.getSimpleName
@@ -481,6 +484,7 @@ class HttpScanHandler(
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
+
   def getRoundOfLatestData(
       response: v0.ScanResource.GetRoundOfLatestDataResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.GetRoundOfLatestDataResponse] = {
@@ -549,6 +553,7 @@ class HttpScanHandler(
         )
     }
   }
+
   def getTopValidatorsByValidatorRewards(
       response: v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.type
   )(
@@ -934,11 +939,13 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdateHistoryV2Response] = {
     implicit val tc: TraceContext = extracted
     val encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson)
+
     def afterMsg = request.after
       .map(a =>
         s": afterMigrationId = ${a.afterMigrationId}, afterRecordTime = ${a.afterRecordTime},"
       )
       .getOrElse(":")
+
     logger.debug(
       s"Requesting updateHistory${afterMsg} pageSize = ${request.pageSize}, encoding = $encoding"
     )
@@ -951,7 +958,7 @@ class HttpScanHandler(
         includeImportUpdates = false,
         extracted,
       )
-        .map(items => definitions.UpdateHistoryResponseV2(items.map(toUpdateV2)))
+        .map(items => definitions.UpdateHistoryResponseV2(items.map(updateV1ToUpdateV2)))
     }
   }
 
@@ -985,7 +992,7 @@ class HttpScanHandler(
           } yield {
             val encodedUpdateV2 = updateO
               .map(
-                ScanHttpEncodings.encodeUpdate(
+                ScanHttpEncodings.encodeUpdateV2(
                   _,
                   encoding,
                   ScanHttpEncodings.V1,
@@ -993,7 +1000,6 @@ class HttpScanHandler(
                   externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
-              .map(toUpdateV2)
             val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
               ScanHttpEncodings.encodeVerdict(v, views)
             }
@@ -1065,7 +1071,7 @@ class HttpScanHandler(
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
           .map(
-            ScanHttpEncodings.encodeUpdate(
+            ScanHttpEncodings.encodeUpdateV2(
               _,
               encoding,
               ScanHttpEncodings.V1,
@@ -1073,7 +1079,6 @@ class HttpScanHandler(
               externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
             )
           )
-          .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
@@ -1110,28 +1115,6 @@ class HttpScanHandler(
         .map(items => definitions.EventHistoryResponse(items))
     }
   }
-
-  private def toUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
-    update match {
-      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
-        UpdateHistoryItemV2(
-          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
-        )
-      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
-        UpdateHistoryItemV2(
-          UpdateHistoryTransactionV2(
-            updateId = t.updateId,
-            migrationId = t.migrationId,
-            workflowId = t.workflowId,
-            recordTime = t.recordTime,
-            synchronizerId = t.synchronizerId,
-            effectiveAt = t.effectiveAt,
-            rootEventIds = t.rootEventIds,
-            eventsById = SortedMap.from(t.eventsById),
-            externalTransactionHash = t.externalTransactionHash,
-          )
-        )
-    }
 
   private def confirmBackfillingIsCompleteThen[T](
       updateHistory: UpdateHistory
@@ -2016,7 +1999,7 @@ class HttpScanHandler(
           case Left(error) =>
             ScanResource.GetUpdateByIdV2Response.NotFound(error)
           case Right(update) =>
-            ScanResource.GetUpdateByIdV2Response.OK(toUpdateV2(update))
+            ScanResource.GetUpdateByIdV2Response.OK(updateV1ToUpdateV2(update))
         }
     }
   }
@@ -2078,6 +2061,7 @@ class HttpScanHandler(
       }
     }
   }
+
   override def listRoundPartyTotals(
       respond: ScanResource.ListRoundPartyTotalsResponse.type
   )(request: definitions.ListRoundPartyTotalsRequest)(
@@ -2318,6 +2302,7 @@ class HttpScanHandler(
         }
     }
   }
+
   override def getMemberTrafficStatus(
       respond: ScanResource.GetMemberTrafficStatusResponse.type
   )(synchronizerId: String, memberId: String)(
@@ -2580,45 +2565,88 @@ class HttpScanHandler(
     }
   }
 
+  private def getBulkStorage(): Option[(AcsSnapshotBulkStorage, UpdateHistoryBulkStorage, Uri)] = {
+    for {
+      acs <- bulkStorage.acsSnapshotBulkStorage
+      update <- bulkStorage.updateHistoryBulkStorage
+      publicUrl <- publicUrlO
+    } yield {
+      (acs, update, publicUrl)
+    }
+  }
+
+  private def encodeBulkStorageObjects(objects: Seq[ObjectKeyAndChecksum], publicUrl: Uri) =
+    objects.map { case ObjectKeyAndChecksum(key, digest) =>
+      val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
+      definitions.BulkStorageObjectRef(
+        s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
+        digest,
+      )
+    }.toVector
+
   override def listBulkAcsSnapshotObjects(
       respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type
   )(
       atOrBeforeRecordTime: OffsetDateTime
   )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
-      bulkStorage.acsSnapshotBulkStorage.fold(
-        Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
-          Status.UNIMPLEMENTED
-            .withDescription("Bulk storage is not configured")
-            .asRuntimeException()
-        )
-      )(acsSnapshotBulkStorage =>
-        publicUrl.fold(
+    withSpan(s"$workflowId.listBulkAcsSnapshotObjects") { _ => _ =>
+      getBulkStorage() match {
+        case None =>
           Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
             Status.UNIMPLEMENTED
-              .withDescription("Public URL is not configured")
+              .withDescription("Bulk storage or public URL is not configured")
               .asRuntimeException()
           )
-        )(publicUrl =>
+        case Some((acsSnapshotBulkStorage, _, publicUrl)) =>
+          val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
           acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
             case AcsSnapshotObjects(ts, objects) =>
               ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
                 definitions.ListBulkAcsSnapshotObjectsResponse(
                   Codec.encode(ts),
-                  objects.map { case ObjectKeyAndChecksum(key, digest) =>
-                    val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
-                    definitions.BulkStorageObjectRef(
-                      s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
-                      digest,
-                    )
-                  }.toVector,
+                  encodeBulkStorageObjects(objects, publicUrl),
                 )
               )
           }
-        )
-      )
+
+      }
+    }
+  }
+
+  override def listBulkUpdateHistoryObjects(
+      respond: ScanResource.ListBulkUpdateHistoryObjectsResponse.type
+  )(body: ListBulkUpdateHistoryObjectsRequest)(
+      extracted: TraceContext
+  ): Future[ScanResource.ListBulkUpdateHistoryObjectsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listBulkUpdateHistoryObjects") { _ => _ =>
+      getBulkStorage() match {
+        case None =>
+          Future.failed[ScanResource.ListBulkUpdateHistoryObjectsResponse](
+            Status.UNIMPLEMENTED
+              .withDescription("Bulk storage or public URL is not configured")
+              .asRuntimeException()
+          )
+        case Some((_, updateHistoryBulkStorage, publicUrl)) =>
+          val afterTs = Codec.tryDecode(Codec.OffsetDateTime)(body.startRecordTime)
+          val upToTs = Codec.tryDecode(Codec.OffsetDateTime)(body.endRecordTime)
+          updateHistoryBulkStorage
+            .getUpdatesBetweenDates(
+              afterTs,
+              upToTs,
+              PageLimit.tryCreate(body.pageSize),
+              body.nextPageToken,
+            )
+            .map { case UpdateHistoryObjectsResponse(objects, nextPageToken) =>
+              ScanResource.ListBulkUpdateHistoryObjectsResponse.OK(
+                definitions.ListBulkUpdateHistoryObjectsResponse(
+                  encodeBulkStorageObjects(objects, publicUrl),
+                  nextPageToken,
+                )
+              )
+            }
+      }
     }
   }
 }

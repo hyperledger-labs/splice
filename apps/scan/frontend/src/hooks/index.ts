@@ -4,7 +4,6 @@ import { useAmuletPriceVotes } from './useAmuletPriceVotes';
 import { useDsoInfos } from './useDsoInfos';
 import { useListVoteRequestResult, useListDsoRulesVoteRequests } from './useListVoteRequests';
 import { useListVotes } from './useListVotes';
-import { useValidatorLicenses } from './useValidatorLicenses';
 import { useVoteRequest } from './useVoteRequest';
 
 export {
@@ -14,5 +13,4 @@ export {
   useListVotes,
   useAmuletPriceVotes,
   useVoteRequest,
-  useValidatorLicenses,
 };

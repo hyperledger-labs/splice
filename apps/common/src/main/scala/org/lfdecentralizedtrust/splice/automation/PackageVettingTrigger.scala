@@ -6,8 +6,14 @@ package org.lfdecentralizedtrust.splice.automation
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
+  DarResources,
+  PackageIdResolver,
+  ParticipantAdminConnection,
+}
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, DarResourcesUtil, PackageVetting}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -19,6 +25,7 @@ abstract class PackageVettingTrigger(
     latestPackagesOnly: Boolean,
     enableUnvetting: Boolean,
     enableUnsupportedDarsUnvetting: Boolean,
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -50,13 +57,14 @@ abstract class PackageVettingTrigger(
           domainId.toString,
           amuletRules.contractId.toString,
           dsoRules.contractId.toString,
-        ) ++ voteRequests.map(_.toString)
+        ) ++ voteRequests.map(_.toString) ++ additionalPackagesToUnvet.map(_.toString())
       )(
         vetting.vetPackages(
           domainId,
           amuletRules,
           AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
           Some((context.pollingClock, maxVettingDelay)),
+          additionalPackagesToUnvet,
         )
       )
       // ensure that unsupported versions are not vetted
@@ -66,16 +74,25 @@ abstract class PackageVettingTrigger(
         domainId,
         AuthorizedState,
       )
+      vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
       unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
-        vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
+        vettedPackageIds,
+        enableUnsupportedDarsUnvetting,
+        latestPackagesOnly,
+        additionalPackagesToUnvet,
       )
-      isUnvettingEnable =
-        unsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
+      // Unvet unsupported packages only if they are currently vetted
+      resolvedUnsupportedPackages = resolvePackagesToUnvetFromVettingState(
+        vettedPackageIds,
+        unsupportedPackages.map(_.packageId).map(PackageId.assertFromString),
+      )
+      isUnvettingEnabled =
+        resolvedUnsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
       // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
-      _ = if (isUnvettingEnable) {
+      _ = if (isUnvettingEnabled) {
         vetting.unvetPackages(
           domainId,
-          unsupportedPackages,
+          resolvedUnsupportedPackages,
           Some((context.pollingClock, maxVettingDelay)),
         )
       }
@@ -95,4 +112,12 @@ abstract class PackageVettingTrigger(
       Future.unit
     }
   }
+
+  private def resolvePackagesToUnvetFromVettingState(
+      vettedPackageIds: Seq[PackageId],
+      unsupportedPackagesIds: Seq[PackageId],
+  ): Seq[DarResource] =
+    unsupportedPackagesIds
+      .filter(vettedPackageIds.contains(_))
+      .flatMap(DarResources.pkgIdToDarResource.get)
 }

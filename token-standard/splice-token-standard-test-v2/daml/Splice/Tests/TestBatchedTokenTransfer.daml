@@ -1,0 +1,98 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests wrt batching transfer actions.
+module Splice.Tests.TestBatchedTokenTransfer where
+
+import Daml.Script
+
+import DA.Time
+
+import Splice.Api.Token.HoldingV1 qualified as V1
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenRegistryV1
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
+import Splice.Testing.TokenStandard.WalletClientV2 (SimpleTransfer(..))
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+
+
+-- Shared test setup
+--------------------
+
+-- TODO(#4813): add and test missing transfer instruction actions; test v2 transfers; test preapproved transfers
+-- TODO(#4540): test with multiple accounts, and acting as an account provider
+
+test_v1_transfers : Script ()
+test_v1_transfers = do
+  -- setup
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let x1 = V1.InstrumentId with
+        id = "X1"
+        admin = env.testTokenV1.admin
+  let y1 = V1.InstrumentId with
+        id = "Y1"
+        admin = env.testTokenV1.admin
+
+  let mkParty name = do
+        party <- allocatePartyExact name
+        WalletClientV2.createBatchingUtility party
+        pure party
+
+  alice <- mkParty "alice"
+  bob <- mkParty "bob"
+  charlie <- mkParty "charlie"
+  dora <- mkParty "dora"
+
+  TestTokenRegistryV1.mint env.testTokenV1 alice "X1" 1000.0
+  TestTokenRegistryV1.mint env.testTokenV1 alice "Y1" 1000.0
+
+  -- test creating three outgoing transfers in on batch
+  at1 <- WalletClientV2.mkTransferFactory_TransferV1' env.registries SimpleTransfer with
+        sender = alice
+        receiver = bob
+        amount = 10.0
+        instrumentId = x1
+        offerTime = days 1
+  at2 <- WalletClientV2.mkTransferFactory_TransferV1' env.registries SimpleTransfer with
+        sender = alice
+        receiver = charlie
+        amount = 25.0
+        instrumentId = y1
+        offerTime = days 1
+  at3 <- WalletClientV2.mkTransferFactory_TransferV1' env.registries SimpleTransfer with
+        sender = alice
+        receiver = dora
+        amount = 10.0
+        instrumentId = x1
+        offerTime = days 1
+  WalletClientV2.executeTSABatch alice (at1 <> at2 <> at3)
+
+  -- test accepting and forwarding a transfer using the holdings just received
+  [(instrCid, _instrView)] <- WalletClientV1.listTransferOffers bob x1
+  ba1 <- WalletClientV2.mkTransferInstruction_AcceptV1 env.registries bob instrCid
+  bt1 <- WalletClientV2.mkTransferFactory_TransferV1' env.registries SimpleTransfer with
+        sender = bob
+        receiver = dora
+        amount = 5.0
+        instrumentId = x1
+        offerTime = days 1
+
+  WalletClientV2.executeTSABatch bob (ba1 <> bt1)
+
+  -- dora accepts all transfers in one go, and merges them
+  doraOffers <- WalletClientV1.listTransferOffers dora x1
+  acceptChoices <- forA doraOffers $ \(offerCid, _offerView) ->
+    WalletClientV2.mkTransferInstruction_AcceptV1 env.registries dora offerCid
+  doraMerge <- WalletClientV2.mkTransferFactory_TransferV1' env.registries SimpleTransfer with
+        sender = dora
+        receiver = dora
+        amount = 15.0 -- TODO(#4875): implement a self-merge choice in the batching utility, so that this amount does not have to be precomputed by the wallet
+        instrumentId = x1
+        offerTime = days 1
+
+  -- test that self-merge extracts the args correctly by executing it twice
+  WalletClientV2.executeTSABatch dora (mconcat acceptChoices <> doraMerge <> doraMerge)
+
+  pure ()

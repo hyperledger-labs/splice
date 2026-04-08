@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.test.HasRetryProvider
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.compat.java8.OptionConverters.RichOptionForJava8
@@ -35,7 +36,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
-class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
+class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest with HasRetryProvider {
 
   private val serialId = 123L
   private val selfSequencerId = SequencerId(
@@ -66,6 +67,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
   private val reconciler = new SequencerBftPeerReconciler(
     sequencerAdminConnection,
     scanConnection,
+    testRetryProvider,
   ) {
     override protected def svDsoStore: SvDsoStore = svDsoStoreMock
 
