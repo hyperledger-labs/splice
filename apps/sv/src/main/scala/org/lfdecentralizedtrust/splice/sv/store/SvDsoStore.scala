@@ -1435,6 +1435,15 @@ object SvDsoStore {
             Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
         )
       },
+      mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION)(co =>
+        co.payload.allocation.transferLeg.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt =
+            Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
+        )
+      },
     )
 
     MultiDomainAcsStore.SimpleContractFilter(
