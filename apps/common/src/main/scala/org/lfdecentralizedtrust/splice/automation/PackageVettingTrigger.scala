@@ -80,6 +80,9 @@ abstract class PackageVettingTrigger(
         enableUnsupportedDarsUnvetting,
         latestPackagesOnly,
         additionalPackagesToUnvet,
+        PackageIdResolver.toPackageConfigMap(
+          amuletRules.payload.configSchedule.initialValue.packageConfig
+        ),
       )
       // Unvet unsupported packages only if they are currently vetted
       resolvedUnsupportedPackages = resolvePackagesToUnvetFromVettingState(
