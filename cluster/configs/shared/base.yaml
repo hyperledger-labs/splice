@@ -128,6 +128,11 @@ monitoring:
         completedDelay:
           # Usually every 30min, we allow up to 1h to avoid false positives.
           seconds: 3600
+      acsSnapshots:
+        # This task repeats every ~3h
+        saveLatencyThresholdSeconds: 2700
+        # This task repeats every ~30sec
+        updateLatencyThresholdSeconds: 3
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5
