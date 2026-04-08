@@ -570,7 +570,7 @@ class TokenStandardV2AllocationIntegrationTest
         dsoParty.toProtoPrimitive -> new tradingappv2.SettlementBatch(
           allocations.map(_._1).asJava,
           settlementFactoryWithDisclosures.factoryId,
-          emptyExtraArgs, // TODO: probably do something with settlementFactoryWithDisclosures.args?
+          settlementFactoryWithDisclosures.args.extraArgs,
         )
       ).asJava,
       List(
