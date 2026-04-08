@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTe
 import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.*
 import com.daml.ledger.api.v2.state_service.GetConnectedSynchronizersResponse
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand, ExerciseByKeyCommand}
-import com.daml.ledger.api.v2.transaction_filter.TransactionShape
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
 
 import scala.concurrent.duration.*
@@ -195,9 +194,8 @@ class LocalNetFrontendIntegrationTest
     }
   }
 
-  "temp" in { implicit env =>
+  "localnet supports configurable protocol versions" in { implicit env =>
     withLocalNet(Seq("-P", "35")) { implicit env =>
-      env.participants.remote.foreach(p => println(s"Participant: ${p.name}"))
       val appProviderParticipant =
         env.participants.remote
           .find(_.name == "app-provider")
@@ -208,7 +206,6 @@ class LocalNetFrontendIntegrationTest
         appProviderParticipant.name,
         appProviderParticipant.config,
       )
-      println(s"Ledger API: ${appProviderParticipant.config.ledgerApi}")
       val hash = participantClient.upload_dar_unless_exists(
         "apps/app/src/test/resources/nuck-example-main-0.0.1.dar"
       )
@@ -228,285 +225,95 @@ class LocalNetFrontendIntegrationTest
         )
       )
 
-
-      val (alice, bob) = clue("Allocate parties") {
-        val alice = participantClient.ledger_api.parties.allocate("alice", userId = "ledger-api-user")
-        val bob = participantClient.ledger_api.parties.allocate("bob", userId = "ledger-api-user")
-        (alice, bob)
-      }
-      clue("alice creates the initial asset") {
-        participantClient.ledger_api.commands.submit(
-          actAs = Seq(alice.party),
-          commands = Seq(
-            Command.of(
-              Command.Command.Create(
-                CreateCommand(
-                  templateId = AssetTemplate,
-                  createArguments = Some(
-                    Record(
-                      recordId = AssetTemplate,
-                      fields = Seq(
-                        RecordField("issuer", Some(Value(Value.Sum.Party(alice.party.toProtoPrimitive)))),
-                        RecordField("owner", Some(Value(Value.Sum.Party(alice.party.toProtoPrimitive)))),
-                        RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
+      val alice = participantClient.ledger_api.parties.allocate("alice", userId = "ledger-api-user").party
+      val bob = participantClient.ledger_api.parties.allocate("bob", userId = "ledger-api-user").party
+      participantClient.ledger_api.commands.submit(
+        actAs = Seq(alice),
+        commands = Seq(
+          Command.of(
+            Command.Command.Create(
+              CreateCommand(
+                templateId = AssetTemplate,
+                createArguments = Some(
+                  Record(
+                    recordId = AssetTemplate,
+                    fields = Seq(
+                      RecordField(
+                        "issuer",
+                        Some(Value(Value.Sum.Party(alice.toProtoPrimitive))),
                       ),
-                    )
-                  ),
-                )
+                      RecordField(
+                        "owner",
+                        Some(Value(Value.Sum.Party(alice.toProtoPrimitive))),
+                      ),
+                      RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
+                    ),
+                  )
+                ),
               )
             )
-          ),
-          userId = "ledger-api-user",
-        )
-      }
-
-      clue("Alice transfers the asset to Bob using exerciseByKey") {
-        // bobTVId <- submit alice do
-        //     exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
-        participantClient.ledger_api.commands.submit(
-          actAs = Seq(alice.party),
-          commands = Seq(
-            Command.of(
-              Command.Command.ExerciseByKey(
-                ExerciseByKeyCommand(
-                  templateId = AssetTemplate,
-                  contractKey = Some(
-                    Value(
-                      Value.Sum.Record(
-                        Record(
-                          recordId = None,
-                          fields = Seq(
-                            RecordField("_1", Some(Value(Value.Sum.Party(alice.party.toProtoPrimitive)))),
-                            RecordField("_2", Some(Value(Value.Sum.Text("Sofa")))),
-                          ),
-                        )
-                      )
-                    )
-                  ),
-                  choice = "Give",
-                  choiceArgument = Some(
-                    Value(
-                      Value.Sum.Record(
-                        Record(
-                          recordId = GiveChoice,
-                          fields = Seq(RecordField("newOwner", Some(Value(Value.Sum.Party(bob.party.toProtoPrimitive))))),
-                        )
-                      )
-                    )
-                  ),
-                )
-              )
-            )
-          ),
-          userId = "ledger-api-user",
-        )
-      }
-
-      val aliceAcs = clue("Read ACS of alice") {
-        participantClient.ledger_api.state.acs.of_party(alice.party)
-      }
-
-      val bobAcs = clue("Read ACS of bob") {
-        participantClient.ledger_api.state.acs.of_party(bob.party)
-      }
-      aliceAcs should have size 1
-      bobAcs should have size 1
-      Seq(aliceAcs.head, bobAcs.head).foreach(
-        _.arguments.get("owner").value shouldBe "bob"
+          )
+        ),
+        userId = "ledger-api-user",
+        optTimeout =
+          None, // Otherwise, optionallyAwait fails with permission issues reading from unrelated parties
       )
 
-      succeed
+      // bobTVId <- submit alice do
+      //     exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
+      participantClient.ledger_api.commands.submit(
+        actAs = Seq(alice),
+        commands = Seq(
+          Command.of(
+            Command.Command.ExerciseByKey(
+              ExerciseByKeyCommand(
+                templateId = AssetTemplate,
+                contractKey = Some(
+                  Value(
+                    Value.Sum.Record(
+                      Record(
+                        recordId = None,
+                        fields = Seq(
+                          RecordField(
+                            "_1",
+                            Some(Value(Value.Sum.Party(alice.toProtoPrimitive))),
+                          ),
+                          RecordField("_2", Some(Value(Value.Sum.Text("Sofa")))),
+                        ),
+                      )
+                    )
+                  )
+                ),
+                choice = "Give",
+                choiceArgument = Some(
+                  Value(
+                    Value.Sum.Record(
+                      Record(
+                        recordId = GiveChoice,
+                        fields = Seq(
+                          RecordField(
+                            "newOwner",
+                            Some(Value(Value.Sum.Party(bob.toProtoPrimitive))),
+                          )
+                        ),
+                      )
+                    )
+                  )
+                ),
+              )
+            )
+          )
+        ),
+        userId = "ledger-api-user",
+        optTimeout = None,
+      )
+
+      val aliceAcs = participantClient.ledger_api.state.acs.of_party(alice)
+      val bobAcs = participantClient.ledger_api.state.acs.of_party(bob)
+      aliceAcs should have size 1
+      bobAcs should have size 1
+      aliceAcs.head.contractId shouldBe bobAcs.head.contractId
+      aliceAcs.head.arguments.get("owner").value shouldBe bob.toProtoPrimitive
     }
   }
-
-//  "localnet supports configurable protocol versions" in { implicit env =>
-//    withLocalNet(Seq("-P", "35")) { implicit env =>
-//      implicit val actorSystem: ActorSystem = env.actorSystem
-//      registerHttpConnectionPoolsCleanup(env)
-//      val host = "json-ledger-api.localhost"
-//      val port = 3000 // JSON API of app provider
-//      val url = s"http://$host:$port"
-//      val filePath = Paths.get("apps/app/src/test/resources/nuck-example-main-0.0.1.dar")
-//      val entity = HttpEntity(
-//        ContentTypes.`application/octet-stream`,
-//        FileIO.fromPath(filePath),
-//      )
-//      val response =
-//        Http()
-//          .singleRequest(
-//            Post(s"$url/v2/packages")
-//              .withHeaders(Seq(Authorization(OAuth2BearerToken(token))))
-//              .withEntity(entity)
-//          )
-//          .futureValue
-//      response.status should be(StatusCodes.OK)
-//
-//      val grpcHost = "grpc-ledger-api.localhost"
-//      val channel = io.grpc.ManagedChannelBuilder.forAddress(grpcHost, port).usePlaintext().build()
-//
-//      def runGrpcCommand[Req, Res, Result](command: GrpcAdminCommand[Req, Res, Result]): Result = {
-//        val service = command
-//          .createServiceInternal(channel)
-//          .withCallCredentials(new AuthCallCredentials(token))
-//        val request = command.createRequestInternal().value
-//        val response = command.submitRequestInternal(service, request).futureValue
-//        command.handleResponseInternal(response).value
-//      }
-//      def listContracts(party: String) = {
-//        val ledgerEnd = runGrpcCommand(LedgerApiCommands.StateService.LedgerEnd())
-//
-//        val observer = new RecordingStreamObserver[GetActiveContractsResponse](
-//          PositiveInt.tryCreate(100),
-//          _.contractEntry.isDefined,
-//        )
-//        runGrpcCommand(
-//          LedgerApiCommands.StateService.GetActiveContracts(
-//            observer = observer,
-//            parties = Set(LfPartyId.fromString(party).value),
-//            limit = PositiveInt.tryCreate(100),
-//            templateFilter = Seq.empty,
-//            interfaceFilter = Seq.empty,
-//            activeAtOffset = ledgerEnd,
-//            verbose = true,
-//            timeout = 30.seconds,
-//          )
-//        )
-//        observer.completion.futureValue
-//        observer.responses
-//      }
-//
-//      runGrpcCommand(
-//        LedgerApiCommands.PackageManagementService.UploadDarFile(
-//          darPath = filePath.toAbsolutePath.toString,
-//          synchronizerId = None,
-//        )
-//      )
-//
-//      val alice = runGrpcCommand(
-//        LedgerApiCommands.PartyManagementService.AllocateParty(
-//          partyIdHint = "alice",
-//          annotations = Map.empty,
-//          identityProviderId = "",
-//          synchronizerId = None,
-//          userId = "ledger-api-user",
-//        )
-//      ).party
-//
-//      val bob = runGrpcCommand(
-//        LedgerApiCommands.PartyManagementService.AllocateParty(
-//          partyIdHint = "bob",
-//          annotations = Map.empty,
-//          identityProviderId = "",
-//          synchronizerId = None,
-//          userId = "ledger-api-user",
-//        )
-//      ).party
-//
-//      val createCommand = Command.of(
-//        Command.Command.Create(
-//          CreateCommand(
-//            templateId = AssetTemplate,
-//            createArguments = Some(
-//              Record(
-//                recordId = AssetTemplate,
-//                fields = Seq(
-//                  RecordField("issuer", Some(Value(Value.Sum.Party(alice)))),
-//                  RecordField("owner", Some(Value(Value.Sum.Party(alice)))),
-//                  RecordField("name", Some(Value(Value.Sum.Text("Sofa")))),
-//                ),
-//              )
-//            ),
-//          )
-//        )
-//      )
-//      runGrpcCommand(
-//        LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
-//          actAs = Seq(LfPartyId.fromString(alice).value),
-//          readAs = Seq.empty,
-//          commands = Seq(createCommand),
-//          workflowId = "",
-//          commandId = "",
-//          deduplicationPeriod = None,
-//          submissionId = "",
-//          minLedgerTimeAbs = None,
-//          disclosedContracts = Seq.empty,
-//          synchronizerId = None,
-//          userId = "ledger-api-user",
-//          packageIdSelectionPreference = Seq.empty,
-//          transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-//          includeCreatedEventBlob = false,
-//          tapsMaxPasses = None,
-//          optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
-//        )
-//      )
-//
-//      // bobTVId <- submit alice do
-//      //     exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
-//      val newOwnerCmd = Command.of(
-//        Command.Command.ExerciseByKey(
-//          ExerciseByKeyCommand(
-//            templateId = AssetTemplate,
-//            contractKey = Some(
-//              Value(
-//                Value.Sum.Record(
-//                  Record(
-//                    recordId = None,
-//                    fields = Seq(
-//                      RecordField("_1", Some(Value(Value.Sum.Party(alice)))),
-//                      RecordField("_2", Some(Value(Value.Sum.Text("Sofa")))),
-//                    ),
-//                  )
-//                )
-//              )
-//            ),
-//            choice = "Give",
-//            choiceArgument = Some(
-//              Value(
-//                Value.Sum.Record(
-//                  Record(
-//                    recordId = GiveChoice,
-//                    fields = Seq(
-//                      RecordField("newOwner", Some(Value(Value.Sum.Party(bob))))
-//                    ),
-//                  )
-//                )
-//              )
-//            ),
-//          )
-//        )
-//      )
-//      runGrpcCommand(
-//        LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
-//          actAs = Seq(LfPartyId.fromString(alice).value),
-//          readAs = Seq.empty,
-//          commands = Seq(newOwnerCmd),
-//          workflowId = "",
-//          commandId = "",
-//          deduplicationPeriod = None,
-//          submissionId = "",
-//          minLedgerTimeAbs = None,
-//          disclosedContracts = Seq.empty,
-//          synchronizerId = None,
-//          userId = "ledger-api-user",
-//          packageIdSelectionPreference = Seq.empty,
-//          transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-//          includeCreatedEventBlob = false,
-//          tapsMaxPasses = None,
-//          optTimeout = Some(NonNegativeDuration.tryFromDuration(30.seconds)),
-//        )
-//      )
-//
-//      val aliceContracts = listContracts(alice)
-//      val bobContracts = listContracts(bob)
-//      aliceContracts should have size 1
-//      bobContracts should have size 1
-//      Seq(aliceContracts.head, bobContracts.head).foreach(
-//        _.contractEntry.activeContract.value.createdEvent.value.createArguments.value
-//          .fields(1)
-//          .value
-//          .value
-//          .getParty shouldBe bob withClue "bob owns the asset after the exerciseByKey command"
-//      )
-//    }
-//  }
 }
