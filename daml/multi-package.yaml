@@ -1,0 +1,24 @@
+packages:
+  - ./splice-amulet
+  - ./splice-amulet-name-service
+  - ./splice-amulet-name-service-test
+  - ./splice-amulet-test
+  - ./splice-api-featured-app-v1
+  - ./splice-api-featured-app-v2
+  - ./splice-api-token-burn-mint-v1
+  - ./splice-dso-governance
+  - ./splice-dso-governance-test
+  - ./splice-util
+  - ./splice-util-batched-markers
+  - ./splice-util-batched-markers-test
+  - ./splice-util-featured-app-proxies
+  - ./splice-util-featured-app-proxies-test
+  - ./splice-util-token-standard-wallet
+  - ./splice-util-token-standard-wallet-test
+  - ./splice-validator-lifecycle
+  - ./splice-validator-lifecycle-test
+  - ./splice-wallet
+  - ./splice-wallet-payments
+  - ./splice-wallet-test
+  - ./splitwell
+  - ./splitwell-test

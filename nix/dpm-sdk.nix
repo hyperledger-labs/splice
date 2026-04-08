@@ -32,6 +32,7 @@ pkgs.stdenv.mkDerivation {
     yq --inplace \
       '.spec.components |= with_entries(
         select(   .key == "damlc"
+               or .key == "daml-new"
                or .key == "daml-script"
                or .key == "canton-enterprise"
                )
