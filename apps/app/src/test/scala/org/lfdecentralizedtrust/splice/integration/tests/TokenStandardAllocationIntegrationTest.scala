@@ -32,9 +32,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppActivityMarker,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
-import org.lfdecentralizedtrust.splice.console.{
-  WalletAppClientReference,
-}
+import org.lfdecentralizedtrust.splice.console.{WalletAppClientReference}
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
