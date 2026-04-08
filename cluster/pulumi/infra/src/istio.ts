@@ -100,6 +100,31 @@ function configureIstiod(
       // taken from https://github.com/istio/istio/issues/37682
       accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
       accessLogEncoding: 'JSON',
+      // taken from https://www.envoyproxy.io/docs/envoy/latest/configuration/advanced/substitution_formatter#config-advanced-substitution-operators
+      accessLogFormat: JSON.stringify({
+        trace_id: '%TRACE_ID%',
+        authority: '%REQ(:AUTHORITY)%',
+        bytes_received: '%BYTES_RECEIVED%',
+        bytes_sent: '%BYTES_SENT%',
+        downstream_local_address: '%DOWNSTREAM_LOCAL_ADDRESS%',
+        downstream_remote_address: '%DOWNSTREAM_REMOTE_ADDRESS%',
+        duration: '%DURATION%',
+        method: '%REQ(:METHOD)%',
+        path: '%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%',
+        protocol: '%PROTOCOL%',
+        request_id: '%REQ(X-REQUEST-ID)%',
+        requested_server_name: '%REQUESTED_SERVER_NAME%',
+        response_code: '%RESPONSE_CODE%',
+        response_code_details: '%RESPONSE_CODE_DETAILS%',
+        response_flags: '%RESPONSE_FLAGS%',
+        start_time: '%START_TIME%',
+        upstream_cluster: '%UPSTREAM_CLUSTER%',
+        upstream_host: '%UPSTREAM_HOST%',
+        upstream_local_address: '%UPSTREAM_LOCAL_ADDRESS%',
+        upstream_service_time: '%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%',
+        user_agent: '%REQ(USER-AGENT)%',
+        x_forwarded_for: '%REQ(X-FORWARDED-FOR)%',
+      }),
       // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
       enablePrometheusMerge: false,
       defaultConfig: {
