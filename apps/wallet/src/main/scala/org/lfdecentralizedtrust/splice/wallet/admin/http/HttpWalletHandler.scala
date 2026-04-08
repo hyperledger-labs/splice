@@ -1078,6 +1078,7 @@ class HttpWalletHandler(
     }
   }
 
+  // TODO (#4914): ensure the AllocationRequest (if it exists) is archived
   override def allocateAmuletV2(respond: WalletResource.AllocateAmuletV2Response.type)(
       body: AllocateAmuletV2Request
   )(extracted: WalletUserRequest): Future[WalletResource.AllocateAmuletV2Response] = {

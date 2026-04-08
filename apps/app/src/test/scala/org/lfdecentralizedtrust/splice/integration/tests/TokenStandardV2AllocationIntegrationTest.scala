@@ -449,7 +449,7 @@ class TokenStandardV2AllocationIntegrationTest
     )(
       "Sender and receiver see the allocation requests",
       _ => {
-        // TODO: use the listAllocationRequests call
+        // TODO (#4912): use the listAllocationRequests call
         val bobAllocationRequest =
           bobValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
             .of_party(
@@ -513,8 +513,8 @@ class TokenStandardV2AllocationIntegrationTest
       )(
         "The Allocation Request is gone",
         _ => {
-          // TODO: use the listAllocationRequests call
-          // TODO: AllocationInstruction_Accept is not being called, so the instructions are not being archived
+          // TODO (#4912): use the listAllocationRequests call
+          // TODO (#4914): the instructions are not being archived by the allocation, so this check won't succeed yet
 //          participant.ledger_api.state.acs
 //            .of_party(
 //              party = bobParty,
