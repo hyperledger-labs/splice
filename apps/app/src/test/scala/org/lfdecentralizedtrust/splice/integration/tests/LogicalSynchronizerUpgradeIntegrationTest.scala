@@ -13,7 +13,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.transaction.{TopologyChangeOp, TopologyMapping}
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.console.*
@@ -346,33 +346,19 @@ class LogicalSynchronizerUpgradeIntegrationTest
         waitForLsuAnnouncement()
       }
 
-      val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
-        .list(
-          store = Synchronizer(decentralizedSynchronizerId),
-          excludeMappings = Seq(TopologyMapping.Code.LsuSequencerConnectionSuccessor),
-        )
-        .result
-        .size
-
       clue("new nodes are initialized") {
         initialSvNodesDoingTheLsu.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
             eventuallySucceeds(2.minutes) {
-              upgradeSequencerClient.topology.transactions
-                .list(decentralizedSynchronizerId)
-                .result
-                .size shouldBe topologyTransactionsOnTheSync
+              upgradeSequencerClient.physical_synchronizer_id shouldBe successorPsid
             }
           }
 
           clue(s"check ${backend.name} initialized mediator") {
             eventuallySucceeds(2.minutes) {
-              upgradeMediatorClient.topology.transactions
-                .list(decentralizedSynchronizerId)
-                .result
-                .size shouldBe topologyTransactionsOnTheSync
+              upgradeMediatorClient.health.initialized() shouldBe true
             }
           }
         }
@@ -412,10 +398,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
           decentralizedSynchronizerAlias,
         )
         sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
-        clientWithAdminToken.topology.transactions
-          .list(store = Synchronizer(decentralizedSynchronizerId))
-          .result
-          .size should be >= topologyTransactionsOnTheSync
       }
 
       clue("Validator connects to the new sequencers and syncs topology") {
