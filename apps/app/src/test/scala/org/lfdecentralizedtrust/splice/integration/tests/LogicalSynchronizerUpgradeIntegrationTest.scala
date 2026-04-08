@@ -13,7 +13,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp
+import com.digitalasset.canton.topology.transaction.{TopologyChangeOp, TopologyMapping}
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.console.*
@@ -47,6 +47,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
@@ -70,6 +71,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
   // won't have a snapshot at that time so the assertions in the
   // update history sanity plugin wil fail.
   override lazy val skipAcsSnapshotChecks = true
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    DomainMigrationUtil.migrationDumpDir.delete()
+  }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -136,6 +142,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           updatedConfig
         )
       })
+      .withSvBftSequencerConnectionDisabled()
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
 
@@ -322,6 +329,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+    val initialSvNodesDoingTheLsu = Seq(sv1Backend, sv2Backend, sv3Backend)
     withCantonSvNodes(
       (
         None,
@@ -339,12 +347,15 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
-        .list(store = Synchronizer(decentralizedSynchronizerId))
+        .list(
+          store = Synchronizer(decentralizedSynchronizerId),
+          excludeMappings = Seq(TopologyMapping.Code.LsuSequencerConnectionSuccessor),
+        )
         .result
         .size
 
       clue("new nodes are initialized") {
-        Seq(sv1Backend, sv2Backend, sv3Backend).map { backend =>
+        initialSvNodesDoingTheLsu.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
@@ -374,13 +385,23 @@ class LogicalSynchronizerUpgradeIntegrationTest
       def participantIsConnectedToNewSynchronizer(
           clientWithAdminToken: ParticipantClientReference,
           isSv4Connected: Boolean,
+          svBackend: Option[SvAppBackendReference],
       ) = {
-        val newSequencerUrls =
-          (if (isSv4Connected) allBackends else allBackends.filter(_.name != sv4Backend.name)).map {
-            backend =>
-              backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-                .stripPrefix("http://")
+        val newSequencerUrls = {
+          svBackend match {
+            case Some(backend) =>
+              Seq(
+                backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
+                  .stripPrefix("http://")
+              )
+            case None =>
+              (if (isSv4Connected) allBackends else allBackends.filter(_.name != sv4Backend.name))
+                .map { backend =>
+                  backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
+                    .stripPrefix("http://")
+                }
           }
+        }
 
         clientWithAdminToken.synchronizers
           .list_connected()
@@ -400,16 +421,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
       clue("Validator connects to the new sequencers and syncs topology") {
         eventually(60.seconds) {
           val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-          participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = false)
+          participantIsConnectedToNewSynchronizer(
+            clientWithAdminToken,
+            isSv4Connected = false,
+            None,
+          )
         }
       }
 
-      clue("SVs connect to the new sequencers and syncs topology") {
-        allBackends.par.map { backend =>
+      initialSvNodesDoingTheLsu.par.map { backend =>
+        clue(s"SV ${backend.name} connects to the new sequencers and syncs topology") {
           eventually() {
             participantIsConnectedToNewSynchronizer(
               backend.participantClientWithAdminToken,
               isSv4Connected = false,
+              Some(backend),
             )
           }
         }
@@ -585,10 +611,23 @@ class LogicalSynchronizerUpgradeIntegrationTest
           )
         ) {
           lateJoiningNode.par.foreach(_.startSync())
+          clue("sv4 connects to the new sync") {
+            eventually(120.seconds) {
+              participantIsConnectedToNewSynchronizer(
+                sv4Backend.participantClientWithAdminToken,
+                isSv4Connected = true,
+                Some(sv4Backend),
+              )
+            }
+          }
           clue("Validator also connects to the sv-4 sequencer") {
             eventually(60.seconds) {
               val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-              participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = true)
+              participantIsConnectedToNewSynchronizer(
+                clientWithAdminToken,
+                isSv4Connected = true,
+                None,
+              )
             }
           }
         }
@@ -621,6 +660,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
             participantIsConnectedToNewSynchronizer(
               bobValidatorLocal.participantClientWithAdminToken,
               isSv4Connected = true,
+              None,
             )
           }
         }

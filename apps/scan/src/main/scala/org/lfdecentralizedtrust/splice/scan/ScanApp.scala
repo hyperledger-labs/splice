@@ -251,7 +251,7 @@ class ScanApp(
           config.synchronizerNodes.current
         ),
         successor = config.synchronizerNodes.successor.map(synchronizerNode(_)),
-        legacy = None,
+        legacy = config.synchronizerNodes.legacy.map(synchronizerNode(_)),
       )
       syncService = new SynchronizerNodeService(
         syncNodes,
@@ -418,6 +418,7 @@ class ScanApp(
         externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
         config.updateHistoryMaxPageSize,
         config.publicUrl,
+        config.rollForwardLsu,
       )
       scanStreamHandler = new HttpScanStreamHandler(
         config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))

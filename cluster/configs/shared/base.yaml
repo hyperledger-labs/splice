@@ -123,8 +123,8 @@ monitoring:
       acsCommitments:
         checkpointDelay:
           # Usually every 30s but while the commitment every 30min gets computed
-          # it gets blocked so we allow up to 10min
-          seconds: 600
+          # it gets blocked so we allow up to 20min
+          seconds: 1200
         completedDelay:
           # Usually every 30min, we allow up to 1h to avoid false positives.
           seconds: 3600

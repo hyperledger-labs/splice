@@ -1,5 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.typesafe.config.ConfigValueFactory
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.*
@@ -11,9 +19,9 @@ import org.lfdecentralizedtrust.splice.config.{
   ParticipantClientConfig,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
   bumpUrl,
   updateAutomationConfig,
+  ConfigurableApp,
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -26,17 +34,15 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
-import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.typesafe.config.ConfigValueFactory
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
+import org.lfdecentralizedtrust.splice.util.{
+  ProcessTestUtil,
+  StandaloneCanton,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
+import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
+import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
@@ -330,52 +336,63 @@ class SvReonboardingIntegrationTest
             }
           }
 
-          eventually(90.seconds) {
-            sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
-              sv1Party,
-              sv2Party,
-              sv3Party,
-            ).map(_.toProtoPrimitive)
-            val mapping = sv1Backend.appState.participantAdminConnection
-              .getPartyToParticipant(
-                decentralizedSynchronizerId,
-                sv1Backend.getDsoInfo().dsoParty,
-                topologySnapshot = TopologySnapshot.Sequenced,
-              )
-              .futureValue
-              .mapping
-            mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
-              sv1Backend.participantClient.id,
-              sv2Backend.participantClient.id,
-              sv3Backend.participantClient.id,
+          val triggers =
+            Seq(sv1ValidatorBackend, sv3ValidatorBackend, sv3ValidatorBackend).map(sv =>
+              // prevent changing sync connetion configs while offboarding to prevent having to re-submit topology transactions that get lost from the queue during reconnets
+              sv.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
             )
-            sv1Backend.appState.participantAdminConnection
-              .getMediatorSynchronizerState(
-                decentralizedSynchronizerId,
-                topologySnapshot = TopologySnapshot.Sequenced,
-              )
-              .futureValue
-              .mapping
-              .active
-              .forgetNE should contain theSameElementsAs Seq(
-              sv1MediatorId,
-              sv2MediatorId,
-              sv3MediatorId,
-            )
-            sv1Backend.appState.participantAdminConnection
-              .getSequencerSynchronizerState(
-                decentralizedSynchronizerId,
-                topologySnapshot = TopologySnapshot.Sequenced,
-              )
-              .futureValue
-              .mapping
-              .active
-              .forgetNE should contain theSameElementsAs Seq(
-              sv1SequencerId,
-              sv2SequencerId,
-              sv3SequencerId,
-            )
-          }
+          TriggerTestUtil
+            .setTriggersWithin(
+              triggersToPauseAtStart = triggers,
+              triggersToResumeAtStart = triggers,
+            ) {
+              eventually(90.seconds) {
+                sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
+                  sv1Party,
+                  sv2Party,
+                  sv3Party,
+                ).map(_.toProtoPrimitive)
+                val mapping = sv1Backend.appState.participantAdminConnection
+                  .getPartyToParticipant(
+                    decentralizedSynchronizerId,
+                    sv1Backend.getDsoInfo().dsoParty,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
+                  .futureValue
+                  .mapping
+                mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
+                  sv1Backend.participantClient.id,
+                  sv2Backend.participantClient.id,
+                  sv3Backend.participantClient.id,
+                )
+                sv1Backend.appState.participantAdminConnection
+                  .getMediatorSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
+                  .futureValue
+                  .mapping
+                  .active
+                  .forgetNE should contain theSameElementsAs Seq(
+                  sv1MediatorId,
+                  sv2MediatorId,
+                  sv3MediatorId,
+                )
+                sv1Backend.appState.participantAdminConnection
+                  .getSequencerSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
+                  .futureValue
+                  .mapping
+                  .active
+                  .forgetNE should contain theSameElementsAs Seq(
+                  sv1SequencerId,
+                  sv2SequencerId,
+                  sv3SequencerId,
+                )
+              }
+            }
         }
 
         // Stop SV4

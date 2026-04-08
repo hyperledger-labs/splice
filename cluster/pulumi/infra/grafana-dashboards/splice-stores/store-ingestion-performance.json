@@ -158,6 +158,80 @@
           "range": true, "refId": "A"
         }
       ]
+    },
+    {
+      "title": "CPU-to-Wall-Clock Ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 0.5 },
+              { "color": "orange", "value": 1.0 },
+              { "color": "red", "value": 2.0 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_cpu_to_wall_clock_ratio{test=\"${test}\"}",
+          "legendFormat": "CPU/Wall-clock Ratio (>0.7: CPU-bound, 0.7~0.25: balanced, <0.25:I/O-bound)",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Peak Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-purple" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_peak_heap_bytes{test=\"${test}\"}",
+          "legendFormat": "Peak Heap",
+          "range": true, "refId": "A"
+        }
+      ]
     }
   ],
   "preload": false,

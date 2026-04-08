@@ -515,6 +515,28 @@ class DbScanStore(
       } yield contractWithStateFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
 
+  override def listFeaturedAppRightsByProvider(
+      providerPartyId: PartyId
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+    waitUntilAcsIngested {
+      for {
+        rows <- storage.query(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            acsStoreId,
+            domainMigrationId,
+            FeaturedAppRight.COMPANION,
+            additionalWhere = sql"""
+                  and featured_app_right_provider = $providerPartyId
+               """,
+          ),
+          "listFeaturedAppRightsByProvider",
+        )
+      } yield rows.map(contractWithStateFromRow(FeaturedAppRight.COMPANION))
+    }
+
   override def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry] = waitUntilAcsIngested {
