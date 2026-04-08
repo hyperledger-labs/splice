@@ -1224,7 +1224,7 @@
         },
         "synchronizers": {
           "current": {
-            "cometBftConfig": {
+            "cometBFT": {
               "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
               "enabled": true
             },
