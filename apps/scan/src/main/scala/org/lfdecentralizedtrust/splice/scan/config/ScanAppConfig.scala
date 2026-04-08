@@ -3,7 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.data.CantonTimestamp
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
   HttpClientConfig,
@@ -14,12 +17,16 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
+import org.lfdecentralizedtrust.splice.store.Limit
+
+import java.time.Instant
 
 trait BaseScanAppConfig {}
 
 final case class ScanSynchronizerConfig(
     sequencer: FullClientConfig,
     mediator: FullClientConfig,
+    bftSequencerConfig: Option[BftSequencerConfig],
 )
 
 final case class MediatorVerdictIngestionConfig(
@@ -41,11 +48,6 @@ final case class BulkStorageConfig(
     s3: Option[S3Config] = None,
 )
 
-final case class SequencerTrafficIngestionConfig(
-    /** Whether sequencer traffic ingestion is enabled. */
-    enabled: Boolean = false
-)
-
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -54,11 +56,11 @@ case class ScanAppBackendConfig(
     override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    sequencerAdminClient: FullClientConfig,
-    mediatorAdminClient: FullClientConfig,
+    synchronizerNodes: ScanSynchronizerNodesConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
-    sequencerTrafficIngestion: SequencerTrafficIngestionConfig = SequencerTrafficIngestionConfig(),
+    enableAppActivityRecordAndTrafficIngestion: Boolean = true,
+    serveAppActivityRecordsAndTraffic: Boolean = true,
     isFirstSv: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,
@@ -69,13 +71,20 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
     updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
+    updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
-    bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    publicUrl: Option[Uri] = None,
+    // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
+    // TODO(#4249): use on-ledger synchronization for switching record times
+    externalTransactionHashThresholdTime: Option[Instant] =
+      ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+    globalSynchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("global"),
+    rollForwardLsu: Option[ScanRollForwardLsuConfig] = None,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -83,6 +92,23 @@ case class ScanAppBackendConfig(
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
+
+final case class ScanRollForwardLsuConfig(
+    upgradeTime: Option[
+      CantonTimestamp
+    ] // If not set, we assume that there is an LsuAnnouncement on the legacy synchronizer.
+)
+
+object ScanAppBackendConfig {
+  val DefaultExternalTransactionHashThresholdTime: Option[Instant] =
+    Some(java.time.Instant.parse("2030-01-01T00:00:00Z"))
+}
+
+final case class ScanSynchronizerNodesConfig(
+    current: ScanSynchronizerConfig,
+    successor: Option[ScanSynchronizerConfig],
+    legacy: Option[ScanSynchronizerConfig],
+)
 
 final case class ScanCacheConfig(
     svNodeState: CacheConfig = CacheConfig(

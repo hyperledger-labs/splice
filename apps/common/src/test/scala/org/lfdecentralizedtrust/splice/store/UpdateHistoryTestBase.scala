@@ -354,6 +354,12 @@ object UpdateHistoryTestBase {
         nodeId.intValue() -> tree.getChildNodeIds(event).asScala.toSeq.map(_.intValue())
       case (nodeId, _) => nodeId.intValue() -> Seq.empty
     }.toMap
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      tree.getEventsById.asScala.collect { case (nodeId, _: ExercisedEvent) =>
+        nodeId.intValue()
+      }.toSeq,
+      nodesWithChildren,
+    )
     new Transaction(
       /*updateId = */ tree.getUpdateId,
       /*commandId = */ if (mode == LostInScanApi) { "" }
@@ -363,7 +369,7 @@ object UpdateHistoryTestBase {
       /*workflowId = */ tree.getWorkflowId,
       /*effectiveAt = */ tree.getEffectiveAt,
       /*events = */ tree.getEvents.asScala
-        .map(withoutLostData(nodesWithChildren, _))
+        .map(withoutLostData(lastDescendantNodes, _))
         .asJava,
       /*offset = */ tree.getOffset,
       /*synchronizerId = */ tree.getSynchronizerId,
@@ -372,19 +378,19 @@ object UpdateHistoryTestBase {
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
 
       /*recordTime = */ tree.getRecordTime,
-      /*externalTransactionHash = */ ByteString.EMPTY,
+      /*externalTransactionHash = */ tree.getExternalTransactionHash,
     )
   }
 
   private def withoutLostData(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       event: Event,
   ): Event = {
     event match {
       case created: CreatedEvent =>
         withoutLostData(created)
       case exercised: ExercisedEvent =>
-        withoutLostData(nodesWithChildren, exercised)
+        withoutLostData(lastDescendantNodes, exercised)
       case _ => throw new RuntimeException("Invalid event type")
     }
   }
@@ -423,7 +429,7 @@ object UpdateHistoryTestBase {
   }
 
   private def withoutLostData(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       exercised: ExercisedEvent,
   ): ExercisedEvent = {
     new ExercisedEvent(
@@ -442,9 +448,11 @@ object UpdateHistoryTestBase {
       /*choiceArgument = */ exercised.getChoiceArgument,
       /*actingParties = */ exercised.getActingParties,
       /*consuming = */ exercised.isConsuming,
-      /*lastDescendedNodeid = */ EventId.lastDescendedNodeFromChildNodeIds(
+      /*lastDescendedNodeid = */ lastDescendantNodes.getOrElse(
         exercised.getNodeId.intValue(),
-        nodesWithChildren,
+        throw new IllegalStateException(
+          s"Node ${exercised.getNodeId.intValue()} was not in lastDescendantNodes"
+        ),
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
       /*implementedInterfaces = */ exercised.getImplementedInterfaces,

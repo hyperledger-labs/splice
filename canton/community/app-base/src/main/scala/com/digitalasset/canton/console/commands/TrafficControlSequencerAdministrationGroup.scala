@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -14,27 +14,28 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
+import com.digitalasset.canton.sequencing.protocol.SubmissionRequestType
+import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.IndividualThroughputCapConfig
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerTrafficStatus,
   TimestampSelector,
 }
 import com.digitalasset.canton.topology.*
+import com.google.protobuf.ByteString
 
 class TrafficControlSequencerAdministrationGroup(
     runner: AdminCommandRunner,
     override val consoleEnvironment: ConsoleEnvironment,
     override val loggerFactory: NamedLoggerFactory,
-) extends TrafficControlAdministrationGroup(
-      runner,
-      consoleEnvironment,
-      loggerFactory,
-    )
-    with Helpful
+) extends Helpful
     with FeatureFlagFilter {
 
   @Help.Summary("Return the traffic state of the given members")
   @Help.Description(
-    """Use this command to get the traffic state of a list of members at the latest safe timestamp."""
+    """Use this command to get the traffic state of a list of members at the latest safe
+      |timestamp.
+      """
   )
   def traffic_state_of_members(
       members: Seq[Member]
@@ -47,10 +48,12 @@ class TrafficControlSequencerAdministrationGroup(
 
   @Help.Summary("Return the traffic state of the given members at the latest approximate time")
   @Help.Description(
-    """Use this command to get the traffic state of a list of members using the latest possible time the sequencer can
-      estimate the state.
-      CAREFUL: The returned state is only an approximation in the future and might not be the actual correct state
-      by the time this timestamp is reached by the synchronizer."""
+    """Use this command to get the traffic state of a list of members using the latest possible
+      |time the sequencer can estimate the state.
+      |
+      |CAREFUL: The returned state is only an approximation in the future and might not be the
+      |actual correct state by the time this timestamp is reached by the synchronizer.
+      """
   )
   def traffic_state_of_members_approximate(
       members: Seq[Member]
@@ -66,7 +69,9 @@ class TrafficControlSequencerAdministrationGroup(
 
   @Help.Summary("Return the last traffic state update of the given members, per member")
   @Help.Description(
-    """Use this command to get the last traffic state update of each member. It will be last updated when a member consumed traffic."""
+    """Use this command to get the last traffic state update of each member. It will be last
+      |updated when a member consumed traffic.
+      """
   )
   def last_traffic_state_update_of_members(
       members: Seq[Member]
@@ -98,12 +103,13 @@ class TrafficControlSequencerAdministrationGroup(
       )
     )
 
-  @Help.Summary("Return the traffic state of the all members.")
+  @Help.Summary("Return the traffic state of the all members")
   @Help.Description(
     """Use this command to get the traffic state of all members.
-      Set latestApproximate to true to get an approximation of the traffic state (including base traffic)
-      at the latest possible timestamp the sequencer can calculate it. This an approximation only because the sequencer
-      may use its wall clock which could be beyond the synchronizer time.
+      |Set latestApproximate to true to get an approximation of the traffic state (including
+      |base traffic) at the latest possible timestamp the sequencer can calculate it. This an
+      |approximation only because the sequencer may use its wall clock which could be beyond
+      |the synchronizer time.
       """
   )
   def traffic_state_of_all_members(
@@ -122,13 +128,16 @@ class TrafficControlSequencerAdministrationGroup(
   @Help.Summary("Set the traffic purchased entry of a member")
   @Help.Description(
     """Use this command to set the new traffic purchased entry of a member.
-      | member: member for which the traffic purchased entry is to be set
-      | serial: serial number of the request, must be strictly greater than the latest update made for that member
-      | newBalance: new traffic purchased entry to be set
       |
-      | returns: the max sequencing time used for the update
-      | After and only after that time, if the new balance still does not appear in the traffic state,
-      |  the update can be considered failed and should be retried.
+      |Parameters:
+      |- member: Member for which the traffic purchased entry is to be set.
+      |- serial: Serial number of the request, must be strictly greater than the latest update
+      |  made for that member.
+      |- newBalance: New traffic purchased entry to be set.
+      |
+      |Returns: The max sequencing time used for the update. After and only after that time,
+      |if the new balance still does not appear in the traffic state, the update can be
+      |considered failed and should be retried.
       """
   )
   def set_traffic_balance(
@@ -142,4 +151,109 @@ class TrafficControlSequencerAdministrationGroup(
       )
     )
 
+  @Help.Summary("Obtain traffic summaries for sequenced events")
+  @Help.Description(
+    """Use this command to retrieve the traffic summaries of
+      | sequenced events from their timestamps.
+      | timestamps: list of timestamps for which to retrieve traffic summaries
+      |
+      | returns: traffic summaries of sequenced events available
+      |  on the sequencer matching the input timestamps.
+      | The response may contain less events than input timestamps.
+      """
+  )
+  def traffic_summaries(timestamps: Seq[CantonTimestamp]): Seq[TrafficSummary] =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SequencerAdminCommands.GetTrafficSummaries(timestamps)
+      )
+    )
+
+  @Help.Summary(
+    "Get the traffic control state to be transferred to a new sequencer during a logical synchronizer upgrade"
+  )
+  @Help.Description(
+    """Use this command on the old synchronizer to get the input for `set_lsu_state`
+      | to be run on the new synchronizer.
+      | A logical synchronizer upgrade must be ongoing and sequencer must have reached
+      | the upgrade time for this call to succeed.
+      """
+  )
+  def get_lsu_state(): ByteString =
+    consoleEnvironment.run(
+      runner.adminCommand(SequencerAdminCommands.GetLsuTrafficControlState(None))
+    )
+
+  @Help.Summary(
+    "Set the traffic control state on a fresh sequencer during a logical synchronizer upgrade"
+  )
+  @Help.Description(
+    """Use this command on the new synchronizer with an output of
+      | `get_lsu_traffic_control_state` from the old synchronizer.
+      | A logical synchronizer upgrade must be ongoing and the command must be called only once
+      | on the successor synchronizer sequencer.
+      | Parameters:
+      | - memberTraffic: ByteString produced by `get_lsu_state`.
+      """
+  )
+  def set_lsu_state(
+      memberTraffic: ByteString
+  ): Unit =
+    consoleEnvironment.run(
+      runner.adminCommand(SequencerAdminCommands.SetLsuTrafficControlState(memberTraffic))
+    )
+
+  @Help.Summary("Set the request throughput caps")
+  @Help.Description(
+    """Throughput caps set general limits on the number of requests being accepted
+       | to protect the general availability of the system.
+       Supported request types are: "confirmation request" and "topology transaction"
+       Note that this option has only an effect if the caps are enabled. Upon restart,
+       | the caps will be reset to their original configuration settings.
+      """
+  )
+  def set_throughput_cap(
+      requestType: SubmissionRequestType,
+      config: IndividualThroughputCapConfig,
+  ): Unit = consoleEnvironment.run(
+    runner.adminCommand(
+      SequencerAdminCommands.SetThroughputCap(requestType, Some(config))
+    )
+  )
+
+  @Help.Summary("Delete a request throughput cap")
+  def unset_throughput_cap(requestType: SubmissionRequestType): Unit =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SequencerAdminCommands.SetThroughputCap(requestType, None)
+      )
+    )
+
+  @Help.Summary("Get the current configured request throughput cap")
+  def get_throughput_cap(
+      requestType: SubmissionRequestType
+  ): Option[IndividualThroughputCapConfig] = consoleEnvironment.run(
+    runner.adminCommand(
+      SequencerAdminCommands.GetThroughputCap(requestType)
+    )
+  )
+
+  @Help.Summary("Update the current configured request throughput cap")
+  def update_throughput_cap(
+      requestType: SubmissionRequestType,
+      update: IndividualThroughputCapConfig => IndividualThroughputCapConfig,
+  ): Unit =
+    consoleEnvironment.runE {
+      for {
+        currentO <- runner
+          .adminCommand(
+            SequencerAdminCommands.GetThroughputCap(requestType)
+          )
+          .toEither
+        current <- currentO.toRight(s"Cap of type $requestType is not configured")
+        _ <- runner
+          .adminCommand(SequencerAdminCommands.SetThroughputCap(requestType, Some(update(current))))
+          .toEither
+      } yield ()
+    }
 }

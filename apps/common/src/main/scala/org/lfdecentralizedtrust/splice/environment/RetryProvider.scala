@@ -678,8 +678,23 @@ object RetryProvider {
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
             TransientErrorKind()
-          case ex: BaseAppConnection.UnexpectedHttpResponse =>
-            // TODO (tech-debt) Revisit whether we can provide more useful info here.
+          case ex: BaseAppConnection.UnexpectedHttpJsonResponse =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            val truncatedMsg = if (msg.length > 100) msg.take(100) + " ... (truncated)" else msg
+            logger.info(truncatedMsg)
+            TransientErrorKind()
+          case ex: BaseAppConnection.UnexpectedHttpMalformedJsonResponse =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind()
+          case ex: BaseAppConnection.UnexpectedHttpTextResponse =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind()
+          case ex: BaseAppConnection.UnexpectedHttpNonJsonResponse =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)

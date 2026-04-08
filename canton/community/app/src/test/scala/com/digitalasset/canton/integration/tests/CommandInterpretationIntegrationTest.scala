@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -91,7 +90,7 @@ sealed trait CommandInterpretationIntegrationTest
       participant1.synchronizers.connect_local(sequencer1, alias = daName)
       participant1.dars.upload(BaseTest.CantonTestsPath)
 
-      val alice = participant1.parties.enable("Alice")
+      val alice = participant1.parties.testing.enable("Alice")
 
       val moduleName = "Loop"
       val templateName = "Helper"
@@ -132,11 +131,10 @@ sealed trait CommandInterpretationIntegrationTest
 
 //class CommandInterpretationIntegrationTestH2 extends CommandInterpretationIntegrationTest {
 //  registerPlugin(new UseH2(loggerFactory))
-//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+//  registerPlugin(new UseBftSequencer(loggerFactory))
 //}
-
 class CommandInterpretationReferenceIntegrationTestPostgres
     extends CommandInterpretationIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

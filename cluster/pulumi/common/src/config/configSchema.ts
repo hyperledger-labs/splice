@@ -18,7 +18,7 @@ const PulumiProjectConfigSchema = z.object({
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
-  synchronizerMigration: SynchronizerMigrationSchema.default({
+  synchronizerMigration: SynchronizerMigrationSchema.prefault({
     active: defaultActiveMigration,
   }),
   persistentHeapDumps: z.boolean().default(false),
@@ -26,15 +26,22 @@ export const ConfigSchema = z.object({
     .object({
       default: PulumiProjectConfigSchema,
     })
-    .and(z.record(PulumiProjectConfigSchema.deepPartial())),
+    .and(
+      z.record(
+        z.string(),
+        PulumiProjectConfigSchema.extend({ cloudSql: CloudSqlConfigSchema.partial() }).partial()
+      )
+    ),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+export type SingleK8sResourceSchema = z.infer<typeof SingleResourceSchema>;
 export const SingleResourceSchema = z
   .object({
     memory: z.string().optional(),
     cpu: z.string().optional(),
+    ephemeralStorage: z.string().optional(),
   })
   .optional();
 

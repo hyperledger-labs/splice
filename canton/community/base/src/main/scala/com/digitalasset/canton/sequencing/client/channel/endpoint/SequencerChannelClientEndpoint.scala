@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.channel.endpoint
@@ -25,7 +25,13 @@ import com.digitalasset.canton.sequencing.client.transports.{
 import com.digitalasset.canton.sequencing.protocol.channel.SequencerChannelId
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, MonadUtil, SingleUseCell}
+import com.digitalasset.canton.util.{
+  ByteStringUtil,
+  EitherTUtil,
+  ErrorUtil,
+  MonadUtil,
+  SingleUseCell,
+}
 import com.digitalasset.canton.version.{HasToByteString, ProtocolVersion}
 import com.google.protobuf.ByteString
 import io.grpc.Context.CancellableContext
@@ -83,8 +89,11 @@ private[channel] final class SequencerChannelClientEndpoint(
 )(implicit executionContext: ExecutionContext)
     extends ConsumesCancellableGrpcStreamObserver[
       String,
+      v30.ConnectToSequencerChannelRequest,
       v30.ConnectToSequencerChannelResponse,
     ](context, parentHasRunOnClosing, timeouts) {
+
+  override protected def useManualFlowControl: Boolean = false
 
   private val security: SequencerChannelSecurity =
     new SequencerChannelSecurity(synchronizerCryptoApi, protocolVersion, timestamp)
@@ -237,7 +246,7 @@ private[channel] final class SequencerChannelClientEndpoint(
         },
       )
       message = new HasToByteString {
-        override def toByteString: ByteString = payload
+        override def toByteString: ByteString = ByteStringUtil.compressGzip(payload)
       }
       encrypted <- security.encrypt(message).leftMap(_.toString)
       _ <- sendMessage(

@@ -1,10 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File.apply
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
@@ -13,10 +16,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -33,8 +34,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupda
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
   updateAutomationConfig,
+  ConfigurableApp,
 }
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
@@ -50,9 +51,9 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithIsolatedEnvironment,
@@ -73,7 +74,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.testDumpDir
+import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.{migrationTestDumpDir, testDumpDir}
 import org.lfdecentralizedtrust.splice.util.{
   DomainMigrationUtil,
   PackageQualifiedName,
@@ -86,7 +87,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger
-import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
@@ -162,8 +162,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 config
                   .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
                   .copy(domainMigrationId = 1L),
-                migrationId = 1L,
-                basePort = 27010,
+                basePort = 5010,
               )
           ),
           validatorApps = config.validatorApps + (
@@ -202,7 +201,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   restoreFromMigrationDump = Some(
-                    (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
+                    (migrationTestDumpDir("aliceValidator") / "domain_migration_dump.json").path
                   ),
                   domainMigrationId = 1L,
                 )
@@ -220,7 +219,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   restoreFromMigrationDump = Some(
-                    (migrationDumpDir("splitwellValidator") / "domain_migration_dump.json").path
+                    (migrationTestDumpDir("splitwellValidator") / "domain_migration_dump.json").path
                   ),
                   onboarding = splitwellValidatorConfig.onboarding.map(onboarding =>
                     onboarding.copy(
@@ -275,7 +274,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             if (name == "aliceValidator" || name == "splitwellValidator")
               validatorConfig.copy(
                 domainMigrationDumpPath =
-                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                  Some((migrationTestDumpDir(name) / "domain_migration_dump.json").path)
               )
             else validatorConfig
           )(conf)
@@ -288,7 +287,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 onboarding = Some(
                   DomainMigration(
                     c.onboarding.value.name,
-                    (migrationDumpDir(
+                    (migrationTestDumpDir(
                       name.stripSuffix("Local")
                     ) / "domain_migration_dump.json").path,
                   )
@@ -297,7 +296,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             } else
               c.copy(
                 domainMigrationDumpPath =
-                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                  Some((migrationTestDumpDir(name) / "domain_migration_dump.json").path)
               )
           )(conf),
         // TODO(DACH-NY/canton-network-node#9014) Consider keeping this running and instead
@@ -374,9 +373,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+            val migrationSequencers = sequencers.filter(_.serial.isEmpty)
             synchronizerId shouldBe decentralizedSynchronizerId
-            sequencers should have size 4 withClue "sequencers"
-            sequencers.foreach { sequencer =>
+            migrationSequencers should have size 4 withClue "migrationSequencers"
+            migrationSequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
             }
         }
@@ -615,14 +615,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   allNodes.map(_.oldParticipantConnection)
                 )
               }
-              deleteDirectoryRecursively(migrationDumpDir.toFile)
+              deleteDirectoryRecursively(testDumpDir.toFile)
             },
           ) {
 
             withClueAndLog("dump has been written in the configured location for the sv.") {
               eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
                 allNodes.foreach { node =>
-                  (migrationDumpDir(
+                  (migrationTestDumpDir(
                     node.oldBackend.name
                   ) / "domain_migration_dump.json").path.exists shouldBe true
                 }
@@ -632,7 +632,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             withClueAndLog("dump has been written in the configured location for the validator.") {
               eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
                 Seq(aliceValidatorBackend, splitwellValidatorBackend).foreach { validator =>
-                  (migrationDumpDir(
+                  (migrationTestDumpDir(
                     validator.name
                   ) / "domain_migration_dump.json").path.exists shouldBe true
                 }
@@ -698,19 +698,22 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {
-                majorityUpgradeNodes.parTraverse { upgradeNode =>
-                  val connection = upgradeNode.newParticipantConnection
-                  for {
-                    result <- connection
-                      .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                        "keep just sv1",
-                        decentralizedSynchronizerId,
-                        dsoPartyDecentralizedNamespace,
-                        _ => NonEmpty(Set, sv1Party.uid.namespace),
-                        RetryFor.WaitingOnInitDependency,
-                      )
-                  } yield result
-                }.futureValue
+                MonadUtil
+                  .parTraverseWithLimit(PositiveInt.tryCreate(4))(majorityUpgradeNodes) {
+                    upgradeNode =>
+                      val connection = upgradeNode.newParticipantConnection
+                      for {
+                        result <- connection
+                          .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                            "keep just sv1",
+                            decentralizedSynchronizerId,
+                            dsoPartyDecentralizedNamespace,
+                            _ => NonEmpty(Set, sv1Party.uid.namespace),
+                            RetryFor.WaitingOnInitDependency,
+                          )
+                      } yield result
+                  }
+                  .futureValue
               }
 
             withClueAndLog("migrate the late joining node") {
@@ -724,6 +727,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .base
@@ -749,6 +753,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .mapping
@@ -876,13 +881,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
                   case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                     synchronizerId shouldBe decentralizedSynchronizerId
-                    sequencers.foreach { sequencer =>
+                    val sequencersWithMigration = sequencers.filter(_.serial.isEmpty)
+                    sequencersWithMigration.foreach { sequencer =>
                       if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
                           s"Expected sequencer migrationId to be either 0 or 1, but got ${sequencer.migrationId}"
                         )
                     }
-                    sequencers.map { sequencer =>
+                    sequencersWithMigration.map { sequencer =>
                       (sequencer.migrationId, sequencer.url)
                     }.toSet shouldBe Set(
                       (0L, getPublicSequencerUrl(sv1Backend)),
@@ -1116,7 +1122,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     inside(sv1ScanLocalBackend.listDsoSequencers()) {
                       case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                         synchronizerId shouldBe decentralizedSynchronizerId
-                        sequencers.map { sequencer =>
+                        val migrationSeqeuncers = sequencers.filter(_.serial.isEmpty)
+                        migrationSeqeuncers.map { sequencer =>
                           (sequencer.migrationId, sequencer.url)
                         }.toSet shouldBe Set(
                           (1L, getPublicSequencerUrl(sv1LocalBackend)),
@@ -1143,8 +1150,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
-    nodes
-      .parTraverse { node =>
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes) { node =>
         SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
           node,
           decentralizedSynchronizerId,
@@ -1197,7 +1204,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     (for {
       conn <- sequencerConnections.aliasToConnection.values
       endpoint <- conn match {
-        case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
+        case connection: data.GrpcSequencerConnection =>
+          connection.endpoints
       }
     } yield endpoint.toString).toSet
   }
@@ -1318,7 +1326,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   }
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
-    sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+    sv.config.localSynchronizerNodes.current.sequencer.externalPublicApiUrl
 
   private def createSomeParticipantUsersState(
       participant: ParticipantClientReference,
@@ -1473,17 +1481,5 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       users,
       rights,
     )
-  }
-}
-
-object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {
-  val migrationDumpDir: Path = testDumpDir.resolve(s"domain-migration-dump")
-  // Not using temp-files so test-generated outputs are easy to inspect.
-  def migrationDumpDir(node: String): Path = {
-    val dumpDir = migrationDumpDir.resolve(s"$node")
-    if (!dumpDir.toFile.exists()) {
-      dumpDir.toFile.mkdirs()
-    }
-    dumpDir
   }
 }

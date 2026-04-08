@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs/promises';
@@ -8,70 +7,24 @@ import { Bucket, File, Storage } from '@google-cloud/storage';
 import { CnInput, ExactNamespace, config } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { exit } from 'process';
 
-export type GcpBucket = {
-  projectId: string;
-  bucketName: string;
-  secretName: string;
-  jsonCredentials: string;
-};
+import { bootstrapBucket, GcpBucket } from './buckets';
 
 export async function bootstrapDataBucketSpec(
   projectId: string,
   bucketName: string
 ): Promise<GcpBucket> {
   const gcpSecretName = config.requireEnv('DATA_EXPORT_BUCKET_SA_KEY_SECRET');
-
-  const cred = await gcp.secretmanager.getSecretVersion({
-    secret: gcpSecretName,
-  });
-
-  return {
-    projectId,
-    bucketName,
-    secretName: `cn-gcp-bucket-${projectId}-${bucketName}`,
-    jsonCredentials: cred.secretData,
-  };
+  return await bootstrapBucket(projectId, bucketName, gcpSecretName);
 }
 
-export type BackupLocation = {
-  bucket: GcpBucket;
-  prefix?: string;
-};
-
-export type BackupConfig = {
-  backupInterval: string;
-  location: BackupLocation;
-};
-
-// Install the bucket's secret into a namespace so apps in there can access the GCP bucket
-export function installBootstrapDataBucketSecret(
-  xns: ExactNamespace,
-  bucket: GcpBucket
-): k8s.core.v1.Secret {
-  return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-${bucket.secretName}`,
-    {
-      metadata: {
-        name: bucket.secretName,
-        namespace: xns.logicalName,
-      },
-      type: 'Opaque',
-      data: {
-        'json-credentials': Buffer.from(bucket.jsonCredentials, 'utf-8').toString('base64'),
-      },
-    },
-    {
-      dependsOn: [xns.ns],
-    }
-  );
-}
-
-function openGcpBucket(bucket: GcpBucket): Bucket {
-  const storage: Storage = new Storage({
-    projectId: bucket.projectId,
-    credentials: JSON.parse(bucket.jsonCredentials),
+function openGcpBucket(bucket: GcpBucket): pulumi.Output<Bucket> {
+  return bucket.jsonCredentials.apply(jsonCredentials => {
+    const storage = new Storage({
+      projectId: bucket.projectId,
+      credentials: JSON.parse(jsonCredentials),
+    });
+    return storage.bucket(bucket.bucketName);
   });
-  return storage.bucket(bucket.bucketName);
 }
 
 async function fetchBucketFile(bucket: Bucket, file: File): Promise<string> {
@@ -156,13 +109,8 @@ export async function fetchAndInstallParticipantBootstrapDump(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
 ): Promise<k8s.core.v1.Secret> {
-  const bucket = openGcpBucket(config.bucket);
-  const content = await getLatestParticipantIdentitiesDump(
-    bucket,
-    xns,
-    config.cluster,
-    config.start,
-    config.end
+  const content = openGcpBucket(config.bucket).apply(bucket =>
+    getLatestParticipantIdentitiesDump(bucket, xns, config.cluster, config.start, config.end)
   );
   return installParticipantIdentitiesSecret(xns, participantBootstrapDumpSecretName, content);
 }

@@ -29,29 +29,35 @@ export function installNodePools(): void {
   }
 
   const nodePoolComputeZone = config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE');
-  new gcp.container.NodePool('cn-infra-node-pool', {
-    cluster,
-    nodeConfig: {
-      machineType: gkeClusterConfig.nodePools.infra.nodeType,
-      taints: [
-        {
-          effect: 'NO_SCHEDULE',
-          key: 'cn_infra',
-          value: 'true',
+  new gcp.container.NodePool(
+    'cn-infra-node-pool',
+    {
+      cluster,
+      nodeConfig: {
+        machineType: gkeClusterConfig.nodePools.infra.nodeType,
+        taints: [
+          {
+            effect: 'NO_SCHEDULE',
+            key: 'cn_infra',
+            value: 'true',
+          },
+        ],
+        labels: {
+          cn_infra: 'true',
         },
-      ],
-      labels: {
-        cn_infra: 'true',
+        loggingVariant: 'DEFAULT',
       },
-      loggingVariant: 'DEFAULT',
+      nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
+      initialNodeCount: 1,
+      autoscaling: {
+        minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
+        maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
+      },
     },
-    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
-    initialNodeCount: 1,
-    autoscaling: {
-      minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
-      maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
-    },
-  });
+    {
+      replaceOnChanges: ['nodeConfig.machineType'],
+    }
+  );
 
   new gcp.container.NodePool('gke-node-pool', {
     cluster,
@@ -81,7 +87,7 @@ function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?
       machineType: config.nodeType,
       bootDisk: {
         diskType: 'hyperdisk-balanced',
-        sizeGb: 100,
+        sizeGb: config.bootDiskSizeGb || 100,
       },
       taints: [
         {

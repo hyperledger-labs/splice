@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
@@ -49,8 +49,13 @@ class Agenda(clock: SimClock, loggerFactory: NamedLoggerFactory) {
         case InternalTick(machine, _, _, _) if machine == node =>
           logger.info(s"Removing internal tick $scheduledCommand to simulate crash")
           false
-        case RunFuture(machine, _, future, _, _) if machine == node =>
-          logger.info(s"Removing future ${future.name} from $scheduledCommand to simulate crash")
+        case RunFuture(machine, runningFuture) if machine == node =>
+          logger.info(
+            s"Removing future ${runningFuture.futureId} from $scheduledCommand to simulate crash: ${runningFuture.future.debugName}"
+          )
+          false
+        case RunFutureContinuation(machine, to, _, _, _) if machine == node =>
+          logger.info(s"Removing future continuation on $machine:$to to simulate crash")
           false
         case _ => true
       }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -85,7 +85,7 @@ object BftTopologyForInitDownloader {
                     val computedHash = hashBuilder.finish().hash
                     if (computedHash == expectedBftHash.topologyStateHash) {
                       logger.info(
-                        s"Successfully downloaded topology state for init with hash matching expected $computedHash"
+                        s"Successfully downloaded topology state of ${topologyTransactions.result.size} for init with hash matching expected $computedHash"
                       )
                       Right(topologyTransactions)
                     } else {

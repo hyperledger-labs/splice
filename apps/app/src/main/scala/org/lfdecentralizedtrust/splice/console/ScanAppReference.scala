@@ -48,6 +48,7 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
@@ -62,9 +63,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvOperatorAppClient
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.StreamConverters
 
+import java.io.OutputStream
 import scala.jdk.OptionConverters.*
 import java.time.Instant
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -252,6 +257,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
+  @Help.Summary("Look up a featured app right by contract ID")
+  def lookupFeaturedAppRightByContractId(
+      contractId: String
+  ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId))
+    }
+
   @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long
@@ -322,15 +335,27 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
+  @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")
   @Help.Summary(
-    "Get the id of the participant hosting a given party"
+    "Get the id of the participant hosting a given party (fails if multiple)"
   )
-  def getPartyToParticipant(
+  def getPartyToParticipantV0(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
   ): ParticipantId =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
+    }
+
+  @Help.Summary(
+    "Get the ids of the participants hosting a given party"
+  )
+  def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  ): Seq[ParticipantId] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId))
     }
 
   @Help.Summary(
@@ -545,6 +570,14 @@ abstract class ScanAppReference(
     }
   }
 
+  def getUpdateByHash(extTxnHash: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateByHash(extTxnHash, encoding)
+      )
+    }
+  }
+
   def getEventHistory(
       count: Int,
       after: Option[(Long, String)],
@@ -748,6 +781,55 @@ abstract class ScanAppReference(
       )
     }
   }
+
+  @Help.Summary("List all objects in bulk storage for an ACS snapshot")
+  def getBulkAcsSnapshot(
+      timestamp: CantonTimestamp
+  ): definitions.ListBulkAcsSnapshotObjectsResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetBulkAcsSnapshot(timestamp)
+      )
+    }
+
+  @Help.Summary("List all objects in bulk storage with updates between given timestamps")
+  def getBulkUpdateHistory(
+      startTimestamp: CantonTimestamp,
+      endTimestamp: CantonTimestamp,
+      nextPageToken: Option[String],
+      limit: Int,
+  ): definitions.ListBulkUpdateHistoryObjectsResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetBulkUpdateHistory(
+          startTimestamp,
+          endTimestamp,
+          nextPageToken,
+          limit,
+        )
+      )
+    }
+
+  @Help.Summary("Download a bulk storage object")
+  def bulkStorageDownload(objectKey: String, output: OutputStream)(implicit
+      ec: ExecutionContext,
+      as: ActorSystem,
+  ): Future[Long] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.BulkStorageDownload(objectKey)
+      ).map(_.runWith(StreamConverters.fromOutputStream(() => output)).map(_.count))
+    }
+
+  @Help.Summary(
+    "Get the current physical synchronizer serial as reported by the SV participant"
+  )
+  def getActivePhysicalSynchronizerSerial(): NonNegativeInt =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetActivePhysicalSynchronizerSerial()
+      )
+    }
 }
 
 final class ScanAppBackendReference(

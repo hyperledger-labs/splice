@@ -8,27 +8,27 @@ import cats.implicits.catsSyntaxOptionId
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   SynchronizerTimeCommands,
   TopologyAdminCommands,
   VaultAdminCommands,
 }
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.data.topology
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
-  ListOwnerToKeyMappingResult,
   ListNamespaceDelegationResult,
+  ListOwnerToKeyMappingResult,
   ListSynchronizerParametersStateResult,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   ClientConfig,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
 }
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
@@ -36,18 +36,18 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -60,13 +60,14 @@ import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  AuthorizedStateChanged,
+  TopologySnapshot,
+  TopologyTransactionType,
+}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.{
   AuthorizedState,
   ProposalSignedByOwnKey,
-}
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
-  AuthorizedStateChanged,
-  TopologyTransactionType,
 }
 
 import java.util.concurrent.atomic.AtomicReference
@@ -89,6 +90,7 @@ abstract class TopologyAdminConnection(
       grpcClientMetrics,
     )
     with RetryProvider.Has
+    with LsuTopologyAdminConnection
     with Spanning {
   import TopologyAdminConnection.{RecreateOnAuthorizedStateChange, TopologyResult}
 
@@ -135,14 +137,13 @@ abstract class TopologyAdminConnection(
    *  fresh domain-time proof.
    */
   def getDomainTimeLowerBound(
-      synchronizerId: SynchronizerId,
+      synchronizerId: Synchronizer,
       maxDomainTimeLag: NonNegativeFiniteDuration,
       timeout: NonNegativeDuration = retryProvider.timeouts.default,
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       SynchronizerTimeCommands.FetchTime(
-        // TODO(#456) Use the proper serial and protocol version
-        Some(PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v34, NonNegativeInt.zero)),
+        Some(synchronizerId),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
         timeout = timeout,
@@ -218,6 +219,7 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       operation: Option[TopologyChangeOp],
       topologyTransactionType: TopologyTransactionType,
+      snapshot: TopologySnapshot,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
@@ -225,6 +227,7 @@ abstract class TopologyAdminConnection(
         filterParty = partyId.filterString,
         operation = operation,
         topologyTransactionType = topologyTransactionType,
+        timeQuery = snapshot.timeQuery,
       ).map { txs =>
         txs.headOption
       }
@@ -236,8 +239,15 @@ abstract class TopologyAdminConnection(
       // get only active (non-removed) mappings by default; this matches the Canton console defaults
       operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      topologySnapshot: TopologySnapshot,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
-    findPartyToParticipant(synchronizerId, partyId, operation, topologyTransactionType).getOrElse {
+    findPartyToParticipant(
+      synchronizerId,
+      partyId,
+      operation,
+      topologyTransactionType,
+      topologySnapshot,
+    ).getOrElse {
       throw Status.NOT_FOUND
         .withDescription(s"No PartyToParticipant state for $partyId on domain $synchronizerId")
         .asRuntimeException
@@ -278,11 +288,16 @@ abstract class TopologyAdminConnection(
 
   def getSequencerSynchronizerState(
       synchronizerId: SynchronizerId,
+      topologySnapshot: TopologySnapshot,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[SequencerSynchronizerState]] =
-    listSequencerSynchronizerState(synchronizerId, HeadState, topologyTransactionType).map { txs =>
+    listSequencerSynchronizerState(
+      synchronizerId,
+      topologySnapshot.timeQuery,
+      topologyTransactionType,
+    ).map { txs =>
       txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
@@ -293,6 +308,7 @@ abstract class TopologyAdminConnection(
 
   def getMediatorSynchronizerState(
       synchronizerId: SynchronizerId,
+      topologySnapshot: TopologySnapshot,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
@@ -301,6 +317,7 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.Synchronizer(synchronizerId),
       synchronizerId,
       topologyTransactionType,
+      topologySnapshot,
     ).map { txs =>
       txs.headOption
         .getOrElse(
@@ -314,12 +331,14 @@ abstract class TopologyAdminConnection(
       store: TopologyStoreId,
       synchronizerId: SynchronizerId,
       topologyTransactionType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[MediatorSynchronizerState]]] = {
     runCommand(
       store,
       topologyTransactionType,
+      timeQuery = topologySnapshot.timeQuery,
     )(baseQuery =>
       TopologyAdminCommands.Read.ListMediatorSynchronizerState(
         baseQuery,
@@ -332,6 +351,7 @@ abstract class TopologyAdminConnection(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
@@ -339,6 +359,7 @@ abstract class TopologyAdminConnection(
       synchronizerId,
       decentralizedNamespace,
       topologyTransactionType,
+      topologySnapshot,
     ).map { txs =>
       txs.headOption
         .getOrElse(
@@ -354,10 +375,12 @@ abstract class TopologyAdminConnection(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       topologyTransactionType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[DecentralizedNamespaceDefinition]]] = {
     runCommand(
       TopologyStoreId.Synchronizer(synchronizerId),
       topologyTransactionType,
+      timeQuery = topologySnapshot.timeQuery,
     )(baseQuery =>
       TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
         baseQuery,
@@ -676,6 +699,67 @@ abstract class TopologyAdminConnection(
       )
     )
 
+  def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
+      store: TopologyStoreId,
+      description: String,
+      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
+      update: M => Either[String, M],
+      retryFor: RetryFor,
+      isProposal: Boolean = false,
+      recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
+        RecreateOnAuthorizedStateChange.Recreate,
+      forceChanges: ForceFlags = ForceFlags.none,
+      waitForAuthorization: Boolean = true,
+      maxSubmissionDelay: Option[(Clock, NonNegativeFiniteDuration)] = None,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    ensureTopologyMappingO(
+      store,
+      description,
+      check.andThen(_.leftMap(_.some)),
+      {
+        case Some(value) => update(value)
+        case None =>
+          throw Status.INTERNAL
+            .withDescription("Update was called without an existing state, should be impossible")
+            .asRuntimeException()
+      },
+      retryFor,
+      isProposal,
+      recreateOnAuthorizedStateChange,
+      forceChanges,
+      waitForAuthorization,
+      maxSubmissionDelay,
+    )
+  }
+
+  def ensureTopologyMappingRemoved[M <: TopologyMapping: ClassTag](
+      description: String,
+      synchronizerId: SynchronizerId,
+      findTopologyMapping: => Future[Option[TopologyResult[M]]],
+      proposal: Boolean = false,
+      forceChanges: ForceFlags = ForceFlags.none,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    retryProvider.ensureThat(
+      RetryFor.WaitingOnInitDependency,
+      "ensure_topology_removed",
+      description,
+      findTopologyMapping.map {
+        case None => Right(())
+        case Some(existing) => Left(existing)
+      },
+      (previous: TopologyResult[M]) =>
+        proposeMapping(
+          TopologyStoreId.Synchronizer(synchronizerId),
+          previous.mapping,
+          previous.base.serial + PositiveInt.one,
+          isProposal = proposal,
+          change = TopologyChangeOp.Remove,
+          forceChanges,
+        ).map(_ => ()),
+      logger,
+    )
+  }
+
   /** Ensure that either the accepted state passes the check, or a topology mapping is created that passes the check
     *  - run the check to see if it holds
     *  - if not then create transaction with the updated mapping
@@ -684,11 +768,13 @@ abstract class TopologyAdminConnection(
     *
     *  This type of re-create of the topology transactions is required to ensure that updating the same topology state in parallel will eventually succeed for all the updates
     */
-  def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
+  def ensureTopologyMappingO[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       description: String,
-      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
-      update: M => Either[String, M],
+      check: TopologyTransactionType => EitherT[Future, Option[TopologyResult[M]], TopologyResult[
+        M
+      ]],
+      update: Option[M] => Either[String, M],
       retryFor: RetryFor,
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
@@ -713,16 +799,18 @@ abstract class TopologyAdminConnection(
           "establish_topology_mapping_retry",
           description,
           check(AuthorizedState).foldF(
-            { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
+            { resultBeforeProposingChange =>
+              val existingSerial =
+                resultBeforeProposingChange.map(_.base.serial).getOrElse(PositiveInt.one)
               (recreateOnAuthorizedStateChange match {
                 case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
-                    if expectedSerial != beforeEstablishedBaseResult.serial =>
-                  Future.failed(AuthorizedStateChanged(beforeEstablishedBaseResult.serial))
+                    if expectedSerial != existingSerial =>
+                  Future.failed(AuthorizedStateChanged(existingSerial))
                 case _ => Future.unit
               })
                 .flatMap { _ =>
                   def proposeNewTopologyTransaction = {
-                    val updatedMapping = update(mapping)
+                    val updatedMapping = update(resultBeforeProposingChange.map(_.mapping))
                     val sleep: Future[Unit] =
                       minSubmissionTimeO.fold(Future.unit) { case (clock, minSubmissionTime) =>
                         logger.info(
@@ -735,7 +823,9 @@ abstract class TopologyAdminConnection(
                       proposeMapping(
                         store,
                         updatedMapping,
-                        serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                        serial = resultBeforeProposingChange
+                          .map(_.base.serial + PositiveInt.one)
+                          .getOrElse(PositiveInt.one),
                         isProposal = isProposal,
                         forceChanges = forceChanges,
                       ).map { signed =>
@@ -780,35 +870,46 @@ abstract class TopologyAdminConnection(
                     "check_establish_topology_mapping",
                     s"check established $description",
                     check(TopologyTransactionType.AuthorizedState)
-                      .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
-                        if (
-                          currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
-                        ) {
-                          if (isProposal && !waitForAuthorization) {
-                            check(TopologyTransactionType.ProposalSignedByOwnKey)
-                              .leftMap { res =>
+                      .leftFlatMap[TopologyResult[M], RuntimeException] {
+                        case Some(currentAuthorizedState) =>
+                          if (
+                            resultBeforeProposingChange
+                              .map(_.base.serial)
+                              .contains(currentAuthorizedState.base.serial)
+                          ) {
+                            if (isProposal && !waitForAuthorization) {
+                              check(TopologyTransactionType.ProposalSignedByOwnKey)
+                                .leftMap { res =>
+                                  Status.FAILED_PRECONDITION
+                                    .withDescription(
+                                      s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
+                                    )
+                                    .asRuntimeException()
+                                }
+                            } else {
+                              EitherT.leftT(
                                 Status.FAILED_PRECONDITION
                                   .withDescription(
-                                    s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
+                                    s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
                                   )
                                   .asRuntimeException()
-                              }
+                              )
+                            }
                           } else {
-                            EitherT.leftT(
-                              Status.FAILED_PRECONDITION
-                                .withDescription(
-                                  s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
-                                )
-                                .asRuntimeException()
+                            EitherT.leftT[Future, TopologyResult[M]](
+                              AuthorizedStateChanged(
+                                currentAuthorizedState.base.serial
+                              )
                             )
                           }
-                        } else {
-                          EitherT.leftT[Future, TopologyResult[M]](
-                            AuthorizedStateChanged(
-                              currentAuthorizedState.base.serial
-                            )
+                        case None =>
+                          EitherT.leftT(
+                            Status.FAILED_PRECONDITION
+                              .withDescription(
+                                s"Condition is not yet observed. Proposed: $proposal, found none."
+                              )
+                              .asRuntimeException()
                           )
-                        }
                       }
                       .rethrowT,
                     logger,
@@ -932,7 +1033,11 @@ abstract class TopologyAdminConnection(
       description,
       topologyTransactionType =>
         EitherT(
-          getSequencerSynchronizerState(synchronizerId, topologyTransactionType).map(result => {
+          getSequencerSynchronizerState(
+            synchronizerId,
+            TopologySnapshot.Sequenced,
+            topologyTransactionType,
+          ).map(result => {
             val newSequencers = sequencerChange(result.mapping.active)
             // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerSynchronizerStateThreshold)
             val newThreshold = Thresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
@@ -1031,7 +1136,11 @@ abstract class TopologyAdminConnection(
       description,
       topologyTransactionType =>
         EitherT(
-          getMediatorSynchronizerState(synchronizerId, topologyTransactionType).map(result =>
+          getMediatorSynchronizerState(
+            synchronizerId,
+            TopologySnapshot.Sequenced,
+            topologyTransactionType,
+          ).map(result =>
             Either
               .cond(
                 result.mapping.active.forgetNE == mediatorChange(result.mapping.active),
@@ -1133,6 +1242,7 @@ abstract class TopologyAdminConnection(
           decentralizedNamespace,
           ownerChange,
           topologyTransactionType,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
       },
       previous => {
@@ -1155,13 +1265,18 @@ abstract class TopologyAdminConnection(
       decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
       topologyType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit tc: TraceContext): EitherT[Future, TopologyResult[
     DecentralizedNamespaceDefinition
   ], TopologyResult[DecentralizedNamespaceDefinition]] = {
     EitherT(
-      getDecentralizedNamespaceDefinition(synchronizerId, decentralizedNamespace, topologyType).map(
-        result =>
-          Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
+      getDecentralizedNamespaceDefinition(
+        synchronizerId,
+        decentralizedNamespace,
+        topologyType,
+        topologySnapshot,
+      ).map(result =>
+        Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
       )
     )
   }
@@ -1412,17 +1527,15 @@ abstract class TopologyAdminConnection(
     )
 
   def ensureSynchronizerTrustCertificateRemoved(
-      retryFor: RetryFor,
       synchronizerId: SynchronizerId,
       member: Member,
   )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThat(
-      retryFor,
-      "ensure_domain_trust_certificate_removed",
+    ensureTopologyMappingRemoved(
       s"Remove domain trust certificate for $member on $synchronizerId",
+      synchronizerId,
       listSynchronizerTrustCertificate(synchronizerId, member).map {
-        case Seq() => Right(())
-        case Seq(cert) => Left(cert)
+        case Seq() => None
+        case Seq(cert) => Some(cert)
         case certs =>
           throw Status.INTERNAL
             .withDescription(
@@ -1430,16 +1543,23 @@ abstract class TopologyAdminConnection(
             )
             .asRuntimeException()
       },
-      (previous: TopologyResult[SynchronizerTrustCertificate]) =>
-        proposeMapping(
-          TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping,
-          previous.base.serial + PositiveInt.one,
-          isProposal = false,
-          change = TopologyChangeOp.Remove,
-        ).map(_ => ()),
-      logger,
     )
+
+  def listLsuAnnouncements(synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[Seq[TopologyResult[LsuAnnouncement]]] = runCmd(
+    TopologyAdminCommands.Read.ListLsuAnnouncement(
+      BaseQuery(
+        TopologyStoreId.Synchronizer(synchronizerId),
+        proposals = false,
+        timeQuery = TimeQuery.HeadState,
+        ops = Some(TopologyChangeOp.Replace),
+        filterSigningKey = "",
+        protocolVersion = None,
+      ),
+      synchronizerId.filterString,
+    )
+  ).map(_.map(r => TopologyResult(r.context, r.item)))
 
   def ensurePartyUnhostedFromParticipant(
       retryFor: RetryFor,
@@ -1469,7 +1589,7 @@ abstract class TopologyAdminConnection(
       (previous: TopologyResult[PartyToParticipant]) =>
         proposeMapping(
           TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping.copy(
+          previous.mapping.tryCopy(
             participants = previous.mapping.participants.filterNot(_.participantId == participant)
           ),
           previous.base.serial + PositiveInt.one,
@@ -1480,23 +1600,21 @@ abstract class TopologyAdminConnection(
     )
 
   def ensurePartyToParticipantRemoved(
-      retryFor: RetryFor,
       synchronizerId: SynchronizerId,
       partyId: PartyId,
       participant: ParticipantId,
       forceChanges: ForceFlags = ForceFlags.none,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThat(
-      retryFor,
-      "ensure_party_to_participant_removed",
+  )(implicit tc: TraceContext): Future[Unit] = {
+    ensureTopologyMappingRemoved(
       s"Remove party to participant for $partyId on $synchronizerId",
+      synchronizerId,
       listPartyToParticipant(
         TopologyStoreId.Synchronizer(synchronizerId).some,
         filterParty = partyId.filterString,
         filterParticipant = participant.filterString,
       ).map {
-        case Seq() => Right(())
-        case Seq(mapping) => Left(mapping)
+        case Seq() => None
+        case Seq(mapping) => Some(mapping)
         case mappings =>
           throw Status.INTERNAL
             .withDescription(
@@ -1504,17 +1622,10 @@ abstract class TopologyAdminConnection(
             )
             .asRuntimeException()
       },
-      (previous: TopologyResult[PartyToParticipant]) =>
-        proposeMapping(
-          TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping,
-          previous.base.serial + PositiveInt.one,
-          isProposal = false,
-          change = TopologyChangeOp.Remove,
-          forceChanges = forceChanges,
-        ).map(_ => ()),
-      logger,
+      proposal = false,
+      forceChanges,
     )
+  }
 
   def runCommand[Req, Res, M <: TopologyMapping, Result <: topology.TopologyResult[M]](
       storeId: TopologyStoreId,
@@ -1600,6 +1711,25 @@ object TopologyAdminConnection {
 
     }
 
+  }
+
+  sealed abstract class TopologySnapshot {
+    def timeQuery: TimeQuery
+  }
+
+  object TopologySnapshot {
+
+    /** Read the latest sequenced state, note that due to the topologyChangeDelay the topology transaction you get from this may not yet be valid.
+      */
+    case object Sequenced extends TopologySnapshot {
+      override def timeQuery: TimeQuery = TimeQuery.Snapshot(CantonTimestamp.MaxValue)
+    }
+
+    /** Read the latest effective state, updates will only be returned after the node has observed a record time >= topologyChangeDelay.
+      */
+    case object Effective extends TopologySnapshot {
+      override def timeQuery: TimeQuery = TimeQuery.HeadState
+    }
   }
 
   sealed abstract class RecreateOnAuthorizedStateChange {

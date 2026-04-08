@@ -9,14 +9,23 @@ import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+  UpdateHistoryTransactionV2,
+  ValidatorReceivedFaucets,
+}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
+  TrafficSummaryT,
   TransactionViewT,
   VerdictResultDbValue,
   VerdictT,
@@ -27,8 +36,21 @@ import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOff
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
+import scala.collection.immutable.SortedMap
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+
+/** Controls whether external transaction hashes are included in encoded responses.
+  *
+  * - AlwaysInclude: The hash is always included if present.
+  * - ApplyThreshold: The hash is only included for transactions recorded on or after
+  *   the separately provided threshold time.
+  */
+sealed trait ExternalHashInclusionPolicy
+object ExternalHashInclusionPolicy {
+  case object AlwaysInclude extends ExternalHashInclusionPolicy
+  case object ApplyThreshold extends ExternalHashInclusionPolicy
+}
 
 /** Transcodes between different representations of ledger updates:
   *
@@ -67,8 +89,12 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
+              Option.when(!tree.getExternalTransactionHash.isEmpty)(
+                HexString.toHexString(tree.getExternalTransactionHash)
+              ),
             )
         )
+
       case ledgerApi.ReassignmentUpdate(update) =>
         update.event match {
           case ledgerApi.ReassignmentEvent.Assign(
@@ -190,6 +216,16 @@ sealed trait ScanHttpEncodings {
       )
   }
 
+  def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2WithHash): TreeUpdateWithMigrationId =
+    http match {
+      case httpApi.UpdateHistoryItemV2WithHash.members
+            .UpdateHistoryTransactionV2WithHash(httpTransaction) =>
+        httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
+      case httpApi.UpdateHistoryItemV2WithHash.members
+            .UpdateHistoryReassignment(httpReassignment) =>
+        httpToLapiReassignment(httpReassignment)
+    }
+
   def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2): TreeUpdateWithMigrationId = http match {
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(httpTransaction) =>
       httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
@@ -203,6 +239,26 @@ sealed trait ScanHttpEncodings {
     case httpApi.UpdateHistoryItem.members.UpdateHistoryReassignment(httpReassignment) =>
       httpToLapiReassignment(httpReassignment)
   }
+
+  def httpToLapiTransaction(
+      httpV2: httpApi.UpdateHistoryTransactionV2WithHash,
+      offset: Long,
+  ): TreeUpdateWithMigrationId = {
+    val http = httpApi.UpdateHistoryTransaction(
+      updateId = httpV2.updateId,
+      migrationId = httpV2.migrationId,
+      workflowId = httpV2.workflowId,
+      recordTime = httpV2.recordTime,
+      synchronizerId = httpV2.synchronizerId,
+      effectiveAt = httpV2.effectiveAt,
+      offset = LegacyOffset.Api.fromLong(offset),
+      rootEventIds = httpV2.rootEventIds,
+      eventsById = httpV2.eventsById,
+      externalTransactionHash = Some(httpV2.externalTransactionHash),
+    )
+    httpToLapiTransaction(http)
+  }
+
   def httpToLapiTransaction(
       httpV2: httpApi.UpdateHistoryTransactionV2,
       offset: Long,
@@ -217,6 +273,7 @@ sealed trait ScanHttpEncodings {
       offset = LegacyOffset.Api.fromLong(offset),
       rootEventIds = httpV2.rootEventIds,
       eventsById = httpV2.eventsById,
+      externalTransactionHash = httpV2.externalTransactionHash,
     )
     httpToLapiTransaction(http)
   }
@@ -231,6 +288,12 @@ sealed trait ScanHttpEncodings {
           EventId.nodeIdFromEventId
         )
     }
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      http.eventsById.collect { case (eventId, _: httpApi.TreeEvent.members.ExercisedEvent) =>
+        EventId.nodeIdFromEventId(eventId)
+      }.toSeq,
+      nodesWithChildren,
+    )
     TreeUpdateWithMigrationId(
       UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
@@ -242,7 +305,7 @@ sealed trait ScanHttpEncodings {
             http.eventsById
               .map { case (eventId, treeEventHttp) =>
                 Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                  nodesWithChildren,
+                  lastDescendantNodes,
                   treeEventHttp,
                 )
               }
@@ -254,7 +317,9 @@ sealed trait ScanHttpEncodings {
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
-            ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+            http.externalTransactionHash
+              .flatMap(HexString.parseToByteString)
+              .getOrElse(ByteString.EMPTY),
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
@@ -313,12 +378,12 @@ sealed trait ScanHttpEncodings {
     }
 
   private def httpToJavaEvent(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       http: httpApi.TreeEvent,
   ): javaApi.Event = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
+      httpToJavaExercisedEvent(lastDescendantNodes, exercisedHttp)
   }
 
   def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
@@ -344,7 +409,7 @@ sealed trait ScanHttpEncodings {
   }
 
   private def httpToJavaExercisedEvent(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       http: httpApi.ExercisedEvent,
   ): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
@@ -362,9 +427,9 @@ sealed trait ScanHttpEncodings {
       decodeChoiceArgument(templateId, interfaceId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
-      EventId.lastDescendedNodeFromChildNodeIds(
+      lastDescendantNodes.getOrElse(
         nodeId,
-        nodesWithChildren,
+        throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
@@ -503,10 +568,43 @@ object ScanHttpEncodings {
     )
   }
 
+  def encodeTrafficSummary(
+      summary: TrafficSummaryT
+  ): definitions.EventHistoryTrafficSummary = {
+    val envelopes = summary.envelopeTrafficSummarys.map { env =>
+      definitions.EnvelopeTrafficSummary(
+        trafficCost = env.trafficCost,
+        viewIds = env.viewIds.toVector,
+      )
+    }.toVector
+    definitions.EventHistoryTrafficSummary(
+      totalTrafficCost = summary.totalTrafficCost,
+      envelopeTrafficSummaries = envelopes,
+    )
+  }
+
+  def encodeAppActivityRecord(
+      record: AppActivityRecordT
+  ): definitions.EventHistoryAppActivityRecords = {
+    val records = record.appProviderParties
+      .zip(record.appActivityWeights)
+      .map { case (party, weight) =>
+        definitions.AppActivityRecord(party = party, weight = weight)
+      }
+      .toVector
+    definitions.EventHistoryAppActivityRecords(
+      roundNumber = record.roundNumber,
+      records = records,
+    )
+  }
+
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
       version: ApiVersion,
+      hashInclusionPolicy: ExternalHashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+      externalTransactionHashThresholdTime: Option[Instant] =
+        ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
   )(implicit
       elc: ErrorLoggingContext
   ): definitions.UpdateHistoryItem = {
@@ -514,7 +612,11 @@ object ScanHttpEncodings {
       case V0 =>
         update
       case V1 =>
-        ScanHttpEncodings.makeConsistentAcrossSvs(update)
+        ScanHttpEncodings.makeConsistentAcrossSvs(
+          update,
+          hashInclusionPolicy,
+          externalTransactionHashThresholdTime,
+        )
     }
     val encodings: ScanHttpEncodings = encoding match {
       case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
@@ -532,6 +634,48 @@ object ScanHttpEncodings {
     )
   }
 
+  def updateV1ToUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryTransactionV2(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash,
+          )
+        )
+    }
+
+  def encodeUpdateV2(
+      update: TreeUpdateWithMigrationId,
+      encoding: definitions.DamlValueEncoding,
+      version: ApiVersion,
+      hashInclusionPolicy: ExternalHashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+      externalTransactionHashThresholdTime: Option[Instant] =
+        ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.UpdateHistoryItemV2 =
+    updateV1ToUpdateV2(
+      encodeUpdate(
+        update,
+        encoding,
+        version,
+        hashInclusionPolicy,
+        externalTransactionHashThresholdTime,
+      )
+    )
+
   /** Returns a copy of the input, modified such that the result is consistent across different SVs:
     * - Offsets are replaced by empty strings
     * - Event ids are replaced by deterministically assigned event ids
@@ -539,24 +683,42 @@ object ScanHttpEncodings {
     * Note: both offsets and event ids are assigned locally by the participant.
     */
   def makeConsistentAcrossSvs(
-      update: TreeUpdateWithMigrationId
+      update: TreeUpdateWithMigrationId,
+      hashInclusionPolicy: ExternalHashInclusionPolicy,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): TreeUpdateWithMigrationId = {
-    update.copy(update = makeConsistentAcrossSvs(update.update))
+    update.copy(update =
+      makeConsistentAcrossSvs(
+        update.update,
+        hashInclusionPolicy,
+        externalTransactionHashThresholdTime,
+      )
+    )
   }
 
   def makeConsistentAcrossSvs(
-      response: UpdateHistoryResponse
+      response: UpdateHistoryResponse,
+      hashInclusionPolicy: ExternalHashInclusionPolicy,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): UpdateHistoryResponse = {
-    response.copy(update = makeConsistentAcrossSvs(response.update))
+    response.copy(update =
+      makeConsistentAcrossSvs(
+        response.update,
+        hashInclusionPolicy,
+        externalTransactionHashThresholdTime,
+      )
+    )
   }
 
   def makeConsistentAcrossSvs(
-      update: ledgerApi.TreeUpdate
+      update: ledgerApi.TreeUpdate,
+      hashInclusionPolicy: ExternalHashInclusionPolicy,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): ledgerApi.TreeUpdate = {
     update match {
       case ledgerApi.TransactionTreeUpdate(tree) =>
         ledgerApi.TransactionTreeUpdate(
-          makeConsistentAcrossSvs(tree)
+          makeConsistentAcrossSvs(tree, hashInclusionPolicy, externalTransactionHashThresholdTime)
         )
       case ledgerApi.ReassignmentUpdate(transfer) =>
         transfer.event match {
@@ -602,7 +764,9 @@ object ScanHttpEncodings {
   }
 
   def makeConsistentAcrossSvs(
-      tree: javaApi.Transaction
+      tree: javaApi.Transaction,
+      hashInclusionPolicy: ExternalHashInclusionPolicy,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
@@ -615,7 +779,13 @@ object ScanHttpEncodings {
           .map(_.intValue())
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
-    }
+    }.toMap
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      tree.getEventsById.asScala.collect { case (_, exercised: javaApi.ExercisedEvent) =>
+        mapping(exercised.getNodeId)
+      }.toSeq,
+      nodesWithChildren,
+    )
     val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
@@ -650,9 +820,9 @@ object ScanHttpEncodings {
           exercised.getChoiceArgument,
           exercised.getActingParties,
           exercised.isConsuming,
-          EventId.lastDescendedNodeFromChildNodeIds(
+          lastDescendantNodes.getOrElse(
             newNodeId,
-            nodesWithChildren.toMap,
+            throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,
@@ -660,6 +830,20 @@ object ScanHttpEncodings {
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
+
+    // Include the external transaction hash based on the hash inclusion policy.
+    val externalTransactionHash: ByteString =
+      hashInclusionPolicy match {
+        case ExternalHashInclusionPolicy.AlwaysInclude =>
+          tree.getExternalTransactionHash
+        case ExternalHashInclusionPolicy.ApplyThreshold =>
+          externalTransactionHashThresholdTime match {
+            case Some(threshold) if !tree.getRecordTime.isBefore(threshold) =>
+              tree.getExternalTransactionHash
+            case _ =>
+              ByteString.EMPTY
+          }
+      }
 
     new javaApi.Transaction(
       tree.getUpdateId,
@@ -671,7 +855,7 @@ object ScanHttpEncodings {
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
-      ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+      externalTransactionHash,
     )
   }
 }

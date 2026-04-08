@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as Yaml from 'js-yaml';
-import { existsSync, readFileSync, realpathSync } from 'fs';
-import { merge, mergeWith } from 'lodash';
-import { dirname, join, resolve } from 'path';
+import { readFileSync } from 'fs';
+import { mergeWith } from 'lodash';
+import { dirname, join, resolve, sep as pathSeparator } from 'path';
+import { env } from 'process';
 
 import { spliceEnvConfig } from './envConfig';
 
@@ -11,10 +12,7 @@ export function readAndParseYaml(
   path: string,
   context: ConfigLoaderContext = initializeContext()
 ): unknown {
-  const resolvedPath =
-    context.pathStack.length === 0
-      ? resolve(path) // resolve against CWD
-      : resolve(dirname(context.pathStack[context.pathStack.length - 1]), path);
+  const resolvedPath = resolveIncludedPath(path, context);
   if (resolvedPath in context.loadedFilesByPath) {
     return context.loadedFilesByPath[resolvedPath];
   } else if (context.pathStack.includes(resolvedPath)) {
@@ -58,6 +56,34 @@ type ConfigLoaderContext = {
   loadedFilesByPath: Partial<Record<string, unknown>>;
   schema: Yaml.Schema;
 };
+
+function resolveIncludedPath(path: string, context: ConfigLoaderContext): string {
+  const pathWithVariableSubstitutions = join(
+    ...path.split(pathSeparator).map(segment => {
+      if (segment === '') {
+        return '/';
+      } else if (segment.startsWith('$')) {
+        const variableName = segment.slice(1);
+        const variableValue = env[variableName];
+        return variableValue === undefined || variableValue === ''
+          ? reportError(
+              `Included path [${path}] references variable [${variableName}] that is not defined.`,
+              context
+            )
+          : variableValue;
+      } else {
+        return segment;
+      }
+    })
+  );
+
+  return context.pathStack.length === 0
+    ? resolve(pathWithVariableSubstitutions) // resolve against CWD
+    : resolve(
+        dirname(context.pathStack[context.pathStack.length - 1]),
+        pathWithVariableSubstitutions
+      );
+}
 
 function makeIncludeTagDefinition(context: ConfigLoaderContext): Yaml.Type {
   return new Yaml.Type('!include', {
@@ -124,21 +150,9 @@ class ConfigError extends Error {
 }
 
 export function loadClusterYamlConfig(): unknown {
-  const baseConfig = readAndParseYaml(
-    `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
-  );
-  // Load an additional common overrides config if it exists;
-  // if the file is identical to the base config for some reason, loading it will not change anything.
-  // It is resolved against the cluster path with expanded symlinks to ensure that additional
-  // overrides from the internal repository are not applied to clusters defined in splice.
-  const commonOverridesConfigPath = `${realpathSync(spliceEnvConfig.context.clusterPath())}/../config.yaml`;
-  const commonOverridesConfig = existsSync(commonOverridesConfigPath)
-    ? readAndParseYaml(commonOverridesConfigPath)
-    : {};
-  const clusterOverridesConfig = readAndParseYaml(getMainConfigPath());
-  return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
+  return readAndParseYaml(getClusterConfigPath());
 }
 
-export function getMainConfigPath(): string {
+export function getClusterConfigPath(): string {
   return join(spliceEnvConfig.context.clusterPath(), 'config.yaml');
 }

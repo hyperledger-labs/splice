@@ -115,6 +115,8 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
               Optional.empty(),
               Optional.empty(),
               Optional.empty(),
+              Optional.empty(),
+              Optional.empty(),
             )
           ).asJava
         ),

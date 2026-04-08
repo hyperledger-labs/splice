@@ -1,0 +1,204 @@
+rateLimits:
+  # Health/status endpoints (unlimited)
+  /api/scan/readyz:
+    name: readyz
+    type: unlimited
+
+  /api/scan/livez:
+    name: livez
+    type: unlimited
+
+  /api/scan/status:
+    name: status
+    type: unlimited
+
+  /api/scan/version:
+    name: version
+    type: unlimited
+
+  # External API endpoints (unlimited)
+  /api/scan/v0/dso:
+    name: dso-info
+    type: unlimited
+
+  /api/scan/v0/validators:
+    name: validators
+    type: unlimited
+
+  /api/scan/v0/scans:
+    name: scans
+    type: unlimited
+
+  /api/scan/v0/dso-sequencers:
+    name: dso-sequencers
+    type: unlimited
+
+  /api/scan/v0/sv-bft-sequencers:
+    name: bft-sequencers
+    type: unlimited
+
+  /api/scan/v0/domains:
+    name: domains
+    type: unlimited
+
+  /api/scan/v1/domains:
+    name: domains-v1
+    type: unlimited
+
+  /api/scan/v0/closed-rounds:
+    name: closed-rounds
+    type: unlimited
+
+  /api/scan/v0/open-and-issuing-mining-rounds:
+    name: open-and-issuing-mining-rounds
+    type: unlimited
+
+  /api/scan/v0/updates:
+    name: v0-updates
+    type: unlimited
+
+  /api/scan/v2/updates:
+    name: v2-updates
+    type: unlimited
+
+  /api/scan/v0/state:
+    name: state
+    type: unlimited
+
+  /api/scan/v0/holdings:
+    name: holdings
+    type: unlimited
+
+  /api/scan/v0/ans-entries:
+    name: ans-entries
+    type: unlimited
+
+  /api/scan/v0/dso-party-id:
+    name: dso-party-id
+    type: unlimited
+
+  /api/scan/v0/transactions:
+    name: transactions
+    type: unlimited
+
+  /api/scan/v0/backfilling:
+    name: backfilling
+    type: unlimited
+
+  /api/scan/v0/admin/validator:
+    name: validator-licenses
+    type: unlimited
+
+  /api/scan/v0/admin/sv/voterequests:
+    name: sv-voterequests
+    type: unlimited
+
+  /api/scan/v0/admin/sv/voteresults:
+    name: sv-voteresults
+    type: unlimited
+
+  /api/scan/v0/activities:
+    name: activities
+    type: unlimited
+
+  /api/scan/v0/amulet-price:
+    name: amulet-price-votes
+    type: unlimited
+
+  /api/scan/v0/amulet-rules:
+    name: amulet-rules
+    type: unlimited
+
+  /api/scan/v0/ans-rules:
+    name: ans-rules
+    type: unlimited
+
+  /api/scan/v0/events:
+    name: events
+    type: unlimited
+
+  /api/scan/v0/external-party-amulet-rules:
+    name: external-party-amulet-rules
+    type: unlimited
+
+  /api/scan/v0/feature-support:
+    name: feature-support
+    type: unlimited
+
+  /api/scan/v0/featured-apps:
+    name: featured-apps
+    type: unlimited
+
+  /api/scan/v0/migrations:
+    name: migrations-schedule
+    type: unlimited
+
+  /api/scan/v0/splice-instance-names:
+    name: splice-instance-names
+    type: unlimited
+
+  /api/scan/v0/synchronizer-bootstrapping-transactions:
+    name: synchronizer-bootstrapping-transactions
+    type: unlimited
+
+  /api/scan/v0/synchronizer-identities:
+    name: synchronizer-identities
+    type: unlimited
+
+  /api/scan/v0/top-validators-by-purchased-traffic:
+    name: top-validators-by-purchased-traffic
+    type: unlimited
+
+  /api/scan/v0/top-validators-by-validator-faucets:
+    name: top-validators-by-validator-faucets
+    type: unlimited
+
+  /api/scan/v0/top-validators-by-validator-rewards:
+    name: top-validators-by-validator-rewards
+    type: unlimited
+
+  /api/scan/v0/transfer-command-counter:
+    name: transfer-command-counter
+    type: unlimited
+
+  /api/scan/v0/transfer-command:
+    name: transfer-command-status
+    type: unlimited
+
+  /api/scan/v0/transfer-preapprovals:
+    name: transfer-preapprovals
+    type: unlimited
+
+  /api/scan/v0/unclaimed-development-fund-coupons:
+    name: unclaimed-development-fund-coupons
+    type: unlimited
+
+  /api/scan/v0/voterequest:
+    name: voterequest
+    type: unlimited
+
+  /api/scan/v0/voterequests:
+    name: voterequests
+    type: unlimited
+
+  /api/scan/v0/history/bulk/acs:
+    name: listBulkAcsSnapshotObjects
+    type: unlimited
+
+  /api/scan/v0/history/bulk/updates:
+    name: listBulkUpdateHistoryObjects
+    type: unlimited
+
+  /api/scan/v0/active-synchronizer-serial:
+    name: activeSynchronizerSerial
+    type: unlimited
+
+  /api/scan/v0/roll-forward-lsu:
+    name: rollForwardLsu
+    type: unlimited
+
+  # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",
+  #              because the endpoint is in scan-stream-server.yaml, not in scan.yaml
+  # /api/scan/v0/history/bulk/download:
+  #   name: bulkStorageDownload
+  #   type: unlimited

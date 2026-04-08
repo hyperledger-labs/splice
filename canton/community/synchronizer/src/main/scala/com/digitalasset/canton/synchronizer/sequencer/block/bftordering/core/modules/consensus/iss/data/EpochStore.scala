@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data
 
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -26,7 +27,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Prepare,
   ViewChange,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
@@ -49,7 +50,7 @@ trait EpochStore[E <: Env[E]] extends AutoCloseable {
 
   def latestEpoch(includeInProgress: Boolean)(implicit
       traceContext: TraceContext
-  ): E#FutureUnlessShutdownT[Epoch]
+  ): E#FutureUnlessShutdownT[Option[Epoch]]
   protected def latestEpochActionName: String = "fetch latest epoch"
 
   def addPrePrepare(prePrepare: SignedMessage[PrePrepare])(implicit
@@ -58,7 +59,7 @@ trait EpochStore[E <: Env[E]] extends AutoCloseable {
   protected def addPrePrepareActionName(prePrepare: SignedMessage[PrePrepare]): String =
     s"add PrePrepare ${prePrepare.message.blockMetadata.blockNumber} epoch: ${prePrepare.message.blockMetadata.epochNumber}"
 
-  def addPreparesAtomically(prepares: Seq[SignedMessage[Prepare]])(implicit
+  def addPreparesAtomically(prepares: NonEmpty[Seq[Traced[SignedMessage[Prepare]]]])(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[Unit]
 
@@ -93,7 +94,7 @@ trait EpochStore[E <: Env[E]] extends AutoCloseable {
 
   def addOrderedBlockAtomically(
       prePrepare: SignedMessage[PrePrepare],
-      commitMessages: Seq[SignedMessage[Commit]],
+      commitMessages: Seq[Traced[SignedMessage[Commit]]],
   )(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[Unit]
@@ -135,6 +136,7 @@ trait EpochStore[E <: Env[E]] extends AutoCloseable {
 }
 
 object EpochStore {
+
   // Can we remove these classes and merge with Epoch/Blocks from Data?
   final case class Epoch(
       info: EpochInfo,

@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
 
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -18,6 +19,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import java.time.Duration
 import scala.concurrent.duration.*
 
+@UnstableTest // TODO(#29233)
 class BftOrdererPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S2M1

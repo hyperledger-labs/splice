@@ -2,7 +2,7 @@
   {
     "contractId": "1",
     "payload": {
-      "amount": "1064.0304414400",
+      "amount": "1000.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"
@@ -17,7 +17,7 @@
       },
       "meta": {
         "values": {
-          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "0",
           "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
         }
       },
@@ -35,7 +35,7 @@
       "lock": null,
       "meta": {
         "values": {
-          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "0",
           "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
         }
       },
@@ -45,7 +45,7 @@
   {
     "contractId": "3",
     "payload": {
-      "amount": "4100.8695585600",
+      "amount": "4289.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"
@@ -53,7 +53,7 @@
       "lock": null,
       "meta": {
         "values": {
-          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "0",
           "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
         }
       },
@@ -63,7 +63,7 @@
   {
     "contractId": "4",
     "payload": {
-      "amount": "489.0000000000",
+      "amount": "500.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"

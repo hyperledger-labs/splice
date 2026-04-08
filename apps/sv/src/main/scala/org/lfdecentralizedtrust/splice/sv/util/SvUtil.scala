@@ -21,27 +21,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRulesConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{cometbft, dso}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-}
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SynchronizerNode}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{
-  CometBftClient,
-  CometBftNode,
-  CometBftRequestSigner,
-}
-import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvCometBftConfig, SvScanConfig}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
+import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvScanConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
@@ -88,7 +77,7 @@ object SvUtil {
         acc: Map[PartyId, Long],
     ): Map[PartyId, Long] =
       if (remainder <= 0) {
-        if (!remainingBeneficiaries.isEmpty) {
+        if (remainingBeneficiaries.nonEmpty) {
           logger.info(
             s"Total SV weight $memberSvRewardWeightBps does not cover the following beneficiaries: $remainingBeneficiaries"
           )
@@ -155,7 +144,7 @@ object SvUtil {
       migrationId: Long,
   )
 
-  def getSequencerConfig(synchronizerNode: Option[SynchronizerNode], migrationId: Long)(implicit
+  def getSequencerConfig(synchronizerNode: Option[SvSynchronizerNode], migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalSequencerConfig]] = synchronizerNode.map { node =>
@@ -170,7 +159,7 @@ object SvUtil {
 
   case class LocalMediatorConfig(mediatorId: String)
 
-  def getMediatorConfig(synchronizerNode: Option[SynchronizerNode])(implicit
+  def getMediatorConfig(synchronizerNode: Option[SvSynchronizerNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalMediatorConfig]] = synchronizerNode.map { node =>
@@ -240,6 +229,8 @@ object SvUtil {
           mediatorConfig.toJava,
           Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
+          Optional.empty(),
+          Optional.empty(),
         )
       ).asJava
     }
@@ -264,8 +255,9 @@ object SvUtil {
       synchronizerId,
       acsCommitmentReconciliationInterval,
     ), // decentralizedSynchronizerConfig
-    Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.empty(), // nextScheduledSynchronizerUpgrade
     voteCooldownTime.map(t => new RelTime(t.duration.toMicros)).toJava,
+    Optional.empty(), // nextScheduledLogicalSynchronizerUpgrade
   )
 
   def keyPairMatches(
@@ -347,81 +339,4 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
-
-  def getSequencerAdminConnection(
-      primarySequencerAdminConnection: Option[SequencerAdminConnection]
-  ): SequencerAdminConnection =
-    primarySequencerAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No sequencer admin connection configured for SV App")
-        .asRuntimeException()
-    )
-
-  def getMediatorAdminConnection(
-      primaryMediatorAdminConnection: Option[MediatorAdminConnection]
-  ): MediatorAdminConnection =
-    primaryMediatorAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No mediator admin connection configured for SV App")
-        .asRuntimeException()
-    )
-
-  def mapToCometBftNode(
-      cometBftClient: Option[CometBftClient],
-      cometBftConfig: Option[SvCometBftConfig],
-      participantAdminConnection: ParticipantAdminConnection,
-      logger: TracedLogger,
-      loggerFactory: NamedLoggerFactory,
-      retryProvider: RetryProvider,
-  )(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Option[CometBftNode]] =
-    (cometBftClient, cometBftConfig) match {
-      case (Some(client), Some(config)) =>
-        SvUtil
-          .getOrGenerateCometBftGovernanceKeySigner(
-            config,
-            participantAdminConnection,
-            logger,
-          )
-          .map(signer =>
-            Some(
-              new CometBftNode(
-                client,
-                signer,
-                config,
-                loggerFactory,
-                retryProvider,
-              )
-            )
-          )
-      case _ => Future.successful(None)
-    }
-
-  def getOrGenerateCometBftGovernanceKeySigner(
-      config: SvCometBftConfig,
-      participantAdminConnection: ParticipantAdminConnection,
-      logger: TracedLogger,
-  )(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[CometBftRequestSigner] = {
-    config.governanceKey match {
-      case Some(governanceKey) => {
-        logger.info("Using CometBFT governance key from config")
-        Future.successful(
-          new CometBftRequestSigner(governanceKey.publicKey, governanceKey.privateKey)
-        )
-      }
-      case None => {
-        logger.info("Using CometBFT governance key managed by participant")
-        CometBftRequestSigner.getOrGenerateSignerFromParticipant(
-          "cometbft-governance-keys",
-          participantAdminConnection,
-          logger,
-        )
-      }
-    }
-  }
 }

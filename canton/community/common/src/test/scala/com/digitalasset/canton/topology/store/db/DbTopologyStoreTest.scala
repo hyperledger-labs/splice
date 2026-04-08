@@ -1,9 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.store.db
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{BatchAggregatorConfig, TopologyConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.topology.PartyId
@@ -26,10 +27,6 @@ import com.digitalasset.canton.topology.transaction.{
 
 trait DbTopologyStoreTest extends TopologyStoreTest with DbTopologyStoreHelper {
   this: DbTest =>
-
-  "DbPartyMetadataStore" should {
-    behave like partyMetadataStore(() => new DbPartyMetadataStore(storage, timeouts, loggerFactory))
-  }
 
   private lazy val largeTestSnapshot = {
     val synchronizerSetup = Seq(
@@ -75,8 +72,10 @@ trait DbTopologyStoreTest extends TopologyStoreTest with DbTopologyStoreHelper {
         _ <- new InitialTopologySnapshotValidator(
           testData.factory.syncCryptoClient.crypto.pureCrypto,
           store,
+          BatchAggregatorConfig.defaultsForTesting,
+          TopologyConfig.forTesting.copy(validateInitialTopologySnapshot = true),
           Some(defaultStaticSynchronizerParameters),
-          validateInitialSnapshot = true,
+          timeouts,
           loggerFactory,
         ).validateAndApplyInitialTopologySnapshot(largeTestSnapshot)
           .valueOrFail("topology bootstrap")

@@ -12,6 +12,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
@@ -35,13 +36,17 @@ class SequencerOnboarding(
       dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
     val dsoRules = dsoRulesAndState.dsoRules
-    participantAdminConnection.getSequencerSynchronizerState(dsoRules.domain, AuthorizedState).map {
-      SequencerSynchronizerState =>
+    participantAdminConnection
+      .getSequencerSynchronizerState(dsoRules.domain, TopologySnapshot.Sequenced, AuthorizedState)
+      .map { SequencerSynchronizerState =>
         val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =
           currentSynchronizerConfigs
-            .flatMap(_.sequencer.toScala)
-            .map(_.sequencerId)
+            .flatMap(config =>
+              config.sequencerIdentity.toScala
+                .map(_.sequencerId)
+                .orElse(config.sequencer.toScala.map(_.sequencerId))
+            )
             .flatMap(sequencerId =>
               SequencerId
                 .fromProtoPrimitive(sequencerId, "sequencerId")
@@ -75,7 +80,7 @@ class SequencerOnboarding(
             .take(1)
             .map(SequencerToOnboard(dsoRules.domain, _))
         } else Seq()
-    }
+      }
   }
 
   override def reconcileTask(
@@ -123,6 +128,7 @@ class SvOnboardingSequencerTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[SequencerToOnboard](
       baseContext,
       store,
+      Some(participantAdminConnection),
     ) {
 
   override val reconciler

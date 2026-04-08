@@ -25,6 +25,7 @@ import Splice.ValidatorLicense
 
 import Splice.Scripts.Util
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 
 import Splice.CometBft
 import Splice.DsoRules
@@ -86,6 +87,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
         voteCooldownTime = None -- use default value of 1 minute
+        nextScheduledLogicalSynchronizerUpgrade = None
   let amuletConfig = fromOptional defaultAmuletConfig optAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
@@ -109,11 +111,15 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
                   sequencerId = "sequencer-id"
                   url = "sequencer.address:1234"
                   availableAfter = Some now
+                sequencerIdentity = Some SequencerIdentityConfig with
+                  sequencerId = "sequencer-id"
+                  availableAfter = Some now
                 mediator = Some MediatorConfig with
                   mediatorId = "mediator-id"
                 scan = Some ScanConfig with
                   publicUrl = "https://sv1.example.com"
                 legacySequencerConfig = None
+                physicalSynchronizers = None
         )]
       amuletConfig
       amuletPrice
@@ -203,7 +209,7 @@ onboardValidator app sponsor validatorName validator = do
 -- | Run the next issuance.
 runNextIssuanceD : AmuletApp -> Decimal -> Script ()
 runNextIssuanceD app amuletPrice = do
-    advanceToNextRoundChange app
+    advanceToNextRoundChange app.dso
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.dso
     [(amuletRulesCid, _)] <- query @AmuletRules app.dso

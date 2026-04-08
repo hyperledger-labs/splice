@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.daml.lf.data.Ref.{IdString, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageVersion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -26,6 +26,7 @@ class PackageVetting(
     participantAdminConnection: ParticipantAdminConnection,
     override val loggerFactory: NamedLoggerFactory,
     latestPackagesOnly: Boolean,
+    enableUnsupportedDarsUnvetting: Boolean,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with Spanning {
@@ -33,30 +34,43 @@ class PackageVetting(
   def vetCurrentPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
     val currentRequiredPackages =
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
-      DarResources
-        .lookupAllPackageVersions(pkg.packageName)
-        .filter(_.metadata.version <= packageVersion)
+      DarResourcesUtil
+        .getRequiredPackageVersions(
+          pkg.packageName,
+          packageVersion,
+          enableUnsupportedDarsUnvetting,
+          additionalPackagesToUnvet = additionalPackagesToUnvet,
+        )
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
     // Since interfaces are not upgradeable, there's no gain in coordinating it via package config.
     // An interface itself also does nothing, only the implementations do, so it's OK from a vetting perspective.
-    } ++ Seq(
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenMetadataV1,
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenHoldingV1,
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenTransferInstructionV1,
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationV1,
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
-    ).map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg)) ++
-      DarResources.utilBatchedMarkers.all.map(pkg =>
-        PackageIdResolver.Package.SpliceUtilBatchedMarkers -> pkg.metadata.version
+    } ++
+      Seq(
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenMetadataV1,
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenHoldingV1,
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenTransferInstructionV1,
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationV1,
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
+        PackageIdResolver.Package.SpliceUtilBatchedMarkers,
+      ).flatMap(pkg =>
+        DarResourcesUtil
+          .getRequiredPackageVersions(
+            pkg.packageName,
+            PackageIdResolver.readPackageVersion(currentPackageConfig, pkg),
+            enableUnsupportedDarsUnvetting,
+            additionalPackagesToUnvet = additionalPackagesToUnvet,
+          )
+          .map(versionToVet => pkg -> versionToVet.metadata.version)
       )
 
     vetPackages(
@@ -88,6 +102,7 @@ class PackageVetting(
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
@@ -95,6 +110,7 @@ class PackageVetting(
         amuletRules.createdAt,
         schedule,
         futureAmuletConfigFromVoteRequests,
+        additionalPackagesToUnvet,
       )
     // sort them and vet in the order of earliest first to ensure that dependencies are vetted at the earliest time as well
     // also it doesn't really make sense to run multiple vettings in parallel as they will just race to update the topology state
@@ -111,6 +127,22 @@ class PackageVetting(
         )
       }
       .map(_ => ())
+  }
+
+  def unvetPackages(
+      domainId: SynchronizerId,
+      resources: Seq[DarResource],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      _ <- withSpan("unvet_dars") { implicit tc => _ =>
+        participantAdminConnection.unvetDars(
+          domainId,
+          resources,
+          maxVettingDelay = maxVettingDelay,
+        )
+      }
+    } yield {}
   }
 
   private def vetPackages(
@@ -145,7 +177,7 @@ class PackageVetting(
     }
     val resources = packagesToProcess.flatMap { case (pkg, packageVersion) =>
       // Upload the version required by current config, and log an error if it is not part of the deployed release
-      DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
+      DarResourcesUtil.lookupPackageMetadata(pkg.packageName, packageVersion) match {
         case None =>
           validFrom match {
             case Some(time) =>
@@ -200,17 +232,24 @@ class PackageVetting(
       createdAt: Instant,
       amuletConfigSchedule: AmuletConfigSchedule,
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
-  ) = {
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
+  )(implicit tc: TraceContext) = {
     (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
       (effectiveAt, config)
     } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
       .flatMap { case (time, config) =>
         packages.flatMap { pkg =>
-          val allPackageVersions =
-            DarResources.lookupAllPackageVersions(pkg.packageName).map(_.metadata.version)
           val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
+          val allPackageVersions =
+            DarResourcesUtil
+              .getRequiredPackageVersions(
+                pkg.packageName,
+                configPackageVersion,
+                enableUnsupportedDarsUnvetting,
+                additionalPackagesToUnvet = additionalPackagesToUnvet,
+              )
+              .map(_.metadata.version)
           allPackageVersions
-            .filter(_ <= configPackageVersion)
             .map(version => time -> (pkg -> version))
         }
       }

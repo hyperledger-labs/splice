@@ -3,24 +3,23 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
+    "@dotenvx/dotenvx": "^1.57.2",
     "@google-cloud/storage": "^7.19.0",
     "@kubernetes/client-node": "^1.4.0",
-    "@pulumi/command": "1.1.3",
-    "@pulumi/gcp": "^9.10.0",
-    "@pulumi/kubernetes": "4.25.0",
-    "@pulumi/pulumi": "^3.220.0",
-    "@pulumi/random": "4.19.0",
-    "@pulumi/std": "2.2.0",
+    "@pulumi/command": "1.2.1",
+    "@pulumi/gcp": "^9.15.0",
+    "@pulumi/kubernetes": "4.28.0",
+    "@pulumi/pulumi": "^3.228.0",
+    "@pulumi/random": "4.19.1",
+    "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
-    "auth0": "^4.28.0",
-    "dotenv": "^16.4.5",
-    "dotenv-expand": "^11.0.6",
+    "auth0": "^5.5.0",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "node-fetch": "^2.7.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -33,12 +32,12 @@
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   },
   "devDependencies": {
-    "@jest/globals": "^30.2.0",
+    "@jest/globals": "^30.3.0",
     "@types/js-yaml": "^4.0.5",
-    "@types/lodash": "^4.17.23",
-    "@types/sinon": "^10.0.15",
+    "@types/lodash": "^4.17.24",
+    "@types/sinon": "^21.0.0",
     "@types/ws": "^8.18.1",
-    "dedent": "^1.7.1",
-    "sinon": "^15.0.4"
+    "dedent": "^1.7.2",
+    "sinon": "^21.0.3"
   }
 }

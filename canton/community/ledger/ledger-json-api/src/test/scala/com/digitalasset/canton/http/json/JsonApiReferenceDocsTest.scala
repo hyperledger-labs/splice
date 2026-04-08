@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json
@@ -28,16 +28,17 @@ class JsonApiReferenceDocsTest extends AnyWordSpecLike with BaseTest with Checkp
   private val existingAsyncApi = File(JsonApiReferenceDocsTest.AsyncApiYaml).contentAsString
 
   "Canton JSON API v2" should {
-    "output golden openapi definitions " ignore {
+    "output golden openapi definitions" ignore {
       GenerateJSONApiDocs.regenerateAll()
     }
 
-    "validate the definitions against the golden files" in {
+    "validate json api definitions against the golden files" in {
       def failureClue(docsType: String): String =
         s"""Current $docsType definitions do not match the golden file.
           | Overwrite the golden file with the current definitions if the API changed.
-          | Definitions can be updated by running GenerateJSONApiDocs class.""".stripMargin
-      val protoInfo = apiDocsGenerator.loadProtoData()
+          | Definitions can be updated by running GenerateJSONApiDocs class or
+          | executing `sbt packageJsonApiDocsArtifacts`""".stripMargin
+      val protoInfo = ProtoInfo(ProtoParser.readProto(), ProtoInfo.loadOverrides())
       val apiDocs = apiDocsGenerator.createStaticDocs(protoInfo)
 
       apiDocs.openApi shouldBe existingOpenApi withClue failureClue("OpenAPI")
@@ -77,8 +78,10 @@ object GenerateJSONApiDocs extends App {
       .createFileIfNotExists()
       .overwrite(protoData.toYaml())
       .discard
-    ProtoInfo(protoData)
+
+    ProtoInfo(protoData, ProtoInfo.loadOverrides())
   }
+
   def regenerateJsonApi(protoData: ProtoInfo) = {
     val apiDocs = apiDocsGenerator.createStaticDocs(protoData)
     File(JsonApiReferenceDocsTest.OpenApiYaml)
@@ -91,4 +94,5 @@ object GenerateJSONApiDocs extends App {
       .overwrite(apiDocs.asyncApi)
       .discard
   }
+
 }

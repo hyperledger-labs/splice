@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
 
-import com.digitalasset.canton.util.BatchN
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Flow
 
@@ -11,25 +10,25 @@ import scala.concurrent.Future
 
 object BatchingParallelIngestionPipe {
 
-  def apply[IN, IN_BATCH, DB_BATCH](
-      submissionBatchSize: Long,
+  def apply[In, InBatch, DbBatch](
+      batchingFlow: Flow[In, Iterable[In], NotUsed],
       inputMappingParallelism: Int,
-      inputMapper: Iterable[IN] => Future[IN_BATCH],
-      seqMapperZero: IN_BATCH,
-      seqMapper: (IN_BATCH, IN_BATCH) => IN_BATCH,
+      inputMapper: Iterable[In] => Future[InBatch],
+      seqMapperZero: InBatch,
+      seqMapper: (InBatch, InBatch) => InBatch,
       dbPrepareParallelism: Int,
-      dbPrepare: IN_BATCH => Future[IN_BATCH],
+      dbPrepare: InBatch => Future[InBatch],
       batchingParallelism: Int,
-      batcher: IN_BATCH => Future[DB_BATCH],
+      batcher: InBatch => Future[DbBatch],
       ingestingParallelism: Int,
-      ingester: DB_BATCH => Future[DB_BATCH],
+      ingester: DbBatch => Future[DbBatch],
       maxTailerBatchSize: Int,
-      ingestTail: Vector[DB_BATCH] => Future[Vector[DB_BATCH]],
-  ): Flow[IN, DB_BATCH, NotUsed] =
+      ingestTail: Vector[DbBatch] => Future[Vector[DbBatch]],
+  ): Flow[In, DbBatch, NotUsed] =
     // The stream coming from ReadService, involves deserialization and translation to Update-s
-    Flow[IN]
+    Flow[In]
       // Batching plus mapping to Database DTOs encapsulates all the CPU intensive computation of the ingestion. Executed in parallel.
-      .via(BatchN(submissionBatchSize.toInt, inputMappingParallelism))
+      .via(batchingFlow)
       .mapAsync(inputMappingParallelism)(inputMapper)
       // Encapsulates sequential/stateful computation (generation of sequential IDs for events)
       .scan(seqMapperZero)(seqMapper)

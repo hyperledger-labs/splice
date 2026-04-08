@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -6,6 +6,8 @@ package com.digitalasset.canton.integration.plugins
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   ExecutorServiceExtensions,
@@ -39,21 +41,15 @@ abstract class UseKms
 
   protected def keyId: Option[KmsKeyId]
   protected def nodes: Set[String]
-  protected def nodesWithSessionSigningKeysDisabled: Set[String]
   protected def enableEncryptedPrivateStore: EncryptedPrivateStoreStatus
   protected def kmsConfig: KmsConfig
 
   protected val timeouts: ProcessingTimeout
   protected val loggerFactory: NamedLoggerFactory
 
-  // ensure that all nodes with session signing keys `disabled` are part of the full protected node set
-  require(
-    nodesWithSessionSigningKeysDisabled.subsetOf(nodes),
-    s"`nodesWithSessionSigningKeysDisabled` must be a subset of `nodes`, but found: " +
-      s"${nodesWithSessionSigningKeysDisabled.diff(nodes).mkString(", ")}",
-  )
-
   private val clock = new WallClock(timeouts, loggerFactory)
+
+  private val kmsExecutorServiceMetrics = new ExecutorServiceMetrics(NoOpMetricsFactory)
 
   protected def withKmsClient[V](
       f: Kms => EitherT[Future, KmsError, V]
@@ -68,6 +64,7 @@ abstract class UseKms
           clock,
           loggerFactory,
           ec,
+          kmsExecutorServiceMetrics,
         )
         .toEitherT[Future]
       res <- ResourceUtil.withResourceM(kmsClient)(f)
@@ -77,6 +74,7 @@ abstract class UseKms
     Threading.newExecutionContext(
       loggerFactory.threadName + "-kms-key-deletion-execution-context",
       noTracingLogger,
+      kmsExecutorServiceMetrics,
     )
 
   private def encryptedPrivateStoreConfig(reverted: Boolean) =
@@ -87,36 +85,24 @@ abstract class UseKms
       cryptoConfig: CryptoConfig,
   ): CryptoConfig =
     if (nodes.contains(name))
-      changeCryptoConfig(cryptoConfig, disableSessionSigningKeysForNode(name))
+      changeCryptoConfig(cryptoConfig)
     else cryptoConfig
 
-  private def changeCryptoConfig(conf: CryptoConfig, disableSessionKeys: Boolean): CryptoConfig =
+  private def changeCryptoConfig(conf: CryptoConfig): CryptoConfig =
     enableEncryptedPrivateStore match {
       case EncryptedPrivateStoreStatus.Enable =>
-        enableEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys = true))
+        enableEncryptedPrivateStore(addKmsConfig(conf))
       case EncryptedPrivateStoreStatus.Revert =>
-        revertEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys = true))
-      // session signing keys can only be used if we are directly storing all our private keys in an external KMS
+        revertEncryptedPrivateStore(addKmsConfig(conf))
+      // if the encrypted private store is disabled, the private crypto API must be backed by an external KMS
       case EncryptedPrivateStoreStatus.Disable =>
-        disableEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys))
+        enableExternalKms(disableEncryptedPrivateStore(addKmsConfig(conf)))
     }
 
-  private def setSessionKeysInKmsConfig(kmsConfig: KmsConfig, enabled: Boolean): KmsConfig =
-    kmsConfig match {
-      case driverConfig: KmsConfig.Driver =>
-        driverConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
-      case awsConfig: KmsConfig.Aws =>
-        awsConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
-      case gcpConfig: KmsConfig.Gcp =>
-        gcpConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
-    }
-
-  private def addKmsConfig(conf: CryptoConfig, disableSessionKeys: Boolean): CryptoConfig =
+  private def addKmsConfig(conf: CryptoConfig): CryptoConfig =
     conf
       .focus(_.kms)
-      .replace(
-        Some(setSessionKeysInKmsConfig(kmsConfig, enabled = !disableSessionKeys))
-      )
+      .replace(Some(kmsConfig))
 
   private def enableEncryptedPrivateStore(conf: CryptoConfig): CryptoConfig =
     conf
@@ -133,8 +119,10 @@ abstract class UseKms
       .focus(_.privateKeyStore.encryption)
       .replace(None)
 
-  private def disableSessionSigningKeysForNode(name: String): Boolean =
-    nodesWithSessionSigningKeysDisabled.contains(name)
+  private def enableExternalKms(conf: CryptoConfig): CryptoConfig =
+    conf
+      .focus(_.provider)
+      .replace(CryptoProvider.Kms)
 
   private def transformConfig(config: CantonConfig): CantonConfig = {
     // change the overall configs
@@ -227,6 +215,7 @@ object UseKms {
           new WallClock(timeouts, loggerFactory),
           loggerFactory,
           ec,
+          new ExecutorServiceMetrics(NoOpMetricsFactory),
         )
         .toEitherT[Future]
       res <- ResourceUtil.withResourceM(kmsClient)(f)

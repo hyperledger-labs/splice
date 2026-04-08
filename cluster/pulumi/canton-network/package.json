@@ -9,8 +9,8 @@
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-validator": "1.0.0",
     "@types/auth0": "^3.3.2",
-    "auth0": "^4.28.0",
-    "ip": "^1.1.9"
+    "auth0": "^5.5.0",
+    "ip": "^2.0.1"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@types/ip": "^1.1.3",
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
+    "@types/sinon": "^21.0.0",
+    "sinon": "^21.0.3"
   }
 }

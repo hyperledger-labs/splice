@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
@@ -10,7 +10,6 @@ import com.daml.ledger.api.v2.admin.participant_pruning_service.{
 }
 import com.daml.metrics.Tracked
 import com.daml.metrics.api.MetricsContext
-import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.ValidationLogger
@@ -40,6 +39,7 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
 import com.digitalasset.canton.platform.apiserver.ApiException
 import com.digitalasset.canton.platform.apiserver.services.logging
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.protobuf.StatusProto
@@ -53,6 +53,7 @@ final class ApiParticipantPruningService private (
     syncService: SyncService,
     metrics: LedgerApiServerMetrics,
     telemetry: Telemetry,
+    safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends ParticipantPruningServiceGrpc.ParticipantPruningService
@@ -108,7 +109,7 @@ final class ApiParticipantPruningService private (
                   stakeholders = Set.empty, // getting all incomplete reassignments
                 )
                 .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
-            previousPrunedOffset <- readBackend.indexDbPrunedUpTo
+            previousPrunedOffset <- readBackend.indexDbPrunedUpto
             incompleteReassignmentOffsets <-
               getIncompleteReassignmentOffsets(pruneUpTo)
             previousIncompleteReassignmentOffsets <-
@@ -158,8 +159,7 @@ final class ApiParticipantPruningService private (
       s"About to prune participant ledger up to ${pruneUpTo.unwrap} inclusively starting with the write service."
     )
     syncService
-      .prune(pruneUpTo, submissionId)
-      .toScalaUnwrapped
+      .prune(pruneUpTo, submissionId, safeToPruneCommitmentState)
       .flatMap {
         case NotPruned(status) =>
           Future.failed(new ApiException(StatusProto.toStatusRuntimeException(status)))
@@ -173,7 +173,7 @@ final class ApiParticipantPruningService private (
       previousPruneUpToInclusive: Option[Offset],
       previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpTo: Offset,
-      incompletReassignmentOffsets: Vector[Offset],
+      incompleteReassignmentOffsets: Vector[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Future[PruneResponse] = {
     logger.info(s"About to prune ledger api server index to ${pruneUpTo.unwrap} inclusively.")
     readBackend
@@ -181,7 +181,7 @@ final class ApiParticipantPruningService private (
         previousPruneUpToInclusive = previousPruneUpToInclusive,
         previousIncompleteReassignmentOffsets = previousIncompleteReassignmentOffsets,
         pruneUpToInclusive = pruneUpTo,
-        incompletReassignmentOffsets = incompletReassignmentOffsets,
+        incompleteReassignmentOffsets = incompleteReassignmentOffsets,
       )
       .map { _ =>
         logger.info(s"Pruned ledger api server index up to ${pruneUpTo.unwrap} inclusively.")
@@ -234,6 +234,7 @@ object ApiParticipantPruningService {
       syncService: SyncService,
       metrics: LedgerApiServerMetrics,
       telemetry: Telemetry,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext
@@ -243,6 +244,7 @@ object ApiParticipantPruningService {
       syncService,
       metrics,
       telemetry,
+      safeToPruneCommitmentState,
       loggerFactory,
     )
 

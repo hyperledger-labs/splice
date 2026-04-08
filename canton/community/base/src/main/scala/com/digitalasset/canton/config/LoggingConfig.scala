@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Detailed logging configurations
   *
@@ -41,7 +40,7 @@ final case class LoggingConfig(
       LoggingConfig.defaultDelayLoggingThreshold,
     jvmGc: GCLoggingConfig = GCLoggingConfig(),
     queryCost: Option[QueryCostMonitoringConfig] = None,
-) extends UniformCantonConfigValidation
+)
 
 /** Configure GC logging
   *
@@ -59,17 +58,8 @@ final case class GCLoggingConfig(
     debugLevel: Boolean = false,
     filter: String = "",
     details: Boolean = true,
-) extends UniformCantonConfigValidation
-
-object GCLoggingConfig {
-  implicit val gcLoggingConfigCantonConfigValidator: CantonConfigValidator[GCLoggingConfig] =
-    CantonConfigValidatorDerivation[GCLoggingConfig]
-}
+)
 
 object LoggingConfig {
-  implicit val loggingConfigCantonConfigValidator: CantonConfigValidator[LoggingConfig] =
-    CantonConfigValidatorDerivation[LoggingConfig]
-
   private val defaultDelayLoggingThreshold = config.NonNegativeFiniteDuration.ofSeconds(20)
-
 }

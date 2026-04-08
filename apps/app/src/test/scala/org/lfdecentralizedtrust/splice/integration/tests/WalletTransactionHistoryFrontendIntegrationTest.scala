@@ -193,26 +193,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
           // remove the balance change tx for scan comparison
           .init
       }
-      withFrontEnd("scan") { implicit webDriver =>
-        actAndCheck(
-          "Go to Scan",
-          go to s"http://localhost:${scanUIPort}",
-        )(
-          "All transactions appear also in scan UI, with the same update ID",
-          _ => {
-            updateIds.foreach(updateId => {
-              val scanActivities = findAll(className("activity-row")).toSeq
-              // Activities do not map 1:1 to updates, a single update may be broken into more than one
-              // activity in Scan, so we check for "at least 1" instead of "exactly 1"
-              forAtLeast(1, scanActivities) { activity =>
-                activity.findChildElement(className("update-id")).map(seleniumText) should be(
-                  Some(updateId)
-                )
-              }
-            })
-          },
-        )
-      }
       clue("update IDs from the UI can be used for querying scan") {
         updateIds.foreach(updateId =>
           eventuallySucceeds() {
@@ -412,7 +392,9 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Transfer Preapproval Created",
                 expectedPartyDescription = Some("Automation"),
-                expectedAmountAmulet = -preapprovalFee,
+                expectedAmountAmulet = -preapprovalFee + 0.01,
+                // The actual preapproval fee is based on a getTime call in the choice so you pay for slightly less than 90 days.
+                // smallAmount is large enough that the whole check becomes meaningless so we use 0.01 explicitly.
               )
             }
             forExactly(1, txs) { tx =>

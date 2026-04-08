@@ -240,7 +240,7 @@ export async function initDumpConfig(): Promise<void> {
     {
       newResource: function (args: pulumi.runtime.MockResourceArgs): {
         id: string;
-        state: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+        state: any;
       } {
         const buffer = Buffer.from(JSON.stringify(args, undefined, 4), 'utf8');
         process.stdout.write(buffer);
@@ -307,6 +307,19 @@ export async function initDumpConfig(): Promise<void> {
                 bucketName: 'data-export-bucket-name',
                 secretName: 'data-export-bucket-sa-key-secret',
                 jsonCredentials: 'data-export-bucket-sa-key-secret-creds',
+              });
+              return {
+                ...args.inputs,
+                secretData,
+              };
+            } else if (args.inputs.secret == 'gcp-topology-snapshot-bucket-sa-key-secret') {
+              const secretData = JSON.stringify({
+                projectId: args.inputs.project,
+                bucketName: 'topology-snapshot-bucket-name',
+                secretName: 'gcp-topology-snapshot-bucket-sa-key-secret',
+                jsonCredentials: 'topology-snapshot-bucket-sa-key-secret-creds',
+                bucketSaKeySecret: 'gcp-topology-snapshot-bucket-sa-key-example',
+                bucketSaIamAccount: 'da-cn-examplet@da-cn-shared.iam.gserviceaccount.com',
               });
               return {
                 ...args.inputs,

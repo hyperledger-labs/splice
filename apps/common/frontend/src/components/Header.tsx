@@ -15,14 +15,11 @@ interface HeaderProps extends React.PropsWithChildren {
 }
 
 const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks, noBorder }) => {
-  const applyNavStyle = (isActive: boolean) => {
-    const style: React.CSSProperties = {
-      color: 'white',
-      textDecoration: 'none',
-    };
-
-    return isActive ? { ...style, textDecoration: 'underline' } : style;
-  };
+  const applyNavStyle = (isActive: boolean): React.CSSProperties => ({
+    color: 'white',
+    textDecoration: isActive ? 'underline' : 'none',
+    whiteSpace: 'nowrap',
+  });
 
   return (
     <>

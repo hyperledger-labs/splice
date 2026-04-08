@@ -45,11 +45,7 @@ object TopupUtil {
     roundNum = latestRound.payload.round.number
     walletBalance <- store
       .getAmuletBalanceWithHoldingFees(
-        roundNum,
-        // Note we are taking the conservative approach here to always deduct holding fees to avoid
-        // attempting to top-up when we don't have the funds.
-        // TODO(#2257): switch the param once the holding fees change landed on MainNet
-        deductHoldingFees = true,
+        roundNum
       )
       .map(_._1)
   } yield walletBalance

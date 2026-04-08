@@ -20,6 +20,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
@@ -105,7 +106,7 @@ class ParticipantPartyMigrator(
         case None =>
           logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(partiesToMigrateFinal.parties, getAcsSnapshot)
+            _ <- importAcs(synchronizerId, partiesToMigrateFinal.parties, getAcsSnapshot)
             _ <- configProvider.clearPartiesToMigrate()
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
@@ -175,8 +176,17 @@ class ParticipantPartyMigrator(
   ): Future[Set[PartyId]] =
     for {
       mappings <- Future.traverse(parties) { partyId =>
+        // Party migration is generally based on effective state so we use that here although
+        // in practice the code here doesn't pay enough attention to timestamps
+        // that if you really fall in the interval between sequencing and effective time things likely fall over either way.
         participantAdminConnection
-          .getPartyToParticipant(synchronizerId, partyId, None, AuthorizedState)
+          .getPartyToParticipant(
+            synchronizerId,
+            partyId,
+            None,
+            AuthorizedState,
+            topologySnapshot = TopologySnapshot.Effective,
+          )
           .map(_.mapping)
       }
     } yield {
@@ -274,14 +284,12 @@ class ParticipantPartyMigrator(
         s"Removing party mapping for $adminPartyId (was mapping to $oldParticipantId)"
       )
       _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
-        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         adminPartyId,
         oldParticipantId,
       )
       _ = logger.info("Removing domain trust certificate.")
       _ <- participantAdminConnection.ensureSynchronizerTrustCertificateRemoved(
-        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         oldParticipantId.member,
       )
@@ -303,8 +311,17 @@ class ParticipantPartyMigrator(
             s"Party $partyId is hosted on participant $participantId",
             topologyTransactionType =>
               EitherT {
+                // Party migration is generally based on effective state so we use that here although
+                // in practice the code here doesn't pay enough attention to timestamps
+                // that if you really fall in the interval between sequencing and effective time things likely fall over either way.
                 participantAdminConnection
-                  .getPartyToParticipant(synchronizerId, partyId, None, topologyTransactionType)
+                  .getPartyToParticipant(
+                    synchronizerId,
+                    partyId,
+                    None,
+                    topologyTransactionType,
+                    topologySnapshot = TopologySnapshot.Effective,
+                  )
                   .flatMap { result =>
                     result.mapping.participants match {
                       case Seq() => Future.successful(Left(result))
@@ -365,6 +382,7 @@ class ParticipantPartyMigrator(
   }
 
   private def importAcs(
+      synchronizerId: SynchronizerId,
       partyIds: Set[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
   ): Future[Unit] = {
@@ -374,7 +392,7 @@ class ParticipantPartyMigrator(
       _ <- MonadUtil.sequentialTraverse(partyIds.toSeq) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
-          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
+          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot), synchronizerId)
         } yield ()
       }
       _ <- participantAdminConnection.reconnectAllDomains()

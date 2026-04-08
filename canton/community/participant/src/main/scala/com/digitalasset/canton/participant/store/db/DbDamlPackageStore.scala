@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -8,7 +8,6 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.LengthLimitedString.setParameterLengthLimitedString
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.participant.state.PackageDescription
@@ -22,8 +21,8 @@ import com.digitalasset.canton.participant.admin.PackageService.{
 }
 import com.digitalasset.canton.participant.store.db.DbDamlPackageStore.DamlPackage
 import com.digitalasset.canton.participant.store.{DamlPackageStore, PackageInfo}
-import com.digitalasset.canton.resource.DbStorage.DbAction
 import com.digitalasset.canton.resource.DbStorage.DbAction.WriteOnly
+import com.digitalasset.canton.resource.DbStorage.{DbAction, toInClause}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.SimpleExecutionQueue
@@ -143,6 +142,26 @@ class DbDamlPackageStore(
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[DamlLf.Archive]] =
     storage.querySingle(exists(packageId), functionFullName).value
 
+  override def filterExisting(
+      packageIds: Set[PackageId]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] = {
+    import DbStorage.Implicits.BuilderChain.*
+
+    NonEmpty.from(packageIds) match {
+      case Some(packageIdsNE) =>
+        storage
+          .query(
+            (sql"select package_id from par_daml_packages where " ++
+              toInClause("package_id", packageIdsNE, PackageId))
+              .as[PackageId],
+            functionFullName,
+          )
+          .map(_.toSet)
+
+      case None => FutureUnlessShutdown.pure(Set.empty)
+    }
+  }
+
   override def getPackageDescription(packageId: PackageId)(implicit
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, PackageDescription] =
@@ -184,12 +203,11 @@ class DbDamlPackageStore(
       limit: Option[Int],
   )(implicit traceContext: TraceContext) = {
     import DbStorage.Implicits.BuilderChain.*
-    import com.digitalasset.canton.resource.DbStorage.Implicits.getResultPackageId
 
     val limitClause = limit.map(l => sql"#${storage.limit(l)}").getOrElse(sql"")
-
     val query = {
-      val inClause = DbStorage.toInClause(field = "package_id", values = nonEmptyPackages)
+      val inClause =
+        DbStorage.toInClause(field = "package_id", values = nonEmptyPackages, LfPackageId)
       (sql"""select package_id
              from par_dar_packages remove_candidates
              where """ ++ inClause ++
@@ -199,7 +217,7 @@ class DbDamlPackageStore(
                  where
                    remove_candidates.package_id = other_dars.package_id
                    and main_package_id != ${mainPackageId.value}
-               )""" ++ limitClause).as[LfPackageId]
+               )""" ++ limitClause).as[PackageId](getResultPackageId)
     }
 
     storage.query(query, functionFullName).map(_.toSeq)

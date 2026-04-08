@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -12,6 +12,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.SubmissionRequestRefused
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
+  Batch,
+  ClosedEnvelope,
   SequencerDeliverError,
   SignedContent,
   SubmissionRequest,
@@ -21,10 +23,12 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
   SequencerAdministrationError,
 }
+import com.digitalasset.canton.synchronizer.sequencer.store.PayloadId
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -37,12 +41,13 @@ abstract class BaseSequencer(
     healthConfig: Option[SequencerHealthConfig],
     clock: Clock,
     signatureVerifier: SignatureVerifier,
+    protocolVersion: ProtocolVersion,
 )(implicit executionContext: ExecutionContext, trace: Tracer)
     extends Sequencer
     with NamedLogging
     with Spanning {
 
-  val periodicHealthCheck: Option[PeriodicAction] = healthConfig.map(conf =>
+  private val periodicHealthCheck: Option[PeriodicAction] = healthConfig.map(conf =>
     // periodically calling the sequencer's health check in order to continuously notify
     // listeners in case the health status has changed.
     new PeriodicAction(
@@ -62,11 +67,12 @@ abstract class BaseSequencer(
       span.setAttribute("sender", submission.sender.toString)
       span.setAttribute("message_id", submission.messageId.unwrap)
       for {
+        estimatedSequencingTime <- EitherT.right(sequencingTime)
         signedSubmissionWithFixedTs <- signatureVerifier
-          .verifySignature[SubmissionRequest](
+          .verifySubmissionRequestSignature(
             signedSubmission,
             HashPurpose.SubmissionRequestSignature,
-            _.sender,
+            estimatedSequencingTime.getOrElse(clock.now),
           )
           .leftMap(e => SubmissionRequestRefused(e))
         isMemberEnabled <- EitherT.right[SequencerDeliverError](
@@ -86,12 +92,15 @@ abstract class BaseSequencer(
   override def acknowledgeSigned(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(
       implicit traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] = for {
-    signedAcknowledgeRequestWithFixedTs <- signatureVerifier
-      .verifySignature[AcknowledgeRequest](
-        signedAcknowledgeRequest,
-        HashPurpose.AcknowledgementSignature,
-        _.member,
-      )
+    estimatedSequencingTime <-
+      if (protocolVersion >= ProtocolVersion.v35) EitherT.rightT[FutureUnlessShutdown, String](None)
+      else EitherT.right(sequencingTime).map(ts => Some(ts.getOrElse(clock.now)))
+    signedAcknowledgeRequestWithFixedTs <- signatureVerifier.verifyAcknowledgeRequestSignature(
+      signedAcknowledgeRequest,
+      HashPurpose.AcknowledgementSignature,
+      estimatedSequencingTime,
+      protocolVersion,
+    )
     _ <- EitherT.right(acknowledgeSignedInternal(signedAcknowledgeRequestWithFixedTs))
   } yield ()
 
@@ -131,7 +140,16 @@ abstract class BaseSequencer(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 
-  protected def sendAsyncSignedInternal(signedSubmission: SignedContent[SubmissionRequest])(implicit
+  /** @param signedSubmission
+    *   Submission to be sent
+    * @param skipLsuChecks
+    *   If true, skips some of the checks around LSU. Should be used only to sequence a
+    *   `LsuSequencingTest` message.
+    */
+  protected def sendAsyncSignedInternal(
+      signedSubmission: SignedContent[SubmissionRequest],
+      skipLsuChecks: Boolean = false,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 
@@ -143,6 +161,10 @@ abstract class BaseSequencer(
   protected def readInternal(member: Member, timestamp: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource]
+
+  protected def readPayloadsFromTimestampsInternal(timestamps: Seq[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]]
 
   override def onClosed(): Unit =
     periodicHealthCheck.foreach(LifeCycle.close(_)(logger))

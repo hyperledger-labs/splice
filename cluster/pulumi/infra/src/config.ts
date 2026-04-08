@@ -44,10 +44,6 @@ const MonitoringConfigSchema = z
             rate: z.number(),
             overMinutes: z.number(),
           }),
-          perMember: z.object({
-            rate: z.number(),
-            overMinutes: z.number(),
-          }),
         }),
         cloudSql: z.object({
           maintenance: z.boolean(),
@@ -68,6 +64,23 @@ const MonitoringConfigSchema = z
         sequencerClientDelay: z.object({
           seconds: z.number(),
         }),
+        acsCommitments: z.object({
+          checkpointDelay: z.object({
+            seconds: z.number(),
+          }),
+          completedDelay: z.object({
+            seconds: z.number(),
+          }),
+        }),
+        sequencerRateLimits: z.object({
+          rejectionRateThreshold: z.number(),
+          circuitBreakerStateThreshold: z.number(),
+        }),
+        walletSweep: z.object({
+          tolerance: z.number(),
+        }),
+        // so existing overrides don't break
+        gcpQuotas: z.object({ enabled: z.literal(true) }).optional(),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),

@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   RetryProvider,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
@@ -119,6 +120,7 @@ class JoiningNodeDsoPartyHosting(
                             .getPartyToParticipant(
                               synchronizerId,
                               dsoParty,
+                              topologySnapshot = TopologySnapshot.Sequenced,
                             )
                             .map(result =>
                               if (
@@ -148,7 +150,10 @@ class JoiningNodeDsoPartyHosting(
           _ = logger.info(
             "Received Acs snapshot from sponsor, importing into candidate participant"
           )
-          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(response.acsSnapshot))
+          _ <- participantAdminConnection.uploadAcsSnapshot(
+            Seq(response.acsSnapshot),
+            synchronizerId,
+          )
           _ = logger.info(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"
           )

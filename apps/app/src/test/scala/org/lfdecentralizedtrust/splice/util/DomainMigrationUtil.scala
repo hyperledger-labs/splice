@@ -1,15 +1,17 @@
 package org.lfdecentralizedtrust.splice.util
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
@@ -46,6 +48,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
           synchronizerId,
           dsoParty,
           None,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
     } {
       _.mapping.participantIds.size shouldBe 4
@@ -71,11 +74,16 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
         .getDecentralizedNamespaceDefinition(
           synchronizerId,
           dsoParty.uid.namespace,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
     } { oldMapping =>
       val decentralizedSynchronizerDecentralizedNamespaceDefinition =
         nodes.head.oldParticipantConnection
-          .getDecentralizedNamespaceDefinition(synchronizerId, dsoParty.uid.namespace)
+          .getDecentralizedNamespaceDefinition(
+            synchronizerId,
+            dsoParty.uid.namespace,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
       oldMapping.mapping shouldBe decentralizedSynchronizerDecentralizedNamespaceDefinition.mapping
     }
@@ -99,8 +107,8 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
   )(assert: T => Assertion)(implicit ec: ExecutionContext): Unit = {
     withClueAndLog(description) {
       eventuallySucceeds(timeUntilSuccess = 1.minute) {
-        nodes
-          .parTraverse { node =>
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes) { node =>
             getData(node)
           }
           .map(
@@ -165,5 +173,14 @@ object DomainMigrationUtil {
     }
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
+
+  def migrationTestDumpDir(node: String) = {
+    val migrationDumpDir = testDumpDir.resolve(s"domain-migration-dump")
+    val dumpDir = migrationDumpDir.resolve(s"$node")
+    if (!dumpDir.toFile.exists()) {
+      dumpDir.toFile.mkdirs()
+    }
+    dumpDir
+  }
 
 }

@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.grpc.GrpcException
 import org.lfdecentralizedtrust.splice.automation.{
   SourceBasedTrigger,
   TaskOutcome,
@@ -14,7 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
-import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanVerdictStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -30,12 +31,13 @@ import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-
+import com.digitalasset.base.error.utils.ErrorDetails
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
+import io.grpc.protobuf.StatusProto
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -46,7 +48,7 @@ class ScanVerdictStoreIngestion(
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
-    appActivityComputation: AppActivityComputation,
+    appActivityComputationO: Option[AppActivityComputation],
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -62,7 +64,7 @@ class ScanVerdictStoreIngestion(
 
   private val mediatorClient =
     new MediatorVerdictsClient(
-      config.mediatorAdminClient,
+      config.synchronizerNodes.current.mediator,
       this,
       grpcClientMetrics,
       context.loggerFactory,
@@ -70,17 +72,25 @@ class ScanVerdictStoreIngestion(
 
   override protected def source(implicit tc: TraceContext): Source[Seq[v30.Verdict], NotUsed] = {
 
+    // Completes when all stores are ready to serve data.
+    def waitForStores(): Future[Unit] =
+      for {
+        _ <- store.waitUntilInitialized
+        _ <- appActivityComputationO match {
+          case Some(appActivityComputation) => appActivityComputation.waitUntilInitialized
+          case None => Future.unit
+        }
+      } yield ()
+
     def mediatorClientSource
         : Source[Seq[v30.Verdict], (KillSwitch, scala.concurrent.Future[Done])] = {
       val base: Source[Seq[v30.Verdict], NotUsed] =
         Source
-          .future(
-            store.waitUntilInitialized.flatMap(_ =>
-              store
-                .maxVerdictRecordTime(migrationId)
-                .map(_.getOrElse(CantonTimestamp.MinValue))
-            )
-          )
+          .future(waitForStores().flatMap { _ =>
+            store
+              .maxVerdictRecordTime(migrationId)
+              .map(_.getOrElse(CantonTimestamp.MinValue))
+          })
           .map { ts =>
             logger.info(s"Streaming verdicts starting from $ts")
             Some(ts)
@@ -146,6 +156,25 @@ class ScanVerdictStoreIngestion(
                 DbScanVerdictStore
                   .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
               })
+              // TODO(#4060): handle missing traffic summaries more robustly. In particular,
+              // note that the whole call will fail if ANY of the requested traffic summaries are missing.
+              // This workaround may therefore drop existing traffic summaries.
+              .recoverWith { case ex @ GrpcException(status, trailers) =>
+                val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+                val errorDetails = ErrorDetails.from(statusProto)
+                val errorCodeId = errorDetails
+                  .flatMap {
+                    case ed: ErrorDetails.ErrorInfoDetail =>
+                      Some(ed.errorCodeId)
+                    case _ => None
+                  }
+                  .headOption
+                  .getOrElse("none")
+                if (errorCodeId == "NO_EVENT_AT_TIMESTAMPS")
+                  Future.successful(Seq.empty)
+                else
+                  Future.failed(ex)
+              }
           case _ =>
             Future.successful(Seq.empty)
         }
@@ -169,15 +198,21 @@ class ScanVerdictStoreIngestion(
           summaryByTime.get(recordTime).map(_ -> v)
         }
 
-        // Compute app activity records (pure, before DB transaction).
-        // Records have verdictRowId = 0; the store resolves actual row_ids during insertion.
-        computedActivities = appActivityComputation.computeActivities(summariesWithVerdicts)
-        pendingAppActivity = computedActivities.flatMap { case (summary, _, recordO) =>
-          recordO.map(summary.sequencingTime -> _)
+        // Compute app activity records (before DB transaction).
+        // Records have verdictRowId = DUMMY_VERDICT_ROW_ID
+        // the store resolves actual row_ids during insertion.
+        appActivityRecords <- appActivityComputationO match {
+          case Some(appActivityComputation) =>
+            appActivityComputation.computeActivities(summariesWithVerdicts).map {
+              _.flatMap { case (summary, _, recordO) =>
+                recordO.map(summary.sequencingTime -> _)
+              }
+            }
+          case None => Future.successful(Seq.empty)
         }
 
-        _ <- store.insertVerdictsWithAppActivityRecords(items, pendingAppActivity)
-      } yield (trafficSummaries.size, pendingAppActivity.size)
+        _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
+      } yield (trafficSummaries.size, appActivityRecords.size)
 
       result.transform {
         case Success((trafficSummaryCount, appActivityCount)) =>

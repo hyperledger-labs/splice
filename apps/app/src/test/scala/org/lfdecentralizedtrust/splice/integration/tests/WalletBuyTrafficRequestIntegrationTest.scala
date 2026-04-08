@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
@@ -19,8 +21,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
-import com.digitalasset.canton.util.FutureInstances.*
-
 import java.time.Duration
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -177,10 +177,12 @@ class WalletBuyTrafficRequestIntegrationTest
                 activeSynchronizerId,
               ) shouldBe expectedTotalPurchasedTraffic
               // double-check that scan returns the same result
-              val participantId = sv1ScanBackend.getPartyToParticipant(
-                activeSynchronizerId,
-                aliceValidatorBackend.getValidatorPartyId(),
-              )
+              val participantId = sv1ScanBackend
+                .getPartyToParticipant(
+                  activeSynchronizerId,
+                  aliceValidatorBackend.getValidatorPartyId(),
+                )
+                .loneElement
               eventually()(
                 sv1ScanBackend
                   .getMemberTrafficStatus(
@@ -206,10 +208,12 @@ class WalletBuyTrafficRequestIntegrationTest
                 activeSynchronizerId,
               ).extraTrafficPurchased.value shouldBe expectedTrafficLimit
               // double-check that scan returns the same result
-              val participantId = sv1ScanBackend.getPartyToParticipant(
-                activeSynchronizerId,
-                aliceValidatorBackend.getValidatorPartyId(),
-              )
+              val participantId = sv1ScanBackend
+                .getPartyToParticipant(
+                  activeSynchronizerId,
+                  aliceValidatorBackend.getValidatorPartyId(),
+                )
+                .loneElement
               sv1ScanBackend
                 .getMemberTrafficStatus(
                   activeSynchronizerId,
@@ -272,8 +276,8 @@ class WalletBuyTrafficRequestIntegrationTest
 
       val successes = loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
-          (1 to 10).toList
-            .parTraverse(_ =>
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(10))((1 to 10).toList)(_ =>
               Future {
                 try {
                   createValidTrafficRequest(
@@ -318,10 +322,12 @@ class WalletBuyTrafficRequestIntegrationTest
         getTotalPurchasedTraffic(validatorApp.participantClient.id, activeSynchronizerId)
       // double-check that scan returns the same result
       val participantId =
-        sv1ScanBackend.getPartyToParticipant(
-          activeSynchronizerId,
-          validatorApp.getValidatorPartyId(),
-        )
+        sv1ScanBackend
+          .getPartyToParticipant(
+            activeSynchronizerId,
+            validatorApp.getValidatorPartyId(),
+          )
+          .loneElement
       eventually()(
         sv1ScanBackend
           .getMemberTrafficStatus(activeSynchronizerId, participantId)

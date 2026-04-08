@@ -11,6 +11,7 @@ import {
 import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import {
+  ArchivedDevelopmentFundCoupon,
   AllocateAmuletRequest,
   createConfiguration,
   ListTransactionsRequest,
@@ -52,6 +53,8 @@ export interface MintingDelegationProposalWithStatus {
 
 import {
   BalanceChange,
+  CouponHistoryEvent,
+  DevelopmentFundCoupon,
   ListAcceptedTransferOffersResponse,
   ListResponse,
   ListSubscriptionRequestsResponse,
@@ -64,6 +67,7 @@ import {
   Notification,
   ListTokenStandardTransfersResponse,
 } from '../models/models';
+import { DevelopmentFundCoupon as DevelopmentFundCouponTemplate } from '@daml.js/splice-amulet/lib/Splice/Amulet/';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import { ContractId } from '@daml/types';
@@ -143,6 +147,23 @@ export interface WalletClient {
   selfGrantFeaturedAppRights: () => Promise<void>;
 
   featureSupport: () => Promise<WalletFeatureSupportResponse>;
+
+  // Development Fund methods
+  allocateDevelopmentFundCoupon: (
+    beneficiary: string,
+    amount: BigNumber,
+    expiresAt: Date,
+    reason: string
+  ) => Promise<void>;
+  listActiveDevelopmentFundCoupons: () => Promise<DevelopmentFundCoupon[]>;
+  listCouponHistoryEvents: (
+    pageSize: number,
+    cursor?: number
+  ) => Promise<{
+    events: CouponHistoryEvent[];
+    nextPageToken?: number;
+  }>;
+  withdrawDevelopmentFundCoupon: (couponId: string, reason: string) => Promise<void>;
 }
 
 class ApiMiddleware
@@ -446,6 +467,67 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       featureSupport: async (): Promise<WalletFeatureSupportResponse> => {
         return await walletClient.featureSupport();
+      },
+
+      // Development Fund methods
+      allocateDevelopmentFundCoupon: async (
+        beneficiary: string,
+        amount: BigNumber,
+        expiresAt: Date,
+        reason: string
+      ): Promise<void> => {
+        const request = {
+          beneficiary: beneficiary,
+          amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
+          expiresAt: expiresAt.getTime() * 1000,
+          reason: reason,
+        };
+        await walletClient.allocateDevelopmentFundCoupon(request);
+      },
+      listActiveDevelopmentFundCoupons: async (): Promise<DevelopmentFundCoupon[]> => {
+        const response = await walletClient.listActiveDevelopmentFundCoupons();
+        return response.active_development_fund_coupons.map(c => {
+          const contract = Contract.decodeOpenAPI(c, DevelopmentFundCouponTemplate);
+          return {
+            id: contract.contractId,
+            createdAt: new Date(c.created_at),
+            fundManager: contract.payload.fundManager,
+            beneficiary: contract.payload.beneficiary,
+            amount: new BigNumber(contract.payload.amount),
+            expiresAt: new Date(contract.payload.expiresAt),
+            reason: contract.payload.reason,
+          };
+        });
+      },
+      listCouponHistoryEvents: async (
+        pageSize: number,
+        cursor?: number
+      ): Promise<{ events: CouponHistoryEvent[]; nextPageToken?: number }> => {
+        const response = await walletClient.listDevelopmentFundCouponHistory(pageSize, cursor);
+        const events: CouponHistoryEvent[] = response.development_fund_coupon_history.map(
+          (item: ArchivedDevelopmentFundCoupon) => {
+            const stableCouponId = `${item.createdAt.getTime()}-${item.fund_manager}-${item.beneficiary}`;
+            const stableEventId = `${stableCouponId}-${item.archivedAt.getTime()}-${item.status}`;
+            return {
+              id: stableEventId,
+              couponId: stableCouponId,
+              eventType: item.status,
+              timestamp: item.archivedAt,
+              fundManager: item.fund_manager,
+              beneficiary: item.beneficiary,
+              amount: new BigNumber(item.amount),
+              allocationReason: item.reason,
+              withdrawalReason: item.rejection_or_withdrawal_reason,
+            };
+          }
+        );
+        return {
+          events,
+          nextPageToken: response.next_page_token,
+        };
+      },
+      withdrawDevelopmentFundCoupon: async (couponId: string, reason: string): Promise<void> => {
+        await walletClient.withdrawDevelopmentFundCoupon(couponId, { reason });
       },
     };
   }, [url, userAccessToken]);

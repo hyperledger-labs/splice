@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store
 
 import com.daml.ledger.resources.ResourceOwner
-import com.digitalasset.canton.ledger.api.health.ReportsHealth
+import com.digitalasset.canton.health.ReportsHealth
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.ServerRole
@@ -15,6 +15,7 @@ import com.digitalasset.canton.platform.store.backend.{
   VerifiedDataSource,
 }
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContext
@@ -89,4 +90,19 @@ object DbSupport {
       storageBackendFactory = storageBackendFactory,
     )
   }
+
+  def forH2DbStorage(
+      h2DbStorage: DbStorage,
+      metrics: LedgerApiServerMetrics,
+      loggerFactory: NamedLoggerFactory,
+  ): DbSupport =
+    DbSupport(
+      dbDispatcher = DbDispatcher.ofDbStorage(
+        dbStorage = h2DbStorage,
+        overallWaitTimer = metrics.index.db.waitAll,
+        overallExecutionTimer = metrics.index.db.execAll,
+        loggerFactory = loggerFactory,
+      ),
+      storageBackendFactory = StorageBackendFactory.of(DbType.H2Database, loggerFactory),
+    )
 }

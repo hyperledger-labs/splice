@@ -19,13 +19,13 @@ import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
+import monocle.macros.syntax.lens.*
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
     with WalletTestUtil
-    with WalletTxLogTestUtil
-    with TimeTestUtil {
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -37,9 +37,9 @@ class ScanEventHistoryIntegrationTest
               restartDelay = NonNegativeFiniteDuration.ofMillis(500)
             ),
             // Route mediator admin client via toxiproxy
-            mediatorAdminClient = scanConfig.mediatorAdminClient.copy(
-              port = Port.tryCreate(scanConfig.mediatorAdminClient.port.unwrap + 20000)
-            ),
+            synchronizerNodes = scanConfig.synchronizerNodes
+              .focus(_.current.mediator.port)
+              .modify(p => Port.tryCreate(p.unwrap + 20000)),
           )
         )(config)
       )
@@ -50,7 +50,6 @@ class ScanEventHistoryIntegrationTest
   private val pageLimit = 1000
 
   "should provide new events with verdicts" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
@@ -115,8 +114,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    initDsoWithSv1Only()
-
     // Disable mediator admin connectivity via proxy before starting scan
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
 
@@ -236,7 +233,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should return event for valid updateId and 404 for missing updateId" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
@@ -287,7 +283,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()

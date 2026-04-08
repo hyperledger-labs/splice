@@ -3,27 +3,25 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
+import cats.syntax.traverse.*
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatus
 import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
   ParticipantAdminConnection,
   SpliceLedgerConnection,
+  SynchronizerNodeService,
   TopologyAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-
-import scala.concurrent.{ExecutionContext, Future}
-import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.topology.SynchronizerId
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import java.time.Instant
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** A trigger that regularly submits the status report of the SV to the DSO. */
@@ -32,8 +30,7 @@ class SubmitSvStatusReportTrigger(
     baseContext: TriggerContext,
     store: SvDsoStore,
     ledgerApiConnection: SpliceLedgerConnection,
-    cometBft: Option[CometBftNode],
-    mediatorAdminConnectionO: Option[MediatorAdminConnection],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -52,12 +49,10 @@ class SubmitSvStatusReportTrigger(
       dsoRules <- store.getDsoRules()
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
-      cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
-      mediatorAdminConnection = SvUtil.getMediatorAdminConnection(
-        mediatorAdminConnectionO
-      )
+      currentNode <- synchronizerNodeService.activeSynchronizerNode()
+      cometBftHeight <- currentNode.cometbftNode.traverse(_.getLatestBlockHeight())
       mediatorSynchronizerTimeLb <- getDomainTimeLowerBound(
-        mediatorAdminConnection,
+        currentNode.mediatorAdminConnection,
         dsoRules.domain,
       )
       participantSynchronizerTimeLb <- getDomainTimeLowerBound(
@@ -102,7 +97,8 @@ class SubmitSvStatusReportTrigger(
         case Success(ok) =>
           Success(ok.timestamp.toInstant)
         case Failure(ex) =>
-          logger.info(s"Failed to get domain time lower bound from ${connection.serviceName}", ex)
+          logger
+            .info(s"Failed to get domain time lower bound from ${connection.serviceName}", ex)
           Success(Instant.EPOCH)
       }
   }

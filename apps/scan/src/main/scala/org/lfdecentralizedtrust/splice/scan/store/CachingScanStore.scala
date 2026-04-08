@@ -209,6 +209,11 @@ class CachingScanStore(
       store.lookupFeaturedAppRight,
     ).get(providerPartyId)
 
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+    store.listFeaturedAppRightsByProvider(providerPartyId)
+
   override def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[AnsEntry.ContractId, AnsEntry]]] =
@@ -363,7 +368,9 @@ class CachingScanStore(
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  @SuppressWarnings(
+    Array("org.wartremover.warts.AsInstanceOf", "com.digitalasset.canton.RequireBlocking")
+  )
   private def getCache[Key, Value](
       cacheName: String,
       cacheConfig: CacheConfig,

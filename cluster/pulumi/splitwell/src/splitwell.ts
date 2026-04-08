@@ -7,7 +7,7 @@ import {
   ansDomainPrefix,
   Auth0Client,
   auth0UserNameEnvVar,
-  BackupConfig,
+  BucketConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
   CnInput,
@@ -37,7 +37,7 @@ export async function installSplitwell(
   onboardingSecret: string,
   splitPostgresInstances: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  backupConfig?: BackupConfig,
+  backupConfig?: BucketConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
@@ -61,7 +61,7 @@ export async function installSplitwell(
 
   const participant = installParticipant(
     splitwellConfig,
-    decentralizedSynchronizerMigrationConfig.active.id,
+    decentralizedSynchronizerMigrationConfig.activeMigrationId,
     xns,
     auth0Client.getCfg(),
     false,

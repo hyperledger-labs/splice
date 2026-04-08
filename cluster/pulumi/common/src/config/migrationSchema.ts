@@ -37,7 +37,8 @@ export const MigrationInfoSchema = z
       .object({
         enableBftSequencer: z.boolean().default(false),
       })
-      .default({}),
+      .strict()
+      .prefault({}),
   })
   .strict();
 
@@ -49,10 +50,12 @@ export const SynchronizerMigrationSchema = z
       version: CnChartVersionSchema,
     })
       .strict()
-      .default(defaultActiveMigration),
+      .prefault(defaultActiveMigration),
     upgrade: MigrationInfoSchema.optional(),
     archived: z.array(MigrationInfoSchema).optional(),
     activeDatabaseId: z.number().optional(),
     attachPvc: z.boolean().default(true),
+    lsuEnabled: z.boolean().default(false),
+    frozenMigrationId: z.number().optional(),
   })
   .strict();

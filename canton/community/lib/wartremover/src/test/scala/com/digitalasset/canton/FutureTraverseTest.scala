@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -210,6 +210,7 @@ object FutureTraverseTest {
     implicit def wannabeFutureApplicative: Applicative[WannabeFuture] = ???
   }
 
+  @AllowTraverseSingleContainer // Scala 3 impl needs the annotation on the type
   final case class SourceTest[T](value: T)
   object SourceTest {
     @AllowTraverseSingleContainer

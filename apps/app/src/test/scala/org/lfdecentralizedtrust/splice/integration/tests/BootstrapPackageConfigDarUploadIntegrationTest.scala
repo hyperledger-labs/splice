@@ -6,9 +6,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, EnabledFeaturesConfig}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
   DarResources,
   PackageResource,
   ParticipantAdminConnection,
@@ -16,7 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
 
 class BootstrapPackageConfigDarUploadIntegrationTest
@@ -33,7 +34,18 @@ class BootstrapPackageConfigDarUploadIntegrationTest
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
-  override def environmentDefinition: SpliceEnvironmentDefinition =
+  protected val enableUnsupportedDarsUnvetting: Boolean = true
+
+  private val extraPackagesToUnvet: Seq[DarResource] = Seq(
+    DarResources.wallet_0_1_15
+  )
+
+  private val supportedPackagesToUnvet: Map[PackageName, Set[PackageVersion]] =
+    extraPackagesToUnvet
+      .groupBy(_.metadata.name)
+      .map { case (name, resources) => name -> resources.map(_.metadata.version).toSet }
+
+  override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       // Technically a single SV test but withCanton doesn't handle that atm.
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -42,6 +54,20 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialPackageConfig = initialPackageConfig)
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
         )(config)
       )
       .withoutAliceValidatorConnectingToSplitwell
@@ -66,11 +92,14 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
         ),
       )() {
-        clue("Initialize sv1 and alice validator") {
+        clue("Initialize sv1, sv2 and alice validator") {
           startAllSync(
             sv1ScanBackend,
             sv1Backend,
             sv1ValidatorBackend,
+            sv2Backend,
+            sv2ScanBackend,
+            sv2ValidatorBackend,
             aliceValidatorBackend,
           )
         }
@@ -85,6 +114,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
             DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
           ),
           sv1Backend.appState.participantAdminConnection,
+          3,
         )
         checkDarVersions(
           decentralizedSynchronizerId,
@@ -96,6 +126,19 @@ class BootstrapPackageConfigDarUploadIntegrationTest
             DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
           ),
           aliceValidatorBackend.appState.participantAdminConnection,
+          2,
+        )
+        checkDarVersions(
+          decentralizedSynchronizerId,
+          Seq(
+            DarResources.amulet -> initialPackageConfig.amuletVersion,
+            DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
+            DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
+            DarResources.wallet -> initialPackageConfig.walletVersion,
+            DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
+          ),
+          sv2Backend.appState.participantAdminConnection,
+          3,
         )
       }
   }
@@ -104,6 +147,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       domainId: SynchronizerId,
       darsToCheck: Seq[(PackageResource, String)],
       participantAdminConnection: ParticipantAdminConnection,
+      serial: Int,
   ): Unit = {
     eventually() {
       val vettedPackages: Seq[VettedPackage] =
@@ -123,7 +167,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       val vettedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
         vettedPackages
           .flatMap { darDesc =>
-            DarResources.lookupPackageId(darDesc.packageId)
+            DarResourcesUtil.lookupPackageId(darDesc.packageId)
           }
           .map(dar => dar.metadata.name -> dar.metadata.version)
       }
@@ -137,9 +181,27 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
         ) {
-          checkDarLatestVersion(vettedDarNameAndVersions, packageResource, upToVersion)
+          checkDarLatestVersion(
+            vettedDarNameAndVersions,
+            packageResource,
+            upToVersion,
+            enableUnsupportedDarsUnvetting,
+          )
         }
       }
+    }
+    clue(s"Vetted package transactions have the expected serial $serial") {
+      participantAdminConnection
+        .listVettedPackages(
+          participantAdminConnection.getParticipantId().futureValue,
+          domainId,
+          AuthorizedState,
+        )
+        .futureValue
+        .loneElement
+        .base
+        .serial
+        .value shouldBe serial
     }
   }
 
@@ -147,16 +209,67 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       uploadedDars: Seq[(PackageName, PackageVersion)],
       packageResource: PackageResource,
       requiredVersion: String,
+      enableUnsupportedDarsUnvetting: Boolean,
   ): Unit = {
-    withClue(
-      s"dars for package ${packageResource.latest.metadata.name} should be up to $requiredVersion"
+    val dars =
+      uploadedDars.filter { case (name, _) =>
+        name == packageResource.latest.metadata.name
+      }
+    clue(
+      s"versions for package ${packageResource.latest.metadata.name} should be up to $requiredVersion"
     ) {
-      val dars =
-        uploadedDars.filter { case (name, _) =>
-          name == packageResource.latest.metadata.name
-        }
       dars should not be empty withClue s"dars for ${packageResource.latest.metadata.name}"
       dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
     }
+    clue(
+      s"versions for package ${packageResource.latest.metadata.name} should strictly contain the required ones"
+    ) {
+      dars.map(_._2) shouldBe DarResourcesUtil
+        .getRequiredPackageVersions(
+          packageResource.latest.metadata.name,
+          PackageVersion.assertFromString(requiredVersion),
+          enableUnsupportedDarsUnvetting,
+        )
+        .map(_.metadata.version)
+        .distinct
+    }
+    if (enableUnsupportedDarsUnvetting) {
+      clue(
+        s"versions older than minimumInitialization for package ${packageResource.latest.metadata.name} should not be vetted"
+      ) {
+        dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
+          p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
+        }
+      }
+    }
   }
+}
+
+class BootstrapPackageConfigDarUploadWithUnsupportedVersionsIntegrationTest
+    extends BootstrapPackageConfigDarUploadIntegrationTest {
+
+  override def dbsSuffix = "bootstrappackageconfigdarupload2"
+
+  override val enableUnsupportedDarsUnvetting: Boolean = false
+
+  override def environmentDefinition: EnvironmentDefinition =
+    super.environmentDefinition
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { case (_, c) =>
+          c.copy(parameters =
+            c.parameters.copy(enabledFeatures =
+              EnabledFeaturesConfig(enableUnsupportedDarsUnvetting = enableUnsupportedDarsUnvetting)
+            )
+          )
+        }(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs { case (_, c) =>
+          c.copy(parameters =
+            c.parameters.copy(enabledFeatures =
+              EnabledFeaturesConfig(enableUnsupportedDarsUnvetting = enableUnsupportedDarsUnvetting)
+            )
+          )
+        }(config)
+      )
 }

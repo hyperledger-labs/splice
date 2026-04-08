@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -71,7 +71,7 @@ class InvalidPackagePreferenceIntegrationTest
   }
 
   val upgradePackageMap: Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)] =
-    TestSubmissionService.buildPackageMap(
+    TestSubmissionService.packageMapOfCompanions(
       Seq(UpgradeItTemplateV1.COMPANION.PACKAGE, UpgradeItTemplateV2.COMPANION.PACKAGE)
     )
 
@@ -174,12 +174,12 @@ class InvalidPackagePreferenceIntegrationTest
                 ),
                 transactionTreeInterceptor = GenTransactionTree.rootViewsUnsafe
                   .andThen(firstElement[TransactionView])
-                  .andThen(TransactionView.viewParticipantDataUnsafe)
+                  .andThen(TransactionView.Optics.viewParticipantDataUnsafe)
                   .andThen(MerkleTree.tryUnwrap[ViewParticipantData])
                   .andThen(GenLens[ViewParticipantData].apply(_.actionDescription))
                   .modify {
                     case ex: ExerciseActionDescription =>
-                      ExerciseActionDescription.packagePreferenceUnsafe
+                      ExerciseActionDescription.Optics.packagePreferenceUnsafe
                         .replace(packagePreference)(ex)
                     case other => other
                   },

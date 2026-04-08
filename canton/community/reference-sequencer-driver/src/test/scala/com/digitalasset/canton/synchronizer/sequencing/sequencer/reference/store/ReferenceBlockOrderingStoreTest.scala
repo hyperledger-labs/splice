@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.sequencer.reference.store
@@ -48,7 +48,7 @@ trait ReferenceBlockOrderingStoreTest extends AsyncWordSpec with BaseTest with F
 
   private def block(height: Long, tracedEvent: Traced[BlockFormat.OrderedRequest]) =
     TimestampedBlock(
-      BlockFormat.Block(height, Seq(tracedEvent)),
+      BlockFormat.Block(height, tracedEvent.value.microsecondsSinceEpoch, Seq(tracedEvent)),
       CantonTimestamp.ofEpochMicro(tracedEvent.value.microsecondsSinceEpoch),
       SignedTopologyTransaction.InitialTopologySequencingTime,
     )

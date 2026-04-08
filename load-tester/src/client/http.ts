@@ -42,8 +42,8 @@ export class HttpClient {
 
   private _raw_request<R extends ResponseType>(
     url: string,
-    method: 'GET' | 'POST',
-    body: string | Buffer | undefined,
+    method: 'GET' | 'POST' | 'DELETE',
+    body: http.RequestBody | null,
     params: RequestParams<R>,
   ): RefinedResponse<'text'> {
     console.debug(`Calling ${method} on endpoint: ${url}`);
@@ -67,8 +67,8 @@ export class HttpClient {
   // base HTTP request with simple error handling
   private _request<R extends ResponseType>(
     url: string,
-    method: 'GET' | 'POST',
-    body: string | Buffer | undefined,
+    method: 'GET' | 'POST' | 'DELETE',
+    body: http.RequestBody | null,
     expectedStatus: 200 | 201 | 302,
     params: RequestParams<R>,
   ): ResponseHandler {
@@ -132,7 +132,7 @@ export class HttpClient {
   private _redirect<R extends ResponseType>(
     url: string,
     method: 'GET' | 'POST',
-    body: string | Buffer | undefined,
+    body: http.RequestBody | null,
     params: RequestParams<R>,
   ): RedirectResponseHandler {
     return this._request(url, method, body, 302, params).then(resp => {
@@ -160,11 +160,11 @@ export class HttpClient {
       url: string,
       params: RequestParams<R>,
     ): RedirectResponseHandler => {
-      return this._redirect(url, 'GET', undefined, params);
+      return this._redirect(url, 'GET', null, params);
     },
     success: <R extends ResponseType>(
       url: string,
-      body: string | Buffer | undefined,
+      body: http.RequestBody | null,
       params: RequestParams<R>,
     ): ResponseHandler => {
       return this._request(url, 'GET', body, 200, params);
@@ -174,24 +174,34 @@ export class HttpClient {
   public post = {
     redirect: <R extends ResponseType>(
       url: string,
-      body: string | Buffer | undefined,
+      body: http.RequestBody | null,
       params: RequestParams<R>,
     ): RedirectResponseHandler => {
       return this._redirect(url, 'POST', body, params);
     },
     success: <R extends ResponseType>(
       url: string,
-      body: string | Buffer | undefined,
+      body: http.RequestBody | null,
       params: RequestParams<R>,
     ): ResponseHandler => {
       return this._request(url, 'POST', body, 200, params);
     },
     s201: <R extends ResponseType>(
       url: string,
-      body: string | Buffer | undefined,
+      body: http.RequestBody | null,
       params: RequestParams<R>,
     ): ResponseHandler => {
       return this._request(url, 'POST', body, 201, params);
+    },
+  };
+
+  public delete = {
+    success: <R extends ResponseType>(
+      url: string,
+      body: http.RequestBody | null,
+      params: RequestParams<R>,
+    ): ResponseHandler => {
+      return this._request(url, 'DELETE', body, 200, params);
     },
   };
 }

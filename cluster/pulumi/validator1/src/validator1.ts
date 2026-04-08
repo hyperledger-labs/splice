@@ -4,7 +4,7 @@ import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgr
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
   activeVersion,
@@ -40,7 +40,7 @@ export async function installValidator1(
   splitPostgresInstances: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
-  backupConfig?: BackupConfig,
+  backupConfig?: BucketConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig,
   autoAcceptTransfers?: AutoAcceptTransfersConfig
@@ -80,7 +80,7 @@ export async function installValidator1(
 
   const participant = installParticipant(
     validator1Config,
-    decentralizedSynchronizerMigrationConfig.active.id,
+    decentralizedSynchronizerMigrationConfig.activeMigrationId,
     xns,
     auth0Client.getCfg(),
     validator1Config?.disableAuth,
@@ -177,7 +177,7 @@ function installIngress(
       ingress: {
         splitwell: splitwell,
         decentralizedSynchronizer: {
-          activeMigrationId: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+          activeMigrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
         },
       },
     }

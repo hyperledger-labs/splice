@@ -3,7 +3,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
@@ -126,7 +126,7 @@ type ValidatorDeploymentConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
   onboardingSecret?: string;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
@@ -153,9 +153,15 @@ async function installValidator(
   const participantPruningConfig = validatorConfig?.participantPruningSchedule;
 
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
-  const postgresValues: ChartValues = loadYamlFromFile(
+  const postgresValuesFromFile: ChartValues = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
   );
+  const postgresValues: ChartValues = validatorConfig.postgresPvcSize
+    ? {
+        ...postgresValuesFromFile,
+        db: { ...postgresValuesFromFile.db, volumeSize: validatorConfig.postgresPvcSize },
+      }
+    : postgresValuesFromFile;
   const postgres = new SplicePostgres(
     xns,
     'postgres',
@@ -168,7 +174,7 @@ async function installValidator(
   );
   const participantAddress = installParticipant(
     validatorConfig,
-    DecentralizedSynchronizerUpgradeConfig.active.id,
+    DecentralizedSynchronizerUpgradeConfig.activeMigrationId,
     xns,
     auth0Client.getCfg(),
     false, // We don't currently support non-auth for validator-runbook
@@ -197,7 +203,7 @@ async function installValidator(
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
+        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.activeMigrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
         TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,

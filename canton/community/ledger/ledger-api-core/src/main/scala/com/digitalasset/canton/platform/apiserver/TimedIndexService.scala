@@ -1,16 +1,21 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
-import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
 import com.daml.ledger.api.v2.update_service.{GetUpdateResponse, GetUpdatesResponse}
 import com.daml.metrics.Timed
+import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.health.HealthStatus
-import com.digitalasset.canton.ledger.api.{EventFormat, UpdateFormat}
+import com.digitalasset.canton.health.HealthStatus
+import com.digitalasset.canton.ledger.api.{
+  AcsContinuationToken,
+  EventFormat,
+  GetActiveContractsResponseFactory,
+  UpdateFormat,
+}
 import com.digitalasset.canton.ledger.participant.state.index.*
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
@@ -46,10 +51,11 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
       begin: Option[Offset],
       endAt: Option[Offset],
       updateFormat: UpdateFormat,
+      descendingOrder: Boolean,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdatesResponse, NotUsed] =
     Timed.source(
       metrics.services.index.transactions,
-      delegate.updates(begin, endAt, updateFormat),
+      delegate.updates(begin, endAt, updateFormat, descendingOrder),
     )
 
   def getUpdateBy(
@@ -64,10 +70,13 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
   override def getActiveContracts(
       eventFormat: EventFormat,
       activeAt: Option[Offset],
-  )(implicit loggingContext: LoggingContextWithTrace): Source[GetActiveContractsResponse, NotUsed] =
+      continuationToken: Option[AcsContinuationToken],
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): Source[GetActiveContractsResponseFactory, NotUsed] =
     Timed.source(
       metrics.services.index.getActiveContracts,
-      delegate.getActiveContracts(eventFormat, activeAt),
+      delegate.getActiveContracts(eventFormat, activeAt, continuationToken),
     )
 
   override def lookupActiveContract(
@@ -108,20 +117,21 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
 
   override def listKnownParties(
       fromExcl: Option[Party],
+      filterString: Option[String185],
       maxResults: Int,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[List[IndexerPartyDetails]] =
     Timed.future(
       metrics.services.index.listKnownParties,
-      delegate.listKnownParties(fromExcl, maxResults),
+      delegate.listKnownParties(fromExcl, filterString, maxResults),
     )
 
   override def prune(
       previousPruneUpToInclusive: Option[Offset],
       previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpToInclusive: Offset,
-      incompletReassignmentOffsets: Vector[Offset],
+      incompleteReassignmentOffsets: Vector[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] =
     Timed.future(
       metrics.services.index.prune,
@@ -129,14 +139,14 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
         previousPruneUpToInclusive = previousPruneUpToInclusive,
         previousIncompleteReassignmentOffsets = previousIncompleteReassignmentOffsets,
         pruneUpToInclusive = pruneUpToInclusive,
-        incompletReassignmentOffsets = incompletReassignmentOffsets,
+        incompleteReassignmentOffsets = incompleteReassignmentOffsets,
       ),
     )
 
-  def indexDbPrunedUpTo(implicit
+  def indexDbPrunedUpto(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[Offset]] =
-    delegate.indexDbPrunedUpTo
+    delegate.indexDbPrunedUpto
 
   override def currentHealth(): HealthStatus =
     delegate.currentHealth()
@@ -161,6 +171,17 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
     Timed.future(
       metrics.services.index.getEventsByContractId,
       delegate.getEventsByContractId(contractId, eventFormat),
+    )
+
+  override def lookupNonUniqueContractKey(
+      readers: Set[Party],
+      key: Key,
+      pageToken: Option[Long],
+      limit: Int,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[ContractKeyPage] =
+    Timed.future(
+      metrics.services.index.lookupNonUniqueContractKey,
+      delegate.lookupNonUniqueContractKey(readers, key, pageToken, limit),
     )
 
   // TODO(i16065): Re-enable getEventsByContractKey tests

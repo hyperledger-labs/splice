@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import better.files.File
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
@@ -12,10 +13,10 @@ import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.grpc.ByteStringStreamObserver
+import com.digitalasset.canton.grpc.{ByteStringStreamObserver, OutputFileStreamObserver}
 import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -29,31 +30,37 @@ import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{Member, NodeIdentity, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
-import com.digitalasset.canton.topology.admin.v30.GenesisStateV2Response
+import com.digitalasset.canton.topology.admin.v30.{
+  GenesisStateV2Response,
+  SequencerLsuStateResponse,
+}
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
-import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.ContentTypes
-import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
-import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
 import com.google.protobuf.ByteString
 import com.typesafe.config.ConfigFactory
+import io.grpc.Status
 import io.grpc.stub.StreamObserver
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.connectors.google.auth.Credentials
+import org.apache.pekko.http.scaladsl.model.ContentTypes
 import org.apache.pekko.stream.connectors.google.{GoogleAttributes, GoogleSettings}
+import org.apache.pekko.stream.connectors.google.auth.Credentials
+import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
+import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
 import org.apache.pekko.util.ByteString as PekkoByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.{BackupDumpConfig, GcpCredentialsConfig}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
+import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -100,6 +107,56 @@ class SequencerAdminConnection(
           observer = responseObserver,
         )
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
+  }
+
+  def getLsuState(file: File, ts: Option[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val responseObserver = new OutputFileStreamObserver[SequencerLsuStateResponse](
+      file,
+      _.chunk,
+    )
+    runCmd(
+      TopologyAdminCommands.Read
+        .SequencerLsuState(
+          store = None,
+          ts = ts,
+          observer = responseObserver,
+        )
+    ).map(_ => ())
+  }
+
+  def initializeFromPredecessor(
+      topologySnapshot: Path,
+      staticSynchronizerParameters: StaticSynchronizerParameters,
+      ignorePsidCheck: Boolean = false,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val inputStream = Files.newInputStream(topologySnapshot)
+    runCmd(
+      SequencerAdminCommands.InitializeFromLsuPredecessor(
+        inputStream,
+        staticSynchronizerParameters,
+        ignorePsidCheck,
+      )
+    ).andThen(_ => inputStream.close())
+  }
+
+  def getPhysicalSynchronizerId()(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] = {
+    runCmd(
+      SequencerAdminCommands.Health.SequencerStatusCommand()
+    ).map(
+      _.successOption
+        .map(_.synchronizerId)
+        .getOrElse(
+          throw Status.UNAVAILABLE
+            .withDescription("Sequencer does not have a synchronizer ID in its status response")
+            .asRuntimeException()
+        )
+    )
   }
 
   def getTopologyTransactionsSummary(store: TopologyStoreId, now: CantonTimestamp)(implicit
@@ -331,12 +388,16 @@ class SequencerAdminConnection(
     )
   }
 
-  def getSequencerSynchronizerState()(implicit
+  def getSequencerSynchronizerState(topologySnapshot: TopologySnapshot)(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[SequencerSynchronizerState]] = {
     for {
       synchronizerId <- getStatus.map(_.trySuccess.synchronizerId)
-      sequencerState <- getSequencerSynchronizerState(synchronizerId.logical, AuthorizedState)
+      sequencerState <- getSequencerSynchronizerState(
+        synchronizerId.logical,
+        topologySnapshot,
+        AuthorizedState,
+      )
     } yield sequencerState
   }
 
@@ -363,7 +424,9 @@ class SequencerAdminConnection(
     // There are multiple cases where we need the caller to retry: we (ab)use gRPC Status codes to communicate this.
     def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = for {
       (sequencerState, trafficState) <- (
-        getSequencerSynchronizerState(),
+        getSequencerSynchronizerState(topologySnapshot =
+          TopologySnapshot.Effective
+        ), // The thresholds only change when it becomes effective
         getSequencerTrafficControlState(currentTrafficState.member),
       ).tupled
     } yield {
@@ -435,6 +498,18 @@ class SequencerAdminConnection(
     SequencerAdminCommands.DisableMember(member)
   )
 
+  def getLsuTrafficControlState(ts: Option[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = runCmd(
+    SequencerAdminCommands.GetLsuTrafficControlState(ts)
+  )
+
+  def setLsuTrafficControlState(memberTraffic: ByteString)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = runCmd(
+    SequencerAdminCommands.SetLsuTrafficControlState(memberTraffic)
+  )
+
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
     getSequencerId
 
@@ -444,6 +519,14 @@ class SequencerAdminConnection(
       case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
     }
+  }
+
+  def performLsuSequencingTest(
+      recipientMediatorGroup: MediatorGroupIndex
+  )(implicit tc: TraceContext): Future[Unit] = {
+    runCmd(
+      SequencerAdminCommands.PerformLsuSequencingTest(recipientMediatorGroup)
+    )
   }
 
 }

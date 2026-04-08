@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -75,6 +75,7 @@ trait UseExternalProcessBase[Config]
   def kill(instanceName: String, force: Boolean = true): Unit = handler.tryKill(instanceName, force)
   def stop(instanceName: String): Unit = handler.stopAndRemove(instanceName)
   def isRunning(instanceName: String): Boolean = handler.tryIsRunning(instanceName)
+  def processHasCrashed(instanceName: String): Boolean = handler.processHasCrashed(instanceName)
   def restart(instanceName: String): Unit = handler.tryRestart(instanceName)
   def config(instanceName: String): Config = handler.tryInfo(instanceName)
 }

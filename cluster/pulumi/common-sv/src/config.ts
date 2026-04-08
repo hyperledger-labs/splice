@@ -3,8 +3,8 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
-  BackupLocation,
+  BucketConfig,
+  BucketLocation,
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
@@ -45,16 +45,19 @@ export interface ScanBigQueryConfig {
   prefix: string;
 }
 
-export interface StaticSvConfig {
+export interface StaticSvConfigBasic {
   nodeName: string;
   ingressName: string;
   onboardingName: string;
+  sweep?: SweepConfig;
+}
+
+export interface StaticSvConfig extends StaticSvConfigBasic {
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
-  sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
   svIdKeySecretName?: string;
   cometBftGovernanceKeySecretName?: string;
@@ -70,8 +73,8 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   onboarding: SvOnboarding;
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
-  periodicBackupConfig?: BackupConfig;
-  identitiesBackupLocation: BackupLocation;
+  periodicBackupConfig?: BucketConfig;
+  identitiesBackupLocation: BucketLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
@@ -79,15 +82,17 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
-  periodicTopologySnapshotConfig?: BackupConfig;
+  periodicTopologySnapshotConfig?: CnInput<BucketConfig>;
   version: CnChartVersion;
   bulkStorageBucket?: BulkStorageBucket;
 }
 
 export const TopologySnapshotSchema = z.object({
-  projectId: z.string(),
-  bucketName: z.string(),
   backupInterval: z.string(),
+  bucketName: z.string(),
+  bucketSaKeySecret: z.string(),
+  bucketSaIamAccount: z.string(),
+  projectId: z.string(),
 });
 
 export const SvConfigSchema = z.object({

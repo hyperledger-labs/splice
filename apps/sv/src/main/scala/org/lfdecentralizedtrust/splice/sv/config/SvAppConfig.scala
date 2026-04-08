@@ -4,19 +4,24 @@
 package org.lfdecentralizedtrust.splice.sv.config
 
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -93,10 +98,9 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
-      initialMaxNumInputs: Int = 100,
+      initialMaxNumInputs: Long = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -108,6 +112,8 @@ object SvOnboardingConfig {
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -218,6 +224,19 @@ object SvOnboardingConfig {
       case other => other
     }
   }
+
+  final case class RollForwardLsuTimestampConfig(
+      topologyExportTime: CantonTimestamp,
+      trafficExportTime: CantonTimestamp,
+  )
+
+  final case class RollForwardLsu(
+      name: String,
+      newPhysicalSynchronizerSerial: NonNegativeInt,
+      newPhysicalSynchronizerProtocolVersion: ProtocolVersion,
+      // If unset, we assume there is an LsuAnnouncement.
+      exportTimes: Option[RollForwardLsuTimestampConfig],
+  ) extends SvOnboardingConfig
 }
 
 final case class InitialAnsConfig(
@@ -272,6 +291,8 @@ final case class SvParticipantClientConfig(
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -294,8 +315,7 @@ case class SvAppBackendConfig(
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
-    cometBftConfig: Option[SvCometBftConfig] = None,
-    localSynchronizerNode: Option[SvSynchronizerNodeConfig],
+    localSynchronizerNodes: SvSynchronizerNodesConfig,
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -304,6 +324,7 @@ case class SvAppBackendConfig(
     domainMigrationId: Long = 0L,
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(2),
+    lsuSequencingTestInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
@@ -331,9 +352,6 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    // We want to be able to override this for simtime tests
-    topologyChangeDelayDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
     delegatelessAutomationExpiredRewardCouponNumBatches: Int = 20,
@@ -346,6 +364,7 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
@@ -365,7 +384,12 @@ case class SvAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    // Map of package name -> set of versions that should be explicitly unvetted
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
+    // If set, automatically copies governance votes (VoteRequests) from the named SV.
+    // The value is the SV name as it appears in DsoRules.svs (e.g. "Digital-Asset-2").
+    copyVotesFrom: Option[String] = None,
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
@@ -382,12 +406,13 @@ case class SvAppBackendConfig(
       PackageVettingLookupService.CacheConfig(),
 ) extends SpliceBackendConfig {
 
-  def shouldSkipSynchronizerInitialization =
+  def shouldSkipSynchronizerInitialization: Boolean =
     skipSynchronizerInitialization &&
       onboarding.fold(true) {
         case _: SvOnboardingConfig.FoundDso => true
         case _: SvOnboardingConfig.JoinWithKey => true
         case _: SvOnboardingConfig.DomainMigration => false
+        case _: SvOnboardingConfig.RollForwardLsu => false
       }
   override val nodeTypeName: String = "SV"
 
@@ -416,6 +441,7 @@ object SvAppBackendConfig {
     PositiveInt.tryCreate(5),
     NonNegativeFiniteDuration.ofSeconds(10),
   )
+
 }
 
 case class SvCometBftConfig(
@@ -472,6 +498,8 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
     pruning: Option[PruningConfig] = Some(
       PruningConfig(
         cron = "0 /10 * * * ?", // Run every 10min,
@@ -494,9 +522,18 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
-) {
-  val parameters: SynchronizerParametersConfig = SynchronizerParametersConfig()
-}
+    cometBftConfig: Option[SvCometBftConfig] = None,
+    protocolVersion: ProtocolVersion = ProtocolVersion.v34,
+    serial: Option[NonNegativeInt],
+    // We want to be able to override this for simtime tests
+    topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(250),
+)
+
+final case class SvSynchronizerNodesConfig(
+    current: SvSynchronizerNodeConfig,
+    successor: Option[SvSynchronizerNodeConfig],
+    legacy: Option[SvSynchronizerNodeConfig] = None,
+)
 
 final case class SvCantonIdentifierConfig(
     participant: String,

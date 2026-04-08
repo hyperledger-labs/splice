@@ -4,8 +4,8 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
-  BackupConfig,
-  BackupLocation,
+  BucketConfig,
+  BucketLocation,
   BootstrappingDumpConfig,
   CnInput,
   config,
@@ -33,8 +33,8 @@ interface DsoArgs {
   auth0Client: Auth0Client;
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
   isDevNet: boolean;
-  periodicBackupConfig?: BackupConfig;
-  identitiesBackupLocation: BackupLocation;
+  periodicBackupConfig?: BucketConfig;
+  identitiesBackupLocation: BucketLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
@@ -211,9 +211,8 @@ export class Dso extends pulumi.ComponentResource {
 
     const dso = this.installDso();
 
-    // eslint-disable-next-line promise/prefer-await-to-then
     this.sv1 = dso.then(r => r.sv1);
-    // eslint-disable-next-line promise/prefer-await-to-then
+
     this.allSvs = dso.then(r => r.allSvs);
 
     this.registerOutputs({});

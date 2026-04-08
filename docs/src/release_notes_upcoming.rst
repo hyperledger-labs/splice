@@ -9,9 +9,12 @@
 
 .. release-notes:: Upcoming
 
-   - Validator App
+    - Deployment
 
-     - Remove the ``new-sequencer-connection-pool`` flag as it didn't
-       do what it was supposed to do. If you did set it, you can
-       safely remove it regardless of whether you disabled the new sequencer connection
-       pools in the participant or not.
+        - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
+          from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.
+
+    - Scan
+
+        - Added a new ``GET /v2/updates/hash/{hash}`` endpoint that returns the update associated with a given external transaction hash of a prepared transaction.
+          This endpoint is not always BFT safe, see the Scan OpenAPI documentation for details.
