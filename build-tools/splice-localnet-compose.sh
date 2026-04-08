@@ -68,6 +68,8 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             CANTON_PROTOCOL_VERSION=$1
+            # FIXME: move this into a different flag (and add to docs that don't use this script):
+            export ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
             ;;
         *)
             echo "Unknown option: $1"
