@@ -72,6 +72,10 @@ const MonitoringConfigSchema = z
             seconds: z.number(),
           }),
         }),
+        acsSnapshots: z.object({
+          saveLatencyThresholdSeconds: z.number(),
+          updateLatencyThresholdSeconds: z.number(),
+        }),
         sequencerRateLimits: z.object({
           rejectionRateThreshold: z.number(),
           circuitBreakerStateThreshold: z.number(),

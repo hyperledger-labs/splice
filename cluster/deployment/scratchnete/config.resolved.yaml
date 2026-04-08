@@ -40,6 +40,9 @@ monitoring:
           seconds: 600
         completedDelay:
           seconds: 3600
+      acsSnapshots:
+        saveLatencyThresholdSeconds: 2700
+        updateLatencyThresholdSeconds: 3
       cloudSql:
         maintenance: false
       cometbft:
