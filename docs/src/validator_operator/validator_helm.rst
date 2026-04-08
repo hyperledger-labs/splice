@@ -409,7 +409,22 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-v
 - Replace ``YOUR_VALIDATOR_PARTY_HINT`` with the desired name for your
   validator operator party. It must be of the format
   ``<organization>-<function>-<enumerator>``.
-- Replace ``YOUR_VALIDATOR_NODE_NAME`` with the name you want your validator node to be represented as on the network. Usually you can use the same value as for your ``validatorPartyHint``.
+.. note::
+
+     If you operate validators across multiple environments, use the ``<function>`` segment to distinguish them. Each environment should have a unique party hint.
+     For example:
+
+     ======================== ====================================
+     Environment              Party Hint
+     ------------------------ ------------------------------------
+     DevNet                   ``MyCompany-devnet-1``
+     TestNet                  ``MyCompany-testnet-1``
+     MainNet                  ``MyCompany-validator-1``
+     ======================== ====================================
+
+     The ``<enumerator>`` can be incremented if you run multiple validator nodes
+     within the same environment (e.g., ``MyCompany-testnet-2``).
+- Replace ``YOUR_VALIDATOR_NODE_NAME`` with the name you want your validator node to be represented as on the network. Usually you can use the same value as for your ``validatorPartyHint``. When operating across multiple environments, this means the node name will also reflect the target environment (e.g., ``MyCompany-devnet-1``).
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
