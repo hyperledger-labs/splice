@@ -209,6 +209,14 @@ trait SvDsoStore
     splice.amulettransferinstruction.AmuletTransferInstruction,
   ]
 
+  /** List amulet allocations that are expired */
+  def listExpiredAmuletAllocations(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amuletallocation.AmuletAllocation.ContractId,
+    splice.amuletallocation.AmuletAllocation,
+  ]
+
   /** List locked amulets that are expired and can never be used as transfer input. */
   def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
