@@ -33,11 +33,13 @@ module Splice.TokenStandard.Utils.Internal.Choices (
   archiveAndCheckActors,
 
 
-  -- * Holding metadata
-
-  -- TODO(#4550): check whether this export is required once we know how v2 tx parsing will work
+  -- * Transfer metadata
   reasonMetaKey,
   txKindMetaKey,
+  senderMetaKey,
+  reasonFromMeta,
+  reasonToMeta,
+  mkMetaTransferFrom,
 
   -- * Missing TextMap utilities
   textMapUnionWith,
@@ -49,7 +51,10 @@ module Splice.TokenStandard.Utils.Internal.Choices (
   textMapTraverseWithKey,
 ) where
 
+import Splice.Api.Token.MetadataV1
+
 import DA.Map qualified as Map
+import DA.Optional
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 import DA.Set qualified as Set
@@ -181,6 +186,26 @@ reasonMetaKey = cip56Prefix <> "reason"
 -- | Kind of the transaction.
 txKindMetaKey : Text
 txKindMetaKey = cip56Prefix <> "tx-kind"
+
+-- | The sender of a transfer.
+senderMetaKey : Text
+senderMetaKey = cip56Prefix <> "sender"
+
+-- | Extra the transfer reason from the metadata. Returns an empty string if no reason is found.
+reasonFromMeta : Metadata -> Text
+reasonFromMeta (Metadata meta) = fromOptional "" $ TextMap.lookup reasonMetaKey meta
+
+-- |  Add the given reason to the metadata, if it's not empty.
+reasonToMeta : Text -> Metadata -> Metadata
+reasonToMeta reason (Metadata meta)
+  | T.isEmpty reason = Metadata meta
+  | otherwise = Metadata $ TextMap.insert reasonMetaKey reason meta
+
+-- | Metadata to tag a transfer for V1 transaction history parsing.
+mkMetaTransferFrom : Party -> Text -> Metadata
+mkMetaTransferFrom sender reason =
+  reasonToMeta reason $ Metadata with
+    values = TextMap.fromList [(txKindMetaKey, "transfer"), (senderMetaKey, partyToText sender)]
 
 
 -- Public fetch support

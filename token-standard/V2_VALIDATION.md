@@ -76,3 +76,10 @@ Cleanup performed so far:
 - Improve commentary on `V2.AllocationRequest` choices
 - Add missing choice observers to `V2.TransferFactory_Transfer`
 - Renamed `_extraObserverDefaultImpl` to `_extraObserversDefaultImpl` to reflect that it can return multiple observers
+- Clarify that input holdings for `V2.TransferFactory_Transfer` must be of the transferred instrument
+- Extend test infrastructure:
+  - Add transfer support for `TestTokenV2`
+  - `WalletClientV2` support for listing and accepting V1 and V2 transfer offers using the same functions
+- Extend `BatchingUtilityV2` with support for accepting V2 transfer instructions
+- Add utility functions to create metadata for [V1 transaction history parsing](https://docs.digitalasset.com/integrate/devnet/exchange-integration/txingestion.html#differences-between-1-step-deposits-and-withdrawals)
+  to `Splice.TokenStandard.Utils`

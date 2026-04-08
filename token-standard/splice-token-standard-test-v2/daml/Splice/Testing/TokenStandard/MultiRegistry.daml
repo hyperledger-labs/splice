@@ -11,6 +11,7 @@ module Splice.Testing.TokenStandard.MultiRegistry
   , getRegistryApis
   , getRegistryApiV1
   , getRegistryApiV2
+  , supportsV2
 
   , mkRegistryApisV1
   , mkRegistryApisV2
@@ -23,6 +24,7 @@ module Splice.Testing.TokenStandard.MultiRegistry
   ) where
 
 import DA.Map qualified as Map
+import DA.Optional
 
 import Splice.TokenStandard.Utils (downcast)
 
@@ -68,6 +70,11 @@ getRegistryApiV2 registries admin = do
   case apis.v2Api of
     None -> fail $ "Registry with admin " <> show admin <> " does not support V2 API"
     Some api -> return api
+
+supportsV2 : MultiRegistry -> Party -> Script Bool
+supportsV2 registries admin = do
+  apis <- getRegistryApis registries admin
+  pure (isSome apis.v2Api)
 
 mkRegistryApisV1 : V1.RegistryApi registry => registry -> RegistryApis
 mkRegistryApisV1 v1Api = RegistryApis with

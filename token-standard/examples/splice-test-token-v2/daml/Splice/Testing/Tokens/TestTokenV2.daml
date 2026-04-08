@@ -7,6 +7,7 @@ module Splice.Testing.Tokens.TestTokenV2 where
 import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
@@ -15,6 +16,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.TokenStandard.Utils
 
 
@@ -127,6 +129,65 @@ template TokenAllocationV2 with
             -- archival of multiple holdings for different instrument-ids.
 
 
+-- | Transfer instruction representing a token transfer offer.
+--
+-- Its input holdings reference the locked tokens.
+template TokenTransferOffer with
+    transfer : V2.Transfer
+  where
+    ensure isValidTransferV2 transfer
+
+    signatory accountParties transfer.sender, transfer.instrumentId.admin
+    observer accountParties transfer.receiver
+
+    interface instance V2.TransferInstruction for TokenTransferOffer where
+      view = V2.TransferInstructionView with
+        originalInstructionCid = None
+        transfer
+        availableActions = Map.fromList
+          [ (jointAuthorizers transfer.sender, [V2.TIA_Withdraw])
+          , (jointAuthorizers transfer.receiver, [V2.TIA_Accept, V2.TIA_Reject])
+          ]
+          -- TODO(#4542): add support for joint authorization steps
+        meta = emptyMetadata
+
+      transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
+      transferInstruction_rejectExtraObservers = transferInstruction_rejectDefaultExtraObservers this
+      transferInstruction_withdrawExtraObservers = transferInstruction_withdrawDefaultExtraObservers this
+
+      transferInstruction_withdrawImpl self arg = do
+        archiveAndCheckActors self arg.actors [jointAuthorizers transfer.sender]
+        archiveLockedHoldingsForTransfer transfer
+        tokenCid <- create Token with
+          holding = senderHoldingFromTransfer transfer
+        pure V2.TransferInstructionResult with
+          output = V2.TransferInstructionResult_Failed
+          senderChangeCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      transferInstruction_rejectImpl self arg = do
+        archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
+        archiveLockedHoldingsForTransfer transfer
+        tokenCid <- create Token with
+          holding = senderHoldingFromTransfer transfer
+        pure V2.TransferInstructionResult with
+          output = V2.TransferInstructionResult_Failed
+          senderChangeCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      transferInstruction_acceptImpl self arg = do
+        archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
+        archiveLockedHoldingsForTransfer transfer
+        tokenCid <- create Token with
+          holding = (senderHoldingFromTransfer transfer) with
+            account = transfer.receiver
+        pure V2.TransferInstructionResult with
+          senderChangeCids = []
+          output = V2.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId tokenCid]
+          meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
+
+
 -- | Template providing all the rules for how the tokens can be changed.
 --
 -- For this test token, they are given by the ones of the V2 token standard factories.
@@ -135,8 +196,15 @@ template TokenRules with
   where
     signatory admin
 
-    -- TODO(#4813): add transfer factory instances
-    -- TODO(#4818): if possible wrt tx history parsing ==> implement V1 interfaces to test-drive compatibility support for implementing V1 based on V2
+    interface instance V2.TransferFactory for TokenRules where
+      view = V2.TransferFactoryView with
+        admin
+        meta = emptyMetadata
+
+      transferFactory_publicFetchImpl = publicFetchDefaultImpl this
+      transferFactory_transferExtraObservers = transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl
+
+      transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
@@ -168,6 +236,70 @@ template TokenRules with
       allocationFactory_allocateImpl self arg = token_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
 
+-- | Create a V2 transfer offer
+token_transferFactory_transferImpl
+  : TokenRules
+  -> ContractId V2.TransferFactory
+  -> V2.TransferFactory_Transfer
+  -> Update V2.TransferInstructionResult
+token_transferFactory_transferImpl tokenRules _self arg = do
+  -- TODO(#4542): allow either of the two authorizers to request the transfer
+  let transfer = arg.transfer
+  checkActors arg.actors [jointAuthorizers transfer.sender]
+  let iid = transfer.instrumentId
+  require' ("transfer.instrumentId.admin", iid.admin) isEqualR ("transferFactory.admin", tokenRules.admin)
+
+  -- consume all inputs
+  inputAmounts <- forA transfer.inputHoldingCids $ \cid -> do
+    let tokenCid = coerceContractId cid : ContractId Token
+    token <- fetch tokenCid
+    archive tokenCid
+    require' ("inputHolding.account", token.holding.account) isEqualR ("transfer.sender", transfer.sender)
+    require' ("inputHolding.instrumentId", token.holding.instrumentId) isEqualR ("transfer.instrumentId", iid)
+    pure token.holding.amount
+  let inputAmount = sum inputAmounts
+  require' ("inputAmount for " <> show transfer.instrumentId, inputAmount) isGreaterOrEqualR
+    ("transfer.amount", transfer.amount)
+
+  -- split off change
+  let remainder = inputAmount - transfer.amount
+  senderChangeCids <-
+      if remainder <= 0.0 then pure [] else do
+        cid <- create Token with
+          holding = (senderHoldingFromTransfer transfer) with
+            amount = remainder
+        pure [toInterfaceContractId cid]
+
+  -- create holding for self-transfer, or transfer offer
+  if transfer.receiver == transfer.sender
+    then do
+      outputCid <- create Token with
+        holding = senderHoldingFromTransfer transfer
+      pure V2.TransferInstructionResult with
+        output = V2.TransferInstructionResult_Completed with
+          receiverHoldingCids = [toInterfaceContractId outputCid]
+        senderChangeCids
+        meta = emptyMetadata
+    else do
+      -- lock the amount to be transferred
+      lockedCid <- create Token with
+        holding = (senderHoldingFromTransfer transfer) with
+          lock = Some $ V2.Lock with
+            holders = iid.admin :: accountParties transfer.sender
+            expiresAt = Some transfer.executeBefore
+            expiresAfter = None
+            context = Some $ "transfer to " <> show transfer.receiver
+      -- create transfer offer
+      transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+        transfer = transfer with
+          inputHoldingCids = [toInterfaceContractId lockedCid]
+      pure V2.TransferInstructionResult with
+        senderChangeCids
+        -- Note: we skip over explaining the change in locked holdings to V1 history parsers,
+        -- as their fallback to just show the updated locked balance together with the instruction
+        -- should be sufficient for wallet users to understand what happened.
+        meta = emptyMetadata
+        output = V2.TransferInstructionResult_Pending with transferInstructionCid
 
 -- | Create a V2 allocation
 token_allocationFactoryV2_allocateImpl
@@ -177,6 +309,7 @@ token_allocationFactoryV2_allocateImpl
   -> Update V2.AllocationInstructionResult
 token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
   let authorizer = arg.allocation.authorizer
+  checkActors arg.actors [jointAuthorizers authorizer]
   -- debit all input amounts
   inputAmounts <- fmap (Map.fromListWithR (+)) $ forA arg.inputHoldingCids $ \cid -> do
     let tokenCid = coerceContractId cid : ContractId Token
@@ -252,3 +385,18 @@ unlockTokenAllocationV2 tokenAllocation _extraArgs = do
 
 mergeAmountMaps : Ord k => Map.Map k Decimal -> Map.Map k Decimal -> Map.Map k (Decimal, Decimal)
 mergeAmountMaps = Map.merge (\_ x -> Some (x, 0.0)) (\_ y -> Some (0.0, y)) (\_ x y -> Some (x, y))
+
+archiveLockedHoldingsForTransfer : V2.Transfer -> Update ()
+archiveLockedHoldingsForTransfer transfer =
+  forA_ transfer.inputHoldingCids archive
+
+senderHoldingFromTransfer : V2.Transfer -> V2.HoldingView
+senderHoldingFromTransfer transfer = V2.HoldingView with
+  account = transfer.sender
+  amount = transfer.amount
+  instrumentId = transfer.instrumentId
+  lock = None
+  meta = emptyMetadata
+
+jointAuthorizers : V2.Account -> [Party]
+jointAuthorizers = dedup . accountParties
