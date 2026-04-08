@@ -1,0 +1,129 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: acs-snapshots
+    folder: canton-network
+    interval: 5m
+    rules:
+      - uid: adwt1yr5xuscge
+        title: Saving ACS snapshot taking too long
+        condition: too_long
+        data:
+          - refId: latency
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # The metric only has one sample every ~3h (more if catching up), the 10m range in the expression
+              # has to be longer than the alert evaluation+pending interval.
+              expr: histogram_quantile(0.99, rate(splice_history_acs_snapshots_latency_save_duration_seconds[10m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: latency
+          - refId: too_long
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $ACS_SNAPSHOT_SAVE_LATENCY_THRESHOLD_SECONDS
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: latency
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: too_long
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: The time to save an incremental snapshot was too high. This step scales with the size of the ACS.
+          runbook_url: ""
+          severity: warning
+          summary: Saving an ACS snapshot took longer than {{ humanizeDuration $ACS_SNAPSHOT_SAVE_LATENCY_THRESHOLD_SECONDS }} in {{ index $labels "namespace" }}'s Scan
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A
+        isPaused: false
+      - uid: t2ln0sn2bdfmcd
+        title: Updating ACS snapshot taking too long
+        condition: too_long
+        data:
+          - refId: latency
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # The metric has one sample every ~30sec (more if catching up).
+              # Here we alert on the average update latency, as the 99th percentile is overly noisy.
+              expr: histogram_avg(rate(splice_history_acs_snapshots_latency_update_duration_seconds[10m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: latency
+          - refId: too_long
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $ACS_SNAPSHOT_UPDATE_LATENCY_THRESHOLD_SECONDS
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: latency
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: too_long
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: The time to update an incremental snapshot was too high. This step scales with the TPS.
+          runbook_url: ""
+          severity: warning
+          summary: Updating an ACS snapshot took longer than {{ humanizeDuration $ACS_SNAPSHOT_UPDATE_LATENCY_THRESHOLD_SECONDS }} on average over the past 10min in {{ index $labels "namespace" }}'s Scan
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A
+        isPaused: false
