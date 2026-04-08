@@ -60,10 +60,15 @@ class WalletMetricsTest
           tx.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
           tx.date.value
       }
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
       val metrics = aliceValidatorBackend.metrics
         .get(
           s"$MetricsPrefix.store.last-ingested-record-time-ms",
-          Map("store_party" -> aliceUserParty.toString),
+          Map(
+            "store_party" -> aliceUserParty.toString,
+            "synchronizer_id" -> synchronizerId.logical.toString,
+          ),
         )
         .select[MetricValue.LongPoint]
         .value
@@ -73,8 +78,6 @@ class WalletMetricsTest
         BigDecimal(time.toEpochMilli) - recordTimeLedgerTimeTolerance,
         BigDecimal(time.toEpochMilli) + recordTimeLedgerTimeTolerance,
       )
-      val synchronizerId =
-        sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
       metrics.attributes("synchronizer_id") shouldBe synchronizerId.logical.toString
     }
   }

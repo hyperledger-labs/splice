@@ -150,5 +150,6 @@ Not publishing sequencer successor as we are past upgrade time.*LsuNodeInitializ
 
 # Roll forward tests
 Failed to connect to scan of FAILED Seed URL.*RollForwardLsuIntegrationTest
+Found roll forward config.*but available sequencers.*is less than the trust threshold in the configuration.*RollForwardLsuIntegrationTest
 
 Ryuk has been disabled

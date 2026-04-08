@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
+  ScanRollForwardLsuConfig,
   ScanSynchronizerConfig,
   ScanSynchronizerNodesConfig,
   CacheConfig as SpliceCacheConfig,
@@ -64,6 +65,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
+import pureconfig.configurable.{genericMapReader, genericMapWriter}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
@@ -86,7 +88,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
   SequencerNodeConfig,
 }
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
@@ -478,8 +480,20 @@ object SpliceConfig {
       deriveReader[SpliceCacheConfig]
     implicit val scanSynchronizerNodes: ConfigReader[ScanSynchronizerNodesConfig] =
       deriveReader[ScanSynchronizerNodesConfig]
+    implicit val scanRollForwardLsuConfigReader: ConfigReader[ScanRollForwardLsuConfig] =
+      deriveReader[ScanRollForwardLsuConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
-      deriveReader[ScanAppBackendConfig]
+      deriveReader[ScanAppBackendConfig].emap { conf =>
+        for {
+          _ <- Either.cond(
+            conf.rollForwardLsu.isEmpty || conf.synchronizerNodes.legacy.isDefined,
+            (),
+            ConfigValidationFailed(
+              "If roll forward LSU is configured, the legacy synchronizer must be configured"
+            ),
+          )
+        } yield conf
+      }
 
     implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
       deriveReader[SvAppClientConfig]
@@ -604,6 +618,11 @@ object SpliceConfig {
     implicit val packageVersionConfigReader: ConfigReader[PackageVersion] =
       ConfigReader.fromString(str =>
         PackageVersion.fromString(str).left.map(err => CannotConvert(str, "PackageVersion", err))
+      )
+    implicit val additionalPackagesToUnvetReader
+        : ConfigReader[Map[PackageName, Set[PackageVersion]]] =
+      genericMapReader(str =>
+        PackageName.fromString(str).left.map(err => CannotConvert(str, "PackageName", err))
       )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
@@ -923,6 +942,8 @@ object SpliceConfig {
       ConfigWriter.forProduct1("p2p-url")(c => c.p2pUrl)
     implicit val scanSynchronizerNodes: ConfigWriter[ScanSynchronizerNodesConfig] =
       deriveWriter[ScanSynchronizerNodesConfig]
+    implicit val scanRollForwardLsuConfigWriter: ConfigWriter[ScanRollForwardLsuConfig] =
+      deriveWriter[ScanRollForwardLsuConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
@@ -1047,6 +1068,9 @@ object SpliceConfig {
       implicitly[ConfigWriter[String]].contramap(_.toProtoPrimitive)
     implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
+    implicit val additionalPackagesToUnvetWriter
+        : ConfigWriter[Map[PackageName, Set[PackageVersion]]] =
+      genericMapWriter(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =

@@ -232,7 +232,7 @@ spec:
                       port = 5007
                     }
                   }
-                  {{- with $sync.cometBftConfig }}
+                  {{- with $sync.cometBFT }}
                   comet-bft-config {
                     enabled = {{ .enabled }}
                     {{- if .connectionUri }}
@@ -280,7 +280,7 @@ spec:
             {{- end }}
             {{- range $syncName, $sync := .Values.synchronizers }}
               {{- if kindIs "map" $sync }}
-              {{- if ($sync.cometBftConfig).externalGovernanceKey }}
+              {{- if ($sync.cometBFT).externalGovernanceKey }}
                 {{- $anyGovernanceKey = true }}
               {{- end }}
               {{- end }}

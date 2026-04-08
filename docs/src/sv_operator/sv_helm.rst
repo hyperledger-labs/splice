@@ -90,7 +90,6 @@ Create the application namespace within Kubernetes.
 
     kubectl create ns sv
 
-
 .. _helm-sv-auth:
 
 Configuring Authentication
@@ -438,7 +437,7 @@ Step 1. In ``sv-validator-values.yaml``, add the following ``synchronizer`` conf
 
     synchronizer:
       connectionType: "trust-single"
-      url: "SEQUENCER_PUBLIC_URI" # domain.sequencerPublicUrl from sv-values.yaml
+      url: "SEQUENCER_PUBLIC_URI" # synchronizers.current.sequencerPublicUrl from sv-values.yaml
 
 Step 2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
 
@@ -549,6 +548,8 @@ you will also need to ensure that `persistence.databaseName` is unique per compo
 Installing the Software
 -----------------------
 
+.. include:: ../common/reloader_recommendation.rst
+
 Configuring the Helm Charts
 +++++++++++++++++++++++++++
 
@@ -630,7 +631,7 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the ``auth.audience`` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
-- Please set ``domain.sequencerPublicUrl`` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
+- Please set ``synchronizers.current.sequencerPublicUrl`` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - Please set ``scan.publicUrl`` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - It is recommended to :ref:`configure pruning <sv-pruning>` .
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. If you do not want to share

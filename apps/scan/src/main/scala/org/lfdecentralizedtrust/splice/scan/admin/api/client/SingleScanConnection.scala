@@ -319,12 +319,51 @@ class SingleScanConnection private[client] (
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListFeaturedAppRightsByProvider(providerPartyId),
+    )
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId),
+    )
+  }
+
+  override def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.ListFeaturedAppRight)
+  }
+
   override def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListDsoSequencers(),
+    )
+  }
+
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupRollForwardLsu(),
     )
   }
 

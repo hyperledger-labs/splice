@@ -4,6 +4,8 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.LfPackageId
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.environment.DarResource
 import org.lfdecentralizedtrust.splice.environment.DarResources.{
@@ -12,7 +14,18 @@ import org.lfdecentralizedtrust.splice.environment.DarResources.{
   pkgMetadataToDarResource,
 }
 
-object DarResourcesUtil {
+object DarResourcesUtil extends NamedLogging {
+
+  override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
+
+  val minimalPackageVersions: Seq[DarResource] = packageResources.flatMap(pkg =>
+    pkg.all.filter(p => p.metadata.version == pkg.minimumInitialization.metadata.version)
+  )
+
+  val supportedPackageVersions: Seq[DarResource] =
+    packageResources.flatMap(pkg =>
+      pkg.all.filter(p => p.metadata.version >= pkg.minimumInitialization.metadata.version)
+    )
 
   def lookupPackageId(packageId: String): Option[DarResource] =
     pkgIdToDarResource.get(packageId)
@@ -26,21 +39,37 @@ object DarResourcesUtil {
   def lookupAllPackageVersions(name: PackageName): Seq[DarResource] =
     packageResources.view.flatMap(_.all).toSeq.filter(_.metadata.name == name)
 
+  // TODO(hyperledger-labs/splice#4049): remove `enableUnsupportedDarsUnvetting` once not needed anymore
   def getRequiredPackageVersions(
       name: PackageName,
       upToRequiredVersion: PackageVersion,
       enableUnsupportedDarsUnvetting: Boolean,
       latestPackagesOnly: Boolean = false,
-  ): Seq[DarResource] = {
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
+  )(implicit tc: TraceContext): Seq[DarResource] = {
     val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
-    // TODO(hyperledger-labs/splice#4049): remove enableUnsupportedDarsUnvetting
+    // Ignore unsupported versions that are smaller or equal to the minimum initialization version in order to keep a minimal set of dars
+    val unsupportedVersions = additionalPackagesToUnvet
+      .getOrElse(name, Set.empty)
+      .filter { v =>
+        if (minimumInitializationVersion < v && v <= upToRequiredVersion) {
+          true
+        } else {
+          logger.debug(
+            s"Version $v of package $name configured in `additionalPackagesToUnvet` is smaller or equal to the minimum initialization version $minimumInitializationVersion or larger than $upToRequiredVersion."
+          )
+          false
+        }
+      }
     packageResources.view
       .flatMap(_.all)
       .toSeq
       .filter(_.metadata.name == name)
       .filter(pkg => {
         val version = pkg.metadata.version
-        if (enableUnsupportedDarsUnvetting) {
+        if (unsupportedVersions.contains(version) && enableUnsupportedDarsUnvetting) {
+          false
+        } else if (enableUnsupportedDarsUnvetting) {
           (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
         } else {
           (!latestPackagesOnly && version < upToRequiredVersion) || version == upToRequiredVersion
@@ -49,26 +78,28 @@ object DarResourcesUtil {
       .distinct
   }
 
-  def filterUnsupportedPackageVersions(packageIds: Seq[LfPackageId]): Seq[DarResource] = {
-    val unsupportedDarResources = packageIds
-      .diff(supportedPackageVersions.map(_.packageId))
-      .flatMap(pkg => pkgIdToDarResource.get(pkg))
-    unsupportedDarResources.filter(pkg =>
+  def filterUnsupportedPackageVersions(
+      vettedPackageIds: Seq[LfPackageId],
+      enableUnsupportedDarsUnvetting: Boolean,
+      latestPackagesOnly: Boolean,
+      additionalPackageIdsToUnvet: Map[PackageName, Set[PackageVersion]],
+  )(implicit tc: TraceContext): Seq[DarResource] = {
+    val allSupportedVersionsPackageIds =
       packageResources
-        .find(_.latest.metadata.name == pkg.metadata.name)
-        .getOrElse(
-          throw new NoSuchElementException(s"Could not find PackageResource ${pkg.metadata.name}.")
+        .flatMap(pkg =>
+          getRequiredPackageVersions(
+            pkg.latest.metadata.name,
+            pkg.latest.metadata.version,
+            enableUnsupportedDarsUnvetting,
+            latestPackagesOnly,
+            additionalPackageIdsToUnvet,
+          )
         )
-        .minimumInitialization
-        .metadata
-        .version > pkg.metadata.version
-    )
+        .map(_.packageId)
+    vettedPackageIds
+      .filterNot(allSupportedVersionsPackageIds.contains(_))
+      .flatMap(pkg => pkgIdToDarResource.get(pkg))
   }
-
-  private val supportedPackageVersions: Seq[DarResource] =
-    packageResources.flatMap(pkg =>
-      pkg.all.filter(p => p.metadata.version >= pkg.minimumInitialization.metadata.version)
-    )
 
   private def lookupMinimumPackageResource(name: PackageName): DarResource =
     packageResources
