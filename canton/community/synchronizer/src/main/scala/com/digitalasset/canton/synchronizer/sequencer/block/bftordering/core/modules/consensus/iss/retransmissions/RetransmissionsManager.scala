@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions
@@ -99,30 +99,36 @@ class RetransmissionsManager[E <: Env[E]](
     previousEpochsRetransmissionsTracker.endEpoch(epochNumber, commitCerts)
   }
 
-  def startEpoch(epochState: EpochState[E])(implicit
+  def startEpoch(epochState: EpochState[E], initInProgress: Boolean = false)(implicit
       traceContext: TraceContext
   ): Unit = currentEpoch match {
     case None =>
       currentEpoch = Some(epochState)
       validator = Some(new RetransmissionMessageValidator(epochState.epoch))
 
-      // when we start an epoch, we immediately request retransmissions.
-      // the subsequent requests are done periodically
-      startRetransmissionsRequest()
+      if (!initInProgress)
+        // when we start an epoch, we immediately request retransmissions.
+        // the subsequent requests are done periodically
+        startRetransmissionsRequest()
     case Some(epoch) =>
       abort(
         s"Tried to start epoch ${epochState.epoch.info.number} when ${epoch.epoch.info.number} has not ended"
       )
   }
 
-  def epochEnded(commitCertificates: Seq[CommitCertificate]): Unit =
+  def epochEnded(
+      commitCertificates: Seq[CommitCertificate],
+      initInProgress: Boolean = false,
+  ): Unit =
     currentEpoch match {
       case Some(epoch) =>
         previousEpochsRetransmissionsTracker.endEpoch(epoch.epoch.info.number, commitCertificates)
         currentEpoch = None
         validator = None
-        stopRequesting()
-        recordMetricsAndResetRequestCounts()
+        if (!initInProgress) {
+          stopRequesting()
+          recordMetricsAndResetRequestCounts()
+        }
       case None =>
         abort("Tried to end epoch when there is none in progress")
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -7,8 +7,8 @@ import cats.Monad
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CachingConfigs
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{BatchAggregatorConfig, CachingConfigs}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.*
@@ -330,6 +330,8 @@ trait DbFinalizedResponseStoreTest
         new SymbolicPureCrypto,
         testedProtocolVersion,
         CachingConfigs.defaultFinalizedMediatorConfirmationRequestsCache,
+        BatchAggregatorConfig.defaultsForTesting,
+        BatchAggregatorConfig.defaultsForTesting,
         timeouts,
         loggerFactory,
       )

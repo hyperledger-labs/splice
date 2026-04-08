@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -10,7 +10,10 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.store.ParticipantPruningStore.ParticipantPruningStatus
-import com.digitalasset.canton.participant.store.db.DbParticipantPruningStore
+import com.digitalasset.canton.participant.store.db.{
+  DbParticipantPruningStore,
+  DbParticipantPruningStoreCached,
+}
 import com.digitalasset.canton.participant.store.memory.InMemoryParticipantPruningStore
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
@@ -38,12 +41,23 @@ trait ParticipantPruningStore extends AutoCloseable {
 
 object ParticipantPruningStore {
   def apply(storage: Storage, timeouts: ProcessingTimeout, loggerFactory: NamedLoggerFactory)(
-      implicit executionContext: ExecutionContext
-  ): ParticipantPruningStore =
+      implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): FutureUnlessShutdown[ParticipantPruningStore] =
     storage match {
-      case _: MemoryStorage => new InMemoryParticipantPruningStore(loggerFactory)
+      case _: MemoryStorage =>
+        FutureUnlessShutdown.pure(new InMemoryParticipantPruningStore(loggerFactory))
       case dbStorage: DbStorage =>
-        new DbParticipantPruningStore(dbStoreName, dbStorage, timeouts, loggerFactory)
+        val dbStore = new DbParticipantPruningStore(dbStoreName, dbStorage, timeouts, loggerFactory)
+        dbStore.pruningStatus().map { initialStatus =>
+          new DbParticipantPruningStoreCached(
+            underlying = dbStore,
+            initialStatus = initialStatus,
+            loggerFactory = loggerFactory,
+          )
+        }
+
     }
 
   private val dbStoreName = String36.tryCreate("DbParticipantPruningStore")

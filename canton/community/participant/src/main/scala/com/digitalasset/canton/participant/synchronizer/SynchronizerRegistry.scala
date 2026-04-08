@@ -1,11 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.synchronizer
 
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, ErrorGroup, Explanation, Resolution}
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader.SequencerInfoLoaderError
+import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader.{
+  SequencerAggregatedInfo,
+  SequencerInfoLoaderError,
+}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.SynchronizerPredecessor
 import com.digitalasset.canton.error.*
@@ -43,6 +46,15 @@ trait SynchronizerRegistry extends AutoCloseable {
     Either[SynchronizerRegistryError, (SynchronizerHandle, SynchronizerConnectionConfig)]
   ]
 
+  /** Performs the handshake with the synchronizer.
+    */
+  def pureHandshake(
+      config: SynchronizerConnectionConfig
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[
+    Either[SynchronizerRegistryError, (SequencerAggregatedInfo, SynchronizerConnectionConfig)]
+  ]
 }
 
 sealed trait SynchronizerRegistryError
@@ -91,6 +103,26 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
         ) {
       final case class Error(reason: String)(implicit val loggingContext: ErrorLoggingContext)
           extends CantonError.Impl(cause = "The participant failed to connect to the sequencers")
+          with SynchronizerRegistryError
+    }
+
+    @Explanation(
+      """This error indicates that the participant failed to connect to the sequencers.
+        |The error is transient, so the participant will retry to connect to the sequencers after this error."""
+    )
+    @Resolution(
+      "Inspect the provided reason. Usually this error resolves itself."
+    )
+    object FailedToConnectToSequencersTransient
+        extends ErrorCode(
+          id = "FAILED_TO_CONNECT_TO_SEQUENCERS_TRANSIENT",
+          ErrorCategory.TransientServerFailure,
+        ) {
+      final case class Error(reason: String)(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause = s"The participant temporarily failed to connect to the sequencers: $reason"
+          )
           with SynchronizerRegistryError
     }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -17,7 +17,7 @@ trait ParticipantPruningStoreTest extends AsyncWordSpec with BaseTest with FailO
 
   protected val name: String36 = String36.tryCreate("ParticipantPruningStoreTest")
 
-  private implicit def toOffset(i: Long): Offset = Offset.tryFromLong(i)
+  protected implicit def toOffset(i: Long): Offset = Offset.tryFromLong(i)
 
   "be not pruning in the beginning" in {
     val store = mk()

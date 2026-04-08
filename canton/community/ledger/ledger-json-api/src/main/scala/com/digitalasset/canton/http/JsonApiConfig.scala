@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http
 
-import com.digitalasset.canton.config.CantonConfigValidator
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.http.WebsocketConfig as WSC
 import org.apache.pekko.stream.ThrottleMode
@@ -17,6 +16,7 @@ import scala.concurrent.duration.*
 final case class JsonApiConfig(
     enabled: Boolean = true,
     websocketConfig: Option[WebsocketConfig] = None,
+    //  @deprecated Use ApiLoggingConfig to enable HTTP body logging
     debugLoggingOfHttpBodies: Boolean = false,
     damlDefinitionsServiceEnabled: Boolean = false,
     address: String = JsonApiConfig.defaultAddress,
@@ -32,8 +32,6 @@ final case class JsonApiConfig(
 }
 
 object JsonApiConfig {
-  implicit val jsonApiConfigCantonConfigValidator: CantonConfigValidator[JsonApiConfig] =
-    CantonConfigValidator.validateAll // Do not recurse as there are no enterprise features on the JSON API
   private val defaultAddress: String = java.net.InetAddress.getLoopbackAddress.getHostAddress
   private val defaultRequestTimeout: FiniteDuration = 20.seconds
 }

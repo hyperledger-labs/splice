@@ -4,6 +4,13 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.data.OptionT
+import cats.implicits.{catsSyntaxOptionId, toTraverseOps}
+import com.digitalasset.canton.drivers as proto
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -12,17 +19,12 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerConnection, SynchronizerNodeService}
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeConfigClient
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
-import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,7 +35,7 @@ class PublishLocalCometBftNodeConfigTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     connection: SpliceLedgerConnection,
-    cometBftNode: CometBftNode,
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -47,7 +49,8 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
+      currentNode <- OptionT(synchronizerNodeService.activeSynchronizerNode().map(_.cometbftNode))
+      localSvNodeConfig <- OptionT.liftF(currentNode.getLocalNodeConfig())
       (rulesAndState, synchronizerNodeConfig) <- getCometBftNodeConfigDsoState(
         store,
         store.key.svParty,
@@ -87,9 +90,10 @@ class PublishLocalCometBftNodeConfigTrigger(
   )(implicit tc: TraceContext): Future[Boolean] =
     for {
       staleContracts <- task.dsoRulesAndState.isStale(store.multiDomainAcsStore)
-      currentNodeConfig <- cometBftNode.getLocalNodeConfig()
+      currentNode <- synchronizerNodeService.activeSynchronizerNode().map(_.cometbftNode)
+      currentNodeConfig <- currentNode.traverse(_.getLocalNodeConfig())
     } yield {
-      staleContracts || task.localSvNodeConfig != currentNodeConfig
+      staleContracts || task.localSvNodeConfig.some != currentNodeConfig
     }
 }
 

@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology
 
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
@@ -14,7 +13,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
   TopologyActivationTime,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
+  EpochLength,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology.NodeTopologyInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   OrderingTopology,
@@ -22,50 +24,46 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.SimulationFuture
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.util.Success
 
 class SimulationOrderingTopologyProvider(
     thisNode: BftNodeId,
+    epochLength: EpochLength, // TODO(#24184) make this dynamic sequencing parameter
     getEndpointsToTopologyData: () => Map[P2PEndpoint, NodeSimulationTopologyData],
     loggerFactory: NamedLoggerFactory,
 ) extends OrderingTopologyProvider[SimulationEnv] {
 
-  override def getOrderingTopologyAt(activationTime: TopologyActivationTime)(implicit
+  override def getOrderingTopologyAt(
+      activationTimeO: Option[TopologyActivationTime],
+      checkPendingChanges: Boolean,
+  )(implicit
       traceContext: TraceContext
-  ): SimulationFuture[Option[(OrderingTopology, CryptoProvider[SimulationEnv])]] =
+  ): SimulationFuture[Option[(OrderingTopology, CryptoProvider[SimulationEnv])]] = {
+    val activationTime = activationTimeO.getOrElse(TestBootstrapTopologyActivationTime)
     SimulationFuture(s"getOrderingTopologyAt($activationTime)") { () =>
-      val activeSequencerTopologyData =
-        getEndpointsToTopologyData().view
-          .filter { case (_, topologyData) =>
-            topologyData.onboardingTime.value <= activationTime.value
-            && topologyData.offboardingTime.forall(activationTime.value <= _)
-          }
-          .map { case (endpoint, topologyData) =>
-            endpointToTestBftNodeId(endpoint) -> topologyData
-          }
-          .toMap
+      val activeSequencerTopologyData = getActiveSequencerTopologyData(activationTime)
 
       val topology =
         OrderingTopology(
           activeSequencerTopologyData.view.mapValues { simulationTopologyData =>
             NodeTopologyInfo(
-              activationTime = simulationTopologyData.onboardingTime,
               keyIds = simulationTopologyData
                 .keysForTimestamp(activationTime.value)
                 .view
                 .map(keyPair => FingerprintKeyId.toBftKeyId(keyPair.publicKey.id))
-                .toSet,
+                .toSet
             )
           }.toMap,
+          epochLength, // TODO(#24184) make this dynamic sequencing parameter
           SequencingParameters.Default,
-          MaxRequestSizeToDeserialize.Limit(
-            DynamicSynchronizerParameters.defaultMaxRequestSize.value
-          ),
+          BaseTest.defaultMaxBytesToDecompress,
           activationTime,
           // Switch the value deterministically so that we trigger all code paths.
-          areTherePendingCantonTopologyChanges = activationTime.value.toMicros % 2 == 0,
+          areTherePendingCantonTopologyChanges =
+            Option.when(checkPendingChanges)(activationTime.value.toMicros % 2 == 0),
         )
       Success(
         Some(
@@ -78,4 +76,31 @@ class SimulationOrderingTopologyProvider(
         )
       )
     }
+  }
+
+  override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
+      traceContext: TraceContext
+  ): SimulationFuture[Option[Map[BftNodeId, TopologyActivationTime]]] =
+    SimulationFuture(s"getFirstKnownAt($activationTime)") { () =>
+      Success(
+        Some(
+          getActiveSequencerTopologyData(activationTime).view.mapValues { simulationTopologyData =>
+            simulationTopologyData.onboardingTime
+          }.toMap
+        )
+      )
+    }
+
+  private def getActiveSequencerTopologyData(
+      activationTime: TopologyActivationTime
+  ): Map[BftNodeId, NodeSimulationTopologyData] =
+    getEndpointsToTopologyData().view
+      .filter { case (_, topologyData) =>
+        topologyData.onboardingTime.value <= activationTime.value
+        && topologyData.offboardingTime.forall(activationTime.value <= _)
+      }
+      .map { case (endpoint, topologyData) =>
+        endpointToTestBftNodeId(endpoint) -> topologyData
+      }
+      .toMap
 }

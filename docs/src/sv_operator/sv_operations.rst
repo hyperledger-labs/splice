@@ -847,9 +847,9 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
       persistence:
         txLogStoreDescriptorUserVersion: 2
 
-.. _sv-unvet_unsercure_package_versions:
+.. _sv-unvet_insecure_package_versions:
 
-Unvet unsecure package versions
+Unvet insecure package versions
 -------------------------------
 
 .. warning::

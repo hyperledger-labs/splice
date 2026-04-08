@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -167,6 +167,7 @@ class PingService(
         synchronizerId = synchronizerId.map(_.toProtoPrimitive).getOrElse(""),
         packageIdSelectionPreference = Nil,
         prefetchContractKeys = Nil,
+        tapsMaxPasses = None,
       ),
       timeout.duration.toScala,
     )
@@ -407,7 +408,7 @@ object PingService {
       created.foreach { contract =>
         acs.put(contract.contractId.contractId, contract) match {
           case Some(_) => logger.error(s"Duplicate contract $contract observed!")
-          case None => logger.info(s"Observed create of $contract")
+          case None => logger.debug(s"Observed create of $contract")
         }
         // respond if we are the active instance
         if (isActive) {
@@ -673,7 +674,7 @@ object PingService {
         val duration = clock.now - started
         if (!promise.isCompleted) {
           logger.info(
-            s"Observed archival of ping contract after ${LoggerUtil.roundDurationForHumans(duration.toScala)}"
+            s"Observed archival of ping contract after ${LoggerUtil.roundDurationForHumans(duration)}"
           )
           promise
             .trySuccess(PingService.Success(duration, respondedBy))
@@ -681,7 +682,7 @@ object PingService {
 
         } else {
           logger.info(
-            s"Observed archival of expired ping contract after ${LoggerUtil.roundDurationForHumans(duration.toScala)}"
+            s"Observed archival of expired ping contract after ${LoggerUtil.roundDurationForHumans(duration)}"
           )
         }
       }
@@ -701,7 +702,7 @@ object PingService {
                 "We were able to create the ping contract, but responder did not respond in time"
               else "We were unable to create the ping contract"
             logger.info(
-              s"Ping $id timeout ($reason) out after ${LoggerUtil.roundDurationForHumans((now - started).toScala)}"
+              s"Ping $id timeout ($reason) out after ${LoggerUtil.roundDurationForHumans(now - started)}"
             )
             promise.trySuccess(Failure(s"Timeout: $reason")).discard
           }

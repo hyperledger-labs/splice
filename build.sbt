@@ -5,11 +5,9 @@ import BuildUtil.runCommand
 import Dependencies.*
 import DamlPlugin.autoImport.*
 import BuildCommon.defs.*
-import java.io.ByteArrayInputStream
-import scala.reflect.io.Streamable
-import java.nio
-import scala.jdk.CollectionConverters.*
+
 import sbtassembly.{MergeStrategy, PathList}
+import CantonDependencies.excludeTranscodeConflictingDependencies
 
 /*
  * sbt-settings that will be shared between all Splice apps.
@@ -32,7 +30,6 @@ lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
 lazy val `canton-wartremover-annotations` = BuildCommon.`canton-wartremover-annotations`
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
-lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-observability` = BuildCommon.`canton-util-observability`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
@@ -42,18 +39,14 @@ lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-adjustable-clock` = BuildCommon.`canton-daml-adjustable-clock`
-lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
 lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
-lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-base-errors` = BuildCommon.`canton-base-errors`
-lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
-lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
-lazy val `canton-transcode` = BuildCommon.`canton-transcode`
+lazy val `canton-observability-metrics-testing` = BuildCommon.`canton-observability-metrics-testing`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
@@ -67,6 +60,7 @@ inThisBuild(
     // slows down just the non integration tests which is a really small subset
     // this helps us get actual realistic times for how long a test takes to run
     Test / parallelExecution := false,
+    resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
   )
 )
 
@@ -109,7 +103,6 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
-    `splice-util-token-standard-wallet-test-daml`,
     `splice-util-batched-markers-daml`,
     `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
@@ -143,9 +136,8 @@ lazy val root: Project = (project in file("."))
     `canton-ledger-common`,
     `canton-ledger-api-core`,
     `canton-ledger-api-value`,
-    `canton-ledger-api`,
-    `canton-bindings-java`,
     `canton-google-common-protos-scala`,
+    `canton-observability-metrics-testing`,
     pulumi,
     `load-tester`,
     tools,
@@ -183,6 +175,8 @@ lazy val root: Project = (project in file("."))
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
     Headers.OtherHeaderSettings,
+    // Disable assembly for all submodules as we want to assemble just the splice-node jar from the apps module
+    assembly / aggregate := false,
   )
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
@@ -195,7 +189,7 @@ lazy val `build-tools-dar-lock-checker` = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.better_files,
-      Dependencies.daml_lf_archive_reader,
+      CantonDependencies.daml_lf_archive_reader,
     ),
     Headers.ApacheDAHeaderSettings,
   )
@@ -206,12 +200,14 @@ lazy val `tools` = project
   .settings(
     libraryDependencies += auth0,
     Headers.ApacheDAHeaderSettings,
+    excludeTranscodeConflictingDependencies,
   )
 
 lazy val docs = project
   .in(file("docs"))
   .dependsOn(`apps-common`)
   .settings(
+    excludeTranscodeConflictingDependencies,
     Compile / resourceGenerators += Def.task {
       val baseDir = baseDirectory.value
       val srcDir = sourceDirectory.value
@@ -347,7 +343,6 @@ lazy val `splice-api-token-metadata-v1-daml`: Project =
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value / "openapi-ts-client",
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-holding-v1-daml` =
   project
@@ -358,7 +353,6 @@ lazy val `splice-api-token-holding-v1-daml` =
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-transfer-instruction-v1-daml` =
   project
@@ -385,7 +379,6 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
         },
       cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-allocation-v1-daml` =
   project
@@ -397,7 +390,6 @@ lazy val `splice-api-token-allocation-v1-daml` =
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-allocation-request-v1-daml` =
   project
@@ -410,7 +402,6 @@ lazy val `splice-api-token-allocation-request-v1-daml` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-allocation-instruction-v1-daml` =
   project
@@ -423,7 +414,6 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-api-token-burn-mint-v1-daml` =
   project
@@ -435,7 +425,6 @@ lazy val `splice-api-token-burn-mint-v1-daml` =
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-token-test-trading-app-daml` =
   project
@@ -449,7 +438,6 @@ lazy val `splice-token-test-trading-app-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-token-standard-test-daml` =
   project
@@ -468,7 +456,6 @@ lazy val `splice-token-standard-test-daml` =
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-token-test-dummy-holding-daml` =
   project
@@ -483,7 +470,6 @@ lazy val `splice-token-test-dummy-holding-daml` =
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := true,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `canton-json-api-v2-openapi-ts-client` = project
   .in(file("canton/community/ledger/ledger-json-api/src/test/resources"))
@@ -660,9 +646,6 @@ lazy val `splice-util-daml` =
     .settings(
       BuildCommon.damlSettings
     )
-    .dependsOn(
-      `canton-bindings-java`
-    )
 
 lazy val `splice-featured-app-api-v1-daml` =
   project
@@ -671,9 +654,6 @@ lazy val `splice-featured-app-api-v1-daml` =
     .settings(
       BuildCommon.damlSettings
     )
-    .dependsOn(
-      `canton-bindings-java`
-    )
 
 lazy val `splice-featured-app-api-v2-daml` =
   project
@@ -681,9 +661,6 @@ lazy val `splice-featured-app-api-v2-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings
-    )
-    .dependsOn(
-      `canton-bindings-java`
     )
 
 lazy val `splice-amulet-daml` =
@@ -703,7 +680,6 @@ lazy val `splice-amulet-daml` =
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-amulet-test-daml` =
   project
@@ -716,7 +692,6 @@ lazy val `splice-amulet-test-daml` =
           (`splice-token-standard-test-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-dso-governance-daml` =
   project
@@ -730,7 +705,6 @@ lazy val `splice-dso-governance-daml` =
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-dso-governance-test-daml` =
   project
@@ -746,7 +720,6 @@ lazy val `splice-dso-governance-test-daml` =
           (`splice-wallet-payments-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-validator-lifecycle-daml` =
   project
@@ -756,7 +729,6 @@ lazy val `splice-validator-lifecycle-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-validator-lifecycle-test-daml` =
   project
@@ -767,7 +739,6 @@ lazy val `splice-validator-lifecycle-test-daml` =
       Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value ++ (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we expose to app developers
 // to manage payments through the wallet.
@@ -781,7 +752,6 @@ lazy val `splice-wallet-payments-daml` =
         (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we do not expose to app devs
 // but do use internally, e.g., for batching.
@@ -800,7 +770,6 @@ lazy val `splice-wallet-daml` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-featured-app-proxies-daml` =
   project
@@ -815,7 +784,6 @@ lazy val `splice-util-featured-app-proxies-daml` =
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-token-standard-wallet-daml` =
   project
@@ -830,7 +798,6 @@ lazy val `splice-util-token-standard-wallet-daml` =
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-featured-app-proxies-test-daml` =
   project
@@ -843,7 +810,6 @@ lazy val `splice-util-featured-app-proxies-test-daml` =
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-token-standard-wallet-test-daml` =
   project
@@ -856,7 +822,6 @@ lazy val `splice-util-token-standard-wallet-test-daml` =
           (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-batched-markers-daml` =
   project
@@ -868,7 +833,6 @@ lazy val `splice-util-batched-markers-daml` =
         (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-util-batched-markers-test-daml` =
   project
@@ -880,7 +844,6 @@ lazy val `splice-util-batched-markers-test-daml` =
         (`splice-token-standard-test-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-wallet-test-daml` =
   project
@@ -891,7 +854,6 @@ lazy val `splice-wallet-test-daml` =
       Compile / damlDependencies := (`splice-amulet-test-daml` / Compile / damlBuild).value ++ (`splice-wallet-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-amulet-name-service-daml` =
   project
@@ -901,7 +863,6 @@ lazy val `splice-amulet-name-service-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-amulet-name-service-test-daml` =
   project
@@ -916,7 +877,6 @@ lazy val `splice-amulet-name-service-test-daml` =
           (`splice-token-standard-test-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splitwell-daml` =
   project
@@ -926,7 +886,6 @@ lazy val `splitwell-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `splitwell-test-daml` =
   project
@@ -937,13 +896,11 @@ lazy val `splitwell-test-daml` =
       Compile / damlDependencies := (`splice-wallet-test-daml` / Compile / damlBuild).value ++ (`splitwell-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
-    .dependsOn(`canton-bindings-java`)
 
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
-      `canton-bindings-java` % "test->test",
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test->test",
@@ -1241,6 +1198,7 @@ lazy val `apps-common-frontend` = {
       `token-standard-cli`,
     )
     .settings(
+      excludeTranscodeConflictingDependencies,
       // daml typescript code generation settings:
       damlTsCodegenSources :=
         (`splice-amulet-daml` / Compile / damlBuild).value ++
@@ -1446,7 +1404,7 @@ lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
   bundle := BuildCommon.bundleFrontend.value,
   cleanFiles += baseDirectory.value / "build",
   cleanFiles += baseDirectory.value / "node_modules",
-) ++ Headers.TsHeaderSettings
+) ++ Headers.TsHeaderSettings ++ excludeTranscodeConflictingDependencies
 
 lazy val `apps-wallet-frontend` = {
   project
@@ -1726,14 +1684,15 @@ def getCommittedDarFiles = {
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
     case PathList("buf.yaml") => MergeStrategy.discard
+    case PathList("com", "digitalasset", _*) => MergeStrategy.first
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
     case "reflect.properties" => MergeStrategy.first
+    case PathList("scala", "reflect", "Selectable.class" | "Selectable$.class") =>
+      MergeStrategy.last
     case PathList("org", "checkerframework", _ @_*) => MergeStrategy.first
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
-    case PathList("com", "digitalasset", "canton", "config", "LocalNodeParametersConfig.class") =>
-      MergeStrategy.first
     case PathList("META-INF", "okio.kotlin_module") => MergeStrategy.last
     case PathList(
           "META-INF",
@@ -1756,6 +1715,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
+    case PathList("com", "daml", "ledger", "api", "scalapb", "package.proto") => MergeStrategy.first
     // Hack for not getting trouble with different versions of generated classes of common openapi
     case x @ PathList("org", "lfdecentralizedtrust", "splice", "http", "v0" | "commonAdmin", _*) =>
       MergeStrategy.first
@@ -1765,7 +1725,10 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     // Don't really care about the notice file so just take any.
     case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
-    case x => oldStrategy(x)
+    case "META-INF/license/LICENSE.boringssl.txt" => MergeStrategy.first
+    case path if path.endsWith("/OSGI-INF/MANIFEST.MF") => MergeStrategy.first
+    case x =>
+      oldStrategy(x)
   }
 }
 
@@ -1943,11 +1906,8 @@ checkErrors := {
     import better.files.File
     val logSpecificIgnores =
       if (File(ignorePatternsFilename(logName)).exists()) Seq(logName) else Seq.empty
-    val bftIgnore = if (sys.env.contains("SPLICE_USE_BFT_SEQUENCER")) {
-      Seq("canton_log_bft")
-    } else {
-      Seq.empty
-    }
+    // ideally we would add them only if dabft is enabled but it's too much of a pain to wire it in the github actions
+    val bftIgnore = Seq("canton_log_bft")
 
     val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
     val beforeIgnorePatterns =
@@ -1992,7 +1952,8 @@ lazy val `apps-metrics-docs` =
       `apps-validator`,
     )
     .settings(
-      Headers.ApacheDAHeaderSettings
+      excludeTranscodeConflictingDependencies,
+      Headers.ApacheDAHeaderSettings,
     )
 
 lazy val `apps-dar-resources-generator` =
@@ -2024,7 +1985,7 @@ lazy val `apps-dar-resources-generator` =
       Headers.ApacheDAHeaderSettings,
       libraryDependencies ++= Seq(
         Dependencies.better_files,
-        Dependencies.daml_lf_archive_reader,
+        CantonDependencies.daml_lf_archive_reader,
         CantonDependencies.cats,
       ),
     )
@@ -2155,6 +2116,10 @@ updateTestConfigForParallelRuns := {
     name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
     name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
+  def isLSUTest(name: String): Boolean =
+    name contains "LogicalSynchronizerUpgradeIntegrationTest"
+  def isLSURollForwardTest(name: String): Boolean =
+    name contains "RollForwardLsu"
 
   val allTestNames =
     definedTests
@@ -2279,6 +2244,16 @@ updateTestConfigForParallelRuns := {
       "tests requiring Canton Enterprise",
       "test-full-class-names-canton-enterprise.log",
       (t: String) => isEnterpriseIntegrationTest(t),
+    ),
+    (
+      "tests to check logical sync upgrade",
+      "test-full-class-names-lsu.log",
+      (t: String) => isLSUTest(t),
+    ),
+    (
+      "tests to check logical sync roll-forward upgrade",
+      "test-full-class-names-roll-forward-lsu.log",
+      (t: String) => isLSURollForwardTest(t),
     ),
     (
       "tests with wall clock time",

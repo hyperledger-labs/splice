@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -66,7 +66,6 @@ trait HasReassignmentCommandsHelpers {
 
     val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
-      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
       verbose = true,
@@ -157,7 +156,6 @@ trait HasReassignmentCommandsHelpers {
 
     val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
-      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
       verbose = true,

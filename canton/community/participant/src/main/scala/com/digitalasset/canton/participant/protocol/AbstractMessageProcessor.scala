@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -10,24 +10,26 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
-import com.digitalasset.canton.ledger.participant.state.Update.SequencerIndexMoved
+import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessSet
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
+import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.{
   ConfirmationResponses,
   ProtocolMessage,
   SignedProtocolMessage,
 }
+import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{
   SendAsyncClientError,
   SendCallback,
   SequencerClientSend,
 }
 import com.digitalasset.canton.sequencing.protocol.{Batch, MessageId, Recipients}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, LoggerUtil}
@@ -41,6 +43,7 @@ abstract class AbstractMessageProcessor(
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
+    clock: Clock,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
     with FlagCloseable
@@ -50,10 +53,10 @@ abstract class AbstractMessageProcessor(
 
   protected def terminateRequest(
       requestCounter: RequestCounter,
-      requestSequencerCounter: SequencerCounter,
       requestTimestamp: CantonTimestamp,
       commitTime: CantonTimestamp,
-      eventO: Option[SequencedUpdate],
+      eventO: Option[SequencedEventUpdate],
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     for {
       _ <- ephemeral.requestJournal.terminate(
@@ -61,18 +64,7 @@ abstract class AbstractMessageProcessor(
         requestTimestamp,
         commitTime,
       )
-      _ <- ephemeral.recordOrderPublisher.tick(
-        // providing directly a SequencerIndexMoved with RequestCounter for the non-submitting participant rejections
-        eventO.getOrElse(
-          SequencerIndexMoved(
-            synchronizerId = psid.logical,
-            recordTime = requestTimestamp,
-          )
-        ),
-        requestSequencerCounter,
-        Some(requestCounter),
-      )
-    } yield ()
+    } yield publishUpdate(eventO)
 
   /** A clean replay replays a request whose request counter is below the clean head in the request
     * journal. Since the replayed request is clean, its effects are not persisted.
@@ -80,7 +72,7 @@ abstract class AbstractMessageProcessor(
   protected def isCleanReplay(requestCounter: RequestCounter): Boolean =
     requestCounter < ephemeral.startingPoints.processing.nextRequestCounter
 
-  protected def unlessCleanReplay(requestCounter: RequestCounter)(
+  private def unlessCleanReplay(requestCounter: RequestCounter)(
       f: => FutureUnlessShutdown[?]
   ): FutureUnlessShutdown[Unit] =
     if (isCleanReplay(requestCounter)) FutureUnlessShutdown.unit else f.void
@@ -91,7 +83,11 @@ abstract class AbstractMessageProcessor(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SignedProtocolMessage[ConfirmationResponses]] =
-    SignedProtocolMessage.trySignAndCreate(responses, ips)
+    SignedProtocolMessage.trySignAndCreate(
+      responses,
+      ips,
+      None, // `ConfirmationResponses` are always signed with a `fixed` timestamp.
+    )
 
   // Assumes that we are not closing (i.e., that this is synchronized with shutdown somewhere higher up the call stack)
   protected def sendResponses(
@@ -124,11 +120,17 @@ abstract class AbstractMessageProcessor(
         sendResult = sequencerClient
           .sendAsync(
             Batch.of(psid.protocolVersion, messages*),
-            topologyTimestamp = Some(requestId.unwrap),
-            maxSequencingTime = maxSequencingTime,
+            timestamps = SendRequestTimestamps(
+              topologyTimestamp = Some(requestId.unwrap),
+              // We use `clock.now` to stay consistent with how other submission requests are signed.
+              approximateTimestampForSigning = clock.now,
+              maxSequencingTime = maxSequencingTime,
+            ),
             messageId = messageId.getOrElse(MessageId.randomMessageId()),
             callback = SendCallback.log(s"Response message for request [$requestId]", logger),
             amplify = true,
+            // We want to use a shorter patience for the confirmation responses
+            useConfirmationResponseAmplificationParameters = true,
           )
 
         /*
@@ -164,6 +166,7 @@ abstract class AbstractMessageProcessor(
       requestCounter: RequestCounter,
       sequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     crypto.ips
       .awaitSnapshot(timestamp)
@@ -180,9 +183,14 @@ abstract class AbstractMessageProcessor(
             s"Bad request $requestCounter: Timed out without a confirmation result message."
           )
           synchronizeWithClosing(functionFullName) {
-
             decisionTimeF.flatMap(
-              terminateRequest(requestCounter, sequencerCounter, timestamp, _, None)
+              terminateRequest(
+                requestCounter,
+                timestamp,
+                _,
+                None,
+                publishUpdate,
+              )
             )
 
           }
@@ -240,7 +248,8 @@ abstract class AbstractMessageProcessor(
       requestCounter: RequestCounter,
       sequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
-      eventO: Option[SequencedUpdate],
+      eventO: Option[SequencedEventUpdate],
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     // Let the request immediately timeout (upon the next message) rather than explicitly adding an empty commit set
     // because we don't have a sequencer counter to associate the commit set with.
@@ -250,7 +259,13 @@ abstract class AbstractMessageProcessor(
       sequencerCounter,
       timestamp,
       FutureUnlessShutdown.pure(decisionTime),
-      terminateRequest(requestCounter, sequencerCounter, timestamp, decisionTime, eventO),
+      terminateRequest(
+        requestCounter,
+        timestamp,
+        decisionTime,
+        eventO,
+        publishUpdate,
+      ),
     )
   }
 }

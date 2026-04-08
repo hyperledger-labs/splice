@@ -533,11 +533,16 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-3",
+      "name": "participant-2",
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [],
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -580,7 +585,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 3
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -591,7 +596,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -614,7 +619,7 @@
       },
       "version": "0.3.20"
     },
-    "name": "splitwell-participant-3",
+    "name": "splitwell-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -737,7 +742,7 @@
         "migration": {
           "id": 3
         },
-        "participantHost": "participant-3",
+        "participantHost": "participant-2",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -911,138 +916,141 @@
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
-        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "additionalUsers": [
-          {
-            "name": "SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "splice-app-splitwell-ledger-api-auth",
-                "optional": false
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
+          "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+          "additionalUsers": [
+            {
+              "name": "SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
+              "valueFrom": {
+                "secretKeyRef": {
+                  "key": "ledger-api-user",
+                  "name": "splice-app-splitwell-ledger-api-auth",
+                  "optional": false
+                }
+              }
+            },
+            {
+              "name": "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME",
+              "value": "auth0|63e12e0415ad881ffe914e61"
+            }
+          ],
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
               }
             }
           },
-          {
-            "name": "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME",
-            "value": "auth0|63e12e0415ad881ffe914e61"
-          }
-        ],
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "In",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
-                }
-              ]
+          "appDars": [],
+          "auth": {
+            "audience": "https://canton.network.global",
+            "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+          },
+          "cluster": {
+            "dnsName": "mock.global.canton.network.digitalasset.com",
+            "fixedTokens": false,
+            "hostname": "mock.global.canton.network.digitalasset.com",
+            "name": "cn-mocknet"
+          },
+          "contactPoint": "sv-support@digitalasset.com",
+          "disableAuth": false,
+          "enablePostgresMetrics": true,
+          "failOnAppVersionMismatch": true,
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migration": {
+            "id": 2,
+            "migrating": false
+          },
+          "nodeIdentifier": "splitwell",
+          "onboardingSecretFrom": {
+            "secretKeyRef": {
+              "key": "secret",
+              "name": "splice-app-validator-onboarding-validator",
+              "optional": false
             }
-          }
-        },
-        "appDars": [],
-        "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "disableAuth": false,
-        "enablePostgresMetrics": true,
-        "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migration": {
-          "id": 3,
-          "migrating": false
-        },
-        "nodeIdentifier": "splitwell",
-        "onboardingSecretFrom": {
-          "secretKeyRef": {
-            "key": "secret",
-            "name": "splice-app-validator-onboarding-validator",
-            "optional": false
-          }
-        },
-        "participantAddress": "participant-3",
-        "participantIdentitiesDumpPeriodicBackup": {
-          "backupInterval": "10m",
-          "location": {
-            "bucket": {
-              "bucketName": "da-cn-data-dumps",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-devnet",
-              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-            },
-            "prefix": "mock/splitwell"
-          }
-        },
-        "participantPruningSchedule": {
-          "cron": "0 /10 * * * ?",
-          "maxDuration": "5m",
-          "retention": "30d"
-        },
-        "persistence": {
-          "databaseName": "val_splitwell",
-          "port": 5432,
-          "postgresName": "validator-pg",
-          "schema": "val_splitwell",
-          "secretName": "validator-pg-secrets",
-          "user": "cnadmin"
-        },
-        "pvc": {
-          "volumeName": "domain-migration-validator-hd-pvc",
-          "volumeStorageClass": "hyperdisk-standard-rwo"
-        },
-        "resources": {},
-        "scanAddress": "http://scan-app.sv-1:5012",
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "svSponsorAddress": "http://sv-app.sv-1:5014",
-        "svValidator": false,
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ],
-        "topup": {
-          "enabled": true,
-          "minTopupInterval": "1m",
-          "targetThroughput": 4500
-        },
-        "useSequencerConnectionsFromScan": true,
-        "validatorPartyHint": "digitalasset-splitwell-1",
-        "validatorWalletUsers": [
-          "auth0|65de04b385816c4a38cc044f"
-        ]
+          },
+          "participantAddress": "participant-2",
+          "participantIdentitiesDumpPeriodicBackup": {
+            "backupInterval": "10m",
+            "location": {
+              "bucket": {
+                "bucketName": "da-cn-data-dumps",
+                "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+                "projectId": "da-cn-devnet",
+                "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+              },
+              "prefix": "mock/splitwell"
+            }
+          },
+          "participantPruningSchedule": {
+            "cron": "0 /10 * * * ?",
+            "maxDuration": "5m",
+            "retention": "30d"
+          },
+          "persistence": {
+            "databaseName": "val_splitwell",
+            "port": 5432,
+            "postgresName": "validator-pg",
+            "schema": "val_splitwell",
+            "secretName": "validator-pg-secrets",
+            "user": "cnadmin"
+          },
+          "pvc": {
+            "volumeName": "domain-migration-validator-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "resources": {},
+          "scanAddress": "http://scan-app.sv-1:5012",
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "svSponsorAddress": "http://sv-app.sv-1:5014",
+          "svValidator": false,
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ],
+          "topup": {
+            "enabled": true,
+            "minTopupInterval": "1m",
+            "targetThroughput": 4500
+          },
+          "useSequencerConnectionsFromScan": true,
+          "validatorPartyHint": "digitalasset-splitwell-1",
+          "validatorWalletUsers": [
+            "auth0|65de04b385816c4a38cc044f"
+          ]
+        }
       },
       "version": "0.3.20"
     },

@@ -1,17 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
 
+import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{Hash, TestHash}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.data.{CantonTimestamp, ContractReassignment}
+import com.digitalasset.canton.ledger.participant.state.SynchronizerUpdate
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
@@ -20,11 +21,24 @@ import com.digitalasset.canton.lifecycle.{
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
+import com.digitalasset.canton.participant.admin.party.{
+  GeneratesUniqueUpdateIds,
+  PartyReplicationIndexingWorkflow,
+  PartyReplicationStatus,
+  PartyReplicationTestInterceptor,
+}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
+import com.digitalasset.canton.participant.store.{
+  ContractStore,
+  PartyReplicationIndexingStore,
+  PartyReplicationStateManager,
+}
 import com.digitalasset.canton.participant.util.{CreatesActiveContracts, TimeOfChange}
-import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
+import com.digitalasset.canton.resource.MemoryStorage
+import com.digitalasset.canton.topology.processing.EffectiveTime
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   PartyId,
@@ -40,12 +54,14 @@ import com.digitalasset.canton.{
   NeedsNewLfContractIds,
   ProtocolVersionChecksFixtureAsyncWordSpec,
   ReassignmentCounter,
+  RepairCounter,
 }
 import com.google.protobuf.ByteString
 import org.scalatest.FutureOutcome
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 import scala.util.chaining.scalaUtilChainingOps
 
 /** The PartyReplicationProcessorTest tests that the OnPR ACS replication protocol implemented by
@@ -74,16 +90,21 @@ final class PartyReplicationProcessorTest
     var tpProceedOrWait: PartyReplicationTestInterceptor.ProceedOrWait =
       PartyReplicationTestInterceptor.Proceed
     var tpSendErrorOverrides: Map[String, String] = Map.empty
-    var persistContractResult = EitherTUtil.unitUS[String]
-    var getInternalContractIdsResult = FutureUnlessShutdown.pure(Map.empty[LfContractId, Long])
+    var persistContractMaybeInjectedError: EitherT[FutureUnlessShutdown, String, Unit] =
+      EitherTUtil.unitUS
 
     def targetProcessor: PartyReplicationTargetParticipantProcessor = tp
 
     private def mkTP(): PartyReplicationTargetParticipantProcessor = {
       val rop = mock[RecordOrderPublisher]
       val requestTracker = mock[RequestTracker]
-      when(rop.schedulePublishAddContracts(any[CantonTimestamp => Update])(anyTraceContext))
-        .thenReturn(UnlessShutdown.unit)
+      val indexingStore = mock[PartyReplicationIndexingStore]
+      val contractStoreEval = Eval.always(mock[ContractStore])
+      when(
+        rop.schedulePublishAddContracts(any[CantonTimestamp => SynchronizerUpdate])(
+          anyTraceContext
+        )
+      ).thenReturn(UnlessShutdown.unit)
       when(rop.publishBufferedEvents()).thenReturn(UnlessShutdown.unit)
       when(
         requestTracker.addReplicatedContracts(
@@ -100,26 +121,102 @@ final class PartyReplicationProcessorTest
         )(anyTraceContext)
       )
         .thenReturn(EitherTUtil.unitUS)
+      when(
+        indexingStore.addImportedContractActivations(
+          any[PartyId],
+          any[TimeOfChange],
+          any[NonEmpty[Seq[ContractReassignment]]],
+        )(anyTraceContext)
+      )
+        .thenReturn(FutureUnlessShutdown.unit)
+      // Don't bother handling indexing of contracts as indexing is to be driven asynchronously by the PartyReplicator.
+      when(
+        indexingStore.consumeNextActivationChangesBatch(
+          any[PartyId],
+          any[NonNegativeLong],
+          any[PositiveInt],
+        )(any[GeneratesUniqueUpdateIds])(anyTraceContext)
+      )
+        .thenReturn(FutureUnlessShutdown.pure(None))
+      when(indexingStore.purgeContractActivationChanges(any[PartyId])(anyTraceContext))
+        .thenReturn(FutureUnlessShutdown.unit)
+
+      val inMemoryStorageForTesting = new MemoryStorage(loggerFactory, timeouts)
+      val sourceParticipantId = DefaultTestIdentities.participant1
+      val targetParticipantId = DefaultTestIdentities.participant2
+      val initialStatus = PartyReplicationStatus(
+        PartyReplicationStatus.ReplicationParams(
+          addPartyRequestId,
+          alice,
+          psid.logical,
+          sourceParticipantId,
+          targetParticipantId,
+          PositiveInt.one,
+          ParticipantPermission.Submission,
+        ),
+        testedProtocolVersion,
+        replicationO = Some(
+          PartyReplicationStatus.PersistentProgress(
+            processedContractCount = NonNegativeInt.zero,
+            nextPersistenceCounter = RepairCounter.Genesis,
+            fullyProcessedAcs = false,
+          )
+        ),
+      )
+      def inMemoryStateManager =
+        new PartyReplicationStateManager(
+          targetParticipantId,
+          inMemoryStorageForTesting,
+          futureSupervisor,
+          exitOnFatalFailures = false,
+          loggerFactory,
+          timeouts,
+        ).tap(_.add(initialStatus).value.futureValueUS.value)
+
+      val persistsContracts = new TargetParticipantAcsPersistence.PersistsContracts {
+        def persistContracts(
+            contracts: NonEmpty[Seq[ContractInstance]]
+        )(implicit
+            executionContext: ExecutionContext,
+            traceContext: TraceContext,
+        ): EitherT[FutureUnlessShutdown, String, Map[LfContractId, Long]] =
+          persistContractMaybeInjectedError.map(_ =>
+            contracts.forgetNE.zipWithIndex.map { case (contract, idx) =>
+              contract.contractId -> idx.toLong
+            }.toMap
+          )
+      }
 
       new PartyReplicationTargetParticipantProcessor(
         partyId = alice,
         requestId = addPartyRequestId,
         psid = psid,
-        partyToParticipantEffectiveAt = CantonTimestamp.ofEpochSecond(10),
-        onAcsFullyReplicated = _ => (),
+        partyOnboardingAt = EffectiveTime(CantonTimestamp.ofEpochSecond(10)),
+        replicationProgressState = inMemoryStateManager,
         onError = logger.info(_),
         onDisconnect = logger.info(_)(_),
-        persistContracts = _ => _ => _ => persistContractResult,
-        getInternalContractIds = _ => _ => getInternalContractIdsResult,
-        recordOrderPublisher = rop,
+        persistsContracts = persistsContracts,
         requestTracker = requestTracker,
-        pureCrypto = testSymbolicCrypto,
+        new PartyReplicationIndexingWorkflow(
+          partyId = alice,
+          psid = psid,
+          indexingStore = indexingStore,
+          contractStore = contractStoreEval,
+          recordOrderPublisher = rop,
+          pureCrypto = testSymbolicCrypto,
+          pauseSynchronizerIndexingDuringPartyReplication = true,
+          batchingConfig = BatchingConfig(),
+          loggerFactory = loggerFactory,
+        ),
+        indexingStore = indexingStore,
         futureSupervisor = futureSupervisor,
         exitOnFatalFailures = true,
         timeouts = timeouts,
         loggerFactory = loggerFactory,
         testOnlyInterceptor = new PartyReplicationTestInterceptor {
-          override def onTargetParticipantProgress(store: TargetParticipantStore)(implicit
+          override def onTargetParticipantProgress(
+              progress: PartyReplicationStatus.AcsReplicationProgress
+          )(implicit
               traceContext: TraceContext
           ): PartyReplicationTestInterceptor.ProceedOrWait = tpProceedOrWait
         },
@@ -228,7 +325,7 @@ final class PartyReplicationProcessorTest
             NonNegativeInt.zero
           )
           val firstBatchEndOrdinal =
-            PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime.decrement
+            TargetParticipantAcsPersistence.contractsToRequestEachTime.decrement
           messagesSent(1)._2 shouldBe PartyReplicationTargetParticipantMessage.SendAcsUpTo(
             firstBatchEndOrdinal
           )
@@ -248,7 +345,7 @@ final class PartyReplicationProcessorTest
 
       "handle single ACS batch" onlyRunWith ProtocolVersion.dev inUS { env =>
         import env.*
-        val firstBatchSize = PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime
+        val firstBatchSize = TargetParticipantAcsPersistence.contractsToRequestEachTime
         for {
           _ <- execUntilDone(tp, "initialize tp")(_.onConnected())
           _ <- execUntilDone(tp, "receive acs batch")(
@@ -292,7 +389,7 @@ final class PartyReplicationProcessorTest
       "complain if SP sends more contract batches than requested" onlyRunWith ProtocolVersion.dev inUS {
         env =>
           import env.*
-          val batchSize = PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime
+          val batchSize = TargetParticipantAcsPersistence.contractsToRequestEachTime
           for {
             _ <- execUntilDone(tp, "initialize tp")(_.onConnected())
             // Make the TP processor wait to prevent it from automatically requesting more contracts
@@ -313,7 +410,7 @@ final class PartyReplicationProcessorTest
         env =>
           import env.*
           val batchSizeTooLarge =
-            PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime.increment
+            TargetParticipantAcsPersistence.contractsToRequestEachTime.increment
           for {
             _ <- execUntilDone(tp, "initialize tp")(_.onConnected())
             // Make the TP processor wait to prevent it from automatically requesting more contracts
@@ -358,7 +455,7 @@ final class PartyReplicationProcessorTest
       "log upon problem sending message to SP" onlyRunWith ProtocolVersion.dev inUS { env =>
         import env.*
         // Fail TP send on the second message to request more contracts
-        val acsBatchSize = PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime
+        val acsBatchSize = TargetParticipantAcsPersistence.contractsToRequestEachTime
         val secondRequestUpperBound = acsBatchSize.unwrap * 2 - 1
         tpSendErrorOverrides = Map(
           s"request next set of contracts up to ordinal $secondRequestUpperBound" -> "simulated request batch error"
@@ -369,7 +466,7 @@ final class PartyReplicationProcessorTest
             _ <- execUntilDone(tp, "receive acs batch")(
               _.handlePayload(
                 createAcsBatch(
-                  PartyReplicationTargetParticipantProcessor.contractsToRequestEachTime
+                  TargetParticipantAcsPersistence.contractsToRequestEachTime
                 )
               )
             )
@@ -399,7 +496,7 @@ final class PartyReplicationProcessorTest
       "error when unable to persist contracts" onlyRunWith ProtocolVersion.dev inUS { env =>
         import env.*
 
-        persistContractResult =
+        persistContractMaybeInjectedError =
           EitherT.fromEither[FutureUnlessShutdown](Left("simulated persist contracts error"))
 
         for {
@@ -421,7 +518,7 @@ final class PartyReplicationProcessorTest
       PartyReplicationSourceParticipantMessage.AcsBatch(
         NonEmpty
           .from(
-            (0 until n.unwrap).map(_ => createActiveContractOld())
+            (0 until n.unwrap).map(_ => createActiveContract())
           )
           .getOrElse(fail("should not be empty"))
       ),

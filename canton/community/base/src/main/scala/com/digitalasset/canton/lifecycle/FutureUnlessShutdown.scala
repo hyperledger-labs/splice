@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -135,6 +135,9 @@ object FutureUnlessShutdown {
   ): FutureUnlessShutdown[T] =
     FutureUnlessShutdown.unit.flatMap(_ => body)
 
+  /** Analog to [[scala.concurrent.Future]]`.successful`, but with a value of [[UnlessShutdown]] */
+  def fromUnlessShutdown[T](value: UnlessShutdown[T]): FutureUnlessShutdown[T] =
+    FutureUnlessShutdown(Future.successful(value))
 }
 
 /** Monad combination of `Future` and [[UnlessShutdown]]
@@ -517,12 +520,12 @@ object FutureUnlessShutdownImpl {
   }
 
   implicit class TimerOnShutdownSyntax(private val timed: Timed.type) extends AnyVal {
-    def future[T](timer: Timer, future: => FutureUnlessShutdown[T]): FutureUnlessShutdown[T] =
+    def futureUS[T](timer: Timer, future: => FutureUnlessShutdown[T]): FutureUnlessShutdown[T] =
       FutureUnlessShutdown(timed.future(timer, future.unwrap))
   }
 
   implicit class TrackOnShutdownSyntax(private val tracked: Tracked.type) extends AnyVal {
-    def future[T](track: Counter, future: => FutureUnlessShutdown[T]): FutureUnlessShutdown[T] =
+    def futureUS[T](track: Counter, future: => FutureUnlessShutdown[T]): FutureUnlessShutdown[T] =
       FutureUnlessShutdown(tracked.future(track, future.unwrap))
   }
 
@@ -534,6 +537,6 @@ object FutureUnlessShutdownImpl {
         track: Counter,
         future: => FutureUnlessShutdown[T],
     ): FutureUnlessShutdown[T] =
-      timed.future(timer, Tracked.future(track, future))
+      FutureUnlessShutdown(timed.future(timer, Tracked.future(track, future.unwrap)))
   }
 }

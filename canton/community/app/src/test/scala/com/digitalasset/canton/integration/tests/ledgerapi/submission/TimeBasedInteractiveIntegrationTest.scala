@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.submission
@@ -13,16 +13,11 @@ import com.digitalasset.canton.damltests.java.cycle.Cycle
 import com.digitalasset.canton.damltests.java.statictimetest.Pass
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseProgrammableSequencer
 import com.digitalasset.canton.integration.tests.ledgerapi.submission.BaseInteractiveSubmissionTest.defaultConfirmingParticipant
 import com.digitalasset.canton.integration.util.UpdateFormatHelpers.getUpdateFormat
-import com.digitalasset.canton.integration.{
-  CommunityIntegrationTest,
-  ConfigTransforms,
-  EnvironmentDefinition,
-  HasCycleUtils,
-  SharedEnvironment,
-}
+import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.TimeoutError
 import com.digitalasset.canton.synchronizer.sequencer.{
   HasProgrammableSequencer,
@@ -30,12 +25,14 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SendPolicy,
 }
 import com.digitalasset.canton.topology.{ExternalParty, ForceFlags}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{HasExecutionContext, config}
 import com.digitalasset.daml.lf.data.Time
 import io.grpc.Status
 import scalapb.TimestampConverters
 
 import java.time.{Duration, Instant}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Random
 
 /** Test interactive submission where the preparing, submitting and executing participants are all
@@ -46,8 +43,8 @@ final class TimeBasedInteractiveIntegrationTest
     with SharedEnvironment
     with BaseInteractiveSubmissionTest
     with HasCycleUtils
-    with HasExecutionContext
-    with HasProgrammableSequencer {
+    with HasProgrammableSequencer
+    with HasExecutionContext {
 
   private val oneDay = Duration.ofHours(24)
   private val ledgerTimeRecordTimeTolerance = Duration.ofSeconds(60)
@@ -55,7 +52,9 @@ final class TimeBasedInteractiveIntegrationTest
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
-      .addConfigTransform(ConfigTransforms.useStaticTime)
+      .addConfigTransforms(
+        ConfigTransforms.useStaticTime
+      )
       .withSetup { implicit env =>
         import env.*
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
@@ -75,7 +74,7 @@ final class TimeBasedInteractiveIntegrationTest
           force = ForceFlags.all,
         )
 
-        aliceE = participant3.parties.external.enable("Alice")
+        aliceE = participant3.parties.testing.external.enable("Alice")
 
       }
       .addConfigTransform(ConfigTransforms.enableInteractiveSubmissionTransforms)
@@ -135,6 +134,7 @@ final class TimeBasedInteractiveIntegrationTest
         Seq(command),
         disclosedContracts = Seq(passContract),
         minLedgerTimeAbs = Some(ledgerTimeSet),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       prepared.preparedTransaction.value.metadata.value.minLedgerEffectiveTime shouldBe Some(
         ledgerTimeSet.toEpochMilli * 1000
@@ -153,6 +153,7 @@ final class TimeBasedInteractiveIntegrationTest
         Seq(aliceE.partyId),
         Seq(createPassCmd(aliceE)),
         minLedgerTimeAbs = Some(simClock.now.toInstant.plusSeconds(20)),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       prepared.preparedTransaction.value.metadata.value.minLedgerEffectiveTime shouldBe None
       prepared.preparedTransaction.value.metadata.value.maxLedgerEffectiveTime shouldBe None
@@ -170,6 +171,7 @@ final class TimeBasedInteractiveIntegrationTest
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       val signatures = Map(
         aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)
@@ -178,11 +180,60 @@ final class TimeBasedInteractiveIntegrationTest
       execAndWait(prepared, signatures).discard
     }
 
-    "respect max record time" in { implicit env =>
+    "enforce max record time" onlyRunWithOrGreaterThan ProtocolVersion.v35 in { implicit env =>
       import env.*
       // Use another party so there's no concurrent updates of its acs with previous tests
-      val johnE = participant3.parties.external.enable("John")
+      val johnE = participant3.parties.testing.external.enable("John")
       val simClock = env.environment.simClock.value
+
+      def test(maxRecordTimeAdjustment: FiniteDuration, expectSuccess: Boolean): Unit = {
+
+        val maxRecordTime = simClock.now.add(maxRecordTimeAdjustment)
+        val prepared =
+          cpn.ledger_api.interactive_submission.prepare(
+            Seq(johnE),
+            Seq(createCycleCommand(johnE, "test")),
+            maxRecordTime = Some(maxRecordTime),
+            hashingSchemeVersion = testedApiHashingSchemeVersion,
+          )
+
+        val signatures = Map(
+          johnE.partyId -> global_secret.sign(prepared.preparedTransactionHash, johnE)
+        )
+
+        val (submissionId, ledgerEnd) = exec(prepared, signatures, epn)
+        val completion = findCompletion(submissionId, ledgerEnd, johnE, epn)
+        if (expectSuccess) {
+          completion.status.value.code shouldBe io.grpc.Status.Code.OK.value()
+        } else {
+          completion.status.value.code shouldBe io.grpc.Status.Code.ABORTED.value()
+          completion.status.value.message should include regex (
+            s"LOCAL_VERDICT_MAX_RECORD_TIME_EXCEEDED.*Rejected transaction as record time exceeds the maximum record time:.*maxRecordTime=${maxRecordTime.toString}"
+          )
+        }
+      }
+
+      test(60.seconds, expectSuccess = true)
+
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        test(-60.seconds, expectSuccess = false),
+        LogEntry.assertLogSeq(
+          Seq(
+            (
+              _.warningMessage should include regex "Time validation has failed: The record time.*exceeds the maximum record time",
+              "time validation",
+            )
+          )
+        ),
+      )
+    }
+
+    "respect max record time" onlyRunWith ProtocolVersion.v34 in { implicit env =>
+      import env.*
+      // Use another party so there's no concurrent updates of its acs with previous tests
+      val johnE = participant3.parties.testing.external.enable("John")
+      val simClock = env.environment.simClock.value
+
       def getJohnAcsSize = participant3.ledger_api.state.acs.of_party(johnE).size
 
       def test(sequenceAt: CantonTimestamp => CantonTimestamp, expectSuccess: Boolean): Unit = {
@@ -195,6 +246,7 @@ final class TimeBasedInteractiveIntegrationTest
             Seq(johnE),
             Seq(createCycleCommand(johnE, "test")),
             maxRecordTime = Some(maxRecordTime),
+            hashingSchemeVersion = testedApiHashingSchemeVersion,
           )
 
         val signatures = Map(
@@ -269,6 +321,7 @@ final class TimeBasedInteractiveIntegrationTest
             aliceE.toProtoPrimitive,
           ).create.commands.loneElement
         ),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       val signatures = Map(
         aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)
@@ -311,6 +364,7 @@ final class TimeBasedInteractiveIntegrationTest
           Seq(command),
           disclosedContracts = Seq(passContract),
           minLedgerTimeAbs = Some(ledgerTimeSet),
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
       val ledgerTimeUsed = Time
         .Timestamp(prepared.preparedTransaction.value.metadata.value.minLedgerEffectiveTime.value)
@@ -327,6 +381,7 @@ final class TimeBasedInteractiveIntegrationTest
         Seq(aliceE.partyId),
         Seq(command),
         minLedgerTimeAbs = Some(expected),
+        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
       val actual =
         Time.Timestamp(prepared.preparedTransaction.value.metadata.value.preparationTime).toInstant
@@ -352,6 +407,7 @@ final class TimeBasedInteractiveIntegrationTest
           Seq(command),
           disclosedContracts = Seq(passContract),
           minLedgerTimeAbs = Some(expected.toInstant),
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
 
       prepared.getPreparedTransaction.getMetadata.getMinLedgerEffectiveTime shouldBe expected.micros

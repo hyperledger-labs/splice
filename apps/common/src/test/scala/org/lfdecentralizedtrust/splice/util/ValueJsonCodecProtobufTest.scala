@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.javaapi.data as JavaApi
-import com.daml.ledger.javaapi.data.Generators.valueGen
+import org.lfdecentralizedtrust.splice.util.Generators.valueGen
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks

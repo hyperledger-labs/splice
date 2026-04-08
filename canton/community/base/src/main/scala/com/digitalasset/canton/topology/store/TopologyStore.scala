@@ -1,12 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.store
 
 import cats.Monoid
-import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse1
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
@@ -15,11 +14,9 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.parallelInstanceFutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -36,8 +33,10 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactions.{
 }
 import com.digitalasset.canton.topology.store.TopologyStore.{
   EffectiveStateChange,
+  StateKeyFetch,
   TopologyStoreDeactivations,
 }
+import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction.GenericValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.db.DbTopologyStore
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
@@ -169,6 +168,13 @@ final case class StoredTopologyTransaction[+Op <: TopologyChangeOp, +M <: Topolo
   def selectOp[TargetOp <: TopologyChangeOp: ClassTag] = transaction
     .selectOp[TargetOp]
     .map(_ => this.asInstanceOf[StoredTopologyTransaction[TargetOp, M]])
+
+  def isActiveAsOf(asOf: EffectiveTime, asOfInclusive: Boolean): Boolean =
+    if (asOfInclusive)
+      validFrom.value <= asOf.value && validUntil.forall(x => x.value > asOf.value)
+    else
+      validFrom.value < asOf.value && validUntil.forall(x => x.value >= asOf.value)
+
 }
 
 object StoredTopologyTransaction
@@ -205,27 +211,6 @@ object StoredTopologyTransaction
   type GenericStoredTopologyTransaction =
     StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]
 
-  /** @return
-    *   `true` if both transactions are the same without comparing the signatures, `false` otherwise
-    */
-  def equalIgnoringSignatures(
-      a: GenericStoredTopologyTransaction,
-      b: GenericStoredTopologyTransaction,
-  ): Boolean = a match {
-    case StoredTopologyTransaction(
-          b.sequenced,
-          b.validFrom,
-          b.validUntil,
-          SignedTopologyTransaction(
-            b.transaction.transaction,
-            _ignoreSignatures,
-            b.transaction.isProposal,
-          ),
-          b.rejectionReason,
-        ) =>
-      true
-    case _ => false
-  }
 }
 
 final case class ValidatedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapping](
@@ -278,7 +263,17 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     * @param includeRejected
     *   whether to include rejected transactions
     */
-  def maxTimestamp(sequencedTime: SequencedTime, includeRejected: Boolean)(implicit
+  def maxTimestamp(
+      sequencedTime: SequencedTime,
+      includeRejected: Boolean,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]]
+
+  /** Returns the timestamps of the latest accepted topology change (non-proposal and non-rejected),
+    * in the store.
+    */
+  def latestTopologyChangeTimestamp()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]]
 
@@ -299,10 +294,6 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
   ): FutureUnlessShutdown[Unit]
 
   def findLatestTransactionsAndProposalsByTxHash(hashes: Set[TxHash])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]]
-
-  def findProposalsByTxHash(asOfExclusive: EffectiveTime, hashes: NonEmpty[Set[TxHash]])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]]
 
@@ -327,6 +318,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       types: Seq[TopologyMapping.Code],
       filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
       filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[PositiveStoredTopologyTransactions]
@@ -341,7 +333,31 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       types: Seq[TopologyMapping.Code],
       filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
       filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[NegativeStoredTopologyTransactions]
+
+  def findAllTransactions(
+      asOf: CantonTimestamp,
+      asOfInclusive: Boolean,
+      isProposal: Boolean,
+      types: Seq[TopologyMapping.Code],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]]
+
+  /** Fetch all items for the given state keys in descending order
+    *
+    * This function is used by the batch loader. As such, we assume that the request is already
+    * batched and therefore that the number of items is capped
+    */
+  def fetchAllDescending(
+      items: Seq[StateKeyFetch]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[GenericStoredTopologyTransactions]
 
   /** Updates topology transactions. The method proceeds as follows: For each mapping hash, it will
     * have optionally a serial and a set of tx hashes. The tx hashes represent proposals which must
@@ -403,6 +419,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       asOfExclusive: CantonTimestamp,
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PartyId]]
 
   /** Finds the topology transaction that first onboarded the sequencer with ID `sequencerId`
@@ -548,6 +565,16 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
   ): FutureUnlessShutdown[Seq[EffectiveStateChange]]
 
   def deleteAllData()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
+
+  /** Copies the topology state from an existing topology store. Should only be done if the local
+    * copy is functionally equivalent to downloading the topology state from the sequencer.
+    * @param sourceStore
+    *   The store from which the topology state should be copied.
+    */
+  def copyFromPredecessorSynchronizerStore(sourceStore: TopologyStore[SynchronizerStore])(implicit
+      ev: StoreID <:< SynchronizerStore,
+      errorLoggingContext: ErrorLoggingContext,
+  ): FutureUnlessShutdown[Unit]
 }
 
 object TopologyStore {
@@ -597,7 +624,8 @@ object TopologyStore {
       }
     }
 
-  lazy val initialParticipantDispatchingSet: Set[TopologyMapping.Code] = Set(
+  lazy val initialParticipantDispatchingSet: NonEmpty[Set[TopologyMapping.Code]] = NonEmpty(
+    Set,
     TopologyMapping.Code.SynchronizerTrustCertificate,
     TopologyMapping.Code.OwnerToKeyMapping,
     TopologyMapping.Code.NamespaceDelegation,
@@ -606,9 +634,9 @@ object TopologyStore {
   def filterInitialParticipantDispatchingTransactions(
       participantId: ParticipantId,
       synchronizerId: SynchronizerId,
-      transactions: Seq[GenericStoredTopologyTransaction],
+      transactions: Seq[GenericSignedTopologyTransaction],
   ): Seq[GenericSignedTopologyTransaction] =
-    transactions.map(_.transaction).filter { signedTx =>
+    transactions.filter { signedTx =>
       initialParticipantDispatchingSet.contains(signedTx.mapping.code) &&
       signedTx.mapping.maybeUid.forall(_ == participantId.uid) &&
       signedTx.mapping.namespace == participantId.namespace &&
@@ -649,41 +677,63 @@ object TopologyStore {
       mappings: Seq[TopologyMapping],
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   ): Set[PartyId] = {
     val (filterPartyIdentifier, filterPartyNamespaceO) =
       UniqueIdentifier.splitFilter(filterParty)
     val (
       filterParticipantIdentifier,
       filterParticipantNamespaceO,
-    ) =
-      UniqueIdentifier.splitFilter(filterParticipant)
-    val validParticipants = mappings.collect { case SynchronizerTrustCertificate(pid, _, _) =>
-      pid
-    }.toSet
-    val validParties = mutable.HashSet[PartyId]()
-    mappings.foreach {
-      case ptp: PartyToParticipant
-          if (filterParty.isEmpty || ptp.partyId.uid
-            .matchesFilters(filterPartyIdentifier, filterPartyNamespaceO)) &&
-            (filterParticipant.isEmpty || ptp.participants
-              .exists(
-                _.participantId.uid
-                  .matchesFilters(filterParticipantIdentifier, filterParticipantNamespaceO)
-              )) && ptp.participants.exists(h => validParticipants.contains(h.participantId)) =>
-        validParties.add(ptp.partyId).discard
-      case cert: SynchronizerTrustCertificate
-          if (filterParty.isEmpty || cert.participantId.adminParty.uid
-            .matchesFilters(filterPartyIdentifier, filterPartyNamespaceO))
-            && (filterParticipant.isEmpty || cert.participantId.adminParty.uid.matchesFilters(
-              filterParticipantIdentifier,
-              filterParticipantNamespaceO,
-            ))
-            && validParticipants
-              .contains(cert.participantId) =>
-        validParties.add(cert.participantId.adminParty).discard
-      case _ => ()
-    }
-    validParties.toSet
+    ) = UniqueIdentifier.splitFilter(filterParticipant)
+
+    val validParties = mappings.view
+      .collect {
+        case ptp: PartyToParticipant => (ptp.partyId, ptp.participantIds)
+        case cert: SynchronizerTrustCertificate =>
+          (cert.participantId.adminParty, Seq(cert.participantId))
+      }
+      .filter { case (partyId, participants) =>
+        lazy val matchesPartyFilter =
+          partyId.uid.matchesFilters(filterPartyIdentifier, filterPartyNamespaceO)
+        lazy val matchesParticipantFilter = participants.exists(
+          _.uid.matchesFilters(filterParticipantIdentifier, filterParticipantNamespaceO)
+        )
+
+        (filterParty.isEmpty || matchesPartyFilter) && (filterParticipant.isEmpty || matchesParticipantFilter)
+      }
+      .map { case (partyId, _) => partyId }
+      // use LinkedHashSet so that in the end we can return a result that is limited and stable, based on the order
+      // of appearance in mappings
+      .to(mutable.LinkedHashSet)
+    validParties.take(limit).toSet
+  }
+
+  /** Data type to instruct state fetching
+    *
+    * @param identifier
+    *   the identifier if we are fetching by uid, empty for NSD and DND
+    * @param validUntilCutoff
+    *   fetch all state changes which are relevant starting from validUntilCutOff (including) until
+    *   infinity
+    */
+  final case class StateKeyFetch(
+      code: TopologyMapping.Code,
+      namespace: Namespace,
+      identifier: Option[String185],
+      validUntilCutoff: EffectiveTime,
+  ) extends PrettyPrinting {
+    override protected def pretty: Pretty[StateKeyFetch] = StateKeyFetch.pretty
+  }
+  object StateKeyFetch {
+    import com.digitalasset.canton.logging.pretty.PrettyUtil.*
+    import com.digitalasset.canton.util.ShowUtil.*
+
+    val pretty: Pretty[StateKeyFetch] = prettyOfClass[StateKeyFetch](
+      param("code", _.code.code.unquoted),
+      param("namespace", _.namespace),
+      paramIfDefined("identifier", _.identifier.map(_.str.unquoted)),
+      param("cutoff", _.validUntilCutoff.value),
+    )
   }
 
 }
@@ -746,10 +796,6 @@ object UnknownOrUnvettedPackages {
 
     }
 
-  def unknown(participantId: ParticipantId, packageId: PackageId): UnknownOrUnvettedPackages =
-    empty.copy(unknown = Map(participantId -> Set(packageId)))
-  def unvetted(participantId: ParticipantId, packageId: PackageId): UnknownOrUnvettedPackages =
-    empty.copy(unvetted = Map(participantId -> Set(packageId)))
   def unvetted(
       participantId: ParticipantId,
       packageIds: Set[PackageId],
@@ -767,17 +813,13 @@ final case class UnknownOrUnvettedPackages(
 }
 
 trait PackageDependencyResolver {
-
-  def packageDependencies(packageId: PackageId)(implicit
+  def packageDependencies(packages: Set[PackageId])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]]
+  ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]]
+}
 
-  def packageDependencies(packages: List[PackageId])(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]] =
-    packages
-      .parTraverse(packageDependencies)
-      .map(_.flatten.toSet -- packages)
-
+object NoPackageDependencies extends PackageDependencyResolver {
+  override def packageDependencies(packages: Set[PackageId])(implicit
+      traceContext: TraceContext
+  ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]] = Right(Set.empty[PackageId])
 }

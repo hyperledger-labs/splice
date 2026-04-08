@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.service
@@ -40,6 +40,10 @@ class GrpcMediatorInitializationService(
         InitializeMediatorRequest
           .fromProtoV30(requestP)
           .leftMap(ProtoDeserializationFailure.Wrap(_))
+      )
+      _ <- EitherT.fromEither[Future](
+        request.sequencerConnections.submissionRequestAmplification.validate
+          .leftMap(FailedToInitialiseSynchronizerNode.Failure(_))
       )
       result <- handler
         .initialize(request)

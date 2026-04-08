@@ -1,14 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{
   AcsInspection,
@@ -166,10 +165,10 @@ sealed trait ReassignmentConfirmationPoliciesPartyIntegrationTest
       .reassignmentId
 
     PartyToParticipantDeclarative(Set(participant1, participant2), Set(daId, acmeId))(
-      owningParticipants = Map(alice -> participant1),
+      owningParticipants = Map(alice.partyId -> participant1),
       targetTopology = Map(
         // Only: alice -> P2 -> acme
-        alice -> Map(
+        alice.partyId -> Map(
           acmeId -> (PositiveInt.one, Set((participant2, Confirmation)))
         )
       ),
@@ -185,7 +184,7 @@ class ReassignmentConfirmationPoliciesPartyIntegrationTestPostgres
     extends ReassignmentConfirmationPoliciesPartyIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2")).map(_.map(InstanceName.tryCreate))

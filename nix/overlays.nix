@@ -6,7 +6,7 @@
   openapi-generator-cli = super.callPackage ./openapi-generator-cli.nix {};
   jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
-  canton = super.callPackage ./canton.nix {inherit use_enterprise;};
+  canton = super.callPackage ./canton.nix {};
   dpm = super.callPackage ./dpm-sdk.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
   daml2js = super.callPackage ./daml2js.nix {inherit use_enterprise;};

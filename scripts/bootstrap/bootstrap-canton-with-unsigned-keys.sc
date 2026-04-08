@@ -14,7 +14,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp
+import com.digitalasset.canton.topology.transaction.{OwnerToKeyMapping, TopologyChangeOp}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
 import com.digitalasset.canton.topology.store.{
@@ -22,7 +22,6 @@ import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactions,
 }
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnectionPoolDelays}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 
 println("Running canton bootstrap script...")
@@ -35,7 +34,9 @@ def dropSignatures(tx: GenericSignedTopologyTransaction): GenericSignedTopologyT
   tx.transaction.mapping match {
     case OwnerToKeyMapping(member, _) =>
       val signaturesToRemove =
-        tx.signatures.forgetNE.filter(_.authorizingLongTermKey != member.namespace.fingerprint).map(_.authorizingLongTermKey)
+        tx.signatures.forgetNE
+          .filter(_.authorizingLongTermKey != member.namespace.fingerprint)
+          .map(_.authorizingLongTermKey)
       tx.removeSignatures(signaturesToRemove).get
     case _ => tx
   }
@@ -43,7 +44,11 @@ def dropSignatures(tx: GenericSignedTopologyTransaction): GenericSignedTopologyT
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v34, NonNegativeInt.zero)
+    .toStaticSynchronizerParameters(
+      sequencer.config.crypto,
+      ProtocolVersion.v34,
+      NonNegativeInt.zero,
+    )
     .map(StaticSynchronizerParameters(_))
     .getOrElse(sys.error("whatever"))
 
@@ -71,7 +76,8 @@ def bootstrapDomainWithUnsignedKeys(
   val synchronizerId = SynchronizerId(
     UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
   )
-  val physicalSynchronizerId = PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v34)
+  val physicalSynchronizerId =
+    PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v34)
 
   val tempStoreForBootstrap = synchronizerOwners
     .map(
@@ -84,7 +90,9 @@ def bootstrapDomainWithUnsignedKeys(
     .getOrElse(sys.error("No synchronizer owners specified."))
 
   val identityTransactions =
-    ((sequencers : Seq[com.digitalasset.canton.console.InstanceReference]) ++ mediators ++ synchronizerOwners ++ Seq(extraParticipant)).flatMap(
+    ((sequencers: Seq[
+      com.digitalasset.canton.console.InstanceReference
+    ]) ++ mediators ++ synchronizerOwners ++ Seq(extraParticipant)).flatMap(
       _.topology.transactions.identity_transactions()
     )
 
@@ -156,7 +164,7 @@ def bootstrapDomainWithUnsignedKeys(
             PositiveInt.tryCreate(5),
             NonNegativeFiniteDuration.ofSeconds(10),
           ),
-          SequencerConnectionPoolDelays.default
+          SequencerConnectionPoolDelays.default,
         ),
         // if we run bootstrap ourselves, we should have been able to reach the nodes
         // so we don't want the bootstrapping to fail spuriously here in the middle of
@@ -212,7 +220,8 @@ Files.write(
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()
 participants.local.foreach(participant => {
-  val adminToken = participant.underlying.map(_.adminTokenDispenser.getCurrentToken.secret).getOrElse("")
+  val adminToken =
+    participant.underlying.map(_.adminTokenDispenser.getCurrentToken.secret).getOrElse("")
   val port = participant.config.ledgerApi.internalPort.get.unwrap
   adminTokensData.append(s"$port" -> adminToken)
 })

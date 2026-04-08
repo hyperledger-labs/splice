@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -6,26 +6,28 @@ package com.digitalasset.canton.sequencing.client
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.sequencing.SequencerAggregator.SequencerAggregatorError
 import com.digitalasset.canton.sequencing.{SequencedSerializedEvent, SequencerAggregator}
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutionContext,
-  ProtocolVersionChecksFixtureAnyWordSpec,
+  TestPredicateFiltersFixtureAnyWordSpec,
 }
 import com.google.protobuf.ByteString
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.{Assertion, Outcome}
 
+import scala.concurrent.duration.*
 import scala.concurrent.{Future, Promise}
 
 class SequencerAggregatorTest
     extends FixtureAnyWordSpec
     with BaseTest
     with ScalaFutures
-    with ProtocolVersionChecksFixtureAnyWordSpec
+    with TestPredicateFiltersFixtureAnyWordSpec
     with HasExecutionContext {
 
   override type FixtureParam = SequencedEventTestFixture
@@ -127,9 +129,7 @@ class SequencerAggregatorTest
 
       assertDownstreamMessage(aggregator, aliceEvents(1))
 
-      aggregator.changeMessageAggregationConfig(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), 2)
-      )
+      aggregator.changeMessageAggregationConfig(config(2))
 
       val f1 = aggregator
         .combineAndMergeEvent(sequencerAlice, aliceEvents(2))
@@ -150,9 +150,7 @@ class SequencerAggregatorTest
     "support reconfiguration to another sequencer" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice), 1)
-      )
+      val aggregator = mkAggregator(config(1))
 
       assertNoMessageDownstream(aggregator)
 
@@ -162,9 +160,7 @@ class SequencerAggregatorTest
 
       assertDownstreamMessage(aggregator, aliceEvents(0))
 
-      aggregator.changeMessageAggregationConfig(
-        config(Set(sequencerBob), 1)
-      )
+      aggregator.changeMessageAggregationConfig(config(1))
 
       aggregator
         .combineAndMergeEvent(sequencerBob, bobEvents(0)) // arrived late event which we ignore
@@ -184,9 +180,7 @@ class SequencerAggregatorTest
       val event1 = createEvent().futureValueUS
       val event2 = createEvent().futureValueUS
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       assertNoMessageDownstream(aggregator)
 
@@ -215,9 +209,7 @@ class SequencerAggregatorTest
       val event1 = createEvent().futureValueUS
       val event2 = createEvent(serializedOverride = Some(ByteString.EMPTY)).futureValueUS
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
       val f1 = aggregator
         .combineAndMergeEvent(sequencerAlice, event1)
 
@@ -240,9 +232,7 @@ class SequencerAggregatorTest
       val events = (1 to 2).map(s =>
         createEvent(timestamp = CantonTimestamp.Epoch.plusSeconds(s.toLong)).futureValueUS
       )
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       val futures = events.map { event =>
         val f = aggregator.combineAndMergeEvent(sequencerAlice, event)
@@ -267,9 +257,7 @@ class SequencerAggregatorTest
     "support reconfiguration to another sequencer" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       assertNoMessageDownstream(aggregator)
 
@@ -283,9 +271,7 @@ class SequencerAggregatorTest
 
       assertCombinedDownstreamMessage(aggregator, aliceEvents(0), bobEvents(0))
 
-      aggregator.changeMessageAggregationConfig(
-        config(Set(sequencerCarlos), 1)
-      )
+      aggregator.changeMessageAggregationConfig(config(1))
 
       aggregator
         .combineAndMergeEvent(sequencerCarlos, carlosEvents(1))
@@ -293,15 +279,54 @@ class SequencerAggregatorTest
 
       assertDownstreamMessage(aggregator, carlosEvents(1))
     }
+
+    "emit AbortedDueToShutdown for a pending aggregation" in { fixture =>
+      import fixture.*
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
+
+      assertNoMessageDownstream(aggregator)
+
+      val incompleteF = aggregator.combineAndMergeEvent(sequencerAlice, aliceEvents(0))
+
+      eventuallyForever(timeUntilSuccess = 0.seconds, durationOfSuccess = 500.millis) {
+        incompleteF.isCompleted shouldBe false
+      }
+      aggregator.close()
+      eventually() {
+        incompleteF.unwrap.futureValue shouldBe AbortedDueToShutdown
+      }
+    }
+
+    "emit AbortedDueToShutdown when observing events after having been closed" in { fixture =>
+      import fixture.*
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
+
+      assertNoMessageDownstream(aggregator)
+
+      val incompleteAliceF = aggregator.combineAndMergeEvent(sequencerAlice, aliceEvents(0))
+
+      eventuallyForever(timeUntilSuccess = 0.seconds, durationOfSuccess = 500.millis) {
+        incompleteAliceF.isCompleted shouldBe false
+      }
+      aggregator.close()
+
+      eventually() {
+        incompleteAliceF.unwrap.futureValue shouldBe AbortedDueToShutdown
+      }
+
+      val incompleteBobF = aggregator.combineAndMergeEvent(sequencerBob, bobEvents(0))
+      eventually() {
+        incompleteBobF.unwrap.futureValue shouldBe AbortedDueToShutdown
+      }
+    }
+
   }
 
   "Sequencer aggregator with two out of 3 expected sequencers" should {
     "pass-through the combined event only if both sequencers emitted it" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       assertNoMessageDownstream(aggregator)
 
@@ -329,16 +354,13 @@ class SequencerAggregatorTest
 
       val f3 = aggregator
         .combineAndMergeEvent(sequencerCarlos, carlosEvents(0)) // late event
-      f3.isCompleted shouldBe true // should be immediately resolved
       f3.futureValueUS shouldBe Right(false)
     }
 
     "recover after skipping an event" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       assertNoMessageDownstream(aggregator)
 
@@ -372,9 +394,7 @@ class SequencerAggregatorTest
     "support reconfiguration to 1 out of 3" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
 
       assertNoMessageDownstream(aggregator)
 
@@ -395,12 +415,7 @@ class SequencerAggregatorTest
         .combineAndMergeEvent(sequencerCarlos, carlosEvents(0))
         .discard // late event
 
-      aggregator.changeMessageAggregationConfig(
-        config(
-          Set(sequencerAlice, sequencerBob, sequencerCarlos),
-          1,
-        )
-      )
+      aggregator.changeMessageAggregationConfig(config(1))
       aggregator
         .combineAndMergeEvent(sequencerAlice, aliceEvents(1))
         .discard
@@ -411,9 +426,7 @@ class SequencerAggregatorTest
     "support reconfiguration to 1 out of 3 while incomplete consensus" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 2)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 2))
       assertNoMessageDownstream(aggregator)
 
       val f = aggregator
@@ -422,9 +435,7 @@ class SequencerAggregatorTest
 
       assertNoMessageDownstream(aggregator)
 
-      aggregator.changeMessageAggregationConfig(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 1)
-      )
+      aggregator.changeMessageAggregationConfig(config(sequencerTrustThreshold = 1))
 
       // consensus requirement is changed which is enough to push the message out
 
@@ -437,9 +448,7 @@ class SequencerAggregatorTest
     "support reconfiguration to 1 out of 3 while overfulfilled consensus" in { fixture =>
       import fixture.*
 
-      val aggregator = mkAggregator(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 3)
-      )
+      val aggregator = mkAggregator(config(sequencerTrustThreshold = 3))
       assertNoMessageDownstream(aggregator)
 
       val f1 = aggregator
@@ -452,9 +461,7 @@ class SequencerAggregatorTest
 
       assertNoMessageDownstream(aggregator)
 
-      aggregator.changeMessageAggregationConfig(
-        config(Set(sequencerAlice, sequencerBob, sequencerCarlos), sequencerTrustThreshold = 1)
-      )
+      aggregator.changeMessageAggregationConfig(config(sequencerTrustThreshold = 1))
 
       // consensus requirement is changed which more than enough (2 are there, 1 is required) to push the message out
       // we do accumulate all signatures still as sequencers are still expected ones

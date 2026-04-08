@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -14,6 +14,7 @@ import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc.ApiInfoServiceS
 import com.digitalasset.canton.connection.v30.GetApiInfoResponse
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{Crypto, Fingerprint, SynchronizerCrypto}
+import com.digitalasset.canton.health.{HealthElement, HealthListener}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasUnlessClosing, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerConnectionPoolMetrics}
@@ -23,10 +24,17 @@ import com.digitalasset.canton.sequencer.api.v30 as SequencerService
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnect
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnectServiceGrpc.SequencerConnectServiceStub
 import com.digitalasset.canton.sequencer.api.v30.SequencerServiceGrpc.SequencerServiceStub
-import com.digitalasset.canton.sequencing.ConnectionX.ConnectionXConfig
+import com.digitalasset.canton.sequencing.ConnectionX.{ConnectionXConfig, ConnectionXHealth}
+import com.digitalasset.canton.sequencing.GrpcInternalSequencerConnectionX.GrpcSequencerConnectionXHealth
 import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.ConnectionAttributes
-import com.digitalasset.canton.sequencing.SequencerConnectionXPool.SequencerConnectionXPoolConfig
-import com.digitalasset.canton.sequencing.SequencerSubscriptionPool.SequencerSubscriptionPoolConfig
+import com.digitalasset.canton.sequencing.SequencerConnectionXPool.{
+  SequencerConnectionXPoolConfig,
+  SequencerConnectionXPoolHealth,
+}
+import com.digitalasset.canton.sequencing.SequencerSubscriptionPool.{
+  SequencerSubscriptionPoolConfig,
+  SequencerSubscriptionPoolHealth,
+}
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.client.{
@@ -43,7 +51,7 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
-import com.digitalasset.canton.util.{PekkoUtil, ResourceUtil}
+import com.digitalasset.canton.util.{Mutex, PekkoUtil, ResourceUtil}
 import com.digitalasset.canton.version.{
   ProtocolVersion,
   ProtocolVersionCompatibility,
@@ -59,7 +67,8 @@ import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise, blocking}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.util.Random
 
 trait ConnectionPoolTestHelpers {
@@ -110,10 +119,11 @@ trait ConnectionPoolTestHelpers {
       index: Int,
       endpointIndexO: Option[Int] = None,
       expectedSequencerIdO: Option[SequencerId] = None,
+      namePrefix: String = "test",
   ): ConnectionXConfig = {
     val endpoint = Endpoint(s"does-not-exist-${endpointIndexO.getOrElse(index)}", Port.tryCreate(0))
     ConnectionXConfig(
-      name = s"test-$index",
+      name = s"$namePrefix-$index",
       endpoint = endpoint,
       transportSecurity = false,
       customTrustCertificates = None,
@@ -122,23 +132,45 @@ trait ConnectionPoolTestHelpers {
     )
   }
 
+  protected def withLowLevelConnection[V]()(
+      f: (ConnectionX, TestHealthListener[ConnectionXHealth]) => V
+  ): V = {
+    val config = mkDummyConnectionConfig(0)
+
+    val connection = GrpcConnectionX(
+      config = config,
+      keepAliveClientConfigO = None,
+      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory,
+    )
+
+    val listener = new TestHealthListener(connection.health)
+    connection.health.registerOnHealthChange(listener)
+
+    ResourceUtil.withResource(connection)(f(_, listener))
+  }
+
   protected def withConnection[V](
       testResponses: TestResponses,
       expectedSequencerIdO: Option[SequencerId] = None,
-  )(f: (InternalSequencerConnectionX, TestHealthListener) => V): V = {
+  )(
+      f: (InternalSequencerConnectionX, TestHealthListener[GrpcSequencerConnectionXHealth]) => V
+  ): V = {
     val stubFactory = new TestSequencerConnectionXStubFactory(testResponses, loggerFactory)
     val config = mkDummyConnectionConfig(0, expectedSequencerIdO = expectedSequencerIdO)
 
     val connection = new GrpcInternalSequencerConnectionX(
-      config,
-      clientProtocolVersions,
-      minimumProtocolVersion,
-      stubFactory,
-      CommonMockMetrics.sequencerClient.connectionPool,
-      MetricsContext.Empty,
-      futureSupervisor,
-      timeouts,
-      loggerFactory.append("connection", config.name),
+      config = config,
+      clientProtocolVersions = clientProtocolVersions,
+      minimumProtocolVersion = minimumProtocolVersion,
+      keepAliveClientConfigO = None,
+      stubFactory = stubFactory,
+      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      metricsContext = MetricsContext.Empty,
+      futureSupervisor = futureSupervisor,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory.append("connection", config.name),
     )
 
     val listener = new TestHealthListener(connection.health)
@@ -152,9 +184,14 @@ trait ConnectionPoolTestHelpers {
       trustThreshold: PositiveInt,
       expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
       poolDelays: SequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+      namePrefix: String = "test",
   ): SequencerConnectionXPoolConfig = {
     val configs =
-      NonEmpty.from((0 until nbConnections.unwrap).map(mkDummyConnectionConfig(_))).value
+      NonEmpty
+        .from(
+          (0 until nbConnections.unwrap).map(mkDummyConnectionConfig(_, namePrefix = namePrefix))
+        )
+        .value
 
     SequencerConnectionXPoolConfig(
       connections = configs,
@@ -162,7 +199,7 @@ trait ConnectionPoolTestHelpers {
       minRestartConnectionDelay = poolDelays.minRestartDelay,
       maxRestartConnectionDelay = poolDelays.maxRestartDelay,
       warnConnectionValidationDelay = poolDelays.warnValidationDelay,
-      expectedPSIdO = expectedSynchronizerIdO,
+      expectedPsidO = expectedSynchronizerIdO,
     )
   }
 
@@ -175,12 +212,22 @@ trait ConnectionPoolTestHelpers {
       testTimeouts: ProcessingTimeout = timeouts,
       poolDelays: SequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
       blockValidation: Int => Boolean = _ => false,
-  )(f: (SequencerConnectionXPool, CreatedConnections, TestHealthListener, Int => Unit) => V): V = {
+      metrics: SequencerConnectionPoolMetrics = CommonMockMetrics.sequencerClient.connectionPool,
+      namePrefix: String = "test",
+  )(
+      f: (
+          SequencerConnectionXPool,
+          CreatedConnections,
+          TestHealthListener[SequencerConnectionXPoolHealth],
+          Int => Unit,
+      ) => V
+  ): V = {
     val config = mkPoolConfig(
       nbConnections,
       trustThreshold,
       expectedSynchronizerIdO,
       poolDelays,
+      namePrefix,
     )
 
     val validationBlocker = new TestValidationBlocker(blockValidation)
@@ -194,7 +241,7 @@ trait ConnectionPoolTestHelpers {
       wallClock,
       testCrypto.crypto,
       Some(seedForRandomness),
-      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      metrics = metrics,
       futureSupervisor,
       testTimeouts,
       loggerFactory,
@@ -223,7 +270,7 @@ trait ConnectionPoolTestHelpers {
   protected def withSubscriptionPool[V](
       livenessMargin: NonNegativeInt,
       connectionPool: SequencerConnectionXPool,
-  )(f: (SequencerSubscriptionPool, TestHealthListener) => V): V = {
+  )(f: (SequencerSubscriptionPool, TestHealthListener[SequencerSubscriptionPoolHealth]) => V): V = {
     val config = mkSubscriptionPoolConfig(livenessMargin)
 
     val subscriptionPoolFactory = new SequencerSubscriptionPoolFactoryImpl(
@@ -255,7 +302,7 @@ trait ConnectionPoolTestHelpers {
       responsesForConnection: PartialFunction[Int, TestResponses] = Map(),
       expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
       livenessMargin: NonNegativeInt,
-  )(f: (SequencerSubscriptionPool, TestHealthListener) => V): V =
+  )(f: (SequencerSubscriptionPool, TestHealthListener[SequencerSubscriptionPoolHealth]) => V): V =
     withConnectionPool(
       nbConnections,
       trustThreshold,
@@ -366,8 +413,8 @@ protected object ConnectionPoolTestHelpers {
     )(implicit
         traceContext: TraceContext,
         ec: ExecutionContext,
-    ): SequencerSubscriptionX[SequencerClientSubscriptionError] =
-      new SequencerSubscriptionX(
+    ): SequencerSubscriptionXImpl[SequencerClientSubscriptionError] =
+      new SequencerSubscriptionXImpl(
         connection = connection,
         member = member,
         startingTimestampO = None,
@@ -409,6 +456,7 @@ protected object ConnectionPoolTestHelpers {
       attributesForConnection,
       responsesForConnection,
       validationBlocker,
+      metrics,
       futureSupervisor,
       timeouts,
       loggerFactory,
@@ -445,7 +493,7 @@ protected object ConnectionPoolTestHelpers {
 
     override def createFromOldConfig(
         sequencerConnections: SequencerConnections,
-        expectedPSIdO: Option[PhysicalSynchronizerId],
+        expectedPsidO: Option[PhysicalSynchronizerId],
         tracingConfig: TracingConfig,
         name: String,
     )(implicit
@@ -460,6 +508,7 @@ protected object ConnectionPoolTestHelpers {
       attributesForConnection: Int => ConnectionAttributes,
       responsesForConnection: PartialFunction[Int, TestResponses],
       validationBlocker: TestValidationBlocker,
+      metrics: SequencerConnectionPoolMetrics,
       futureSupervisor: FutureSupervisor,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
@@ -471,7 +520,8 @@ protected object ConnectionPoolTestHelpers {
         esf: ExecutionSequencerFactory,
         materializer: Materializer,
     ): InternalSequencerConnectionX = {
-      val s"test-$indexStr" = config.name: @unchecked
+      val nameRegex = raw".*-(\d+)".r
+      val nameRegex(indexStr) = config.name: @unchecked
       val index = indexStr.toInt
 
       val attributes = attributesForConnection(index)
@@ -498,15 +548,16 @@ protected object ConnectionPoolTestHelpers {
       val stubFactory = new TestSequencerConnectionXStubFactory(responses, loggerFactory)
 
       val connection = new GrpcInternalSequencerConnectionX(
-        config,
-        clientProtocolVersions,
-        minimumProtocolVersion,
-        stubFactory,
-        CommonMockMetrics.sequencerClient.connectionPool,
-        MetricsContext.Empty,
-        futureSupervisor,
-        timeouts,
-        loggerFactory.append("connection", config.name),
+        config = config,
+        clientProtocolVersions = clientProtocolVersions,
+        minimumProtocolVersion = minimumProtocolVersion,
+        keepAliveClientConfigO = None,
+        stubFactory = stubFactory,
+        metrics = metrics,
+        metricsContext = MetricsContext.Empty,
+        futureSupervisor = futureSupervisor,
+        timeouts = timeouts,
+        loggerFactory = loggerFactory.append("connection", config.name),
       )
 
       createdConnections.add(index, connection)
@@ -517,26 +568,23 @@ protected object ConnectionPoolTestHelpers {
 
   protected class CreatedConnections {
     private val connectionsMap = TrieMap[Int, InternalSequencerConnectionX]()
-
+    private val lock = new Mutex()
     def apply(index: Int): InternalSequencerConnectionX = connectionsMap.apply(index)
 
     def add(index: Int, connection: InternalSequencerConnectionX): Unit =
-      blocking {
-        synchronized {
-          connectionsMap.updateWith(index) {
-            case Some(_) => throw new IllegalStateException("Connection already exists")
-            case None => Some(connection)
-          }
+      lock.exclusive {
+        connectionsMap.updateWith(index) {
+          case Some(_) => throw new IllegalStateException("Connection already exists")
+          case None => Some(connection)
         }
       }
 
-    def snapshotAndClear(): Map[Int, InternalSequencerConnectionX] = blocking {
-      synchronized {
+    def snapshotAndClear(): Map[Int, InternalSequencerConnectionX] =
+      lock.exclusive {
         val snapshot = connectionsMap.readOnlySnapshot().toMap
         connectionsMap.clear()
         snapshot
       }
-    }
 
     def size: Int = connectionsMap.size
   }
@@ -731,6 +779,34 @@ protected object ConnectionPoolTestHelpers {
           )
 
         case _ => throw new IllegalStateException(s"Connection type not supported: $connection")
+      }
+  }
+
+  private class TestHealthListener[HE <: HealthElement](val element: HE)
+      extends HealthListener
+      with Matchers {
+    import scala.collection.mutable
+    import BaseTest.eventuallyForever
+
+    private val lock = new Mutex()
+    private val statesBuffer = mutable.ArrayBuffer[element.State]()
+
+    def shouldStabilizeOn(state: element.State): Assertion =
+      // Check that we reach the given state, and remain on it
+      // The default 2 seconds is a bit short when machines are under heavy load
+      eventuallyForever(timeUntilSuccess = 10.seconds) {
+        statesBuffer.last shouldBe state
+      }
+
+    def clear(): Unit = statesBuffer.clear()
+
+    override def name: String = s"${element.name}-test-listener"
+
+    override def poke()(implicit traceContext: TraceContext): Unit =
+      lock.exclusive {
+        val state = element.getState
+
+        statesBuffer += state
       }
   }
 

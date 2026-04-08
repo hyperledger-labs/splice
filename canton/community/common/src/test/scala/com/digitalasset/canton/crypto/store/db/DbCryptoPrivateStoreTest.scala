@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store.db
 
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreExtendedTest
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
@@ -30,7 +31,13 @@ trait DbCryptoPrivateStoreTest extends AsyncWordSpec with CryptoPrivateStoreExte
 
   "DbCryptoPrivateStore" can {
     behave like cryptoPrivateStoreExtended(
-      new DbCryptoPrivateStore(storage, testedReleaseProtocolVersion, timeouts, loggerFactory),
+      new DbCryptoPrivateStore(
+        storage,
+        testedReleaseProtocolVersion,
+        timeouts,
+        BatchingConfig(),
+        loggerFactory,
+      ),
       encrypted = false,
     )
   }

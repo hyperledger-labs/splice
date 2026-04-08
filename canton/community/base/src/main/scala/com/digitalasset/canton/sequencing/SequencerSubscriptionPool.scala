@@ -1,11 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
 
-import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
+import com.digitalasset.canton.health.{
+  AtomicHealthComponent,
+  ComponentHealthState,
+  HealthQuasiComponent,
+}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasRunOnClosing}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
@@ -13,6 +16,7 @@ import com.digitalasset.canton.sequencing.SequencerSubscriptionPool.SequencerSub
 import com.digitalasset.canton.sequencing.SequencerSubscriptionPoolImpl.SubscriptionStartProvider
 import com.digitalasset.canton.sequencing.client.SequencerClient.SequencerTransports
 import com.digitalasset.canton.sequencing.client.{SequencerClient, SequencerClientSubscriptionError}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -51,6 +55,9 @@ trait SequencerSubscriptionPool extends FlagCloseable with NamedLogging {
 
   def health: SequencerSubscriptionPoolHealth
 
+  /** Return the health status of the subscriptions. Only the active subscriptions are reported. */
+  def getSubscriptionsHealthStatus: Seq[HealthQuasiComponent]
+
   /** Return the current active subscriptions in the pool. */
   def subscriptions: Set[SequencerSubscriptionX[SequencerClientSubscriptionError]]
 
@@ -72,7 +79,7 @@ object SequencerSubscriptionPool {
     */
   final case class SequencerSubscriptionPoolConfig(
       livenessMargin: NonNegativeInt,
-      subscriptionRequestDelay: config.NonNegativeFiniteDuration,
+      subscriptionRequestDelay: NonNegativeFiniteDuration,
   ) extends PrettyPrinting {
     override protected def pretty: Pretty[SequencerSubscriptionPoolConfig] = prettyOfClass(
       param("livenessMargin", _.livenessMargin),
@@ -87,7 +94,7 @@ object SequencerSubscriptionPool {
       * TODO(i27260): remove when no longer needed
       */
     def fromSequencerTransports(
-        sequencerTransports: SequencerTransports[?]
+        sequencerTransports: SequencerTransports
     ): SequencerSubscriptionPoolConfig =
       SequencerSubscriptionPoolConfig(
         livenessMargin = sequencerTransports.sequencerLivenessMargin,

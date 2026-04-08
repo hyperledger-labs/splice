@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -9,7 +9,6 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.*
@@ -55,8 +54,7 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
-      sequencingTimeLowerBoundExclusive =
-        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
+      lsuSequencingBounds = None,
       clock,
       sequencerId,
       crypto,

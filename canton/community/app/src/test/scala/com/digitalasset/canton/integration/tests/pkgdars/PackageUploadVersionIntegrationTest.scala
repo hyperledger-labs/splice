@@ -1,13 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pkgdars
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.TemplateId.templateIdsFromJava
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -17,13 +17,15 @@ import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors
 import com.digitalasset.canton.lfdev.java as M
 import com.digitalasset.canton.version.ProtocolVersion
 
+@RollbackTest
 class PackageUploadVersionIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with PackageUsableMixin {
 
+  registerPlugin(new UseH2(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.H2](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer.tryCreate(Set("sequencer1"), Set("sequencer2")),
     )

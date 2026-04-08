@@ -1,14 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CantonConfig, StorageConfig}
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.environment.CantonEnvironment
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.UseBftSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -18,7 +16,7 @@ import com.digitalasset.canton.integration.{
 
 sealed trait SimplestPingCommunityIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment[CantonConfig, CantonEnvironment] {
+    with SharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology
@@ -31,7 +29,6 @@ sealed trait SimplestPingCommunityIntegrationTest
 
     sequencer1.start()
     mediator1.start()
-
     sequencer1.health.status shouldBe NodeStatus.NotInitialized(
       active = true,
       Some(WaitingForInitialization),
@@ -66,6 +63,6 @@ sealed trait SimplestPingCommunityIntegrationTest
 final class SimplestPingReferenceCommunityIntegrationTest
     extends SimplestPingCommunityIntegrationTest {
   registerPlugin(
-    new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory)
+    new UseBftSequencer(loggerFactory)
   )
 }

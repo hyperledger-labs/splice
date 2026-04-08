@@ -1,14 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
-import cats.instances.option.*
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -28,6 +26,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerWriter.*
 import com.digitalasset.canton.synchronizer.sequencer.WriterStartupError.FailedToInitializeFromSnapshot
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.synchronizer.sequencer.store.{SequencerStore, SequencerWriterStore}
+import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SimClock}
 import com.digitalasset.canton.tracing.TraceContext
@@ -425,7 +424,7 @@ class SequencerWriter(
           // close the running writer and reset the reference
           val closed = runningWriterRef
             .getAndSet(None)
-            .parTraverse_(_.close())
+            .fold(FutureUnlessShutdown.unit)(_.close())
             .recover { case NonFatal(e) =>
               logger.debug("Running writer will be recovered, due to non-fatal error:", e)
               UnlessShutdown.unit
@@ -526,7 +525,7 @@ object SequencerWriter {
       protocolVersion: ProtocolVersion,
       loggerFactory: NamedLoggerFactory,
       blockSequencerMode: Boolean,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      lsuSequencingBounds: Option[LsuSequencingBounds],
       metrics: SequencerMetrics,
   )(implicit materializer: Materializer, executionContext: ExecutionContext): SequencerWriter = {
     implicit val loggingContext: ErrorLoggingContext = ErrorLoggingContext(
@@ -550,7 +549,7 @@ object SequencerWriter {
           protocolVersion,
           metrics,
           blockSequencerMode,
-          sequencingTimeLowerBoundExclusive,
+          lsuSequencingBounds,
         )
           .toMat(Sink.ignore)(Keep.both)
           .mapMaterializedValue(m => new RunningSequencerWriterFlow(m._1, m._2.void))

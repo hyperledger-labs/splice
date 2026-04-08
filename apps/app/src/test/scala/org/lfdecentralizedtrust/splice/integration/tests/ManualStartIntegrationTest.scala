@@ -122,7 +122,7 @@ class ManualStartIntegrationTest
       def sequencerAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("sequencer", name)
         new SequencerAdminConnection(
-          FullClientConfig(port = config.localSynchronizerNode.value.sequencer.adminApi.port),
+          FullClientConfig(port = config.localSynchronizerNodes.current.sequencer.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,
@@ -132,7 +132,7 @@ class ManualStartIntegrationTest
       def mediatorAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("mediator", name)
         new MediatorAdminConnection(
-          FullClientConfig(port = config.localSynchronizerNode.value.mediator.adminApi.port),
+          FullClientConfig(port = config.localSynchronizerNodes.current.mediator.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,
@@ -246,7 +246,7 @@ class ManualStartIntegrationTest
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
             sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.zero
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification.toInternal
             mediatorConnection.getPruningSchedule().futureValue.value shouldBe PruningSchedule(
               "0 /10 * * * ?",
               PositiveDurationSeconds.ofMinutes(5),

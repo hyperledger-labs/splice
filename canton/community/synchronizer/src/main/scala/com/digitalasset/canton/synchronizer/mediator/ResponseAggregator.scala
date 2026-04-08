@@ -1,11 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import cats.data.OptionT
-import cats.syntax.parallel.*
+import com.daml.metrics.api.MetricHandle.Timer
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewPosition}
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -20,6 +22,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import pprint.Tree
 
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 
 trait ResponseAggregator extends HasLoggerName with Product with Serializable {
@@ -40,12 +44,27 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
 
   def isFinalized: Boolean
 
+  private val firstResponseReceived = new AtomicReference[Option[CantonTimestamp]](None)
+
+  /** Records the response latency metric */
+  def recordResponseMetric(
+      timer: Timer,
+      responseTimestamp: CantonTimestamp,
+      sender: ParticipantId,
+  ): Unit =
+    firstResponseReceived.getAndUpdate(_.orElse(Some(responseTimestamp))).foreach { firstTs =>
+      timer.update(responseTimestamp.toEpochMilli - firstTs.toEpochMilli, TimeUnit.MILLISECONDS)(
+        new MetricsContext(Map("sender" -> sender.uid.toString))
+      )
+    }
+
   /** Validate the additional confirmation response received and record unless already finalized.
     */
   def validateAndProgress(
       responseTimestamp: CantonTimestamp,
       confirmationResponses: ConfirmationResponses,
       topologySnapshot: TopologySnapshot,
+      batchingConfig: BatchingConfig,
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
@@ -62,6 +81,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
             confirmationResponses.rootHash,
             confirmationResponses.sender,
             topologySnapshot,
+            batchingConfig,
           )
         case Some(aggregation) =>
           aggregation
@@ -71,6 +91,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
               confirmationResponses.rootHash,
               confirmationResponses.sender,
               topologySnapshot,
+              batchingConfig,
             )
             .map(_.orElse(Some(aggregation)))
       }
@@ -82,6 +103,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
       rootHash: RootHash,
       sender: ParticipantId,
       topologySnapshot: TopologySnapshot,
+      batchingConfig: BatchingConfig,
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
@@ -95,6 +117,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
       localVerdict: LocalVerdict,
       topologySnapshot: TopologySnapshot,
       confirmingParties: Set[LfPartyId],
+      batchingConfig: BatchingConfig,
   )(implicit
       ec: ExecutionContext,
       loggingContext: NamedLoggingContext,
@@ -189,17 +212,19 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
             }
 
             val informeesByView = ViewKey[VKEY].informeesAndThresholdByKey(request)
-            val ret = informeesByView.toList
-              .parTraverseFilter { case (viewKey, viewConfirmationParameters) =>
-                val confirmingParties = viewConfirmationParameters.confirmers
-                topologySnapshot.canConfirm(sender, confirmingParties).map { partiesCanConfirm =>
-                  val hostedConfirmingParties = confirmingParties.toSeq
-                    .filter(partiesCanConfirm.contains)
-                  Option.when(hostedConfirmingParties.nonEmpty)(
-                    viewKey -> hostedConfirmingParties.toSet
-                  )
-                }
+            val ret: FutureUnlessShutdown[List[(VKEY, Set[LfPartyId])]] = MonadUtil
+              .parTraverseFilterWithLimit(batchingConfig.parallelism)(informeesByView.toList) {
+                case (viewKey, viewConfirmationParameters) =>
+                  val confirmingParties = viewConfirmationParameters.confirmers
+                  topologySnapshot.canConfirm(sender, confirmingParties).map { partiesCanConfirm =>
+                    val hostedConfirmingParties = confirmingParties.toSeq
+                      .filter(partiesCanConfirm.contains)
+                    Option.when(hostedConfirmingParties.nonEmpty)(
+                      viewKey -> hostedConfirmingParties.toSet
+                    )
+                  }
               }
+              .map(_.toList)
               .map { viewsWithConfirmingPartiesForSender =>
                 loggingContext.debug(
                   s"Malformed response $responseTimestamp from $sender considered as a rejection for $viewsWithConfirmingPartiesForSender"

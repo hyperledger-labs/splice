@@ -1,9 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.TrafficControlParameters
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnections,
+  SynchronizerConnectionConfig,
+  TrafficControlParameters,
+}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{
@@ -11,13 +15,10 @@ import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeNumeric,
   PositiveInt,
 }
-import com.digitalasset.canton.config.{StorageConfig, SynchronizerTimeTrackerConfig}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseProgrammableSequencer,
-  UseReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseProgrammableSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -25,13 +26,9 @@ import com.digitalasset.canton.integration.{
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.sequencing.TrafficControlParameters as InternalTrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.TimeProof
-import com.digitalasset.canton.sequencing.{
-  SequencerConnections,
-  TrafficControlParameters as InternalTrafficControlParameters,
-}
 import com.digitalasset.canton.synchronizer.sequencer.{HasProgrammableSequencer, SendDecision}
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.Member
@@ -69,6 +66,7 @@ sealed trait TickRequestIntegrationTest
     setBalanceRequestSubmissionWindowSize = setBalanceRequestSubmissionWindowSize,
     enforceRateLimiting = true,
     baseEventCost = NonNegativeLong.tryCreate(500L),
+    freeConfirmationResponses = true,
   )
 
   private def advanceTimeBeyondTimeouts(simClock: SimClock): Unit = {
@@ -307,7 +305,7 @@ sealed trait TickRequestIntegrationTest
 
 class TickRequestIntegrationTestMemory extends TickRequestIntegrationTest {
   registerPlugin(
-    new UseReferenceBlockSequencer[StorageConfig.Memory](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

@@ -1,18 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
-import cats.data.{EitherT, NonEmptySeq}
+import cats.data.EitherT
 import cats.implicits.toFoldableOps
 import cats.instances.future.*
 import cats.syntax.bifunctor.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.*
@@ -31,6 +31,7 @@ import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, OpenEnvelope
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.store.{SequencedEventStore, SequencerCounterTrackerStore}
+import com.digitalasset.canton.synchronizer.LsuSequencingTestMessageHandler
 import com.digitalasset.canton.synchronizer.mediator.Mediator.PruningError
 import com.digitalasset.canton.synchronizer.mediator.store.MediatorState
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
@@ -41,16 +42,18 @@ import com.digitalasset.canton.topology.{
   MediatorId,
   PhysicalSynchronizerId,
   SynchronizerOutboxHandle,
+  SynchronizerTopologyManager,
   TopologyManagerStatus,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, FutureUtil}
+import com.digitalasset.canton.util.{EitherTUtil, FutureUnlessShutdownUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 
 /** Responsible for events processing. Reads mediator confirmation requests and confirmation
@@ -64,20 +67,32 @@ private[mediator] class Mediator(
     val topologyClient: SynchronizerTopologyClientWithInit,
     private[canton] val syncCrypto: SynchronizerCryptoClient,
     topologyTransactionProcessor: TopologyTransactionProcessor,
+    val topologyManager: SynchronizerTopologyManager,
     val topologyManagerStatus: TopologyManagerStatus,
     val synchronizerOutboxHandle: SynchronizerOutboxHandle,
     val timeTracker: SynchronizerTimeTracker,
     val state: MediatorState,
+    asynchronousProcessing: Boolean,
     private[canton] val sequencerCounterTrackerStore: SequencerCounterTrackerStore,
     sequencedEventStore: SequencedEventStore,
     parameters: CantonNodeParameters,
     clock: Clock,
-    metrics: MediatorMetrics,
+    val metrics: MediatorMetrics,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with FlagCloseableAsync
     with HasCloseContext {
+
+  val getActiveLsuSuccessor: Mediator.GetActiveLsuSuccessor = new Mediator.GetActiveLsuSuccessor {
+    override def apply(ts: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Option[SynchronizerSuccessor]] = for {
+      snapshot <- syncCrypto.awaitSnapshot(ts)
+      lsuO <- snapshot.ipsSnapshot.announcedLsu()
+      activeSuccessor = lsuO.collect { case (s, _) if s.upgradeTime <= ts => s }
+    } yield activeSuccessor
+  }
 
   def psid: PhysicalSynchronizerId = sequencerClient.psid
   def protocolVersion: ProtocolVersion = sequencerClient.protocolVersion
@@ -93,7 +108,7 @@ private[mediator] class Mediator(
     )
 
   private val verdictSender =
-    VerdictSender(sequencerClient, syncCrypto, mediatorId, loggerFactory)
+    VerdictSender(sequencerClient, syncCrypto, mediatorId, parameters.batchingConfig, loggerFactory)
 
   private val processor = new ConfirmationRequestAndResponseProcessor(
     mediatorId,
@@ -101,8 +116,11 @@ private[mediator] class Mediator(
     syncCrypto,
     timeTracker,
     state,
+    asynchronousProcessing = asynchronousProcessing,
     loggerFactory,
     timeouts,
+    parameters.batchingConfig,
+    getActiveLsuSuccessor,
   )
 
   private val deduplicator = MediatorEventDeduplicator.create(
@@ -110,14 +128,19 @@ private[mediator] class Mediator(
     verdictSender,
     syncCrypto.ips,
     protocolVersion,
+    metrics,
     loggerFactory,
   )
 
+  private val lsuTestSequencingMessageHandler =
+    new LsuSequencingTestMessageHandler(metrics, syncCrypto, loggerFactory)
+
   private val eventsProcessor = new MediatorEventsProcessor(
     topologyTransactionProcessor.createHandler(psid),
+    lsuTestSequencingMessageHandler,
     processor,
     deduplicator,
-    loggerFactory,
+    loggerFactory = loggerFactory,
   )
 
   val stateInspection: MediatorStateInspection = new MediatorStateInspection(state)
@@ -159,6 +182,7 @@ private[mediator] class Mediator(
     * the provided timestamp is before the prehead position of the sequenced events store, meaning
     * that all events up until this point have completed processing and can be safely removed.
     */
+  @nowarn("cat=deprecation")
   def prune(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PruningError, Unit] =
@@ -185,7 +209,7 @@ private[mediator] class Mediator(
             .flatMap(snapshot => snapshot.listDynamicSynchronizerParametersChanges())
         )
 
-      _ <- NonEmptySeq.fromSeq(synchronizerParametersChanges) match {
+      _ <- NonEmpty.from(synchronizerParametersChanges) match {
         case Some(synchronizerParametersChangesNes) =>
           prune(
             pruneAt = timestamp,
@@ -205,25 +229,18 @@ private[mediator] class Mediator(
   private def prune(
       pruneAt: CantonTimestamp,
       cleanTimestamp: CantonTimestamp,
-      synchronizerParametersChanges: NonEmptySeq[DynamicSynchronizerParametersWithValidity],
+      synchronizerParametersChanges: NonEmpty[Seq[DynamicSynchronizerParametersWithValidity]],
   )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, PruningError, Unit] = {
-    val latestSafePruningTsO = Mediator.latestSafePruningTsBefore(
+    val latestSafePruningTs = Mediator.latestSafePruningTsBefore(
       synchronizerParametersChanges,
       cleanTimestamp,
     )
 
     for {
-      _ <- EitherT.fromEither[FutureUnlessShutdown] {
-        latestSafePruningTsO
-          .toRight(PruningError.MissingSynchronizerParametersForValidPruningTsComputation(pruneAt))
-          .flatMap { latestSafePruningTs =>
-            Either.cond[PruningError, Unit](
-              pruneAt <= latestSafePruningTs,
-              (),
-              PruningError.CannotPruneAtTimestamp(pruneAt, latestSafePruningTs),
-            )
-          }
-      }
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        pruneAt <= latestSafePruningTs,
+        PruningError.CannotPruneAtTimestamp(pruneAt, latestSafePruningTs),
+      )
 
       _ = logger.debug(show"Pruning finalized responses up to [$pruneAt]")
       _ <- EitherT.right(state.prune(pruneAt))
@@ -290,25 +307,28 @@ private[mediator] class Mediator(
               syncCrypto.crypto.pureCrypto,
             )
 
-            val rejectionsF = openingErrors.parTraverse_ { error =>
-              val cause =
-                s"Received an envelope at ${closedEvent.timestamp} that cannot be opened. Discarding envelope... Reason: $error"
-              val alarm = MediatorError.MalformedMessage.Reject(cause)
-              alarm.report()
+            val rejectionsF =
+              MonadUtil.parTraverseWithLimit_(parameters.batchingConfig.parallelism)(
+                openingErrors
+              ) { error =>
+                val cause =
+                  s"Received an envelope at ${closedEvent.timestamp} that cannot be opened. Discarding envelope... Reason: $error"
+                val alarm = MediatorError.MalformedMessage.Reject(cause)
+                alarm.report()
 
-              val rootHashMessages = openEvent.envelopes.mapFilter(
-                ProtocolMessage.select[RootHashMessage[SerializedRootHashMessagePayload]]
-              )
-
-              if (rootHashMessages.nonEmpty) {
-                // In this case, we assume it is a Mediator Confirmation Request message
-                sendMalformedRejection(
-                  rootHashMessages,
-                  closedEvent.timestamp,
-                  MediatorVerdict.MediatorReject(alarm),
+                val rootHashMessages = openEvent.envelopes.mapFilter(
+                  ProtocolMessage.select[RootHashMessage[SerializedRootHashMessagePayload]]
                 )
-              } else FutureUnlessShutdown.unit
-            }
+
+                if (rootHashMessages.nonEmpty) {
+                  // In this case, we assume it is a Mediator Confirmation Request message
+                  sendMalformedRejection(
+                    rootHashMessages,
+                    closedEvent.timestamp,
+                    MediatorVerdict.MediatorReject(alarm),
+                  )
+                } else FutureUnlessShutdown.unit
+              }
 
             (
               WithCounter(
@@ -337,6 +357,7 @@ private[mediator] class Mediator(
       SyncCloseable(
         "mediator",
         LifeCycle.close(
+          topologyManager,
           topologyTransactionProcessor,
           syncCrypto,
           timeTracker,
@@ -351,6 +372,19 @@ private[mediator] class Mediator(
 }
 
 private[mediator] object Mediator {
+  trait GetActiveLsuSuccessor {
+    def apply(at: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Option[SynchronizerSuccessor]]
+  }
+  object GetActiveLsuSuccessor {
+    @VisibleForTesting
+    val Never = new GetActiveLsuSuccessor {
+      override def apply(at: CantonTimestamp)(implicit tc: TraceContext) =
+        FutureUnlessShutdown.pure(None)
+    }
+  }
+
   sealed trait PruningError {
     def message: String
   }
@@ -359,13 +393,6 @@ private[mediator] object Mediator {
     /** The mediator has not yet processed enough data for any to be available for pruning */
     case object NoDataAvailableForPruning extends PruningError {
       lazy val message: String = "There is no mediator data available for pruning"
-    }
-
-    /** Dynamic synchronizer parameters available for ts were not found */
-    final case class MissingSynchronizerParametersForValidPruningTsComputation(ts: CantonTimestamp)
-        extends PruningError {
-      override def message: String =
-        show"Dynamic synchronizer parameters to compute earliest available pruning timestamp not found for ts [$ts]"
     }
 
     /** The mediator can prune some data but data for the requested timestamp cannot yet be removed
@@ -379,35 +406,41 @@ private[mediator] object Mediator {
     }
   }
 
-  sealed trait PruningSafetyCheck extends Product with Serializable
-  case object Safe extends PruningSafetyCheck
-  final case class SafeUntil(ts: CantonTimestamp) extends PruningSafetyCheck
-
-  private[mediator] def checkPruningStatus(
+  /** Returns the latest safe pruning timestamp on behalf of requests governed by the provided
+    * synchronizer parameters and relative to the clean timestamp and the timeout determined by the
+    * "confirmationResponseTimeout" synchronizer parameter.
+    *
+    * If no requests can be pending anymore (or "yet" in the case of future parameters), return the
+    * most "permissive" safe pruning timestamp consisting of the clean timestamp.
+    */
+  private[mediator] def latestSafePruningTsForSynchronizerParameters(
       synchronizerParameters: DynamicSynchronizerParametersWithValidity,
       cleanTs: CantonTimestamp,
-  ): PruningSafetyCheck = {
+  ): CantonTimestamp = {
     lazy val timeout = synchronizerParameters.parameters.confirmationResponseTimeout
     lazy val cappedSafePruningTs = synchronizerParameters.validFrom.max(cleanTs - timeout)
 
     if (cleanTs <= synchronizerParameters.validFrom) // If these parameters apply only to the future
-      Safe
+      cleanTs
     else {
       synchronizerParameters.validUntil match {
-        case None => SafeUntil(cappedSafePruningTs)
-        case Some(validUntil) if cleanTs <= validUntil => SafeUntil(cappedSafePruningTs)
+        case None => cappedSafePruningTs
         case Some(validUntil) =>
-          if (validUntil + timeout <= cleanTs) Safe else SafeUntil(cappedSafePruningTs)
+          // cleanTs falls within the validity period of the synchronizer parameters
+          if (cleanTs <= validUntil) cappedSafePruningTs
+          // requests governed by the synchronizer parameters have all been processed completely
+          else if (validUntil + timeout <= cleanTs) cleanTs
+          // some pending requests governed by the synchronizer parameters could still time out
+          else cappedSafePruningTs
       }
     }
   }
 
   /** Returns the latest safe pruning ts which is <= cleanTs */
   private[mediator] def latestSafePruningTsBefore(
-      allSynchronizerParametersChanges: NonEmptySeq[DynamicSynchronizerParametersWithValidity],
+      allSynchronizerParametersChanges: NonEmpty[Seq[DynamicSynchronizerParametersWithValidity]],
       cleanTs: CantonTimestamp,
-  ): Option[CantonTimestamp] = allSynchronizerParametersChanges
-    .map(checkPruningStatus(_, cleanTs))
-    .collect { case SafeUntil(ts) => ts }
-    .minOption
+  ): CantonTimestamp = allSynchronizerParametersChanges
+    .map(latestSafePruningTsForSynchronizerParameters(_, cleanTs))
+    .min1
 }

@@ -1,13 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.db
 
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.config.BatchAggregatorConfig
+import com.digitalasset.canton.config.{BatchAggregatorConfig, CachingConfigs}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
+import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.PekkoEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.db.DbAvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.{
@@ -21,7 +22,14 @@ import scala.concurrent.ExecutionContext
 trait DbAvailabilityStoreTest extends AvailabilityStoreTest { this: DbTest =>
 
   override def createStore(): AvailabilityStore[PekkoEnv] =
-    new DbAvailabilityStore(BatchAggregatorConfig(), storage, timeouts, loggerFactory)(
+    new DbAvailabilityStore(
+      BatchAggregatorConfig(),
+      CachingConfigs(),
+      SequencerMetrics.noop(getClass.getSimpleName).bftOrdering,
+      storage,
+      timeouts,
+      loggerFactory,
+    )(
       implicitly[ExecutionContext]
     )
 

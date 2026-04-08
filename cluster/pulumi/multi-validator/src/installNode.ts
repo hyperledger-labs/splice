@@ -31,12 +31,12 @@ export async function installNode(): Promise<void> {
     };
 
     const participant = new MultiParticipant(
-      `multi-participant-${i}-${DecentralizedSynchronizerUpgradeConfig.active.id}`,
+      `multi-participant-${i}-${DecentralizedSynchronizerUpgradeConfig.activeMigrationId}`,
       {
         namespace: namespace.ns,
         postgres: {
           ...postgresConf,
-          db: `participant_${DecentralizedSynchronizerUpgradeConfig.active.id}`,
+          db: `participant_${DecentralizedSynchronizerUpgradeConfig.activeMigrationId}`,
         },
       },
       { dependsOn: [postgres] }

@@ -20,6 +20,7 @@ export function getDsoRulesConfig(
     nextScheduledSynchronizerUpgrade: nextScheduledSynchronizerUpgrade
       ? nextScheduledSynchronizerUpgrade
       : null,
+    nextScheduledLogicalSynchronizerUpgrade: null,
     actionConfirmationTimeout: {
       microseconds: '3600000000',
     },
@@ -194,6 +195,10 @@ export function getExpectedDsoRulesConfigDiffsHTML(
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">maxTextLength</div><div
       class="jsondiffpatch-value"><pre>"1024"</pre></div></li><li
+    data-key="nextScheduledLogicalSynchronizerUpgrade"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">nextScheduledLogicalSynchronizerUpgrade</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li
     data-key="nextScheduledSynchronizerUpgrade"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">nextScheduledSynchronizerUpgrade</div><div
@@ -290,6 +295,10 @@ export function getExpectedDsoRulesConfigDiffsHTML(
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">maxTextLength</div><div
       class="jsondiffpatch-value"><pre>"1024"</pre></div></li><li
+    data-key="nextScheduledLogicalSynchronizerUpgrade"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">nextScheduledLogicalSynchronizerUpgrade</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li
     data-key="nextScheduledSynchronizerUpgrade"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">nextScheduledSynchronizerUpgrade</div><div

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
@@ -28,38 +28,40 @@ private[availability] object AvailabilityModuleMetrics {
   )(implicit mc: MetricsContext): Unit = {
     import metrics.availability.*
 
-    requested.proposals.updateValue(state.toBeProvidedToConsensus.size)
-    requested.batches.updateValue(
-      state.toBeProvidedToConsensus.map(_.maxBatchesPerProposal.toInt).sum
-    )
+    val (requestsCount, requestedBatches) =
+      state.nextToBeProvidedToConsensus.maxBatchesPerProposal
+        .map(maxBatchesPerProposal => (1, maxBatchesPerProposal.toInt))
+        .getOrElse((0, 0))
+
+    requested.proposals.updateValue(requestsCount)
+    requested.batches.updateValue(requestedBatches)
 
     val readyForConsensusMc = mc.withExtraLabels(dissemination.labels.ReadyForConsensus -> "true")
+    val disseminationComplete = state.disseminationCompleteView
     locally {
       implicit val mc: MetricsContext = readyForConsensusMc
-      dissemination.bytes.updateValue(state.batchesReadyForOrdering.values.map(_.stats.bytes).sum)
-      dissemination.requests.updateValue(
-        state.batchesReadyForOrdering.values.map(_.stats.requests).sum
-      )
-      dissemination.batches.updateValue(state.batchesReadyForOrdering.size)
+      dissemination.bytes.updateValue(disseminationComplete.map(_._2.stats.bytes).sum)
+      dissemination.requests.updateValue(disseminationComplete.map(_._2.stats.requests).sum)
+      dissemination.batches.updateValue(disseminationComplete.size)
     }
     val inProgressMc = mc.withExtraLabels(dissemination.labels.ReadyForConsensus -> "false")
     locally {
       implicit val mc: MetricsContext = inProgressMc
       dissemination.bytes.updateValue(
-        state.disseminationProgress.values.map(_.batchMetadata.stats.bytes).sum
+        state.disseminationProgress.values.map(_.stats.bytes).sum
       )
       dissemination.requests.updateValue(
-        state.disseminationProgress.values.map(_.batchMetadata.stats.requests).sum
+        state.disseminationProgress.values.map(_.stats.requests).sum
       )
       dissemination.batches.updateValue(state.disseminationProgress.size)
     }
 
     val regressionsToSigning =
-      state.disseminationProgress.values.map(_.batchMetadata.regressionsToSigning).sum +
-        state.batchesReadyForOrdering.values.map(_.regressionsToSigning).sum
+      state.disseminationProgress.values.map(_.regressionsToSigning).sum +
+        disseminationComplete.map(_._2.regressionsToSigning).sum
     val regressedDisseminations =
-      state.disseminationProgress.values.map(_.batchMetadata.disseminationRegressions).sum +
-        state.batchesReadyForOrdering.values.map(_.disseminationRegressions).sum
+      state.disseminationProgress.values.map(_.disseminationRegressions).sum +
+        disseminationComplete.map(_._2.disseminationRegressions).sum
     regression.batch.inc(regressionsToSigning.toLong)(
       mc.withExtraLabels(
         regression.labels.stage.Key -> regression.labels.stage.values.Signing.toString
@@ -71,19 +73,8 @@ private[availability] object AvailabilityModuleMetrics {
       )
     )
     // Reset regressions counts to avoid double counting
-    state.disseminationProgress = state.disseminationProgress.map { case (key, value) =>
-      key -> value.copy(
-        batchMetadata = value.batchMetadata.copy(
-          regressionsToSigning = 0,
-          disseminationRegressions = 0,
-        )
-      )
-    }
-    state.batchesReadyForOrdering = state.batchesReadyForOrdering.map { case (key, value) =>
-      key -> value.copy(
-        regressionsToSigning = 0,
-        disseminationRegressions = 0,
-      )
-    }
+    state.disseminationProgress.addAll(state.disseminationProgress.map { case (key, status) =>
+      key -> status.resetRegressions()
+    })
   }
 }
