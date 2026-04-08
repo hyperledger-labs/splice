@@ -41,6 +41,13 @@ abstract class ChoiceContextBuilder[DisclosedContract, ChoiceContext, Self](
     this
   }
 
+  def discloseAll(contracts: Iterable[Contract[?, ?]]): Self = {
+    disclosedContracts.addAll(
+      contracts.map(toTokenStandardDisclosedContract(_, activeSynchronizerId, excludeDebugFields))
+    )
+    this
+  }
+
   def addContract(contextKey: String, contract: Contract[?, ?]): Self = {
     contextEntries.addOne(
       contextKey ->
