@@ -227,7 +227,7 @@ class RollForwardLsuIntegrationTest
       ),
       participants = false,
       enableBftSequencer = true,
-      logSuffix = "global-synchronizer-upgrade",
+      logSuffix = "roll-forward-lsu",
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {

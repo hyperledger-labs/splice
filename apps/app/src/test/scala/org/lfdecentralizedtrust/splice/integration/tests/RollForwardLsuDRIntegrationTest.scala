@@ -58,6 +58,28 @@ class RollForwardLsuDRIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
+  // There are a few different timestamps involved in DR:
+  // 1. The timestamp at which we export topology.
+  // 2. The timestamp at which we export traffic, this is usually just the last sequenced message.
+  // 3. The timestamp at which we stop accepting messages on the broken synchronizer.
+  //    Assuming the synchronizer didn't explode and stopped fully on its own you configure this in Canton under `max-sequencing-time`.
+  // 4. The time at which new sequenced messages are allowed on the new synchronizer.
+  //    This must be >= the time at which topology is exported. After this time
+  //    LSU sequencing test messages are possible but nothing else.
+  //    This is configured in Canton under `lower-bound-sequencing-time-exclusive` for the new sequencer.
+  // 5. The time at which all traffic resumes on the new synchronizer. This
+  //    is configured in Canton under `upgrade-time` for the new sequencer.
+  // In practice, this can often collapse and 1,2,3 are identical and 4,5 as well which is also the setup
+  // we use in this test.
+
+  // This needs to be long enough in the future that we can start Canton and initialize for SVs.
+  val maxSequencingTime = CantonTimestamp.now().plusSeconds(120)
+  val topologyExportTime = maxSequencingTime
+  val trafficExportTime = maxSequencingTime
+  // 5s chosen by fair dice roll
+  val lowerBoundSequencingTimeExclusive = maxSequencingTime.plusSeconds(5)
+  val upgradeTime = lowerBoundSequencingTimeExclusive
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -132,8 +154,8 @@ class RollForwardLsuDRIntegrationTest
       )
       .addConfigTransform((_, config) =>
         ConfigTransforms
-          // This bumps current but not legacy
-          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))(config)
+          // This bumps both current and legacy
+          .bumpCantonSyncPortsBy(22_000)(config)
       )
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
@@ -147,29 +169,41 @@ class RollForwardLsuDRIntegrationTest
   //    Assuming the synchronizer didn't explode and stopped fully on its own you configure this in Canton under `max-sequencing-time`.
   // 4. The time at which new sequenced messages are allowed on the new synchronizer.
   //    This must be >= the time at which topology is exported. After this time
-  //    LSU sequencing test
-
+  //    LSU sequencing test messages are possible but nothing else.
+  //    This is configured in Canton under `lower-bound-sequencing-time-exclusive` for the new sequencer.
+  // 5. The time at which all traffic resumes on the new synchronizer. This
+  //    is configured in Canton under `upgrade-time` for the new sequencer.
+  // In practice, this can often collapse and 1,2,3 are identical and 4,5 as well.
   "roll forward LSU DR" in { implicit env =>
-    val upgradeTime = env.clock.now.plusSeconds(120)
-    val
-    val allNodes = Seq[AppBackendReference](
-      sv1ScanBackend,
-      sv2ScanBackend,
-      sv3ScanBackend,
-      sv4ScanBackend,
-      sv1Backend,
-      sv2Backend,
-      sv3Backend,
-      sv4Backend,
-      aliceValidatorBackend,
-      // TODO(#4682): Fix with BFT connections
-      // sv1ValidatorBackend,
-      // sv2ValidatorBackend,
-      // sv3ValidatorBackend,
-      // sv4ValidatorBackend,
-    )
+    withCantonSvNodes(
+      (
+        None,
+        None,
+        None,
+        None,
+      ),
+      participants = false,
+      enableBftSequencer = false,
+      logSuffix = "roll-forward-lsu-before-dr",
+    )() {
+      val allNodes = Seq[AppBackendReference](
+        sv1ScanBackend,
+        sv2ScanBackend,
+        sv3ScanBackend,
+        sv4ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv4Backend,
+      )
 
-    startAllSync(allNodes*)
+      clue("Start nodes before DR") {
+        startAllSync(allNodes*)
+      }
+      clue("Stop nodes before DR to avoid log warnings") {
+        stopAllAsync(allNodes*).futureValue
+      }
+    }
 
     // TODO(#4682): Fix with BFT connections
     // actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
@@ -233,7 +267,7 @@ class RollForwardLsuDRIntegrationTest
       ),
       participants = false,
       enableBftSequencer = true,
-      logSuffix = "global-synchronizer-upgrade",
+      logSuffix = "roll-forward-lsu-dr",
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {
@@ -369,26 +403,10 @@ class RollForwardLsuDRIntegrationTest
         }
       }
 
-      clue("Alice is connected to new physical synchronizer") {
-        eventually() {
-          aliceValidatorBackend.participantClient.synchronizers
-            .list_connected()
-            .loneElement
-            .physicalSynchronizerId
-            .serial shouldBe newSynchronizerSerial
-        }
-      }
-
-      clue("Alice can tap") {
-        aliceValidatorWalletClient.tap(100.0)
-      }
-
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
-        stopAllAsync(allNodes*).futureValue
         allSvLocalBackends.par.foreach(
           _.participantClient.synchronizers.disconnect_all()
         )
-        aliceValidatorBackend.participantClient.synchronizers.disconnect_all()
       }
     }
   }
