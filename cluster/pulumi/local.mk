@@ -14,7 +14,7 @@ $(dir)/.build: $(dir)/package.json $(dir)/package-lock.json
 
 .PHONY: $(dir)/clean
 $(dir)/clean:
-	cd $(@D) && rm -rfv node_modules .build
+	cd $(@D) && rm -rf node_modules .build
 
 .PHONY: $(dir)/format
 $(dir)/format: $(dir)/.build
