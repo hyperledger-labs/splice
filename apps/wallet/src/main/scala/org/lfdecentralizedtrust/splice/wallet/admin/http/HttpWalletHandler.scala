@@ -1084,10 +1084,10 @@ class HttpWalletHandler(
     implicit val WalletUserRequest(_, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.allocateAmuletV2") { _ => _ =>
       val now = walletManager.clock.now.toInstant
-      val sender = userWallet.store.key.endUserParty
+      val authorizer = userWallet.store.key.endUserParty
       val commandId = CommandId(
         "org.lfdecentralizedtrust.splice.wallet.allocateAmulet",
-        Seq(sender),
+        Seq(authorizer),
         Seq( // TODO: revisit this
           body.settlement.settlementRef.id,
           body.settlement.settlementRef.cid.getOrElse(""),
@@ -1114,7 +1114,7 @@ class HttpWalletHandler(
             new holdingv2.Account(
               java.util.Optional.empty,
               java.util.Optional.empty,
-              sender.toProtoPrimitive,
+              leg.sender,
             ),
             new holdingv2.Account(java.util.Optional.empty, java.util.Optional.empty, leg.receiver),
             Codec.tryDecode(Codec.JavaBigDecimal)(leg.amount),
@@ -1125,7 +1125,7 @@ class HttpWalletHandler(
         /*authorizer=*/ new holdingv2.Account(
           java.util.Optional.empty,
           java.util.Optional.empty,
-          sender.toProtoPrimitive,
+          authorizer.toProtoPrimitive,
         ),
       )
       val dedupConfig = AmuletOperationDedupConfig(
