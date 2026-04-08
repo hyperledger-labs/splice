@@ -2,7 +2,7 @@
   "name": "@lfdecentralizedtrust/splice-pulumi-multi-validator",
   "main": "src/index.ts",
   "devDependencies": {
-    "@types/sinon": "^21.0.0",
+    "@types/sinon": "^21.0.1",
     "sinon": "^21.0.3"
   },
   "dependencies": {

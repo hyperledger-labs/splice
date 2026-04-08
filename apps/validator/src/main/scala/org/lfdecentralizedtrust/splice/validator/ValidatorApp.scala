@@ -874,7 +874,7 @@ class ValidatorApp(
         validatorTopupConfig,
         config.domains.global.buyExtraTraffic.grpcDeadline,
         config.transferPreapproval,
-        config.domains.global.url.isEmpty,
+        config.domains.global.url.isEmpty && !(config.svValidator && config.disableSvValidatorBftSequencerConnection),
         config.svValidator,
         clock,
         domainTimeAutomationService.domainTimeSync,

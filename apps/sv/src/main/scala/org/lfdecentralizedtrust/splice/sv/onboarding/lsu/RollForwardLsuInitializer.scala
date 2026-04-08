@@ -10,6 +10,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -24,14 +25,13 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import SvOnboardingConfig.RollForwardLsuTimestampConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.RollForwardLsuTimestampConfig
 import org.lfdecentralizedtrust.splice.sv.lsu.{LsuNodeInitializer, LsuStateExporter}
 import org.lfdecentralizedtrust.splice.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil}
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
-import io.grpc.Status
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class RollForwardLsuInitializer(
@@ -69,7 +69,6 @@ class RollForwardLsuInitializer(
   val initializer = new LsuNodeInitializer(
     synchronizerNodeService.nodes,
     currentNode, // roll forward goes from legacy => current
-    None,
     loggerFactory,
     retryProvider,
   )
