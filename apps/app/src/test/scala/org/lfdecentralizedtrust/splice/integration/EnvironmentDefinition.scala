@@ -353,6 +353,22 @@ case class EnvironmentDefinition(
   def withBftSequencersSuccessor: EnvironmentDefinition =
     addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
 
+  def withSvBftSequencerConnectionDisabled(): EnvironmentDefinition =
+    addConfigTransforms(
+      (_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(bftSequencerConnection = false)
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_ { validatorConfig =>
+          if (validatorConfig.svValidator)
+            validatorConfig.copy(
+              disableSvValidatorBftSequencerConnection = true
+            )
+          else validatorConfig
+        }(config),
+    )
+
   def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
     addConfigTransforms((_, conf) =>
       ConfigTransforms.updateAllSvAppConfigs_(config =>
