@@ -5,7 +5,6 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedContractEntry
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv2,
   allocationv2,
@@ -74,7 +73,9 @@ class TokenStandardV2AllocationIntegrationTest
       venueParty,
       aliceParty,
       bobParty,
+      aliceAllocationRequestId,
       aliceAllocationId,
+      bobAllocationRequestId,
       bobAllocationId,
       otcTrade,
     ) = setupAllocatedOtcTrade()
@@ -116,10 +117,10 @@ class TokenStandardV2AllocationIntegrationTest
       ).asJava,
       List(
         new tradingappv2.OTCTradeAllocationRequest.ContractId(
-          aliceAllocationId.contractId
+          aliceAllocationRequestId.contractId
         ),
         new tradingappv2.OTCTradeAllocationRequest.ContractId(
-          bobAllocationId.contractId
+          bobAllocationRequestId.contractId
         ),
       ).asJava,
       extraAuthorizers,
@@ -139,122 +140,41 @@ class TokenStandardV2AllocationIntegrationTest
           )
       },
     )(
-      "The trade is archived",
+      "Alice and Bob's balance reflect the trade",
       _ => {
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(tradingappv2.OTCTrade.COMPANION)(
             venueParty
-          ) shouldBe empty withClue "OTCTrades"
+          ) shouldBe empty withClue "OTCTrade"
+
+        suppressFailedClues(loggerFactory) {
+          clue("Check alice's balance") {
+            checkBalance(
+              aliceWalletClient,
+              expectedRound = None,
+              expectedUnlockedQtyRange = (
+                tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
+                tapAmount - aliceTransferAmount + bobTransferAmount,
+              ),
+              expectedLockedQtyRange = (0.0, 0.0),
+              expectedHoldingFeeRange = holdingFeesBound,
+            )
+          }
+          clue("Check bob's balance") {
+            checkBalance(
+              bobWalletClient,
+              expectedRound = None,
+              expectedUnlockedQtyRange = (
+                tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
+                tapAmount + aliceTransferAmount - bobTransferAmount,
+              ),
+              expectedLockedQtyRange = (0.0, 0.0),
+              expectedHoldingFeeRange = holdingFeesBound,
+            )
+          }
+        }
       },
     )
-//    actAndCheck(
-//      "Settlement venue settles the trade", {
-//        val aliceContext = clue("Get choice context for alice's allocation") {
-//          val scanResponse =
-//            sv1ScanBackend.getAllocationTransferContext(allocatedOtcTrade.aliceAllocationId)
-//          aliceValidatorBackend.scanProxy.getAllocationTransferContext(
-//            allocatedOtcTrade.aliceAllocationId
-//          ) shouldBe scanResponse
-//          scanResponse
-//        }
-//        // We do this after alice gets her context so one is featured and one isn't.
-//        actAndCheck("Venue self-features", splitwellWalletClient.selfGrantFeaturedAppRight())(
-//          "Scan shows featured app right",
-//          _ =>
-//            sv1ScanBackend.lookupFeaturedAppRight(allocatedOtcTrade.venueParty) shouldBe a[Some[?]],
-//        )
-//
-//        val bobContext = clue("Get choice context for bob's allocation") {
-//          sv1ScanBackend.getAllocationTransferContext(allocatedOtcTrade.bobAllocationId)
-//        }
-//
-//        def mkExtraArg(context: ChoiceContextWithDisclosures) =
-//          new metadatav1.ExtraArgs(context.choiceContext, emptyMetadata)
-//
-//        val settlementChoice = new tradingapp.OTCTrade_Settle(
-//          Map(
-//            "leg0" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-//              allocatedOtcTrade.aliceAllocationId,
-//              mkExtraArg(aliceContext),
-//            ),
-//            "leg1" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-//              allocatedOtcTrade.bobAllocationId,
-//              mkExtraArg(bobContext),
-//            ),
-//          ).asJava
-//        )
-//
-//        splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-//          .submitJava(
-//            Seq(allocatedOtcTrade.venueParty),
-//            commands = allocatedOtcTrade.tradeId
-//              .exerciseOTCTrade_Settle(
-//                settlementChoice
-//              )
-//              .commands()
-//              .asScala
-//              .toSeq,
-//            disclosedContracts = aliceContext.disclosedContracts ++ bobContext.disclosedContracts,
-//          )
-//      },
-//    )(
-//      "Alice and Bob's balance reflect the trade",
-//      tree => {
-//        suppressFailedClues(loggerFactory) {
-//          clue("Check alice's balance") {
-//            checkBalance(
-//              aliceWalletClient,
-//              expectedRound = None,
-//              expectedUnlockedQtyRange = (
-//                tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
-//                tapAmount - aliceTransferAmount + bobTransferAmount,
-//              ),
-//              expectedLockedQtyRange = (0.0, 0.0),
-//              expectedHoldingFeeRange = holdingFeesBound,
-//            )
-//          }
-//          clue("Check bob's balance") {
-//            checkBalance(
-//              bobWalletClient,
-//              expectedRound = None,
-//              expectedUnlockedQtyRange = (
-//                tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
-//                tapAmount + aliceTransferAmount - bobTransferAmount,
-//              ),
-//              expectedLockedQtyRange = (0.0, 0.0),
-//              expectedHoldingFeeRange = holdingFeesBound,
-//            )
-//          }
-//        }
-//        val events = tree.getEventsById().asScala.values
-//        forExactly(1, events) {
-//          inside(_) { case c: CreatedEvent =>
-//            if (
-//              PackageVersion.assertFromString(
-//                sv1ScanBackend
-//                  .getAmuletRules()
-//                  .payload
-//                  .configSchedule
-//                  .initialValue
-//                  .packageConfig
-//                  .amulet
-//              ) >= DarResources.amulet_0_1_17.metadata.version
-//            ) {
-//              val decoded = JavaDecodeUtil
-//                .decodeCreated(FeaturedAppActivityMarker.COMPANION)(c)
-//                .value
-//              decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
-//            } else {
-//              val decoded = JavaDecodeUtil
-//                .decodeCreated(AppRewardCoupon.COMPANION)(c)
-//                .value
-//              decoded.data.featured shouldBe true
-//              decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
-//            }
-//          }
-//        }
-//      },
-//    )
   }
 
   private def setupAllocatedOtcTrade()(implicit env: SpliceTestConsoleEnvironment) = {
@@ -355,7 +275,16 @@ class TokenStandardV2AllocationIntegrationTest
     val aliceAllocation = allocate(aliceWalletClient, aliceAllocationRequest)
     val bobAllocation = allocate(bobWalletClient, bobAllocationRequest)
 
-    AllocatedOtcTrade(venueParty, aliceParty, bobParty, aliceAllocation, bobAllocation, otcTrade)
+    AllocatedOtcTrade(
+      venueParty,
+      aliceParty,
+      bobParty,
+      aliceAllocationRequestCid,
+      aliceAllocation,
+      bobAllocationRequestCid,
+      bobAllocation,
+      otcTrade,
+    )
   }
 
   def createAllocationRequestV2ViaOTCTrade(
@@ -514,7 +443,9 @@ object TokenStandardV2AllocationIntegrationTest {
       venueParty: PartyId,
       aliceParty: PartyId,
       bobParty: PartyId,
+      aliceAllocationRequestId: allocationrequestv2.AllocationRequest.ContractId,
       aliceAllocationId: allocationv2.Allocation.ContractId,
+      bobAllocationRequestId: allocationrequestv2.AllocationRequest.ContractId,
       bobAllocationId: allocationv2.Allocation.ContractId,
       otcTrade: tradingappv2.OTCTrade.Contract,
   )
