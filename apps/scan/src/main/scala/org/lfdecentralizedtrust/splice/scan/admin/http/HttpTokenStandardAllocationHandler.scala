@@ -8,7 +8,9 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
@@ -20,6 +22,7 @@ import org.lfdecentralizedtrust.tokenstandard.allocation.{v1, v2}
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
 class HttpTokenStandardAllocationHandler(
@@ -133,6 +136,17 @@ class HttpTokenStandardAllocationHandler(
           body.excludeDebugFields.getOrElse(false)
         )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
+        // TODO: don't do N queries but just one with =ANY()
+        allocations <- Future.traverse(settleBatch.allocationCids.asScala) { allocationCid =>
+          contractFetcher.lookupContractById(amuletallocationv2.AmuletAllocationV2.COMPANION)(
+            allocationCid
+          )
+        }
+        lockedAmulets <- Future.traverse(
+          allocations.flatten.flatMap(_.payload.lockedAmulet.toScala)
+        ) { lockedAmuletCid =>
+          contractFetcher.lookupContractById(LockedAmulet.COMPANION)(lockedAmuletCid)
+        }
         // TODO
 //        // pre-approval and featured app rights are only provided if they exist and are required
 //        receiver = PartyId.tryFromProtoPrimitive(settleBatch.transfer.receiver)
@@ -158,6 +172,7 @@ class HttpTokenStandardAllocationHandler(
 //                "transfer-preapproval" -> optTransferPreapproval,
 //              )
               .disclose(externalPartyAmuletRules.contract)
+              .discloseAll(lockedAmulets.flatten)
               .build(),
           )
       )
