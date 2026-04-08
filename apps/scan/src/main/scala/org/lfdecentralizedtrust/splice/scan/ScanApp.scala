@@ -507,10 +507,10 @@ class ScanApp(
                 buildRouteForOperation(_, "token_standard_transfer_instruction"),
               ),
               TokenStandardAllocationInstructionV1Resource.routes(
-                  tokenStandardAllocationInstructionHandler,
-                  buildRouteForOperation(_, "token_standard_allocation_instruction_v1"),
-                ),
-                TokenStandardAllocationInstructionV2Resource.routes(
+                tokenStandardAllocationInstructionHandler,
+                buildRouteForOperation(_, "token_standard_allocation_instruction_v1"),
+              ),
+              TokenStandardAllocationInstructionV2Resource.routes(
                 tokenStandardAllocationInstructionHandler,
                 buildRouteForOperation(_, "token_standard_allocation_instruction_v2"),
               ),
@@ -519,10 +519,10 @@ class ScanApp(
                 buildRouteForOperation(_, "token_standard_metadata"),
               ),
               TokenStandardAllocationV1Resource.routes(
-                  tokenStandardAllocationHandler,
-                  buildRouteForOperation(_, "token_standard_allocation_v1"),
-                ),
-                TokenStandardAllocationV2Resource.routes(
+                tokenStandardAllocationHandler,
+                buildRouteForOperation(_, "token_standard_allocation_v1"),
+              ),
+              TokenStandardAllocationV2Resource.routes(
                 tokenStandardAllocationHandler,
                 buildRouteForOperation(_, "token_standard_allocation_v2"),
               ),
