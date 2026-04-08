@@ -480,6 +480,7 @@ class ScanApp(
                           customTimeout.duration,
                           httpErrorHandler.timeoutHandler(customTimeout.duration, _),
                         ).tflatMap { _ =>
+
                           // only apply exceptions directive for custom timeout routes
                           httpErrorHandler.exceptionsDirective(traceContext).tflatMap { _ =>
                             provide(traceContext)
