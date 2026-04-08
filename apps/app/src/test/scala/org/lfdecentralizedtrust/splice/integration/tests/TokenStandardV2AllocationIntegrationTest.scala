@@ -108,8 +108,8 @@ class TokenStandardV2AllocationIntegrationTest
     val extraAuthorizers =
       otcTrade.data.autoReceiptAuthorizers.asScala.filterNot(_.startsWith("splitwell")).asJava
     val otcTradeSettleArgs = new tradingappv2.OTCTrade_Settle(
-      Map(
-        dsoParty.toProtoPrimitive -> new tradingappv2.SettlementBatch(
+      Map[String, tradingappv2.SettlementBatch](
+        dsoParty.toProtoPrimitive -> new tradingappv2.settlementbatch.SettlementBatchV2(
           allocations.asJava,
           settlementFactoryWithDisclosures.factoryId,
           settlementFactoryWithDisclosures.args.extraArgs,
@@ -432,9 +432,9 @@ class TokenStandardV2AllocationIntegrationTest
 
   def basicAccount(party: PartyId): holdingv2.Account =
     new holdingv2.Account(
-      java.util.Optional.empty(),
-      java.util.Optional.empty(),
       party.toProtoPrimitive,
+      java.util.Optional.empty(),
+      java.util.Optional.empty(),
     )
 }
 

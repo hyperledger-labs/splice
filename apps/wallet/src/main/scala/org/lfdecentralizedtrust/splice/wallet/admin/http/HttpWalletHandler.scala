@@ -1113,20 +1113,20 @@ class HttpWalletHandler(
           new allocationv2.TransferLeg(
             leg.transferLegId,
             new holdingv2.Account(
-              java.util.Optional.empty,
-              java.util.Optional.empty,
               leg.sender,
+              java.util.Optional.empty,
+              java.util.Optional.empty,
             ),
-            new holdingv2.Account(java.util.Optional.empty, java.util.Optional.empty, leg.receiver),
+            new holdingv2.Account(leg.receiver, java.util.Optional.empty, java.util.Optional.empty),
             Codec.tryDecode(Codec.JavaBigDecimal)(leg.amount),
             new holdingv2.InstrumentId(userWallet.store.key.dsoParty.toProtoPrimitive, "Amulet"),
             new metadatav1.Metadata(leg.meta.getOrElse(Map.empty).asJava),
           )
         }.asJava,
         /*authorizer=*/ new holdingv2.Account(
-          java.util.Optional.empty,
-          java.util.Optional.empty,
           authorizer.toProtoPrimitive,
+          java.util.Optional.empty,
+          java.util.Optional.empty,
         ),
       )
       val dedupConfig = AmuletOperationDedupConfig(
@@ -1184,7 +1184,11 @@ class HttpWalletHandler(
         case x =>
           throw new IllegalArgumentException(s"Unexpected AllocationInstructionResult: $x")
       },
-      result.senderChangeCids.asScala.map(_.contractId).toVector,
+      result.authorizerChangeCids
+        .getOrDefault("Amulet", java.util.List.of())
+        .asScala
+        .map(_.contractId)
+        .toVector,
       result.meta.values.asScala.toMap,
     )
   }
