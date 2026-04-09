@@ -21,7 +21,7 @@ import { CopyableIdentifier, PageSectionHeader, VoteStats } from '../../componen
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
 import dayjs from 'dayjs';
-import { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 
 export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
@@ -93,7 +93,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const sortedData = sortProposals(data, sortOrder);
+  const sortedData = useMemo(() => sortProposals(data, sortOrder), [data, sortOrder]);
 
   const columnsCount = getColumnsCount(showThresholdDeadline, showStatus, showVoteStats);
   const gridTemplate = getGridTemplate(columnsCount);
@@ -144,8 +144,17 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
             </Table>
           </TableContainer>
           {supportsInfiniteScroll && (
-            <Box ref={ref} sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-              {isFetchingNextPage ? (
+            <Box
+              ref={ref}
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                py: 2,
+                minHeight: 40,
+              }}
+            >
+              {isFetchingNextPage || (inView && hasNextPage) ? (
                 <CircularProgress size={24} />
               ) : hasNextPage ? (
                 <Typography fontSize={14} color="text.secondary">
@@ -209,7 +218,7 @@ interface VoteRowProps {
   showVoteStats?: boolean;
 }
 
-const VoteRow: React.FC<VoteRowProps> = props => {
+const VoteRow: React.FC<VoteRowProps> = React.memo(props => {
   const {
     actionName,
     description,
@@ -307,7 +316,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       </TableCell>
     </TableRow>
   );
-};
+});
 
 interface AllVotesProps {
   acceptedVotes: number;

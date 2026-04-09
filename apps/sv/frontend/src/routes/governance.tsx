@@ -55,11 +55,47 @@ export const Governance: React.FC = () => {
   const votesQuery = votesHooks.useListVotes(voteRequestIds);
 
   const svPartyId = dsoInfosQuery.data?.svPartyId;
+  const votingThreshold = dsoInfosQuery.data?.votingThreshold;
   const alreadyVotedRequestIds: Set<ContractId<VoteRequest>> = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
       : new Set();
   }, [votesQuery.data, svPartyId]);
+
+  const voteHistory = useMemo(() => {
+    const pages = voteResultsInfiniteQuery.data?.pages;
+    if (!pages || !svPartyId || votingThreshold === undefined) return [];
+
+    const allVoteResults = pages.flatMap(page => page.results);
+
+    return allVoteResults
+      .filter(
+        vr =>
+          (vr.outcome.tag === 'VRO_Accepted' &&
+            dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())) ||
+          vr.outcome.tag === 'VRO_Expired' ||
+          vr.outcome.tag === 'VRO_Rejected'
+      )
+      .map(vr => {
+        const votes = vr.request.votes.entriesArray().map(e => e[1]);
+
+        return {
+          contractId: vr.request.trackingCid,
+          actionName:
+            actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
+          description: vr.request.reason.body,
+          votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+          voteTakesEffect:
+            (vr.outcome.tag === 'VRO_Accepted' &&
+              dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
+            dayjs(vr.completedAt).format(dateTimeFormatISO),
+          yourVote: computeYourVote(votes, svPartyId),
+          status: getVoteResultStatus(vr.outcome),
+          voteStats: computeVoteStats(votes),
+          acceptanceThreshold: votingThreshold,
+        } as ProposalListingData;
+      });
+  }, [voteResultsInfiniteQuery.data?.pages, amuletName, svPartyId, votingThreshold]);
 
   if (
     dsoInfosQuery.isPending ||
@@ -80,7 +116,6 @@ export const Governance: React.FC = () => {
   }
 
   const voteRequests = listVoteRequestsQuery.data;
-  const votingThreshold = dsoInfosQuery.data.votingThreshold;
 
   const actionRequiredRequests = voteRequests
     .filter(v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
@@ -115,38 +150,9 @@ export const Governance: React.FC = () => {
         yourVote: computeYourVote(votes, svPartyId),
         status: 'In Progress',
         voteStats: computeVoteStats(votes),
-        acceptanceThreshold: votingThreshold,
+        acceptanceThreshold: votingThreshold!,
       } as ProposalListingData;
     });
-
-  const allVoteResults = voteResultsInfiniteQuery.data.pages.flatMap(page => page.results);
-
-  const filteredVoteResults = allVoteResults.filter(
-    vr =>
-      (vr.outcome.tag === 'VRO_Accepted' &&
-        dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())) ||
-      vr.outcome.tag === 'VRO_Expired' ||
-      vr.outcome.tag === 'VRO_Rejected'
-  );
-
-  const voteHistory = filteredVoteResults.map(vr => {
-    const votes = vr.request.votes.entriesArray().map(e => e[1]);
-
-    return {
-      contractId: vr.request.trackingCid,
-      actionName: actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
-      description: vr.request.reason.body,
-      votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
-      voteTakesEffect:
-        (vr.outcome.tag === 'VRO_Accepted' &&
-          dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
-        dayjs(vr.completedAt).format(dateTimeFormatISO),
-      yourVote: computeYourVote(votes, svPartyId),
-      status: getVoteResultStatus(vr.outcome),
-      voteStats: computeVoteStats(votes),
-      acceptanceThreshold: votingThreshold,
-    } as ProposalListingData;
-  });
 
   return (
     <Box sx={{ p: 4 }}>
