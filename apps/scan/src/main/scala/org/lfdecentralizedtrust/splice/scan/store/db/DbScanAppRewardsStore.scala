@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Row types and store for the CIP-0104 reward accounting tables.
   *
-  * Covers six tables populated by ComputeAppRewardsTrigger:
+  * Covers six tables populated by RewardComputationTrigger:
   *   - app_activity_party_totals / app_activity_round_totals — per-party and per-round
   *     aggregation of traffic-weighted app activity.
   *   - app_reward_party_totals / app_reward_round_totals — per-party minting allowances
@@ -958,7 +958,7 @@ class DbScanAppRewardsStore(
     *
     * Used for rounds where no parties are above the reward threshold.
     * Inserting this as a level-0 batch and root hash marks the round as
-    * computed, so that ComputeAppRewardsTrigger does not retry it, and
+    * computed, so that RewardComputationTrigger does not retry it, and
     * lookupBatchByHash returns BatchOfMintingAllowances(Seq.empty)
     * rather than None.
     */
