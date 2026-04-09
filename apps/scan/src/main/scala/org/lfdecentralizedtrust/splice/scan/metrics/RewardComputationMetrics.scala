@@ -17,7 +17,7 @@ class RewardComputationMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
   val activePartiesCount: Counter = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "active-parties-count",
+      name = prefix :+ "active_parties_count",
       summary = "Cumulative number of parties with activity across computed rounds",
       qualification = Traffic,
     )
@@ -25,7 +25,7 @@ class RewardComputationMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
   val activityRecordsCount: Counter = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "activity-records-count",
+      name = prefix :+ "activity_records_count",
       summary = "Cumulative number of activity records summarized across computed rounds",
       qualification = Traffic,
     )
@@ -33,7 +33,7 @@ class RewardComputationMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
   val rewardedPartiesCount: Counter = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "rewarded-parties-count",
+      name = prefix :+ "rewarded_parties_count",
       summary = "Cumulative number of parties with rewards across computed rounds",
       qualification = Traffic,
     )
@@ -41,7 +41,7 @@ class RewardComputationMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
   val batchesCreatedCount: Counter = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "batches-created-count",
+      name = prefix :+ "batches_created_count",
       summary = "Cumulative number of reward batches created across computed rounds",
       qualification = Traffic,
     )
