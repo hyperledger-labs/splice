@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.scan.metrics.RewardComputationMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -86,6 +87,10 @@ class RewardComputationTrigger(
     appRewardsStore
       .lookupLatestRoundWithRewardComputation()
       .map(_.exists(_ >= task.roundNumber))
+
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    super.closeAsync() :+
+      SyncCloseable("RewardComputationMetrics", rewardMetrics.close())
 }
 
 object RewardComputationTrigger {

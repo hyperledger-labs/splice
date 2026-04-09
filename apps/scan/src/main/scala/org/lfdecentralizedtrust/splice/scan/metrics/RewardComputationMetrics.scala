@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.metrics
 
-import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
+import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Traffic
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
@@ -11,46 +11,57 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.Rewar
 
 class RewardComputationMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     metricsContext: MetricsContext
-) {
+) extends AutoCloseable {
   private val prefix: MetricName =
     SpliceMetrics.MetricsPrefix :+ "scan" :+ "reward_computation"
 
-  val activePartiesCount: Counter = metricsFactory.counter(
+  val activePartiesCount: Gauge[Long] = metricsFactory.gauge(
     MetricInfo(
       name = prefix :+ "active_parties_count",
-      summary = "Cumulative number of parties with activity across computed rounds",
+      summary = "Number of parties with activity in the latest computed round",
       qualification = Traffic,
-    )
+    ),
+    0L,
   )(metricsContext)
 
-  val activityRecordsCount: Counter = metricsFactory.counter(
+  val activityRecordsCount: Gauge[Long] = metricsFactory.gauge(
     MetricInfo(
       name = prefix :+ "activity_records_count",
-      summary = "Cumulative number of activity records summarized across computed rounds",
+      summary = "Number of activity records in the latest computed round",
       qualification = Traffic,
-    )
+    ),
+    0L,
   )(metricsContext)
 
-  val rewardedPartiesCount: Counter = metricsFactory.counter(
+  val rewardedPartiesCount: Gauge[Long] = metricsFactory.gauge(
     MetricInfo(
       name = prefix :+ "rewarded_parties_count",
-      summary = "Cumulative number of parties with rewards across computed rounds",
+      summary = "Number of parties with rewards in the latest computed round",
       qualification = Traffic,
-    )
+    ),
+    0L,
   )(metricsContext)
 
-  val batchesCreatedCount: Counter = metricsFactory.counter(
+  val batchesCreatedCount: Gauge[Long] = metricsFactory.gauge(
     MetricInfo(
       name = prefix :+ "batches_created_count",
-      summary = "Cumulative number of reward batches created across computed rounds",
+      summary = "Number of reward batches created in the latest computed round",
       qualification = Traffic,
-    )
+    ),
+    0L,
   )(metricsContext)
 
   def record(summary: RewardComputationSummary): Unit = {
-    activePartiesCount.inc(summary.activePartiesCount)(metricsContext)
-    activityRecordsCount.inc(summary.activityRecordsCount)(metricsContext)
-    rewardedPartiesCount.inc(summary.rewardedPartiesCount)(metricsContext)
-    batchesCreatedCount.inc(summary.batchesCreatedCount)(metricsContext)
+    activePartiesCount.updateValue(summary.activePartiesCount)
+    activityRecordsCount.updateValue(summary.activityRecordsCount)
+    rewardedPartiesCount.updateValue(summary.rewardedPartiesCount)
+    batchesCreatedCount.updateValue(summary.batchesCreatedCount)
+  }
+
+  override def close(): Unit = {
+    activePartiesCount.close()
+    activityRecordsCount.close()
+    rewardedPartiesCount.close()
+    batchesCreatedCount.close()
   }
 }
