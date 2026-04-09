@@ -869,14 +869,14 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "409":
           description:
-            A transfer with the same tracking id has been created.
+            An allocation with the same tracking id has been created.
           content:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "429":
           description:
-            A transfer with the same tracking id is currently being processed,
+            An allocation with the same tracking id is currently being processed,
             which may or may not succeed. Retry submitting the request with exponential
             back-off.
           content:
@@ -1913,6 +1913,8 @@ components:
         dummy: # cannot define an empty object for some reason
           type: object
 
+    # TODO (#4912): either add a new endpoint (and fix the description here),
+    #               or edit this type definition to also include AllocationV2 with a type/version tag
     ListAllocationsResponse:
       type: object
       description:
