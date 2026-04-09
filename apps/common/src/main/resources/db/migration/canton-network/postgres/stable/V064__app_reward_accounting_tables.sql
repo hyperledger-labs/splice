@@ -39,7 +39,7 @@ create table app_activity_round_totals
     -- Used for debugging purposes.
     active_app_provider_parties_count     bigint not null,
     -- Total number of activity records in this round across all parties.
-    num_activity_records_in_round         bigint not null,
+    activity_records_count                bigint not null,
 
     constraint app_activity_round_totals_pkey primary key (history_id, round_number)
 );

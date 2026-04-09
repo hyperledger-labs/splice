@@ -4047,7 +4047,7 @@ components:
         - round_number
         - total_app_activity_weight
         - active_parties_count
-        - num_activity_records_in_round
+        - activity_records_count
       properties:
         round_number:
           type: integer
@@ -4058,6 +4058,6 @@ components:
         active_parties_count:
           type: integer
           format: int64
-        num_activity_records_in_round:
+        activity_records_count:
           type: integer
           format: int64

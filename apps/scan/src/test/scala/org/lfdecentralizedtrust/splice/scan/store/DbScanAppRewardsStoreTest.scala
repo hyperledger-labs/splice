@@ -61,7 +61,7 @@ class DbScanAppRewardsStoreTest
           roundNumber = roundNumber,
           totalRoundAppActivityWeight = 999999L,
           activeAppProviderPartiesCount = 5L,
-          numActivityRecordsInRound = 42L,
+          activityRecordsCount = 42L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
         loaded <- store.getAppActivityRoundTotalByRound(roundNumber)
@@ -275,7 +275,7 @@ class DbScanAppRewardsStoreTest
           roundNumber = roundNumber,
           totalRoundAppActivityWeight = 1000L,
           activeAppProviderPartiesCount = 2L,
-          numActivityRecordsInRound = 10L,
+          activityRecordsCount = 10L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
         duplicate = row.copy(totalRoundAppActivityWeight = 2000L)
@@ -324,7 +324,7 @@ class DbScanAppRewardsStoreTest
 
         roundTotal.value.totalRoundAppActivityWeight shouldBe 500L
         roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
-        roundTotal.value.numActivityRecordsInRound shouldBe 1L
+        roundTotal.value.activityRecordsCount shouldBe 1L
       }
     }
 
@@ -368,7 +368,7 @@ class DbScanAppRewardsStoreTest
 
         roundTotal.value.totalRoundAppActivityWeight shouldBe 1000L // 300+300+400
         roundTotal.value.activeAppProviderPartiesCount shouldBe 3L
-        roundTotal.value.numActivityRecordsInRound shouldBe 2L // 2 activity records total
+        roundTotal.value.activityRecordsCount shouldBe 4L // sum of per-party counts: alice=2 + bob=1 + charlie=1
       }
     }
 
@@ -384,7 +384,7 @@ class DbScanAppRewardsStoreTest
         partyTotals shouldBe empty
         roundTotal.value.totalRoundAppActivityWeight shouldBe 0L
         roundTotal.value.activeAppProviderPartiesCount shouldBe 0L
-        roundTotal.value.numActivityRecordsInRound shouldBe 0L
+        roundTotal.value.activityRecordsCount shouldBe 0L
       }
     }
 
@@ -406,7 +406,7 @@ class DbScanAppRewardsStoreTest
         partyTotals.head.totalAppActivityWeight shouldBe 100L
         partyTotals.head.numActivityRecords shouldBe 1L
         roundTotal.value.totalRoundAppActivityWeight shouldBe 100L
-        roundTotal.value.numActivityRecordsInRound shouldBe 1L
+        roundTotal.value.activityRecordsCount shouldBe 1L
       }
     }
 
