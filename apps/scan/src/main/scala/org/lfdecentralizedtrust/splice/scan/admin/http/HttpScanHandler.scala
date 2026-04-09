@@ -2498,32 +2498,28 @@ class HttpScanHandler(
               case Some(batch: DbScanAppRewardsStore.BatchOfBatches) =>
                 ScanResource.GetRewardAccountingBatchResponse.OK(
                   definitions.GetRewardAccountingBatchResponse(
-                    batchType =
-                      definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfBatches,
-                    childHashes = Some(
-                      batch.childHashes
-                        .map(_.toHex)
-                        .toVector
-                    ),
-                    mintingAllowances = None,
+                    definitions.RewardAccountingBatchOfBatches(
+                      batchType =
+                        definitions.RewardAccountingBatchOfBatches.BatchType.BatchOfBatches,
+                      childHashes = batch.childHashes.map(_.toHex).toVector,
+                    )
                   )
                 )
               case Some(batch: DbScanAppRewardsStore.BatchOfMintingAllowances) =>
                 ScanResource.GetRewardAccountingBatchResponse.OK(
                   definitions.GetRewardAccountingBatchResponse(
-                    batchType =
-                      definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfMintingAllowances,
-                    childHashes = None,
-                    mintingAllowances = Some(
-                      batch.allowances
+                    definitions.RewardAccountingBatchOfMintingAllowances(
+                      batchType =
+                        definitions.RewardAccountingBatchOfMintingAllowances.BatchType.BatchOfMintingAllowances,
+                      mintingAllowances = batch.allowances
                         .map(a =>
                           definitions.RewardAccountingMintingAllowance(
                             provider = a.provider,
                             amount = a.amount.toString,
                           )
                         )
-                        .toVector
-                    ),
+                        .toVector,
+                    )
                   )
                 )
             }

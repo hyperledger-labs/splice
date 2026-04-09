@@ -4134,23 +4134,44 @@ components:
           description: Hex-encoded root hash
 
     GetRewardAccountingBatchResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/RewardAccountingBatchOfBatches"
+        - "$ref": "#/components/schemas/RewardAccountingBatchOfMintingAllowances"
+      discriminator:
+        propertyName: batch_type
+        mapping:
+          BatchOfBatches: "#/components/schemas/RewardAccountingBatchOfBatches"
+          BatchOfMintingAllowances: "#/components/schemas/RewardAccountingBatchOfMintingAllowances"
+
+    RewardAccountingBatchOfBatches:
       type: object
       required:
         - batch_type
+        - child_hashes
       properties:
         batch_type:
           type: string
-          enum: [BatchOfBatches, BatchOfMintingAllowances]
+          enum: [BatchOfBatches]
         child_hashes:
           type: array
           items:
             type: string
-          description: Hex-encoded child batch hashes (present for BatchOfBatches)
+          description: Hex-encoded child batch hashes
+
+    RewardAccountingBatchOfMintingAllowances:
+      type: object
+      required:
+        - batch_type
+        - minting_allowances
+      properties:
+        batch_type:
+          type: string
+          enum: [BatchOfMintingAllowances]
         minting_allowances:
           type: array
           items:
             "$ref": "#/components/schemas/RewardAccountingMintingAllowance"
-          description: Party + amount pairs (present for BatchOfMintingAllowances)
+          description: Party + amount pairs
 
     RewardAccountingMintingAllowance:
       type: object

@@ -104,11 +104,6 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
       clue("Verify batch lookup for root hash returns batch contents") {
         val batch = sv1ScanBackend.getRewardAccountingBatch(earliest, rootHashHex)
         batch shouldBe defined
-        // Root batch is either BatchOfBatches or BatchOfMintingAllowances
-        // depending on party count vs batch size
-        batch.value.batchType.value should (
-          be("BatchOfBatches") or be("BatchOfMintingAllowances")
-        )
       }
 
       clue("Verify 404 for batch lookup with non-existent hash") {
