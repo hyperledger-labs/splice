@@ -146,7 +146,6 @@ class HttpTokenStandardAllocationHandler(
         ) { lockedAmuletCid =>
           contractFetcher.lookupContractById(LockedAmulet.COMPANION)(lockedAmuletCid)
         }
-        // TODO (#4916): Put TransferPreapproval & FeaturedAppRight in the right place
       } yield v2.Resource.GetSettlementFactoryResponseOK(
         v2.definitions
           .FactoryWithChoiceContext(
@@ -166,16 +165,6 @@ class HttpTokenStandardAllocationHandler(
     val now = clock.now
     for {
       amuletRules <- store.getAmuletRules()
-      newestOpenRound <- store
-        .lookupLatestUsableOpenMiningRound(now)
-        .map(
-          _.getOrElse(
-            throw io.grpc.Status.NOT_FOUND
-              .withDescription(s"No open usable OpenMiningRound found.")
-              .asRuntimeException()
-          )
-        )
-      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
       externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder = new V2ChoiceContextBuilder(
@@ -186,10 +175,6 @@ class HttpTokenStandardAllocationHandler(
         excludeDebugFields,
       )
       choiceContextBuilder
-        .addContracts(
-          "amulet-rules" -> amuletRules,
-          "open-round" -> newestOpenRound.contract,
-        )
         .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO)
     }
   }
