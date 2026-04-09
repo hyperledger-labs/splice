@@ -72,7 +72,6 @@ object ContractCompanions {
     allocationrequestv1.AllocationRequest.INTERFACE,
     allocationinstructionv1.AllocationInstruction.INTERFACE,
     allocationinstructionv1.AllocationFactory.INTERFACE,
-
     holdingv2.Holding.INTERFACE,
     transferinstructionv2.TransferInstruction.INTERFACE,
     transferinstructionv2.TransferFactory.INTERFACE,
@@ -81,7 +80,6 @@ object ContractCompanions {
     allocationrequestv2.AllocationRequest.INTERFACE,
     allocationinstructionv2.AllocationInstruction.INTERFACE,
     allocationinstructionv2.AllocationFactory.INTERFACE,
-
     featuredapprightv1.FeaturedAppRight.INTERFACE,
     featuredapprightv2.FeaturedAppRight.INTERFACE,
   )
