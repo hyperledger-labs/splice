@@ -6,7 +6,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTrigger
-import org.lfdecentralizedtrust.splice.scan.rewards.RewardIssuanceParams
+import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanAppRewardsStore,
@@ -27,7 +27,14 @@ class DbScanAppRewardsStoreTest
     with HasExecutionContext
     with SplicePostgresTest {
 
-  import DbScanAppRewardsStoreTest.{Activity, DecimalSamples, IssuanceRate, Threshold, roundNumber}
+  import DbScanAppRewardsStoreTest.{
+    Activity,
+    DecimalSamples,
+    IssuanceRate,
+    Threshold,
+    roundNumber,
+    testInputs,
+  }
 
   private val migrationId = 0L
 
@@ -527,9 +534,8 @@ class DbScanAppRewardsStoreTest
       } yield {
         summary.activePartiesCount shouldBe 2L
         summary.activityRecordsCount shouldBe 4L // sum of per-party counts: alice=2 + bob=2
-        // TODO(#4382): update when full reward pipeline is wired into computeAndStoreRewards
-        summary.rewardedPartiesCount shouldBe 0L
-        summary.batchesCreatedCount shouldBe 0L
+        summary.rewardedPartiesCount shouldBe 2L
+        summary.batchesCreatedCount should be >= 1L
       }
     }
 
@@ -546,7 +552,7 @@ class DbScanAppRewardsStoreTest
         summary.activePartiesCount shouldBe 0L
         summary.activityRecordsCount shouldBe 0L
         summary.rewardedPartiesCount shouldBe 0L
-        summary.batchesCreatedCount shouldBe 0L
+        summary.batchesCreatedCount shouldBe 1L // empty root batch
       }
     }
 
@@ -677,6 +683,52 @@ class DbScanAppRewardsStoreTest
     rewardTotalsTestCases.foreach { tc =>
       s"computeRewardTotals — ${tc.description}" in {
         RewardTotalsTests.run(tc)
+      }
+    }
+
+    // -- computeAndStoreRewards tests ------------------------------------------
+
+    "computeAndStoreRewards — rejects incomplete activity" in {
+      for {
+        (store, historyId) <- newStore()
+        // Activity in roundNumber but no sentinel records in adjacent rounds
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
+        result <- store
+          .computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
+          .failed
+      } yield {
+        result.getMessage should include("Incomplete app activity")
+      }
+    }
+
+    "computeAndStoreRewards — produces root hash for complete round" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(5000000L))
+        _ <- store.computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
+        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+        activityTotals <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        // Pipeline completed: activity aggregated and root hash produced
+        rootHash shouldBe defined
+        rootHash.value.rootHash.size shouldBe 32
+        activityTotals shouldBe defined
+        activityTotals.value.totalRoundAppActivityWeight shouldBe 5000000L
+      }
+    }
+
+    "computeAndStoreRewards — re-run for same round raises error" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(5000000L))
+        _ <- store.computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
+        result <- store
+          .computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
+          .failed
+      } yield {
+        result shouldBe a[Exception]
       }
     }
 
@@ -1127,6 +1179,29 @@ object DbScanAppRewardsStoreTest {
     val Half: BigDecimal = BigDecimal("0.5")
     val One: BigDecimal = BigDecimal("1.0")
   }
+
+  /** Minimal RewardComputationInputs for testing computeAndStoreRewards.
+    * Uses simple round numbers: 1 CC per round, threshold 0.5 CC,
+    * trafficPrice/amuletPrice = 1.0 so 1 MB of traffic = 1 CC of reward.
+    */
+  val testInputs: RewardComputationInputs = {
+    import RewardComputationInputs.{fromBigDecimal as n}
+    val tickDurationMicros = 600L * 1000000L
+    val microsPerYear = 365L * 24 * 3600 * 1000000L
+    val roundsPerYear = BigDecimal(microsPerYear) / BigDecimal(tickDurationMicros)
+    RewardComputationInputs(
+      amuletToIssuePerYear = n(roundsPerYear),
+      appRewardPercentage = n(BigDecimal("0.5")),
+      featuredAppRewardCap = n(BigDecimal("100")),
+      unfeaturedAppRewardCap = n(BigDecimal("0")),
+      developmentFundPercentage = n(BigDecimal("0.1")),
+      tickDurationMicros = tickDurationMicros,
+      amuletPrice = n(BigDecimal("1.0")),
+      trafficPrice = n(BigDecimal("1.0")),
+      appRewardCouponThreshold = n(BigDecimal("0.5")),
+    )
+  }
+
   object DecimalSamples {
     val Zero: BigDecimal = BigDecimal("0")
     val One: BigDecimal = BigDecimal("1")
