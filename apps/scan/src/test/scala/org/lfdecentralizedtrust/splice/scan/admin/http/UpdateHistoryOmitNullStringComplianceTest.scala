@@ -6,12 +6,17 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 import com.digitalasset.canton.BaseTest
 import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AppActivityRecord,
   CreatedEvent,
+  EnvelopeTrafficSummary,
   EventHistoryAppActivityRecords,
   EventHistoryItem,
   EventHistoryTrafficSummary,
   EventHistoryVerdict,
   ExercisedEvent,
+  Quorum,
+  TransactionView,
+  TransactionViews,
   UpdateHistoryAssignment,
   UpdateHistoryReassignment,
   UpdateHistoryTransaction,
@@ -116,6 +121,8 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
     }
 
     "not have any Option[_] fields unless they are Option[OmitNullString]" in {
+      // NOTE: each type is checked individually, not recursively. If you add a new type to the
+      // update history schema, add a corresponding `checkNoUnsafeOptions` line here.
       val violations =
         checkNoUnsafeOptions[UpdateHistoryTransaction]("UpdateHistoryTransaction") ++
           checkNoUnsafeOptions[UpdateHistoryTransactionV2]("UpdateHistoryTransactionV2") ++
@@ -130,7 +137,12 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
           checkNoUnsafeOptions[EventHistoryItem]("EventHistoryItem") ++
           checkNoUnsafeOptions[EventHistoryVerdict]("EventHistoryVerdict") ++
           checkNoUnsafeOptions[EventHistoryTrafficSummary]("EventHistoryTrafficSummary") ++
-          checkNoUnsafeOptions[EventHistoryAppActivityRecords]("EventHistoryAppActivityRecords")
+          checkNoUnsafeOptions[EventHistoryAppActivityRecords]("EventHistoryAppActivityRecords") ++
+          checkNoUnsafeOptions[TransactionViews]("TransactionViews") ++
+          checkNoUnsafeOptions[TransactionView]("TransactionView") ++
+          checkNoUnsafeOptions[Quorum]("Quorum") ++
+          checkNoUnsafeOptions[EnvelopeTrafficSummary]("EnvelopeTrafficSummary") ++
+          checkNoUnsafeOptions[AppActivityRecord]("AppActivityRecord")
 
       if (violations.nonEmpty) {
         fail(
