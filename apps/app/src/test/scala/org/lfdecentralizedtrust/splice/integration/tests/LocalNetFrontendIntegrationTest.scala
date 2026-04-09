@@ -26,17 +26,6 @@ class LocalNetFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(Seq("localnet-topology.conf"), this.getClass.getSimpleName)
-//      .addConfigTransforms((_, conf) =>
-//        conf.copy(
-//          remoteParticipants = conf.remoteParticipants.map { case (p, config) =>
-//            p -> config.copy(
-//              adminApi = config.adminApi,
-//              ledgerApi = config.ledgerApi,
-//              token = Some(AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")),
-//            )
-//          }
-//        )
-//      )
       .updateTestingConfig(
         _.focus(_.participantsWithoutLapiVerification).replace(
           Set(
