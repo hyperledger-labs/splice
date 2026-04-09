@@ -40,6 +40,9 @@ monitoring:
           seconds: 1200
         completedDelay:
           seconds: 3600
+      acsSnapshots:
+        saveLatencyThresholdSeconds: 2700
+        updateLatencyThresholdSeconds: 3
       cloudSql:
         maintenance: false
       cometbft:
@@ -52,6 +55,16 @@ monitoring:
         thresholdPerNamespace: 0.05
       deployment:
         pendingPeriodMinutes: 5
+      gcpQuotas:
+        excludedApproachingMetrics: []
+        excludedMetrics:
+          - 'cloudkms.googleapis.com/read_requests'
+          - 'cloudkms.googleapis.com/write_requests'
+          - 'cloudkms.googleapis.com/crypto_requests'
+          - 'cloudkms.googleapis.com/hsm_symmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_generate_random_requests'
+          - 'cloudkms.googleapis.com/external_kms_requests'
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:

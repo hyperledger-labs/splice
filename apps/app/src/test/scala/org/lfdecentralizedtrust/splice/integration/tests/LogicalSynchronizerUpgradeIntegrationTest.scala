@@ -33,7 +33,10 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSynchronizerUpgradeTrigger,
+  LogicalSynchronizerUpgradeSequencingTestTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -115,7 +118,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
-        ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000)(config)
+        ConfigTransforms
+          .bumpCantonSyncSuccessorPortsBy(22_000)
+          .andThen(
+            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
+              // TODO(DACH-NY/cn-test-failures#7890) Reenable once this is fixed in Canton
+              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
+            )
+          )(config)
       )
       // use the standalone participant
       .addConfigTransforms((_, config) => {
