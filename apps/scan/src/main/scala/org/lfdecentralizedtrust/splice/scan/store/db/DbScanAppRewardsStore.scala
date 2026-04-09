@@ -646,9 +646,7 @@ class DbScanAppRewardsStore(
           totalWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
           params = inputs.deriveIssuanceParams(totalWeight)
           _ <- computeRewardTotalsAction(roundNumber, params)
-          leafCount <- insertLeafBatches(roundNumber, batchSize)
-          _ <- aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
-          _ <- insertRootHash(roundNumber)
+          _ <- computeRewardHashesAction(roundNumber, batchSize)
         } yield ())
           .map(_ => logger.debug(s"Computed and stored rewards for round $roundNumber."))
           .transactionally,
@@ -842,18 +840,8 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
-    val action = for {
-      leafCount <- insertLeafBatches(roundNumber, batchSize)
-      rootLevel <-
-        if (leafCount > 0)
-          aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
-        else
-          insertEmptyLeafBatch(roundNumber).map(_ => 0)
-      _ <- insertRootHash(roundNumber)
-    } yield (leafCount, rootLevel)
-
     runUpdate(
-      action.map { case (leafCount, rootLevel) =>
+      computeRewardHashesAction(roundNumber, batchSize).map { case (leafCount, rootLevel) =>
         val levels = rootLevel + 1
         logger.info(
           s"Computed reward hashes for round $roundNumber: $leafCount leaf batches, $levels levels."
@@ -862,6 +850,24 @@ class DbScanAppRewardsStore(
       "appRewards.computeRewardHashes",
     )
   }
+
+  /** DBIO action for the Merkle tree hash computation.
+    * Used by both `computeRewardHashes` (standalone) and
+    * `computeAndStoreRewards` (as part of the full pipeline transaction).
+    */
+  private def computeRewardHashesAction(
+      roundNumber: Long,
+      batchSize: Int,
+  ) =
+    for {
+      leafCount <- insertLeafBatches(roundNumber, batchSize)
+      rootLevel <-
+        if (leafCount > 0)
+          aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+        else
+          insertEmptyLeafBatch(roundNumber).map(_ => 0)
+      _ <- insertRootHash(roundNumber)
+    } yield (leafCount, rootLevel)
 
   /** Stage 3 of the reward computation pipeline (level 0 of the Merkle tree).
     *
