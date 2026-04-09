@@ -255,7 +255,7 @@ Using Non-Default Protocol Versions
 
 
 
-The protocol version used in LocalNet can be configured by setting the ``CANTON_PROTOCOL_VERSION``
+The protocol version used in the LocalNet synchronizer and participants can be configured by setting the ``CANTON_PROTOCOL_VERSION``
 environment variable to the required version prior to launching LocalNet. Non-stable protocol versions can be used for
 early testing, but require explicit opt-in. To enable that, export also a
 ``ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env`` environment variable.
