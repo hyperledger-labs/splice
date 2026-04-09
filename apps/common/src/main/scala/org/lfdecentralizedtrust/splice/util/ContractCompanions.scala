@@ -17,6 +17,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceAmulet,
   DecoderSpliceAmuletNameService,
@@ -67,6 +72,16 @@ object ContractCompanions {
     allocationrequestv1.AllocationRequest.INTERFACE,
     allocationinstructionv1.AllocationInstruction.INTERFACE,
     allocationinstructionv1.AllocationFactory.INTERFACE,
+
+    holdingv2.Holding.INTERFACE,
+    transferinstructionv2.TransferInstruction.INTERFACE,
+    transferinstructionv2.TransferFactory.INTERFACE,
+    allocationv2.Allocation.INTERFACE,
+    allocationv2.SettlementFactory.INTERFACE,
+    allocationrequestv2.AllocationRequest.INTERFACE,
+    allocationinstructionv2.AllocationInstruction.INTERFACE,
+    allocationinstructionv2.AllocationFactory.INTERFACE,
+
     featuredapprightv1.FeaturedAppRight.INTERFACE,
     featuredapprightv2.FeaturedAppRight.INTERFACE,
   )
