@@ -7,6 +7,10 @@ import com.digitalasset.canton.BaseTest
 import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   CreatedEvent,
+  EventHistoryAppActivityRecords,
+  EventHistoryItem,
+  EventHistoryTrafficSummary,
+  EventHistoryVerdict,
   ExercisedEvent,
   UpdateHistoryAssignment,
   UpdateHistoryReassignment,
@@ -85,7 +89,11 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
     * Do NOT add new entries here — new optional fields must use `Option[OmitNullString]`.
     */
   private val allowedLegacyOptionFields: Set[String] = Set(
-    "ExercisedEvent.interfaceId"
+    "ExercisedEvent.interfaceId",
+    "EventHistoryItem.update",
+    "EventHistoryItem.verdict",
+    "EventHistoryItem.trafficSummary",
+    "EventHistoryItem.appActivityRecords",
   )
 
   /** All types that participate in BFT consensus via the update history JSON encoding. */
@@ -118,7 +126,11 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
           checkNoUnsafeOptions[UpdateHistoryAssignment]("UpdateHistoryAssignment") ++
           checkNoUnsafeOptions[UpdateHistoryUnassignment]("UpdateHistoryUnassignment") ++
           checkNoUnsafeOptions[CreatedEvent]("CreatedEvent") ++
-          checkNoUnsafeOptions[ExercisedEvent]("ExercisedEvent")
+          checkNoUnsafeOptions[ExercisedEvent]("ExercisedEvent") ++
+          checkNoUnsafeOptions[EventHistoryItem]("EventHistoryItem") ++
+          checkNoUnsafeOptions[EventHistoryVerdict]("EventHistoryVerdict") ++
+          checkNoUnsafeOptions[EventHistoryTrafficSummary]("EventHistoryTrafficSummary") ++
+          checkNoUnsafeOptions[EventHistoryAppActivityRecords]("EventHistoryAppActivityRecords")
 
       if (violations.nonEmpty) {
         fail(
