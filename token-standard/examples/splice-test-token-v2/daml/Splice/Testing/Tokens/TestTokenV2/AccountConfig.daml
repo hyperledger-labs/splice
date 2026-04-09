@@ -1,0 +1,140 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Account authorization configuration and functions to make use of it.
+module Splice.Testing.Tokens.TestTokenV2.AccountConfig where
+
+import DA.Map qualified as Map
+import DA.Optional
+import DA.Set qualified as Set
+import DA.Text qualified as T
+
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
+
+
+data PartyConfig = PartyConfig with
+    canInitiate : Bool
+    mustApprove : Bool
+  deriving (Eq, Show)
+
+-- | A configuration of the authorization rules for an account.
+--
+-- Note: this is but one possible way to configure account authorization rules.
+-- It was built to demonstrate a non-trivial rule-set and test that the `V2.TransferInstruction` APIs
+-- are sufficient for wallets to interact with the assets.
+data AccountConfig = AccountConfig with
+    ownerConfig : PartyConfig
+    providerConfig : PartyConfig
+  deriving (Eq, Show)
+
+
+-- String conversion
+--------------------
+
+-- | Account configs are encoded in the account id as a string with the format:
+-- "o{ownerConfig}p{providerConfig}/"
+-- where {ownerConfig} and {providerConfig} are strings with the following format:
+-- "{i}{a}"
+-- where "i" is present if the party can initiate an action and "a" is present if the party must approve an action.
+--
+-- Note: storing the config in the account id is a convenient option, but not a requirement.
+-- It could also be stored on-ledger and looked up when needed with the drawback that the available actions
+-- on an allocation or transfer instruction view will have to over-approximate
+-- the actually available actions to cater for the case where the config changes
+-- after the instruction is created.
+accountConfigFromId : Text -> AccountConfig
+accountConfigFromId str
+  | "/" `T.isPrefixOf` str'' = AccountConfig with ..
+  | otherwise = error $ "Expected '/' after account config prefixes in: " <> show str
+
+  -- | FIXME: share parsing code per party config
+  where
+    (ownerInitiate, ownerApproval, len)
+      | "oia" `T.isPrefixOf` str = (True, True, 3)
+      | "oi" `T.isPrefixOf` str = (True, False, 2)
+      | "oa" `T.isPrefixOf` str = (False, True, 2)
+      | "o" `T.isPrefixOf` str = (False, False, 1)
+      | otherwise = error $ "Invalid owner account config prefix: " <> show str
+    ownerConfig = PartyConfig with canInitiate = ownerInitiate, mustApprove = ownerApproval
+    str' = T.drop len str
+    (providerInitiate, providerApproval, len')
+      | "pia" `T.isPrefixOf` str' = (True, True, 3)
+      | "pi" `T.isPrefixOf` str' = (True, False, 2)
+      | "pa" `T.isPrefixOf` str' = (False, True, 2)
+      | "p" `T.isPrefixOf` str' = (False, False, 1)
+      | otherwise = error $ "Invalid provider account config prefix: " <> show str'
+    providerConfig = PartyConfig with canInitiate = providerInitiate, mustApprove = providerApproval
+    str'' = T.drop len' str'
+
+
+-- | Valid accounts must have at least one party that can initiate an action and
+-- at least one party that must approve an action.
+hasValidAccountId : V2.Account -> Bool
+hasValidAccountId account =
+  let config = accountConfigFromId account.id in
+  (config.ownerConfig.canInitiate || config.providerConfig.canInitiate) &&
+  (config.ownerConfig.mustApprove || config.providerConfig.mustApprove)
+
+partyConfigToString : PartyConfig -> Text
+partyConfigToString config =
+  (if config.canInitiate then "i" else "") <>
+  (if config.mustApprove then "a" else "")
+
+accountConfigToString : AccountConfig -> Text
+accountConfigToString config = T.implode $
+  [ "o", partyConfigToString config.ownerConfig
+  , "p", partyConfigToString config.providerConfig]
+
+
+-- Actors
+----------
+
+-- | The parties that can acct next on an account given the previous actor and the account config.
+-- This function encodes the core of the state machine for who needs to act when.
+nextActors : Optional Party -> AccountConfig -> V2.Account -> Set.Set Party
+nextActors previousActor config account =
+    Set.fromList $
+      [ account.owner | canAct config.ownerConfig account.owner ] <>
+      [ p | Some p <- [account.provider], canAct config.providerConfig p ]
+  where
+    hasNotActed p = Some p /= previousActor
+    canAct (PartyConfig with canInitiate; mustApprove) p =
+      hasNotActed p &&
+      (canInitiate || isSome previousActor && mustApprove)
+
+-- | Parties that must approve an action on the account.
+requiredApprovers : AccountConfig -> V2.Account -> Set.Set Party
+requiredApprovers (AccountConfig with ownerConfig = owner, providerConfig = provider) account =
+  Set.fromList $
+    [ account.owner | ownerApproval ] <>
+    [ p | providerApproval, Some p <- [account.provider] ]
+  where
+    ownerApproval = owner.mustApprove || (owner.canInitiate && not provider.canInitiate)
+    providerApproval = provider.mustApprove || (provider.canInitiate && not owner.canInitiate)
+
+-- | Available actions on a transfer instruction.
+--
+-- FIXME: invert the Map of actions in a separate PR to simplify this code.
+mkAvailableTransferActions
+  : Map.Map V2.TransferInstructionAction Party
+  -> (V2.Account, AccountConfig) -> (V2.Account, AccountConfig) -> Map.Map [Party] [V2.TransferInstructionAction]
+mkAvailableTransferActions existingRequests sender receiver =
+    Map.fromListWithR (++) $
+      actionsFor V2.TIA_Accept receiver <>
+      actionsFor V2.TIA_Reject receiver <>
+      actionsFor V2.TIA_Withdraw sender
+  where
+    actionsFor action (account, config) =
+      [ (actors, [action]) | actors <- nextActorsFor action existingRequests config account ]
+
+-- | Next actors for a particular action.
+--
+-- Used both for computing the available actions, as well as the actors that are allowed to exercise a particular action.
+nextActorsFor : V2.TransferInstructionAction -> Map.Map V2.TransferInstructionAction Party -> AccountConfig -> V2.Account -> [[Party]]
+nextActorsFor action existingRequests config account =
+  Set.toList (requiredApprovers config account) ::
+  [ [actor] | actor <- Set.toList (nextActors (Map.lookup action existingRequests) config account) ]
+
+-- FIXME: move to the definition of V2.TransferInstructionAction
+deriving instance Ord V2.TransferInstructionAction

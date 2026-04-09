@@ -1,0 +1,192 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests about transfers that invlove account providers, and their various authorization schemes.
+module Splice.Tests.TestAccountProviderTransfer where
+
+import Daml.Script
+
+import DA.Map qualified as Map
+import DA.Time
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
+
+import Splice.TokenStandard.Utils as TSU
+
+import Splice.Testing.Utils
+import Splice.Testing.Tokens.TestTokenV2 qualified as TokenV2
+import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+
+
+-- Shared test setup
+--------------------
+
+-- TODO(#4813): add and test missing transfer instruction actions; test v2 transfers; test preapproved transfers
+-- TODO(#4540): test with multiple accounts, and acting as an account provider
+
+test_self_transfer_to_account : Script ()
+test_self_transfer_to_account = do
+  -- registry and instrument setup
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let registries = env.registries
+  let instrX = V2.InstrumentId with
+        id = "X2"
+        admin = env.testTokenV2.admin
+  let instrY = V2.InstrumentId with
+        id = "Y2"
+        admin = env.testTokenV2.admin
+  let mkParty name = do
+        party <- allocatePartyExact name
+        WalletClientV2.createBatchingUtility party
+        pure party
+
+  [(tokenRulesCid, _)] <- query @TokenV2.TokenRules env.testTokenV2.admin
+
+  -- party setup
+  alice <- mkParty "alice"
+  bob <- mkParty "bob"
+  custodian1 <- mkParty "custodian1"
+
+  -- accounts
+  let bobSelf = V2.Account with
+        owner = bob
+        provider = None
+        id = "oiap/default"
+  let aliceSelf1 = V2.Account with
+        owner = alice
+        provider = None
+        id = "oiap/acc1"
+  let aliceSelf2 = V2.Account with
+        owner = alice
+        provider = None
+        id = "oiap/acc2"
+  let aliceCustody = V2.Account with
+        owner = alice
+        provider = Some custodian1
+        id = "oiapia/acc2"
+        -- FIXME: consider again ruling out the empty account-id by removing the 'Optional' from the account ID field
+
+  -- mint funds
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 150.0
+  TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
+
+
+  -- Check balances
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrY 150.0
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 200.0
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 200.0
+
+
+  -- shared transfer params
+  now <- getTime
+  let requestedAt = now
+  let executeBefore = now `addRelTime` days 1
+
+  -- test that alice can directly transfer between self-custodied accounts
+  None <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
+    actors = [alice]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = aliceSelf1
+      receiver = aliceSelf2
+      amount = 10.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "alice -> aliceSelf - test transfer 1" emptyMetadata
+
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 90.0
+  WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 10.0
+
+  -- test transfer to custodied account
+  Some instrCid1 <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
+    actors = [alice]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = aliceSelf1
+      receiver = aliceCustody
+      amount = 20.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "alice -> aliceCustody - test transfer 2" emptyMetadata
+
+  WalletClientV2.acceptTransferOffer registries custodian1 instrCid1
+
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 70.0
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 220.0
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 220.0
+
+  -- test alice initiating transfer out of custody account to a third-party
+  Some instrCid2 <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
+    actors = [alice]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = aliceCustody
+      receiver = bobSelf
+      amount = 1.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 3" emptyMetadata
+
+  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
+  let cid = coerceContractId instrCid2 : ContractId TokenV2.TokenTransferCreation
+  result <- submitMulti [custodian1] [env.testTokenV2.admin] $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+    actors = [custodian1]
+    inputHoldingCids = holdingCids
+    tokenRulesCid
+  V2.TransferInstructionResult_Pending instrCid3 <- pure result.output
+
+  WalletClientV2.acceptTransferOffer registries bob instrCid3
+
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 219.0
+  WalletClientV2.checkAccountBalance bob bobSelf instrX 1.0
+
+  -- test custodian initiating transfer out of custody account to themselves
+  Some instrCid4 <- WalletClientV2.transfer registries custodian1 V2.TransferFactory_Transfer with
+    actors = [custodian1]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = aliceCustody
+      receiver = aliceSelf2
+      amount = 2.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "aliceCustody -> aliceSelf2 - test transfer 4" emptyMetadata
+
+  -- once alice acceptss that transfer happens directly
+  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
+  let cid = coerceContractId instrCid4 : ContractId TokenV2.TokenTransferCreation
+  result <- submitMulti [alice] [env.testTokenV2.admin] $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+    actors = [alice]
+    inputHoldingCids = holdingCids
+    tokenRulesCid
+  V2.TransferInstructionResult_Completed _ <- pure result.output
+
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 217.0
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 70.0  -- unchanged
+  WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 12.0
+
+  pure ()
+
+
+acceptTransferOffers : MultiRegistry.MultiRegistry -> Party -> V2.InstrumentId -> Script WalletClientV2.TSABatch
+acceptTransferOffers registries actor instrumentId = do
+  offers <- WalletClientV2.listTransferOffersV2 actor instrumentId
+  acceptChoices <- forA offers $ \(cid, offer) -> do
+    case Map.lookup [actor] offer.availableActions of
+      Some actions | V2.TIA_Accept `elem` actions ->
+        WalletClientV2.mkAcceptTransferOffer registries actor (cid, offer.transfer)
+      _ -> pure mempty
+  pure (mconcat acceptChoices)
