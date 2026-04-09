@@ -704,6 +704,7 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        _ <- assertRootHash(store, roundNumber)
       } yield {
         // 2 rewarded parties fit in 1 batch of size 2
         val level0 = batchHashes.filter(_.batchLevel == 0)
@@ -711,9 +712,6 @@ class DbScanAppRewardsStoreTest
 
         level0(0).partySeqNumBeginIncl shouldBe 0
         level0(0).partySeqNumEndExcl shouldBe 2
-
-        // Hashes should be 32 bytes (SHA-256)
-        level0(0).batchHash.size shouldBe 32
       }
     }
 
@@ -730,12 +728,12 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        _ <- assertRootHash(store, roundNumber)
       } yield {
         val level0 = batchHashes.filter(_.batchLevel == 0)
         level0 should have size 1
         level0.head.partySeqNumBeginIncl shouldBe 0
         level0.head.partySeqNumEndExcl shouldBe 1
-        level0.head.batchHash.size shouldBe 32
       }
     }
 
@@ -770,6 +768,7 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        _ <- assertRootHash(store, roundNumber)
       } yield {
         val level0 = batchHashes.filter(_.batchLevel == 0)
         val level1 = batchHashes.filter(_.batchLevel == 1)
@@ -783,9 +782,6 @@ class DbScanAppRewardsStoreTest
         level2(0).partySeqNumEndExcl shouldBe 8
         level2(1).partySeqNumBeginIncl shouldBe 8
         level2(1).partySeqNumEndExcl shouldBe 9
-
-        // All hashes are 32 bytes
-        all(batchHashes.map(_.batchHash.size)) shouldBe 32
       }
     }
 
@@ -819,6 +815,7 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        _ <- assertRootHash(store, roundNumber)
       } yield {
         val level0 = batchHashes.filter(_.batchLevel == 0)
         val level1 = batchHashes.filter(_.batchLevel == 1)
@@ -828,7 +825,6 @@ class DbScanAppRewardsStoreTest
         // Single level-1 batch spans all parties
         level1.head.partySeqNumBeginIncl shouldBe 0
         level1.head.partySeqNumEndExcl shouldBe 4
-        level1.head.batchHash.size shouldBe 32
       }
     }
 
@@ -861,18 +857,16 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
-        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+        rootHash <- assertRootHash(store, roundNumber)
       } yield {
         // Only level 0, no higher levels
         batchHashes should have size 1
         batchHashes.head.batchLevel shouldBe 0
         batchHashes.head.partySeqNumBeginIncl shouldBe 0
         batchHashes.head.partySeqNumEndExcl shouldBe 3
-        batchHashes.head.batchHash.size shouldBe 32
 
         // Root hash equals the single leaf batch hash
-        rootHash shouldBe defined
-        rootHash.value.rootHash shouldBe batchHashes.head.batchHash
+        rootHash shouldBe batchHashes.head.batchHash
       }
     }
 
@@ -902,11 +896,9 @@ class DbScanAppRewardsStoreTest
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
-        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+        _ <- assertRootHash(store, roundNumber)
         latestRound <- store.lookupLatestRoundWithRewardComputation()
       } yield {
-        rootHash shouldBe defined
-        rootHash.value.rootHash.size shouldBe 32
         latestRound.value shouldBe roundNumber
       }
     }
@@ -919,14 +911,11 @@ class DbScanAppRewardsStoreTest
           Seq(AppActivityPartyTotalT(historyId, roundNumber, 1000000L, "alice::provider"))
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
-        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        rootHash <- assertRootHash(store, roundNumber)
         // Look up the root hash via lookupBatchByHash
-        result <- store.lookupBatchByHash(roundNumber, rootHash.value.rootHash)
+        result <- store.lookupBatchByHash(roundNumber, rootHash)
       } yield {
-        // Root hash exists (round is marked as computed)
-        rootHash shouldBe defined
-        rootHash.value.rootHash.size shouldBe 32
         // Single empty level-0 batch
         batchHashes should have size 1
         batchHashes.head.batchLevel shouldBe 0
@@ -1096,6 +1085,26 @@ class DbScanAppRewardsStoreTest
       _ <- insertActivityRecord(historyId, round - 1, Seq("sentinel::provider"), Seq(1L))
       _ <- insertActivityRecord(historyId, round + 1, Seq("sentinel::provider"), Seq(1L))
     } yield ()
+
+  /** Verify invariants that hold after every computeRewardHashes call:
+    * - a root hash exists for the round
+    * - the root hash is 32 bytes (SHA-256)
+    * - all batch hashes are 32 bytes
+    * Returns the root hash for further scenario-specific assertions.
+    */
+  private def assertRootHash(
+      store: DbScanAppRewardsStore,
+      roundNumber: Long,
+  ): Future[ByteString] =
+    for {
+      rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+      batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+    } yield {
+      rootHash shouldBe defined
+      rootHash.value.rootHash.size shouldBe 32
+      all(batchHashes.map(_.batchHash.size)) shouldBe 32
+      rootHash.value.rootHash
+    }
 
   private val storeCounter = new java.util.concurrent.atomic.AtomicLong(1)
 
