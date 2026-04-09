@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequiremen
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.RewardHash
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
@@ -163,7 +163,7 @@ class DbScanAppRewardsStoreTest
     "insert and read back app_reward_batch_hashes" in {
       for {
         (store, historyId) <- newStore()
-        hash = ByteString.copyFrom(
+        hash = RewardHash(
           Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
         )
         row = AppRewardBatchHashT(
@@ -185,7 +185,7 @@ class DbScanAppRewardsStoreTest
     "insert and read back app_reward_root_hashes" in {
       for {
         (store, historyId) <- newStore()
-        hash = ByteString.copyFrom(Array[Byte](0xca.toByte, 0xfe.toByte, 0xba.toByte, 0xbe.toByte))
+        hash = RewardHash(Array[Byte](0xca.toByte, 0xfe.toByte, 0xba.toByte, 0xbe.toByte))
         row = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
@@ -232,7 +232,7 @@ class DbScanAppRewardsStoreTest
             batchLevel = 0,
             partySeqNumBeginIncl = i * 10,
             partySeqNumEndExcl = (i + 1) * 10,
-            batchHash = ByteString.copyFrom(Array.fill(32)((i + 1).toByte)),
+            batchHash = RewardHash(Array.fill(32)((i + 1).toByte)),
           )
         }
         _ <- store.insertAppRewardBatchHashes(rows)
@@ -289,13 +289,13 @@ class DbScanAppRewardsStoreTest
         row = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
-          rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
+          rootHash = RewardHash(Array[Byte](1, 2, 3, 4)),
         )
         _ <- store.insertAppRewardRootHashes(Seq(row))
         duplicate = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
-          rootHash = ByteString.copyFrom(Array[Byte](5, 6, 7, 8)),
+          rootHash = RewardHash(Array[Byte](5, 6, 7, 8)),
         )
         result <- store.insertAppRewardRootHashes(Seq(duplicate)).failed
       } yield {
@@ -461,12 +461,12 @@ class DbScanAppRewardsStoreTest
             AppRewardRootHashT(
               historyId = historyId,
               roundNumber = 10L,
-              rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
+              rootHash = RewardHash(Array[Byte](1, 2, 3, 4)),
             ),
             AppRewardRootHashT(
               historyId = historyId,
               roundNumber = 20L,
-              rootHash = ByteString.copyFrom(Array[Byte](5, 6, 7, 8)),
+              rootHash = RewardHash(Array[Byte](5, 6, 7, 8)),
             ),
           )
         )
@@ -484,7 +484,7 @@ class DbScanAppRewardsStoreTest
             AppRewardRootHashT(
               historyId = historyId,
               roundNumber = 5L,
-              rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
+              rootHash = RewardHash(Array[Byte](1, 2, 3, 4)),
             )
           )
         )
@@ -803,7 +803,7 @@ class DbScanAppRewardsStoreTest
         (store, _) <- newStore()
         result <- store.lookupBatchByHash(
           roundNumber,
-          ByteString.copyFrom(Array.fill(32)(0.toByte)),
+          RewardHash(Array.fill(32)(0.toByte)),
         )
       } yield {
         result shouldBe None
@@ -946,7 +946,7 @@ class DbScanAppRewardsStoreTest
       partyCount: Int,
       rewardedCount: Int = -1,
       batchSize: Int,
-  ): Future[(DbScanAppRewardsStore, Seq[AppRewardBatchHashT], ByteString)] = {
+  ): Future[(DbScanAppRewardsStore, Seq[AppRewardBatchHashT], RewardHash)] = {
     val rewarded = if (rewardedCount < 0) partyCount else rewardedCount
     for {
       (store, historyId) <- newStore()
@@ -981,7 +981,7 @@ class DbScanAppRewardsStoreTest
   private def assertRootHash(
       store: DbScanAppRewardsStore,
       roundNumber: Long,
-  ): Future[ByteString] =
+  ): Future[RewardHash] =
     for {
       rootHash <- store.getAppRewardRootHashByRound(roundNumber)
       batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)

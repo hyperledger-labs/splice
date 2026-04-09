@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -71,13 +70,13 @@ object DbScanAppRewardsStore {
       batchLevel: Int,
       partySeqNumBeginIncl: Int,
       partySeqNumEndExcl: Int,
-      batchHash: ByteString,
+      batchHash: RewardHash,
   )
 
   final case class AppRewardRootHashT(
       historyId: Long,
       roundNumber: Long,
-      rootHash: ByteString,
+      rootHash: RewardHash,
   )
 
   /** Summary of a single round's reward computation, for metrics reporting. */
@@ -88,10 +87,30 @@ object DbScanAppRewardsStore {
       batchesCreatedCount: Long,
   )
 
+  /** A SHA-256 hash stored as raw bytes, avoiding unnecessary Array[Byte] ↔
+    * ByteString conversions at the DB boundary. Conversion to hex strings
+    * for the HTTP layer is done via `toHex` / `fromHex`.
+    */
+  final case class RewardHash(bytes: Array[Byte]) {
+    def toHex: String = bytes.map("%02x".format(_)).mkString
+    def size: Int = bytes.length
+
+    override def equals(obj: Any): Boolean = obj match {
+      case other: RewardHash => java.util.Arrays.equals(bytes, other.bytes)
+      case _ => false
+    }
+    override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
+  }
+
+  object RewardHash {
+    def fromHex(hex: String): RewardHash =
+      RewardHash(hex.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray)
+  }
+
   final case class MintingAllowance(provider: String, amount: BigDecimal)
 
   sealed trait BatchContents
-  case class BatchOfBatches(childHashes: Seq[ByteString]) extends BatchContents
+  case class BatchOfBatches(childHashes: Seq[RewardHash]) extends BatchContents
   case class BatchOfMintingAllowances(allowances: Seq[MintingAllowance]) extends BatchContents
 }
 
@@ -178,7 +197,7 @@ class DbScanAppRewardsStore(
       batchLevel = prs.<<[Int],
       partySeqNumBeginIncl = prs.<<[Int],
       partySeqNumEndExcl = prs.<<[Int],
-      batchHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
+      batchHash = DbScanAppRewardsStore.RewardHash(prs.<<[Array[Byte]]),
     )
   }
 
@@ -187,7 +206,7 @@ class DbScanAppRewardsStore(
     DbScanAppRewardsStore.AppRewardRootHashT(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
-      rootHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
+      rootHash = DbScanAppRewardsStore.RewardHash(prs.<<[Array[Byte]]),
     )
   }
 
@@ -417,7 +436,7 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.batchLevel},
-              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash.toByteArray})"""
+              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash.bytes})"""
       })
       (sql"""insert into #${Tables.appRewardBatchHashes}(
               history_id, round_number, batch_level,
@@ -465,7 +484,7 @@ class DbScanAppRewardsStore(
     if (items.isEmpty) DBIO.successful(0)
     else {
       val values = sqlCommaSeparated(items.map { row =>
-        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash.toByteArray})"""
+        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash.bytes})"""
       })
       (sql"""insert into #${Tables.appRewardRootHashes}(
               history_id, round_number, root_hash
@@ -510,7 +529,7 @@ class DbScanAppRewardsStore(
     */
   def lookupBatchByHash(
       roundNumber: Long,
-      batchHash: ByteString,
+      batchHash: DbScanAppRewardsStore.RewardHash,
   )(implicit tc: TraceContext): Future[Option[DbScanAppRewardsStore.BatchContents]] =
     for {
       batchO <- findBatchByHash(roundNumber, batchHash)
@@ -528,7 +547,7 @@ class DbScanAppRewardsStore(
 
   private def findBatchByHash(
       roundNumber: Long,
-      batchHash: ByteString,
+      batchHash: DbScanAppRewardsStore.RewardHash,
   )(implicit tc: TraceContext): Future[Option[(Int, Int, Int)]] = {
     import storage.DbStorageConverters.setParameterByteArray
     runQuerySingle(
@@ -536,7 +555,7 @@ class DbScanAppRewardsStore(
             from #${Tables.appRewardBatchHashes}
             where history_id = $historyId
               and round_number = $roundNumber
-              and batch_hash = ${batchHash.toByteArray}
+              and batch_hash = ${batchHash.bytes}
             limit 1
       """.as[(Int, Int, Int)].headOption,
       "appRewards.lookupBatchByHash.find",
@@ -548,7 +567,7 @@ class DbScanAppRewardsStore(
       parentLevel: Int,
       beginIncl: Int,
       endExcl: Int,
-  )(implicit tc: TraceContext): Future[Seq[ByteString]] =
+  )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.RewardHash]] =
     runQuery(
       sql"""select batch_hash
             from #${Tables.appRewardBatchHashes}
@@ -560,7 +579,7 @@ class DbScanAppRewardsStore(
             order by party_seq_num_begin_incl
       """.as[Array[Byte]],
       "appRewards.lookupBatchByHash.children",
-    ).map(_.map(ByteString.copyFrom))
+    ).map(_.map(DbScanAppRewardsStore.RewardHash(_)))
 
   /** Retrieve minting allowances for a leaf batch range.
     *

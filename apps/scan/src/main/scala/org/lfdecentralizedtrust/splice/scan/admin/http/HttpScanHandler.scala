@@ -2463,7 +2463,7 @@ class HttpScanHandler(
               ScanResource.GetRewardAccountingRootHashResponse.OK(
                 definitions.GetRewardAccountingRootHashResponse(
                   roundNumber = rootHash.roundNumber,
-                  rootHash = rootHash.rootHash.toByteArray.map("%02x".format(_)).mkString,
+                  rootHash = rootHash.rootHash.toHex,
                 )
               )
           }
@@ -2486,48 +2486,47 @@ class HttpScanHandler(
             )
           )
         case Some(appRewardsStore) =>
-          val hashBytes =
-            com.google.protobuf.ByteString.copyFrom(
-              batchHash.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray
-            )
-          appRewardsStore.lookupBatchByHash(roundNumber, hashBytes).map {
-            case None =>
-              ScanResource.GetRewardAccountingBatchResponse.NotFound(
-                ErrorResponse(
-                  s"Batch not (yet) found for round $roundNumber with hash $batchHash"
+          appRewardsStore
+            .lookupBatchByHash(roundNumber, DbScanAppRewardsStore.RewardHash.fromHex(batchHash))
+            .map {
+              case None =>
+                ScanResource.GetRewardAccountingBatchResponse.NotFound(
+                  ErrorResponse(
+                    s"Batch not (yet) found for round $roundNumber with hash $batchHash"
+                  )
                 )
-              )
-            case Some(batch: DbScanAppRewardsStore.BatchOfBatches) =>
-              ScanResource.GetRewardAccountingBatchResponse.OK(
-                definitions.GetRewardAccountingBatchResponse(
-                  batchType = definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfBatches,
-                  childHashes = Some(
-                    batch.childHashes
-                      .map(_.toByteArray.map("%02x".format(_)).mkString)
-                      .toVector
-                  ),
-                  mintingAllowances = None,
+              case Some(batch: DbScanAppRewardsStore.BatchOfBatches) =>
+                ScanResource.GetRewardAccountingBatchResponse.OK(
+                  definitions.GetRewardAccountingBatchResponse(
+                    batchType =
+                      definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfBatches,
+                    childHashes = Some(
+                      batch.childHashes
+                        .map(_.toHex)
+                        .toVector
+                    ),
+                    mintingAllowances = None,
+                  )
                 )
-              )
-            case Some(batch: DbScanAppRewardsStore.BatchOfMintingAllowances) =>
-              ScanResource.GetRewardAccountingBatchResponse.OK(
-                definitions.GetRewardAccountingBatchResponse(
-                  batchType =
-                    definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfMintingAllowances,
-                  childHashes = None,
-                  mintingAllowances = Some(
-                    batch.allowances
-                      .map(a =>
-                        definitions.RewardAccountingMintingAllowance(
-                          provider = a.provider,
-                          amount = a.amount.toString,
+              case Some(batch: DbScanAppRewardsStore.BatchOfMintingAllowances) =>
+                ScanResource.GetRewardAccountingBatchResponse.OK(
+                  definitions.GetRewardAccountingBatchResponse(
+                    batchType =
+                      definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfMintingAllowances,
+                    childHashes = None,
+                    mintingAllowances = Some(
+                      batch.allowances
+                        .map(a =>
+                          definitions.RewardAccountingMintingAllowance(
+                            provider = a.provider,
+                            amount = a.amount.toString,
+                          )
                         )
-                      )
-                      .toVector
-                  ),
+                        .toVector
+                    ),
+                  )
                 )
-              )
-          }
+            }
       }
     }
   }
