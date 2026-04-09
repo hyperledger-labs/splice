@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.admin.http.{ScanHttpEncodings, ScanJsonSupport}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   PageLimit,
@@ -129,11 +129,14 @@ class UpdateHistorySegmentBulkStorage(
         ScanHttpEncodings.V1,
       )
     )
-    /* When we add new fields, we make them optional, and they will be None until a coordinated switching point.
-     * We therefore want to drop null values from the JSON, to avoid emitting a lot of "fieldX: null" in the dumps until the switching point,
-     * otherwise we'll break BFT guarantees when SVs adopt a version with the optional field asynchronously.
-     */
-    val updatesStr = encoded.map(_.asJson.dropNullValues.noSpacesSortKeys).mkString("\n") + "\n"
+    // Import custom encoders that omit null OmitNullString fields.
+    // When we add new optional OmitNullString fields, they will be None until a coordinated
+    // switching point.  The custom encoders ensure the null keys are absent from the JSON so that
+    // SVs adopting a new version asynchronously do not break BFT guarantees.
+    import ScanJsonSupport.*
+    val updatesStr = encoded
+      .map(u => u.asJson.noSpacesSortKeys)
+      .mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
       s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption
