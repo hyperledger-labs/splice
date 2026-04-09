@@ -507,6 +507,13 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             PageLimit.tryCreate(100),
           )(traceContext)
 
+          resultFilteredTwoParties <- store.listExpiredAmuletAllocations(
+            Set(userParty(2), userParty(3))
+          )(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100),
+          )(traceContext)
+
         } yield {
           val allContracts = resultAll.map(_.contract)
           allContracts should contain(expiredCid)
@@ -517,6 +524,11 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           filteredContracts should contain(expiredCid)
           filteredContracts should not contain ignoredCid
           filteredContracts should not contain activeCid
+
+          val filteredTwoPartiesContracts = resultFilteredTwoParties.map(_.contract)
+          filteredTwoPartiesContracts should not contain expiredCid
+          filteredTwoPartiesContracts should not contain ignoredCid
+          filteredTwoPartiesContracts should not contain activeCid
         }
       }
     }
