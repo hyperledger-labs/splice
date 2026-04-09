@@ -84,33 +84,9 @@ class ExpiredAmuletAllocationTrigger(
             dsoRules <- store.getDsoRules()
             extAmuletRules <- store.getExternalPartyAmuletRules()
 
-            inputsWithParties <- MonadUtil.sequentialTraverse(task.work.expiredContracts) {
-              contract =>
-                val sender = PartyId.tryFromProtoPrimitive(
-                  contract.payload.allocation.transferLeg.sender
-                )
-                val receiver = PartyId.tryFromProtoPrimitive(
-                  contract.payload.allocation.transferLeg.receiver
-                )
-                val executor = PartyId.tryFromProtoPrimitive(
-                  contract.payload.allocation.settlement.executor
-                )
-
-                for {
-                  lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
-                    splice.amulet.LockedAmulet.COMPANION
-                  )(contract.payload.lockedAmulet)
-                } yield {
-                  val input =
-                    new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput(
-                      new splice.amuletallocation.AmuletAllocation.ContractId(
-                        contract.contractId.contractId
-                      ),
-                      java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
-                    )
-                  (input, Set(sender, receiver, executor))
-                }
-            }
+            inputsWithParties <- MonadUtil.sequentialTraverse(task.work.expiredContracts)(
+              buildExpireInput
+            )
 
             inputs = inputsWithParties.map(_._1)
             informees = inputsWithParties.flatMap(_._2).toSet
@@ -158,6 +134,37 @@ class ExpiredAmuletAllocationTrigger(
           } yield res
         }
     } yield res
+  }
+
+  private def buildExpireInput(
+      contract: org.lfdecentralizedtrust.splice.util.AssignedContract[
+        splice.amuletallocation.AmuletAllocation.ContractId,
+        splice.amuletallocation.AmuletAllocation,
+      ]
+  )(implicit tc: TraceContext): Future[
+    (
+        splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput,
+        Set[PartyId],
+    )
+  ] = {
+    val sender = PartyId.tryFromProtoPrimitive(contract.payload.allocation.transferLeg.sender)
+    val receiver = PartyId.tryFromProtoPrimitive(contract.payload.allocation.transferLeg.receiver)
+    val executor = PartyId.tryFromProtoPrimitive(contract.payload.allocation.settlement.executor)
+
+    for {
+      lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
+        splice.amulet.LockedAmulet.COMPANION
+      )(contract.payload.lockedAmulet)
+    } yield {
+      val input =
+        new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput(
+          new splice.amuletallocation.AmuletAllocation.ContractId(
+            contract.contractId.contractId
+          ),
+          java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
+        )
+      (input, Set(sender, receiver, executor))
+    }
   }
 }
 
