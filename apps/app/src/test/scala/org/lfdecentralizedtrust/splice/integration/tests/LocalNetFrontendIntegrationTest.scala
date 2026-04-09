@@ -26,17 +26,17 @@ class LocalNetFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(Seq("localnet-topology.conf"), this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) =>
-        conf.copy(
-          remoteParticipants = conf.remoteParticipants.map { case (p, config) =>
-            p -> config.copy(
-              adminApi = config.adminApi,
-              ledgerApi = config.ledgerApi,
-              token = Some(AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")),
-            )
-          }
-        )
-      )
+//      .addConfigTransforms((_, conf) =>
+//        conf.copy(
+//          remoteParticipants = conf.remoteParticipants.map { case (p, config) =>
+//            p -> config.copy(
+//              adminApi = config.adminApi,
+//              ledgerApi = config.ledgerApi,
+//              token = Some(AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")),
+//            )
+//          }
+//        )
+//      )
       .updateTestingConfig(
         _.focus(_.participantsWithoutLapiVerification).replace(
           Set(
@@ -212,7 +212,7 @@ class LocalNetFrontendIntegrationTest
       val participantClient = new ParticipantClientReference(
         env,
         appProviderParticipant.name,
-        appProviderParticipant.config,
+        appProviderParticipant.config.copy(token = Some(token)),
       )
       val hash = participantClient.upload_dar_unless_exists(
         "apps/app/src/test/resources/nuck-example-main-0.0.1.dar"
