@@ -8,20 +8,12 @@ create table app_activity_party_totals
     -- Total activity weight recorded for the app provider in the given round.
     -- Measured in bytes of traffic.
     total_app_activity_weight   bigint not null,
-    -- Sequence number of the app provider party in the given round.
-    -- Assigned in ascending order of app_provider_party starting from 0 for each round.
-    -- Used as a compact reference to the app provider party in other tables to save space,
-    -- as the party identifier can be long.
-    app_provider_party_seq_num  int not null,
     -- The app provider party for which the totals are computed.
     app_provider_party          text not null,
     -- Number of activity records that contributed to this party's total in this round.
     num_activity_records        bigint not null,
 
-    constraint app_activity_party_totals_pkey primary key (history_id, round_number, app_provider_party_seq_num),
-
-    -- Uniqueness constraint and index to lookup activity totals by app provider party.
-    constraint uq_app_activity_party unique (history_id, round_number, app_provider_party)
+    constraint app_activity_party_totals_pkey primary key (history_id, round_number, app_provider_party)
 );
 
 -- Per-round totals of app activity weights across all app providers.
@@ -52,7 +44,11 @@ create table app_reward_party_totals
     -- The mining round number for which the totals are computed.
     round_number                bigint not null,
     -- Party number within the round.
+    -- Assigned in ascending order of app_provider_party starting from 0,
+    -- numbering only above-threshold (rewarded) parties.
     app_provider_party_seq_num  int not null,
+    -- The rewarded app provider party.
+    app_provider_party          text not null,
 
     -- Total app reward amount minting allowance for the app provider in the given round.
     -- Measured in Amulet.
@@ -60,8 +56,9 @@ create table app_reward_party_totals
 
     constraint app_reward_party_totals_pkey primary key (history_id, round_number, app_provider_party_seq_num),
 
-    constraint app_reward_party_totals_activity_fkey foreign key (history_id, round_number, app_provider_party_seq_num)
-      references app_activity_party_totals (history_id, round_number, app_provider_party_seq_num)
+    -- Ensures every rewarded party has a corresponding activity record.
+    constraint app_reward_party_totals_activity_fkey foreign key (history_id, round_number, app_provider_party)
+      references app_activity_party_totals (history_id, round_number, app_provider_party)
 );
 
 -- Per-round totals of app rewards across all app providers.
@@ -102,7 +99,8 @@ create table app_reward_batch_hashes
     round_number                  bigint not null,
     -- The level of the batch for the given round.
     -- Levels are assigned in ascending order starting from 0 for each round,
-    -- with each batch containing a contiguous sequence of parties based on their app_provider_party_seq_num.
+    -- with each batch containing a contiguous sequence of rewarded parties
+    -- based on their app_provider_party_seq_num in app_reward_party_totals.
     --
     -- Child batches can be found by looking for batches with the same
     -- round_number and a lower batch_level and have a party_seq_num_begin_incl that is

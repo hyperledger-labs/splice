@@ -36,7 +36,6 @@ object DbScanAppRewardsStore {
       historyId: Long,
       roundNumber: Long,
       totalAppActivityWeight: Long,
-      appProviderPartySeqNum: Int,
       appProviderParty: String,
       numActivityRecords: Long,
   )
@@ -53,6 +52,7 @@ object DbScanAppRewardsStore {
       historyId: Long,
       roundNumber: Long,
       appProviderPartySeqNum: Int,
+      appProviderParty: String,
       totalAppRewardAmount: BigDecimal,
   )
 
@@ -131,7 +131,6 @@ class DbScanAppRewardsStore(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
       totalAppActivityWeight = prs.<<[Long],
-      appProviderPartySeqNum = prs.<<[Int],
       appProviderParty = prs.<<[String],
       numActivityRecords = prs.<<[Long],
     )
@@ -154,6 +153,7 @@ class DbScanAppRewardsStore(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
       appProviderPartySeqNum = prs.<<[Int],
+      appProviderParty = prs.<<[String],
       totalAppRewardAmount = prs.<<[BigDecimal],
     )
   }
@@ -210,12 +210,12 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.totalAppActivityWeight},
-              ${row.appProviderPartySeqNum}, ${row.appProviderParty},
+              ${row.appProviderParty},
               ${row.numActivityRecords})"""
       })
       (sql"""insert into #${Tables.appActivityPartyTotals}(
               history_id, round_number, total_app_activity_weight,
-              app_provider_party_seq_num, app_provider_party,
+              app_provider_party,
               num_activity_records
             ) values """ ++ values).asUpdate
     }
@@ -242,11 +242,11 @@ class DbScanAppRewardsStore(
 
     runQuery(
       sql"""select history_id, round_number, total_app_activity_weight,
-                   app_provider_party_seq_num, app_provider_party,
+                   app_provider_party,
                    num_activity_records
             from #${Tables.appActivityPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
-            order by app_provider_party_seq_num
+            order by app_provider_party
       """.as[DbScanAppRewardsStore.AppActivityPartyTotalT],
       "appRewards.getAppActivityPartyTotalsByRound",
     )
@@ -317,11 +317,11 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.appProviderPartySeqNum},
-              ${row.totalAppRewardAmount})"""
+              ${row.appProviderParty}, ${row.totalAppRewardAmount})"""
       })
       (sql"""insert into #${Tables.appRewardPartyTotals}(
               history_id, round_number, app_provider_party_seq_num,
-              total_app_reward_amount
+              app_provider_party, total_app_reward_amount
             ) values """ ++ values).asUpdate
     }
   }
@@ -347,7 +347,7 @@ class DbScanAppRewardsStore(
 
     runQuery(
       sql"""select history_id, round_number, app_provider_party_seq_num,
-                   total_app_reward_amount
+                   app_provider_party, total_app_reward_amount
             from #${Tables.appRewardPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
             order by app_provider_party_seq_num
@@ -683,11 +683,6 @@ class DbScanAppRewardsStore(
                    count(*) as num_activity_records
             from unnested
             group by party
-          ),
-          numbered as (
-            select party, total_weight, num_activity_records,
-                   (row_number() over (order by party) - 1)::int as seq_num
-            from aggregated
           )"""
 
   /** Insert per-party totals and return the inserted weights via RETURNING. */
@@ -697,12 +692,11 @@ class DbScanAppRewardsStore(
               (history_id,
                round_number,
                total_app_activity_weight,
-               app_provider_party_seq_num,
                app_provider_party,
                num_activity_records)
-            select $historyId, $roundNumber, total_weight, seq_num, party,
+            select $historyId, $roundNumber, total_weight, party,
                    num_activity_records
-            from numbered
+            from aggregated
             returning total_app_activity_weight, num_activity_records
           )"""
 
@@ -753,7 +747,7 @@ class DbScanAppRewardsStore(
     val unclaimed = params.unclaimedAppRewardAmount
 
     (sql"""with computed as (
-             select history_id, round_number, app_provider_party_seq_num,
+             select history_id, round_number, app_provider_party,
                     (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
                       * $issuance as total_app_reward_amount
              from #${Tables.appActivityPartyTotals}
@@ -761,8 +755,11 @@ class DbScanAppRewardsStore(
            ),
            inserted_parties as (
              insert into #${Tables.appRewardPartyTotals}
-               (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
-             select history_id, round_number, app_provider_party_seq_num, total_app_reward_amount
+               (history_id, round_number, app_provider_party_seq_num,
+                app_provider_party, total_app_reward_amount)
+             select history_id, round_number,
+                    (row_number() over (order by app_provider_party) - 1)::int,
+                    app_provider_party, total_app_reward_amount
              from computed
              where total_app_reward_amount >= $threshold
              returning total_app_reward_amount

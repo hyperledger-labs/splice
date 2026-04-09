@@ -134,13 +134,13 @@ object RewardComputationTrigger {
     }
 
   // TODO(#4383): Remove this once it is obtained from the appropriate Contract
-  private[automation] val placeholderBatchSize: Int = 100
+  private[scan] val placeholderBatchSize: Int = 100
 
   // TODO(#4383): Remove this once the values are obtained from the appropriate Contract
   // These placeholder values are from MainNet DSO config:
   //
   // (Round 89782: Checked in RewardComputationInputsTest).
-  private[automation] val placeholderInputs: RewardComputationInputs = {
+  private[scan] val placeholderInputs: RewardComputationInputs = {
     import RewardComputationInputs.{fromBigDecimal as n}
     val tickDurationMicros: Long = 600L * 1000000L
     RewardComputationInputs(
