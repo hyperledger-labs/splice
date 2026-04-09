@@ -56,13 +56,15 @@ import org.apache.pekko.util.ByteString as PekkoByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.{BackupDumpConfig, GcpCredentialsConfig}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  TopologyResult,
+  TopologySnapshot,
+}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton sequencer admin API that we rely
@@ -112,18 +114,25 @@ class SequencerAdminConnection(
   def getLsuState(file: File, ts: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    val responseObserver = new OutputFileStreamObserver[SequencerLsuStateResponse](
-      file,
-      _.chunk,
-    )
-    runCmd(
-      TopologyAdminCommands.Read
-        .SequencerLsuState(
-          store = None,
-          ts = ts,
-          observer = responseObserver,
+    Future {
+      blocking {
+        file.createFileIfNotExists(createParents = true)
+        new OutputFileStreamObserver[SequencerLsuStateResponse](
+          file,
+          _.chunk,
         )
-    ).map(_ => ())
+      }
+    }.flatMap { observer =>
+      runCmd(
+        TopologyAdminCommands.Read
+          .SequencerLsuState(
+            store = None,
+            ts = ts,
+            observer = observer,
+          )
+      ).map(_ => ())
+
+    }
   }
 
   def initializeFromPredecessor(

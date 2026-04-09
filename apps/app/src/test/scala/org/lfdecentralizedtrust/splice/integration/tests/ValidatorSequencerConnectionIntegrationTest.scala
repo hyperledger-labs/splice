@@ -25,6 +25,7 @@ import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorTrustedSynchronizerConfig
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class ValidatorSequencerConnectionIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with SvTestUtil

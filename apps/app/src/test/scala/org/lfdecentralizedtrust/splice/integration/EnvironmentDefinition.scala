@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Suppre
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
@@ -35,7 +36,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceEnvironmentFactory,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
+import org.lfdecentralizedtrust.splice.sv.config.{
+  SvCantonIdentifierConfig,
+  SvAppBackendConfig,
+  SvSynchronizerNodeConfig,
+}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
@@ -95,6 +100,7 @@ case class EnvironmentDefinition(
       .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
+      .withProtocolVersion
       .withEagerAppActivityMarkerConversion
 
   def withAllocatedUsers(
@@ -169,6 +175,18 @@ case class EnvironmentDefinition(
           )
         )(config),
     )
+
+  def withProtocolVersion: EnvironmentDefinition =
+    addConfigTransforms((_, config) => {
+      val protocolVersionO = sys.env.get("PROTOCOL_VERSION").filter(_ != "")
+      protocolVersionO.fold(config)(pv =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          updateAllSynchronizerNodeConfigs(
+            _.focus(_.protocolVersion).replace(ProtocolVersion.tryCreate(pv))
+          )
+        )(config)
+      )
+    })
 
   def withInitializedNodes(): EnvironmentDefinition =
     copy(setup = implicit env => {
@@ -339,6 +357,22 @@ case class EnvironmentDefinition(
   def withBftSequencersSuccessor: EnvironmentDefinition =
     addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
 
+  def withSvBftSequencerConnectionDisabled(): EnvironmentDefinition =
+    addConfigTransforms(
+      (_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(bftSequencerConnection = false)
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_ { validatorConfig =>
+          if (validatorConfig.svValidator)
+            validatorConfig.copy(
+              disableSvValidatorBftSequencerConnection = true
+            )
+          else validatorConfig
+        }(config),
+    )
+
   def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
     addConfigTransforms((_, conf) =>
       ConfigTransforms.updateAllSvAppConfigs_(config =>
@@ -370,6 +404,20 @@ case class EnvironmentDefinition(
           )
       )(config)
     )
+
+  def updateAllSynchronizerNodeConfigs(
+      f: SvSynchronizerNodeConfig => SvSynchronizerNodeConfig
+  ): SvAppBackendConfig => SvAppBackendConfig =
+    c =>
+      c.focus(_.localSynchronizerNodes)
+        .modify(
+          _.focus(_.current)
+            .modify(f)
+            .focus(_.successor)
+            .modify(_.map(f))
+            .focus(_.legacy)
+            .modify(_.map(f))
+        )
 
   def withOnboardingParticipantPromotionDelayEnabled(): EnvironmentDefinition = {
     addConfigTransform((_, config) =>
