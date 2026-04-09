@@ -82,6 +82,9 @@ const MonitoringConfigSchema = z
           completedDelay: z.object({
             seconds: z.number(),
           }),
+          computeDuration: z.object({
+            seconds: z.number(),
+          }),
         }),
         acsSnapshots: z.object({
           saveLatencyThresholdSeconds: z.number(),
