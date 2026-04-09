@@ -131,12 +131,13 @@ class HttpTokenStandardAllocationHandler(
                 .asRuntimeException()
             )
         }
-        choiceContextBuilder <- getAmuletRulesTransferContext(
+        choiceContextBuilder <- getExternalPartyTransferContext(
           body.excludeDebugFields.getOrElse(false)
         )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
         // TODO: don't do N queries but just one with =ANY()
         allocations <- Future.traverse(settleBatch.allocationCids.asScala) { allocationCid =>
+          // TODO (#4949): this only lists V2 allocations, but it should also do V2
           contractFetcher.lookupContractById(amuletallocationv2.AmuletAllocationV2.COMPANION)(
             allocationCid
           )
@@ -159,11 +160,12 @@ class HttpTokenStandardAllocationHandler(
     }
   }
 
-  private def getAmuletRulesTransferContext(excludeDebugFields: Boolean)(implicit
+  private def getExternalPartyTransferContext(excludeDebugFields: Boolean)(implicit
       tc: TraceContext
   ): Future[V2ChoiceContextBuilder] = {
     val now = clock.now
     for {
+      // amuletRules only used to get the active synchronizer
       amuletRules <- store.getAmuletRules()
       externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
