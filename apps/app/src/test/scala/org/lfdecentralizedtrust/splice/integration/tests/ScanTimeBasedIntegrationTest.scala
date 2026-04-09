@@ -638,6 +638,7 @@ class ScanTimeBasedIntegrationTest
         .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
 
       // Compare bulk storage data to hot storage data from scan
+      // TODO(#4788): for now, bulk storage still uses v0, so we use that here as well
       val acsAtMidnightFromScan = sv1ScanBackend
         .getAcsSnapshotAtV1(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
@@ -690,7 +691,6 @@ class ScanTimeBasedIntegrationTest
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)
         .filter(isInTimeRange)
-
       updatesFromScan should contain theSameElementsAs updatesFromS3
 
       // Compare acs v0 and v1 endpoints
@@ -700,7 +700,6 @@ class ScanTimeBasedIntegrationTest
         .createdEvents
 
       compareAcsV0V1(acsV0AtMidnightFromScan, acsAtMidnightFromScan)
-
     }
   }
 }

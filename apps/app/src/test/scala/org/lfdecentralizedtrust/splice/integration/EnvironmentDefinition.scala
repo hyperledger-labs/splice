@@ -80,6 +80,10 @@ case class EnvironmentDefinition(
       ConfigTransforms.withBftSequencers() +: this.configTransformsWithContext(context)
     else configTransformsWithContext(context)
   }
+  def updateTestingConfig(
+      update: TestingConfigInternal => TestingConfigInternal
+  ): EnvironmentDefinition =
+    copy(testingConfig = update(testingConfig))
 
   def withManualStart: EnvironmentDefinition = {
     this
