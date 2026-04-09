@@ -9,6 +9,8 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Map qualified as Map
+import DA.Optional
+import DA.Set qualified as Set
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 
@@ -128,17 +130,36 @@ template TokenAllocationV2 with
             -- the creation, as this choice here cannot express the creation and
             -- archival of multiple holdings for different instrument-ids.
 
+-- FIXME: loc
+existingConfirmers : TokenTransferOffer -> [Party]
+existingConfirmers offer = do
+  p <- jointAuthorizers offer.transfer.sender
+  guard (p `notElem` offer.confirmCreation)
+  pure p
 
 -- | Transfer instruction representing a token transfer offer.
 --
 -- Its input holdings reference the locked tokens.
 template TokenTransferOffer with
     transfer : V2.Transfer
+    originalInstructionCid : Optional (ContractId V2.TransferInstruction)
+    confirmCreation : [Party]
   where
     ensure isValidTransferV2 transfer
 
-    signatory accountParties transfer.sender, transfer.instrumentId.admin
-    observer accountParties transfer.receiver
+    signatory existingConfirmers this, transfer.instrumentId.admin
+    observer (if null confirmCreation then accountParties transfer.receiver else confirmCreation)
+
+    choice TokenTransferOffer_ConfirmCreation : V2.TransferInstructionResult
+      with
+        inputHoldingCids : [ContractId V2.Holding]
+        actors : [Party]
+        -- FIXME: extraArgs
+      controller actors
+      do
+        let origId = Some $ fromOptional (toInterfaceContractId self) originalInstructionCid
+        token_transferFactory_transferImpl transfer.instrumentId.admin origId actors confirmCreation
+          (transfer with inputHoldingCids)
 
     interface instance V2.TransferInstruction for TokenTransferOffer where
       view = V2.TransferInstructionView with
@@ -204,7 +225,9 @@ template TokenRules with
       transferFactory_publicFetchImpl = publicFetchDefaultImpl this
       transferFactory_transferExtraObservers = transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl
 
-      transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
+      transferFactory_transferImpl self arg = do
+        let missingConfirmers = jointAuthorizers arg.transfer.sender
+        token_transferFactory_transferImpl admin None arg.actors missingConfirmers arg.transfer
 
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
@@ -238,24 +261,45 @@ template TokenRules with
 
 -- | Create a V2 transfer offer
 token_transferFactory_transferImpl
-  : TokenRules
-  -> ContractId V2.TransferFactory
-  -> V2.TransferFactory_Transfer
+  : Party
+  -> Optional (ContractId V2.TransferInstruction)
+  -> [Party]
+  -> [Party]
+  -> V2.Transfer
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl tokenRules _self arg = do
-  -- TODO(#4542): allow either of the two authorizers to request the transfer
-  let transfer = arg.transfer
-  checkActors arg.actors [jointAuthorizers transfer.sender]
-  let iid = transfer.instrumentId
-  require' ("transfer.instrumentId.admin", iid.admin) isEqualR ("transferFactory.admin", tokenRules.admin)
+token_transferFactory_transferImpl admin originalInstructionCid actors missingConfirmers transfer = do
+  require' ("actors", actors) isSubsetOfR ("missingConfirmers", missingConfirmers)
+  require' ("actors", actors) (notR isEqualR) ("empty list", [])
+  require' ("transfer.instrumentId.admin", transfer.instrumentId.admin) isEqualR ("transferFactory.admin", admin)
+  let newMissingConfirmers = Set.fromList missingConfirmers `Set.difference` Set.fromList actors
+  if Set.null newMissingConfirmers
+    then token_transferFactory_transferImplCore admin originalInstructionCid transfer
+    else do
+      -- create transfer offer with the remaining missing confirmers as confirmers
+      instrCid <- create TokenTransferOffer with
+        originalInstructionCid
+        confirmCreation = Set.toList newMissingConfirmers
+        transfer
+      pure V2.TransferInstructionResult with
+        output = V2.TransferInstructionResult_Pending with transferInstructionCid = coerceContractId instrCid
+        senderChangeCids = transfer.inputHoldingCids
+        meta = emptyMetadata
 
+
+-- | Create a V2 transfer offer
+token_transferFactory_transferImplCore
+  : Party
+  -> Optional (ContractId V2.TransferInstruction)
+  -> V2.Transfer
+  -> Update V2.TransferInstructionResult
+token_transferFactory_transferImplCore admin originalInstructionCid transfer = do
   -- consume all inputs
   inputAmounts <- forA transfer.inputHoldingCids $ \cid -> do
     let tokenCid = coerceContractId cid : ContractId Token
     token <- fetch tokenCid
     archive tokenCid
     require' ("inputHolding.account", token.holding.account) isEqualR ("transfer.sender", transfer.sender)
-    require' ("inputHolding.instrumentId", token.holding.instrumentId) isEqualR ("transfer.instrumentId", iid)
+    require' ("inputHolding.instrumentId", token.holding.instrumentId) isEqualR ("transfer.instrumentId", transfer.instrumentId)
     pure token.holding.amount
   let inputAmount = sum inputAmounts
   require' ("inputAmount for " <> show transfer.instrumentId, inputAmount) isGreaterOrEqualR
@@ -285,12 +329,14 @@ token_transferFactory_transferImpl tokenRules _self arg = do
       lockedCid <- create Token with
         holding = (senderHoldingFromTransfer transfer) with
           lock = Some $ V2.Lock with
-            holders = iid.admin :: accountParties transfer.sender
+            holders = transfer.instrumentId.admin :: accountParties transfer.sender
             expiresAt = Some transfer.executeBefore
             expiresAfter = None
             context = Some $ "transfer to " <> show transfer.receiver
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+        originalInstructionCid
+        confirmCreation = []
         transfer = transfer with
           inputHoldingCids = [toInterfaceContractId lockedCid]
       pure V2.TransferInstructionResult with

@@ -8,7 +8,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
   (
     -- * Reading/checking holdings
     listHoldings,
-    listHoldings',
+    listVisibleHoldings,
     listHoldingCids,
     listLockedHoldings,
     listUnlockedHoldingCidsFor,
@@ -23,6 +23,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
     -- * Reading transfer instructions
     listTransferOffers,
+    listTransferOffersV2,
 
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
@@ -97,22 +98,21 @@ import Daml.Script
 -- | List the holdings of a party of a specific instrument.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listHoldings p instrumentId = do
-  filter (\(_, holding) -> holding.instrumentId == instrumentId) <$> listHoldings' p
+  filter (\(_, holding) -> holding.instrumentId == instrumentId && holding.account.owner == p) <$> listVisibleHoldings p
 
 -- | List the holdings of a party of a specific instrument.
-listHoldings' : Party -> Script [(ContractId V2.Holding, V2.HoldingView)]
-listHoldings' p = do
+listVisibleHoldings : Party -> Script [(ContractId V2.Holding, V2.HoldingView)]
+listVisibleHoldings p = do
   holdingsV2 <- queryInterface @V2.Holding p
   let instrumentHoldingsV2 = Map.fromList $ do
         (cid, Some holding) <- holdingsV2
-        guard (holding.account.owner == p)
         pure (cid, holding)
   -- enrich with V1 only holdings
   holdingsV1 <- queryInterface @V1.Holding p
   let instrumentHoldingsV1 = do
         (cidV1, Some holding) <- holdingsV1
         let cid = TSU.upcast cidV1
-        guard (holding.owner == p && not (Map.member cid instrumentHoldingsV2))
+        guard (not $ Map.member cid instrumentHoldingsV2)
         pure (cid, TSU.upcast holding)
   pure $ instrumentHoldingsV1 ++ Map.toList instrumentHoldingsV2
 
@@ -126,8 +126,8 @@ listHoldingCids p instrumentId = (map fst) <$> listHoldings p instrumentId
 
 listUnlockedHoldingCidsFor : V2.Account -> Party -> V2.InstrumentId -> Script [ContractId V2.Holding]
 listUnlockedHoldingCidsFor account actor instrumentId = do
-  holdings <- listHoldings actor instrumentId
-  pure [cid | (cid, holding) <- holdings, holding.account == account, isNone holding.lock]
+  holdings <- listVisibleHoldings actor
+  pure [cid | (cid, holding) <- holdings, holding.instrumentId == instrumentId, holding.account == account, isNone holding.lock]
 
 -- | Check that a holding with a specific amount exists for the given owner.
 checkHoldingWithAmountExists : Party -> V2.InstrumentId -> Decimal -> Script ()
