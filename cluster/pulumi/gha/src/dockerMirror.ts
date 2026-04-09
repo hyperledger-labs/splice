@@ -56,12 +56,6 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
             },
           },
         },
-        garbageCollect: {
-          // Run periodic garbage collection to reclaim space from
-          // unreferenced blobs after the proxy scheduler expires them.
-          enabled: true,
-          schedule: '0 1 * * *',
-        },
         ...infraAffinityAndTolerations,
       },
     },
