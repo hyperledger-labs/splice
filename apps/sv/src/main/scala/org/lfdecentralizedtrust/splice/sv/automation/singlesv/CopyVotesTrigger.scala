@@ -57,11 +57,29 @@ class CopyVotesTrigger(
       s"Automatically Copied from $sourceSvName: ${sourceVote.reason.body}",
     )
 
-  private def shouldCopyVote(sourceVote: Vote, currentVote: Option[Vote]): Boolean =
-    currentVote.forall { vote =>
-      vote.accept != sourceVote.accept ||
-      vote.reason.url != sourceVote.reason.url ||
-      vote.reason.body != copiedReason(sourceVote).body
+  private def isCopiedFrom(vote: Vote, svName: String): Boolean =
+    vote.reason.body.startsWith(s"Automatically Copied from $svName:")
+
+  private def isNewer(sourceVote: Vote, currentVote: Vote): Boolean =
+    sourceVote.optCastAt.toScala.exists(sourceCastAt =>
+      currentVote.optCastAt.toScala.forall(sourceCastAt.isAfter)
+    )
+
+  private def shouldCopyVote(
+      sourceVote: Vote,
+      currentVote: Option[Vote],
+      thisSvName: String,
+  ): Boolean =
+    currentVote match {
+      case None => true
+      case Some(vote) =>
+        !isCopiedFrom(sourceVote, thisSvName) &&
+        isNewer(sourceVote, vote) &&
+        (
+          vote.accept != sourceVote.accept ||
+            vote.reason.url != sourceVote.reason.url ||
+            vote.reason.body != copiedReason(sourceVote).body
+        )
     }
 
   override def completeTask(
@@ -87,7 +105,7 @@ class CopyVotesTrigger(
           val sourceVoteOpt = votes.get(sourceSvName)
           val thisSvVote = votes.get(myName)
           sourceVoteOpt match {
-            case Some(sourceVote) if shouldCopyVote(sourceVote, thisSvVote) =>
+            case Some(sourceVote) if shouldCopyVote(sourceVote, thisSvVote, myName) =>
               val trackingCid = task.payload.trackingCid.toScala
                 .getOrElse(task.contractId)
               for {

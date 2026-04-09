@@ -884,6 +884,10 @@
           "name": "rewards-collected",
           "type": "banned"
         },
+        "/api/scan/v0/roll-forward-lsu": {
+          "name": "rollForwardLsu",
+          "type": "unlimited"
+        },
         "/api/scan/v0/round-of-latest-data": {
           "name": "round-of-latest-data",
           "type": "banned"
@@ -1220,7 +1224,7 @@
         },
         "synchronizers": {
           "current": {
-            "cometBftConfig": {
+            "cometBFT": {
               "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
               "enabled": true
             },

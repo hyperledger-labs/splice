@@ -31,7 +31,7 @@ function localSynchronizerNodeValues(
     ...(useCantonBft ? { enableBftSequencer: true } : {}),
     ...(!useCantonBft
       ? {
-          cometBftConfig: {
+          cometBFT: {
             enabled: true,
             connectionUri: pulumi.interpolate`http://${(node as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
             ...(cometBftGovernanceKey ? { externalGovernanceKey: true } : {}),

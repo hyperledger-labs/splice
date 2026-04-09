@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   override protected def runEventHistorySanityCheck: Boolean = false

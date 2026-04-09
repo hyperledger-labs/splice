@@ -22,6 +22,7 @@ import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
+import org.lfdecentralizedtrust.splice.scan.config.ScanRollForwardLsuConfig
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvOnboardingConfig,
   SvSynchronizerNodeConfig,
@@ -120,6 +121,8 @@ class RollForwardLsuIntegrationTest
                   .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
                   .focus(_.synchronizerNodes)
                   .modify(c => c.copy(legacy = c.current.some))
+                  .focus(_.rollForwardLsu)
+                  .replace(Some(ScanRollForwardLsuConfig(upgradeTime = None)))
             ),
           ),
         (_, config) => ConfigTransforms.withBftSequencers(_.contains("Local"))(config),
@@ -152,6 +155,7 @@ class RollForwardLsuIntegrationTest
       sv2Backend,
       sv3Backend,
       sv4Backend,
+      aliceValidatorBackend,
       // TODO(#4682): Fix with BFT connections
       // sv1ValidatorBackend,
       // sv2ValidatorBackend,
@@ -359,11 +363,26 @@ class RollForwardLsuIntegrationTest
         }
       }
 
+      clue("Alice is connected to new physical synchronizer") {
+        eventually() {
+          aliceValidatorBackend.participantClient.synchronizers
+            .list_connected()
+            .loneElement
+            .physicalSynchronizerId
+            .serial shouldBe newSynchronizerSerial
+        }
+      }
+
+      clue("Alice can tap") {
+        aliceValidatorWalletClient.tap(100.0)
+      }
+
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         stopAllAsync(allNodes*).futureValue
         allSvLocalBackends.par.foreach(
-          _.participantClientWithAdminToken.synchronizers.disconnect_all()
+          _.participantClient.synchronizers.disconnect_all()
         )
+        aliceValidatorBackend.participantClient.synchronizers.disconnect_all()
       }
     }
   }
