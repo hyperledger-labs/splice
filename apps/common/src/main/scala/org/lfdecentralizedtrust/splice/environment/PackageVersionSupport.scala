@@ -111,6 +111,10 @@ trait PackageVersionSupport extends NamedLogging {
       tc: TraceContext
   ): Future[FeatureSupport] = supports24hSubmissionDelay(parties, now)
 
+  def supportsExpireAmuletAllocations(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = supports24hSubmissionDelay(parties, now)
+
   def supports24hSubmissionDelayDsoGovernance(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
