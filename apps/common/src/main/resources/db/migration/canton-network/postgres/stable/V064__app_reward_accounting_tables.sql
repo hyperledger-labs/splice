@@ -120,6 +120,7 @@ create table app_reward_batch_hashes
 );
 
 create index idx_app_reward_batch_hash_by_hash on app_reward_batch_hashes (history_id, round_number, batch_hash);
+create index idx_app_reward_batch_hash_by_level on app_reward_batch_hashes (history_id, round_number, batch_level);
 
 
 -- Root hash per round, marking completion of reward computation.
