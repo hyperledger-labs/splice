@@ -29,7 +29,6 @@ import scala.concurrent.duration.*
   * null field from JSON responses via the custom `Encoder` instances provided by
   * [[ScanJsonSupport]], while retaining all other null fields.
   */
-@SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
 class GeneratedScanRouteDropNullsTest extends AnyWordSpec with BaseTest with ScalatestRouteTest {
 
   private def responseBodyString: String =
@@ -50,7 +49,8 @@ class GeneratedScanRouteDropNullsTest extends AnyWordSpec with BaseTest with Sca
         eventsById = SortedMap.empty,
         externalTransactionHash = None, // <-- this should be dropped
       )
-      doReturn(
+      // ignoring the result since it's obviously a Future.successful stub.
+      val _ = doReturn(
         Future.successful(
           ScanResource.GetUpdateHistoryV2ResponseOK(
             UpdateHistoryResponseV2(
@@ -105,7 +105,8 @@ class GeneratedScanRouteDropNullsTest extends AnyWordSpec with BaseTest with Sca
         trafficSummary = None, // should be preserved as null
         appActivityRecords = None, // should be preserved as null
       )
-      doReturn(
+      // ignoring the result since it's obviously a Future.successful stub.
+      val _ = doReturn(
         Future.successful(
           ScanResource.GetEventByIdResponseOK(eventItem)
         )
