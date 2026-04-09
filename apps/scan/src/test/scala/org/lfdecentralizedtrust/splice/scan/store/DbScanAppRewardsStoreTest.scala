@@ -500,6 +500,54 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    // -- computeAndStoreRewards summary tests ----------------------------------
+
+    "computeAndStoreRewards — returns correct summary counts" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        // 3 activity records, 2 parties (alice in 2 records, bob in 1)
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          Seq("alice::provider", "bob::provider"),
+          Seq(3000000L, 2000000L),
+        )
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          Seq("alice::provider"),
+          Seq(1000000L),
+        )
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          Seq("bob::provider"),
+          Seq(500000L),
+        )
+        summary <- store.computeAndStoreRewards(roundNumber)
+      } yield {
+        summary.activePartiesCount shouldBe 2L
+        summary.activityRecordsCount shouldBe 3L
+        // No reward computation on this branch yet
+        summary.rewardedPartiesCount shouldBe 0L
+        summary.batchesCreatedCount shouldBe 0L
+      }
+    }
+
+    "computeAndStoreRewards — empty round returns zero counts" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        summary <- store.computeAndStoreRewards(roundNumber)
+      } yield {
+        summary.activePartiesCount shouldBe 0L
+        summary.activityRecordsCount shouldBe 0L
+        summary.rewardedPartiesCount shouldBe 0L
+        summary.batchesCreatedCount shouldBe 0L
+      }
+    }
+
     // -- computeRewardTotals tests -------------------------------------------
 
     val rewardTotalsTestCases = Seq(

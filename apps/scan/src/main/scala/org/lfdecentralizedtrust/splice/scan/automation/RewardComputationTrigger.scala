@@ -61,7 +61,15 @@ class RewardComputationTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     appRewardsStore
       .computeAndStoreRewards(task.roundNumber)
-      .map(_ => TaskSuccess(s"Computed rewards for round ${task.roundNumber}"))
+      .map(summary =>
+        TaskSuccess(
+          s"Computed rewards for round ${task.roundNumber}: " +
+            s"${summary.activePartiesCount} active parties, " +
+            s"${summary.activityRecordsCount} activity records, " +
+            s"${summary.rewardedPartiesCount} rewarded parties, " +
+            s"${summary.batchesCreatedCount} batches"
+        )
+      )
 
   override protected def isStaleTask(
       task: RewardComputationTrigger.Task
