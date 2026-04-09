@@ -19,17 +19,27 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
     {
       name: 'docker-registry-mirror',
       chart: 'docker-registry',
-      version: '2.3.0',
+      version: '3.0.0',
       namespace: namespace.metadata.name,
       repositoryOpts: {
         repo: 'https://twuni.github.io/docker-registry.helm',
       },
       values: {
+        extraEnvVars: [
+          {
+            // Avoid `traces export...connection refused` error spam
+            name: 'OTEL_TRACES_EXPORTER',
+            value: 'none',
+          },
+          {
+            // Keep cached images for 30 days before expiring them (default: 168h = 7 days).
+            name: 'REGISTRY_PROXY_TTL',
+            value: '720h',
+          },
+        ],
         proxy: {
           // Configure the registry to act as a read-through cache for the Docker Hub.
           enabled: true,
-          // Keep cached images for 30 days before expiring them (default: 168h / 7 days).
-          ttl: '720h',
         },
         persistence: {
           storageClass: standardStorageClassName,
@@ -50,7 +60,6 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           // Run periodic garbage collection to reclaim space from
           // unreferenced blobs after the proxy scheduler expires them.
           enabled: true,
-          deleteUntagged: true,
           schedule: '0 1 * * *',
         },
         ...infraAffinityAndTolerations,

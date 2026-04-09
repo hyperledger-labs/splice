@@ -37,9 +37,14 @@ monitoring:
     alerts:
       acsCommitments:
         checkpointDelay:
-          seconds: 600
+          seconds: 1200
         completedDelay:
           seconds: 3600
+        computeDuration:
+          seconds: 1200
+      acsSnapshots:
+        saveLatencyThresholdSeconds: 2700
+        updateLatencyThresholdSeconds: 3
       cloudSql:
         maintenance: false
       cometbft:
@@ -52,6 +57,16 @@ monitoring:
         thresholdPerNamespace: 0.05
       deployment:
         pendingPeriodMinutes: 5
+      gcpQuotas:
+        excludedApproachingMetrics: []
+        excludedMetrics:
+          - 'cloudkms.googleapis.com/read_requests'
+          - 'cloudkms.googleapis.com/write_requests'
+          - 'cloudkms.googleapis.com/crypto_requests'
+          - 'cloudkms.googleapis.com/hsm_symmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_generate_random_requests'
+          - 'cloudkms.googleapis.com/external_kms_requests'
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
@@ -136,6 +151,11 @@ pulumiStacks:
     resources:
       requests:
         memory: '6Gi'
+splitwell:
+  participant:
+    additionalEnvVars:
+      - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
 sv:
   scan:
     externalRateLimits:
@@ -241,6 +261,9 @@ sv:
         /api/scan/v0/rewards-collected:
           name: 'rewards-collected'
           type: 'banned'
+        /api/scan/v0/roll-forward-lsu:
+          name: 'rollForwardLsu'
+          type: 'unlimited'
         /api/scan/v0/round-of-latest-data:
           name: 'round-of-latest-data'
           type: 'banned'
@@ -343,8 +366,8 @@ svs:
           memory: '2Gi'
     participant:
       additionalEnvVars:
-        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
-          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+        - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -424,6 +447,10 @@ validator1:
   deduplicationDuration: '30m'
   logging:
     level: 'DEBUG'
+  participant:
+    additionalEnvVars:
+      - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
   participantPruningSchedule:
     cron: '0 /10 * * * ?'
     maxDuration: '5m'

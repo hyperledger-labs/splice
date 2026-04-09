@@ -14,10 +14,13 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   override protected def runEventHistorySanityCheck: Boolean = false
@@ -204,6 +207,18 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         .futureValue
         .headOption
         .value
+
+      // Ensure that it's actually gone to avoid races in the ResetDecentralizedNamespace plugin
+      // where the topology is submitted to all but has not yet gone through
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.topology.decentralized_namespaces
+          .list(TopologyStoreId.Synchronizer(decentralizedSynchronizerId))
+          .loneElement
+          .item
+          .owners
+          .map(_.fingerprint)
+          .forgetNE should not contain sv1SequencerId.fingerprint
+      }
     }
   }
 

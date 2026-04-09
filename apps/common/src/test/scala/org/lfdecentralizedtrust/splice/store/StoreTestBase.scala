@@ -84,6 +84,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruc
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.Transfer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
+  AllocationSpecification,
+  SettlementInfo,
+  TransferLeg,
+  Reference,
+}
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
@@ -382,6 +389,57 @@ abstract class StoreTestBase
     contract(
       AmuletTransferInstruction.TEMPLATE_ID_WITH_PACKAGE_ID,
       new AmuletTransferInstruction.ContractId(contractId),
+      template,
+    )
+  }
+
+  protected def amuletAllocation(
+      sender: PartyId,
+      receiver: PartyId,
+      executor: PartyId,
+      amount: java.math.BigDecimal,
+      requestedAt: Instant,
+      allocateBefore: Instant,
+      settleBefore: Instant,
+      contractId: String = nextCid(),
+  ): Contract[
+    AmuletAllocation.ContractId,
+    AmuletAllocation,
+  ] = {
+    val instrumentId = new InstrumentId(dsoParty.toProtoPrimitive, "Amulet")
+    val emptyMeta = new Metadata(java.util.Collections.emptyMap())
+
+    val settlementInfo = new SettlementInfo(
+      executor.toProtoPrimitive,
+      new Reference("test-settlement", Optional.empty()),
+      requestedAt,
+      allocateBefore,
+      settleBefore,
+      emptyMeta,
+    )
+
+    val transferLeg = new TransferLeg(
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount,
+      instrumentId,
+      emptyMeta,
+    )
+
+    val allocationSpec = new AllocationSpecification(
+      settlementInfo,
+      "leg-1",
+      transferLeg,
+    )
+
+    val template = new AmuletAllocation(
+      new LockedAmulet.ContractId(nextCid()),
+      allocationSpec,
+    )
+
+    contract(
+      AmuletAllocation.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new AmuletAllocation.ContractId(contractId),
       template,
     )
   }

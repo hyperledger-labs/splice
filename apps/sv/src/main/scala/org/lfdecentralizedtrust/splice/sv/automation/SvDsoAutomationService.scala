@@ -255,10 +255,12 @@ class SvDsoAutomationService(
             synchronizerNodeReconciler,
             synchronizerNodeService.nodes,
             successorSynchronizerNode,
+            participantAdminConnection,
             store,
             config.domainMigrationDumpPath.getOrElse(
               throw new IllegalArgumentException("Domain migration dump path must be set for LSU")
             ),
+            config.bftSequencerConnection,
           )
         )
         registerTrigger(
