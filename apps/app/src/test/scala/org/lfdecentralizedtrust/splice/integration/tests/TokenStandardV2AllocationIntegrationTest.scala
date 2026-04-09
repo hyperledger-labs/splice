@@ -84,7 +84,7 @@ class TokenStandardV2AllocationIntegrationTest
     val settlementInfo = new allocationv2.SettlementInfo(
       java.util.List.of(venueParty.toProtoPrimitive),
       new allocationv2.Reference(
-        "OTCTradeProposal",
+        "OTCTrade",
         java.util.Optional.of(new metadatav1.AnyContract.ContractId(otcTrade.id.contractId)),
       ),
       otcTrade.data.createdAt,
@@ -301,7 +301,7 @@ class TokenStandardV2AllocationIntegrationTest
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitJava(
             actAs = Seq(venueParty),
-            commands = mkTestTradeProposal(
+            commands = mkTestTrade(
               dsoParty,
               venueParty,
               aliceParty,
@@ -316,7 +316,7 @@ class TokenStandardV2AllocationIntegrationTest
           )
       },
     )(
-      "There exists a trade proposal visible to the venue's participant",
+      "There exists a trade visible to the venue's participant",
       _ =>
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(tradingappv2.OTCTrade.COMPANION)(
@@ -390,7 +390,7 @@ class TokenStandardV2AllocationIntegrationTest
     CreateAllocationRequestResult(otcTrade, aliceAllocationRequest, bobAllocationRequest)
   }
 
-  def mkTestTradeProposal(
+  def mkTestTrade(
       dso: PartyId,
       venue: PartyId,
       alice: PartyId,
