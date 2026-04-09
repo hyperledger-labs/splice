@@ -47,6 +47,28 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/validator/onboarding/permission:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "grantValidatorPermission"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantValidatorPermissionRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrantValidatorPermissionResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/validator/licenses:
     get:
       tags: [sv]
@@ -674,6 +696,28 @@ components:
           description: |
             Human-readable alias of the validator party decoded from the stored secret.
           type: string
+
+    GrantValidatorPermissionRequest:
+      type: object
+      required:
+        - validator_party_id
+        - validator_participant_id
+      properties:
+        validator_party_id:
+          type: string
+          description: "The party ID of the validator being granted ValidatorPermission."
+        validator_participant_id:
+          type: string
+          description: "The participant ID of the validator."
+
+    GrantValidatorPermissionResponse:
+      type: object
+      required:
+        - validator_permission_contract_id
+      properties:
+        validator_permission_contract_id:
+          type: string
+          description: "The contract ID of the newly created ValidatorPermission contract."
 
     PrepareValidatorOnboardingRequest:
       type: object
