@@ -31,12 +31,13 @@ DOWN_COMMAND=( stop )
 CANTON_PROTOCOL_VERSION=""
 
 function usage() {
-    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-P <protocol_version>]"
+    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
     echo ""
     echo "Options:"
     echo "  -D                        Completely tear down the localnet (using 'docker compose down') instead of just stopping the containers (using 'docker compose stop')"
     echo "  -M                        Start the localnet with the 'multi-sync' profile enabled"
-    echo "  -P <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
+    echo "  -u                        Enable unstable Canton protocol versions"
+    echo "  -p <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
 }
 
 if [[ $# -lt 1 ]]; then
@@ -50,7 +51,7 @@ case $1 in
         ;;
     *)
         echo "Invalid action: $1. Use 'start' or 'stop'."
-        echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
+        usage
         exit 1
         ;;
 esac
@@ -64,7 +65,7 @@ while [[ $# -gt 0 ]]; do
         -M)
             MULTI_SYNC_PROFILE=( --profile multi-sync )
             ;;
-        -P)
+        -p)
             shift
             if [[ -z "$1" ]]; then
                 echo "Error: -P requires a protocol version argument."
@@ -73,12 +74,14 @@ while [[ $# -gt 0 ]]; do
             fi
             CANTON_PROTOCOL_VERSION=$1
             export CANTON_PROTOCOL_VERSION
-            # FIXME: move this into a different flag (and add to docs that don't use this script):
-            export ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
+            ;;
+        -u)
+            ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
+            export ALPHA_PROTOCOL_VERSION_ENV
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
+            usage
             exit 1
             ;;
     esac
