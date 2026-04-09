@@ -911,6 +911,36 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    "computeRewardHashes — round with no rewarded parties produces empty root hash" in {
+      for {
+        (store, historyId) <- newStore()
+        // Activity exists but no reward party totals (all below threshold)
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(AppActivityPartyTotalT(historyId, roundNumber, 1000000L, "alice::provider"))
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
+        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        // Look up the root hash via lookupBatchByHash
+        result <- store.lookupBatchByHash(roundNumber, rootHash.value.rootHash)
+      } yield {
+        // Root hash exists (round is marked as computed)
+        rootHash shouldBe defined
+        rootHash.value.rootHash.size shouldBe 32
+        // Single empty level-0 batch
+        batchHashes should have size 1
+        batchHashes.head.batchLevel shouldBe 0
+        batchHashes.head.partySeqNumBeginIncl shouldBe 0
+        batchHashes.head.partySeqNumEndExcl shouldBe 0
+        // lookupBatchByHash returns empty MintingAllowances, not None
+        result shouldBe defined
+        result.value shouldBe a[DbScanAppRewardsStore.BatchOfMintingAllowances]
+        val allowances =
+          result.value.asInstanceOf[DbScanAppRewardsStore.BatchOfMintingAllowances].allowances
+        allowances shouldBe empty
+      }
+    }
+
     "computeRewardHashes — re-run for same round raises error" in {
       for {
         (store, historyId) <- newStore()

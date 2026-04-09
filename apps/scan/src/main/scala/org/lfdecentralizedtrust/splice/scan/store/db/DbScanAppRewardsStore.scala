@@ -828,7 +828,11 @@ class DbScanAppRewardsStore(
       _ = logger.debug(
         s"Inserted $leafCount leaf batches for round $roundNumber."
       )
-      _ <- aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+      _ <-
+        if (leafCount > 0)
+          aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+        else
+          insertEmptyLeafBatch(roundNumber).map(_ => ())
       _ <- insertRootHash(roundNumber)
     } yield ()
 
@@ -923,6 +927,29 @@ class DbScanAppRewardsStore(
           ) sub
           group by batch_num
     """.asUpdate
+
+  /** The hash of a BatchOfMintingAllowances containing no parties.
+    *
+    * Used for rounds where no parties are above the reward threshold.
+    * Inserting this as a level-0 batch and root hash marks the round as
+    * computed, so that ComputeAppRewardsTrigger does not retry it, and
+    * lookupBatchByHash returns BatchOfMintingAllowances(Seq.empty)
+    * rather than None.
+    */
+  private def emptyBatchHash =
+    sql"""decode(hash_batch_of_minting_allowances(ARRAY[]::text[]), 'hex')"""
+
+  /** Insert a level-0 batch for a round with no rewarded parties.
+    *
+    * The batch covers the empty party range [0, 0) and hashes an empty
+    * BatchOfMintingAllowances. This lets insertRootHash find a batch to
+    * copy, and lets lookupBatchByHash return a well-typed empty result.
+    */
+  private def insertEmptyLeafBatch(roundNumber: Long) =
+    (sql"""insert into #${Tables.appRewardBatchHashes}(
+             history_id, round_number, batch_level,
+             party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+           values ($historyId, $roundNumber, 0, 0, 0, """ ++ emptyBatchHash ++ sql")").asUpdate
 
   /** Copy the single remaining batch hash into the root hashes table.
     * Reads the highest batch_level to find the root.
