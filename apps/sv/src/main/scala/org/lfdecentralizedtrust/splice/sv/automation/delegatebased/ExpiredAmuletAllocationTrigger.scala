@@ -82,88 +82,79 @@ class ExpiredAmuletAllocationTrigger(
         } else {
           for {
             dsoRules <- store.getDsoRules()
-            extAmuletRulesOpt <- store.lookupExternalPartyAmuletRules()
+            extAmuletRules <- store.getExternalPartyAmuletRules()
 
-            res <- extAmuletRulesOpt.value match {
-              case None =>
-                Future.successful(
-                  TaskSuccess("No ExternalPartyAmuletRules contract found, skipping expiry.")
+            inputsWithParties <- MonadUtil.sequentialTraverse(task.work.expiredContracts) {
+              contract =>
+                val sender = PartyId.tryFromProtoPrimitive(
+                  contract.payload.allocation.transferLeg.sender
                 )
-              case Some(extAmuletRules) =>
+                val receiver = PartyId.tryFromProtoPrimitive(
+                  contract.payload.allocation.transferLeg.receiver
+                )
+                val executor = PartyId.tryFromProtoPrimitive(
+                  contract.payload.allocation.settlement.executor
+                )
+
                 for {
-                  inputsWithParties <- MonadUtil.sequentialTraverse(task.work.expiredContracts) {
-                    contract =>
-                      val sender = PartyId.tryFromProtoPrimitive(
-                        contract.payload.allocation.transferLeg.sender
-                      )
-                      val receiver = PartyId.tryFromProtoPrimitive(
-                        contract.payload.allocation.transferLeg.receiver
-                      )
-                      val executor = PartyId.tryFromProtoPrimitive(
-                        contract.payload.allocation.settlement.executor
-                      )
-
-                      for {
-                        lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
-                          splice.amulet.LockedAmulet.COMPANION
-                        )(contract.payload.lockedAmulet)
-                      } yield {
-                        val input =
-                          new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput(
-                            new splice.amuletallocation.AmuletAllocation.ContractId(
-                              contract.contractId.contractId
-                            ),
-                            java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
-                          )
-                        (input, Set(sender, receiver, executor))
-                      }
-                  }
-
-                  inputs = inputsWithParties.map(_._1)
-                  informees = inputsWithParties.flatMap(_._2).toSet
-
-                  res <-
-                    if (inputs.isEmpty) {
-                      Future.successful(
-                        TaskSuccess("No vetted expired Amulet Allocations to process")
-                      )
-                    } else {
-                      val expireAllocations =
-                        new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocations(
-                          dsoRules.payload.dso,
-                          inputs.asJava,
-                          informees.map(_.toProtoPrimitive).toList.asJava,
-                        )
-
-                      svTaskContext
-                        .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
-                        .submit(
-                          Seq(store.key.svParty),
-                          Seq(store.key.dsoParty),
-                          update = dsoRules
-                            .exercise(
-                              _.exerciseDsoRules_ExpireAmuletAllocations(
-                                extAmuletRules.contract.contractId,
-                                expireAllocations,
-                                controller,
-                              )
-                            )
-                            .update
-                            .commands()
-                            .asScala
-                            .toSeq,
-                        )
-                        .noDedup
-                        .withSynchronizerId(dsoRules.domain)
-                        .yieldUnit()
-                        .map(_ =>
-                          TaskSuccess(
-                            s"archived batch of ${inputs.size} expired Amulet Allocations"
-                          )
-                        )
-                    }
-                } yield res
+                  lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
+                    splice.amulet.LockedAmulet.COMPANION
+                  )(contract.payload.lockedAmulet)
+                } yield {
+                  val input =
+                    new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput(
+                      new splice.amuletallocation.AmuletAllocation.ContractId(
+                        contract.contractId.contractId
+                      ),
+                      java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
+                    )
+                  (input, Set(sender, receiver, executor))
+                }
             }
+
+            inputs = inputsWithParties.map(_._1)
+            informees = inputsWithParties.flatMap(_._2).toSet
+
+            res <-
+              if (inputs.isEmpty) {
+                Future.successful(
+                  TaskSuccess("No vetted expired Amulet Allocations to process")
+                )
+              } else {
+                val expireAllocations =
+                  new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocations(
+                    dsoRules.payload.dso,
+                    inputs.asJava,
+                    informees.map(_.toProtoPrimitive).toList.asJava,
+                  )
+
+                svTaskContext
+                  .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
+                  .submit(
+                    Seq(store.key.svParty),
+                    Seq(store.key.dsoParty),
+                    update = dsoRules
+                      .exercise(
+                        _.exerciseDsoRules_ExpireAmuletAllocations(
+                          extAmuletRules.contract.contractId,
+                          expireAllocations,
+                          controller,
+                        )
+                      )
+                      .update
+                      .commands()
+                      .asScala
+                      .toSeq,
+                  )
+                  .noDedup
+                  .withSynchronizerId(dsoRules.domain)
+                  .yieldUnit()
+                  .map(_ =>
+                    TaskSuccess(
+                      s"archived batch of ${inputs.size} expired Amulet Allocations"
+                    )
+                  )
+              }
           } yield res
         }
     } yield res

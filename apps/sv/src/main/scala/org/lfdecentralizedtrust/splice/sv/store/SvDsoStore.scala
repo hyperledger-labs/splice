@@ -981,6 +981,19 @@ trait SvDsoStore
       splice.amuletrules.TransferPreapproval.COMPANION
     )
 
+  def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]] = lookupExternalPartyAmuletRules().map(
+    _.value.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription("No active ExternalPartyAmuletRules contract")
+        .asRuntimeException()
+    )
+  )
+
   def lookupExternalPartyAmuletRules()(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[ContractWithState[
