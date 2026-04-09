@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.store
 import cats.{Eval, Monoid}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.*
+import com.daml.ledger.javaapi.data.{Contract as _, *}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AmuletCreateSummary
@@ -50,6 +50,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   transferoffer as transferCodegen,
 }
 import org.lfdecentralizedtrust.splice.history.{
+  AllocationExecuteTransfer,
+  AllocationFactoryAllocate,
+  AllocationFactoryV2Allocate,
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
@@ -73,6 +76,7 @@ import org.lfdecentralizedtrust.splice.history.{
   LockedAmuletUnlock,
   LockedAmuletUnlockV2,
   Mint,
+  SettlementFactorySettle,
   Tap,
   Transfer,
   TransferInstructionCreate,
@@ -82,10 +86,6 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferPreapproval_Renew,
   TransferPreapproval_Send,
   TransferPreapproval_SendV2,
-  AllocationFactoryAllocate,
-  AllocationFactoryV2Allocate,
-  AllocationV2Settle,
-  AllocationExecuteTransfer,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.util.{
@@ -1091,43 +1091,28 @@ class UserWalletTxLogParser(
                   )
               }
             }
-          case AllocationV2Settle(node) =>
-            // analogous to AllocationExecuteTransfer below
+          // Using SettlementFactorySettle makes it easier than using AllocationV2Settle,
+          // because that one does not (easily) include the transfer legs whereas this one does
+          case SettlementFactorySettle(node) =>
             now {
-              val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
-              val amulets = node.result.value.authorizerHoldingCids.asScala.flatMap {
-                case (authorizer, holdings) =>
-                  holdings.asScala.map { holdingCid =>
-                    tree
-                      .findCreation(
-                        splice.amulet.Amulet.COMPANION,
-                        new splice.amulet.Amulet.ContractId(holdingCid.contractId),
-                      )
-                      .getOrElse(
-                        throw new RuntimeException(
-                          s"The amulet contract $holdingCid was not found in transaction ${tree.getUpdateId}"
+              node.argument.value.transferLegs.asScala.foldLeft(State.empty) {
+                case (stateAcc, leg) =>
+                  stateAcc.appended(
+                    State(
+                      immutable.Queue(
+                        BalanceChangeTxLogEntry(
+                          eventId = EventId
+                            .prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                          // The sending side should already be handled in AllocationFactoryV2Allocate,
+                          // here we just need to handle the coin unlocking
+                          receiver = leg.receiver.owner,
+                          amount = leg.amount,
+                          subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
+                          date = Some(tree.getEffectiveAt),
                         )
                       )
-                  }
-              }
-              amulets.foldLeft(State.empty) { case (stateAcc, holding) =>
-                val receiver = holding.payload.owner
-                val amount = holding.payload.amount.initialAmount
-                val transferEntry = TransferTxLogEntry(
-                  eventId =
-                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
-                  subtype = Some(
-                    TransferTransactionSubtype.Transfer.toProto
-                  ),
-                  date = Some(tree.getEffectiveAt),
-                  sender = Some(PartyAndAmount(sender, -amount)),
-                  receivers = Seq(PartyAndAmount(receiver, amount)),
-                  senderHoldingFees = BigDecimal(0.0),
-                  appRewardsUsed = BigDecimal(0.0),
-                  validatorRewardsUsed = BigDecimal(0.0),
-                  svRewardsUsed = Some(BigDecimal(0.0)),
-                )
-                stateAcc.appended(State(immutable.Queue(transferEntry)))
+                    )
+                  )
               }
             }
           case AllocationExecuteTransfer(node) =>
