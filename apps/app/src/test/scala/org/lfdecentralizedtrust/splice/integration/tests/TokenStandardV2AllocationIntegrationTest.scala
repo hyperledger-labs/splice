@@ -61,6 +61,8 @@ class TokenStandardV2AllocationIntegrationTest
     emptyChoiceContext,
     emptyMetadata,
   )
+  // although holding fees are not applied anymore, they are still in the checkBalance assertion
+  // TODO (#4094): remove this
   val holdingFeesBound = (BigDecimal(0.0), BigDecimal(1.0))
   val tapAmount = walletUsdToAmulet(1000.0)
   val aliceTransferAmount = walletUsdToAmulet(100.0)
