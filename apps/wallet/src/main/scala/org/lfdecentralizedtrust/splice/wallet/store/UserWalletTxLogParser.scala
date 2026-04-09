@@ -1091,9 +1091,44 @@ class UserWalletTxLogParser(
                   )
               }
             }
-          case AllocationV2Settle(_) =>
+          case AllocationV2Settle(node) =>
+            // analogous to AllocationExecuteTransfer below
             now {
-              State.empty
+              val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
+              val amulets = node.result.value.authorizerHoldingCids.asScala.flatMap {
+                case (authorizer, holdings) =>
+                  holdings.asScala.map { holdingCid =>
+                    tree
+                      .findCreation(
+                        splice.amulet.Amulet.COMPANION,
+                        new splice.amulet.Amulet.ContractId(holdingCid.contractId),
+                      )
+                      .getOrElse(
+                        throw new RuntimeException(
+                          s"The amulet contract $holdingCid was not found in transaction ${tree.getUpdateId}"
+                        )
+                      )
+                  }
+              }
+              amulets.foldLeft(State.empty) { case (stateAcc, holding) =>
+                val receiver = holding.payload.owner
+                val amount = holding.payload.amount.initialAmount
+                val transferEntry = TransferTxLogEntry(
+                  eventId =
+                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                  subtype = Some(
+                    TransferTransactionSubtype.Transfer.toProto
+                  ),
+                  date = Some(tree.getEffectiveAt),
+                  sender = Some(PartyAndAmount(sender, -amount)),
+                  receivers = Seq(PartyAndAmount(receiver, amount)),
+                  senderHoldingFees = BigDecimal(0.0),
+                  appRewardsUsed = BigDecimal(0.0),
+                  validatorRewardsUsed = BigDecimal(0.0),
+                  svRewardsUsed = Some(BigDecimal(0.0)),
+                )
+                stateAcc.appended(State(immutable.Queue(transferEntry)))
+              }
             }
           case AllocationExecuteTransfer(node) =>
             defer {
