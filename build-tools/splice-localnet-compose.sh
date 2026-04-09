@@ -28,6 +28,7 @@ export DB_PORT
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
+ALPHA_PROTOCOL_VERSION_ENV=""
 
 function usage() {
     echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
@@ -76,7 +77,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -u)
             ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
-            export ALPHA_PROTOCOL_VERSION_ENV
             ;;
         *)
             echo "Unknown option: $1"
@@ -86,6 +86,8 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+export ALPHA_PROTOCOL_VERSION_ENV
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"

@@ -225,8 +225,10 @@ class LocalNetFrontendIntegrationTest
         )
       )
 
-      val alice = participantClient.ledger_api.parties.allocate("alice", userId = "ledger-api-user").party
-      val bob = participantClient.ledger_api.parties.allocate("bob", userId = "ledger-api-user").party
+      val alice =
+        participantClient.ledger_api.parties.allocate("alice", userId = "ledger-api-user").party
+      val bob =
+        participantClient.ledger_api.parties.allocate("bob", userId = "ledger-api-user").party
       participantClient.ledger_api.commands.submit(
         actAs = Seq(alice),
         commands = Seq(
