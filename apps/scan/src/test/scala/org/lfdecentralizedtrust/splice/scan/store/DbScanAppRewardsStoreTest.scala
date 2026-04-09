@@ -43,6 +43,7 @@ class DbScanAppRewardsStoreTest
           totalAppActivityWeight = 123456L,
           appProviderPartySeqNum = 0,
           appProviderParty = "alice::provider",
+          numActivityRecords = 3L,
         )
         _ <- store.insertAppActivityPartyTotals(Seq(row))
         loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
@@ -60,6 +61,7 @@ class DbScanAppRewardsStoreTest
           roundNumber = roundNumber,
           totalRoundAppActivityWeight = 999999L,
           activeAppProviderPartiesCount = 5L,
+          activityRecordsCount = 42L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
         loaded <- store.getAppActivityRoundTotalByRound(roundNumber)
@@ -77,6 +79,7 @@ class DbScanAppRewardsStoreTest
           totalAppActivityWeight = 500L,
           appProviderPartySeqNum = 0,
           appProviderParty = "bob::provider",
+          numActivityRecords = 1L,
         )
         _ <- store.insertAppActivityPartyTotals(Seq(activityRow))
         rewardRow = AppRewardPartyTotalT(
@@ -119,6 +122,7 @@ class DbScanAppRewardsStoreTest
             totalAppActivityWeight = 1L,
             appProviderPartySeqNum = i,
             appProviderParty = s"party-$i::provider",
+            numActivityRecords = 1L,
           )
         }
         _ <- store.insertAppActivityPartyTotals(activityRows)
@@ -206,6 +210,7 @@ class DbScanAppRewardsStoreTest
             totalAppActivityWeight = (i + 1) * 100L,
             appProviderPartySeqNum = i,
             appProviderParty = s"party-$i::provider",
+            numActivityRecords = 1L,
           )
         }
         _ <- store.insertAppActivityPartyTotals(rows)
@@ -252,6 +257,7 @@ class DbScanAppRewardsStoreTest
           totalAppActivityWeight = 100L,
           appProviderPartySeqNum = 0,
           appProviderParty = "dup::provider",
+          numActivityRecords = 1L,
         )
         _ <- store.insertAppActivityPartyTotals(Seq(row))
         duplicate = row.copy(totalAppActivityWeight = 200L)
@@ -269,6 +275,7 @@ class DbScanAppRewardsStoreTest
           roundNumber = roundNumber,
           totalRoundAppActivityWeight = 1000L,
           activeAppProviderPartiesCount = 2L,
+          activityRecordsCount = 10L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
         duplicate = row.copy(totalRoundAppActivityWeight = 2000L)
@@ -313,9 +320,11 @@ class DbScanAppRewardsStoreTest
         partyTotals.head.appProviderParty shouldBe "alice::provider"
         partyTotals.head.totalAppActivityWeight shouldBe 500L
         partyTotals.head.appProviderPartySeqNum shouldBe 0
+        partyTotals.head.numActivityRecords shouldBe 1L
 
         roundTotal.value.totalRoundAppActivityWeight shouldBe 500L
         roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
+        roundTotal.value.activityRecordsCount shouldBe 1L
       }
     }
 
@@ -345,17 +354,21 @@ class DbScanAppRewardsStoreTest
         partyTotals(0).appProviderParty shouldBe "alice::provider"
         partyTotals(0).totalAppActivityWeight shouldBe 300L // 200 + 100
         partyTotals(0).appProviderPartySeqNum shouldBe 0
+        partyTotals(0).numActivityRecords shouldBe 2L // appears in both records
 
         partyTotals(1).appProviderParty shouldBe "bob::provider"
         partyTotals(1).totalAppActivityWeight shouldBe 300L
         partyTotals(1).appProviderPartySeqNum shouldBe 1
+        partyTotals(1).numActivityRecords shouldBe 1L
 
         partyTotals(2).appProviderParty shouldBe "charlie::provider"
         partyTotals(2).totalAppActivityWeight shouldBe 400L
         partyTotals(2).appProviderPartySeqNum shouldBe 2
+        partyTotals(2).numActivityRecords shouldBe 1L
 
         roundTotal.value.totalRoundAppActivityWeight shouldBe 1000L // 300+300+400
         roundTotal.value.activeAppProviderPartiesCount shouldBe 3L
+        roundTotal.value.activityRecordsCount shouldBe 4L // sum of per-party counts: alice=2 + bob=1 + charlie=1
       }
     }
 
@@ -371,6 +384,7 @@ class DbScanAppRewardsStoreTest
         partyTotals shouldBe empty
         roundTotal.value.totalRoundAppActivityWeight shouldBe 0L
         roundTotal.value.activeAppProviderPartiesCount shouldBe 0L
+        roundTotal.value.activityRecordsCount shouldBe 0L
       }
     }
 
@@ -390,7 +404,9 @@ class DbScanAppRewardsStoreTest
         partyTotals should have size 1
         partyTotals.head.appProviderParty shouldBe "alice::provider"
         partyTotals.head.totalAppActivityWeight shouldBe 100L
+        partyTotals.head.numActivityRecords shouldBe 1L
         roundTotal.value.totalRoundAppActivityWeight shouldBe 100L
+        roundTotal.value.activityRecordsCount shouldBe 1L
       }
     }
 
@@ -773,13 +789,13 @@ object DbScanAppRewardsStoreTest {
   private val roundNumber = 42L
 
   object Activity {
-    val alice5M = AppActivityPartyTotalT(0L, roundNumber, 5000000L, 0, "alice::provider")
-    val bob150K = AppActivityPartyTotalT(0L, roundNumber, 150000L, 1, "bob::provider")
-    val alice250K = AppActivityPartyTotalT(0L, roundNumber, 250000L, 0, "alice::provider")
-    val aliceDecimal = AppActivityPartyTotalT(0L, roundNumber, 3333333L, 0, "alice::provider")
-    val alice1M = AppActivityPartyTotalT(0L, roundNumber, 1000000L, 0, "alice::provider")
-    val alice100K = AppActivityPartyTotalT(0L, roundNumber, 100000L, 0, "alice::provider")
-    val bob50K = AppActivityPartyTotalT(0L, roundNumber, 50000L, 1, "bob::provider")
+    val alice5M = AppActivityPartyTotalT(0L, roundNumber, 5000000L, 0, "alice::provider", 1L)
+    val bob150K = AppActivityPartyTotalT(0L, roundNumber, 150000L, 1, "bob::provider", 1L)
+    val alice250K = AppActivityPartyTotalT(0L, roundNumber, 250000L, 0, "alice::provider", 1L)
+    val aliceDecimal = AppActivityPartyTotalT(0L, roundNumber, 3333333L, 0, "alice::provider", 1L)
+    val alice1M = AppActivityPartyTotalT(0L, roundNumber, 1000000L, 0, "alice::provider", 1L)
+    val alice100K = AppActivityPartyTotalT(0L, roundNumber, 100000L, 0, "alice::provider", 1L)
+    val bob50K = AppActivityPartyTotalT(0L, roundNumber, 50000L, 1, "bob::provider", 1L)
   }
 
   object IssuanceRate {
