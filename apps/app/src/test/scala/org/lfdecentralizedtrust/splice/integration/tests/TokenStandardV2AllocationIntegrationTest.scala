@@ -248,7 +248,7 @@ class TokenStandardV2AllocationIntegrationTest
         "The Allocation Request is gone",
         _ => {
           // TODO (#4912): use the listAllocationRequests call
-          // TODO (#4914): the instructions are not being archived by the allocation, so this check won't succeed yet
+          // TODO (#4914): the request is not being archived as part of allocation, so this check won't succeed yet
 //          participant.ledger_api.state.acs
 //            .of_party(
 //              party = bobParty,
