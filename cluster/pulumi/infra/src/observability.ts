@@ -910,6 +910,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replace(
                 '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
                 monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              )
+              .replace(
+                '$ACS_COMMITMENT_COMPUTE_DURATION_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.computeDuration.seconds.toString()
               ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
