@@ -262,4 +262,6 @@ early testing, but require explicit opt-in. To enable that, export also a
 
 .. warning::
    Non-stable protocol versions are unreleased versions that are under development, and are
-   subject to announced breaking changes.
+   subject to announced breaking changes. One implication of this is that this environment usually cannot
+   be upgraded, and will therefore require a full reset for every change. Use only for early testing and development
+   purposes.

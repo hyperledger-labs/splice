@@ -28,7 +28,6 @@ export DB_PORT
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
-CANTON_PROTOCOL_VERSION=""
 
 function usage() {
     echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
@@ -36,7 +35,7 @@ function usage() {
     echo "Options:"
     echo "  -D                        Completely tear down the localnet (using 'docker compose down') instead of just stopping the containers (using 'docker compose stop')"
     echo "  -M                        Start the localnet with the 'multi-sync' profile enabled"
-    echo "  -u                        Enable unstable Canton protocol versions"
+    echo "  -u                        Enable unstable Canton protocol versions. WARNING: This should be used only for temporary test environments that be be reset often."
     echo "  -p <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
 }
 
