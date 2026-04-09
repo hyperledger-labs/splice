@@ -4,12 +4,14 @@
 package org.lfdecentralizedtrust.splice.scan.automation
 
 import org.apache.pekko.stream.Materializer
+import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.scan.metrics.RewardComputationMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -38,6 +40,12 @@ class RewardComputationTrigger(
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[RewardComputationTrigger.Task] {
 
+  private val rewardMetrics = new RewardComputationMetrics(context.metricsFactory)(
+    MetricsContext(
+      "current_migration_id" -> updateHistory.domainMigrationInfo.currentMigrationId.toString
+    )
+  )
+
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[RewardComputationTrigger.Task]] = {
@@ -61,7 +69,8 @@ class RewardComputationTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     appRewardsStore
       .computeAndStoreRewards(task.roundNumber)
-      .map(summary =>
+      .map { summary =>
+        rewardMetrics.record(summary)
         TaskSuccess(
           s"Computed rewards for round ${task.roundNumber}: " +
             s"${summary.activePartiesCount} active parties, " +
@@ -69,7 +78,7 @@ class RewardComputationTrigger(
             s"${summary.rewardedPartiesCount} rewarded parties, " +
             s"${summary.batchesCreatedCount} batches"
         )
-      )
+      }
 
   override protected def isStaleTask(
       task: RewardComputationTrigger.Task
