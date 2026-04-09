@@ -43,6 +43,14 @@ module Splice.TokenStandard.Utils (
   fromAnyContractId,
   toAnyContractId,
 
+  -- * Transfer metadata
+  reasonMetaKey,
+  txKindMetaKey,
+  senderMetaKey,
+  reasonFromMeta,
+  reasonToMeta,
+  mkMetaTransferFrom,
+
   -- * Missing TextMap utilities
 
   -- TODO(#4865): upstream these to the Daml stdlib
@@ -123,15 +131,30 @@ module Splice.TokenStandard.Utils (
   -- * Allocation factory implementations
 
   -- ** V2 Choice observers
-  allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl,
-  allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl,
+  allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl,
+  allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl,
+
 
   -- * Transfer factory implementations
+
+  -- * Validation
+  isValidTransferV2,
+
+  -- ** V2 for dual version templates
   transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1,
   transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1,
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
 
   transferFactory_v2_senderActor_transferImpl,
+
+  -- ** TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl,
+
+  -- ** TransferInstruction extra observers
+  transferInstruction_acceptDefaultExtraObservers,
+  transferInstruction_rejectDefaultExtraObservers,
+  transferInstruction_withdrawDefaultExtraObservers,
 ) where
 
 

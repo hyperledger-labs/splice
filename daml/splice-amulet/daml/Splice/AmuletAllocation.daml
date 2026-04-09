@@ -21,7 +21,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as V1
 import Splice.Api.Token.AllocationV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.TokenStandard.Utils hiding (require)
+import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
@@ -106,8 +106,7 @@ template AmuletAllocation
 
         pure AmuletAllocation_DsoExpireResult with
           senderHoldingCids
-          meta = Metadata with
-            values = TextMap.fromList [(reasonMetaKey, "expired as settleBefore has passed")]
+          meta = TSU.reasonToMeta "expired as settleBefore has passed" emptyMetadata
 
 
 -- Allocation usage

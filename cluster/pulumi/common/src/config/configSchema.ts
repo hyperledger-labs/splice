@@ -36,6 +36,7 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+export type SingleK8sResourceSchema = z.infer<typeof SingleResourceSchema>;
 export const SingleResourceSchema = z
   .object({
     memory: z.string().optional(),

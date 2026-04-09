@@ -159,8 +159,9 @@ data AllocationInstructionResult = AllocationInstructionResult with
     output : AllocationInstructionResult_Output
      -- ^ The output of the step.
     authorizerChangeCids : TextMap.TextMap [ContractId Holding]
-      -- ^ New holdings owned by the authorizer created to return "change", keyed
-      -- by `instrumentId.id`. Can be used by callers to batch creating or
+      -- ^ Holdings owned by the authorizer that were not used to fund the
+      -- allocation or that were created to return "change", keyed by
+      -- `instrumentId.id`. Can be used by callers to batch creating or
       -- updating multiple allocation instructions in a single Daml transaction.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., fees charged.
