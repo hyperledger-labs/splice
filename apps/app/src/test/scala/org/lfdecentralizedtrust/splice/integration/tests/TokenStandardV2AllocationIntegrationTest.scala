@@ -65,8 +65,6 @@ class TokenStandardV2AllocationIntegrationTest
   val tapAmount = walletUsdToAmulet(1000.0)
   val aliceTransferAmount = walletUsdToAmulet(100.0)
   val bobTransferAmount = walletUsdToAmulet(20.0)
-  val feesReserveMultiplier = 1.1 // fee reserves are 4 x the fees required for the transfer
-  val feesUpperBound = walletUsdToAmulet(1.15)
 
   "Settle a DvP using allocations" in { implicit env =>
     val AllocatedOtcTrade(
@@ -153,7 +151,7 @@ class TokenStandardV2AllocationIntegrationTest
               aliceWalletClient,
               expectedRound = None,
               expectedUnlockedQtyRange = (
-                tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
+                tapAmount - aliceTransferAmount + bobTransferAmount,
                 tapAmount - aliceTransferAmount + bobTransferAmount,
               ),
               expectedLockedQtyRange = (0.0, 0.0),
@@ -165,7 +163,7 @@ class TokenStandardV2AllocationIntegrationTest
               bobWalletClient,
               expectedRound = None,
               expectedUnlockedQtyRange = (
-                tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
+                tapAmount + aliceTransferAmount - bobTransferAmount,
                 tapAmount + aliceTransferAmount - bobTransferAmount,
               ),
               expectedLockedQtyRange = (0.0, 0.0),
