@@ -25,6 +25,10 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
         repo: 'https://twuni.github.io/docker-registry.helm',
       },
       values: {
+        extraEnvVars: {
+          // Keep cached images for 30 days before expiring them (default: 168h = 7 days).
+          REGISTRY_PROXY_TTL: "720h",
+        },
         proxy: {
           // Configure the registry to act as a read-through cache for the Docker Hub.
           enabled: true,
@@ -48,7 +52,6 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           // Run periodic garbage collection to reclaim space from
           // unreferenced blobs after the proxy scheduler expires them.
           enabled: true,
-          deleteUntagged: true,
           schedule: '0 1 * * *',
         },
         ...infraAffinityAndTolerations,
