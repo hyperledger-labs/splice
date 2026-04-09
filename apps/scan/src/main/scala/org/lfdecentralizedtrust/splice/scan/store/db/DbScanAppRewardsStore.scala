@@ -660,6 +660,8 @@ class DbScanAppRewardsStore(
   /** Read back the summary counters for a round that was just computed,
     * within the same transaction.
     */
+  // TODO(#4645): read activity_records_count from app_activity_round_totals
+  //              instead of using a separate count query
   private def readComputationSummary(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[DbScanAppRewardsStore.RewardComputationSummary] =
