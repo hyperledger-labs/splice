@@ -4,11 +4,17 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import io.circe.Encoder
+import io.circe.syntax.*
 import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  EventHistoryItem,
+  GetImportUpdatesResponse,
+  GetUpdatesBeforeResponse,
   UpdateHistoryItem,
   UpdateHistoryItemV2,
   UpdateHistoryReassignment,
+  UpdateHistoryResponse,
+  UpdateHistoryResponseV2,
   UpdateHistoryTransaction,
   UpdateHistoryTransactionV2,
 }
@@ -79,4 +85,60 @@ object ScanJsonSupport {
       case UpdateHistoryItemV2.members.UpdateHistoryReassignment(member) =>
         Encoder[UpdateHistoryReassignment].apply(member)
     }
+
+  // -- Wrapper types that transitively contain UpdateHistoryTransaction -----------------------
+  // The guardrail-generated encoders for these types call `.asJson` on their fields, which
+  // resolves the companion-object encoders at compile time.  We re-encode specific fields so
+  // that `.asJson` picks up our custom encoders above.
+
+  /** Replaces a single field in a guardrail-generated encoder with a value encoded using the
+    * implicits in this scope.  This is necessary because the `.asJson` calls inside the generated
+    * companion-object encoders resolve implicits at the generated file's compile time — our custom
+    * encoders defined here are not in scope there and can never be picked up.
+    *
+    * `JsonObject.add` replaces the value when the key already exists, preserving key order.
+    */
+  private def reEncode[A, B: Encoder](
+      underlying: Encoder.AsObject[A],
+      jsonKey: String,
+      accessor: A => B,
+  ): Encoder.AsObject[A] =
+    Encoder.AsObject.instance[A] { a =>
+      underlying.encodeObject(a).add(jsonKey, accessor(a).asJson)
+    }
+
+  implicit val encodeUpdateHistoryResponseV2: Encoder.AsObject[UpdateHistoryResponseV2] =
+    reEncode(
+      UpdateHistoryResponseV2.encodeUpdateHistoryResponseV2,
+      "transactions",
+      _.transactions,
+    )
+
+  implicit val encodeUpdateHistoryResponse: Encoder.AsObject[UpdateHistoryResponse] =
+    reEncode(
+      UpdateHistoryResponse.encodeUpdateHistoryResponse,
+      "transactions",
+      _.transactions,
+    )
+
+  implicit val encodeEventHistoryItem: Encoder.AsObject[EventHistoryItem] =
+    reEncode(
+      EventHistoryItem.encodeEventHistoryItem,
+      "update",
+      _.update,
+    )
+
+  implicit val encodeGetUpdatesBeforeResponse: Encoder.AsObject[GetUpdatesBeforeResponse] =
+    reEncode(
+      GetUpdatesBeforeResponse.encodeGetUpdatesBeforeResponse,
+      "transactions",
+      _.transactions,
+    )
+
+  implicit val encodeGetImportUpdatesResponse: Encoder.AsObject[GetImportUpdatesResponse] =
+    reEncode(
+      GetImportUpdatesResponse.encodeGetImportUpdatesResponse,
+      "transactions",
+      _.transactions,
+    )
 }
