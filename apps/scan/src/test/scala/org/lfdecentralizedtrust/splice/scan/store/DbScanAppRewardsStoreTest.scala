@@ -763,27 +763,29 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    "computeRewardHashes — round with no rewarded parties produces empty root hash" in {
-      for {
-        (store, batchHashes, rootHash) <- setupAndComputeHashes(
-          partyCount = 1,
-          rewardedCount = 0,
-          batchSize = 100,
-        )
-        // Look up the root hash via lookupBatchByHash
-        result <- store.lookupBatchByHash(roundNumber, rootHash)
-      } yield {
-        // Single empty level-0 batch
-        batchHashes should have size 1
-        batchHashes.head.batchLevel shouldBe 0
-        batchHashes.head.partySeqNumBeginIncl shouldBe 0
-        batchHashes.head.partySeqNumEndExcl shouldBe 0
-        // lookupBatchByHash returns empty MintingAllowances, not None
-        result shouldBe defined
-        result.value shouldBe a[DbScanAppRewardsStore.BatchOfMintingAllowances]
-        val allowances =
-          result.value.asInstanceOf[DbScanAppRewardsStore.BatchOfMintingAllowances].allowances
-        allowances shouldBe empty
+    Seq(
+      ("no activity parties", 0, -1),
+      ("activity but no rewarded parties", 1, 0),
+    ).foreach { case (desc, parties, rewarded) =>
+      s"computeRewardHashes — $desc produces empty root hash" in {
+        for {
+          (store, batchHashes, rootHash) <- setupAndComputeHashes(
+            partyCount = parties,
+            rewardedCount = rewarded,
+            batchSize = 100,
+          )
+          result <- store.lookupBatchByHash(roundNumber, rootHash)
+        } yield {
+          batchHashes should have size 1
+          batchHashes.head.batchLevel shouldBe 0
+          batchHashes.head.partySeqNumBeginIncl shouldBe 0
+          batchHashes.head.partySeqNumEndExcl shouldBe 0
+          result shouldBe defined
+          result.value shouldBe a[DbScanAppRewardsStore.BatchOfMintingAllowances]
+          val allowances =
+            result.value.asInstanceOf[DbScanAppRewardsStore.BatchOfMintingAllowances].allowances
+          allowances shouldBe empty
+        }
       }
     }
 
@@ -952,7 +954,13 @@ class DbScanAppRewardsStoreTest
       (store, historyId) <- newStore()
       _ <- store.insertAppActivityPartyTotals(
         (0 until partyCount).map(i =>
-          AppActivityPartyTotalT(historyId, roundNumber, 1000000L * (i + 1), s"party$i::provider", 1L)
+          AppActivityPartyTotalT(
+            historyId,
+            roundNumber,
+            1000000L * (i + 1),
+            s"party$i::provider",
+            1L,
+          )
         )
       )
       _ <- store.insertAppRewardPartyTotals(
