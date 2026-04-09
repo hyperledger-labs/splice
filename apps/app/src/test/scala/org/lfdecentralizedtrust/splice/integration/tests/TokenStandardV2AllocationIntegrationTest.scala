@@ -97,7 +97,7 @@ class TokenStandardV2AllocationIntegrationTest
       otcTrade.data.transferLegs,
       allocations.asJava,
       /* extraReceiptAuthorizers =*/ java.util.List.of(),
-      /*actors = */ java.util.List.of(aliceParty.toProtoPrimitive, bobParty.toProtoPrimitive),
+      /*actors = */ java.util.List.of(venueParty.toProtoPrimitive),
       emptyExtraArgs,
     )
     val settlementFactoryWithDisclosures =
