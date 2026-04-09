@@ -691,7 +691,6 @@ class ScanTimeBasedIntegrationTest
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)
         .filter(isInTimeRange)
-
       updatesFromScan should contain theSameElementsAs updatesFromS3
 
       // Compare acs v0 and v1 endpoints

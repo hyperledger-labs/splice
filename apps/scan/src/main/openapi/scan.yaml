@@ -2697,7 +2697,9 @@ components:
           description: |
             For an externally signed transaction, contains the external transaction hash
             signed by the external party. Can be used to correlate an external submission with a committed transaction.
+            This field is conditionally omitted from JSON when null (see OmitNullString).
           type: string
+          x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     BaseUpdateHistoryTransaction:
       type: object
       required:
@@ -2765,7 +2767,9 @@ components:
               description: |
                 For an externally signed transaction, contains the external transaction hash
                 signed by the external party. Can be used to correlate an external submission with a committed transaction.
+                This field is conditionally omitted from JSON when null (see OmitNullString).
               type: string
+              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     UpdateHistoryTransactionV2WithHash:
       allOf:
         - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
@@ -2778,6 +2782,7 @@ components:
                 For an externally signed transaction, contains the external transaction hash
                 signed by the external party. Can be used to correlate an external submission with a committed transaction.
               type: string
+              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     TreeEvent:
       type: object
       description: |

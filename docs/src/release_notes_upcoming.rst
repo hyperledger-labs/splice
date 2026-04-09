@@ -9,6 +9,10 @@
 
 .. release-notes:: Upcoming
 
+    - SV App
+
+        - Package versions newer than the version specified in the AmuletRules configuration are now automatically unvetted by the SV app after a successful downgrade vote.
+
     - Deployment
 
         - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
@@ -46,3 +50,7 @@
           guaranteed to be consistent across all instances of Scan, therefore is suitable for BFT reads.
           The update ID will be omitted for contracts created in a prior migration ID, or potentially in the
           future in extreme cases of disaster recovery.
+
+    - LocalNet
+
+        - Added support for configuring the protocol version used in LocalNet.

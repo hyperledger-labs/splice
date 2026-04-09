@@ -5,6 +5,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.automation.PackageVettingTrigger
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
+  AmuletConfig,
+  PackageConfig,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
@@ -18,13 +22,23 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
-import org.lfdecentralizedtrust.splice.util.{PackageUnvettingUtil, UploadablePackage}
+import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigSchedule,
+  AmuletConfigUtil,
+  PackageUnvettingUtil,
+  UploadablePackage,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.concurrent.PatienceConfiguration
 
 import scala.concurrent.duration.FiniteDuration
 
-class UnsupportedPackageVettingIntegrationTest extends IntegrationTest with PackageUnvettingUtil {
+class UnsupportedPackageVettingIntegrationTest
+    extends IntegrationTest
+    with PackageUnvettingUtil
+    with AmuletConfigUtil
+    with WalletTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -112,5 +126,76 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest with Pack
         ) should contain noElementsOf darsUnvettedByAutomation.map(_.packageId)
       }
     }
+  }
+
+  "SVs unvet package versions above the configured PackageConfig, validators do not" in {
+    implicit env =>
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
+
+      val validatorDarsAbovePackageConfigVersion = Seq(
+        DarResources.wallet_0_1_18,
+        DarResources.walletPayments_0_1_17,
+        DarResources.amuletNameService_0_1_18,
+        DarResources.amulet_0_1_17,
+      )
+      val svDarsAbovePackageConfigVersion = Seq(
+        DarResources.dsoGovernance_0_1_23
+      ) ++ validatorDarsAbovePackageConfigVersion
+
+      clue("sv1 votes to downgrade to the previous package versions") {
+        val amuletRules = sv1ScanBackend.getAmuletRules()
+        val currentConfig =
+          AmuletConfigSchedule(amuletRules).getConfigAsOf(env.environment.clock.now)
+
+        val downgradedPackageConfig = new PackageConfig(
+          DarResources.amulet_0_1_16.metadata.version.toString(),
+          DarResources.amuletNameService_0_1_17.metadata.version.toString(),
+          DarResources.dsoGovernance_0_1_22.metadata.version.toString(),
+          currentConfig.packageConfig.validatorLifecycle,
+          DarResources.wallet_0_1_17.metadata.version.toString(),
+          DarResources.walletPayments_0_1_16.metadata.version.toString(),
+        )
+        val newAmuletConfig = new AmuletConfig(
+          currentConfig.transferConfig,
+          currentConfig.issuanceCurve,
+          currentConfig.decentralizedSynchronizer,
+          currentConfig.tickDuration,
+          downgradedPackageConfig,
+          currentConfig.transferPreapprovalFee,
+          currentConfig.featuredAppActivityMarkerAmount,
+          currentConfig.optDevelopmentFundManager,
+          currentConfig.externalPartyConfigStateTickDuration,
+        )
+        setAmuletConfig(Seq((None, newAmuletConfig, currentConfig)))
+      }
+
+      clue("sv1 unvets package versions above the downgraded PackageConfig") {
+        eventually() {
+          getVettedPackageIds(
+            sv1Backend.appState.participantAdminConnection,
+            synchronizerId,
+          ) should contain noElementsOf svDarsAbovePackageConfigVersion.map(_.packageId)
+        }
+      }
+
+      clue("sv1 validator unvets package versions above the downgraded PackageConfig") {
+        eventually() {
+          getVettedPackageIds(
+            sv1ValidatorBackend.appState.participantAdminConnection,
+            synchronizerId,
+          ) should contain noElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
+        }
+      }
+
+      clue("alice validator keeps package versions above the downgraded PackageConfig vetted") {
+        eventually() {
+          getVettedPackageIds(
+            aliceValidatorBackend.appState.participantAdminConnection,
+            synchronizerId,
+          ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
+        }
+        alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
+      }
   }
 }

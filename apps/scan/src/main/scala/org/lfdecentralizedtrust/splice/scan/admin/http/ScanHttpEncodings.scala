@@ -14,6 +14,7 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
+import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   UpdateHistoryItem,
@@ -90,7 +91,7 @@ sealed trait ScanHttpEncodings {
                 )
               }.toMap,
               Option.when(!tree.getExternalTransactionHash.isEmpty)(
-                HexString.toHexString(tree.getExternalTransactionHash)
+                OmitNullString(HexString.toHexString(tree.getExternalTransactionHash))
               ),
             )
         )
@@ -348,6 +349,7 @@ sealed trait ScanHttpEncodings {
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
             http.externalTransactionHash
+              .map(_.value)
               .flatMap(HexString.parseToByteString)
               .getOrElse(ByteString.EMPTY),
           )
