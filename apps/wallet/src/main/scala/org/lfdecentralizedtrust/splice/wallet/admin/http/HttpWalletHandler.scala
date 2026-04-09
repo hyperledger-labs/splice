@@ -68,7 +68,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationinstructionv2,
   allocationrequestv1,
-//  allocationrequestv2,
   allocationv1,
   allocationv2,
   holdingv1,
@@ -1078,7 +1077,6 @@ class HttpWalletHandler(
     }
   }
 
-  // TODO (#4914): ensure the AllocationRequest (if it exists) is archived
   override def allocateAmuletV2(respond: WalletResource.AllocateAmuletV2Response.type)(
       body: AllocateAmuletV2Request
   )(extracted: WalletUserRequest): Future[WalletResource.AllocateAmuletV2Response] = {
