@@ -14,6 +14,7 @@ import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.*
 import com.daml.ledger.api.v2.state_service.GetConnectedSynchronizersResponse
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand, ExerciseByKeyCommand}
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
+import monocle.Monocle.toAppliedFocusOps
 
 import scala.concurrent.duration.*
 import scala.sys.process.*
@@ -34,6 +35,13 @@ class LocalNetFrontendIntegrationTest
               token = Some(AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")),
             )
           }
+        )
+      )
+      .updateTestingConfig(
+        _.focus(_.participantsWithoutLapiVerification).replace(
+          Set(
+            "app-provider"
+          )
         )
       )
       .withManualStart
