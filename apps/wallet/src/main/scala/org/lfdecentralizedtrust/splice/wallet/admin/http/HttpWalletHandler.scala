@@ -1129,7 +1129,8 @@ class HttpWalletHandler(
       )
       val dedupConfig = AmuletOperationDedupConfig(
         commandId,
-        dedupDuration,
+        // Overriden to be low enough (5m) that we allow the same allocation to be re-created after being withdrawn
+        DedupDuration(com.google.protobuf.Duration.newBuilder().setSeconds(5L * 60L).build()),
       )
       for {
         result <- userWallet.treasury.enqueueAmuletAllocationOperation(
