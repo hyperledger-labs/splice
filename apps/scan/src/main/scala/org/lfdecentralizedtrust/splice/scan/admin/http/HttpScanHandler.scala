@@ -2499,8 +2499,7 @@ class HttpScanHandler(
                 ScanResource.GetRewardAccountingBatchResponse.OK(
                   definitions.GetRewardAccountingBatchResponse(
                     definitions.RewardAccountingBatchOfBatches(
-                      batchType =
-                        definitions.RewardAccountingBatchOfBatches.BatchType.BatchOfBatches,
+                      batchType = "BatchOfBatches",
                       childHashes = batch.childHashes.map(_.toHex).toVector,
                     )
                   )
@@ -2509,8 +2508,7 @@ class HttpScanHandler(
                 ScanResource.GetRewardAccountingBatchResponse.OK(
                   definitions.GetRewardAccountingBatchResponse(
                     definitions.RewardAccountingBatchOfMintingAllowances(
-                      batchType =
-                        definitions.RewardAccountingBatchOfMintingAllowances.BatchType.BatchOfMintingAllowances,
+                      batchType = "BatchOfMintingAllowances",
                       mintingAllowances = batch.allowances
                         .map(a =>
                           definitions.RewardAccountingMintingAllowance(
