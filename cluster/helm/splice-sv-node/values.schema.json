@@ -271,7 +271,7 @@
                 "enableBftSequencer": {
                   "type": "boolean"
                 },
-                "cometBftConfig": {
+                "cometBFT": {
                   "type": "object",
                   "required": ["enabled"],
                   "properties": {
@@ -322,7 +322,7 @@
                 "enableBftSequencer": {
                   "type": "boolean"
                 },
-                "cometBftConfig": {
+                "cometBFT": {
                   "type": "object",
                   "required": ["enabled"],
                   "properties": {
@@ -373,7 +373,7 @@
                 "enableBftSequencer": {
                   "type": "boolean"
                 },
-                "cometBftConfig": {
+                "cometBFT": {
                   "type": "object",
                   "required": ["enabled"],
                   "properties": {

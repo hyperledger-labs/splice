@@ -336,15 +336,13 @@ class SvReonboardingIntegrationTest
             }
           }
 
-          val triggers =
-            Seq(sv1ValidatorBackend, sv3ValidatorBackend, sv3ValidatorBackend).map(sv =>
-              // prevent changing sync connetion configs while offboarding to prevent having to re-submit topology transactions that get lost from the queue during reconnets
-              sv.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
-            )
           TriggerTestUtil
             .setTriggersWithin(
-              triggersToPauseAtStart = triggers,
-              triggersToResumeAtStart = triggers,
+              triggersToPauseAtStart =
+                Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend).map(sv =>
+                  // prevent changing sync connection configs while offboarding to prevent having to re-submit topology transactions that get lost from the queue during reconnets
+                  sv.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
+                )
             ) {
               eventually(90.seconds) {
                 sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(

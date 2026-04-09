@@ -149,7 +149,7 @@ set:
     audience: "mock_audience"
 
 tests:
-  - it: "sets inline cometBftConfig under synchronizers.current with enabled and connectionUri"
+  - it: "sets inline cometBFT under synchronizers.current with enabled and connectionUri"
     set:
       synchronizers:
         current:
@@ -158,7 +158,7 @@ tests:
           mediatorAddress: "mediator-test-address"
           sequencerPruningConfig:
             enabled: false
-          cometBftConfig:
+          cometBFT:
             enabled: true
             connectionUri: "http://cometbft.test.com:26657"
     documentSelector:
@@ -194,7 +194,7 @@ tests:
       - isNull:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')]
 
-  - it: "sets inline cometBftConfig under synchronizers.current with enabled only (no connectionUri)"
+  - it: "sets inline cometBFT under synchronizers.current with enabled only (no connectionUri)"
     set:
       synchronizers:
         current:
@@ -203,7 +203,7 @@ tests:
           mediatorAddress: "mediator-test-address"
           sequencerPruningConfig:
             enabled: false
-          cometBftConfig:
+          cometBFT:
             enabled: true
     documentSelector:
       path: kind
@@ -244,7 +244,7 @@ tests:
           mediatorAddress: "mediator-test-address"
           sequencerPruningConfig:
             enabled: false
-          cometBftConfig:
+          cometBFT:
             enabled: true
             connectionUri: "http://cometbft.test.com:26657"
             externalGovernanceKey: true
@@ -267,7 +267,7 @@ tests:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.key
           value: "private"
 
-  - it: "sets inline cometBftConfig under both synchronizers.current and synchronizers.successor"
+  - it: "sets inline cometBFT under both synchronizers.current and synchronizers.successor"
     set:
       synchronizers:
         current:
@@ -276,7 +276,7 @@ tests:
           mediatorAddress: "mediator-current-address"
           sequencerPruningConfig:
             enabled: false
-          cometBftConfig:
+          cometBFT:
             enabled: true
             connectionUri: "http://cometbft-current.test.com:26657"
         successor:
@@ -285,7 +285,7 @@ tests:
           mediatorAddress: "mediator-successor-address"
           sequencerPruningConfig:
             enabled: false
-          cometBftConfig:
+          cometBFT:
             enabled: true
             connectionUri: "http://cometbft-successor.test.com:26657"
     documentSelector:
