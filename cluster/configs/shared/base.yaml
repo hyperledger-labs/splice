@@ -182,7 +182,7 @@ cloudArmor:
         withinIntervalSeconds: 60
         maxRequestsBeforeHttp429: 0
 multiValidator:
-  postgresPvcSize: '100Gi'
+  postgresPvcSize: '500Gi'
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN
       value: |
