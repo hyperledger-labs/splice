@@ -15,6 +15,8 @@ create table app_activity_party_totals
     app_provider_party_seq_num  int not null,
     -- The app provider party for which the totals are computed.
     app_provider_party          text not null,
+    -- Number of activity records that contributed to this party's total in this round.
+    num_activity_records        bigint not null,
 
     constraint app_activity_party_totals_pkey primary key (history_id, round_number, app_provider_party_seq_num),
 
@@ -36,6 +38,8 @@ create table app_activity_round_totals
     -- Number of parties with non-zero activity in the given round.
     -- Used for debugging purposes.
     active_app_provider_parties_count     bigint not null,
+    -- Total number of activity records in this round across all parties.
+    activity_records_count                bigint not null,
 
     constraint app_activity_round_totals_pkey primary key (history_id, round_number)
 );
