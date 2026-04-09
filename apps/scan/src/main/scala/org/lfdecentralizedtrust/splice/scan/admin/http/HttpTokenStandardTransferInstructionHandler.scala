@@ -226,8 +226,8 @@ class HttpTokenStandardTransferInstructionHandler(
         ChoiceContextBuilder,
       ](
         s"AmuletTransferInstruction '$transferInstructionId'",
-        amuletInstr.payload.lockedAmulet,
-        amuletInstr.payload.transfer.executeBefore,
+        Some(amuletInstr.payload.lockedAmulet),
+        Some(amuletInstr.payload.transfer.executeBefore),
         requireLockedAmulet,
         None,
         store,
