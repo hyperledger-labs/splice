@@ -131,11 +131,61 @@ template TokenAllocationV2 with
             -- archival of multiple holdings for different instrument-ids.
 
 -- FIXME: loc
-existingConfirmers : TokenTransferOffer -> [Party]
-existingConfirmers offer = do
-  p <- jointAuthorizers offer.transfer.sender
-  guard (p `notElem` offer.confirmCreation)
+existingConfirmers : TokenTransferCreation -> [Party]
+existingConfirmers co = do
+  p <- jointAuthorizers co.transfer.sender
+  guard (p `notElem` co.missingConfirmers)
   pure p
+
+-- | A template representing a transfer being created, but not yet offered.
+template TokenTransferCreation with
+    missingConfirmers : [Party]
+    transfer : V2.Transfer
+  where
+    ensure isValidTransferV2 transfer
+
+    signatory existingConfirmers this, transfer.instrumentId.admin
+    observer missingConfirmers
+
+    choice TokenTransferCreation_ConfirmCreation : V2.TransferInstructionResult
+      with
+        inputHoldingCids : [ContractId V2.Holding]
+        actors : [Party]
+        -- FIXME: extraArgs
+      controller actors
+      do
+        let origId = Some (toInterfaceContractId self)
+        token_transferFactory_transferImpl transfer.instrumentId.admin origId actors missingConfirmers
+          (transfer with inputHoldingCids)
+
+    interface instance V2.TransferInstruction for TokenTransferCreation where
+      view = V2.TransferInstructionView with
+        originalInstructionCid = None
+        transfer
+        availableActions = Map.fromList
+          [([actor], [V2.TIA_Withdraw]) | actor <- jointAuthorizers transfer.sender]
+          -- FIXME: add TIA_Confirm action to confirm the creation
+        meta = emptyMetadata
+
+      transferInstruction_acceptExtraObservers _arg = []
+      transferInstruction_rejectExtraObservers _arg = []
+      transferInstruction_withdrawExtraObservers _arg = observer this
+
+      transferInstruction_withdrawImpl self arg = do
+        -- FIXME: joint withdrawal
+        archiveAndCheckActors self arg.actors [ [actor] | actor <- jointAuthorizers transfer.sender]
+        archiveLockedHoldingsForTransfer transfer
+        tokenCid <- create Token with
+          holding = senderHoldingFromTransfer transfer
+        pure V2.TransferInstructionResult with
+          output = V2.TransferInstructionResult_Failed
+          senderChangeCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      transferInstruction_rejectImpl _self _arg = fail "TokenTransferCreation: reject not supported"
+      transferInstruction_acceptImpl  _self _arg = fail "TokenTransferCreation: accept not supported"
+
+
 
 -- | Transfer instruction representing a token transfer offer.
 --
@@ -143,23 +193,11 @@ existingConfirmers offer = do
 template TokenTransferOffer with
     transfer : V2.Transfer
     originalInstructionCid : Optional (ContractId V2.TransferInstruction)
-    confirmCreation : [Party]
   where
     ensure isValidTransferV2 transfer
 
-    signatory existingConfirmers this, transfer.instrumentId.admin
-    observer (if null confirmCreation then accountParties transfer.receiver else confirmCreation)
-
-    choice TokenTransferOffer_ConfirmCreation : V2.TransferInstructionResult
-      with
-        inputHoldingCids : [ContractId V2.Holding]
-        actors : [Party]
-        -- FIXME: extraArgs
-      controller actors
-      do
-        let origId = Some $ fromOptional (toInterfaceContractId self) originalInstructionCid
-        token_transferFactory_transferImpl transfer.instrumentId.admin origId actors confirmCreation
-          (transfer with inputHoldingCids)
+    signatory jointAuthorizers transfer.sender, transfer.instrumentId.admin
+    observer accountParties transfer.receiver
 
     interface instance V2.TransferInstruction for TokenTransferOffer where
       view = V2.TransferInstructionView with
@@ -276,10 +314,9 @@ token_transferFactory_transferImpl admin originalInstructionCid actors missingCo
     then token_transferFactory_transferImplCore admin originalInstructionCid transfer
     else do
       -- create transfer offer with the remaining missing confirmers as confirmers
-      instrCid <- create TokenTransferOffer with
-        originalInstructionCid
-        confirmCreation = Set.toList newMissingConfirmers
-        transfer
+      instrCid <- create TokenTransferCreation with
+        missingConfirmers = Set.toList newMissingConfirmers
+        transfer = transfer with inputHoldingCids = []
       pure V2.TransferInstructionResult with
         output = V2.TransferInstructionResult_Pending with transferInstructionCid = coerceContractId instrCid
         senderChangeCids = transfer.inputHoldingCids
@@ -336,7 +373,6 @@ token_transferFactory_transferImplCore admin originalInstructionCid transfer = d
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
         originalInstructionCid
-        confirmCreation = []
         transfer = transfer with
           inputHoldingCids = [toInterfaceContractId lockedCid]
       pure V2.TransferInstructionResult with

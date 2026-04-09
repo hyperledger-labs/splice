@@ -152,8 +152,8 @@ test_self_transfer_to_account = do
   offers <- queryInterface @V2.TransferInstruction custodian1
   [(cid0, offer)] <- pure [ (oCid, o) | (oCid, Some o) <- offers, o.transfer.receiver == bobBasic ]
   holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor offer.transfer.sender custodian1 offer.transfer.instrumentId
-  let cid = coerceContractId cid0 : ContractId TokenV2.TokenTransferOffer
-  submit custodian1 $ exerciseCmd cid TokenV2.TokenTransferOffer_ConfirmCreation with
+  let cid = coerceContractId cid0 : ContractId TokenV2.TokenTransferCreation
+  submit custodian1 $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
     actors = [custodian1]
     inputHoldingCids = holdingCids
     -- extraArgs = emptyExtraArgs
