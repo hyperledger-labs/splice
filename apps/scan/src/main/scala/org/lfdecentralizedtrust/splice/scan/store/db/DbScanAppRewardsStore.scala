@@ -564,10 +564,11 @@ class DbScanAppRewardsStore(
 
   /** Retrieve minting allowances for a leaf batch range.
     *
-    * Uses a LEFT JOIN from activity totals to reward totals because parties
-    * whose reward fell below the threshold have no row in `app_reward_party_totals`.
-    * `coalesce` maps these NULLs to zero, matching the hashing convention
-    * used in `insertLeafBatches` where below-threshold parties hash as '0.0000000000'.
+    * Serves the contents of a level-0 batch from `lookupBatchByHash`.
+    *
+    * Reads only from `app_reward_party_totals` (stage 2 output) — the
+    * same data source as `insertLeafBatches`, ensuring the returned
+    * party+amount pairs are consistent with the hashes in the Merkle tree.
     */
   private def getLeafAllowances(
       roundNumber: Long,
@@ -575,18 +576,13 @@ class DbScanAppRewardsStore(
       endExcl: Int,
   )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.MintingAllowance]] =
     runQuery(
-      sql"""select a.app_provider_party,
-                   coalesce(r.total_app_reward_amount, 0.0000000000)
-            from #${Tables.appActivityPartyTotals} a
-            left join #${Tables.appRewardPartyTotals} r
-              on a.history_id = r.history_id
-              and a.round_number = r.round_number
-              and a.app_provider_party_seq_num = r.app_provider_party_seq_num
-            where a.history_id = $historyId
-              and a.round_number = $roundNumber
-              and a.app_provider_party_seq_num >= $beginIncl
-              and a.app_provider_party_seq_num < $endExcl
-            order by a.app_provider_party_seq_num
+      sql"""select app_provider_party, total_app_reward_amount
+            from #${Tables.appRewardPartyTotals}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and app_provider_party_seq_num >= $beginIncl
+              and app_provider_party_seq_num < $endExcl
+            order by app_provider_party_seq_num
       """.as[(String, BigDecimal)],
       "appRewards.lookupBatchByHash.allowances",
     ).map(_.map { case (provider, amount) =>
@@ -736,7 +732,18 @@ class DbScanAppRewardsStore(
     )
   }
 
-  /** DBIO action for computing reward totals. */
+  /** Stage 2 of the reward computation pipeline.
+    *
+    * Reads per-party activity weights from `app_activity_party_totals` (stage 1
+    * output), converts bytes to CC minting allowances via the issuance rate,
+    * filters out parties below the reward threshold, and assigns contiguous
+    * `app_provider_party_seq_num` values (0..M-1) to the M rewarded parties.
+    *
+    * Writes to `app_reward_party_totals` (per-party rewards with seq_num and
+    * party name) and `app_reward_round_totals` (round-level aggregates).
+    * Downstream stages (`insertLeafBatches`, `getLeafAllowances`) read only
+    * from `app_reward_party_totals`.
+    */
   private def computeRewardTotalsAction(
       roundNumber: Long,
       params: RewardIssuanceParams,
@@ -806,7 +813,7 @@ class DbScanAppRewardsStore(
 
   /** Build Merkle tree of reward hashes for a single round.
     *
-    * Level 0: hash each batch of MintingAllowances from activity + reward data.
+    * Level 0: hash each batch of MintingAllowances from reward party totals.
     * Level 1+: hash batches of batches until a single root remains.
     * All levels run in a single transaction.
     */
@@ -833,18 +840,15 @@ class DbScanAppRewardsStore(
     )
   }
 
-  /** Level 0: group parties into batches, hash each as BatchOfMintingAllowances.
+  /** Stage 3 of the reward computation pipeline (level 0 of the Merkle tree).
     *
-    * Uses a LEFT JOIN from activity totals to reward totals because parties
-    * whose reward fell below the threshold have no row in `app_reward_party_totals`.
-    * `coalesce` maps these NULLs to the text '0.0000000000' before hashing,
-    * so below-threshold parties contribute a deterministic zero-amount hash
-    * rather than being omitted from the Merkle tree.
+    * Reads only from `app_reward_party_totals` (stage 2 output). Groups
+    * rewarded parties into batches of `batchSize` by integer division on
+    * their contiguous `app_provider_party_seq_num`, assigned in stage 2.
     *
-    * Parties are grouped into batches of `batchSize` by integer division on
-    * `app_provider_party_seq_num`. Each batch is hashed using the plpgsql
-    * `hash_batch_of_minting_allowances` function (equivalent to
-    * `Splice.Amulet.CryptoHash` on-ledger).
+    * Hashes each batch as a `BatchOfMintingAllowances` using
+    * `hash_batch_of_minting_allowances`, and writes the resulting entries
+    * to `app_reward_batch_hashes`.
     *
     * Returns the number of leaf batches created.
     */
@@ -860,22 +864,18 @@ class DbScanAppRewardsStore(
             min(seq_num), max(seq_num) + 1,
             decode(hash_batch_of_minting_allowances(
               array_agg(
-                hash_minting_allowance(party, coalesce(amount, '0.0000000000'))
+                hash_minting_allowance(party, amount::text)
                 order by seq_num
               )
             ), 'hex')
           from (
             select
-              a.app_provider_party_seq_num as seq_num,
-              a.app_provider_party as party,
-              r.total_app_reward_amount::text as amount,
-              (a.app_provider_party_seq_num / $batchSize) as batch_num
-            from #${Tables.appActivityPartyTotals} a
-            left join #${Tables.appRewardPartyTotals} r
-              on a.history_id = r.history_id
-              and a.round_number = r.round_number
-              and a.app_provider_party_seq_num = r.app_provider_party_seq_num
-            where a.history_id = $historyId and a.round_number = $roundNumber
+              app_provider_party_seq_num as seq_num,
+              app_provider_party as party,
+              total_app_reward_amount as amount,
+              (app_provider_party_seq_num / $batchSize) as batch_num
+            from #${Tables.appRewardPartyTotals}
+            where history_id = $historyId and round_number = $roundNumber
           ) sub
           group by batch_num
     """.asUpdate

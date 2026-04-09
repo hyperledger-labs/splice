@@ -685,8 +685,9 @@ class DbScanAppRewardsStoreTest
     "computeRewardHashes — leaf batches for 3 parties with batchSize=2" in {
       for {
         (store, historyId) <- newStore()
-        // 3 parties: seq_nums 0, 1, 2
-        // With batchSize=2: batch 0 = [0,1], batch 1 = [2]
+        // 3 activity parties, but only alice and bob are above threshold
+        // 2 rewarded parties: seq_nums 0, 1
+        // With batchSize=2: batch 0 = [0,1] — fits in a single batch
         _ <- store.insertAppActivityPartyTotals(
           Seq(
             AppActivityPartyTotalT(historyId, roundNumber, 5000000L, "alice::provider", 1L),
@@ -694,7 +695,7 @@ class DbScanAppRewardsStoreTest
             AppActivityPartyTotalT(historyId, roundNumber, 1000000L, "charlie::provider", 1L),
           )
         )
-        // Insert reward totals for alice and bob (charlie is below threshold)
+        // Only alice and bob are rewarded (charlie is below threshold)
         _ <- store.insertAppRewardPartyTotals(
           Seq(
             AppRewardPartyTotalT(historyId, roundNumber, 0, "alice::provider", BigDecimal("10.0")),
@@ -704,18 +705,15 @@ class DbScanAppRewardsStoreTest
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
       } yield {
-        // Should have 2 leaf batches at level 0
+        // 2 rewarded parties fit in 1 batch of size 2
         val level0 = batchHashes.filter(_.batchLevel == 0)
-        level0 should have size 2
+        level0 should have size 1
 
-        // Batch 0: parties [0, 1], Batch 1: party [2]
         level0(0).partySeqNumBeginIncl shouldBe 0
         level0(0).partySeqNumEndExcl shouldBe 2
-        level0(1).partySeqNumBeginIncl shouldBe 2
-        level0(1).partySeqNumEndExcl shouldBe 3
 
         // Hashes should be 32 bytes (SHA-256)
-        all(level0.map(_.batchHash.size)) shouldBe 32
+        level0(0).batchHash.size shouldBe 32
       }
     }
 
@@ -726,7 +724,9 @@ class DbScanAppRewardsStoreTest
           Seq(AppActivityPartyTotalT(historyId, roundNumber, 5000000L, "alice::provider", 1L))
         )
         _ <- store.insertAppRewardPartyTotals(
-          Seq(AppRewardPartyTotalT(historyId, roundNumber, 0, "alice::provider", BigDecimal("10.0")))
+          Seq(
+            AppRewardPartyTotalT(historyId, roundNumber, 0, "alice::provider", BigDecimal("10.0"))
+          )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
@@ -759,7 +759,13 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.insertAppRewardPartyTotals(
           (0 to 8).map(i =>
-            AppRewardPartyTotalT(historyId, roundNumber, i, s"party$i::provider", BigDecimal(s"${i + 1}.0"))
+            AppRewardPartyTotalT(
+              historyId,
+              roundNumber,
+              i,
+              s"party$i::provider",
+              BigDecimal(s"${i + 1}.0"),
+            )
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
@@ -802,7 +808,13 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.insertAppRewardPartyTotals(
           (0 to 3).map(i =>
-            AppRewardPartyTotalT(historyId, roundNumber, i, s"party$i::provider", BigDecimal(s"${i + 1}.0"))
+            AppRewardPartyTotalT(
+              historyId,
+              roundNumber,
+              i,
+              s"party$i::provider",
+              BigDecimal(s"${i + 1}.0"),
+            )
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
@@ -838,7 +850,13 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.insertAppRewardPartyTotals(
           (0 to 2).map(i =>
-            AppRewardPartyTotalT(historyId, roundNumber, i, s"party$i::provider", BigDecimal(s"${i + 1}.0"))
+            AppRewardPartyTotalT(
+              historyId,
+              roundNumber,
+              i,
+              s"party$i::provider",
+              BigDecimal(s"${i + 1}.0"),
+            )
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
@@ -874,7 +892,13 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.insertAppRewardPartyTotals(
           (0 to 4).map(i =>
-            AppRewardPartyTotalT(historyId, roundNumber, i, s"party$i::provider", BigDecimal(s"${i + 1}.0"))
+            AppRewardPartyTotalT(
+              historyId,
+              roundNumber,
+              i,
+              s"party$i::provider",
+              BigDecimal(s"${i + 1}.0"),
+            )
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
@@ -887,39 +911,6 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    "computeRewardHashes — below-threshold party hashes same as explicit zero amount" in {
-      // Party below threshold (absent from reward table) should hash with
-      // amount '0.0000000000' to match Daml's show on Numeric 10.
-      // We verify this by computing hashes two ways and comparing.
-      val round1 = 42L
-      val round2 = 43L
-      for {
-        (store, historyId) <- newStore()
-        // Round 1: alice has activity but is NOT in reward table (below threshold)
-        _ <- store.insertAppActivityPartyTotals(
-          Seq(AppActivityPartyTotalT(historyId, round1, 1000000L, "alice::provider", 1L))
-        )
-        // No reward party total for alice — COALESCE fires
-        _ <- store.computeRewardHashes(round1, batchSize = 100)
-        batchesRound1 <- store.getAppRewardBatchHashesByRound(round1)
-
-        // Round 2: alice has activity AND is in reward table with explicit zero
-        _ <- store.insertAppActivityPartyTotals(
-          Seq(AppActivityPartyTotalT(historyId, round2, 1000000L, "alice::provider", 1L))
-        )
-        _ <- store.insertAppRewardPartyTotals(
-          Seq(AppRewardPartyTotalT(historyId, round2, 0, "alice::provider", BigDecimal("0.0000000000")))
-        )
-        _ <- store.computeRewardHashes(round2, batchSize = 100)
-        batchesRound2 <- store.getAppRewardBatchHashesByRound(round2)
-      } yield {
-        // Both should produce exactly one level-0 batch with the same hash
-        batchesRound1 should have size 1
-        batchesRound2 should have size 1
-        batchesRound1.head.batchHash shouldBe batchesRound2.head.batchHash
-      }
-    }
-
     "computeRewardHashes — re-run for same round raises error" in {
       for {
         (store, historyId) <- newStore()
@@ -927,7 +918,9 @@ class DbScanAppRewardsStoreTest
           Seq(AppActivityPartyTotalT(historyId, roundNumber, 1000000L, "alice::provider", 1L))
         )
         _ <- store.insertAppRewardPartyTotals(
-          Seq(AppRewardPartyTotalT(historyId, roundNumber, 0, "alice::provider", BigDecimal("10.0")))
+          Seq(
+            AppRewardPartyTotalT(historyId, roundNumber, 0, "alice::provider", BigDecimal("10.0"))
+          )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
         result <- store.computeRewardHashes(roundNumber, batchSize = 100).failed
@@ -999,7 +992,13 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.insertAppRewardPartyTotals(
           (0 to 3).map(i =>
-            AppRewardPartyTotalT(historyId, roundNumber, i, s"party$i::provider", BigDecimal(s"${i + 1}.0"))
+            AppRewardPartyTotalT(
+              historyId,
+              roundNumber,
+              i,
+              s"party$i::provider",
+              BigDecimal(s"${i + 1}.0"),
+            )
           )
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
