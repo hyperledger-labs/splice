@@ -16,7 +16,6 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
@@ -43,6 +42,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
   PackageVettingLookupService,
 }
+import org.lfdecentralizedtrust.splice.lsu.LsuRollForwardTimestamp
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
@@ -226,8 +226,8 @@ object SvOnboardingConfig {
   }
 
   final case class RollForwardLsuTimestampConfig(
-      topologyExportTime: CantonTimestamp,
-      trafficExportTime: CantonTimestamp,
+      topologyExportTime: LsuRollForwardTimestamp,
+      trafficExportTime: LsuRollForwardTimestamp,
   )
 
   final case class RollForwardLsu(

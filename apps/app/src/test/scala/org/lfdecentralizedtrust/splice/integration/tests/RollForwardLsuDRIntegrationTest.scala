@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.lsu.LsuRollForwardTimestamp
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.scan.config.ScanRollForwardLsuConfig
 import org.lfdecentralizedtrust.splice.sv.config.{
@@ -54,6 +55,7 @@ class RollForwardLsuDRIntegrationTest
   override protected lazy val resetRequiredTopologyState: Boolean = false
 
   override def dbsSuffix = "lsu"
+  override def usesDbs = super.usesDbs ++ super.usesDbs.map(_ + "beforedr")
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
@@ -71,9 +73,11 @@ class RollForwardLsuDRIntegrationTest
   // In practice, this can often collapse and 1,2,3 are identical and 4,5 as well which is also the setup
   // we use in this test.
 
+  // In theory we just want max sequencing time but Canton then waits for a time proof for that so we instead just use the timestamp of the last topology transaction.
+  val topologyExportTimeFile = File.newTemporaryFile()
+
   // This needs to be long enough in the future that we can start Canton and initialize for SVs.
-  val maxSequencingTime = CantonTimestamp.now().plusSeconds(120)
-  val topologyExportTime = maxSequencingTime
+  val maxSequencingTime = CantonTimestamp.now().plusSeconds(160)
   val trafficExportTime = maxSequencingTime
   // 5s chosen by fair dice roll
   val lowerBoundSequencingTimeExclusive = maxSequencingTime.plusSeconds(5)
@@ -91,9 +95,11 @@ class RollForwardLsuDRIntegrationTest
                 // TODO(#4682) Make it work with BFT connections.
                 bftSequencerConnection = false,
                 domainMigrationDumpPath = Some(
-                  (File(DomainMigrationUtil.migrationTestDumpDir(
-                    name
-                  )) / "domain_migration_dump.json").path
+                  (File(
+                    DomainMigrationUtil.migrationTestDumpDir(
+                      name
+                    )
+                  ) / "domain_migration_dump.json").path
                 ),
                 parameters = config.parameters.copy(
                   spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
@@ -129,10 +135,12 @@ class RollForwardLsuDRIntegrationTest
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
                           ProtocolVersion.v34,
-                          exportTimes = Some(SvOnboardingConfig.RollForwardLsuTimestampConfig(
-                            topologyExportTime = topologyExportTime,
-                            trafficExportTime = trafficExportTime,
-                          )),
+                          exportTimes = Some(
+                            SvOnboardingConfig.RollForwardLsuTimestampConfig(
+                              topologyExportTime = LsuRollForwardTimestamp.TimestampFromFile(topologyExportTimeFile.path),
+                              trafficExportTime = LsuRollForwardTimestamp.Timestamp(trafficExportTime),
+                            )
+                          ),
                         )
                         .some
                     )
@@ -154,9 +162,16 @@ class RollForwardLsuDRIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
+        // Bump current for the non-local nodes before DR
         ConfigTransforms
-          // This bumps both current and legacy
-          .bumpCantonSyncPortsBy(22_000)(config)
+          .bumpCantonSyncPortsBy(22_000, n => !n.contains("Local"))
+          .andThen(
+            // Bump current and legacy for the local nodes after DR
+            ConfigTransforms
+              .bumpCantonSyncPortsBy(23_000, _.contains("Local"))
+              // Bump legacy back to the old port
+              .andThen(ConfigTransforms.bumpCantonSyncLegacyPortsBy(22_000))
+          )(config)
       )
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
@@ -186,7 +201,9 @@ class RollForwardLsuDRIntegrationTest
       participants = false,
       enableBftSequencer = false,
       logSuffix = "roll-forward-lsu-before-dr",
-      extraSequencerConfig = Seq(s"parameters.lsu-repair.global-max-sequencing-time-inclusive=${maxSequencingTime}"),
+      extraSequencerConfig =
+        Seq(s"parameters.lsu-repair.global-max-sequencing-time-inclusive=${maxSequencingTime}"),
+      overrideSvDbsSuffix = Some("lsubeforedr"),
     )() {
       val allNodes = Seq[AppBackendReference](
         sv1ScanBackend,
@@ -205,169 +222,176 @@ class RollForwardLsuDRIntegrationTest
       clue("Stop nodes before DR to avoid log warnings") {
         stopAllAsync(allNodes*).futureValue
       }
-    }
 
-    withCantonSvNodes(
-      (
-        None,
-        None,
-        None,
-        None,
-      ),
-      participants = false,
-      enableBftSequencer = true,
-      logSuffix = "roll-forward-lsu-dr",
-      extraSequencerConfig = Seq(
-        s"parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=${lowerBoundSequencingTimeExclusive}",
-        s"parameters.lsu-repair.lsu-sequencing-bounds-override.upgrade-time=${upgradeTime}",
-      ),
-    )() {
+      val topologyTxs = sv1Backend.participantClient.topology.transactions.list(decentralizedSynchronizerId)
+      val topologyExportTime = topologyTxs.result.map(_.sequenced).max
+      logger.info(s"Setting topology export time to $topologyExportTime")
+      topologyExportTimeFile.overwrite(topologyExportTime.value.toString)
 
-      val allSvLocalBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
-      val allScanLocalBackends =
-        Seq(sv1ScanLocalBackend, sv2ScanLocalBackend, sv3ScanLocalBackend, sv4ScanLocalBackend)
+      withCantonSvNodes(
+        (
+          None,
+          None,
+          None,
+          None,
+        ),
+        participants = false,
+        enableBftSequencer = true,
+        logSuffix = "roll-forward-lsu-dr",
+        extraSequencerConfig = Seq(
+          s"parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=${lowerBoundSequencingTimeExclusive}",
+          s"parameters.lsu-repair.lsu-sequencing-bounds-override.upgrade-time=${upgradeTime}",
+        ),
+        portsRange = Some(28),
+      )() {
 
-      // Wait first so that the participant has observed the timestamp and will happily migrate.
-      clue(s"wait for upgrade time $upgradeTime") {
-        Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
-      }
+        val allSvLocalBackends =
+          Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
+        val allScanLocalBackends =
+          Seq(sv1ScanLocalBackend, sv2ScanLocalBackend, sv3ScanLocalBackend, sv4ScanLocalBackend)
 
-      // Restart SV app with roll-forward LSU config
-      startAllSync(((allSvLocalBackends: Seq[AppBackendReference]) ++ allScanLocalBackends)*)
-
-      val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
-      val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
-
-      val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
-        .list(store = Synchronizer(decentralizedSynchronizerId))
-        .result
-        .size
-
-      clue("new nodes are initialized") {
-        allSvLocalBackends.map { backend =>
-          val upgradeSequencerClient = backend.sequencerClientFor(_.current)
-          val upgradeMediatorClient = backend.mediatorClientFor(_.current)
-          clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
-            eventuallySucceeds(2.minutes) {
-              upgradeSequencerClient.topology.transactions
-                .list(decentralizedSynchronizerId)
-                .result
-                .size shouldBe topologyTransactionsOnTheSync
-            }
-          }
-
-          clue(s"check ${backend.name} initialized mediator") {
-            eventuallySucceeds(2.minutes) {
-              upgradeMediatorClient.topology.transactions
-                .list(decentralizedSynchronizerId)
-                .result
-                .size shouldBe topologyTransactionsOnTheSync
-            }
-          }
+        // Wait first so that the participant has observed the timestamp and will happily migrate.
+        clue(s"wait for upgrade time $upgradeTime") {
+          Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
         }
-      }
 
-      def participantIsConnectedToNewSynchronizer(
-          sv: SvAppBackendReference
-      ) = {
-        sv.participantClient.synchronizers
-          .list_connected()
-          .loneElement
-          .physicalSynchronizerId shouldBe successorPsid
-        val sequencerUrlSet = getSequencerUrlSet(
-          sv.participantClient,
-          decentralizedSynchronizerAlias,
-        )
-        sequencerUrlSet should have size 1
-        sequencerUrlSet shouldBe Set(
-          sv.config.localSynchronizerNodes.current.sequencer.externalPublicApiUrl
-            .stripPrefix("http://")
-        )
-        sv.participantClient.topology.transactions
+        // Restart SV app with roll-forward LSU config
+        startAllSync(((allSvLocalBackends: Seq[AppBackendReference]) ++ allScanLocalBackends)*)
+
+        val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
+        val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
+
+        val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
           .list(store = Synchronizer(decentralizedSynchronizerId))
           .result
-          .size should be >= topologyTransactionsOnTheSync
-      }
+          .size
 
-      clue("physical synchronizers configs are set") {
-        eventually() {
-          val rulesAndState =
-            sv1LocalBackend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
-          val nodeStates = rulesAndState.svNodeStates.values
-            .map(
-              _.payload.state.synchronizerNodes
-                .get(decentralizedSynchronizerId.toProtoPrimitive)
-            )
-          nodeStates
-            .flatMap { node =>
-              node.physicalSynchronizers.toScala.value.asScala.get(0)
+        clue("new nodes are initialized") {
+          allSvLocalBackends.map { backend =>
+            val upgradeSequencerClient = backend.sequencerClientFor(_.current)
+            val upgradeMediatorClient = backend.mediatorClientFor(_.current)
+            clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
+              eventuallySucceeds(2.minutes) {
+                upgradeSequencerClient.topology.transactions
+                  .list(decentralizedSynchronizerId)
+                  .result
+                  .size shouldBe topologyTransactionsOnTheSync
+              }
             }
-            .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
-            "http://localhost:5108",
-            "http://localhost:5208",
-            "http://localhost:5308",
-            "http://localhost:5408",
-          )
-          nodeStates
-            .flatMap { node =>
-              node.physicalSynchronizers.toScala.value.asScala.get(newSynchronizerSerial.value)
+
+            clue(s"check ${backend.name} initialized mediator") {
+              eventuallySucceeds(2.minutes) {
+                upgradeMediatorClient.topology.transactions
+                  .list(decentralizedSynchronizerId)
+                  .result
+                  .size shouldBe topologyTransactionsOnTheSync
+              }
             }
-            .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
-            "http://localhost:27108",
-            "http://localhost:27208",
-            "http://localhost:27308",
-            "http://localhost:27408",
-          )
+          }
         }
-      }
 
-      clue("SVs connect to the new sequencers and sync topology") {
-        allSvLocalBackends.par.map { backend =>
+        def participantIsConnectedToNewSynchronizer(
+            sv: SvAppBackendReference
+        ) = {
+          sv.participantClient.synchronizers
+            .list_connected()
+            .loneElement
+            .physicalSynchronizerId shouldBe successorPsid
+          val sequencerUrlSet = getSequencerUrlSet(
+            sv.participantClient,
+            decentralizedSynchronizerAlias,
+          )
+          sequencerUrlSet should have size 1
+          sequencerUrlSet shouldBe Set(
+            sv.config.localSynchronizerNodes.current.sequencer.externalPublicApiUrl
+              .stripPrefix("http://")
+          )
+          sv.participantClient.topology.transactions
+            .list(store = Synchronizer(decentralizedSynchronizerId))
+            .result
+            .size should be >= topologyTransactionsOnTheSync
+        }
+
+        clue("physical synchronizers configs are set") {
           eventually() {
-            participantIsConnectedToNewSynchronizer(backend)
+            val rulesAndState =
+              sv1LocalBackend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
+            val nodeStates = rulesAndState.svNodeStates.values
+              .map(
+                _.payload.state.synchronizerNodes
+                  .get(decentralizedSynchronizerId.toProtoPrimitive)
+              )
+            nodeStates
+              .flatMap { node =>
+                node.physicalSynchronizers.toScala.value.asScala.get(0)
+              }
+              .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+              "http://localhost:5108",
+              "http://localhost:5208",
+              "http://localhost:5308",
+              "http://localhost:5408",
+            )
+            nodeStates
+              .flatMap { node =>
+                node.physicalSynchronizers.toScala.value.asScala.get(newSynchronizerSerial.value)
+              }
+              .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+              "http://localhost:27108",
+              "http://localhost:27208",
+              "http://localhost:27308",
+              "http://localhost:27408",
+            )
           }
         }
-      }
 
-      clue("Scan reports active physical synchronizer serial 1 after upgrade") {
-        eventually() {
-          allScanLocalBackends.foreach { scan =>
-            scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
+        clue("SVs connect to the new sequencers and sync topology") {
+          allSvLocalBackends.par.map { backend =>
+            eventually() {
+              participantIsConnectedToNewSynchronizer(backend)
+            }
           }
         }
-      }
 
-      clue("LSU sequencers are registered") {
-        eventually() {
-          inside(sv1ScanLocalBackend.listDsoSequencers()) {
-            case Seq(DomainSequencers(synchronizerId, sequencers)) =>
-              synchronizerId shouldBe decentralizedSynchronizerId
-              sequencers should have size 12
-              sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
-                clue(s"check sequencers for $sv") {
-                  sequencers.size shouldBe 3
-                  forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe 0
-                    sequencer.migrationId shouldBe -1
-                  }
-                  forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
-                    sequencer.migrationId shouldBe -1
-                  }
-                  forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial should be(empty)
-                    sequencer.migrationId shouldBe 0
+        clue("Scan reports active physical synchronizer serial 1 after upgrade") {
+          eventually() {
+            allScanLocalBackends.foreach { scan =>
+              scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
+            }
+          }
+        }
+
+        clue("LSU sequencers are registered") {
+          eventually() {
+            inside(sv1ScanLocalBackend.listDsoSequencers()) {
+              case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+                synchronizerId shouldBe decentralizedSynchronizerId
+                sequencers should have size 12
+                sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
+                  clue(s"check sequencers for $sv") {
+                    sequencers.size shouldBe 3
+                    forExactly(1, sequencers) { sequencer =>
+                      sequencer.serial.value shouldBe 0
+                      sequencer.migrationId shouldBe -1
+                    }
+                    forExactly(1, sequencers) { sequencer =>
+                      sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
+                      sequencer.migrationId shouldBe -1
+                    }
+                    forExactly(1, sequencers) { sequencer =>
+                      sequencer.serial should be(empty)
+                      sequencer.migrationId shouldBe 0
+                    }
                   }
                 }
-              }
+            }
           }
         }
-      }
 
-      clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
-        allSvLocalBackends.par.foreach(
-          _.participantClient.synchronizers.disconnect_all()
-        )
+        clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
+          allSvLocalBackends.par.foreach(
+            _.participantClient.synchronizers.disconnect_all()
+          )
+        }
       }
     }
   }
