@@ -54,7 +54,7 @@ class HttpTokenStandardAllocationInstructionHandler(
                 .asRuntimeException()
             )
           )
-        // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+        // TODO(#4950) Don't include amulet rules and newest open round when informees all have vetted the newest version.
         externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
       } yield {
         val activeSynchronizerId =
@@ -102,7 +102,7 @@ class HttpTokenStandardAllocationInstructionHandler(
                 .asRuntimeException()
             )
           )
-        // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+        // TODO(#4950) Don't include amulet rules and newest open round when informees all have vetted the newest version.
         externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
       } yield {
         val activeSynchronizerId =
