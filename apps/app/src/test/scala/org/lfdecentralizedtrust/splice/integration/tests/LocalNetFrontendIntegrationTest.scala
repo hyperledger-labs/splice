@@ -259,8 +259,6 @@ class LocalNetFrontendIntegrationTest
           None, // Otherwise, optionallyAwait fails with permission issues reading from unrelated parties
       )
 
-      // bobTVId <- submit alice do
-      //     exerciseByKeyCmd @Asset (alice, "TV") Give with newOwner = bob
       participantClient.ledger_api.commands.submit(
         actAs = Seq(alice),
         commands = Seq(

@@ -977,7 +977,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
         externalParties.headOption match {
           case Some(externalParty) =>
-            val ret = external.submit(
+            external.submit(
               actAs = externalParty,
               commands,
               synchronizerId,
@@ -998,7 +998,6 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
               tapsMaxPasses = tapsMaxPasses,
             )
-            ret
 
           case _ =>
             val tx = consoleEnvironment.run {
