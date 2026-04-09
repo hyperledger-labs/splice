@@ -825,21 +825,21 @@ class DbScanAppRewardsStore(
 
     val action = for {
       leafCount <- insertLeafBatches(roundNumber, batchSize)
-      _ = logger.debug(
-        s"Inserted $leafCount leaf batches for round $roundNumber."
-      )
-      _ <-
+      rootLevel <-
         if (leafCount > 0)
           aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
         else
-          insertEmptyLeafBatch(roundNumber).map(_ => ())
+          insertEmptyLeafBatch(roundNumber).map(_ => 0)
       _ <- insertRootHash(roundNumber)
-    } yield ()
+    } yield (leafCount, rootLevel)
 
     runUpdate(
-      action
-        .map(_ => logger.debug(s"Computed reward hashes for round $roundNumber."))
-        .transactionally,
+      action.map { case (leafCount, rootLevel) =>
+        val levels = rootLevel + 1
+        logger.info(
+          s"Computed reward hashes for round $roundNumber: $leafCount leaf batches, $levels levels."
+        )
+      }.transactionally,
       "appRewards.computeRewardHashes",
     )
   }
@@ -887,18 +887,19 @@ class DbScanAppRewardsStore(
   /** Aggregate batches at the current level into parent batches at level+1.
     * Recurses until only one batch remains.
     */
+  /** @return the level of the root batch (0 if only leaf batches exist) */
   private def aggregateToRoot(
       roundNumber: Long,
       batchSize: Int,
       level: Int,
       batchCount: Int,
-  ): DBIOAction[Unit, NoStream, Effect.All] =
-    if (batchCount <= 1) DBIO.successful(())
+  ): DBIOAction[Int, NoStream, Effect.All] =
+    if (batchCount <= 1) DBIO.successful(level)
     else
       for {
         nextCount <- insertNextLevel(roundNumber, batchSize, level)
-        _ <- aggregateToRoot(roundNumber, batchSize, level + 1, nextCount)
-      } yield ()
+        rootLevel <- aggregateToRoot(roundNumber, batchSize, level + 1, nextCount)
+      } yield rootLevel
 
   /** Insert level+1 batches by grouping level batches into chunks of batchSize,
     * hashing each chunk as BatchOfBatches.
