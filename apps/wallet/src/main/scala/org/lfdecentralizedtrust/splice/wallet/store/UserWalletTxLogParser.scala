@@ -83,6 +83,7 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferPreapproval_Send,
   TransferPreapproval_SendV2,
   AllocationFactoryAllocate,
+  AllocationFactoryV2Allocate,
   AllocationExecuteTransfer,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
@@ -1063,26 +1064,30 @@ class UserWalletTxLogParser(
                 state
               } else {
                 // After the change to support a 24h submisison delay there is no internal call to AmuletRules_Transfer anymore.
-                val transferEntry = TransferTxLogEntry(
-                  eventId =
-                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
-                  subtype = Some(
-                    TransferTransactionSubtype.Transfer.toProto
-                  ),
-                  date = Some(tree.getEffectiveAt),
-                  sender = Some(
-                    PartyAndAmount(
-                      node.argument.value.allocation.transferLeg.sender,
-                      -node.argument.value.allocation.transferLeg.amount,
-                    )
-                  ),
-                  receivers = Seq.empty, // This only locks CC so there is not actually any receiver
-                  senderHoldingFees = BigDecimal(0.0),
-                  appRewardsUsed = BigDecimal(0.0),
-                  validatorRewardsUsed = BigDecimal(0.0),
-                  svRewardsUsed = Some(BigDecimal(0.0)),
+                State.fromAllocationTransferLeg(
+                  tree.getUpdateId,
+                  exercised.getNodeId,
+                  tree.getEffectiveAt,
+                  node.argument.value.allocation.transferLeg.sender,
+                  node.argument.value.allocation.transferLeg.amount,
                 )
-                state.appended(State(immutable.Queue(transferEntry)))
+              }
+            }
+          case AllocationFactoryV2Allocate(node) =>
+            // 24h submisison delay is already effective as of Token Standard V2,
+            // so we know (unlike in V1, see above) that there will not be an internal call to AmuletRules_Transfer
+            now {
+              node.argument.value.allocation.transferLegs.asScala.foldLeft(State.empty) {
+                case (stateAcc, leg) =>
+                  stateAcc.appended(
+                    State.fromAllocationTransferLeg(
+                      tree.getUpdateId,
+                      exercised.getNodeId,
+                      tree.getEffectiveAt,
+                      leg.sender.owner,
+                      leg.amount,
+                    )
+                  )
               }
             }
           case AllocationExecuteTransfer(node) =>
@@ -2020,6 +2025,34 @@ object UserWalletTxLogParser {
         archivedAt = Some(archivedAt),
       )
       State(entries = immutable.Queue(newEntry))
+    }
+
+    def fromAllocationTransferLeg(
+        updateId: String,
+        nodeId: Int,
+        effectiveAt: Instant,
+        sender: String,
+        amount: BigDecimal,
+    ) = {
+      val transferEntry = TransferTxLogEntry(
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(updateId, nodeId),
+        subtype = Some(
+          TransferTransactionSubtype.Transfer.toProto
+        ),
+        date = Some(effectiveAt),
+        sender = Some(
+          PartyAndAmount(
+            sender,
+            -amount,
+          )
+        ),
+        receivers = Seq.empty, // This only locks CC so there is not actually any receiver
+        senderHoldingFees = BigDecimal(0.0),
+        appRewardsUsed = BigDecimal(0.0),
+        validatorRewardsUsed = BigDecimal(0.0),
+        svRewardsUsed = Some(BigDecimal(0.0)),
+      )
+      State(entries = immutable.Queue(transferEntry))
     }
 
     private def getAmuletCreateEvent(tx: Transaction, cid: ContractId[AmuletCreate.T]) =
