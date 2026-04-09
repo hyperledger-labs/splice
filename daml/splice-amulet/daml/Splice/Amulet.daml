@@ -14,7 +14,7 @@ import DA.Optional (fromOptional)
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
-import Splice.TokenStandard.Utils
+import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
