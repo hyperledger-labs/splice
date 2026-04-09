@@ -6,15 +6,9 @@ package org.lfdecentralizedtrust.splice.automation
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.environment.{
-  DarResource,
-  DarResources,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-}
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, DarResourcesUtil, PackageVetting}
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVetting}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -30,7 +24,8 @@ abstract class PackageVettingTrigger(
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
 
-  private val previouslyRunInputRef = new AtomicReference[Set[String]](Set.empty)
+  private val previouslyRunInputRefForVetting = new AtomicReference[Set[String]](Set.empty)
+  private val previouslyRunInputRefForUnvetting = new AtomicReference[Set[String]](Set.empty)
 
   def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId]
 
@@ -52,72 +47,64 @@ abstract class PackageVettingTrigger(
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
       dsoRules <- getDsoRules()
+      newAmuletConfigVoteRequests = AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(
+        dsoRules,
+        voteRequests,
+      )
       _ <- runIfInputChanged(
         Seq(
           domainId.toString,
           amuletRules.contractId.toString,
           dsoRules.contractId.toString,
-        ) ++ voteRequests.map(_.toString) ++ additionalPackagesToUnvet.map(_.toString())
+        ) ++ voteRequests.map(_.toString) ++ additionalPackagesToUnvet.map(_.toString()),
+        previouslyRunInputRefForVetting,
+        "vetting",
       )(
         vetting.vetPackages(
           domainId,
           amuletRules,
-          AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
+          newAmuletConfigVoteRequests,
           Some((context.pollingClock, maxVettingDelay)),
           additionalPackagesToUnvet,
         )
       )
       // ensure that unsupported versions are not vetted
-      participantId <- participantAdminConnection.getParticipantId()
-      vettedPackages <- participantAdminConnection.listVettedPackages(
-        participantId,
-        domainId,
-        AuthorizedState,
-      )
-      vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
-      unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
-        vettedPackageIds,
-        enableUnsupportedDarsUnvetting,
-        latestPackagesOnly,
-        additionalPackagesToUnvet,
-      )
-      // Unvet unsupported packages only if they are currently vetted
-      resolvedUnsupportedPackages = resolvePackagesToUnvetFromVettingState(
-        vettedPackageIds,
-        unsupportedPackages.map(_.packageId).map(PackageId.assertFromString),
-      )
-      isUnvettingEnabled =
-        resolvedUnsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
-      // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
-      _ = if (isUnvettingEnabled) {
+      _ <- runIfInputChanged(
+        Seq(
+          amuletRules.payload.configSchedule.initialValue.packageConfig.toString
+        ) ++ additionalPackagesToUnvet.map(_.toString()),
+        previouslyRunInputRefForUnvetting,
+        "unvetting",
+        enabled = enableUnvetting && enableUnsupportedDarsUnvetting,
+      )(
         vetting.unvetPackages(
           domainId,
-          resolvedUnsupportedPackages,
+          additionalPackagesToUnvet,
+          amuletRules.payload.configSchedule.initialValue.packageConfig,
           Some((context.pollingClock, maxVettingDelay)),
         )
-      }
+      )
     } yield false
   }
 
   private def runIfInputChanged(
-      input: Seq[String]
+      input: Seq[String],
+      reference: AtomicReference[Set[String]],
+      keyword: String,
+      enabled: Boolean = true,
   )(run: => Future[Unit])(implicit tc: TraceContext) = {
-    val previouslyRunInput = previouslyRunInputRef.get()
-    if (previouslyRunInput != input.toSet) {
+    val previouslyRunInput = reference.get()
+    if (previouslyRunInput != input.toSet && enabled) {
       logger.info(
-        s"Running package vetting as the input has changed from $previouslyRunInput to $input"
+        s"Running package $keyword as the input has changed from $previouslyRunInput to $input"
       )
-      run.map(_ => previouslyRunInputRef.set(input.toSet))
+      run.map(_ => reference.set(input.toSet))
     } else {
+      logger.debug(
+        s"Not running package $keyword as the input has not changed from $previouslyRunInput or the mechanism is disabled by configuration."
+      )
       Future.unit
     }
   }
 
-  private def resolvePackagesToUnvetFromVettingState(
-      vettedPackageIds: Seq[PackageId],
-      unsupportedPackagesIds: Seq[PackageId],
-  ): Seq[DarResource] =
-    unsupportedPackagesIds
-      .filter(vettedPackageIds.contains(_))
-      .flatMap(DarResources.pkgIdToDarResource.get)
 }

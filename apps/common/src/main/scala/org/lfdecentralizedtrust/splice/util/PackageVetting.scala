@@ -12,10 +12,15 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
+  AmuletConfig,
+  PackageConfig,
+  USD,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -129,7 +134,37 @@ class PackageVetting(
       .map(_ => ())
   }
 
+  // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
   def unvetPackages(
+      domainId: SynchronizerId,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
+      currentPackageConfig: PackageConfig,
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      participantId <- participantAdminConnection.getParticipantId()
+      vettedPackages <- participantAdminConnection.listVettedPackages(
+        participantId,
+        domainId,
+        AuthorizedState,
+      )
+      vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
+      unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
+        vettedPackageIds,
+        enableUnsupportedDarsUnvetting,
+        latestPackagesOnly,
+        additionalPackagesToUnvet,
+        PackageIdResolver.toPackageConfigMap(currentPackageConfig),
+      )
+      _ <- unvetPackages(
+        domainId,
+        unsupportedPackages,
+        maxVettingDelay,
+      )
+    } yield ()
+  }
+
+  private def unvetPackages(
       domainId: SynchronizerId,
       resources: Seq[DarResource],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
