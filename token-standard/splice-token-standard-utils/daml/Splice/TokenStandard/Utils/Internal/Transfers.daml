@@ -11,10 +11,20 @@ module Splice.TokenStandard.Utils.Internal.Transfers (
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
 
   transferFactory_v2_senderActor_transferImpl,
+
+  -- * TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl,
+
+  -- ** TransferInstruction extra observers
+  transferInstruction_acceptDefaultExtraObservers,
+  transferInstruction_rejectDefaultExtraObservers,
+  transferInstruction_withdrawDefaultExtraObservers,
 ) where
 
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
 
@@ -162,3 +172,32 @@ transferFactory_v2_senderActor_transferImpl self arg = do
     expectedAdmin = arg.transfer.instrumentId.admin
     transfer = downcast arg.transfer
     extraArgs = arg.extraArgs
+
+-- | For public assets the receivers should be observers as well.
+transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl : TransferInstructionV2.TransferFactory_Transfer -> [Party]
+transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl arg =
+  accountParties arg.transfer.sender <> accountParties arg.transfer.receiver
+
+-- | Default for private assets, where the only observers are the account
+-- parties of the sender.
+transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl : TransferInstructionV2.TransferFactory_Transfer -> [Party]
+transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl arg =
+  accountParties arg.transfer.sender
+
+-- | Default observers for the `V2.TransferInstruction_Accept` choice, which are
+-- the observers of the instruction contract.
+transferInstruction_acceptDefaultExtraObservers
+  : HasObserver t => t -> TransferInstructionV2.TransferInstruction_Accept -> [Party]
+transferInstruction_acceptDefaultExtraObservers this _arg = observer this
+
+-- | Default observers for the `V2.TransferInstruction_Reject` choice, which are
+-- the observers of the instruction contract.
+transferInstruction_rejectDefaultExtraObservers
+  : HasObserver t => t -> TransferInstructionV2.TransferInstruction_Reject -> [Party]
+transferInstruction_rejectDefaultExtraObservers this _arg = observer this
+
+-- | Default observers for the `V2.TransferInstruction_Withdraw` choice, which are
+-- the observers of the instruction contract.
+transferInstruction_withdrawDefaultExtraObservers
+  : HasObserver t => t -> TransferInstructionV2.TransferInstruction_Withdraw -> [Party]
+transferInstruction_withdrawDefaultExtraObservers this _arg = observer this

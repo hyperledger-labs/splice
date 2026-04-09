@@ -114,6 +114,8 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
+      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
       transferFactory_publicFetchImpl = publicFetchDefaultImpl this
 
@@ -131,7 +133,7 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      allocationFactory_allocateExtraObservers = allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl
+      allocationFactory_allocateExtraObservers = allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this

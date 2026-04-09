@@ -163,7 +163,7 @@ template TokenRules with
         admin
         meta = emptyMetadata
 
-      allocationFactory_allocateExtraObservers = allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl
+      allocationFactory_allocateExtraObservers = allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl
 
       allocationFactory_allocateImpl self arg = token_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
