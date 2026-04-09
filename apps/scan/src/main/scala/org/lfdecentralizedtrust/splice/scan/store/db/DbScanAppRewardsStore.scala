@@ -660,8 +660,6 @@ class DbScanAppRewardsStore(
   /** Read back the summary counters for a round that was just computed,
     * within the same transaction.
     */
-  // TODO(#4645): read activity_records_count from app_activity_round_totals
-  //              instead of using a separate count query
   private def readComputationSummary(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[DbScanAppRewardsStore.RewardComputationSummary] =
@@ -670,10 +668,9 @@ class DbScanAppRewardsStore(
             (select active_app_provider_parties_count
              from #${Tables.appActivityRoundTotals}
              where history_id = $historyId and round_number = $roundNumber),
-            (select count(*)
-             from app_activity_record_store a
-             join scan_verdict_store v on a.verdict_row_id = v.row_id
-             where a.round_number = $roundNumber and v.history_id = $historyId),
+            (select activity_records_count
+             from #${Tables.appActivityRoundTotals}
+             where history_id = $historyId and round_number = $roundNumber),
             (select coalesce(rewarded_app_provider_parties_count, 0)
              from #${Tables.appRewardRoundTotals}
              where history_id = $historyId and round_number = $roundNumber),

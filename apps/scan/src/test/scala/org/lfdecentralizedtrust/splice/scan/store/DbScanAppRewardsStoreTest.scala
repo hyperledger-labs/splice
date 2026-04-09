@@ -506,7 +506,7 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- insertSentinelRecords(historyId, roundNumber)
-        // 3 activity records, 2 parties (alice in 2 records, bob in 1)
+        // 3 activity records, 2 parties (alice in 2 records, bob in 2)
         _ <- insertActivityRecord(
           historyId,
           roundNumber,
@@ -528,8 +528,8 @@ class DbScanAppRewardsStoreTest
         summary <- store.computeAndStoreRewards(roundNumber)
       } yield {
         summary.activePartiesCount shouldBe 2L
-        summary.activityRecordsCount shouldBe 3L
-        // No reward computation on this branch yet
+        summary.activityRecordsCount shouldBe 4L // sum of per-party counts: alice=2 + bob=2
+        // TODO(#4382): update when full reward pipeline is wired into computeAndStoreRewards
         summary.rewardedPartiesCount shouldBe 0L
         summary.batchesCreatedCount shouldBe 0L
       }
