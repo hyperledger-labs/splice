@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -31,6 +31,16 @@ class DbStorageMetrics(
   val general: DbQueueMetrics = new DbQueueMetrics(histograms.general, metricsFactory)
 
   val write: DbQueueMetrics = new DbQueueMetrics(histograms.write, metricsFactory)
+
+  val internalContractIdsCacheSize: Gauge[Int] = metricsFactory.gauge(
+    MetricInfo(
+      histograms.prefix :+ "internal_contract_ids_cache_size",
+      summary = "Size of the internal contract IDs cache",
+      description = """The number of entries in the internal contract IDs cache.""",
+      qualification = MetricQualification.Debug,
+    ),
+    0,
+  )
 
 }
 

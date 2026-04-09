@@ -4,12 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.cometbft
 
 import cats.Show.Shown
-import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
-import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider}
-import org.lfdecentralizedtrust.splice.sv.config.SvCometBftConfig
-import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
 import com.digitalasset.canton.drivers.cometbft.{
   GovernanceKey,
   NetworkConfigChangeRequest,
@@ -18,6 +13,7 @@ import com.digitalasset.canton.drivers.cometbft.{
   SvNodeConfigChange,
   SvNodeConfigChangeRequest,
 }
+import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange.Kind.SetConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -25,13 +21,21 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryFor,
+  RetryProvider,
+}
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
+import org.lfdecentralizedtrust.splice.sv.config.SvCometBftConfig
 import scalapb.TimestampConverters
 
 import java.time.Instant
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import io.grpc.Status
 
 /** A handle to a CometBFT node.
   */
@@ -312,6 +316,45 @@ class CometBftNode(
 }
 
 object CometBftNode {
+
+  def apply(
+      cometBftConfig: Option[SvCometBftConfig],
+      participantAdminConnection: ParticipantAdminConnection,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[CometBftNode]] =
+    cometBftConfig match {
+      case Some(config) if config.enabled =>
+        val client = new CometBftClient(
+          new CometBftHttpRpcClient(
+            CometBftConnectionConfig(config.connectionUri),
+            loggerFactory,
+          ),
+          loggerFactory,
+        )
+        CometBftRequestSigner
+          .getOrGenerateSignerFromConfig(
+            config,
+            participantAdminConnection,
+            loggerFactory,
+          )
+          .map(signer =>
+            Some(
+              new CometBftNode(
+                client,
+                signer,
+                config,
+                loggerFactory,
+                retryProvider,
+              )
+            )
+          )
+      case _ => Future.successful(None)
+    }
+
   case class NetworkConfigDiff(
       deletes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       updates: Seq[proto.cometbft.NetworkConfigChangeRequest],

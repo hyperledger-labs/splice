@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
@@ -26,6 +26,7 @@ object GrpcServerOwner {
       desiredPort: Port,
       maxInboundMessageSize: Int,
       maxInboundMetadataSize: Int,
+      maxConcurrentStreamsPerConnection: Int,
       sslContext: Option[SslContext] = None,
       interceptors: List[ServerInterceptor] = List.empty,
       metrics: LedgerApiServerMetrics,
@@ -53,6 +54,7 @@ object GrpcServerOwner {
           desiredPort,
           maxInboundMessageSize,
           maxInboundMetadataSize,
+          maxConcurrentStreamsPerConnection,
           sslContext,
           keepAlive,
           allInterceptors,

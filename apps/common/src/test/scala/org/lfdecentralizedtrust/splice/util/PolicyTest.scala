@@ -6,7 +6,6 @@ import com.digitalasset.canton.util.DelayUtil
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
 import com.digitalasset.canton.util.retry.{Jitter, Success, Backoff}
 import com.digitalasset.canton.{BaseTest, HasExecutorService}
-import com.digitalasset.canton.integration.IntegrationTestMetrics
 import org.scalatest.Assertion
 import org.scalatest.funspec.AsyncFunSpec
 
@@ -14,11 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 
-class PolicyTest
-    extends AsyncFunSpec
-    with BaseTest
-    with HasExecutorService
-    with IntegrationTestMetrics {
+class PolicyTest extends AsyncFunSpec with BaseTest with HasExecutorService {
   val flagCloseable: FlagCloseable = FlagCloseable(logger, DefaultProcessingTimeouts.testing)
   describe("retry.Backoff") {
     val resetRetriesAfter = 250.millis

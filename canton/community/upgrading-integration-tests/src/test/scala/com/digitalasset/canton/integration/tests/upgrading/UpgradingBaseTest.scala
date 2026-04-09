@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -65,6 +65,8 @@ object UpgradingBaseTest extends ShouldVerb {
   lazy val FooV4: String = getResourcePath("foo-4.0.0.dar")
   lazy val UtilV1: String = getResourcePath("util-1.0.0.dar")
   lazy val UtilV2: String = getResourcePath("util-2.0.0.dar")
+  lazy val QuxV1: String = getResourcePath("qux-1.0.0.dar")
+  lazy val QuxV2: String = getResourcePath("qux-2.0.0.dar")
 
   /** The DARs above are used to test interface fetches that, at time of writing, is a 2.dev
     * feature. For this reason only tests running a dev version of canton can use them.

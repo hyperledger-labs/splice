@@ -1,0 +1,263 @@
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.integration.tests.upgrade.lsu
+
+import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters
+import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
+import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.integration.*
+import com.digitalasset.canton.integration.EnvironmentDefinition.S1M1
+import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LsuBase.Fixture
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.topology.{PartyId, TopologyManagerError}
+import com.digitalasset.canton.version.ProtocolVersion
+
+import java.time.Duration
+import scala.annotation.nowarn
+
+/** The goal is to ensure that an LSU can be cancelled and that another LSU can be done
+  * subsequently.
+  *
+  * Test setup:
+  *
+  *   - LSU is announced
+  *   - Before the upgrade time, it is cancelled
+  *   - Another LSU is announced
+  *   - Second LSU is performed
+  */
+@nowarn("msg=dead code")
+final class LsuCancellationIntegrationTest extends LsuBase {
+  override protected def testName: String = "lsu-cancellation"
+
+  registerPlugin(
+    new UseBftSequencer(
+      loggerFactory,
+      MultiSynchronizer.tryCreate(Set("sequencer1"), Set("sequencer2"), Set("sequencer3")),
+    )
+  )
+  registerPlugin(new UsePostgres(loggerFactory))
+
+  override protected lazy val newOldSequencers: Map[String, String] =
+    throw new IllegalAccessException("Use fixtures instead")
+  override protected lazy val newOldMediators: Map[String, String] =
+    throw new IllegalAccessException("Use fixtures instead")
+
+  private lazy val upgradeTime1: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(30)
+  private lazy val upgradeTime2: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(90)
+
+  private var fixture1: Fixture = _
+  private var fixture2: Fixture = _
+
+  private var bob: PartyId = _
+
+  private var dynamicSynchronizerParameters: ConsoleDynamicSynchronizerParameters = _
+
+  override protected lazy val upgradeTime: CantonTimestamp = throw new IllegalAccessException(
+    "Use upgradeTime1 and upgradeTime2 instead"
+  )
+
+  override protected def configTransforms: List[ConfigTransform] = {
+    val allNewNodes = Set("sequencer2", "sequencer3", "mediator2", "mediator3")
+
+    List(
+      ConfigTransforms.disableAutoInit(allNewNodes),
+      ConfigTransforms.useStaticTime,
+    ) ++ ConfigTransforms.enableAlphaVersionSupport
+  }
+
+  override lazy val environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
+      .buildBaseEnvironmentDefinition(
+        numParticipants = 1,
+        numSequencers = 3,
+        numMediators = 3,
+      )
+      /*
+      The test is made slightly more robust by controlling explicitly which nodes are running.
+      This allows to ensure that correct synchronizer nodes are used for each LSU.
+       */
+      .withManualStart
+      .withNetworkBootstrap { implicit env =>
+        new NetworkBootstrapper(S1M1)
+      }
+      .addConfigTransforms(configTransforms*)
+      .withSetup { implicit env =>
+        import env.*
+        participants.local.start()
+
+        participants.all.synchronizers.connect(defaultSynchronizerConnectionConfig())
+
+        participants.all.dars.upload(CantonExamplesPath)
+        participant1.health.ping(participant1)
+
+        setDefaultsDynamicSynchronizerParameters(daId, synchronizerOwners1)
+      }
+
+  /** Check whether an LSU is ongoing
+    * @param successor
+    *   Defined iff an upgrade is ongoing
+    */
+  private def checkLsuOngoing(
+      successor: Option[SynchronizerSuccessor]
+  )(implicit env: TestConsoleEnvironment) = {
+    import env.*
+
+    val connectedSynchronizer = participant1.underlying.value.sync
+      .connectedSynchronizerForAlias(daName)
+      .value
+
+    connectedSynchronizer.ephemeral.recordOrderPublisher.getSynchronizerSuccessor shouldBe successor
+
+    connectedSynchronizer.synchronizerCrypto.currentSnapshotApproximation.futureValueUS.ipsSnapshot
+      .announcedLsu()
+      .futureValueUS
+      .map { case (successor, _) => successor } shouldBe successor
+  }
+
+  "Logical synchronizer upgrade should be cancellable and re-announced" should {
+    "initial setup" in { implicit env =>
+      import env.*
+
+      fixture1 = Fixture(
+        currentPsid = daId,
+        upgradeTime = upgradeTime1,
+        oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer1), Seq(mediator1)),
+        newSynchronizerNodes = SynchronizerNodes(Seq(sequencer2), Seq(mediator2)),
+        newOldNodesResolution = Map("sequencer2" -> "sequencer1", "mediator2" -> "mediator1"),
+        oldSynchronizerOwners = synchronizerOwners1,
+        newPV = ProtocolVersion.dev,
+        newSerial = daId.serial.increment.toNonNegative,
+      )
+
+      fixture2 = Fixture(
+        currentPsid = daId,
+        upgradeTime = upgradeTime2,
+        oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer1), Seq(mediator1)),
+        newSynchronizerNodes = SynchronizerNodes(Seq(sequencer3), Seq(mediator3)),
+        newOldNodesResolution = Map("sequencer3" -> "sequencer1", "mediator3" -> "mediator1"),
+        oldSynchronizerOwners = synchronizerOwners1,
+        newPV = ProtocolVersion.dev,
+        newSerial = fixture1.newSerial.increment.toNonNegative,
+      )
+
+      dynamicSynchronizerParameters = participant1.topology.synchronizer_parameters.latest(daId)
+
+      // Some assertions below don't make sense if the value is too low
+      dynamicSynchronizerParameters.decisionTimeout.asJava.getSeconds should be > 10L
+
+      daId should not be fixture1.newPsid
+      fixture1.newPsid should not be fixture2.newPsid
+
+      val alice = participant1.parties.enable("Alice")
+      val bank = participant1.parties.enable("Bank")
+      IouSyntax.createIou(participant1)(bank, alice).discard
+    }
+
+    "first LSU and cancellation" in { implicit env =>
+      import env.*
+
+      val clock = environment.simClock.value
+
+      sequencer2.start()
+      mediator2.start()
+
+      performSynchronizerNodesLsu(fixture1)
+
+      eventually()(checkLsuOngoing(Some(fixture1.synchronizerSuccessor)))
+
+      // Fails because the upgrade is ongoing
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        participant1.parties.enable("Bob"),
+        _.shouldBeCantonErrorCode(TopologyManagerError.AnnouncedLsuTopologyFreeze),
+      )
+
+      clock.advanceTo(upgradeTime1.minusSeconds(5))
+
+      fixture1.oldSynchronizerOwners.foreach(
+        _.topology.lsu.announcement.revoke(fixture1.newPsid, fixture1.upgradeTime)
+      )
+
+      eventually()(checkLsuOngoing(None))
+
+      // LSU traffic state returns an error
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        sequencer1.traffic_control.get_lsu_state(),
+        _.shouldBeCantonErrorCode(SequencerError.NoLsuAnnounced),
+      )
+
+      sequencer2.stop()
+      mediator2.stop()
+
+      clock.advanceTo(upgradeTime1.immediateSuccessor)
+
+      // Time offset on the old sequencer is not applied
+      sequencer1.underlying.value.sequencer.timeTracker
+        .fetchTime()
+        .futureValueUS should be < upgradeTime1.plus(
+        dynamicSynchronizerParameters.decisionTimeout.asJava
+      )
+
+      // LSU traffic state returns an error
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        sequencer1.traffic_control.get_lsu_state(),
+        _.shouldBeCantonErrorCode(SequencerError.NoLsuAnnounced),
+      )
+
+      // With a cancelled LSU there's no LSU tick, so we need to create some traffic
+      // for participant to observe time moving past the upgrade time
+      participant1.health.ping(participant1)
+
+      // Call should fail if no upgrade is ongoing
+      eventually() {
+        participant1.underlying.value.sync
+          .performLsu(daId, fixture1.synchronizerSuccessor)
+          .value
+          .futureValueUS
+          .left
+          .value shouldBe "No synchronizer upgrade ongoing"
+      }
+
+      bob = participant1.parties.enable("Bob")
+    }
+
+    "second LSU" in { implicit env =>
+      import env.*
+
+      val clock = environment.simClock.value
+
+      sequencer3.start()
+      mediator3.start()
+
+      performSynchronizerNodesLsu(fixture2)
+
+      clock.advanceTo(upgradeTime2.immediateSuccessor)
+      transferTraffic(Some(fixture2))
+      eventually() {
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participants.all.forall(_.synchronizers.is_connected(fixture2.newPsid)) shouldBe true
+      }
+      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now, logger)
+
+      // Time offset is applied on the old sequencer
+      sequencer1.underlying.value.sequencer.timeTracker
+        .fetchTimeProof()
+        .futureValueUS
+        .timestamp should be >= upgradeTime2.plus(
+        dynamicSynchronizerParameters.decisionTimeout.asJava
+      )
+
+      // Bob is known
+      participant1.topology.party_to_participant_mappings
+        .list(fixture2.newPsid, filterParty = bob.filterString)
+        .loneElement
+    }
+  }
+}

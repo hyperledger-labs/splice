@@ -80,7 +80,7 @@ export async function installValidator1(
 
   const participant = installParticipant(
     validator1Config,
-    decentralizedSynchronizerMigrationConfig.active.id,
+    decentralizedSynchronizerMigrationConfig.activeMigrationId,
     xns,
     auth0Client.getCfg(),
     validator1Config?.disableAuth,
@@ -177,7 +177,7 @@ function installIngress(
       ingress: {
         splitwell: splitwell,
         decentralizedSynchronizer: {
-          activeMigrationId: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+          activeMigrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
         },
       },
     }

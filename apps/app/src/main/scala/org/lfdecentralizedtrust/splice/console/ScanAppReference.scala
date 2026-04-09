@@ -48,6 +48,7 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
@@ -254,6 +255,14 @@ abstract class ScanAppReference(
   ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
+    }
+
+  @Help.Summary("Look up a featured app right by contract ID")
+  def lookupFeaturedAppRightByContractId(
+      contractId: String
+  ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId))
     }
 
   @Help.Summary("Get the Amulet config parameters for a given round")
@@ -609,6 +618,14 @@ abstract class ScanAppReference(
     }
   }
 
+  def getUpdateByHash(extTxnHash: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateByHash(extTxnHash, encoding)
+      )
+    }
+  }
+
   def getEventHistory(
       count: Int,
       after: Option[(Long, String)],
@@ -852,6 +869,15 @@ abstract class ScanAppReference(
       ).map(_.runWith(StreamConverters.fromOutputStream(() => output)).map(_.count))
     }
 
+  @Help.Summary(
+    "Get the current physical synchronizer serial as reported by the SV participant"
+  )
+  def getActivePhysicalSynchronizerSerial(): NonNegativeInt =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetActivePhysicalSynchronizerSerial()
+      )
+    }
 }
 
 final class ScanAppBackendReference(

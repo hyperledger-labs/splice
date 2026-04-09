@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.party
@@ -25,7 +25,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.AdminWorkflowService
 import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow.*
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal as M
-import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.ledger.api.client.{
   CommandResult,
   CommandSubmitterWithRetry,
@@ -50,10 +49,9 @@ class PartyReplicationAdminWorkflow(
     ledgerClient: LedgerClient,
     participantId: ParticipantId,
     syncService: CantonSyncService,
+    partyReplicator: PartyReplicator,
     clock: Clock,
-    config: UnsafeOnlinePartyReplicationConfig,
     futureSupervisor: FutureSupervisor,
-    exitOnFatalFailures: Boolean,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -61,20 +59,6 @@ class PartyReplicationAdminWorkflow(
 ) extends AdminWorkflowService
     with FlagCloseable
     with NamedLogging {
-
-  // See the note in the PartyReplicator pertaining to lifetime.
-  val partyReplicator =
-    new PartyReplicator(
-      participantId,
-      syncService,
-      clock,
-      config,
-      markOnPRAgreementDone,
-      futureSupervisor,
-      exitOnFatalFailures,
-      timeouts,
-      loggerFactory,
-    )
 
   /** Have the target/current participant submit a Daml PartyReplication.PartyReplicationProposal
     * contract to agree on with the source participant.
@@ -118,6 +102,7 @@ class PartyReplicationAdminWorkflow(
             synchronizerId = synchronizerId.toProtoPrimitive,
             packageIdSelectionPreference = Nil,
             prefetchContractKeys = Nil,
+            tapsMaxPasses = None,
           ),
           timeouts.default.asFiniteApproximation,
         )
@@ -204,6 +189,7 @@ class PartyReplicationAdminWorkflow(
             synchronizerId = synchronizerIdS,
             packageIdSelectionPreference = Nil,
             prefetchContractKeys = Nil,
+            tapsMaxPasses = None,
           ),
           timeouts.default.asFiniteApproximation,
         )
@@ -337,7 +323,7 @@ class PartyReplicationAdminWorkflow(
     * @return
     *   {@code true} if the agreement was successfully marked as done, {@code false} otherwise.
     */
-  private def markOnPRAgreementDone(
+  private[party] def markOnPRAgreementDone(
       ap: PartyReplicationAgreementParams,
       damlAgreementCid: LfContractId,
       tc: TraceContext,
@@ -403,6 +389,7 @@ class PartyReplicationAdminWorkflow(
                 synchronizerId = ap.synchronizerId.toProtoPrimitive,
                 packageIdSelectionPreference = Nil,
                 prefetchContractKeys = Nil,
+                tapsMaxPasses = None,
               ),
               timeouts.default.asFiniteApproximation,
             )

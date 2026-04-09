@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -10,7 +10,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{KeepAliveClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{AtomicHealthElement, CompositeHealthElement, HealthListener}
@@ -35,21 +35,18 @@ import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnectionXStub.SequencerConnectionXStubError
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
-import com.digitalasset.canton.sequencing.client.transports.{
-  GrpcClientTransportHelpers,
-  GrpcSequencerClientAuth,
-}
+import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.protocol.HandshakeResponse
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, SingleUseCell}
+import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, Mutex, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContextExecutor, blocking}
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Failure
 
 /** Sequencer connection specialized for gRPC transport.
@@ -58,6 +55,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
     override val config: ConnectionXConfig,
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     stubFactory: SequencerConnectionXStubFactory,
     metrics: SequencerConnectionPoolMetrics,
     metricsContext: MetricsContext,
@@ -66,12 +64,12 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
     protected override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor, esf: ExecutionSequencerFactory, materializer: Materializer)
     extends InternalSequencerConnectionX
-    with PrettyPrinting
-    with GrpcClientTransportHelpers {
+    with PrettyPrinting {
   import GrpcInternalSequencerConnectionX.*
 
+  private val lock = Mutex()
   private val connection: GrpcConnectionX =
-    GrpcConnectionX(config, metrics, timeouts, loggerFactory)
+    GrpcConnectionX(config, keepAliveClientConfigO, metrics, timeouts, loggerFactory)
   private val connectionMetricsContext: MetricsContext = metricsContext.withExtraLabels(
     "connection" -> connection.config.name
   )
@@ -96,11 +94,14 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
 
     override protected def combineDependentStates: SequencerConnectionXState =
       (connection.health.getState, localState.get) match {
-        case (_, LocalState.Fatal) => SequencerConnectionXState.Fatal
+        case (_, LocalState.Fatal(description)) => SequencerConnectionXState.Fatal(description)
         case (ConnectionXState.Stopped, LocalState.Initial) => SequencerConnectionXState.Initial
         case (ConnectionXState.Stopped, LocalState.Starting) => SequencerConnectionXState.Starting
-        case (ConnectionXState.Stopped, _) => SequencerConnectionXState.Stopped
-        case (ConnectionXState.Started, LocalState.Stopping) => SequencerConnectionXState.Stopping
+        case (ConnectionXState.Stopped, LocalState.Stopping(description)) =>
+          SequencerConnectionXState.Stopped(description)
+        case (ConnectionXState.Stopped, LocalState.Validated) => SequencerConnectionXState.Stopped()
+        case (ConnectionXState.Started, LocalState.Stopping(description)) =>
+          SequencerConnectionXState.Stopping(description)
         case (ConnectionXState.Started, LocalState.Validated) => SequencerConnectionXState.Validated
         case (ConnectionXState.Started, _) => SequencerConnectionXState.Started
       }
@@ -143,7 +144,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
         metrics
           .connectionHealth(connectionMetricsContext)
           .updateValue(state match {
-            case SequencerConnectionXState.Fatal => 0
+            case SequencerConnectionXState.Fatal(_) => 0
             case SequencerConnectionXState.Validated => 2
             case _ => 1
           })
@@ -167,7 +168,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
   )(implicit traceContext: TraceContext): LocalState = {
     val oldState = localState.getAndUpdate {
       // Cannot recover from fatal
-      case LocalState.Fatal => LocalState.Fatal
+      case fatal: LocalState.Fatal => fatal
       case nonFatal: NonFatalLocalState => update(nonFatal)
     }
     health.refresh()
@@ -176,70 +177,69 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
 
   override def start()(implicit
       traceContext: TraceContext
-  ): Either[SequencerConnectionXError, Unit] = blocking {
-    synchronized {
+  ): Either[SequencerConnectionXError, Unit] =
+    lock.exclusive {
       logger.info(s"Starting $name")
       val oldState = updateLocalState {
         // No need to trigger a new validation
         case LocalState.Validated => LocalState.Validated
-        case LocalState.Initial | LocalState.Stopping | LocalState.Starting => LocalState.Starting
+        case LocalState.Initial | LocalState.Stopping(_) | LocalState.Starting =>
+          LocalState.Starting
       }
 
       oldState match {
-        case LocalState.Fatal =>
-          val message = "The connection is in a fatal state and cannot be started"
+        case fatal: LocalState.Fatal =>
+          val message = s"The connection is in $fatal state and cannot be started"
           logger.info(message)
           Left(SequencerConnectionXError.InvalidStateError(message))
         case LocalState.Starting | LocalState.Validated =>
           logger.debug(s"Ignoring start of connection as it is in state $oldState")
           Either.unit
-        case LocalState.Initial | LocalState.Stopping =>
+        case LocalState.Initial | LocalState.Stopping(_) =>
           connection.start()
           Either.unit
       }
     }
-  }
 
-  override def fail(reason: String)(implicit traceContext: TraceContext): Unit = blocking {
-    synchronized {
+  override def fail(reason: String)(implicit traceContext: TraceContext): Unit =
+    lock.exclusive {
       logger.info(s"Stopping $name for non-fatal reason: $reason")
       lastFailureReasonRef.set(Some(reason))
 
       val oldState = updateLocalState {
         case LocalState.Initial => LocalState.Initial
-        case LocalState.Starting | LocalState.Stopping | LocalState.Validated => LocalState.Stopping
+        case LocalState.Starting | LocalState.Validated => LocalState.Stopping(Some(reason))
+        case stopping: LocalState.Stopping => stopping
       }
 
       oldState match {
-        case LocalState.Fatal =>
-          logger.info("The connection is in a fatal state")
-        case LocalState.Initial | LocalState.Stopping =>
-          logger.debug(s"Ignoring stop of connection as it is in state $oldState")
+        case fatal: LocalState.Fatal =>
+          logger.info(s"The connection is in $fatal state")
+        case LocalState.Initial | LocalState.Stopping(_) =>
+          logger.debug(s"The connection is already stopped as it is in state $oldState")
         case LocalState.Starting | LocalState.Validated =>
           // Clean authenticator
           userConnectionRef.getAndSet(None).foreach(_.close())
           connection.stop()
       }
     }
-  }
 
-  override def fatal(reason: String)(implicit traceContext: TraceContext): Unit = blocking {
-    synchronized {
+  override def fatal(reason: String)(implicit traceContext: TraceContext): Unit =
+    lock.exclusive {
       logger.info(s"Stopping $name for fatal reason: $reason")
       lastFailureReasonRef.set(Some(reason))
 
-      val oldState = updateLocalState(_ => LocalState.Fatal)
+      val oldState = updateLocalState(_ => LocalState.Fatal(Some(reason)))
 
       oldState match {
-        case LocalState.Fatal | LocalState.Initial | LocalState.Stopping =>
-          logger.debug(s"Ignoring stop of connection as it is in state $oldState")
+        case LocalState.Fatal(_) | LocalState.Initial | LocalState.Stopping(_) =>
+          logger.debug(s"The connection is already stopped as it is in state $oldState")
         case LocalState.Starting | LocalState.Validated =>
           // Clean authenticator
           userConnectionRef.getAndSet(None).foreach(_.close())
           connection.stop()
       }
     }
-  }
 
   private def validate()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     def handleFailedValidation(error: SequencerConnectionXInternalError): Unit = error match {
@@ -269,7 +269,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
           val oldLocalState = updateLocalState {
             case LocalState.Starting | LocalState.Validated => LocalState.Validated
             // Validation is void if stopping or the connection was never started
-            case state @ (LocalState.Initial | LocalState.Stopping) => state
+            case state @ (LocalState.Initial | LocalState.Stopping(_)) => state
           }
 
           oldLocalState match {
@@ -310,11 +310,17 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
           logPolicy = CantonGrpcUtil.SilentLogPolicy,
         )
         .leftMap(SequencerConnectionXInternalError.StubError.apply)
+
       handshakePV <- EitherT
         .fromEither[FutureUnlessShutdown](handshakeResponse match {
           case success: HandshakeResponse.Success =>
             Right(success.serverProtocolVersion)
-          case _ => Left(SequencerConnectionXInternalError.ValidationError(s"Failed handshake"))
+          case failure: HandshakeResponse.Failure =>
+            Left(
+              SequencerConnectionXInternalError.ValidationError(
+                s"Failed handshake: ${failure.reason}"
+              )
+            )
         })
       _ = logger.debug(s"Handshake successful with PV $handshakePV")
 
@@ -333,8 +339,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
         config.expectedSequencerIdO.forall(_ == sequencerId),
         (),
         SequencerConnectionXInternalError.ValidationError(
-          s"Connection is not on expected sequencer:" +
-            s" expected ${config.expectedSequencerIdO}, got $sequencerId"
+          s"Connection is not on expected sequencer: expected ${config.expectedSequencerIdO}, got $sequencerId"
         ),
       )
 
@@ -471,8 +476,10 @@ object GrpcInternalSequencerConnectionX {
     * }}}
     */
   private object LocalState {
-    case object Fatal extends LocalState {
-      override protected def pretty: Pretty[Fatal.type] = prettyOfObject[Fatal.type]
+    final case class Fatal(descriptionO: Option[String] = None) extends LocalState {
+      override protected def pretty: Pretty[Fatal] = prettyOfClass(
+        unnamedParamIfDefined(_.descriptionO.map(_.unquoted))
+      )
     }
     case object Initial extends NonFatalLocalState {
       override protected def pretty: Pretty[Initial.type] = prettyOfObject[Initial.type]
@@ -480,8 +487,10 @@ object GrpcInternalSequencerConnectionX {
     case object Starting extends NonFatalLocalState {
       override protected def pretty: Pretty[Starting.type] = prettyOfObject[Starting.type]
     }
-    case object Stopping extends NonFatalLocalState {
-      override protected def pretty: Pretty[Stopping.type] = prettyOfObject[Stopping.type]
+    final case class Stopping(descriptionO: Option[String] = None) extends NonFatalLocalState {
+      override protected def pretty: Pretty[Stopping] = prettyOfClass(
+        unnamedParamIfDefined(_.descriptionO.map(_.unquoted))
+      )
     }
     case object Validated extends NonFatalLocalState {
       override protected def pretty: Pretty[Validated.type] = prettyOfObject[Validated.type]
@@ -492,6 +501,7 @@ object GrpcInternalSequencerConnectionX {
 class GrpcInternalSequencerConnectionXFactory(
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     metrics: SequencerConnectionPoolMetrics,
     metricsContext: MetricsContext,
     futureSupervisor: FutureSupervisor,
@@ -507,6 +517,7 @@ class GrpcInternalSequencerConnectionXFactory(
       config,
       clientProtocolVersions,
       minimumProtocolVersion,
+      keepAliveClientConfigO,
       stubFactory = new SequencerConnectionXStubFactoryImpl(loggerFactory),
       metrics,
       metricsContext,

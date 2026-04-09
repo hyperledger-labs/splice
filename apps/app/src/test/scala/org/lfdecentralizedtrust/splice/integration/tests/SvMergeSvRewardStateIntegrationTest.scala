@@ -66,7 +66,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
           newRewardStates should have size 2 withClue "SvRewardStates"
         },
       )
-      loggerFactory.assertLogs(
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
           resumeAllDsoDelegateTriggers[MergeSvRewardStateContractsTrigger]
           clue("Trigger merges SvRewardState contracts") {
@@ -76,9 +76,12 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
             }
           }
         },
-        _.warningMessage should include(
-          "SV Digital-Asset-2 has 2 SvRewardState contracts, this likely indicates a bug"
-        ),
+        lines =>
+          forAll(lines)(
+            _.warningMessage should include(
+              "SV Digital-Asset-2 has 2 SvRewardState contracts, this likely indicates a bug"
+            )
+          ),
       )
     }
   // Not testing reward state contracts for different sv names, this is covered through every test with multiple SVs anyway.

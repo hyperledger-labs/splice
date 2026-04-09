@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.cli
@@ -57,7 +57,7 @@ class CliTest extends AnyWordSpec with BaseTest {
       }
       "parse logging flags successfully" in {
         val (maybeCli: Option[Cli], _) = parse(
-          "-C canton.parameters.manual-start=yes --log-truncate --log-level-root=DEBUG --log-level-canton=DEBUG --log-level-stdout=ERROR --log-file-appender=rolling --log-file-name=log/wurst.log --log-file-rolling-history=20 --log-file-rolling-pattern=YYYY-mm-dd-HH --log-last-errors=false"
+          "-C canton.parameters.manual-start=yes --log-truncate --log-level-root=DEBUG --log-level-canton=DEBUG --log-level-stdout=ERROR --log-file-appender=rolling --log-file-name=log/wurst.log --log-file-rolling-history=20 --log-file-rolling-pattern=YYYY-mm-dd-HH"
         )
         val cli = maybeCli.value
         cli.logFileAppender shouldBe LogFileAppender.Rolling
@@ -68,7 +68,6 @@ class CliTest extends AnyWordSpec with BaseTest {
         cli.logFileName should contain("log/wurst.log")
         cli.logFileHistory should contain(20)
         cli.logFileRollingPattern should contain("YYYY-mm-dd-HH")
-        cli.logLastErrors shouldBe false
       }
 
       "ensure that command flags allow overriding profile definitions" in {

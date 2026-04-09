@@ -157,6 +157,39 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListSvBftSequencersResponse"
 
+  /v0/roll-forward-lsu:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRollForwardLsu"
+      description: |
+        Retrieve information on a roll-forward LSU
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRollForwardLsuResponse"
+
+  /v0/active-synchronizer-serial:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getActivePhysicalSynchronizerSerial"
+      description: |
+        Get the current physical synchronizer serial as reported by the SV participant.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetActivePhysicalSynchronizerSerialResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
@@ -437,6 +470,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UpdateHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v2/updates/hash/{hash}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByHash"
+      description: |
+        Returns the update associated with the given hash of the prepared transaction.
+
+        This endpoint is not always BFT safe.
+        For transactions committed before a scan instance started indexing hashes, the instance will return a 404 error.
+        For transactions committed around the time different scans started indexing hashes,
+        some scan instances might return a 404 error while others return the matching update.
+
+        This is in contrast to the `v2/updates` and `v2/updates/{update_id}` endpoints, which are guaranteed to be always BFT safe.
+      parameters:
+        - name: "hash"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItemV2WithHash"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -864,6 +935,49 @@ paths:
         return it; `featured_app_right` will be empty otherwise.
       parameters:
         - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
+
+  /v0/featured-apps/by-provider/{provider_party_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listFeaturedAppRightsByProvider"
+      description: |
+        List all `FeaturedAppRight` contracts for the given provider.
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
+
+  /v0/featured-apps/by-contract-id/{contract_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupFeaturedAppRightByContractId"
+      description: |
+        Look up a `FeaturedAppRight` contract by its contract ID.
+        Returns `featured_app_right` if found, empty otherwise.
+      parameters:
+        - name: "contract_id"
           in: "path"
           required: true
           schema:
@@ -2075,11 +2189,11 @@ components:
             $ref: "#/components/schemas/SynchronizerBftSequencer"
     SynchronizerBftSequencer:
       type: object
-      required: ["migrationId", "id", "p2pUrl"]
+      required: ["serialId", "id", "p2pUrl"]
       properties:
-        migrationId:
+        serialId:
           description: |
-            The synchronizer migration id corresponding to this sequencer.
+            The synchronizer serial corresponding to this sequencer.
           type: integer
           format: int64
         id:
@@ -2115,6 +2229,13 @@ components:
         migrationId:
           description: |
             The synchronizer migration id corresponding to this sequencer.
+            Set to -1 if serial is set.
+          type: integer
+          format: int64
+        synchronizerSerial:
+          description: |
+            The synchronizer serial corresponding to this sequencer.
+            One of migrationId or serialId will be set.
           type: integer
           format: int64
         id:
@@ -2131,6 +2252,36 @@ components:
             Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
+    GetRollForwardLsuResponse:
+      type: object
+      properties:
+        rollForwardLsu:
+          description: "Info on a roll-forward LSU"
+          "$ref": "#/components/schemas/RollForwardLsu"
+    RollForwardLsu:
+      type: object
+      required:
+        - upgradeTime
+        - currentPhysicalSynchronizerId
+        - successorPhysicalSynchronizerId
+      properties:
+        upgradeTime:
+          description: The time at which to upgrade
+          type: string
+          format: date-time
+        currentPhysicalSynchronizerId:
+          type: string
+        successorPhysicalSynchronizerId:
+          type: string
+    GetActivePhysicalSynchronizerSerialResponse:
+      type: object
+      required: ["serial"]
+      properties:
+        serial:
+          description: |
+            The current physical synchronizer serial as reported by the SV participant.
+          type: integer
+          format: int64
     ListDsoScansResponse:
       type: object
       required: ["scans"]
@@ -2346,6 +2497,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItemV2WithHash:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransactionV2WithHash"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItemV2:
       type: object
       description: |
@@ -2537,10 +2695,10 @@ components:
             $ref: "#/components/schemas/TreeEvent"
         external_transaction_hash:
           description: |
-            For transaction externally signed, contains the external transaction hash
+            For an externally signed transaction, contains the external transaction hash
             signed by the external party. Can be used to correlate an external submission with a committed transaction.
           type: string
-    UpdateHistoryTransactionV2:
+    BaseUpdateHistoryTransaction:
       type: object
       required:
         - update_id
@@ -2598,11 +2756,28 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
-        external_transaction_hash:
-          description: |
-            For transaction externally signed, contains the external transaction hash
-            signed by the external party. Can be used to correlate an external submission with a committed transaction.
-          type: string
+    UpdateHistoryTransactionV2:
+      allOf:
+        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
+        - type: object
+          properties:
+            external_transaction_hash:
+              description: |
+                For an externally signed transaction, contains the external transaction hash
+                signed by the external party. Can be used to correlate an external submission with a committed transaction.
+              type: string
+    UpdateHistoryTransactionV2WithHash:
+      allOf:
+        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
+        - type: object
+          required:
+            - external_transaction_hash
+          properties:
+            external_transaction_hash:
+              description: |
+                For an externally signed transaction, contains the external transaction hash
+                signed by the external party. Can be used to correlate an external submission with a committed transaction.
+              type: string
     TreeEvent:
       type: object
       description: |
@@ -4291,4 +4466,3 @@ components:
           description: |
             The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
-

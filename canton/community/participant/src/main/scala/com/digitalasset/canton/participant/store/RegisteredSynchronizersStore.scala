@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -54,11 +54,11 @@ object SynchronizerAliasAndIdStore {
 
   final case class InconsistentLogicalSynchronizerIds(
       alias: SynchronizerAlias,
-      newPSId: PhysicalSynchronizerId,
-      existingPSId: PhysicalSynchronizerId,
+      newPsid: PhysicalSynchronizerId,
+      existingPsid: PhysicalSynchronizerId,
   ) extends Error {
     val message =
-      s"Synchronizer with id $newPSId and alias $alias cannot be registered because existing id `$existingPSId` is for a different logical synchronizer"
+      s"Synchronizer with id $newPsid and alias $alias cannot be registered because existing id `$existingPsid` is for a different logical synchronizer"
   }
 }
 

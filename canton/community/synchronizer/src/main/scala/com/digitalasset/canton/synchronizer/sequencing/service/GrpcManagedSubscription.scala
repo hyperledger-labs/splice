@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
@@ -15,13 +15,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SequencerSubscription
 import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.SequencedEventError
+import com.digitalasset.canton.sequencing.client.transports.ServerSubscriptionCloseReason
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
+import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError.EventsUnavailableForTimestamp
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import io.grpc.stub.ServerCallStreamObserver
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,6 +42,14 @@ trait ManagedSubscription extends FlagCloseable with CloseNotification {
     * @return
     */
   def isCancelled: Boolean
+
+  /** Close the subscription for a transient reason, using an UNAVAILABLE status and the provided
+    * reason.
+    *
+    * The client can match on the provided reason, and should interpret this as an indication that
+    * the connection to the sequencer itself is not terminated, and the subscription can be retried.
+    */
+  def transientClose(reason: ServerSubscriptionCloseReason.TransientCloseReason): Unit
 }
 
 /** Creates and manages a SequencerSubscription for the given grpc response observer. The sequencer
@@ -55,7 +64,7 @@ private[service] class GrpcManagedSubscription[T](
       CreateSubscriptionError,
       SequencerSubscription[SequencedEventError],
     ],
-    observer: ServerCallStreamObserver[T],
+    grpcObserverHandle: GrpcObserverHandle[T],
     val member: Member,
     val expireAt: Option[CantonTimestamp],
     override protected val timeouts: ProcessingTimeout,
@@ -83,17 +92,17 @@ private[service] class GrpcManagedSubscription[T](
     close()
   }
 
+  override def transientClose(reason: ServerSubscriptionCloseReason.TransientCloseReason): Unit =
+    signalAndClose(
+      ErrorSignal(Status.UNAVAILABLE.withDescription(reason.description).asException())
+    )
+
   private val handler: SequencedEventOrErrorHandler[SequencedEventError] = {
     case Right(event) =>
       implicit val traceContext: TraceContext = event.traceContext
-      FutureUnlessShutdown
-        .outcomeF {
-          Future {
-            Right(synchronizeWithClosingSync("grpc-managed-subscription-handler") {
-              observer.onNext(toSubscriptionResponse(event))
-            }.onShutdown(()))
-          }
-        }
+      unlessClosing(
+        grpcObserverHandle.onNext(toSubscriptionResponse(event)).map(Right(_))
+      )
         .recover { case NonFatal(e) =>
           logger.warn(
             "Unexpected error was thrown while publishing a sequencer event to GRPC subscriber",
@@ -126,7 +135,15 @@ private[service] class GrpcManagedSubscription[T](
             logger.warn("Creating sequencer subscription failed", exception)
             signalAndClose(ErrorSignal(exception))
           case Success(UnlessShutdown.Outcome(Left(err))) =>
-            logger.warn(s"Creating sequencer subscription returned error: $err")
+            val message = s"Creating sequencer subscription returned error: $err"
+            err match {
+              case _: EventsUnavailableForTimestamp =>
+                // Logging at INFO level because this can happen during normal operations for a decentralized synchronizer
+                // where a participant updates its sequencer connection config before it has caught up to the point
+                // where the sequencer was actually onboarded.
+                logger.info(message)
+              case _ => logger.warn(message)
+            }
             signalAndClose(
               ErrorSignal(Status.FAILED_PRECONDITION.withDescription(err.toString).asException())
             )
@@ -164,15 +181,13 @@ private[service] class GrpcManagedSubscription[T](
           .fold(logger.debug("Closing but underlying subscription has not been created"))(_.close())
 
         closeSignal match {
-          case NoSignal =>
-            () // don't send anything, likely as the underlying channel is already cancelled
-          case CompleteSignal => observer.onCompleted()
-          case ErrorSignal(cause) => observer.onError(cause)
+          case CompleteSignal => grpcObserverHandle.onCompleted()
+          case ErrorSignal(cause) => grpcObserverHandle.onError(cause)
         }
       } finally notifyClosed()
   }
 
-  override def isCancelled: Boolean = observer.isCancelled
+  override def isCancelled: Boolean = grpcObserverHandle.isCancelled
 }
 
 private object GrpcManagedSubscription {
@@ -180,7 +195,6 @@ private object GrpcManagedSubscription {
   /** How should the response observer be closed
     */
   private sealed trait ObserverCloseSignal extends Product with Serializable
-  private case object NoSignal extends ObserverCloseSignal
   private case object CompleteSignal extends ObserverCloseSignal
   private final case class ErrorSignal(cause: Throwable) extends ObserverCloseSignal
 }

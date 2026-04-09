@@ -1,19 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.base.error.utils.DecodedCantonError
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.examples.java.iou.Dummy
-import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UsePostgres,
-  UseReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -99,8 +94,8 @@ sealed abstract class MaxRequestSizeCrashIntegrationTest
 
   // High request size
   private val overrideMaxRequestSize = NonNegativeInt.tryCreate(30_000)
-  // Request size chosen so that even TimeProof requests are rejected
-  private val lowMaxRequestSize = NonNegativeInt.zero
+  // Too low to allow create command to succeed. High enough for parameters to be updatable.
+  private val lowMaxRequestSize = NonNegativeInt.tryCreate(500)
 
   "Canton" should {
     "recover from failure due to too small request size " in { implicit env =>
@@ -146,7 +141,7 @@ sealed abstract class MaxRequestSizeCrashIntegrationTest
           }
 
           val matchError =
-            s"MaxViewSizeExceeded\\(view size = .*, max request size configured = .*\\)."
+            s"MaxViewSizeExceeded\\(view size .bytes. = .*, max request size configured .bytes. = .*\\)."
 
           val (commandId, _) = submitCommand(env.participant1)
 
@@ -210,12 +205,6 @@ sealed abstract class MaxRequestSizeCrashIntegrationTest
       submissionF.futureValue.discard
     }
   }
-}
-
-class MaxRequestSizeCrashReferenceIntegrationIntegrationTestPostgres
-    extends MaxRequestSizeCrashIntegrationTest {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 class MaxRequestSizeCrashBftOrderingIntegrationIntegrationTestPostgres

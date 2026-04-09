@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -59,8 +59,7 @@ final case class SequencerAlias private (protected val str: String255)
 }
 
 object SequencerAlias extends LengthLimitedStringWrapperCompanion[String255, SequencerAlias] {
-  val Default = SequencerAlias.tryCreate("DefaultSequencer")
-
+  val Default: SequencerAlias = SequencerAlias.tryCreate("DefaultSequencer")
   override protected def companion: String255.type = String255
   override def instanceName: String = "SequencerAlias"
   override protected def factoryMethodWrapper(str: String255): SequencerAlias = SequencerAlias(str)

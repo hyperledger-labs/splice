@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.participant.state.index.{
+  ContractKeyPage,
   ContractState,
   ContractStore,
   MaximumLedgerTime,
@@ -286,6 +287,14 @@ class ContractStoreBasedMaximumLedgerTimeServiceSpec
             loggingContext: LoggingContextWithTrace
         ): Future[ContractState] =
           Future.successful(fixtureMap(contractId))
+
+        override def lookupNonUniqueContractKey(
+            readers: Set[Party],
+            key: Key,
+            pageToken: Option[Long],
+            limit: Int,
+        )(implicit loggingContext: LoggingContextWithTrace): Future[ContractKeyPage] =
+          throw new UnsupportedOperationException
       },
       loggerFactory,
     )

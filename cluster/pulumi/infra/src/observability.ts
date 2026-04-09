@@ -850,6 +850,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$INGESTION_ENTRIES_PER_BATCH_THRESHOLD',
                 monitoringConfig.alerting.alerts.ingestion.thresholdEntriesPerBatch.toString()
               ),
+            'acs_snapshots_alerts.yaml': readGrafanaAlertingFile('acs_snapshots_alerts.yaml')
+              .replaceAll(
+                '$ACS_SNAPSHOT_SAVE_LATENCY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsSnapshots.saveLatencyThresholdSeconds.toString()
+              )
+              .replaceAll(
+                '$ACS_SNAPSHOT_UPDATE_LATENCY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsSnapshots.updateLatencyThresholdSeconds.toString()
+              ),
             'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
               'sv-status-report_alerts.yaml',
               [
@@ -901,6 +910,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replace(
                 '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
                 monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              )
+              .replace(
+                '$ACS_COMMITMENT_COMPUTE_DURATION_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.computeDuration.seconds.toString()
               ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
@@ -930,10 +943,13 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   subtitle: `Wallet sweep from ${fromParty.hint} to ${toParty.hint}`,
                   ownerPrefixRegex: fromParty.regex,
                   // trigger if it goes above 10% of the defined maxBalance
-                  maxBalanceThreshold: `${config.maxBalance * 1.1}`,
+                  maxBalanceThreshold: `${config.maxBalance * monitoringConfig.alerting.alerts.walletSweep.tolerance}`,
                   uid: `df6rim37tocud${i}`,
                 };
               })
+            ),
+            'traffic_based_rewards_alerts.yaml': readGrafanaAlertingFile(
+              'traffic_based_rewards_alerts.yaml'
             ),
           },
         }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])

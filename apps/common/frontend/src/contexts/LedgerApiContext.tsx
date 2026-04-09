@@ -138,7 +138,6 @@ export class LedgerApiClient {
     const body = {
       commands: [command],
       workflowId: '',
-      applicationId: '',
       commandId: uuidv4(),
       deduplicationPeriod: { Empty: {} },
       actAs: actAs,

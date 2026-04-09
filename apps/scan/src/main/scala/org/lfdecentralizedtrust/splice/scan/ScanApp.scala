@@ -19,7 +19,9 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   SequencerAdminConnection,
   SpliceLedgerClient,
+  SynchronizerNodeService,
 }
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
@@ -39,7 +41,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanSynchronizerConfig}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
@@ -123,6 +125,17 @@ class ScanApp(
       ledgerClient: SpliceLedgerClient,
   )(implicit traceContext: TraceContext) = Future.unit
 
+  def synchronizerNode(config: ScanSynchronizerConfig): ScanSynchronizerNode =
+    new ScanSynchronizerNode(
+      new SequencerAdminConnection(
+        config.sequencer,
+        amuletAppParameters.loggingConfig.api,
+        loggerFactory,
+        nodeMetrics.grpcClientMetrics,
+        retryProvider,
+      )
+    )
+
   override def initialize(
       ledgerClient: SpliceLedgerClient,
       // The primary party in scan as that points to the SV party
@@ -134,15 +147,22 @@ class ScanApp(
         this.getClass.getSimpleName,
         loggerFactory,
       )
-    val bftSequencersWithAdminConnections = config.bftSequencers.map(bftSequencer =>
-      new SequencerAdminConnection(
-        bftSequencer.sequencerAdminClient,
-        amuletAppParameters.loggingConfig.api,
-        loggerFactory,
-        nodeMetrics.grpcClientMetrics,
-        retryProvider,
-      ) -> bftSequencer
-    )
+    val bftSequencersWithAdminConnections = {
+      val all = Seq(config.synchronizerNodes.current) ++
+        config.synchronizerNodes.successor.toList ++
+        config.synchronizerNodes.legacy.toList
+      all.flatMap { syncConfig =>
+        syncConfig.bftSequencerConfig.map { bftConfig =>
+          new SequencerAdminConnection(
+            syncConfig.sequencer,
+            amuletAppParameters.loggingConfig.api,
+            loggerFactory,
+            nodeMetrics.grpcClientMetrics,
+            retryProvider,
+          ) -> bftConfig
+        }
+      }
+    }
     for {
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
@@ -226,12 +246,19 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         loggerFactory,
       )
-      sequencerAdminConnection = new SequencerAdminConnection(
-        config.sequencerAdminClient,
-        amuletAppParameters.loggingConfig.api,
+      syncNodes = LocalSynchronizerNodes(
+        current = synchronizerNode(
+          config.synchronizerNodes.current
+        ),
+        successor = config.synchronizerNodes.successor.map(synchronizerNode(_)),
+        legacy = config.synchronizerNodes.legacy.map(synchronizerNode(_)),
+      )
+      syncService = new SynchronizerNodeService(
+        syncNodes,
+        participantAdminConnection,
+        config.globalSynchronizerAlias,
+        config.parameters.spliceCachingConfigs.physicalSynchronizerExpiration,
         loggerFactory,
-        nodeMetrics.grpcClientMetrics,
-        retryProvider,
       )
       automation = new ScanAutomationService(
         config,
@@ -268,7 +295,7 @@ class ScanApp(
         if (config.enableAppActivityRecordAndTrafficIngestion) {
           Some(
             new SequencerTrafficClient(
-              config.sequencerAdminClient,
+              config.synchronizerNodes.current.sequencer,
               ScanApp.this,
               nodeMetrics.grpcClientMetrics,
               loggerFactory,
@@ -373,7 +400,7 @@ class ScanApp(
         config.svUser,
         config.spliceInstanceNames,
         participantAdminConnection,
-        sequencerAdminConnection,
+        syncService,
         automation,
         updateHistory,
         acsSnapshotStore,
@@ -391,6 +418,7 @@ class ScanApp(
         externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
         config.updateHistoryMaxPageSize,
         config.publicUrl,
+        config.rollForwardLsu,
       )
       scanStreamHandler = new HttpScanStreamHandler(
         config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))
@@ -445,9 +473,6 @@ class ScanApp(
                   // rate limit after the metrics to capture the result in the http metrics
                   httpRateLimiter.withRateLimit(httpService)(operation).tflatMap { _ =>
                     val httpErrorHandler = new HttpErrorHandler(loggerFactory)
-                    val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
-                      provide(traceContext)
-                    }
                     (httpService, config.parameters.customTimeouts.get(operation)) match {
                       // custom HTTP timeouts
                       case ("scan", Some(customTimeout)) =>
@@ -455,10 +480,15 @@ class ScanApp(
                           customTimeout.duration,
                           httpErrorHandler.timeoutHandler(customTimeout.duration, _),
                         ).tflatMap { _ =>
-                          base
+                          // only apply exceptions directive for custom timeout routes
+                          httpErrorHandler.exceptionsDirective(traceContext).tflatMap { _ =>
+                            provide(traceContext)
+                          }
                         }
                       case _ =>
-                        base
+                        httpErrorHandler.directive(traceContext).tflatMap { _ =>
+                          provide(traceContext)
+                        }
                     }
                   }
                 )
@@ -497,7 +527,7 @@ class ScanApp(
     } yield {
       ScanApp.State(
         participantAdminConnection,
-        sequencerAdminConnection,
+        syncNodes,
         storage,
         store,
         automation,
@@ -521,7 +551,7 @@ object ScanApp {
 
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      sequencerAdminConnection: SequencerAdminConnection,
+      synchronizerNodes: LocalSynchronizerNodes[ScanSynchronizerNode],
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
@@ -546,9 +576,12 @@ object ScanApp {
         verdictAutomation,
         store,
         storage,
-        sequencerAdminConnection,
+        synchronizerNodes.current,
         participantAdminConnection,
       )(logger)
+      synchronizerNodes.successor.foreach(
+        LifeCycle.close(_)(logger)
+      )
     }
   }
 }

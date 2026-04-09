@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules
@@ -9,6 +9,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.SupportedVersions
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -36,7 +37,22 @@ object Consensus {
 
   sealed trait Message[+E] extends Product
 
-  final case object Init extends Message[Nothing]
+  sealed trait Init extends Message[Nothing]
+  object Init {
+    final case object KickOff extends Init
+
+    final case class LatestEpochsLoaded(
+        latestCompletedEpoch: EpochStore.Epoch,
+        latestEpoch: EpochStore.Epoch,
+    ) extends Init
+
+    final case class EpochInitDataLoaded(
+        latestCompletedEpoch: Epoch,
+        latestEpoch: Epoch,
+        epochInProgress: EpochStore.EpochInProgress,
+        completedBlocks: Seq[EpochStore.Block],
+    ) extends Init
+  }
 
   final case object Start extends Message[Nothing]
 
@@ -52,8 +68,10 @@ object Consensus {
   sealed trait LocalAvailability extends ProtocolMessage
   object LocalAvailability {
     final case object NoProposalAvailableYet extends LocalAvailability
-    final case class ProposalCreated(orderingBlock: OrderingBlock, epochNumber: EpochNumber)
-        extends LocalAvailability
+    final case class ProposalCreated(
+        forBlock: BlockNumber,
+        orderingBlock: OrderingBlock,
+    ) extends LocalAvailability
   }
 
   /** The networked consensus protocol for ISS running on top of PBFT
@@ -225,7 +243,7 @@ object Consensus {
           Some(originalByteString),
         )
 
-      override def versioningTable: VersioningTable =
+      override val versioningTable: VersioningTable =
         VersioningTable(
           SupportedVersions.ProtoData ->
             VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.StateTransferMessage)(
@@ -300,7 +318,7 @@ object Consensus {
           rpv <- protocolVersionRepresentativeFor(SupportedVersions.ProtoData)
         } yield BlockTransferResponse(commitCert, from)(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.StateTransferMessage)(
             supportedProtoVersionMemoized(_)(fromProtoStateTransferMessage),
@@ -320,11 +338,13 @@ object Consensus {
 
     final case class BlockVerified[E <: Env[E]](
         commitCertificate: CommitCertificate,
+        currentEpochInfo: EpochInfo,
         from: BftNodeId,
     ) extends StateTransferMessage
 
     final case class BlockStored[E <: Env[E]](
         commitCertificate: CommitCertificate,
+        currentEpochInfo: EpochInfo,
         from: BftNodeId,
     ) extends StateTransferMessage
   }

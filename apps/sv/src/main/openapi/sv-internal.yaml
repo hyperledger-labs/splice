@@ -190,6 +190,17 @@ paths:
         "200":
           description: ok
 
+  /v0/admin/synchronizer/lsu/cancel:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "cancelLogicalSynchronizerUpgrade"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/domain/migration-dump:
     get:
       tags: [ sv ]
@@ -614,6 +625,52 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
+  /v0/admin/sv/featured-app-rights/by-contract-id/{contract_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "lookupFeaturedAppRightByContractId"
+      description: |
+        Look up a `FeaturedAppRight` contract by its contract ID.
+      parameters:
+        - name: "contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Featured app right, if found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupFeaturedAppRightByContractIdResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+
+  /v0/admin/sv/featured-app-rights/by-provider/{provider_party_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "listFeaturedAppRightsByProvider"
+      description: |
+        Lookup the `FeaturedAppRight` contract for a provider.
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Featured app right for provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFeaturedAppRightsByProviderResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
   /v0/admin/feature-support:
     get:
@@ -1185,3 +1242,22 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
+    LookupFeaturedAppRightByContractIdResponse:
+      description: |
+        A `Splice.Amulet.FeaturedAppRight` contract looked up by contract ID, if it exists.
+      type: object
+      properties:
+        featured_app_right:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListFeaturedAppRightsByProviderResponse:
+      description: |
+        The `Splice.Amulet.FeaturedAppRight` contract for a specific provider, if it exists.
+      type: object
+      required:
+        - featured_app_rights
+      properties:
+        featured_app_rights:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

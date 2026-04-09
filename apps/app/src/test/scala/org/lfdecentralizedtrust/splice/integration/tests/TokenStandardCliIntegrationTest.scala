@@ -260,6 +260,19 @@ class TokenStandardCliIntegrationTest
           )
         }
       }
+
+      clue(
+        "SV1 scan API (/vX/updates/hash/{hash}) should return the update with external txn hash"
+      ) {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareExtTxnHashViaScanAPIForHash(
+            scanClient,
+            onboardingBobExtPartySetupResult.updateId,
+            onboardingBobExtPartySetupResult.txHash,
+          )
+        }
+      }
     }
   }
 
@@ -309,8 +322,10 @@ class TokenStandardCliIntegrationTest
             includeTransactions = Some(
               TransactionFormat(
                 eventFormat = Some(
-                  EventFormat(filtersByParty =
-                    Map(checkingPartyId.toProtoPrimitive -> Filters(Nil))
+                  EventFormat(
+                    filtersByParty = Map(checkingPartyId.toProtoPrimitive -> Filters(Nil)),
+                    filtersForAnyParty = None,
+                    verbose = false,
                   )
                 ),
                 transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,

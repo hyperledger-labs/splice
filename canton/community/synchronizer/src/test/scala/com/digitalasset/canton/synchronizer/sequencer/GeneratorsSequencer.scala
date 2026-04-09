@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -14,10 +14,12 @@ import com.digitalasset.canton.sequencing.protocol.{
   AggregationId,
   AggregationRule,
   GeneratorsProtocol as GeneratorsProtocolSeq,
+  TrafficState,
 }
 import com.digitalasset.canton.sequencing.traffic.{TrafficConsumed, TrafficPurchased}
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
 import com.digitalasset.canton.synchronizer.sequencer.store.VersionedStatus
+import com.digitalasset.canton.synchronizer.sequencer.traffic.LsuTrafficState
 import com.digitalasset.canton.synchronizer.sequencing.integrations.state.DbSequencerStateManagerStore.AggregatedSignaturesOfSender
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
@@ -122,6 +124,20 @@ final class GeneratorsSequencer(
       protocolVersion,
     )
   )
+
+  implicit val lsuTrafficState: Arbitrary[LsuTrafficState] = {
+    implicit val arbMemberTrafficState: Arbitrary[(Member, TrafficState)] = Arbitrary(
+      for {
+        member <- Arbitrary.arbitrary[Member]
+        trafficState <- Arbitrary.arbitrary[TrafficState]
+      } yield (member, trafficState)
+    )
+    Arbitrary(
+      boundedMapGen.map(
+        LsuTrafficState(_)(LsuTrafficState.protocolVersionRepresentativeFor(protocolVersion))
+      )
+    )
+  }
 
   implicit val versionedStatusArb: Arbitrary[VersionedStatus] = {
     implicit val protoAnyArb: Arbitrary[com.google.protobuf.any.Any] = Arbitrary(

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.services.time
@@ -6,8 +6,8 @@ package com.digitalasset.canton.integration.tests.ledgerapi.services.time
 import com.daml.grpc.GrpcException
 import com.daml.ledger.api.v2.testing.time_service.{GetTimeRequest, SetTimeRequest, TimeServiceGrpc}
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
-import com.digitalasset.canton.config.{CantonConfig, ClockConfig, DbConfig}
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.config.{CantonConfig, ClockConfig}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.CantonFixture
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentSetupPlugin}
 import com.digitalasset.canton.ledger.api.util.TimestampConversion.fromInstant
@@ -19,7 +19,8 @@ import java.time.Instant
 final class WallClockTimeIT extends CantonFixture {
 
   registerPlugin(WallClockOverrideConfig(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   private val unimplemented: PartialFunction[Any, Unit] = { case GrpcException.UNIMPLEMENTED() =>
     ()

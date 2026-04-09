@@ -1,12 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
+import com.daml.tls.BaseServerTlsConfig
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import monocle.macros.syntax.lens.*
 
 trait SynchronizerConnectivityTlsIntegrationTests
@@ -15,10 +16,10 @@ trait SynchronizerConnectivityTlsIntegrationTests
     with HasCycleUtils {
 
   private val certChainFile = PemFile(
-    ExistingFile.tryCreate("enterprise/app/src/test/resources/tls/public-api.crt")
+    ExistingFile.tryCreate("community/app/src/test/resources/tls/public-api.crt")
   )
   private val privateKeyFile = PemFile(
-    ExistingFile.tryCreate("enterprise/app/src/test/resources/tls/public-api.pem")
+    ExistingFile.tryCreate("community/app/src/test/resources/tls/public-api.pem")
   )
 
   override lazy val environmentDefinition: EnvironmentDefinition =
@@ -27,7 +28,7 @@ trait SynchronizerConnectivityTlsIntegrationTests
         ConfigTransforms.updateAllSequencerConfigs_(
           _.focus(_.publicApi.tls).replace(
             Some(
-              TlsBaseServerConfig(
+              BaseServerTlsConfig(
                 certChainFile = certChainFile,
                 privateKeyFile = privateKeyFile,
               )
@@ -66,6 +67,6 @@ class SynchronizerConnectivityTlsReferenceIntegrationTestsPostgres
     extends SynchronizerConnectivityTlsIntegrationTests {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseBftSequencer(loggerFactory)
   )
 }

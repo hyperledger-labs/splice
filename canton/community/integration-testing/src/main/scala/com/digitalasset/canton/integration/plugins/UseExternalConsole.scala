@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -22,7 +22,7 @@ final case class UseExternalConsole(
     cantonBin: String,
     configDirectory: String = "tmp/",
     logDirectory: String = "log/",
-    resourceDirectory: String = "enterprise/app/src/test/resources",
+    resourceDirectory: String = "community/app/src/test/resources",
     extraConfigs: Seq[String] = Nil,
     extraEnv: Seq[(String, String)] = Nil,
     fileNameHint: String,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command
@@ -7,7 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationDuration
 import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
-import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.util.{TimeProvider, TimeProviderType}
 import com.digitalasset.canton.ledger.api.{CommandId, Commands, DisclosedContract}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.{
@@ -25,7 +25,7 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutor,
   CommandInterpretationResult,
 }
-import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, TimeProviderType}
+import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.{FatContractInstanceHelper, SeedService}
 import com.digitalasset.canton.protocol.LfSerializationVersion
 import com.digitalasset.canton.topology.SynchronizerId
@@ -33,6 +33,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -57,7 +58,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.CompletableFuture
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 class CommandSubmissionServiceImplSpec
@@ -129,7 +130,12 @@ class CommandSubmissionServiceImplSpec
               LfError.Interpretation.DamlException(
                 LfInterpretationError.DuplicateContractKey(
                   GlobalKey
-                    .assertBuild(tmplId, Value.ValueUnit, PackageName.assertFromString("pkg-name"))
+                    .assertBuild(
+                      tmplId,
+                      PackageName.assertFromString("pkg-name"),
+                      Value.ValueUnit,
+                      crypto.Hash.hashPrivateKey("dummy-key-hash"),
+                    )
                 )
               ),
               None,
@@ -262,6 +268,7 @@ class CommandSubmissionServiceImplSpec
       disclosedContracts = ImmArray(disclosedContract),
       synchronizerId = None,
       prefetchKeys = Seq.empty,
+      tapsMaxPasses = None,
     )
 
     val submitterInfo = SubmitterInfo(
@@ -304,7 +311,9 @@ class CommandSubmissionServiceImplSpec
       routingSynchronizerState = routingSynchronizerState,
     )
 
-    when(syncService.getRoutingSynchronizerState(traceContext)).thenReturn(routingSynchronizerState)
+    when(syncService.getRoutingSynchronizerState(traceContext)).thenReturn(
+      FutureUnlessShutdown.pure(routingSynchronizerState)
+    )
 
     when(
       commandExecutor.execute(
@@ -332,7 +341,7 @@ class CommandSubmissionServiceImplSpec
         eqTo(Map.empty),
         eqTo(processedDisclosedContracts),
       )(any[TraceContext])
-    ).thenReturn(CompletableFuture.completedFuture(SubmissionResult.Acknowledged))
+    ).thenReturn(Future(SubmissionResult.Acknowledged))
 
     def apiSubmissionService(
         checkOverloaded: TraceContext => Option[state.SubmissionResult] = _ => None

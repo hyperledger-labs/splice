@@ -12,6 +12,7 @@ import scala.util.Using
   * for testing the runbook we spin up our own Canton instance.
   */
 object ProcessTestUtil {
+  val javaToolOptionsKey = "JAVA_TOOL_OPTIONS"
   final case class Process(process: java.lang.Process) {
     def destroyAndWait(): Unit = {
       process.destroy()
@@ -113,8 +114,7 @@ trait ProcessTestUtil { this: BaseTest =>
       extraEnv*
     )
   }
-  val javaToolOptionsKey = "JAVA_TOOL_OPTIONS"
-  val defaultJavaToolOptions = "-Xms6g -Xmx8g"
+  val defaultJavaToolOptions = "-Xms4g -Xmx6g"
   private def startCantonInternal(
       args: Seq[String],
       logSuffix: String,
@@ -130,7 +130,6 @@ trait ProcessTestUtil { this: BaseTest =>
     }
     startProcess(
       defaultArgsCanton(logSuffix) ++ args,
-      // Using the same memory settings as in the `./start-canton.sh` script
       extraEnv =
         extraEnv :+ ((javaToolOptionsKey, s"$defaultJavaToolOptions $extraJavaToolOptions")),
     )

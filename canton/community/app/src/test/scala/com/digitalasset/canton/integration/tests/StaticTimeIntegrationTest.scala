@@ -1,12 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.config.StorageConfig
 import com.digitalasset.canton.damltests.java.statictimetest.Pass
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.UseBftSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -33,7 +32,7 @@ trait StaticTimeIntegrationTest extends CommunityIntegrationTest with SharedEnvi
 
     participant1.synchronizers.connect_local(sequencer1, daName)
     participant1.dars.upload(CantonTestsPath)
-    val alice = participant1.parties.enable("Alice")
+    val alice = participant1.parties.testing.enable("Alice")
 
     val now = clock.now
     assertResult(CantonTimestamp.Epoch)(now)
@@ -81,5 +80,5 @@ trait StaticTimeIntegrationTest extends CommunityIntegrationTest with SharedEnvi
 }
 
 class StaticTimeIntegrationTestInMemory extends StaticTimeIntegrationTest {
-  registerPlugin(new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

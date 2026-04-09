@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -174,10 +174,10 @@ final case class TransactionView private (
     subviews = Some(subviews.toProtoV30),
   )
 
-  /** The global key inputs that the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]]
-    * computes while interpreting the root action of the view, enriched with the maintainers of the
-    * key and the [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing
-    * the key.
+  /** The global key inputs that the
+    * [[com.digitalasset.daml.lf.transaction.LegacyContractStateMachine]] computes while
+    * interpreting the root action of the view, enriched with the maintainers of the key and the
+    * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing the key.
     *
     * @throws java.lang.IllegalStateException
     *   if the [[ViewParticipantData]] of this view or any subview is blinded
@@ -339,7 +339,7 @@ object TransactionView
       (HashOps, ProtocolVersion),
     ] {
   override def name: String = "TransactionView"
-  override def versioningTable: VersioningTable = VersioningTable(
+  override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewNode)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
@@ -416,13 +416,14 @@ object TransactionView
 
   /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
-  val viewCommonDataUnsafe: Lens[TransactionView, MerkleTree[ViewCommonData]] =
-    GenLens[TransactionView](_.viewCommonData)
-
-  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
-  @VisibleForTesting
-  val viewParticipantDataUnsafe: Lens[TransactionView, MerkleTree[ViewParticipantData]] =
-    GenLens[TransactionView](_.viewParticipantData)
+  object Optics {
+    val subviewsUnsafe: Lens[TransactionView, TransactionSubviews] =
+      GenLens[TransactionView](_.subviews)
+    val viewCommonDataUnsafe: Lens[TransactionView, MerkleTree[ViewCommonData]] =
+      GenLens[TransactionView](_.viewCommonData)
+    val viewParticipantDataUnsafe: Lens[TransactionView, MerkleTree[ViewParticipantData]] =
+      GenLens[TransactionView](_.viewParticipantData)
+  }
 
   private def fromProtoV30(
       context: (HashOps, ProtocolVersion),

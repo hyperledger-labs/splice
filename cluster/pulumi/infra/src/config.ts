@@ -18,6 +18,17 @@ export const clusterBaseDomain = clusterHostname.split('.')[0];
 
 export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 
+const quotaMetricNameSchema = z
+  .string()
+  .regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z0-9-]+\/[a-zA-Z0-9_./-]+$/, 'full GCP quota metric name');
+
+const GcpQuotasConfigSchema = z.object({
+  // so existing overrides don't break
+  enabled: z.literal(true).optional(),
+  excludedMetrics: z.array(quotaMetricNameSchema),
+  excludedApproachingMetrics: z.array(quotaMetricNameSchema),
+});
+
 const MonitoringConfigSchema = z
   .object({
     alerting: z.object({
@@ -71,13 +82,22 @@ const MonitoringConfigSchema = z
           completedDelay: z.object({
             seconds: z.number(),
           }),
+          computeDuration: z.object({
+            seconds: z.number(),
+          }),
+        }),
+        acsSnapshots: z.object({
+          saveLatencyThresholdSeconds: z.number(),
+          updateLatencyThresholdSeconds: z.number(),
         }),
         sequencerRateLimits: z.object({
           rejectionRateThreshold: z.number(),
           circuitBreakerStateThreshold: z.number(),
         }),
-        // so existing overrides don't break
-        gcpQuotas: z.object({ enabled: z.literal(true) }).optional(),
+        walletSweep: z.object({
+          tolerance: z.number(),
+        }),
+        gcpQuotas: GcpQuotasConfigSchema,
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
@@ -135,6 +155,8 @@ export const InfraConfigSchema = z.object({
 });
 
 export type CloudArmorConfig = z.infer<typeof CloudArmorConfigSchema>;
+
+export type GcpQuotaAlertsConfig = z.infer<typeof GcpQuotasConfigSchema>;
 
 export type Config = z.infer<typeof InfraConfigSchema>;
 

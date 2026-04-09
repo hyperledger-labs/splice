@@ -1,14 +1,16 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.util.BytesUnit
 import com.github.blemale.scaffeine.Scaffeine
 import com.google.common.annotations.VisibleForTesting
 
+import java.util.concurrent.{Executor, RejectedExecutionException}
 import scala.concurrent.ExecutionContext
 
 /** Configurations settings for a single cache
@@ -21,37 +23,33 @@ import scala.concurrent.ExecutionContext
 final case class CacheConfig(
     maximumSize: PositiveNumeric[Long],
     expireAfterAccess: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
-) extends UniformCantonConfigValidation {
+) {
 
-  def buildScaffeine()(implicit ec: ExecutionContext): Scaffeine[Any, Any] =
+  def buildScaffeine(
+      loggerFactory: NamedLoggerFactory
+  )(implicit ec: ExecutionContext): Scaffeine[Any, Any] =
+    buildScaffeineWithoutExecutor()
+      .executor(new FallbackExecutor(ec, loggerFactory))
+
+  /** Can be used if there's no reasonable ExecutionContext instance to pass
+    */
+  def buildScaffeineWithoutExecutor(): Scaffeine[Any, Any] =
     Scaffeine()
       .maximumSize(maximumSize.value)
       .expireAfterAccess(expireAfterAccess.underlying)
-      .executor(ec.execute(_))
-}
-object CacheConfig {
-  implicit val cacheConfigCantonConfigValidator: CantonConfigValidator[CacheConfig] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[CacheConfig]
-  }
 }
 
 final case class CacheConfigWithMemoryBounds(
     maximumMemory: PositiveNumeric[BytesUnit],
     expireAfterAccess: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
-) extends UniformCantonConfigValidation {
-  def buildScaffeine()(implicit ec: ExecutionContext): Scaffeine[Any, Any] =
+) {
+  def buildScaffeine(
+      loggerFactory: NamedLoggerFactory
+  )(implicit ec: ExecutionContext): Scaffeine[Any, Any] =
     Scaffeine()
       .maximumWeight(maximumMemory.value.bytes)
       .expireAfterAccess(expireAfterAccess.underlying)
-      .executor(ec.execute(_))
-}
-object CacheConfigWithMemoryBounds {
-  implicit val cacheConfigWithMemoryBoundsCantonConfigValidator
-      : CantonConfigValidator[CacheConfigWithMemoryBounds] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[CacheConfigWithMemoryBounds]
-  }
+      .executor(new FallbackExecutor(ec, loggerFactory))
 }
 
 /** Configurations settings for a single cache where elements are evicted after a certain time as
@@ -65,21 +63,16 @@ object CacheConfigWithMemoryBounds {
 final case class CacheConfigWithTimeout(
     maximumSize: PositiveNumeric[Long],
     expireAfterTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(10),
-) extends UniformCantonConfigValidation {
+) {
 
-  def buildScaffeine()(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
+  def buildScaffeine(
+      loggerFactory: NamedLoggerFactory
+  )(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
     Scaffeine()
       .maximumSize(maximumSize.value)
       .expireAfterWrite(expireAfterTimeout.underlying)
-      .executor(executionContext.execute(_))
+      .executor(new FallbackExecutor(executionContext, loggerFactory))
 
-}
-object CacheConfigWithTimeout {
-  implicit val cacheConfigWithTimeoutCantonConfigValidator
-      : CantonConfigValidator[CacheConfigWithTimeout] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[CacheConfigWithTimeout]
-  }
 }
 
 /** Configuration settings for a cache where elements are only evicted when the maximum size is
@@ -90,19 +83,13 @@ object CacheConfigWithTimeout {
   */
 final case class CacheConfigWithSizeOnly(
     maximumSize: PositiveNumeric[Long]
-) extends UniformCantonConfigValidation {
-  def buildScaffeine()(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
+) {
+  def buildScaffeine(
+      loggerFactory: NamedLoggerFactory
+  )(implicit executionContext: ExecutionContext): Scaffeine[Any, Any] =
     Scaffeine()
       .maximumSize(maximumSize.value)
-      .executor(executionContext.execute(_))
-}
-
-object CacheConfigWithSizeOnly {
-  implicit val cacheConfigWithWSizeOnlyCantonConfigValidator
-      : CantonConfigValidator[CacheConfigWithSizeOnly] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[CacheConfigWithSizeOnly]
-  }
+      .executor(new FallbackExecutor(executionContext, loggerFactory))
 }
 
 /** Configuration settings for a cache that stores: (a) the public asymmetric encryptions of the
@@ -119,7 +106,7 @@ object CacheConfigWithSizeOnly {
   *   configuration for the receiver's cache that stores the decryptions of the session keys
   */
 final case class SessionEncryptionKeyCacheConfig(
-    enabled: Boolean,
+    enabled: Boolean = true,
     senderCache: CacheConfigWithTimeout = CacheConfigWithTimeout(
       maximumSize = PositiveNumeric.tryCreate(10000),
       expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
@@ -128,13 +115,7 @@ final case class SessionEncryptionKeyCacheConfig(
       maximumSize = PositiveNumeric.tryCreate(10000),
       expireAfterTimeout = PositiveFiniteDuration.ofSeconds(10),
     ),
-) extends UniformCantonConfigValidation
-
-object SessionEncryptionKeyCacheConfig {
-  implicit val sessionEncryptionKeyCacheConfigCantonConfigValidator
-      : CantonConfigValidator[SessionEncryptionKeyCacheConfig] =
-    CantonConfigValidatorDerivation[SessionEncryptionKeyCacheConfig]
-}
+)
 
 /** Configuration settings for various internal caches
   *
@@ -160,22 +141,22 @@ final case class CachingConfigs(
     partyCache: CacheConfig = CachingConfigs.defaultPartyCache,
     participantCache: CacheConfig = CachingConfigs.defaultParticipantCache,
     keyCache: CacheConfig = CachingConfigs.defaultKeyCache,
-    sessionEncryptionKeyCache: SessionEncryptionKeyCacheConfig =
-      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+    sessionEncryptionKeyCache: SessionEncryptionKeyCacheConfig = SessionEncryptionKeyCacheConfig(),
     publicKeyConversionCache: CacheConfig = CachingConfigs.defaultPublicKeyConversionCache,
     packageVettingCache: CacheConfig = CachingConfigs.defaultPackageVettingCache,
-    packageDependencyCache: CacheConfig = CachingConfigs.defaultPackageDependencyCache,
     packageUpgradeCache: CacheConfigWithSizeOnly = CachingConfigs.defaultPackageUpgradeCache,
     memberCache: CacheConfig = CachingConfigs.defaultMemberCache,
-    kmsMetadataCache: CacheConfig = CachingConfigs.kmsMetadataCache,
+    kmsMetadataCache: CacheConfig = CachingConfigs.defaultKmsMetadataCache,
     finalizedMediatorConfirmationRequests: CacheConfig =
       CachingConfigs.defaultFinalizedMediatorConfirmationRequestsCache,
-    sequencerPayloadCache: CacheConfigWithMemoryBounds = CachingConfigs.defaultSequencerPayloadCache,
-) extends UniformCantonConfigValidation
+    sequencerPayloadCache: CacheConfigWithMemoryBounds =
+      CachingConfigs.defaultSequencerPayloadCache,
+    sequencerCatchupPayloadCache: CacheConfigWithMemoryBounds =
+      CachingConfigs.defaultSequencerPayloadCache,
+    bftOrderingBatchCache: CacheConfigWithMemoryBounds = CachingConfigs.defaultBftOrderingBatchCache,
+)
 
 object CachingConfigs {
-  implicit val cachingConfigsCantonConfigValidator: CantonConfigValidator[CachingConfigs] =
-    CantonConfigValidatorDerivation[CachingConfigs]
 
   val defaultStaticStringCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
@@ -193,30 +174,49 @@ object CachingConfigs {
     maximumSize = PositiveNumeric.tryCreate(10000),
     expireAfterAccess = NonNegativeFiniteDuration.ofMinutes(60),
   )
-  val defaultSessionEncryptionKeyCacheConfig: SessionEncryptionKeyCacheConfig =
-    SessionEncryptionKeyCacheConfig(
-      enabled = true
-    )
   val defaultPackageVettingCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
-  val defaultPackageDependencyCache: CacheConfig =
-    CacheConfig(
-      maximumSize = PositiveNumeric.tryCreate(10000),
-      NonNegativeFiniteDuration.ofMinutes(15),
-    )
   val defaultPackageUpgradeCache: CacheConfigWithSizeOnly = CacheConfigWithSizeOnly(
     maximumSize = PositiveNumeric.tryCreate(10000)
   )
   val defaultMemberCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
-  val kmsMetadataCache: CacheConfig =
+  val defaultKmsMetadataCache: CacheConfig =
     CacheConfig.apply(maximumSize = PositiveNumeric.tryCreate(20))
   val defaultFinalizedMediatorConfirmationRequestsCache =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
   val defaultSequencerPayloadCache: CacheConfigWithMemoryBounds =
-    CacheConfigWithMemoryBounds(maximumMemory = PositiveNumeric.tryCreate(BytesUnit.MB(200L)))
+    CacheConfigWithMemoryBounds(
+      maximumMemory = PositiveNumeric.tryCreate(BytesUnit.MB(64L)),
+      expireAfterAccess = NonNegativeFiniteDuration.ofMinutes(10),
+    )
+  val defaultBftOrderingBatchCache: CacheConfigWithMemoryBounds =
+    CacheConfigWithMemoryBounds(
+      maximumMemory = PositiveNumeric.tryCreate(BytesUnit.MB(64L)),
+      expireAfterAccess = NonNegativeFiniteDuration.ofMinutes(10),
+    )
   @VisibleForTesting
   val testing =
     CachingConfigs(contractStore = CacheConfig(maximumSize = PositiveNumeric.tryCreate(100)))
 
+}
+
+/** A side effect of cache operations, including get, put, invalidate and cleanup is that tasks are
+  * scheduled on the executor. Sometime, due to race conditions on shutdown, or due to calls made
+  * during shutdown (e.g. cleanup) the underlying executor may already be shut down. In this
+  * situation we fall back to the direct execution context. The main task observed during testing is
+  * the BoundedLocalCache.PerformCleanupTask.
+  */
+class FallbackExecutor(context: ExecutionContext, loggerFactory: NamedLoggerFactory)
+    extends Executor {
+  private val tracedLogger = loggerFactory.getTracedLogger(getClass)
+  override def execute(command: Runnable): Unit =
+    try {
+      context.execute(command)
+    } catch {
+      case _: RejectedExecutionException =>
+        tracedLogger.underlying.info(s"Falling back to direct execution for $command")
+        DirectExecutionContext(tracedLogger).execute(command)
+        tracedLogger.underlying.info(s"Execution complete for: $command")
+    }
 }

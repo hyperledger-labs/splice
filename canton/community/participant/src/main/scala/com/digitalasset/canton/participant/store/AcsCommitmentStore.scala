@@ -1,25 +1,28 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.InternedPartyId
 import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.store.AcsCommitmentStore.ReinitializationStatus
+import com.digitalasset.canton.protocol.messages.CommitmentPeriodState.CommitmentPeriodStateInOutstanding
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
   CommitmentPeriod,
   CommitmentPeriodState,
   SignedProtocolMessage,
 }
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.store.PrunableByTime
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 
+import scala.collection.immutable
 import scala.collection.immutable.SortedSet
 import scala.util.control.Breaks.*
 
@@ -49,7 +52,7 @@ trait AcsCommitmentStore extends AcsCommitmentLookup with PrunableByTime with Au
     * Caller needs to ensure the periods are valid.
     */
   def markOutstanding(
-      periods: NonEmpty[Set[CommitmentPeriod]],
+      periods: NonEmpty[immutable.Iterable[CommitmentPeriod]],
       counterParticipants: NonEmpty[Set[ParticipantId]],
   )(implicit
       traceContext: TraceContext
@@ -95,7 +98,7 @@ trait AcsCommitmentStore extends AcsCommitmentLookup with PrunableByTime with Au
     */
   def markSafe(
       counterParticipant: ParticipantId,
-      periods: NonEmpty[Set[CommitmentPeriod]],
+      periods: NonEmpty[immutable.Iterable[CommitmentPeriod]],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     markPeriod(
       counterParticipant,
@@ -118,7 +121,7 @@ trait AcsCommitmentStore extends AcsCommitmentLookup with PrunableByTime with Au
     */
   def markUnsafe(
       counterParticipant: ParticipantId,
-      periods: NonEmpty[Set[CommitmentPeriod]],
+      periods: NonEmpty[immutable.Iterable[CommitmentPeriod]],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     markPeriod(
       counterParticipant,
@@ -139,22 +142,10 @@ trait AcsCommitmentStore extends AcsCommitmentLookup with PrunableByTime with Au
     */
   protected def markPeriod(
       counterParticipant: ParticipantId,
-      periods: NonEmpty[Set[CommitmentPeriod]],
-      matchingState: CommitmentPeriodState,
+      periods: NonEmpty[immutable.Iterable[CommitmentPeriod]],
+      matchingState: CommitmentPeriodStateInOutstanding,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 
-  /** Marks a period for all counter participant as cleared by multi-hosted party tracking.
-    *
-    * Caller needs to ensure the periods are valid.
-    *
-    * Idempotent behavior.
-    *
-    * Any period marked by this will be considered fine to prune for the
-    * [[noOutstandingCommitments]].
-    */
-  def markMultiHostedCleared(period: CommitmentPeriod)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
   val runningCommitments: IncrementalCommitmentStore
 
   val queue: CommitmentQueue
@@ -182,16 +173,21 @@ trait AcsCommitmentLookup {
   ): FutureUnlessShutdown[Option[CantonTimestampSecond]]
 
   /** The latest timestamp before or at the given timestamp for which no commitments are
-    * outstanding. A list of [[com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants]]
-    * can be given for counter participants that should not be considered. It is safe to prune the
-    * synchronizer at the returned timestamp as long as it is not before the last timestamp needed
-    * for crash recovery (see
+    * outstanding. By default, any counter-commitments that do not match the local one, either
+    * because they have not been received or because they do not match, are outstanding. The
+    * parameter [[com.digitalasset.canton.scheduler.SafeToPruneCommitmentState]], if provided,
+    * changes the commitment states that are considered outstanding. Also, through config, a list of
+    * [[com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants]] can be given for
+    * counter participants that should not be considered. It is safe to prune the synchronizer at
+    * the returned timestamp as long as it is not before the last timestamp needed for crash
+    * recovery (see
     * com.digitalasset.canton.participant.pruning.PruningProcessor.latestSafeToPruneTick)
     *
     * Returns None if no such tick is known.
     */
   def noOutstandingCommitments(
-      beforeOrAt: CantonTimestamp
+      beforeOrAt: CantonTimestamp,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[CantonTimestamp]]
@@ -260,7 +256,9 @@ trait IncrementalCommitmentStore {
     */
   def get()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[(RecordTime, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType])]
+  ): FutureUnlessShutdown[
+    (RecordTime, Map[SortedSet[InternedPartyId], AcsCommitment.CommitmentType])
+  ]
 
   /** Return the record time of the latest update.
     *
@@ -283,8 +281,8 @@ trait IncrementalCommitmentStore {
     */
   def update(
       rt: RecordTime,
-      updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
-      deletes: Set[SortedSet[LfPartyId]],
+      updates: Map[SortedSet[InternedPartyId], AcsCommitment.CommitmentType],
+      deletes: Set[SortedSet[InternedPartyId]],
       updateMode: UpdateMode,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 
@@ -325,6 +323,9 @@ trait IncrementalCommitmentStore {
   def markReinitializationCompleted(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
+
+  /** Forget all the running commitments in the checkpoint */
+  def forgetCheckpoints()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 }
 
 /** Manages the buffer (priority queue) for incoming commitments.
@@ -399,6 +400,7 @@ object AcsCommitmentStore {
     * A clean timestamp is one that is not covered by the unclean periods. The periods are given as
     * pairs of `(startExclusive, endInclusive)` timestamps.
     */
+  // TODO(##30039) latestCleanPeriod doesn't consider a period clean even if it's cleared by a later period
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   def latestCleanPeriod(
       beforeOrAt: CantonTimestamp,

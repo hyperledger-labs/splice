@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -10,22 +10,15 @@ import cats.syntax.parallel.*
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.transaction.Transaction as ApiTransaction
+import com.daml.ledger.api.v2.transaction_filter.*
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
-import com.daml.ledger.api.v2.transaction_filter.{
-  CumulativeFilter,
-  EventFormat,
-  Filters,
-  TransactionFormat,
-  UpdateFormat,
-  WildcardFilter,
-}
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
-import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.UpdateWrapper
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
+import com.digitalasset.canton.crypto.{RandomOps, SaltSeed}
 import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.TestSubmissionService.{
@@ -44,13 +37,14 @@ import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
   NamedLogging,
 }
-import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
+import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.platform.apiserver.SeedService.WeakRandom
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.TryUtil
 import com.digitalasset.daml.lf.command.ApiCommands
 import com.digitalasset.daml.lf.crypto
@@ -72,25 +66,28 @@ import com.digitalasset.daml.lf.engine.{
   ResultPrefetch,
 }
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.*
+import com.digitalasset.daml.lf.transaction.{NextGenContractStateMachine, *}
+import com.digitalasset.daml.lf.value.ContractIdVersion
 import io.grpc.stub.StreamObserver
 import org.scalatest.OptionValues.*
 
+import java.security.SecureRandom
 import java.time.Duration
 import java.util.UUID
-import scala.annotation.{tailrec, unused}
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 class TestSubmissionService(
     participantId: ParticipantId,
     maxDeduplicationDuration: NonNegativeFiniteDuration,
-    damle: Engine,
+    engine: Engine,
     contractResolver: LfContractId => TraceContext => Future[Option[FatContractInstance]],
     keyResolver: TestKeyResolver,
     packageResolver: PackageResolver,
     syncService: SyncService,
-    basePackageMap: Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)],
+    mkPackageMap: TraceContext => Future[Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]],
+    contractStateMode: NextGenContractStateMachine.Mode = NextGenContractStateMachine.Mode.default,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -148,7 +145,7 @@ class TestSubmissionService(
       commands: CommandsWithMetadata,
       transaction: SubmittedTransaction,
       nodeSeeds: ImmArray[(NodeId, crypto.Hash)],
-      globalKeyInputs: Map[LfGlobalKey, Option[LfContractId]],
+      globalKeyInputs: Map[LfGlobalKey, Vector[LfContractId]],
   )(implicit traceContext: TraceContext): Future[Completion] = {
     val submitterInfo = commands.submitterInfo(maxDeduplicationDuration.duration)
     val meta = commands.transactionMeta(transaction, nodeSeeds)
@@ -236,7 +233,7 @@ class TestSubmissionService(
       submitterInfo: SubmitterInfo,
       meta: TransactionMeta,
       transaction: SubmittedTransaction,
-      keyMapping: Map[LfGlobalKey, Option[LfContractId]],
+      keyMapping: Map[LfGlobalKey, Vector[LfContractId]],
   )(implicit traceContext: TraceContext): Future[Unit] =
     submitTransaction(submitterInfo, meta, transaction, keyMapping).map {
       case SubmissionResult.Acknowledged => ()
@@ -247,10 +244,11 @@ class TestSubmissionService(
       submitterInfo: SubmitterInfo,
       meta: TransactionMeta,
       transaction: SubmittedTransaction,
-      keyMapping: Map[LfGlobalKey, Option[LfContractId]],
-  )(implicit traceContext: TraceContext): Future[SubmissionResult] = {
-    val routingSynchronizerState = syncService.getRoutingSynchronizerState
+      keyMapping: Map[LfGlobalKey, Vector[LfContractId]],
+  )(implicit traceContext: TraceContext): Future[SubmissionResult] =
     for {
+      routingSynchronizerState <- syncService.getRoutingSynchronizerState
+        .failOnShutdownToAbortException("test submit transaction")
       synchronizerRank <- syncService
         .selectRoutingSynchronizer(
           submitterInfo = submitterInfo,
@@ -275,9 +273,7 @@ class TestSubmissionService(
           keyResolver = keyMapping,
           processedDisclosedContracts = ImmArray.Empty, // TODO(#9795) wire proper value
         )
-        .toScalaUnwrapped
     } yield submissionResult
-  }
 
   def interpret(commands: CommandsWithMetadata)(implicit
       traceContext: TraceContext
@@ -296,27 +292,45 @@ class TestSubmissionService(
       apiCommands: ApiCommands,
       readAs: Seq[PartyId],
       submissionSeed: crypto.Hash = WeakRandom.nextSeed(),
-      @unused packageMapOverride: Option[
+      packageMapOverride: Option[
         Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]
       ] = None,
-      @unused packagePreferenceOverride: Option[Set[Ref.PackageId]] = None,
+      packagePreferenceOverride: Option[Set[Ref.PackageId]] = None,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, Error, (SubmittedTransaction, Transaction.Metadata)] = {
-    val result =
-      damle.submit(
-        packageMap = packageMapOverride.getOrElse(basePackageMap),
-        packagePreference = packagePreferenceOverride.getOrElse(basePackageMap.keySet),
+  ): EitherT[Future, Error, (SubmittedTransaction, Transaction.Metadata)] = EitherT(for {
+
+    packageMap <- packageMapOverride match {
+      case Some(packageMap) => Future.successful(packageMap)
+      case None => mkPackageMap(traceContext)
+    }
+    packagePreference = packagePreferenceOverride
+      .getOrElse(
+        // Pick the packages with highest versions from packageMap
+        packageMap.groupBy { case (_, (name, _)) => name }.values.map { allPackagesWithGivenName =>
+          val (packageIdWithGivenNameAndMaxVersion, _) =
+            allPackagesWithGivenName.maxBy { case (_, (_, version)) => version }
+          packageIdWithGivenNameAndMaxVersion
+        }
+      )
+      .toSet
+
+    result =
+      engine.submit(
+        packageMap = packageMap,
+        packagePreference = packagePreference,
         submitters = actAs.map(_.toLf).toSet,
         readAs = readAs.map(_.toLf).toSet,
         cmds = apiCommands,
         participantId = participantId.toLf,
         prefetchKeys = Seq.empty,
         submissionSeed = submissionSeed,
+        contractIdVersion = ContractIdVersion.V1,
+        contractStateMode = contractStateMode,
       )
 
-    EitherT(resolve(result))
-  }
+    txOrErr <- resolve(result)
+  } yield txOrErr)
 
   private def resolve(
       result: Result[(SubmittedTransaction, Transaction.Metadata)]
@@ -350,17 +364,22 @@ class TestSubmissionService(
 
       case ResultNeedPackage(packageId, resume) =>
         for {
-          pckgO <- packageResolver(packageId)(traceContext).failOnShutdownToAbortException(
-            "TestSubmissionService"
-          )
+          pckgO <- packageResolver
+            .resolve(packageId, PackageResolver.ignoreMissingPackage)
+            .failOnShutdownToAbortException(
+              "TestSubmissionService"
+            )
           r <- resolve(resume(pckgO))
         } yield r
 
-      case ResultNeedKey(key, resume) =>
+      case ResultNeedKey(key, _, _, resume) =>
+        // TODO(#30398) review this code once engine really support NUCK
+
         val gk = key.globalKey
         for {
           cidO <- keyResolver.resolveKey(gk)(traceContext)
-          r <- resolve(resume(cidO))
+          contracts <- cidO.toList.parTraverse(contractResolver(_)(traceContext))
+          r <- resolve(resume(contracts.flatten.toVector, None))
         } yield r
 
       case ResultInterruption(continue, _) =>
@@ -397,21 +416,24 @@ object TestSubmissionService {
       customKeyResolver: Option[TestKeyResolver] = None,
       checkAuthorization: Boolean = true,
       enableLfDev: Boolean = false,
-      companionPackages: Seq[ContractTypeCompanion.Package] = Seq.empty,
+      contractStateMode: NextGenContractStateMachine.Mode =
+        NextGenContractStateMachine.Mode.devDefault,
   )(implicit env: TestConsoleEnvironment): TestSubmissionService = {
     import env.*
 
     val participantNode = participant.underlying.value
+    val loggerFactory = participantNode.loggerFactory
 
-    val damle = new Engine(
+    val engine = new Engine(
       EngineConfig(
         allowedLanguageVersions =
           if (enableLfDev)
-            LanguageVersion.AllVersions(LanguageVersion.Major.V2)
+            LanguageVersion.allLfVersionsRange
           else
-            LanguageVersion.StableVersions(LanguageVersion.Major.V2),
+            LanguageVersion.stableLfVersionsRange,
         checkAuthorization = checkAuthorization,
-      )
+      ),
+      loggerFactory,
     )
 
     def resolveContract(
@@ -424,27 +446,41 @@ object TestSubmissionService {
 
     val keyResolver = customKeyResolver.getOrElse(ActiveKeyResolver(participant))
 
-    val packageResolver: PackageResolver = id =>
-      tc => participantNode.sync.packageService.getPackage(id)(tc)
-
-    val loggerFactory = participantNode.loggerFactory
-
-    val packageMap = buildPackageMap(companionPackages)
+    val packageResolver: PackageResolver = participantNode.sync.packageService.packageResolver
 
     new TestSubmissionService(
       participant.id,
       participantNode.sync.maxDeduplicationDuration,
-      damle,
+      engine,
       resolveContract,
       keyResolver,
       packageResolver,
       participantNode.sync,
-      packageMap,
+      mkPackageMap(participantNode)(_),
+      contractStateMode,
       loggerFactory,
     )
   }
 
-  def buildPackageMap(
+  private def mkPackageMap(
+      participantNode: ParticipantNode
+  )(traceContext: TraceContext)(implicit executionContext: ExecutionContext): Future[
+    Map[LfPackageId, (Ref.PackageName, Ref.PackageVersion)]
+  ] = participantNode.sync.packageService
+    .listPackages()(traceContext)
+    .map(
+      _.map(description =>
+        description.packageId -> (
+          Ref.PackageName.assertFromString(description.name.str),
+          Ref.PackageVersion.assertFromString(description.version.str)
+        )
+      ).toMap
+    )
+    .onShutdown(
+      throw new UnsupportedOperationException("Building package map failed due to shutdown.")
+    )
+
+  def packageMapOfCompanions(
       pkgs: Seq[ContractTypeCompanion.Package]
   ): Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)] =
     pkgs.view.map { p =>
@@ -542,6 +578,12 @@ object TestSubmissionService {
       Future.successful(None)
   }
 
+  private val randomOps: RandomOps = (length: Int) => {
+    val randBytes = new Array[Byte](length)
+    new SecureRandom().nextBytes(randBytes)
+    randBytes
+  }
+
   final case class CommandsWithMetadata(
       commands: Seq[Command],
       actAs: Seq[PartyId],
@@ -552,6 +594,8 @@ object TestSubmissionService {
       deduplicationPeriodO: Option[DeduplicationPeriod] = None,
       ledgerTime: Time.Timestamp = Time.Timestamp.now(),
       submissionSeed: crypto.Hash = WeakRandom.nextSeed(),
+      transactionSeed: SaltSeed = SaltSeed.generate()(randomOps),
+      transactionUuid: UUID = UUID.randomUUID(),
       packageMapOverride: Option[Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]] = None,
       packagePreferenceOverride: Option[Set[Ref.PackageId]] = None,
   ) {

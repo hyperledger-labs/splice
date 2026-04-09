@@ -97,6 +97,8 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 packageIdSelectionPreference = Seq.empty,
                 transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
                 includeCreatedEventBlob = includeCreatedEventBlob,
+                optTimeout = None,
+                tapsMaxPasses = None,
               )
             )
           }

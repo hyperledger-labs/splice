@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.services.reflection
 
 import com.daml.grpc.test.StreamConsumer
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.CantonFixture
 import io.grpc.reflection.v1.{
   ServerReflectionGrpc,
@@ -17,7 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 final class ReflectionIT extends CantonFixture {
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   private val listServices: ServerReflectionRequest =
     ServerReflectionRequest.newBuilder().setHost("127.0.0.1").setListServices("").build()
@@ -28,7 +28,7 @@ final class ReflectionIT extends CantonFixture {
 
       "provide a list of exposed services" in { env =>
         import env.*
-        val expectedServiceCount: Int = 19
+        val expectedServiceCount: Int = 20
         (for {
           response <- execRequest(listServices)
         } yield {

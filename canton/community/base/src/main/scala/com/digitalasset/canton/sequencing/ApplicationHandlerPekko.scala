@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -113,13 +113,15 @@ class ApplicationHandlerPekko[F[+_], Context](
       val firstEvent = batch.head1
       val firstTimestamp = firstEvent.timestamp
 
+      import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.TimerOnShutdownSyntax
+
       metrics.handler.numEvents.inc(batch.size.toLong)(MetricsContext.Empty)
       logger.debug(s"Passing ${batch.size} events to the application handler ${handler.name}.")
       // Measure only the synchronous part of the application handler so that we see how much the application handler
       // contributes to the sequential processing bottleneck.
       val syncResultFF = FutureUnlessShutdown.fromTry(
         Try(
-          Timed.future(metrics.handler.applicationHandle, handler(Traced(batch)))
+          Timed.futureUS(metrics.handler.applicationHandle, handler(Traced(batch)))
         )
       )
 

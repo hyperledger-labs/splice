@@ -1,10 +1,7 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
-
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.semiauto.CantonConfigValidatorDerivation
 
 /** Configuration relating to reassignments.
   *
@@ -31,10 +28,4 @@ import com.digitalasset.canton.config.semiauto.CantonConfigValidatorDerivation
 final case class ReassignmentsConfig(
     targetTimestampForwardTolerance: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(5)
-) extends UniformCantonConfigValidation
-
-object ReassignmentsConfig {
-  implicit val reassignmentsConfigCantonConfigValidator
-      : CantonConfigValidator[ReassignmentsConfig] =
-    CantonConfigValidatorDerivation[ReassignmentsConfig]
-}
+)

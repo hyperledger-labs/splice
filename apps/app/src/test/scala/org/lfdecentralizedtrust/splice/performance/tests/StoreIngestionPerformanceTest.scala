@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSin
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
 import io.circe.Json
+import java.lang.management.ManagementFactory
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,9 +32,20 @@ final case class StoreIngestionPerfMetrics(
     totalItems: Long,
     totalBatches: Long,
     totalTimeNs: BigDecimal,
+    processCpuTimeNs: BigDecimal,
+    peakHeapBytes: BigDecimal,
 ) {
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
+
+  /** Ratio of process CPU time to wall-clock time.
+    * Some thresholds we can use for rough classification:
+    * > 0.7 : CPU-bound
+    * 0.7 ~ 0.25: balanced
+    * < 0.25 : I/O-bound
+    */
+  def cpuToWallClockRatio: BigDecimal =
+    if (totalTimeNs > 0) processCpuTimeNs / totalTimeNs else BigDecimal(0)
 }
 
 abstract class StoreIngestionPerformanceTest(
@@ -136,6 +148,9 @@ abstract class StoreIngestionPerformanceTest(
     var totalTimeNs = BigDecimal(0)
     var totalItems = 0L
     var totalBatches = 0L
+    var totalCpuNs = BigDecimal(0)
+    var maxHeapBytes = BigDecimal(0)
+
     Source
       .fromIterator(() => txs.iterator)
       .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
@@ -149,13 +164,19 @@ abstract class StoreIngestionPerformanceTest(
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
-        val before = System.nanoTime()
+        val wallBefore = System.nanoTime()
+        val cpuBefore = getProcessCpuTimeNs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
-            val after = System.nanoTime()
-            val duration = after - before
+            val wallAfter = System.nanoTime()
+            val cpuAfter = getProcessCpuTimeNs
+            val duration = wallAfter - wallBefore
+            val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
             totalTimeNs += duration
+            totalCpuNs += cpuDeltaNs
+            val heapNow = getHeapUsedBytes
+            maxHeapBytes = maxHeapBytes.max(heapNow)
             totalItems += batch.length
             totalBatches += 1
             val avg = totalTimeNs / totalItems
@@ -165,13 +186,34 @@ abstract class StoreIngestionPerformanceTest(
             println(s"${this.getClass.getName}: $msg")
           }
       })
-      .map(_ =>
+      .map { _ =>
+        println(
+          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms, peak heap=$maxHeapBytes bytes"
+        )
+
         StoreIngestionPerfMetrics(
           totalItems = totalItems,
           totalBatches = totalBatches,
           totalTimeNs = totalTimeNs,
+          processCpuTimeNs = totalCpuNs,
+          peakHeapBytes = maxHeapBytes,
         )
-      )
+      }
+  }
+
+  /** Process-wide CPU time in nanoseconds.
+    * Returns -1 if not supported (treated as 0 by the caller via math.max).
+    */
+  private def getProcessCpuTimeNs: Long = {
+    ManagementFactory.getOperatingSystemMXBean match {
+      case osBean: com.sun.management.OperatingSystemMXBean => osBean.getProcessCpuTime
+      case _ => -1L
+    }
+  }
+
+  /** Process-wide current heap memory usage in bytes (point-in-time snapshot). */
+  private def getHeapUsedBytes: BigDecimal = {
+    BigDecimal(ManagementFactory.getMemoryMXBean.getHeapMemoryUsage.getUsed)
   }
 
   /** A separate Python script pushes the metrics to Prometheus Pushgateway.
@@ -211,6 +253,21 @@ abstract class StoreIngestionPerformanceTest(
             BigDecimal(completionEpochSec),
           ),
           metric("success", "Test run succeeded (1) or failed (0)", BigDecimal(successInt)),
+          metric(
+            "process_cpu_time_ns",
+            "Process-wide CPU time in nanoseconds (all cores combined)",
+            metrics.processCpuTimeNs,
+          ),
+          metric(
+            "peak_heap_bytes",
+            "Peak JVM heap memory usage in bytes observed across all ingestion batches",
+            metrics.peakHeapBytes,
+          ),
+          metric(
+            "cpu_to_wall_clock_ratio",
+            "Ratio of process CPU time to wall-clock time (>0.7=CPU-bound, 0.25~0.7=standard, <0.25=I/O-bound)",
+            metrics.cpuToWallClockRatio,
+          ),
         ),
       )
       .spaces2

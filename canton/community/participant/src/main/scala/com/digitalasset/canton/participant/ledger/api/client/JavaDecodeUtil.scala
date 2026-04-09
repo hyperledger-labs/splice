@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api.client
@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
   InterfaceCompanion,
+  UnknownTrailingFieldPolicy,
 }
 import com.daml.ledger.javaapi.data.{
   ArchivedEvent,
@@ -47,6 +48,14 @@ object JavaDecodeUtil {
       Some(companion.fromCreatedEvent(event))
     } else None
 
+  def decodeCreated[TC](
+      companion: ContractCompanion[TC, ?, ?],
+      policy: UnknownTrailingFieldPolicy,
+  )(event: JavaCreatedEvent): Option[TC] =
+    if (matchesTemplate(event.getTemplateId, event.getPackageName, companion.TEMPLATE_ID)) {
+      Some(companion.fromCreatedEvent(event, policy))
+    } else None
+
   def decodeCreated[Id, View](
       companion: InterfaceCompanion[?, Id, View]
   )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
@@ -56,6 +65,18 @@ object JavaDecodeUtil {
       )
     ) {
       Some(companion.fromCreatedEvent(event))
+    } else None
+
+  def decodeCreated[Id, View](
+      companion: InterfaceCompanion[?, Id, View],
+      policy: UnknownTrailingFieldPolicy,
+  )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
+    if (
+      event.getInterfaceViews.keySet.asScala.exists(
+        matchesTemplate(_, event.getPackageName, companion.TEMPLATE_ID)
+      )
+    ) {
+      Some(companion.fromCreatedEvent(event, policy))
     } else None
 
   def flatToCreated(transaction: JavaTransaction): Seq[JavaCreatedEvent] =
