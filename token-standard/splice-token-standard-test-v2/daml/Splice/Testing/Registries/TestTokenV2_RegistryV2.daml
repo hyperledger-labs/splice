@@ -18,6 +18,7 @@ module Splice.Testing.Registries.TestTokenV2_RegistryV2
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
 import Splice.TokenStandard.Utils
 
@@ -42,8 +43,8 @@ instance RegistryApi TestTokenV2Registry where
   getSettlementFactory = registryApi_getSettlementFactory
   getAllocation_WithdrawContext = registryApi_getEmptyContext
   getAllocation_CancelContext = registryApi_getCancelContext
-  getTransferInstruction_AcceptContext = registryApi_getEmptyContext
-  getTransferInstruction_RejectContext = registryApi_getEmptyContext
+  getTransferInstruction_AcceptContext = registryApi_getTransferOfferContext
+  getTransferInstruction_RejectContext = registryApi_getTransferOfferContext
   getTransferInstruction_WithdrawContext = registryApi_getEmptyContext
 
 
@@ -110,6 +111,16 @@ registryApi_getEmptyContext : Action a => TestTokenV2Registry -> ContractId t ->
 registryApi_getEmptyContext _registry _workflowCid _meta =
   pure OpenApiChoiceContext with
     disclosures = mempty
+    choiceContext = emptyChoiceContext
+
+registryApi_getTransferOfferContext : TestTokenV2Registry -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+registryApi_getTransferOfferContext registry instrCid _meta = do
+  Some instrView <- queryInterfaceContractId @V2.TransferInstruction registry.admin instrCid
+  lockedDs <- forA instrView.transfer.inputHoldingCids $ \holdingCid -> do
+    let tokenCid = coerceContractId holdingCid : ContractId Token
+    queryDisclosure' @Token registry.admin tokenCid
+  pure OpenApiChoiceContext with
+    disclosures = mconcat lockedDs
     choiceContext = emptyChoiceContext
 
 registryApi_getCancelContext

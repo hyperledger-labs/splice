@@ -36,6 +36,9 @@ data Transfer = Transfer with
     inputHoldingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
+      -- The holdings MUST be owned by the sender account, and match the
+      -- instrument specified by the transfer.
+      --
       -- MAY be empty if the registry supports automatic selection of holdings for transfers
       -- or does not represent holdings on-ledger.
       --

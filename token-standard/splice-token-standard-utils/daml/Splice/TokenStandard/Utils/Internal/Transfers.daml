@@ -6,6 +6,10 @@
 -- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
 module Splice.TokenStandard.Utils.Internal.Transfers (
 
+  -- * Validation
+  isValidTransferV2,
+
+  -- * Default implementations
   transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1,
   transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1,
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
@@ -20,7 +24,12 @@ module Splice.TokenStandard.Utils.Internal.Transfers (
   transferInstruction_acceptDefaultExtraObservers,
   transferInstruction_rejectDefaultExtraObservers,
   transferInstruction_withdrawDefaultExtraObservers,
+  -- * Available actions
+  transferInstructionV2_availableActionsDefault,
 ) where
+
+
+import DA.Map qualified as Map
 
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
@@ -28,6 +37,18 @@ import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
 
+
+-- Validation
+-------------
+
+-- | Check basic invariants of a `V2.Transfer`.
+isValidTransferV2 : TransferInstructionV2.Transfer -> Bool
+isValidTransferV2 TransferInstructionV2.Transfer{..} =
+    amount > 0.0 &&
+    requestedAt <= executeBefore &&
+    -- No account meta allowed on the leg for sender or receiver to avoid confusion
+    validateNoAccountMeta "sender" meta &&
+    validateNoAccountMeta "receiver" meta
 
 
 -- TransferInstruction
@@ -201,3 +222,10 @@ transferInstruction_rejectDefaultExtraObservers this _arg = observer this
 transferInstruction_withdrawDefaultExtraObservers
   : HasObserver t => t -> TransferInstructionV2.TransferInstruction_Withdraw -> [Party]
 transferInstruction_withdrawDefaultExtraObservers this _arg = observer this
+
+-- | Available actions for a V2 transfer that uses the default controllers for its actions.
+transferInstructionV2_availableActionsDefault : TransferInstructionV2.Transfer -> Map.Map [Party] [TransferInstructionV2.TransferInstructionAction]
+transferInstructionV2_availableActionsDefault transfer = Map.fromList
+  [ ([transfer.sender.owner], [TransferInstructionV2.TIA_Withdraw])
+  , ([transfer.receiver.owner], [TransferInstructionV2.TIA_Accept, TransferInstructionV2.TIA_Reject])
+  ]
