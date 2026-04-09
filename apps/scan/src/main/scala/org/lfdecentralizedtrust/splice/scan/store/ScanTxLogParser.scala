@@ -444,7 +444,7 @@ class ScanTxLogParser(
               State(txLogEntry)
             }
           // Token Standard V2: the Scan txlog will go away so we don't bother parsing it
-          case AllocationFactoryV2Allocate(_) | SettlementFactorySettle(_) =>
+          case AllocationFactoryV2Allocate(_) | AllocationV2Settle(_) =>
             State.empty
           case _ =>
             parseTrees(

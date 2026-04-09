@@ -104,19 +104,20 @@ final object AllocationFactoryAllocate
         splice.api.token.allocationinstructionv1.AllocationFactory.CHOICE_AllocationFactory_Allocate,
     )
 
-final object AllocationFactoryV2Allocate extends InterfaceExerciseNodeCompanion.Mk(
-  interface = splice.api.token.allocationinstructionv2.AllocationFactory.INTERFACE,
-  template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
-  choice =
-    splice.api.token.allocationinstructionv2.AllocationFactory.CHOICE_AllocationFactory_Allocate,
-)
+final object AllocationFactoryV2Allocate
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.allocationinstructionv2.AllocationFactory.INTERFACE,
+      template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
+      choice =
+        splice.api.token.allocationinstructionv2.AllocationFactory.CHOICE_AllocationFactory_Allocate,
+    )
 
-final object SettlementFactorySettle extends InterfaceExerciseNodeCompanion.Mk(
-  interface = splice.api.token.allocationv2.SettlementFactory.INTERFACE,
-  template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
-  choice =
-    splice.api.token.allocationv2.SettlementFactory.CHOICE_SettlementFactory_SettleBatch,
-)
+final object AllocationV2Settle
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.allocationv2.Allocation.INTERFACE,
+      template = splice.amuletallocationv2.AmuletAllocationV2.COMPANION,
+      choice = splice.api.token.allocationv2.Allocation.CHOICE_Allocation_Settle,
+    )
 
 final object AllocationExecuteTransfer
     extends InterfaceExerciseNodeCompanion.Mk(

@@ -84,6 +84,7 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferPreapproval_SendV2,
   AllocationFactoryAllocate,
   AllocationFactoryV2Allocate,
+  AllocationV2Settle,
   AllocationExecuteTransfer,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
@@ -1089,6 +1090,10 @@ class UserWalletTxLogParser(
                     )
                   )
               }
+            }
+          case AllocationV2Settle(_) =>
+            now {
+              State.empty
             }
           case AllocationExecuteTransfer(node) =>
             defer {
