@@ -96,7 +96,7 @@ class TokenStandardV2AllocationIntegrationTest
       settlementInfo,
       otcTrade.data.transferLegs,
       allocations.asJava,
-      /* extraReceiptAuthorizers =*/ List(aliceParty, bobParty).map(basicAccount).asJava,
+      /* extraReceiptAuthorizers =*/ java.util.List.of(),
       /*actors = */ java.util.List.of(aliceParty.toProtoPrimitive, bobParty.toProtoPrimitive),
       emptyExtraArgs,
     )
