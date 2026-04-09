@@ -652,7 +652,7 @@ class ScanTimeBasedIntegrationTest
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(
         ByteString(out.toByteArray),
-        io.circe.parser.decode[definitions.CreatedEvent],
+        io.circe.parser.decode[definitions.ActiveContract],
       )
       acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
 
