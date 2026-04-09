@@ -37,9 +37,12 @@ monitoring:
     alerts:
       acsCommitments:
         checkpointDelay:
-          seconds: 600
+          seconds: 1200
         completedDelay:
           seconds: 3600
+      acsSnapshots:
+        saveLatencyThresholdSeconds: 2700
+        updateLatencyThresholdSeconds: 3
       cloudSql:
         maintenance: false
       cometbft:
@@ -52,6 +55,16 @@ monitoring:
         thresholdPerNamespace: 0.05
       deployment:
         pendingPeriodMinutes: 5
+      gcpQuotas:
+        excludedApproachingMetrics: []
+        excludedMetrics:
+          - 'cloudkms.googleapis.com/read_requests'
+          - 'cloudkms.googleapis.com/write_requests'
+          - 'cloudkms.googleapis.com/crypto_requests'
+          - 'cloudkms.googleapis.com/hsm_symmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_generate_random_requests'
+          - 'cloudkms.googleapis.com/external_kms_requests'
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
@@ -246,6 +259,9 @@ sv:
         /api/scan/v0/rewards-collected:
           name: 'rewards-collected'
           type: 'banned'
+        /api/scan/v0/roll-forward-lsu:
+          name: 'rollForwardLsu'
+          type: 'unlimited'
         /api/scan/v0/round-of-latest-data:
           name: 'round-of-latest-data'
           type: 'banned'

@@ -123,11 +123,16 @@ monitoring:
       acsCommitments:
         checkpointDelay:
           # Usually every 30s but while the commitment every 30min gets computed
-          # it gets blocked so we allow up to 10min
-          seconds: 600
+          # it gets blocked so we allow up to 20min
+          seconds: 1200
         completedDelay:
           # Usually every 30min, we allow up to 1h to avoid false positives.
           seconds: 3600
+      acsSnapshots:
+        # This task repeats every ~3h
+        saveLatencyThresholdSeconds: 2700
+        # This task repeats every ~30sec
+        updateLatencyThresholdSeconds: 3
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5
@@ -135,6 +140,22 @@ monitoring:
         # Multiplier applied to a wallet sweep's configured maxBalance to set the alert threshold.
         # 1.5 means the alert fires if the balance is 50% higher than expected.
         tolerance: 1.5
+      gcpQuotas:
+        # Quota metric names to exclude from all GCP quota alerts.
+        # Each entry is matched exactly for quota exceeded.
+        # Prefer `excludedApproachingMetrics` to ignore only the >90% alerts.
+        excludedMetrics:
+          - cloudkms.googleapis.com/read_requests
+          - cloudkms.googleapis.com/write_requests
+          - cloudkms.googleapis.com/crypto_requests
+          - cloudkms.googleapis.com/hsm_symmetric_requests
+          - cloudkms.googleapis.com/hsm_asymmetric_requests
+          - cloudkms.googleapis.com/hsm_generate_random_requests
+          - cloudkms.googleapis.com/external_kms_requests
+        # Quota metric names to exclude only from the "approaching limit" (>90%) alerts.
+        # These metrics will still trigger the "quota exceeded" alert.
+        # GCP is more forgiving of larger sets in this value.
+        excludedApproachingMetrics: []
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')

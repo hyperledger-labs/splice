@@ -260,6 +260,19 @@ class TokenStandardCliIntegrationTest
           )
         }
       }
+
+      clue(
+        "SV1 scan API (/vX/updates/hash/{hash}) should return the update with external txn hash"
+      ) {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareExtTxnHashViaScanAPIForHash(
+            scanClient,
+            onboardingBobExtPartySetupResult.updateId,
+            onboardingBobExtPartySetupResult.txHash,
+          )
+        }
+      }
     }
   }
 
