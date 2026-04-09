@@ -58,6 +58,7 @@ abstract class PackageVettingTrigger(
           dsoRules.contractId.toString,
         ) ++ voteRequests.map(_.toString) ++ additionalPackagesToUnvet.map(_.toString()),
         previouslyRunInputRefForVetting,
+        "vetting",
       )(
         vetting.vetPackages(
           domainId,
@@ -73,7 +74,8 @@ abstract class PackageVettingTrigger(
           amuletRules.payload.configSchedule.initialValue.packageConfig.toString
         ) ++ additionalPackagesToUnvet.map(_.toString()),
         previouslyRunInputRefForUnvetting,
-        enableUnvetting && enableUnsupportedDarsUnvetting,
+        "unvetting",
+        enabled = enableUnvetting && enableUnsupportedDarsUnvetting,
       )(
         vetting.unvetPackages(
           domainId,
@@ -88,18 +90,18 @@ abstract class PackageVettingTrigger(
   private def runIfInputChanged(
       input: Seq[String],
       reference: AtomicReference[Set[String]],
-      isEnabled: Boolean = true,
+      keyword: String,
+      enabled: Boolean = true,
   )(run: => Future[Unit])(implicit tc: TraceContext) = {
     val previouslyRunInput = reference.get()
-    val keyWord = if (reference == previouslyRunInputRefForVetting) "vetting" else "unvetting"
-    if (previouslyRunInput != input.toSet && isEnabled) {
+    if (previouslyRunInput != input.toSet && enabled) {
       logger.info(
-        s"Running package $keyWord as the input has changed from $previouslyRunInput to $input"
+        s"Running package $keyword as the input has changed from $previouslyRunInput to $input"
       )
       run.map(_ => reference.set(input.toSet))
     } else {
       logger.debug(
-        s"Not running package $keyWord as the input has not changed from $previouslyRunInput or the mechanism is disabled by configuration."
+        s"Not running package $keyword as the input has not changed from $previouslyRunInput or the mechanism is disabled by configuration."
       )
       Future.unit
     }

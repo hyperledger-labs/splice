@@ -88,13 +88,13 @@ object DarResourcesUtil extends NamedLogging {
     val allSupportedVersionsPackageIds =
       packageResources
         .flatMap { pkg =>
-          val upToRequiredVersion = packageConfigMap.getOrElse(
+          val versionFromAmuletRules = packageConfigMap.getOrElse(
             pkg.latest.metadata.name,
             pkg.latest.metadata.version,
           )
           getRequiredPackageVersions(
             pkg.latest.metadata.name,
-            upToRequiredVersion,
+            versionFromAmuletRules,
             enableUnsupportedDarsUnvetting,
             latestPackagesOnly,
             additionalPackageIdsToUnvet,

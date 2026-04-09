@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigUtil,
   PackageUnvettingUtil,
   UploadablePackage,
+  WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.concurrent.PatienceConfiguration
@@ -36,7 +37,8 @@ import scala.concurrent.duration.FiniteDuration
 class UnsupportedPackageVettingIntegrationTest
     extends IntegrationTest
     with PackageUnvettingUtil
-    with AmuletConfigUtil {
+    with AmuletConfigUtil
+    with WalletTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -193,6 +195,7 @@ class UnsupportedPackageVettingIntegrationTest
             synchronizerId,
           ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
         }
+        alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
       }
   }
 }
