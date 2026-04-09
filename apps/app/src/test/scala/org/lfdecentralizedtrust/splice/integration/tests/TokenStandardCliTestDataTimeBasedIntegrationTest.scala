@@ -1001,12 +1001,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
     }
 
-    aliceWalletClient.allocateAmulet(createAllocationSpec("leg-1"))
-    aliceWalletClient.allocateAmulet(createAllocationSpec("leg-2"))
-
-    eventually() {
-      aliceWalletClient.list().lockedAmulets should have length 2
-    }
+    actAndCheck(
+      "Alice creates two AmuletAllocations", {
+        aliceWalletClient.allocateAmulet(createAllocationSpec("leg-1"))
+        aliceWalletClient.allocateAmulet(createAllocationSpec("leg-2"))
+      },
+    )(
+      "Alice's wallet shows 2 locked amulets",
+      _ => aliceWalletClient.list().lockedAmulets should have length 2,
+    )
 
     val allocations =
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -1046,7 +1049,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
       aliceWalletClient.list().lockedAmulets shouldBe empty
 
-      aliceWalletClient.list().amulets.length shouldBe (amuletsBeforeExpiry + 2)
+      aliceWalletClient.list().amulets should have length (amuletsBeforeExpiry + 2).toLong
     }
   }
 
