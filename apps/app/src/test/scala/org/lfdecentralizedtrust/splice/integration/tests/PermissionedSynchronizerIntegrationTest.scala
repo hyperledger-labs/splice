@@ -95,16 +95,22 @@ class PermissionedSynchronizerIntegrationTest
       val aliceParty = aliceValidatorBackend.getValidatorPartyId()
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
 
-      sv1Backend.grantValidatorPermission(aliceParty, aliceParticipantId)
-
       val allSvs = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
 
-      eventually() {
-        for (sv <- allSvs) {
-          sv.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(ValidatorPermission.COMPANION)(dsoParty) should have size 1
-        }
-      }
+      actAndCheck(
+        "Grant validator permission to Alice",
+        sv1Backend.grantValidatorPermission(aliceParty, aliceParticipantId),
+      )(
+        "Verify visibility across all SVs",
+        _ => {
+          for (sv <- allSvs) {
+            clue(s"Checking visibility on ${sv.name}") {
+              sv.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(ValidatorPermission.COMPANION)(dsoParty) should have size 1
+            }
+          }
+        },
+      )
     }
 
   }

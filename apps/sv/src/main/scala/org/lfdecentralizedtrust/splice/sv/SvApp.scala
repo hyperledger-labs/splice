@@ -57,7 +57,11 @@ import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
-import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  AppStoreWithIngestion,
+  MultiDomainAcsStore,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.admin.http.{
@@ -857,30 +861,48 @@ object SvApp {
 
     for {
       dsoRules <- store.getDsoRules()
-      cmd = dsoRules.exercise(
-        _.exerciseDsoRules_GrantValidatorPermission(
-          svParty.toProtoPrimitive,
-          validatorPartyId,
-          validatorParticipantId,
-        )
+      queryResult <- store.lookupValidatorPermissionWithOffset(
+        com.digitalasset.canton.topology.PartyId.tryFromProtoPrimitive(validatorPartyId)
       )
-      res <- retryProvider.retryForClientCalls(
-        "grantValidatorPermission",
-        "grant validator permission via DsoRules",
-        for {
-          res <- dsoStoreWithIngestion
-            .connection(SpliceLedgerConnectionPriority.Low)
-            .submit(
-              actAs = Seq(svParty),
-              readAs = Seq(dsoParty),
-              update = cmd,
+
+      res <- queryResult match {
+        case MultiDomainAcsStore.QueryResult(_, Some(permission)) =>
+          Future.successful(Right(permission.contractId))
+
+        case MultiDomainAcsStore.QueryResult(offset, None) =>
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_GrantValidatorPermission(
+              svParty.toProtoPrimitive,
+              validatorPartyId,
+              validatorParticipantId,
             )
-            .noDedup
-            .yieldResult()
-        } yield res,
-        logger,
-      )
-    } yield Right(res.exerciseResult.permissionCid)
+          )
+
+          retryProvider.retryForClientCalls(
+            "grantValidatorPermission",
+            "grant validator permission via DsoRules",
+            for {
+              submitRes <- dsoStoreWithIngestion
+                .connection(SpliceLedgerConnectionPriority.Low)
+                .submit(
+                  actAs = Seq(svParty),
+                  readAs = Seq(dsoParty),
+                  update = cmd,
+                )
+                .withDedup(
+                  commandId = SpliceLedgerConnection.CommandId(
+                    "org.lfdecentralizedtrust.splice.sv.grantValidatorPermission",
+                    Seq(svParty, dsoParty),
+                    validatorPartyId,
+                  ),
+                  deduplicationOffset = offset,
+                )
+                .yieldResult()
+            } yield Right(submitRes.exerciseResult.permissionCid),
+            logger,
+          )
+      }
+    } yield res
   }
 
   // TODO(DACH-NY/canton-network-node#5364): move this and like functions into appropriate utility namespaces

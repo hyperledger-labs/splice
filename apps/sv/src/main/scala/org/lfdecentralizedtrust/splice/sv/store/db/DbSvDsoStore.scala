@@ -1134,6 +1134,35 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
+  override def lookupValidatorPermissionWithOffset(
+      validator: PartyId
+  )(implicit tc: TraceContext): Future[
+    MultiDomainAcsStore.QueryResult[Option[Contract[
+      splice.validatorpermission.ValidatorPermission.ContractId,
+      splice.validatorpermission.ValidatorPermission,
+    ]]]
+  ] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DsoTables.acsTableName,
+            acsStoreId,
+            domainMigrationId,
+            splice.validatorpermission.ValidatorPermission.COMPANION,
+            where = sql"""validator = $validator""",
+            orderLimit = sql"limit 1",
+          ).headOption,
+          "lookupValidatorPermissionWithOffset",
+        )
+    } yield MultiDomainAcsStore.QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(
+        contractFromRow(splice.validatorpermission.ValidatorPermission.COMPANION)(_)
+      ),
+    )).getOrRaise(offsetExpectedError())
+  }
+
   override def listValidatorLicensePerValidator(validator: String, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
