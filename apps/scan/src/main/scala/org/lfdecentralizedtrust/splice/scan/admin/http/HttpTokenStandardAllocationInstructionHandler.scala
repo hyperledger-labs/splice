@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.scan.util
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, DarResourcesUtil}
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2
-import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2
 
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
