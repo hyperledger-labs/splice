@@ -1,0 +1,113 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | A representation of the V2 off-ledger registry API of a token standard V2 compatible asset registry.
+module Splice.Testing.TokenStandard.RegistryApiV2
+  ( RegistryApi(..)
+
+  -- * Generic registry support
+  , GenericRegistry(..)
+  , mkGenericRegistry
+  ) where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV2 qualified as V2
+import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
+
+import Splice.Testing.Utils
+
+import Daml.Script
+
+-- | Type-class for simulating calls to the off-ledger API of a registry.
+--
+-- The function names match the names of the handlers defined in the OpenAPI specification.
+class RegistryApi app where
+
+  getTransferFactory
+    : app -> V2.TransferFactory_Transfer
+    -> Script (EnrichedFactoryChoice V2.TransferFactory V2.TransferFactory_Transfer)
+
+  getAllocationFactory
+    : app -> V2.AllocationFactory_Allocate
+    -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_Allocate)
+
+  getSettlementFactory
+    : app -> V2.SettlementFactory_SettleBatch
+    -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
+
+  getAllocation_WithdrawContext
+    : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocation_CancelContext
+    : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_AcceptContext
+    : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_RejectContext
+    : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_WithdrawContext
+    : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+
+-- Generic registry support
+---------------------------
+
+-- | Generic type to hold any registry implementation, used for testing multi-registry scenarios.
+--
+-- List all functiions explicitly instead of capturing the type-class dictionary, as Daml does
+-- not support existential types.
+--
+-- TODO(tech-debt): define registries directly as an instance of this type.
+data GenericRegistry = GenericRegistry with
+  ggetTransferFactory
+    : V2.TransferFactory_Transfer
+    -> Script (EnrichedFactoryChoice V2.TransferFactory V2.TransferFactory_Transfer)
+
+  ggetAllocationFactory
+    : V2.AllocationFactory_Allocate
+    -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_Allocate)
+
+  ggetSettlementFactory
+    : V2.SettlementFactory_SettleBatch
+    -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
+
+  ggetAllocation_WithdrawContext
+    : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  ggetAllocation_CancelContext
+    : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  ggetTransferInstruction_AcceptContext
+    : ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  ggetTransferInstruction_RejectContext
+    : ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  ggetTransferInstruction_WithdrawContext
+    : ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+-- | Create a 'GenericRegistry' from any specific registry implementation.
+mkGenericRegistry : (RegistryApi app) => app -> GenericRegistry
+mkGenericRegistry app =
+  GenericRegistry with
+    ggetTransferFactory = getTransferFactory app
+    ggetAllocationFactory = getAllocationFactory app
+    ggetSettlementFactory = getSettlementFactory app
+    ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
+    ggetAllocation_CancelContext = getAllocation_CancelContext app
+    ggetTransferInstruction_AcceptContext = getTransferInstruction_AcceptContext app
+    ggetTransferInstruction_RejectContext = getTransferInstruction_RejectContext app
+    ggetTransferInstruction_WithdrawContext = getTransferInstruction_WithdrawContext app
+
+instance RegistryApi GenericRegistry where
+  getTransferFactory registry = registry.ggetTransferFactory
+  getAllocationFactory registry = registry.ggetAllocationFactory
+  getSettlementFactory registry = registry.ggetSettlementFactory
+  getAllocation_WithdrawContext registry = registry.ggetAllocation_WithdrawContext
+  getAllocation_CancelContext registry = registry.ggetAllocation_CancelContext
+  getTransferInstruction_AcceptContext registry = registry.ggetTransferInstruction_AcceptContext
+  getTransferInstruction_RejectContext registry = registry.ggetTransferInstruction_RejectContext
+  getTransferInstruction_WithdrawContext registry = registry.ggetTransferInstruction_WithdrawContext

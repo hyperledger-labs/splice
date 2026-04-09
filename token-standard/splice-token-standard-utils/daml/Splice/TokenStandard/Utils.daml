@@ -1,0 +1,152 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utilities to implement token standard templates and choices.
+module Splice.TokenStandard.Utils (
+
+  -- * Utilities for both allocation and transfer workflows
+
+  -- ** Accounts
+  basicAccount,
+  isBasicAccount,
+  accountParties,
+
+  ensureBasicAccount,
+  ensureNoAccountMeta,
+
+  -- ** Requirements checking
+  require,
+  require',
+  isMemberR,
+  isEqualR,
+  isEqualSetR,
+  isSubsetOfR,
+  oneOfR,
+  notR,
+  isGreaterOrEqualR,
+  isGreaterR,
+  isLessR,
+  isLessOrEqualR,
+
+  requireMatchExpected,
+  requireUnique,
+
+  -- ** Actors pattern
+  checkActor,
+  checkActors,
+  archiveAndCheckActors,
+
+  -- ** Public fetch implementation
+  publicFetchDefaultImpl,
+
+  -- * AnyContractId conversion
+  fromAnyContractId,
+  toAnyContractId,
+
+  -- * Missing TextMap utilities
+
+  -- TODO(#4865): upstream these to the Daml stdlib
+  textMapUnionWith,
+  textMapSingleton,
+  textMapValues,
+  textMapKeys,
+  textMapZip,
+  textMapZipWithDefault,
+  textMapTraverseWithKey,
+
+  -- * API type conversions
+  BackwardCompatible(..),
+  ForwardCompatible(..),
+
+
+  -- * Allocation workflows
+
+  -- ** Utilities for allocations
+  allocationAdmin,
+  netAllocationCreditAmounts,
+  filterLegsForAccount,
+  splitLegsByAdmin,
+  splitLegsByAuthorizer,
+
+  -- ** Allocation implementation
+
+  -- *** Ensures clauses
+  isValidSettlementInfoV1,
+  isValidAllocationSpecificationV1,
+
+  isValidSettlementInfoV2,
+  isValidAllocationSpecificationV2,
+
+  -- *** Available actions
+  allocationV1_availableActionsDefault,
+  allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
+  upcast_v1_v2_Allocation,
+
+  -- *** Choices
+  allocationV2_settleDefaultImplUsingV1,
+  allocationV2_withdrawDefaultImplUsingV1,
+  allocationV2_cancelDefaultImplUsingV1,
+
+  -- ** Settlement factory implementation
+  settlementFactoryV2_settleBatchDefaultImpl,
+  settlementFactoryV2_defaultCreateReceiptAllocation,
+
+  -- *** Support for custom batch settlement
+  PreparedAllocations(..),
+  validateAndPrepareAllocations,
+
+  -- * Allocation request implementation
+
+  -- ** V1 defaults
+  allocationRequestV1_rejectDefaultImpl,
+  allocationRequestV1_withdrawDefaultImpl,
+
+  -- ** V2 defaults
+  allocationRequestV2_acceptDefaultExtraObservers,
+  allocationRequestV2_rejectDefaultExtraObservers,
+  allocationRequestV2_withdrawDefaultExtraObservers,
+
+  allocationRequestV2_acceptDefaultImpl,
+
+  -- ** V2 for dual version templates
+  allocationRequestV2_rejectDefaultImplUsingV1,
+  allocationRequestV2_withdrawDefaultImplUsingV1,
+
+  -- ** V2 for V2-only templates
+  allocationRequestV2_rejectDefaultImplV2Only,
+  allocationRequestV2_withdrawDefaultImplV2Only,
+  -- TODO(#4517): ensure these functions are tested
+
+  -- * Allocation factory implementations
+
+  -- ** V2 Choice observers
+  allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl,
+  allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl,
+
+
+  -- * Transfer factory implementations
+  transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1,
+  transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1,
+  transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
+
+  transferFactory_v2_senderActor_transferImpl,
+
+  -- ** TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl,
+
+  -- ** TransferInstruction extra observers
+  transferInstruction_acceptDefaultExtraObservers,
+  transferInstruction_rejectDefaultExtraObservers,
+  transferInstruction_withdrawDefaultExtraObservers,
+) where
+
+
+import Splice.TokenStandard.Utils.Internal.Conversions
+import Splice.TokenStandard.Utils.Internal.Choices
+import Splice.TokenStandard.Utils.Internal.Transfers
+import Splice.TokenStandard.Utils.Internal.Allocations
+

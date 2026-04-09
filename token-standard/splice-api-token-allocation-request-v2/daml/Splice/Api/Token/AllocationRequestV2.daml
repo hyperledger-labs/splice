@@ -1,0 +1,163 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | V2 of the AllocationRequest interface, which is used by applications
+-- to inform their users that they should create allocations for a specific settlement.
+--
+-- Users may view and react to these requests using for example a token standard
+-- wallet or custom automation that uses the Ledger API directly.
+module Splice.Api.Token.AllocationRequestV2 where
+
+import DA.Map as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2
+
+-- | A request by an app for allocations to be created to enable the execution of a settlement.
+--
+-- Apps MAY use one or more requests per settlement, depending on their needs
+-- and confidentiality requirements.
+--
+-- Apps SHOULD have as contract observers both the owners and providers of all
+-- accounts that need to create requested allocations.
+interface AllocationRequest where
+  viewtype AllocationRequestView
+
+  allocationRequest_acceptImpl
+    : ContractId AllocationRequest -> AllocationRequest_Accept -> Update AllocationRequest_AcceptResult
+  allocationRequest_rejectImpl
+    : ContractId AllocationRequest -> AllocationRequest_Reject -> Update AllocationRequest_RejectResult
+  allocationRequest_withdrawImpl
+    : ContractId AllocationRequest -> AllocationRequest_Withdraw -> Update AllocationRequest_WithdrawResult
+
+  allocationRequest_rejectExtraObservers : AllocationRequest_Reject -> [Party]
+  allocationRequest_acceptExtraObservers : AllocationRequest_Accept -> [Party]
+  allocationRequest_withdrawExtraObservers : AllocationRequest_Withdraw -> [Party]
+
+  nonconsuming choice AllocationRequest_Accept : AllocationRequest_AcceptResult
+    -- ^ Signal to settlement.executors that the requested allocations will be
+    -- created before `settlement.settleAt`.
+    --
+    -- Wallets SHOULD call this choice in the same transaction as the creation
+    -- of the requested allocation to protect from creating the same
+    -- allocation multiple times.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation request is
+    -- consumed by the body of this choice.
+    with
+      actors : [Party]
+        -- ^ The parties accepting the allocation request.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized acceptance.
+        --
+        -- Implementations SHOULD allow calling this choice for all parties that
+        -- can create an allocation matching this request.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    observer allocationRequest_acceptExtraObservers this arg
+    controller actors
+    do allocationRequest_acceptImpl this self arg
+
+  nonconsuming choice AllocationRequest_Reject : AllocationRequest_RejectResult
+    -- ^ Reject an allocation request to signal that no allocation will be created for it.
+    --
+    -- The choice is nonconsuming to support alternative consumption patterns.
+    -- e.g., by calling the consuming V1.AllocationRequest_Reject choice for
+    -- transaction parsing compatibility.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation request is
+    -- consumed by the body of this choice.
+    with
+      actors : [Party]
+        -- ^ The parties rejecting the allocation request.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized rejection.
+        --
+        -- Implementations SHOULD allow calling this choice for all parties that
+        -- can create an allocation matching this request.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    observer allocationRequest_rejectExtraObservers this arg
+    controller actors
+    do allocationRequest_rejectImpl this self arg
+
+  nonconsuming choice AllocationRequest_Withdraw : AllocationRequest_WithdrawResult
+    -- ^ Withdraw an allocation request as the executors.
+    --
+    -- The choice is nonconsuming to support alternative consumption patterns,
+    -- e.g., by calling the consuming V1.AllocationRequest_Withdraw choice for
+    -- transaction parsing compatibility.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation request is
+    -- consumed by the body of this choice.
+    with
+      actors : [Party]
+        -- ^ The parties withdrawing the allocation request.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized withdrawal.
+        --
+        -- Implementations SHOULD allow the `settlement.executors` to jointly
+        -- call this choice.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    observer allocationRequest_withdrawExtraObservers this arg
+    controller actors
+    do allocationRequest_withdrawImpl this self arg
+
+-- | Actions available on an allocation request.
+data AllocationRequestAction
+    = ARA_Accept
+    | ARA_Reject
+    | -- | Used to represent app-specific actions on allocation requests.
+      ARA_Custom with
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        description : Text
+          -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
+    deriving (Show, Eq)
+
+-- | View of an `AllocationRequest`.
+data AllocationRequestView = AllocationRequestView with
+    authorizer : Account
+      -- ^ Account that is asked to create allocations for this request.
+      --
+      -- Wallets SHOULD use this field to determine whether a request requires
+      -- user action or is informational only.
+    settlement : SettlementInfo
+      -- ^ Settlement for which allocations are requested to be created.
+    transferLegs : [TransferLeg]
+      -- ^ Transfer legs that are requested to be authorized for execution as
+      -- part of the settlement.
+      --
+      -- This may or may not be a complete list of transfer legs that are part of the settlement,
+      -- depending on the confidentiality requirements of the app.
+    availableActions : Map.Map [Party] [AllocationRequestAction]
+      -- ^ The actions that the wallet can present to the user on the allocation request.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, app-specific delegation contracts to be in place.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation request, used for extensibility.
+  deriving (Show, Eq)
+
+data AllocationRequest_AcceptResult = AllocationRequest_AcceptResult with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of accepting the allocation request, used for extensibility.
+  deriving (Show, Eq)
+
+data AllocationRequest_RejectResult = AllocationRequest_RejectResult with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of rejecting the allocation request, used for extensibility.
+  deriving (Show, Eq)
+
+data AllocationRequest_WithdrawResult = AllocationRequest_WithdrawResult with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of withdrawing the allocation request, used for extensibility.
+  deriving (Show, Eq)

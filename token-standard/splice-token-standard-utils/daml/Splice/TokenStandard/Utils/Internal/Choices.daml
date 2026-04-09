@@ -1,0 +1,243 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Internal modules defining utility functions for implementing token standard v2 choices.
+--
+-- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
+module Splice.TokenStandard.Utils.Internal.Choices (
+
+  -- * Requirements checking
+  require,
+  require',
+  requireMatchExpected,
+  requireUnique,
+
+  -- ** Common predicates
+  isMemberR,
+  isEqualR,
+  isEqualSetR,
+  isSubsetOfR,
+  notR,
+  oneOfR,
+  isGreaterOrEqualR,
+  isGreaterR,
+  isLessR,
+  isLessOrEqualR,
+
+  -- * Choice implementations
+  publicFetchDefaultImpl,
+
+  -- * Actors pattern
+  checkActor,
+  checkActors,
+  archiveAndCheckActors,
+
+
+  -- * Holding metadata
+
+  -- TODO(#4550): check whether this export is required once we know how v2 tx parsing will work
+  reasonMetaKey,
+  txKindMetaKey,
+
+  -- * Missing TextMap utilities
+  textMapUnionWith,
+  textMapSingleton,
+  textMapValues,
+  textMapKeys,
+  textMapZip,
+  textMapZipWithDefault,
+  textMapTraverseWithKey,
+) where
+
+import DA.Map qualified as Map
+import DA.Text qualified as T
+import DA.TextMap qualified as TextMap
+import DA.Set qualified as Set
+
+
+-- Requirements checking
+------------------------
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+-- | Improved variant of 'require' that checks a requirement and raises a
+-- user-friendly error in case the requirement is not met.
+require'
+  : (Show a, Show b)
+  => (Text, a)
+     -- ^ Left-hand side with description.
+  -> (Text, a -> b -> Bool)
+     -- ^ Predicate to check
+  -> (Text, b)
+     -- ^ Right-hand side with description.
+  -> Update ()
+require' (desc1, v1) (descFailure, predicate) (desc2, v2)
+  | predicate v1 v2 = pure ()
+  | otherwise = fail $ T.unlines
+      [ "'" <> desc1 <> "' " <> descFailure <> " '" <> desc2 <> "'."
+      , desc1 <> ": " <> show v1
+      , desc2 <> ": " <> show v2
+      ]
+
+-- | Predicate to check equality.
+isEqualR : Eq a => (Text, a -> a -> Bool)
+isEqualR = ("is not equal to", (==))
+
+-- | Predicate to check >=.
+isGreaterOrEqualR : Ord a => (Text, a -> a -> Bool)
+isGreaterOrEqualR = ("is less than", (>=))
+
+-- | Predicate to check >.
+isGreaterR : Ord a => (Text, a -> a -> Bool)
+isGreaterR = ("is not greater than", (>))
+
+-- | Predicate to check <.
+isLessR : Ord a => (Text, a -> a -> Bool)
+isLessR = ("is not less than", (<))
+
+-- | Predicate to check <=.
+isLessOrEqualR : Ord a => (Text, a -> a -> Bool)
+isLessOrEqualR = ("is greater than", (<=))
+
+-- | Predicate to check list membership.
+isMemberR : Ord a => (Text, a -> [a] -> Bool)
+isMemberR = ("is not a member of", elem)
+
+-- | Predicate to test that the list on the LHS is a subset of the list on the RHS.
+isSubsetOfR : Ord a => (Text, [a] -> [a] -> Bool)
+isSubsetOfR = ("is not a subset of", \x y -> Set.fromList x `Set.isSubsetOf` Set.fromList y)
+
+-- | Predicate to check equality of two lists interpreted as sets, i.e.,
+-- ignoring the order and count of elements.
+isEqualSetR : Ord a => (Text, [a] -> [a] -> Bool)
+isEqualSetR = ("does not have the same elements as", \x y -> Set.fromList x == Set.fromList y)
+
+-- | Predicte combinator that requires the given predicate to be true for one of
+-- the elements on the RHS.
+oneOfR : (Text, a -> b -> Bool) -> (Text, a -> [b] -> Bool)
+oneOfR (descFailure, predicate) = (descFailure <> " one of", \x ys -> any (predicate x) ys)
+
+notR : (Text, a -> b -> Bool) -> (Text, a -> b -> Bool)
+notR (descFailure, predicate)
+  | newFailureDesc == descFailure = error $ "notR: the description does contain 'not ': "  <> descFailure
+  | otherwise = (newFailureDesc, \x y -> not (predicate x y))
+  where
+    newFailureDesc = T.replace "not " "" descFailure
+
+-- | Abbreviation to check that an actual value matches its expected value.
+requireMatchExpected : (Eq a, Show a) => (Text, a) -> a -> Update ()
+requireMatchExpected actual expected = require' actual isEqualR ("expected value", expected)
+
+-- | Check that the elements in a list are unique, and raise a user-friendly message if not.
+requireUnique : (Ord a, Show a) => Text -> [a] -> Update ()
+requireUnique description xs
+  | Prelude.null duplicates = pure ()
+  | otherwise = fail $ T.unlines $
+      "Expected unique " <> description <> ", but found duplicates:" :: map show duplicates
+  where
+   groups = Map.fromListWithR (++) [(x, [x]) | x <- xs]
+   duplicates = [x | (x, occurrences) <- Map.toList groups, length occurrences > 1]
+
+
+-- Actors pattern
+-----------------
+
+-- | Check that the actor is one of the allowed actors.
+--
+-- Useful for V1 implementations that use a single actor.
+checkActor : Party -> [Party] -> Update ()
+checkActor actor allowedActors = do
+  require' ("actor", actor) isMemberR ("allowed actors", allowedActors)
+
+-- | Check that the actor is one of the allowed actors.
+checkActors : [Party] -> [[Party]] -> Update ()
+checkActors actors allowedActors = do
+  require' ("actors", actors) (oneOfR isEqualSetR) ("allowed actors", allowedActors)
+
+-- | Preamble for V2 choices that follow the actors pattern and are meant to consume the
+-- contract on which they are exercised.
+--
+-- SHOULD be used consistently as the first action in all non-factory V2 choices.
+archiveAndCheckActors : HasArchive i => ContractId i -> [Party] -> [[Party]] -> Update ()
+archiveAndCheckActors cid arg allowedActors = do
+  archive cid
+  checkActors arg allowedActors
+
+
+-- Holding change metadata
+--------------------------
+
+cip56Prefix : Text
+cip56Prefix = "splice.lfdecentralizedtrust.org/"
+
+-- | Short, human-readable reason for the transaction.
+reasonMetaKey : Text
+reasonMetaKey = cip56Prefix <> "reason"
+
+-- | Kind of the transaction.
+txKindMetaKey : Text
+txKindMetaKey = cip56Prefix <> "tx-kind"
+
+
+-- Public fetch support
+-----------------------
+
+-- | Default implementation for public fetch choices.
+publicFetchDefaultImpl
+  : forall i v t arg. (HasInterfaceView i v, HasToInterface t i)
+  => t -> ContractId i -> arg -> Update v
+publicFetchDefaultImpl this _self _arg = do
+  pure (view (toInterface this : i))
+
+
+-- Missing TextMap utilities
+------------------------------
+
+-- TODO(#4865): upstream these to the Daml stdlib
+
+-- | Create a text map with a single key-value pair.
+textMapSingleton : Text -> a -> TextMap.TextMap a
+textMapSingleton k v = TextMap.fromList [(k, v)]
+
+-- | Values of a text map.
+textMapValues : TextMap.TextMap a -> [a]
+textMapValues = map snd . TextMap.toList
+
+-- | Keys of a text map.
+textMapKeys : TextMap.TextMap a -> [Text]
+textMapKeys = map fst . TextMap.toList
+
+-- | Union of two text maps, using the provided function to resolve conflicts.
+textMapUnionWith : (a -> a -> a) -> TextMap.TextMap a -> TextMap.TextMap a -> TextMap.TextMap a
+textMapUnionWith f =
+  TextMap.merge
+    (\_ v1 -> Some v1)
+    (\_ v2 -> Some v2)
+    (\_ v1 v2 -> Some (f v1 v2))
+
+-- | Zip two text maps together, keeping all keys from both maps.
+textMapZip : TextMap.TextMap a -> TextMap.TextMap b -> TextMap.TextMap (Optional a, Optional b)
+textMapZip =
+  TextMap.merge
+    (\_ v1 -> Some (Some v1, None))
+    (\_ v2 -> Some (None, Some v2))
+    (\_ v1 v2 -> Some (Some v1, Some v2))
+
+-- | Zip two text maps together, keeping all keys from both maps. For missing values, use the provided default value.
+textMapZipWithDefault : a -> TextMap.TextMap a -> TextMap.TextMap a -> TextMap.TextMap (a, a)
+textMapZipWithDefault defaultValue =
+  TextMap.merge
+    (\_ v1 -> Some (v1, defaultValue))
+    (\_ v2 -> Some (defaultValue, v2))
+    (\_ v1 v2 -> Some (v1, v2))
+
+-- | Like `Traversable.traverse` but with access to the key of each element as well.
+textMapTraverseWithKey : Applicative f => TextMap.TextMap a -> (Text -> a -> f b) -> f (TextMap.TextMap b)
+textMapTraverseWithKey m f =
+    TextMap.fromList <$> mapA f' (TextMap.toList m)
+  where
+    f' (k, v) = (k,) <$> f k v

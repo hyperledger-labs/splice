@@ -39,3 +39,10 @@
 
         - Added a new ``GET /v2/updates/hash/{hash}`` endpoint that returns the update associated with a given external transaction hash of a prepared transaction.
           This endpoint is not always BFT safe, see the Scan OpenAPI documentation for details.
+
+    - Token Standard V2 (CIP-112)
+
+      - Add preview of the V2 token standard APIs and implement them for Amulet
+
+      .. TODO(#4707): add callouts for wallets, explorers, SVs, validator operators, app operators as needed
+      .. TODO(#4707): add Daml versions of token standard to release notes

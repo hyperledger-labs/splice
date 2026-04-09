@@ -1037,7 +1037,7 @@ summarizeAndValidateExternalPartyContext context dso tf = do
 
   return TransferContextSummaryV2 with
     dso = dso
-    config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig
+    config = transferConfigAmuletFromExternalPartyConfigState externalPartyConfigState
     featuredAppProvider
     openRoundNumber = externalPartyConfigState.holdingFeesOpenRoundNumber
     amuletPrice = externalPartyConfigState.amuletPrice
@@ -1377,6 +1377,10 @@ scaleFees2 s c = TransferConfigV2 with
 
 transferConfigAmuletFromOpenRound : OpenMiningRound -> TransferConfig Amulet
 transferConfigAmuletFromOpenRound openRound = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
+
+transferConfigAmuletFromExternalPartyConfigState : ExternalPartyConfigState -> TransferConfigV2 Amulet
+transferConfigAmuletFromExternalPartyConfigState externalPartyConfigState =
+  scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) externalPartyConfigState.transferConfig
 
 validateBuyMemberTrafficInputs : AmuletConfig Unit.USD -> Text -> Int -> Either InvalidTransferReason ()
 validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
@@ -1916,11 +1920,10 @@ totalBurnFromSummary TransferSummary{..} = sum outputFees + holdingFees + sender
 
 externalPartyTransferFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update ExternalPartyTransferContext
 externalPartyTransferFromChoiceContext dso context = do
-  externalPartyConfigState <- getFromContextU @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
-  _ <- fetchChecked (ForDso with dso) externalPartyConfigState
+  (configStateCid, _configState) <- getExternalPartyConfigStateFromChoiceContext dso context
   optFeaturedAppRightCid <- lookupFromContextU @(ContractId FeaturedAppRight) context featuredAppRightContextKey
   pure ExternalPartyTransferContext with
-    externalPartyConfigState
+    externalPartyConfigState = configStateCid
     featuredAppRight = optFeaturedAppRightCid
 
 -- | Used when we want to ignore a featured app right, even if it is present in the context.
@@ -1928,6 +1931,13 @@ unfeaturedPaymentContextFromChoiceContext : Party -> Api.Token.MetadataV1.Choice
 unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   context <- externalPartyTransferFromChoiceContext dso choiceContext
   pure context with featuredAppRight = None
+
+getExternalPartyConfigStateFromChoiceContext
+  : Party -> Api.Token.MetadataV1.ChoiceContext -> Update (ContractId ExternalPartyConfigState, ExternalPartyConfigState)
+getExternalPartyConfigStateFromChoiceContext dso context = do
+  cid <- getFromContextU @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
+  state <- fetchChecked (ForDso with dso = dso) cid
+  pure (cid, state)
 
 bootstrapExternalPartyConfigState : AmuletRules -> OpenMiningRoundTriple -> Update ()
 bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
