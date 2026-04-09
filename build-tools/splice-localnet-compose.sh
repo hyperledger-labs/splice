@@ -72,6 +72,7 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             CANTON_PROTOCOL_VERSION=$1
+            export CANTON_PROTOCOL_VERSION
             # FIXME: move this into a different flag (and add to docs that don't use this script):
             export ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
             ;;
@@ -83,8 +84,6 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
-
-export CANTON_PROTOCOL_VERSION
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"
