@@ -2,3 +2,5 @@
 pulumiProjectConfig:
   default:
     replacePostgresStatefulSetOnChanges: true
+multiValidator:
+  postgresPvcSize: '300Gi'
