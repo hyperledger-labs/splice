@@ -23,7 +23,7 @@ cometbft helm values
    -      rpcServers: "..."
    +      enable: false
 
-2) For the single sv config, you are now bootstraping a single sv so put your own keys
+2) For the single sv config, you are now bootstrapping a single sv so put your own keys
    in:
 
 ::
@@ -100,7 +100,7 @@ Infra-level things you might want to consider
   to the public internet at this point.
 
 -  approved SV identities (which make their way into sv helm values): if
-   you are deploying a single bootstraping node, you can set this to []
+   you are deploying a single bootstrapping node, you can set this to []
 
 How to run through a HDM
 ~~~~~~~~~~~~~~~~~~~~~~~~
