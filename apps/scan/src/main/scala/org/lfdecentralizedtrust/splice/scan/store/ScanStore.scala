@@ -520,6 +520,16 @@ object ScanStore {
               Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
           )
         },
+        mkFilter(splice.amuletallocationv2.AmuletAllocationV2.COMPANION)(co =>
+          co.payload.allocation.transferLegs.asScala.exists(_.instrumentId.admin == dso)
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = contract.payload.allocation.settlement.settlementDeadline
+              .map(Timestamp.assertFromInstant(_))
+              .toScala,
+          )
+        },
         mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>
           co.payload.transfer.instrumentId.admin == dso
         ) { contract =>

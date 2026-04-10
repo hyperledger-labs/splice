@@ -76,6 +76,17 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
 
+  /** Returns all contracts that have the given ids.
+    * If they do not exist, they will not be included in the return list.
+    * Note that only one companion is provided, meaning that they all must be of the same type.
+    */
+  def lookupContractsById[C, TCid <: ContractId[?], T](
+      companion: C
+  )(ids: Seq[ContractId[?]])(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ContractWithState[TCid, T]]]
+
   /** Returns any contract of the same template as the passed companion.
     */
   def findAnyContractWithOffset[C, TCid <: ContractId[?], T](

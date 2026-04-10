@@ -19,6 +19,7 @@ import java.time.Instant
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
+import cats.implicits.toTraverseOps
 
 abstract class ChoiceContextBuilder[DisclosedContract, ChoiceContext, Self](
     val activeSynchronizerId: String,
@@ -37,6 +38,13 @@ abstract class ChoiceContextBuilder[DisclosedContract, ChoiceContext, Self](
   def disclose(contract: Contract[?, ?]): Self = {
     disclosedContracts.addOne(
       toTokenStandardDisclosedContract(contract, activeSynchronizerId, excludeDebugFields)
+    )
+    this
+  }
+
+  def discloseAll(contracts: Iterable[Contract[?, ?]]): Self = {
+    disclosedContracts.addAll(
+      contracts.map(toTokenStandardDisclosedContract(_, activeSynchronizerId, excludeDebugFields))
     )
     this
   }
@@ -111,7 +119,7 @@ object ChoiceContextBuilder {
               .asRuntimeException()
           )
         )
-      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+      // TODO(#4950) Don't include amulet rules and newest open round when informees all have vetted the newest version.
       externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder: Builder = newBuilder(
@@ -139,8 +147,8 @@ object ChoiceContextBuilder {
     Builder,
   ]](
       description: String,
-      lockedAmuletId: amulet.LockedAmulet.ContractId,
-      expiry: Instant,
+      lockedAmuletIdOpt: Option[amulet.LockedAmulet.ContractId],
+      expiryOpt: Option[Instant],
       requireLockedAmulet: Boolean,
       featuredProvider: Option[PartyId],
       store: ScanStore,
@@ -152,9 +160,11 @@ object ChoiceContextBuilder {
       tc: TraceContext,
   ): Future[ChoiceContext] = {
     for {
-      optLockedAmulet <- fetcher.lookupContractById(
-        amulet.LockedAmulet.COMPANION
-      )(lockedAmuletId)
+      optLockedAmulet <- lockedAmuletIdOpt.flatTraverse { lockedAmuletId =>
+        fetcher.lookupContractById(
+          amulet.LockedAmulet.COMPANION
+        )(lockedAmuletId)
+      }
       (choiceContextBuilder, _) <- getAmuletRulesTransferContext[
         DisclosedContract,
         ChoiceContext,
@@ -173,11 +183,10 @@ object ChoiceContextBuilder {
       if (optLockedAmulet.isEmpty) {
         // the locked amulet did expire and was unlocked
         if (requireLockedAmulet) {
-          val expiresAt =
-            CantonTimestamp.fromInstant(expiry)
+          val expiresAt = expiryOpt.map(CantonTimestamp.fromInstant)
           throw io.grpc.Status.NOT_FOUND
             .withDescription(
-              s"LockedAmulet '$lockedAmuletId' not found for $description, which expires on $expiresAt"
+              s"LockedAmulet '$lockedAmuletIdOpt' not found for $description, which expires on $expiresAt"
             )
             .asRuntimeException()
         } else {

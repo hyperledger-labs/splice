@@ -45,6 +45,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationr
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv1,
   allocationv1,
+  allocationv2,
   transferinstructionv1,
 }
 
@@ -1224,6 +1225,57 @@ object HttpWalletAppClient {
         String,
         definitions.AllocateAmuletResponse,
       ]] = { case http.AllocateAmuletResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case class AllocateAmuletV2(spec: allocationv2.AllocationSpecification)
+        extends InternalBaseCommand[
+          http.AllocateAmuletV2Response,
+          definitions.AllocateAmuletV2Response,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.AllocateAmuletV2Response] =
+        client.allocateAmuletV2(
+          definitions.AllocateAmuletV2Request(
+            definitions.AllocateAmuletV2Request.Settlement(
+              executors = spec.settlement.executors.asScala.toVector,
+              settlementRef = definitions.AllocateAmuletV2Request.Settlement.SettlementRef(
+                spec.settlement.settlementRef.id,
+                spec.settlement.settlementRef.cid.map(_.contractId).toScala,
+              ),
+              requestedAt =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.requestedAt)),
+              settleAt = Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleAt)),
+              settlementDeadline = spec.settlement.settlementDeadline
+                .map(deadline => Codec.encode(CantonTimestamp.assertFromInstant(deadline)))
+                .toScala,
+              meta = Some(spec.settlement.meta.values.asScala.toMap),
+            ),
+            spec.transferLegs.asScala.map { transferLegs =>
+              definitions.TransferLegV2(
+                transferLegs.transferLegId,
+                sender = transferLegs.sender.owner,
+                receiver = transferLegs.receiver.owner,
+                Codec.JavaBigDecimal.instance.encode(transferLegs.amount),
+                Some(transferLegs.meta.values.asScala.toMap),
+              )
+            }.toVector,
+          ),
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.AllocateAmuletV2Response, Either[
+        String,
+        definitions.AllocateAmuletV2Response,
+      ]] = { case http.AllocateAmuletV2Response.OK(value) =>
         Right(value)
       }
     }
