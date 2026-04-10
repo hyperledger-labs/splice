@@ -24,6 +24,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardV2Allocati
   CreateAllocationRequestResult,
 }
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  BalanceChangeTxLogEntry,
+  PartyAndAmount,
+  TransferTxLogEntry,
+  TxLogEntry,
+}
 
 import java.time.Instant
 import java.util.UUID
@@ -35,6 +41,7 @@ class TokenStandardV2AllocationIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with HasExecutionContext
     with WalletTestUtil
+    with WalletTxLogTestUtil
     with TriggerTestUtil {
 
   protected val tokenStandardV2TestDarPath =
@@ -159,6 +166,40 @@ class TokenStandardV2AllocationIntegrationTest
               expectedLockedQtyRange = (0.0, 0.0),
               expectedHoldingFeeRange = holdingFeesBound,
             )
+            checkTxHistory(
+              aliceWalletClient,
+              Seq(
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, bobTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(bobParty.toProtoPrimitive, -bobTransferAmount)
+                  )
+                },
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(bobParty.toProtoPrimitive, aliceTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, -aliceTransferAmount)
+                  )
+                },
+                { case logEntry: BalanceChangeTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+                },
+              ),
+              ignore = {
+                case transfer: TransferTxLogEntry =>
+                  inside(transfer) { _ =>
+                    // ignore merges
+                    transfer.receivers.isEmpty && transfer.sender.value.party == aliceParty.toProtoPrimitive
+                  }
+                case _ => false
+              },
+            )
           }
           clue("Check bob's balance") {
             checkBalance(
@@ -170,6 +211,40 @@ class TokenStandardV2AllocationIntegrationTest
               ),
               expectedLockedQtyRange = (0.0, 0.0),
               expectedHoldingFeeRange = holdingFeesBound,
+            )
+            checkTxHistory(
+              bobWalletClient,
+              Seq(
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, bobTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(bobParty.toProtoPrimitive, -bobTransferAmount)
+                  )
+                },
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(bobParty.toProtoPrimitive, aliceTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, -aliceTransferAmount)
+                  )
+                },
+                { case logEntry: BalanceChangeTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+                },
+              ),
+              ignore = {
+                case transfer: TransferTxLogEntry =>
+                  inside(transfer) { _ =>
+                    // ignore merges
+                    transfer.receivers.isEmpty && transfer.sender.value.party == bobParty.toProtoPrimitive
+                  }
+                case _ => false
+              },
             )
           }
         }
