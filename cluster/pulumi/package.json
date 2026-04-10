@@ -41,6 +41,7 @@
         "cluster",
         "gcp",
         "infra",
+        "observability",
         "sv-runbook",
         "observability",
         "validator-runbook",

@@ -289,7 +289,7 @@ class ParticipantClientReference(
   // when uploading the same DAR twice.
   def upload_dar_unless_exists(
       path: String
-  ): Unit = {
+  ): String = {
     val dar = DarParser.assertReadArchiveFromFile(new File(path))
     val hash = dar.main.getHash
     val pkgs = this.ledger_api.packages.list()
@@ -310,6 +310,7 @@ class ParticipantClientReference(
         store = TopologyStoreId.Synchronizer(sync.synchronizerId),
       )
     }
+    hash
   }
 }
 

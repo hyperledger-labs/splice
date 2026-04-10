@@ -116,6 +116,11 @@ function installDockerRunnerScaleSet(
                     name: 'RUNNER_WAIT_FOR_DOCKER_IN_SECONDS',
                     value: '120',
                   },
+                  // May help shutting down runners https://github.com/actions/runner/pull/2233
+                  {
+                    name: 'RUNNER_MANUALLY_TRAP_SIG',
+                    value: 'true',
+                  },
                 ],
                 resources: resourcesSpecFromConfig(resources),
                 // required to mount the nix store inside the container from the NFS

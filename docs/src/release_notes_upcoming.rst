@@ -43,3 +43,14 @@
 
         - Added a new ``GET /v2/updates/hash/{hash}`` endpoint that returns the update associated with a given external transaction hash of a prepared transaction.
           This endpoint is not always BFT safe, see the Scan OpenAPI documentation for details.
+
+        - ``POST /v0/state/acs`` has been labeled as deprecated, and replaced by a newer ``POST /v1/state/acs``.
+          The new `/v1` endpoint replaces the event ID in the response from `/v0` by an (optional) update ID. The update ID for
+          each contract in the ACS refers to the update in which the contract has been created. This value is
+          guaranteed to be consistent across all instances of Scan, therefore is suitable for BFT reads.
+          The update ID will be omitted for contracts created in a prior migration ID, or potentially in the
+          future in extreme cases of disaster recovery.
+
+    - LocalNet
+
+        - Added support for configuring the protocol version used in LocalNet.

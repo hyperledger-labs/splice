@@ -481,6 +481,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getTraceContext,
       t.getRecordTime,
       t.getExternalTransactionHash,
+      t.getPaidTrafficCost,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =

@@ -33,7 +33,7 @@ endpoints, which are used for readiness and liveness probes.
 
   The ``splice_store_last_ingested_record_time_ms`` metric represents the last ingested record time in each validator store. It can be used to track general activity of the node:
 
-  * If this value continue to increase over time, your node is active and stays in sync with the network.
+  * If this value continues to increase over time, your node is active and stays in sync with the network.
     Note that it only advances if your node actually ingests new transactions.
     For a validator collecting validator liveness rewards this happens every round so you should expect your lag to never go above 20min.
 

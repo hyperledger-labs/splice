@@ -15,17 +15,18 @@ import com.digitalasset.canton.config.{
   BatchAggregatorConfig,
   ClientConfig,
   JwksCacheConfig,
-  KeepAliveClientConfig,
   PemFileOrString,
   ServerConfig,
   StorageConfig,
 }
-import com.digitalasset.canton.networking.grpc.CantonServerBuilder
+import com.digitalasset.canton.networking.grpc.{CantonServerBuilder, ClientChannelParams}
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   BftBlockOrderingStandaloneNetworkConfig,
   DefaultAvailabilityMaxNonOrderedBatchesPerNode,
+  DefaultAvailabilityMaxProposalCreationDelay,
   DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning,
+  DefaultBlockingDbReadTimeout,
   DefaultConsensusBlockCompletionTimeout,
   DefaultConsensusEmptyBlockCreationTimeout,
   DefaultConsensusQueueMaxSize,
@@ -119,6 +120,10 @@ import scala.concurrent.duration.*
   * @param outputFetchTimeoutCap
   *   The maximum timeout, after jitter and backoff are considered, that a node's availability
   *   module will wait while fetching batch data from a peer.
+  * @param blockingDbReadTimeout
+  *   The maximum time allowed for block reads to restore state from the database after restarts.
+  *   Currently, if the timeout is reached during any of the blocking reads on startup, the node
+  *   shuts down and must restart to try again.
   * @param initialNetwork
   *   Optionally, the set of peers for which the local node has connections with on startup. If set
   *   to [[scala.None]], the peer starts up with no preexisting peers.
@@ -164,6 +169,8 @@ final case class BftBlockOrdererConfig(
     availabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int =
       DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning,
     availabilityMaxNonOrderedBatchesPerNode: Short = DefaultAvailabilityMaxNonOrderedBatchesPerNode,
+    availabilityMaxProposalCreationDelay: FiniteDuration =
+      DefaultAvailabilityMaxProposalCreationDelay,
     // TODO(#24184) make a dynamic sequencing parameter
     maxBatchesPerBlockProposal: Short = DefaultMaxBatchesPerProposal,
     consensusQueueMaxSize: Int = DefaultConsensusQueueMaxSize,
@@ -177,6 +184,7 @@ final case class BftBlockOrdererConfig(
     outputFetchTimeoutCap: FiniteDuration = DefaultOutputFetchTimeoutCap,
     outputEnqueueMaxRetries: Int = DefaultOutputEnqueueMaxRetries,
     outputEnqueueMaxRetryDelay: FiniteDuration = DefaultOutputEnqueueMaxRetryDelay,
+    blockingDbReadTimeout: FiniteDuration = DefaultBlockingDbReadTimeout,
     initialNetwork: Option[P2PNetworkConfig] = None,
     standalone: Option[BftBlockOrderingStandaloneNetworkConfig] = None,
     // TODO(#24184) make a dynamic sequencing parameter
@@ -210,6 +218,7 @@ object BftBlockOrdererConfig {
   val DefaultMaxBatchesPerProposal: Short = 16
   val DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int = 5
   val DefaultAvailabilityMaxNonOrderedBatchesPerNode: Short = 1000
+  val DefaultAvailabilityMaxProposalCreationDelay: FiniteDuration = 250.millis
   val DefaultConsensusQueueMaxSize: Int = 10 * 1024
   val DefaultConsensusQueuePerNodeQuota: Int = 1024
   val DefaultConsensusBlockCompletionTimeout: FiniteDuration = 10.seconds
@@ -221,6 +230,7 @@ object BftBlockOrdererConfig {
   val DefaultOutputFetchTimeoutCap: FiniteDuration = 5.second
   val DefaultOutputEnqueueMaxRetries: Int = retry.Forever
   val DefaultOutputEnqueueMaxRetryDelay: FiniteDuration = 5.seconds
+  val DefaultBlockingDbReadTimeout: FiniteDuration = 1.minute
 
   val DefaultHowLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist =
     LeaderSelectionPolicyConfig.HowLongToBlacklist.Linear
@@ -385,9 +395,8 @@ object BftBlockOrdererConfig {
       override val tlsConfig: Option[TlsClientConfig] = Some(
         TlsClientConfig(trustCollectionFile = None, clientCert = None, enabled = true)
       ),
-  ) extends ClientConfig {
-    override val keepAliveClient: Option[KeepAliveClientConfig] = None
-  }
+      channel: ClientChannelParams = ClientChannelParams.Default,
+  ) extends ClientConfig
 
   final case class EndpointId(
       address: String,

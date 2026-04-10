@@ -26,10 +26,10 @@ export async function listHoldingTransactions(
 ): Promise<void> {
   try {
     const ledgerClient: LedgerJsonApi = createLedgerApiClient(opts);
-    const afterOffset =
+    const afterOffset: number =
       Number(opts.afterOffset) ||
       (await ledgerClient.getV2StateLatestPrunedOffsets())
-        .participantPrunedUpToInclusive;
+        .participantPrunedUpToInclusive!;
     const updates = await ledgerClient.postV2UpdatesFlats({
       updateFormat: {
         includeTransactions: {
