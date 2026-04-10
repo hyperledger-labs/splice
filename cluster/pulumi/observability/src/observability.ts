@@ -556,7 +556,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
   );
   createGrafanaAlerting(namespaceName);
   if (!isMainNet) {
-    createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack]);
+    createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack, postgres.pg]);
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
@@ -674,6 +674,7 @@ function createGrafanaServiceAccount(
     },
     {
       provider: grafanaProvider,
+      dependsOn: dependsOn.concat([grafanaProvider, serviceAccountResource]),
     }
   );
   new k8s.core.v1.Secret('grafana-service-account-token-secret', {
