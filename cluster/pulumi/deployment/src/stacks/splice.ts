@@ -1,8 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
+import * as semver from 'semver';
 import {
+  activeVersion,
   CLUSTER_BASENAME,
+  CnChartVersion,
   config,
   DecentralizedSynchronizerUpgradeConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -23,6 +26,13 @@ import {
   createStackCR,
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
+
+function isVersionAtLeast(version: CnChartVersion, minVersion: string): boolean {
+  if (version.type === 'local') {
+    return true;
+  }
+  return semver.gte(version.version, minVersion);
+}
 
 export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   if (deploymentConf.projectsToDeploy.has('sv-runbook')) {
@@ -48,8 +58,11 @@ export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   if (deploymentConf.projectsToDeploy.has('infra')) {
     yield { project: 'infra', stack: `infra.${CLUSTER_BASENAME}` };
   }
-  if (deploymentConf.projectsToDeploy.has('observability')) {
-    yield { project: 'observability', stack: `infra.${CLUSTER_BASENAME}` };
+  if (
+    deploymentConf.projectsToDeploy.has('observability') &&
+    isVersionAtLeast(activeVersion, '0.6.0')
+  ) {
+    yield { project: 'observability', stack: `observability.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('canton-network')) {
     yield { project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` };
@@ -102,6 +115,20 @@ export function installSpliceStacks(
   }
   if (deploymentConf.projectsToDeploy.has('infra')) {
     createStackCR('infra', 'infra', namespace, false, reference, envRefs, gcpSecret);
+  }
+  if (
+    deploymentConf.projectsToDeploy.has('observability') &&
+    isVersionAtLeast(activeVersion, '0.6.0')
+  ) {
+    createStackCR(
+      'observability',
+      'observability',
+      namespace,
+      false,
+      reference,
+      envRefs,
+      gcpSecret
+    );
   }
   if (deploymentConf.projectsToDeploy.has('canton-network')) {
     createStackCR(
