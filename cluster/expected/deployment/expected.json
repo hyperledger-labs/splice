@@ -1025,13 +1025,6 @@
             "toPath": "splice/cluster/pulumi/infra/Pulumi.infra.mock.yaml"
           },
           {
-            "fromPath": "cluster/stacks/prod/observability/Pulumi.infra.mock.yaml",
-            "repository": {
-              "name": "splice-node-active-base"
-            },
-            "toPath": "splice/cluster/pulumi/observability/Pulumi.infra.mock.yaml"
-          },
-          {
             "fromPath": "cluster/stacks/prod/canton-network/Pulumi.canton-network.mock.yaml",
             "repository": {
               "name": "splice-node-active-base"
