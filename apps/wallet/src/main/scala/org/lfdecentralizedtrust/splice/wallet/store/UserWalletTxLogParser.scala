@@ -110,7 +110,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.{
   TransferTransactionSubtype,
 }
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv2
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
@@ -121,7 +121,7 @@ class UserWalletTxLogParser(
   import UserWalletTxLogParser.*
 
   private val endUserPartyProtoPrimitive = endUserParty.toProtoPrimitive
-  private val amuletInstrumentId = new holdingv1.InstrumentId(
+  private val amuletInstrumentIdV2 = new holdingv2.InstrumentId(
     dsoParty.toProtoPrimitive,
     "Amulet",
   )
@@ -1089,16 +1089,22 @@ class UserWalletTxLogParser(
             now {
               node.argument.value.allocation.transferLegs.asScala.foldLeft(State.empty) {
                 case (stateAcc, leg) =>
-                  stateAcc.appended(
-                    State.fromAllocationTransferLeg(
-                      tree.getUpdateId,
-                      exercised.getNodeId,
-                      leg.transferLegId,
-                      tree.getEffectiveAt,
-                      leg.sender.owner,
-                      leg.amount,
+                  // Here we only care about the amulet locking, i.e., when sender=enduser
+                  // The transfer itself is handled below in SettlementFactorySettle
+                  if (
+                    leg.instrumentId == amuletInstrumentIdV2 && leg.sender.owner == endUserPartyProtoPrimitive
+                  ) {
+                    stateAcc.appended(
+                      State.fromAllocationTransferLeg(
+                        tree.getUpdateId,
+                        exercised.getNodeId,
+                        leg.transferLegId,
+                        tree.getEffectiveAt,
+                        leg.sender.owner,
+                        leg.amount,
+                      )
                     )
-                  )
+                  } else stateAcc
               }
             }
           // Using SettlementFactorySettle makes it easier than using AllocationV2Settle,
@@ -1108,8 +1114,8 @@ class UserWalletTxLogParser(
               node.argument.value.transferLegs.asScala.foldLeft(State.empty) {
                 case (stateAcc, transferLeg) =>
                   if (
-                    transferLeg.instrumentId == amuletInstrumentId &&
-                    transferLeg.sender.owner == endUserPartyProtoPrimitive || transferLeg.receiver.owner == endUserPartyProtoPrimitive
+                    // the sender part is handled by AllocationFactoryV2Allocate above
+                    transferLeg.instrumentId == amuletInstrumentIdV2 && transferLeg.receiver.owner == endUserPartyProtoPrimitive
                   ) {
                     stateAcc.appended(
                       State(
