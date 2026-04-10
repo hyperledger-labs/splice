@@ -31,6 +31,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { infraStack } from '@lfdecentralizedtrust/splice-pulumi-common/src/stackReferences';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
@@ -48,9 +49,8 @@ import {
   slackToken,
   supportTeamEmail,
 } from './alertings';
-import { infraConfig, monitoringConfig } from './config';
+import { monitoringConfig, prometheusConfig } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
-import { istioVersion } from './istio';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -95,32 +95,19 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
-const namespaceName = 'observability';
 
-export function configureObservability(dependsOn: pulumi.Resource[] = []): pulumi.Resource {
-  const namespace = new k8s.core.v1.Namespace(
-    namespaceName,
-    {
-      metadata: {
-        name: namespaceName,
-        // istio really doesn't play well with prometheus
-        // it seems to  modify the scraping calls from prometheus and change labels/include extra time series that make no sense
-        labels: { 'istio-injection': 'disabled' },
-      },
-    },
-    {
-      dependsOn,
-      aliases: [
-        { name: 'observabilty' }, // Legacy typo
-      ],
-    }
-  );
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const istioDashboardVersions: pulumi.Output<any> =
+  infraStack.requireOutput('istioDashboardVersions');
+
+export function configureObservability(namespace: ExactNamespace): pulumi.Resource {
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '82.9.0';
   const prometheusStackCrdVersion = '0.89.0';
-  const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
+  const namespaceName = namespace.logicalName;
+  const postgres = installPostgres(namespace);
   const adminPassword = grafanaKeysFromSecret().adminPassword;
-  const migrationSnapshots = getVolumeSnapshotsForHyperdiskMigration();
+  const migrationSnapshots = getVolumeSnapshotsForHyperdiskMigration(namespaceName);
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
@@ -256,8 +243,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             },
             enableFeatures: ['memory-snapshot-on-shutdown', 'promql-experimental-functions'],
             enableRemoteWriteReceiver: true,
-            retention: infraConfig.prometheus.retentionDuration,
-            retentionSize: infraConfig.prometheus.retentionSize,
+            retention: prometheusConfig.retentionDuration,
+            retentionSize: prometheusConfig.retentionSize,
             resources: {
               requests: {
                 memory: clusterProdLike ? (!clusterIsResetPeriodically ? '8Gi' : '3Gi') : '2Gi',
@@ -279,7 +266,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
-                      storage: infraConfig.prometheus.storageSize,
+                      storage: prometheusConfig.storageSize,
                     },
                   },
                   ...(migrationSnapshots.prometheus ? migrationSnapshots.prometheus : {}),
@@ -337,32 +324,32 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               control_plane: {
                 gnetId: 7645,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.general,
+                revision: istioDashboardVersions.apply(v => v.general),
               },
               mesh: {
                 gnetId: 7639,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.general,
+                revision: istioDashboardVersions.apply(v => v.general),
               },
               performance: {
                 gnetId: 11829,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.general,
+                revision: istioDashboardVersions.apply(v => v.general),
               },
               service: {
                 gnetId: 7636,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.general,
+                revision: istioDashboardVersions.apply(v => v.general),
               },
               workload: {
                 gnetId: 7630,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.general,
+                revision: istioDashboardVersions.apply(v => v.general),
               },
               wasm: {
                 gnetId: 13277,
                 datasource: 'Prometheus',
-                revision: istioVersion.dashboards.wasm,
+                revision: istioDashboardVersions.apply(v => v.wasm),
               },
             },
           },
@@ -531,11 +518,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: [namespace],
+      dependsOn: [namespace.ns],
     }
   );
 
-  const path = commandScriptPath('cluster/pulumi/infra/prometheus-crd-update.sh');
+  const path = commandScriptPath('cluster/pulumi/observability/prometheus-crd-update.sh');
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
@@ -544,9 +531,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     { dependsOn: prometheusStack }
   );
 
-  istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
-  istioVirtualService(namespace, 'grafana', 'grafana', 80);
-  istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
+  istioVirtualService(namespace.ns, 'prometheus', 'prometheus-prometheus', 9090);
+  istioVirtualService(namespace.ns, 'grafana', 'grafana', 80);
+  istioVirtualService(namespace.ns, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
   // that prevents running expensive queries when the dashboard just loads
   createGrafanaDashboards(namespaceName);
@@ -569,11 +556,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   );
   createGrafanaAlerting(namespaceName);
   if (!isMainNet) {
-    createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn.concat([prometheusStack]));
+    createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack]);
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
-  if (infraConfig.prometheus.installPrometheusPushgateway) {
+  if (prometheusConfig.installPrometheusPushgateway) {
     new k8s.helm.v3.Release('prometheus-pushgateway', {
       name: 'prometheus-pushgateway',
       chart: 'prometheus-pushgateway',
@@ -1002,7 +989,7 @@ function grafanaAlertNotificationPolicies() {
 
 function readGrafanaAlertingFile(file: string) {
   const fileContent = fs.readFileSync(
-    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    `${SPLICE_ROOT}/cluster/pulumi/observability/grafana-alerting/${file}`,
     'utf-8'
   );
   // Ignore no data or data source error if the cluster is reset periodically
@@ -1049,7 +1036,7 @@ interface GrafanaRuleFile {
 // reads grafana alerting template rule from file, fill it with alert rules custom configurations and append to rules
 function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
   const fileContent = fs.readFileSync(
-    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    `${SPLICE_ROOT}/cluster/pulumi/observability/grafana-alerting/${file}`,
     'utf-8'
   );
 
@@ -1080,7 +1067,10 @@ function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRules
 }
 
 function readAlertingManagerFile(file: string) {
-  return fs.readFileSync(`${SPLICE_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
+  return fs.readFileSync(
+    `${SPLICE_ROOT}/cluster/pulumi/observability/alert-manager/${file}`,
+    'utf-8'
+  );
 }
 
 function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
@@ -1109,7 +1099,7 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
   );
 }
 
-function getVolumeSnapshotsForHyperdiskMigration() {
+function getVolumeSnapshotsForHyperdiskMigration(namespaceName: string) {
   if (
     hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra &&
     hyperdiskSupportConfig.hyperdiskSupport.migratingInfra

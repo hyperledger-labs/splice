@@ -48,6 +48,9 @@ export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   if (deploymentConf.projectsToDeploy.has('infra')) {
     yield { project: 'infra', stack: `infra.${CLUSTER_BASENAME}` };
   }
+  if (deploymentConf.projectsToDeploy.has('observability')) {
+    yield { project: 'observability', stack: `infra.${CLUSTER_BASENAME}` };
+  }
   if (deploymentConf.projectsToDeploy.has('canton-network')) {
     yield { project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` };
   }

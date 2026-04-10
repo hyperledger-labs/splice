@@ -9,7 +9,7 @@ import { Input } from '@pulumi/pulumi';
 export function createGrafanaDashboards(namespace: Input<string>): void {
   createdNestedConfigMapForFolder(
     namespace,
-    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
+    `${SPLICE_ROOT}/cluster/pulumi/observability/grafana-dashboards/`
   );
   createConfigMapForFolder(
     namespace,

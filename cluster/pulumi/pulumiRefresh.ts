@@ -16,6 +16,8 @@ export async function runStacksRefresh(): Promise<void> {
   operations.push(refreshOperation(validator1, abortController));
   const infra = await stack('infra', 'infra', true, {});
   operations.push(refreshOperation(infra, abortController));
+  const observability = await stack('observability', 'observability', true, {});
+  operations.push(refreshOperation(observability, abortController));
   const splitwell = await stack('splitwell', 'splitwell', true, {});
   operations.push(refreshOperation(splitwell, abortController));
   const multiValidatorStack = await stack('multi-validator', 'multi-validator', true, {});
