@@ -21,9 +21,12 @@ module Splice.Testing.TokenStandard.WalletClientV2
     checkHoldingBounds,
     checkHoldingApprox,
 
-    -- * Reading transfer instructions
+    -- * Managing transfer offers
     listTransferOffers,
     listTransferOffersV2,
+
+    transfer,
+    acceptTransferOffer,
 
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
@@ -174,6 +177,9 @@ checkBalance : Party -> V2.InstrumentId -> Decimal -> Script ()
 checkBalance p instrumentId balance =
   checkBalanceBounds p instrumentId (balance, balance)
 
+-- Transfer offers
+------------------
+
 -- | List pending V2 transfer offers (as sender or receiver)
 listTransferOffersV2 : Party -> V2.InstrumentId -> Script [(ContractId V2.TransferInstruction, V2.TransferInstructionView)]
 listTransferOffersV2 p instrumentId = do
@@ -199,6 +205,28 @@ listTransferOffers p instrumentId = do
         guard (all (\(cidV2, _) -> cidV2 /= cid) offersV2) -- filter out any offers that also exist in V2
         pure (cid, TSU.upcast instrView.transfer)
   pure (adjustedOffersV2 <> trimmedOffersV1)
+
+
+transfer : MultiRegistry.MultiRegistry -> Party -> V2.TransferFactory_Transfer -> Script (Optional (ContractId V2.TransferInstruction))
+transfer registries actor transferArg = do
+  batch <- mkTransferFactory_TransferV2 registries transferArg
+  extractPendingTransferInstructionV2 <$> executeSingletonTSABatch actor batch
+
+acceptTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
+acceptTransferOffer registries actor instrCid = do
+  batch <- mkTransferInstruction_AcceptV2 registries actor instrCid
+  extractPendingTransferInstructionV2 <$> executeSingletonTSABatch actor batch
+
+extractPendingTransferInstructionV2 : BatchingUtilityV2.TokenStandardActionResult -> Optional (ContractId V2.TransferInstruction)
+extractPendingTransferInstructionV2 (BatchingUtilityV2.TSAR_TransferInstructionResultV2 result) =
+  case result.output of
+    V2.TransferInstructionResult_Pending instrCid -> Some instrCid
+    _ -> None
+extractPendingTransferInstructionV2 result = error $ "Expected a TransferInstructionResultV2, but got: " <> show result
+
+
+-- Allocations
+--------------
 
 -- | List all allocations requested from the actor for instruments by the admin.
 listRequestedAllocationsForAdmin : Party -> V2.Account -> Party -> Script [V2.AllocationSpecification]
@@ -258,6 +286,17 @@ executeTSABatch actor batch = do
         actions = batch.actions
         inputHoldingMap
         archiveAfterExecution = False
+
+
+-- | Execute a batch containing a single token standard action.
+executeSingletonTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.TokenStandardActionResult
+executeSingletonTSABatch actor batch = do
+  -- Note: in a production wallet we'd want to execute the action directly without the BatchingUtilityV2
+  -- to save on traffic cost. For testing here, we skip that for code simplicity.
+  result <- executeTSABatch actor batch
+  case result.actionResults of
+    [res] -> pure res
+    _ -> fail "Multiple actions were executed in the batch, expected exactly one"
 
 -- | Get a map of unlocked holding cids for the given accounts and instruments.
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap

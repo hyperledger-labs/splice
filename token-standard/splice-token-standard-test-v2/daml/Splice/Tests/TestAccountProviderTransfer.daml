@@ -38,7 +38,7 @@ import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 test_self_transfer_to_account : Script ()
 test_self_transfer_to_account = do
-  -- setup
+  -- registry and instrument setup
   env <- MultiRegistry.initialize MultiRegistry.defaultConfig
   let registries = env.registries
   let instrX = V2.InstrumentId with
@@ -47,22 +47,20 @@ test_self_transfer_to_account = do
   let instrY = V2.InstrumentId with
         id = "Y2"
         admin = env.testTokenV2.admin
-
   let mkParty name = do
         party <- allocatePartyExact name
         WalletClientV2.createBatchingUtility party
         pure party
-
-  let mkTransfer t = WalletClientV2.mkTransferFactory_TransferV2 env.registries
-
+  -- party setup
   alice <- mkParty "alice"
   bob <- mkParty "bob"
-
   custodian1 <- mkParty "custodian1"
+  let allUserParties = [alice, bob]
+  -- accounts
   let bobSelf = V2.Account with
         owner = bob
         provider = None
-        id = Some "oiap/bobself"
+        id = Some "oiap/default"
   let aliceSelf1 = V2.Account with
         owner = alice
         provider = None
@@ -75,20 +73,20 @@ test_self_transfer_to_account = do
         owner = alice
         provider = Some custodian1
         id = Some "oiapia/acc2"
-        -- FIXME: check that "" is not allowed as an account ID for TestTokenV2; consider ruling it out by removing the 'Optional' from the account ID field
-  let allParties = [alice, bob]
+        -- FIXME: consider again ruling out the empty account-id by removing the 'Optional' from the account ID field
 
+  -- mint funds
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 100.0
+  TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
 
+  -- define transfers
   now <- getTime
   let requestedAt = now
   let executeBefore = now `addRelTime` days 1
 
-  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
-  -- TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 100.0
-  TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
-
-  -- test creating three outgoing transfers in on batch
-  at1 <- mkTransfer registries V2.TransferFactory_Transfer with
+  -- test that alice can directly transfer between self-custodied accounts
+  None <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
     actors = [alice]
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
@@ -100,6 +98,8 @@ test_self_transfer_to_account = do
       requestedAt
       executeBefore
       meta = TSU.reasonToMeta "alice -> aliceSelf - test transfer 1" emptyMetadata
+
+{-
   -- test creating three outgoing transfers in on batch
   at1 <- mkTransfer registries V2.TransferFactory_Transfer with
     actors = [alice]
@@ -135,22 +135,7 @@ test_self_transfer_to_account = do
       requestedAt
       executeBefore
       meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 1" emptyMetadata
-  {-
-  at2 <- mkTransfer SimpleTransfer with
-        sender = alice
-        receiver = charlie
-        amount = 25.0
-        instrumentId = instrY
-        offerTime = days 1
-        reason = "alice -> charlie - test transfer 2"
-  at3 <- mkTransfer SimpleTransfer with
-        sender = alice
-        receiver = dora
-        amount = 10.0
-        instrumentId = instrX
-        offerTime = days 1
-        reason = "alice -> dora - test transfer 3"
-  -}
+
 
   WalletClientV2.executeTSABatch alice ac1
 
@@ -173,50 +158,8 @@ test_self_transfer_to_account = do
   baccept <- acceptTransferOffers registries bob instrX
   WalletClientV2.executeTSABatch bob baccept
 
-{-
-  -- test accepting and forwarding a transfer using the holdings just received
-  baccept <- acceptTransferOffers registries bob instrX
-  bt1 <- mkTransfer SimpleTransfer with
-        sender = bob
-        receiver = dora
-        amount = 5.0
-        instrumentId = instrX
-        offerTime = days 1
-        reason = "bob -> dora - test transfer 4"
-
-  WalletClientV2.executeTSABatch bob (baccept <> bt1)
-
-  -- dora accepts all transfers in one go, and merges them
-  daccept <- acceptTransferOffers registries dora instrX
-  doraMerge <- mkTransfer SimpleTransfer with
-        sender = dora
-        receiver = dora
-        amount = 15.0 -- TODO(#4875): implement a self-merge choice in the batching utility, so that this amount does not have to be precomputed by the wallet
-        instrumentId = instrX
-        offerTime = days 1
-        reason = "dora -> dora - test self-merge"
-  -- test that self-merge extracts the args correctly by executing it twice
-  WalletClientV2.executeTSABatch dora (daccept <> doraMerge <> doraMerge)
-
-  -- charlie accepts their offer
-  -- TODO(#4813): actually reject as part of a batch, once we have the support for that in the batching utility
-  caccept <- acceptTransferOffers registries charlie instrY
-  WalletClientV2.executeTSABatch charlie caccept
-
-  -- Check balances
-  WalletClientV2.checkBalance alice instrX 980.0
-  WalletClientV2.checkBalance alice instrY 975.0
-  WalletClientV2.checkBalance bob instrX 5.0
-  WalletClientV2.checkBalance charlie instrY 25.0
-
-  -- No transfer instructions left
-  forA_ allParties $ \p -> do
-    [] <- queryInterface @V1.TransferInstruction p
-    [] <- queryInterface @V2.TransferInstruction p
-    pure ()
 
 -}
-
   pure ()
 
 

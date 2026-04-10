@@ -1,0 +1,140 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Tests.TestTokenV2.UnitTest_AccountConfig where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.Set qualified as Set
+import DA.Text qualified as T
+
+import Daml.Script
+
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Testing.Tokens.TestTokenV2.AccountConfig
+
+test_accountConfig : Script ()
+test_accountConfig = do
+  let partyConfigs = do
+        canInitiate <- [False, True]
+        mustApprove <- [False, True]
+        pure $ PartyConfig with canInitiate; mustApprove
+  let testCases = do
+        ownerConfig <- partyConfigs
+        providerConfig <- partyConfigs
+        pure $ AccountConfig with ownerConfig; providerConfig
+
+  forA_ testCases $ \config -> do
+    let accountId = accountConfigToString config <> "/"
+        parsedConfig = accountConfigFromId (Some accountId)
+    unless (config == parsedConfig) $
+      error $ "Parsed config does not match original config for account id: " <> show accountId <>
+              "\nOriginal config: " <> show config <>
+              "\nParsed config: " <> show parsedConfig
+
+
+jointControl : (Text, AccountConfig)
+jointControl =
+  ( "jointControl"
+  , AccountConfig with
+      ownerConfig = PartyConfig with canInitiate = True; mustApprove = True
+      providerConfig = PartyConfig with canInitiate = True; mustApprove = True
+  )
+
+providerControl : (Text, AccountConfig)
+providerControl =
+  ( "providerControl"
+  , AccountConfig with
+      ownerConfig = PartyConfig with canInitiate = False; mustApprove = False
+      providerConfig = PartyConfig with canInitiate = True; mustApprove = True
+  )
+
+providerConfirmation : (Text, AccountConfig)
+providerConfirmation =
+  ( "providerConfirmation"
+  , AccountConfig with
+      ownerConfig = PartyConfig with canInitiate = True; mustApprove = False
+      providerConfig = PartyConfig with canInitiate = False; mustApprove = True
+  )
+
+test_nextActors : Script ()
+test_nextActors = do
+  let Some o = partyFromText "owner"
+  let Some p = partyFromText "provider"
+  let account = V2.Account with owner = o; provider = Some p; id = Some ("dummy-id")
+  let testCases =
+        [ ( jointControl
+          , None
+          , [o, p]
+          )
+        , ( jointControl
+          , Some o
+          , [p]
+          )
+        , ( jointControl
+          , Some p
+          , [o]
+          )
+        ] <>
+        [ ( providerControl
+          , None
+          , [p]
+          )
+        , ( providerControl
+          , Some o
+          , [p]
+          )
+        , ( providerControl
+          , Some p
+          , []
+          )
+        ] <>
+        [ ( providerConfirmation
+          , None
+          , [o]
+          )
+        , ( providerConfirmation
+          , Some o
+          , [p]
+          )
+        , ( providerConfirmation
+          , Some p -- this case cannot be reached in practice
+          , [o]
+          )
+        ]
+  forA_ testCases $ \((name, config), previousAction, expectedActors) -> do
+    let actualActors = nextActors previousAction config account
+    unless (actualActors == Set.fromList expectedActors) $
+      error $ T.unlines [
+        "Unexpected next actors with " <> name,
+        "Previous action: " <> show previousAction,
+        "Actual: " <> show actualActors,
+        "Expected: " <> show expectedActors
+      ]
+
+test_requiredApprovers : Script ()
+test_requiredApprovers = do
+  let Some o = partyFromText "owner"
+  let Some p = partyFromText "provider"
+  let account = V2.Account with owner = o; provider = Some p; id = Some ("dummy-id")
+  let testCases =
+        [ ( jointControl
+          , [o, p]
+          )
+        , ( providerControl
+          , [p]
+          )
+        , ( providerConfirmation
+          , [p]
+          )
+        ]
+  forA_ testCases $ \((name, config), expectedApprovers) -> do
+    let actualApprovers = requiredApprovers config account
+    unless (actualApprovers == Set.fromList expectedApprovers) $
+      error $ T.unlines [
+        "Unexpected approvers with " <> name,
+        "Actual: " <> show actualApprovers,
+        "Expected: " <> show expectedApprovers
+      ]
+
+
