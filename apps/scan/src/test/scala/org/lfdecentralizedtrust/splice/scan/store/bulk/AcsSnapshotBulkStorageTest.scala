@@ -133,6 +133,22 @@ class AcsSnapshotBulkStorageTest
           new CompactJsonScanHttpEncodings(identity, identity)
             .javaToHttpActiveContract(c.eventId, c.event)
         ) should contain theSameElementsInOrderAs allContractsFromS3
+
+        /* We hard-code the expected digests to enforce that the persisted data format does not change.
+           These values must not be modified unless there is a conscious decision to change the persisted format,
+           with a migration plan for how to apply it consistently across SVs. */
+        bucketConnection
+          .getChecksums(objectKeys.toSeq)
+          .futureValue
+          .map(_.checksum) should contain theSameElementsInOrderAs Seq(
+          "ViKwAawccbUGu7VOF9K+w1fwXOJL82x8KtlPR8fE5QQ=",
+          "0JsYpCrjL3Iesxvba4mq6JazsAq3iIAKWPjViQhQDd0=",
+          "uGbENvaUVHMbZ5aVwR0iezkR1tpO0plZPXs79Rg2Kx0=",
+          "ecGsxj9T8BgMPgaguPcKJK9tomTEPuSv216vqvGrtVE=",
+          "CVECMUsWmg4hN0gdI2mOhXPZabJjxYNft/J0e3Yo/JU=",
+          "EGexqBExmi9b6H+kjsD+4aizbR6pBP3qQ6LXmMfiXMY=",
+          "ciCi6myO535U0y+eeZS90agy4QwBueeWGAZnnbr2zvM=",
+        )
       }
     }
 
