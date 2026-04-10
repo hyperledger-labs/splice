@@ -135,25 +135,20 @@ class HttpTokenStandardAllocationHandler(
           body.excludeDebugFields.getOrElse(false)
         )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
-        // TODO: don't do N queries but just one with =ANY()
-        allocations <- Future.traverse(settleBatch.allocationCids.asScala) { allocationCid =>
-          // TODO (#4949): this only lists V2 allocations, but it should also do V2
-          contractFetcher.lookupContractById(amuletallocationv2.AmuletAllocationV2.COMPANION)(
-            allocationCid
-          )
-        }
-        lockedAmulets <- Future.traverse(
-          allocations.flatten.flatMap(_.payload.lockedAmulet.toScala)
-        ) { lockedAmuletCid =>
-          contractFetcher.lookupContractById(LockedAmulet.COMPANION)(lockedAmuletCid)
-        }
+        // TODO (#4949): this only lists V2 allocations, but it should also do V1
+        allocations <- contractFetcher.lookupContractsById(
+          amuletallocationv2.AmuletAllocationV2.COMPANION
+        )(settleBatch.allocationCids.asScala.toSeq)
+        lockedAmulets <- contractFetcher.lookupContractsById(LockedAmulet.COMPANION)(
+          allocations.flatMap(_.payload.lockedAmulet.toScala)
+        )
       } yield v2.Resource.GetSettlementFactoryResponseOK(
         v2.definitions
           .FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             choiceContextBuilder
               .disclose(externalPartyAmuletRules.contract)
-              .discloseAll(lockedAmulets.flatten)
+              .discloseAll(lockedAmulets)
               .build(),
           )
       )

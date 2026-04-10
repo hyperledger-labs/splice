@@ -214,6 +214,31 @@ final class DbMultiDomainAcsStore[TXE](
       .value
   }
 
+  override def lookupContractsById[C, TCid <: ContractId[?], T](
+      companion: C
+  )(ids: Seq[ContractId[?]])(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ContractWithState[TCid, T]]] = {
+    if (ids.isEmpty) Future.successful(Seq.empty)
+    else {
+      waitUntilAcsIngested {
+        storage
+          .query( // index: acs_store_template_sid_mid_cid
+            selectFromAcsTableWithState(
+              acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              companion,
+              additionalWhere = (sql"and " ++ inClause("acs.contract_id", ids)).toActionBuilder,
+            ),
+            "lookupContractsById",
+          )
+          .map(result => result.map(contractWithStateFromRow(companion)(_)))
+      }
+    }
+  }
+
   /** Returns any contract of the same template as the passed companion.
     */
   override def findAnyContractWithOffset[C, TCid <: ContractId[?], T](companion: C)(implicit
