@@ -326,7 +326,7 @@ template TokenRules with
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
-
+    -- FIXME: carry over the account authorization logic to the allocation factory and allocations once it has been reviewed
     interface instance V2.AllocationFactory for TokenRules where
       view = V2.AllocationFactoryView with
         admin
@@ -527,6 +527,5 @@ senderHoldingFromTransfer transfer = V2.HoldingView with
   lock = None
   meta = emptyMetadata
 
--- FIXME: Use Set
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedupSort . accountParties

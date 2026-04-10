@@ -18,6 +18,11 @@ data PartyConfig = PartyConfig with
     mustApprove : Bool
   deriving (Eq, Show)
 
+-- | A configuration of the authorization rules for an account.
+--
+-- Note: this is but one possible way to configure account authorization rules.
+-- It was built to demonstrate a non-trivial rule-set and test that the `V2.TransferInstruction` APIs
+-- are sufficient for wallets to interact with the assets.
 data AccountConfig = AccountConfig with
     ownerConfig : PartyConfig
     providerConfig : PartyConfig
