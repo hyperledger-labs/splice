@@ -1,6 +1,4 @@
 !include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
-pulumiProjectConfig:
-  default:
-    replacePostgresStatefulSetOnChanges: true
 multiValidator:
   postgresPvcSize: '500Gi'
+  requiresOnboardingSecret: false
