@@ -1,15 +1,15 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  dpmVersion = "3.5.0-pre-snapshot.20260130.227.0.vdd0bd833";
+  dpmVersion = "3.5.0-weekly-snapshot.20260409.59.0.v43aaa4c9";
   system = pkgs.stdenv.hostPlatform.system;
   os = if pkgs.stdenv.isDarwin then "darwin" else "linux";
   arch = if pkgs.stdenv.isAarch64 then "arm64" else "amd64";
 
   dpmHashes = {
-    "x86_64-linux" = "sha256:1k9csx67s81jzr02qaa6ggh1hps4m1rd3yrpxrp1ly5mv2w2hwqp";
-    "aarch64-linux" = "sha256:162nasjhrh8vhn2j3hqswi8w7q1xnn7njcqzdkfk9aq8x1gq9lgw";
-    "aarch64-darwin" = "sha256:1vb2fbvnbnlv16y0kwfsiaw972aj3kalcq19066j6rsq02lrvrsg";
+    "x86_64-linux" = "sha256:1k9csx67s81jzr02qaa6ggh1hps4m1rd3yrpxrp1ly5mv2w2hwqa";
+    "aarch64-linux" = "sha256:162nasjhrh8vhn2j3hqswi8w7q1xnn7njcqzdkfk9aq8x1gq9lgh";
+    "aarch64-darwin" = "sha256:0cg1jdic4nxcqlz5lg4jam2g4xnw12d7y8dwbgiwiz116j5x1kr2";
   };
   dpmHash = dpmHashes.${system} or (throw "Unsupported system: ${system}");
 in
