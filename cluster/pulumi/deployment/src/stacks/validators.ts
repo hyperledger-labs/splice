@@ -23,8 +23,8 @@ export function installAllValidatorStacks(
   if (deploymentConf.projectsToDeploy.has('validator-runbook')) {
     const validatorStacksToCreate = deployedValidators.map(validator => {
       return {
-        validator: validator,
-        stackName: validatorRunbookStackName(validator),
+        validator: validator.name,
+        stackName: validatorRunbookStackName(validator.name),
       };
     });
     validatorStacksToCreate.forEach(validator => {

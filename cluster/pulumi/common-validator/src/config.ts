@@ -8,6 +8,7 @@ import {
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { CnChartVersionSchema } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/versionSchema';
 import { z } from 'zod';
 
 export const SynchronizerConfigSchema = z.union([
@@ -129,6 +130,7 @@ export const ValidatorConfigSchema = z
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
     partyAllocator: PartyAllocatorConfigSchema.prefault({ enable: false }),
+    version: CnChartVersionSchema.optional(),
   })
   .and(ValidatorNodeConfigSchema);
 
@@ -140,10 +142,9 @@ export const allValidatorsConfig: ValidatorsConfig = ValidatorsConfigSchema.pars
   clusterSubConfig('validators')
 );
 
-const allValidators = Object.keys(allValidatorsConfig);
-export const deployedValidators = DeployValidatorRunbook
-  ? allValidators
-  : allValidators.filter(validator => validator !== 'validator-runbook');
+export const deployedValidators = Object.entries(allValidatorsConfig)
+  .filter(([name]) => DeployValidatorRunbook || name !== 'validator-runbook')
+  .map(([name, config]) => ({ name, config }));
 
 export const validatorRunbookStackName = (name: string): string =>
   name === 'validator-runbook' ? name : `validators.${name}`;
