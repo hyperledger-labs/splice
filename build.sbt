@@ -1747,7 +1747,7 @@ lazy val bundleTask = {
       Seq("-r", "scripts/transform-config.sc", "testResources/transform-config.sc")
     val dashboards = Seq(
       "-r",
-      "cluster/pulumi/infra/grafana-dashboards",
+      "cluster/pulumi/observability/grafana-dashboards",
       "grafana-dashboards",
       "-r",
       "network-health",
