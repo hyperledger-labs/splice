@@ -71,10 +71,22 @@ class ExternallySignedTxsTimeBasedIntegrationTest
         aliceValidatorWalletClient.transferPreapprovalSend(onboarding1.party, 100.0, ""),
       )(
         "External party 1 sees the transfer",
-        _ =>
-          aliceValidatorBackend
-            .getExternalPartyBalance(onboarding1.party)
-            .totalUnlockedCoin shouldBe "100.0000000000",
+        _ => {
+          // Reproduce the bug condition: multiple rounds are open while the endpoint summarizes
+          // current ACS holdings. The response must use the latest open round, otherwise fees can
+          // be computed against a round that predates the amulet creation.
+          val activeOpenRounds = sv1ScanBackend
+            .getOpenAndIssuingMiningRounds()
+            ._1
+            .filter(openRound => !openRound.payload.opensAt.isAfter(env.environment.clock.now.toInstant))
+          activeOpenRounds.size should be > 1
+          val latestOpenRound =
+            sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now).contract.payload.round.number
+          val balance = aliceValidatorBackend.getExternalPartyBalance(onboarding1.party)
+          balance.totalUnlockedCoin shouldBe "100.0000000000"
+          balance.computedAsOfRound shouldBe latestOpenRound
+          BigDecimal(balance.accumulatedHoldingFeesTotal) should be >= BigDecimal(0)
+        },
       )
 
       // Onboard external party 2
