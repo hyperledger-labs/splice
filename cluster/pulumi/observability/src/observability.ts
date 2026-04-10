@@ -1089,9 +1089,9 @@ function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
 function installPostgres(namespace: ExactNamespace): SplicePostgres {
   return new SplicePostgres(
     namespace,
-    'grafana-pg',
-    'grafana-pg',
-    'grafana-pg-secret',
+    'grafana-postgres',
+    'grafana-postgres',
+    'grafana-postgres-secret',
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
     true, // overrideDbSizeFromValues
     false, // disableProtection
