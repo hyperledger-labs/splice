@@ -169,10 +169,14 @@ class TokenStandardV2AllocationIntegrationTest
             checkTxHistory(
               aliceWalletClient,
               Seq(
-                { case logEntry: BalanceChangeTxLogEntry =>
-                  logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
-                  logEntry.receiver shouldBe aliceParty.toProtoPrimitive
-                  logEntry.amount shouldBe bobTransferAmount
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, bobTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(bobParty.toProtoPrimitive, -bobTransferAmount)
+                  )
                 },
                 { case logEntry: TransferTxLogEntry =>
                   logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
@@ -202,10 +206,14 @@ class TokenStandardV2AllocationIntegrationTest
             checkTxHistory(
               bobWalletClient,
               Seq(
-                { case logEntry: BalanceChangeTxLogEntry =>
-                  logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
-                  logEntry.receiver shouldBe bobParty.toProtoPrimitive
-                  logEntry.amount shouldBe aliceTransferAmount
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(bobParty.toProtoPrimitive, aliceTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, -aliceTransferAmount)
+                  )
                 },
                 { case logEntry: TransferTxLogEntry =>
                   logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto

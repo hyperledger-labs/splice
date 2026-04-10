@@ -1076,6 +1076,7 @@ class UserWalletTxLogParser(
                 State.fromAllocationTransferLeg(
                   tree.getUpdateId,
                   exercised.getNodeId,
+                  node.argument.value.allocation.transferLegId,
                   tree.getEffectiveAt,
                   node.argument.value.allocation.transferLeg.sender,
                   node.argument.value.allocation.transferLeg.amount,
@@ -1092,6 +1093,7 @@ class UserWalletTxLogParser(
                     State.fromAllocationTransferLeg(
                       tree.getUpdateId,
                       exercised.getNodeId,
+                      leg.transferLegId,
                       tree.getEffectiveAt,
                       leg.sender.owner,
                       leg.amount,
@@ -1104,22 +1106,36 @@ class UserWalletTxLogParser(
           case SettlementFactorySettle(node) =>
             now {
               node.argument.value.transferLegs.asScala.foldLeft(State.empty) {
-                case (stateAcc, leg) =>
+                case (stateAcc, transferLeg) =>
                   if (
-                    leg.instrumentId == amuletInstrumentId && leg.sender.owner == endUserPartyProtoPrimitive || leg.receiver.owner == endUserPartyProtoPrimitive
+                    transferLeg.instrumentId == amuletInstrumentId &&
+                    transferLeg.sender.owner == endUserPartyProtoPrimitive || transferLeg.receiver.owner == endUserPartyProtoPrimitive
                   ) {
                     stateAcc.appended(
                       State(
                         immutable.Queue(
-                          BalanceChangeTxLogEntry(
+                          TransferTxLogEntry(
+                            // we need to include the transferLegId because of unique constraint on (store_id, tx_log_id, event_id)
                             eventId = EventId
-                              .prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                              .prefixedFromUpdateIdAndNodeId(
+                                tree.getUpdateId,
+                                exercised.getNodeId,
+                              ) + ":" + transferLeg.transferLegId,
+                            subtype = Some(
+                              TransferTransactionSubtype.Transfer.toProto
+                            ),
                             // The sending side should already be handled in AllocationFactoryV2Allocate,
                             // here we just need to handle the coin unlocking
-                            receiver = leg.receiver.owner,
-                            amount = leg.amount,
-                            subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
+                            receivers =
+                              Seq(PartyAndAmount(transferLeg.receiver.owner, transferLeg.amount)),
+                            sender =
+                              Some(PartyAndAmount(transferLeg.sender.owner, -transferLeg.amount)),
                             date = Some(tree.getEffectiveAt),
+                            // seems redundant but otherwise parsing fails
+                            senderHoldingFees = BigDecimal(0.0),
+                            appRewardsUsed = BigDecimal(0.0),
+                            validatorRewardsUsed = BigDecimal(0.0),
+                            svRewardsUsed = Some(BigDecimal(0.0)),
                           )
                         )
                       )
@@ -2067,12 +2083,14 @@ object UserWalletTxLogParser {
     def fromAllocationTransferLeg(
         updateId: String,
         nodeId: Int,
+        transferLegId: String,
         effectiveAt: Instant,
         sender: String,
         amount: BigDecimal,
     ) = {
       val transferEntry = TransferTxLogEntry(
-        eventId = EventId.prefixedFromUpdateIdAndNodeId(updateId, nodeId),
+        // we need to include the transferLegId because of unique constraint on (store_id, tx_log_id, event_id)
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(updateId, nodeId) + ":" + transferLegId,
         subtype = Some(
           TransferTransactionSubtype.Transfer.toProto
         ),
