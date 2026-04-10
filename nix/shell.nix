@@ -21,6 +21,7 @@ let
     canton
     circleci-cli
     curl
+    dpm-sdk
     docker
     evans
     geckodriver
