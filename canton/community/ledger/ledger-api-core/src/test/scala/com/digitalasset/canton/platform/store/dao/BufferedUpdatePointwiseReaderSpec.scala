@@ -128,7 +128,7 @@ class BufferedUpdatePointwiseReaderSpec extends AsyncFlatSpec with MockitoSugar 
       effectiveAt = Timestamp.Epoch,
       offset = offset,
       events = Vector(null),
-      completionStreamResponse = None,
+      completionStreamResponseO = None,
       synchronizerId = someSynchronizerId.toProtoPrimitive,
       recordTime = Timestamp.Epoch,
       externalTransactionHash = None,

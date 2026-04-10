@@ -45,6 +45,11 @@ sealed trait MediatorInspectionServiceIntegrationTest
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
+      .withSetup { implicit env =>
+        import env.*
+        participant1.synchronizers.connect_local(sequencer1, daName)
+        participant1.dars.upload(CantonExamplesPath)
+      }
 
   // helper methods to access mediator internals
   private def mediator(implicit env: TestConsoleEnvironment) =
@@ -87,14 +92,6 @@ sealed trait MediatorInspectionServiceIntegrationTest
   }
 
   "Mediator" should {
-    "connect participant and upload examples dar" in { implicit env =>
-      import env.*
-      clue("participant1 connects to sequencer1") {
-        participant1.synchronizers.connect_local(sequencer1, daName)
-        participant1.dars.upload(CantonExamplesPath)
-      }
-    }
-
     "detect timeouts on any sequenced time and properly serve verdicts" in { implicit env =>
       import env.*
 
@@ -130,9 +127,7 @@ sealed trait MediatorInspectionServiceIntegrationTest
 
           // subscribe to verdicts from the beginning and wait for nrRequests verdicts in a future
           val verdicts =
-            Future(
-              mediator1.inspection.verdicts_until_complete(CantonTimestamp.MinValue, nrRequests)
-            )
+            Future(mediator1.inspection.verdicts(CantonTimestamp.MinValue, nrRequests))
 
           // wait for nrRequests dropped responses
           droppedMessages.await()
@@ -148,7 +143,7 @@ sealed trait MediatorInspectionServiceIntegrationTest
 
           // there should be nrRequests verdicts with rejection
           verdicts.futureValue should have size nrRequests.toLong
-          forAll(verdicts.futureValue)(_.verdict.value.verdict shouldBe VERDICT_RESULT_REJECTED)
+          forAll(verdicts.futureValue)(_.verdict shouldBe VERDICT_RESULT_REJECTED)
         },
         LogEntry.assertLogSeq(
           mustContainWithClue = Seq.empty,
@@ -180,12 +175,7 @@ sealed trait MediatorInspectionServiceIntegrationTest
         allowNextResponse()
 
         val recordTime = recordTimeF.futureValue
-        val verdict =
-          mediator1.inspection
-            .verdicts_until_complete(nextFromTimestamp, 1)
-            .loneElement
-            .verdict
-            .value
+        val verdict = mediator1.inspection.verdicts(nextFromTimestamp, 1).loneElement
 
         verdict.verdict shouldBe VERDICT_RESULT_ACCEPTED
         verdict.recordTime.value shouldBe recordTime.toProtoTimestamp
@@ -215,10 +205,8 @@ sealed trait MediatorInspectionServiceIntegrationTest
         val recordTime1 = recordTime1F.futureValue
         val recordTime2 = recordTime2F.futureValue
 
-        val Seq(verdict1, verdict2) =
-          mediator1.inspection
-            .verdicts_until_complete(nextFromTimestamp, 2)
-            .flatMap(_.verdict): @unchecked
+        val verdicts = mediator1.inspection.verdicts(nextFromTimestamp, 2)
+        val (verdict1, verdict2) = (verdicts.head, verdicts(1))
         verdict1.recordTime.value shouldBe recordTime1.toProtoTimestamp
         verdict2.recordTime.value shouldBe recordTime2.toProtoTimestamp
 
@@ -245,10 +233,8 @@ sealed trait MediatorInspectionServiceIntegrationTest
         val recordTime1 = recordTime1F.futureValue
         // also the corresponding verdict
         mediator1.inspection
-          .verdicts_until_complete(nextFromTimestamp, 1)
+          .verdicts(nextFromTimestamp, 1)
           .loneElement
-          .verdict
-          .value
           .recordTime
           .value shouldBe recordTime1.toProtoTimestamp
 
@@ -270,10 +256,8 @@ sealed trait MediatorInspectionServiceIntegrationTest
         val recordTime2 = recordTime2F.futureValue
         val recordTime3 = recordTime3F.futureValue
 
-        val Seq(verdict1, verdict2, verdict3) =
-          mediator1.inspection
-            .verdicts_until_complete(nextFromTimestamp, 3)
-            .flatMap(_.verdict): @unchecked
+        val verdicts = mediator1.inspection.verdicts(nextFromTimestamp, 3)
+        val (verdict1, verdict2, verdict3) = (verdicts.head, verdicts(1), verdicts(2))
         verdict1.recordTime.value shouldBe recordTime1.toProtoTimestamp
         verdict2.recordTime.value shouldBe recordTime2.toProtoTimestamp
         verdict3.recordTime.value shouldBe recordTime3.toProtoTimestamp
@@ -286,7 +270,17 @@ sealed trait MediatorInspectionServiceIntegrationTest
         verdict1.finalizationTime.value should be < verdict3.finalizationTime.value
         verdict3.finalizationTime.value should be < verdict2.finalizationTime.value
 
-        recordTime3
+        // The nextFromTimestamp is at least equal to the finalization time of request 2
+        // because that's the last confirmation response that was received and no other
+        // request is still pending
+        // Technically ths is a lower bound as other NON confirmation request events
+        // received afterward may also safely advance the nextFromTimestamp
+        mediator.state.finalizedResponseStore
+          .fetch(RequestId(recordTime2))
+          .value
+          .futureValueUS
+          .value
+          .finalizationTime
       }
 
       // restart the mediator
@@ -294,9 +288,7 @@ sealed trait MediatorInspectionServiceIntegrationTest
       mediator1.start()
 
       // now check the mediator state after initialization
-      mediatorState.youngestFinalizedRequest.get shouldBe nextFromTimestamp
-      mediatorState.recordOrderTimeAwaiter.getCurrentKnownTime() shouldBe nextFromTimestamp
-      highestRecordTime() shouldBe nextFromTimestamp
+      mediator.getCurrentWatermark should be >= nextFromTimestamp
     }
 
     "reinitialize mediator state" in { implicit env =>
@@ -332,15 +324,6 @@ sealed trait MediatorInspectionServiceIntegrationTest
         val recordTimeOfRequest2 = highestRecordTime()
         // wait to see a new highest record time in the finalized response store
         recordTimeOfRequest2 should be > highestRecordTimeAtStart
-        // and wait that the mediator has fully processed the send-receipt for the verdict,
-        // to avoid a race between updating the mediator's prehead sequencer counter
-        // and rewinding it here in the test for the sake of testing the re-initialization procedure
-        val verdictOfRequest2 = mediatorState.finalizedResponseStore
-          .fetch(RequestId(recordTimeOfRequest2))
-          .value
-          .futureValueUS
-          .value
-        mediatorPrehead().timestamp should be > verdictOfRequest2.finalizationTime
       }
 
       // now set the mediator's prehead to the prehead of request 1.
@@ -355,19 +338,19 @@ sealed trait MediatorInspectionServiceIntegrationTest
 
       // request verdicts but with a low timeout, because we expect not to receive any verdicts yet,
       // since request 1 hasn't been finalized yet
-      (mediator1.inspection.verdicts_until_complete(
+      val verdictsBeforeRequest1Finalization = mediator1.inspection.verdicts(
         highestRecordTimeAtStart,
         1,
         timeout = NonNegativeDuration.ofSeconds(2),
-      )) shouldBe empty
+      )
+      verdictsBeforeRequest1Finalization shouldBe empty
 
       // now sequence response 1 and wait for request 1 and 2 to complete
       response1P.success(())
       val recordTime1 = recordTime1F.futureValue
       val recordTime2 = recordTime2F.futureValue
 
-      val verdicts =
-        mediator1.inspection.verdicts_until_complete(highestRecordTimeAtStart, 2).flatMap(_.verdict)
+      val verdicts = mediator1.inspection.verdicts(highestRecordTimeAtStart, 2)
       verdicts should have size 2
       verdicts.map(_.recordTime.value) shouldBe Seq(recordTime1, recordTime2).map(
         _.toProtoTimestamp

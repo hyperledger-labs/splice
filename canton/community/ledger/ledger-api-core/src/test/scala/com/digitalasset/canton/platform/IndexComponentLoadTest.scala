@@ -7,9 +7,7 @@ import com.daml.ledger.api.v2.update_service.GetUpdateResponse
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.{
-  CumulativeFilter,
-  EventFormat,
-  TemplateWildcardFilter,
+  AcsContinuationToken,
   TransactionFormat,
   TransactionShape,
   UpdateFormat,
@@ -27,7 +25,7 @@ import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
-import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
+import com.digitalasset.daml.lf.data.{Bytes, Time}
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.flatspec.AnyFlatSpec
@@ -56,23 +54,6 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       connectionPoolEnabled = true,
     ).toPostgresDbConfig
 
-  private val wildcardTemplates = CumulativeFilter(
-    templateFilters = Set.empty,
-    interfaceFilters = Set.empty,
-    templateWildcardFilter = Some(TemplateWildcardFilter(includeCreatedEventBlob = false)),
-  )
-  private def eventFormat(party: Ref.Party) = EventFormat(
-    filtersByParty = Map(
-      party -> wildcardTemplates
-    ),
-    filtersForAnyParty = None,
-    verbose = false,
-  )
-  private val allPartyEventFormat = EventFormat(
-    filtersByParty = Map.empty,
-    filtersForAnyParty = Some(wildcardTemplates),
-    verbose = false,
-  )
   override implicit val traceContext: TraceContext = TraceContext.createNew("load-test")
 
   private val testAcsChangeFactory = TestAcsChangeFactory()
@@ -122,8 +103,8 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
           eventFormat = eventFormat(dsoParty),
           activeAt = ledgerEndOffset,
           continuationToken = None,
+          checksum = AcsContinuationToken.emptyChecksum,
         )
-        .map(_.withEmptyChecksum)
         .zipWithIndex
         .runWith(Sink.last)
         .map { case (last, lastIndex) =>

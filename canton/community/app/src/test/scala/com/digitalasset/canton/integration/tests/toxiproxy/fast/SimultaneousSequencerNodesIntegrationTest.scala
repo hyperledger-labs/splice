@@ -4,7 +4,6 @@
 package com.digitalasset.canton.integration.tests.toxiproxy.fast
 
 import com.digitalasset.canton.admin.api.client.data.SequencerConnections
-import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
   DbLockedConnectionPoolConfig,
@@ -37,7 +36,6 @@ import monocle.macros.syntax.lens.*
 /** Two simultaneous block-based sequencers must not write to the database. The one that does not
   * acquire the lock (passive) should get killed.
   */
-@UnstableTest // TODO(#31490)
 class SimultaneousSequencerNodesIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
@@ -72,6 +70,7 @@ class SimultaneousSequencerNodesIntegrationTest
             .replace(Some(ReplicationConfig(connectionPool = lowerTimeoutConfig)))
         )
       }
+      .addConfigTransform(ConfigTransforms.setExitOnFatalFailures(true))
       .withSetup { implicit env =>
         import env.*
         logger.debug(s"Starting sequencer ${remoteSequencer1.name}")
@@ -118,10 +117,8 @@ class SimultaneousSequencerNodesIntegrationTest
         externalPlugin.processHasCrashed(remoteSequencer2.name) shouldBe true
       }
 
-      // even though the process has crashed, the plugin still thinks it is running, so we explicitly kill it
-      externalPlugin.isRunning(remoteSequencer2.name) shouldBe true
-      externalPlugin.kill(remoteSequencer2.name)
-      externalPlugin.isRunning(remoteSequencer2.name) shouldBe false
+      // even though the process has crashed, the plugin still thinks it is running, so we explicitly mark it
+      externalPlugin.crashed(remoteSequencer2.name)
     }
 
     "stopping the first sequencer should allow the second to start" in { implicit env =>
@@ -163,26 +160,22 @@ class SimultaneousSequencerNodesIntegrationTest
       loggerFactory.suppressWarningsAndErrors {
         externalPlugin.start(remoteSequencer1.name)
         remoteSequencer1.health.wait_for_initialized()
-      }
-
-      eventually() {
-        remoteSequencer2.health.is_running() shouldBe false
-        externalPlugin.processHasCrashed(remoteSequencer2.name) shouldBe true
-      }
-      // even though the process has crashed, the plugin still thinks it is running, so we explicitly kill it
-      externalPlugin.isRunning(remoteSequencer2.name) shouldBe true
-      externalPlugin.kill(remoteSequencer2.name)
-      externalPlugin.isRunning(remoteSequencer2.name) shouldBe false
-
-      toxic.remove()
-
-      loggerFactory.suppressWarningsAndErrors {
         // make sure sequencer1 is functional again
         mediator1.sequencer_connection.set(
           SequencerConnections.single(remoteSequencer1.sequencerConnection)
         )
         participant1.health.ping(participant1)
       }
+
+      eventually() {
+        remoteSequencer2.health.is_running() shouldBe false
+        externalPlugin.processHasCrashed(remoteSequencer2.name) shouldBe true
+      }
+
+      // even though the process has crashed, the plugin still thinks it is running, so we explicitly mark it
+      externalPlugin.crashed(remoteSequencer2.name)
+
+      toxic.remove()
     }
   }
 

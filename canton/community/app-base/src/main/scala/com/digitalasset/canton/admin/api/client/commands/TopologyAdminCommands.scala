@@ -43,6 +43,7 @@ import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
 
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import scala.concurrent.Future
 import scala.reflect.ClassTag
@@ -662,6 +663,7 @@ object TopologyAdminCommands {
 
     final case class SequencerLsuState(
         store: Option[TopologyStoreId],
+        ts: Option[CantonTimestamp],
         observer: StreamObserver[SequencerLsuStateResponse],
     ) extends BaseCommand[
           v30.SequencerLsuStateRequest,
@@ -669,7 +671,7 @@ object TopologyAdminCommands {
           CancellableContext,
         ] {
       override protected def createRequest(): Either[String, v30.SequencerLsuStateRequest] =
-        Right(v30.SequencerLsuStateRequest(store.map(_.toProtoV30)))
+        Right(v30.SequencerLsuStateRequest(store.map(_.toProtoV30), ts.map(_.toProtoTimestamp)))
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
@@ -876,7 +878,7 @@ object TopologyAdminCommands {
               Some(store.toProtoV30),
               waitToBecomeEffective.map(_.toProtoPrimitive),
             ),
-          topologySnapshot,
+          new ByteArrayInputStream(topologySnapshot.toByteArray),
         )
       override protected def handleResponse(
           response: ImportTopologySnapshotResponse
@@ -912,7 +914,7 @@ object TopologyAdminCommands {
               Some(store.toProtoV30),
               waitToBecomeEffective.map(_.toProtoPrimitive),
             ),
-          topologySnapshot,
+          new ByteArrayInputStream(topologySnapshot.toByteArray),
         )
       override protected def handleResponse(
           response: ImportTopologySnapshotV2Response

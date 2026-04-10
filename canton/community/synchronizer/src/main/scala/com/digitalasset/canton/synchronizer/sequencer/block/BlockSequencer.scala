@@ -75,7 +75,10 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   SequencerPastUpgradeTime,
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.{PayloadId, SequencerStore}
-import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
+import com.digitalasset.canton.synchronizer.sequencer.time.{
+  DisasterRecoverySequencingTimeUpperBound,
+  LsuSequencingBounds,
+}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.*
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   LsuTrafficState,
@@ -126,6 +129,7 @@ class BlockSequencer(
     blockRateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
     lsuSequencingBounds: Option[LsuSequencingBounds],
+    drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
     processingTimeouts: ProcessingTimeout,
     logEventDetails: Boolean,
     prettyPrinter: CantonPrettyPrinter,
@@ -158,6 +162,7 @@ class BlockSequencer(
       loggerFactory,
       blockSequencerMode = true,
       lsuSequencingBounds,
+      drSequencingTimeUpperBound,
       rateLimitManagerO = Some(blockRateLimitManager),
     )
     with DatabaseSequencerIntegration
@@ -278,6 +283,7 @@ class BlockSequencer(
       blockRateLimitManager,
       orderingTimeFixMode,
       lsuSequencingBounds = lsuSequencingBounds,
+      drSequencingTimeUpperBound = drSequencingTimeUpperBound,
       getAnnouncedLsu = announcedLsu.get(),
       producePostOrderingTopologyTicks,
       metrics,
@@ -290,14 +296,14 @@ class BlockSequencer(
       TraceContext.createNew("block-sequencer-driver-source")
 
     val pauseAtUpgradeTimeUntilLsuTrafficInitialized =
-      lsuSequencingBounds.fold(Flow[Traced[RawLedgerBlock]]) {
-        case LsuSequencingBounds(upgradeTime, _) =>
-          PekkoUtil.mapAsyncAndDrainUS(Flow[Traced[RawLedgerBlock]], 1) {
-            case block if block.value.baseSequencingTimeMicrosFromEpoch > upgradeTime.toMicros =>
-              lsuTrafficInitialized.futureUS.map(_ => block)
-            case block =>
-              FutureUnlessShutdown.pure(block)
-          }
+      lsuSequencingBounds.fold(Flow[Traced[RawLedgerBlock]]) { lsuSequencingBounds =>
+        PekkoUtil.mapAsyncAndDrainUS(Flow[Traced[RawLedgerBlock]], 1) {
+          case block
+              if block.value.baseSequencingTimeMicrosFromEpoch > lsuSequencingBounds.upgradeTime.toMicros =>
+            lsuTrafficInitialized.futureUS.map(_ => block)
+          case block =>
+            FutureUnlessShutdown.pure(block)
+        }
       }
     val driverSource = Source
       .futureSource(runtimeReady.unwrap.map {
@@ -312,6 +318,7 @@ class BlockSequencer(
       // Explicit async to make sure that the block processing runs in parallel with the block retrieval
       .async
       .map(updateGenerator.extractBlockEvents)
+      .async
       .via(stateManager.processBlock(updateGenerator))
       .wireTap { update =>
         throughputCap.addBlockUpdate(update.value)
@@ -374,7 +381,7 @@ class BlockSequencer(
           )
           _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
             submission.maxSequencingTime < maxSequencingTimeUpperBound,
-            SequencerErrors.SubmissionRequestRefused(
+            SequencerErrors.MaxSequencingTimeTooFar(
               s"Max sequencing time ${submission.maxSequencingTime} for submission with id ${submission.messageId} is too far in the future, currently bounded at $maxSequencingTimeUpperBound"
             ): CantonBaseError,
           )
@@ -442,7 +449,7 @@ class BlockSequencer(
   ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
     EitherT
       .fromEither[FutureUnlessShutdown](
-        throughputCap.shouldRejectTransaction(submission.requestType, submission.sender, 0)
+        throughputCap.shouldAllowTransaction(submission.requestType, submission.sender, 0)
       )
       .leftMap { msg =>
         SequencerErrors.Overloaded(
@@ -974,7 +981,7 @@ class BlockSequencer(
       // so we handle it here.
       FutureUnlessShutdown.pure(Map.empty)
     } else {
-      val timestamp = selector match {
+      val timestampO = selector match {
         case ExactTimestamp(timestamp) => Some(timestamp)
         case LastUpdatePerMember => None
         // For the latest safe timestamp, we use the last timestamp of the latest processed block.
@@ -983,14 +990,24 @@ class BlockSequencer(
         // all traffic has been consumed for that block. This means we can use this timestamp to compute an updated
         // base traffic that will be correct. More precisely, we take the immediate successor such that we include
         // all the changes of that last block.
-        case LatestSafe => Some(stateManager.getHeadState.block.lastTs.immediateSuccessor)
+        case LatestSafe =>
+          Some(
+            stateManager.getHeadState.block.lastTs.immediateSuccessor
+              /*
+                Just after LSU (before any block is sequenced), we allow querying traffic state at upgrade time.
+                This is safe to do because we know we are past upgrade time and traffic is initialized.
+               */
+              .max(lsuSequencingBounds.fold(CantonTimestamp.MinValue)(_.upgradeTime))
+          )
         case LatestApproximate =>
           Some(clock.now.max(stateManager.getHeadState.block.lastTs.immediateSuccessor))
       }
 
+      logger.info(s"Using $timestampO to fetch traffic state with selector $selector")
+
       blockRateLimitManager.getStates(
         requestedMembers,
-        timestamp,
+        timestampO,
         stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
           lsuSequencingBounds.map(_.upgradeTime)
         ),
@@ -1057,12 +1074,7 @@ class BlockSequencer(
             }
         }
       )
-      trafficState <- EitherT.right(
-        trafficStatesForMembers(
-          members,
-          selector,
-        )
-      )
+      trafficState <- EitherT.right(trafficStatesForMembers(members, selector))
     } yield SequencerTrafficStatus(trafficState)
 
   override def getTrafficStateAt(member: Member, timestamp: CantonTimestamp)(implicit
@@ -1108,23 +1120,40 @@ class BlockSequencer(
     super.updateLsuSuccessor(successorO, announcementEffectiveTime)
   }
 
-  override def getLsuTrafficControlState(implicit
+  override def getLsuTrafficControlState(trafficTsOverride: Option[CantonTimestamp] = None)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
     for {
-      // - Check that LSU is ongoing
-      upgrade <- EitherT
-        .fromOption[FutureUnlessShutdown](
-          announcedLsu.get(),
-          SequencerError.NoLsuAnnounced.Error(cryptoApi.psid, cryptoApi.topologyKnownUntilTimestamp),
-        )
-        .leftWiden[CantonBaseError]
+      ts <- trafficTsOverride match {
+        case Some(trafficTsOverride) =>
+          EitherT.pure[FutureUnlessShutdown, CantonBaseError](trafficTsOverride)
+        case None =>
+          // Read upgrade time from LSU
+          EitherT
+            .fromOption[FutureUnlessShutdown](
+              announcedLsu.get().map(_.successor.upgradeTime),
+              SequencerError.NoLsuAnnounced
+                .Error(cryptoApi.psid, cryptoApi.topologyKnownUntilTimestamp),
+            )
+            .leftWiden[CantonBaseError]
+      }
+
+      trafficStates <- getLsuTrafficControlStateInternal(ts)
+    } yield {
+      LsuTrafficState(trafficStates)(
+        LsuTrafficState.protocolVersionRepresentativeFor(protocolVersion)
+      )
+    }
+
+  private def getLsuTrafficControlStateInternal(ts: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Map[Member, TrafficState]] = {
+    logger.info(s"Computing LSU traffic state at $ts")
+    for {
       // - Traffic control is enabled
       _ <- EitherT(
         cryptoApi.ips.currentSnapshotApproximation
-          .flatMap(
-            _.trafficControlParameters(protocolVersion)
-          )
+          .flatMap(_.trafficControlParameters(protocolVersion))
           .map(_.toRight[CantonBaseError](TrafficControlDisabled.Error()))
       )
 
@@ -1132,11 +1161,8 @@ class BlockSequencer(
       _ <- {
         val now = clock.now
         EitherTUtil.condUnitET[FutureUnlessShutdown](
-          now >= upgrade.successor.upgradeTime,
-          SequencerError.NotAtUpgradeTimeOrBeyond.Error(
-            upgrade.successor.upgradeTime,
-            Some(now),
-          ),
+          now >= ts,
+          SequencerError.NotAtUpgradeTimeOrBeyond.Error(ts, Some(now)),
         )
       }
 
@@ -1148,13 +1174,11 @@ class BlockSequencer(
         store.readHeadBlockInfo().map(_.map(_.lastTs))
       )
       latestSequencerEventTimestamp = stateManager.getHeadState.block.latestSequencerEventTimestamp
-        .orElse(
-          lsuSequencingBounds.map(_.upgradeTime)
-        )
+        .orElse(lsuSequencingBounds.map(_.upgradeTime))
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        latestPersistedBlockTimeO.exists(_ >= upgrade.successor.upgradeTime),
+        latestPersistedBlockTimeO.exists(_ >= ts),
         SequencerError.NotAtUpgradeTimeOrBeyond.Error(
-          upgrade.successor.upgradeTime,
+          ts,
           latestPersistedBlockTimeO,
         ),
       )
@@ -1164,21 +1188,19 @@ class BlockSequencer(
       _ <- EitherT.right[LsuSequencerError](
         SyncCryptoClient.getSnapshotForTimestamp(
           cryptoApi,
-          upgrade.successor.upgradeTime,
+          ts,
           latestSequencerEventTimestamp,
         )
       )
       // - All checks passed
       // - Get all members known at the upgrade time
       allMembers <- EitherT.right[LsuSequencerError](
-        dbSequencerStore.allRegisteredMembers(registeredAtBeforeInclusive =
-          upgrade.successor.upgradeTime
-        )
+        dbSequencerStore.allRegisteredMembers(registeredAtBeforeInclusive = ts)
       )
       // - Get traffic states at the upgrade time for all members
       consumedRecordsPerMember <- EitherT.right[LsuSequencerError](
         blockRateLimitManager.trafficConsumedStore
-          .lookupLatestBeforeInclusive(upgrade.successor.upgradeTime.immediatePredecessor)
+          .lookupLatestBeforeInclusive(ts.immediatePredecessor)
           .map(_.map(tc => tc.member -> tc).toMap)
       )
       // TODO(#29997): This doesn't scale to millions of traffic accounts, need a batch method or a different approach
@@ -1189,12 +1211,12 @@ class BlockSequencer(
             val trafficPurchasedET =
               blockRateLimitManager.trafficPurchasedManager.getTrafficPurchasedAt(
                 member,
-                upgrade.successor.upgradeTime,
+                ts,
                 latestSequencerEventTimestamp.orElse(lsuSequencingBounds.map(_.upgradeTime)),
               )
             trafficPurchasedET.map { trafficPurchasedO =>
               member -> trafficConsumedO
-                .getOrElse(TrafficConsumed.init(member))
+                .getOrElse(TrafficConsumed.init(member, CantonTimestamp.MinValue))
                 .toTrafficState(trafficPurchasedO)
             }
           }
@@ -1206,20 +1228,14 @@ class BlockSequencer(
           .map(_.toMap)
       _ = {
         if (logger.underlying.isDebugEnabled) {
-          logger.debug(
-            "Traffic states at LSU time for all members:"
-          )
+          logger.debug("Traffic states at LSU time for all members:")
           trafficStates.foreach { case (member, trafficState) =>
             logger.debug(s"\t- $member: $trafficState")
           }
         }
       }
-
-    } yield {
-      LsuTrafficState(trafficStates)(
-        LsuTrafficState.protocolVersionRepresentativeFor(protocolVersion)
-      )
-    }
+    } yield trafficStates
+  }
 
   private val runningSetLsuTraffic =
     new AtomicReference[
