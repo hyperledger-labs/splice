@@ -59,9 +59,15 @@ template AmuletTransferInstruction
           ]
         meta = emptyMetadata
 
-      Api.TransferInstructionV2.transferInstruction_acceptImpl = transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1 transfer.receiver
-      Api.TransferInstructionV2.transferInstruction_rejectImpl = transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1 transfer.receiver
-      Api.TransferInstructionV2.transferInstruction_withdrawImpl = transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 transfer.sender
+      transferInstruction_acceptImpl = transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1 transfer.receiver
+      transferInstruction_rejectImpl = transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1 transfer.receiver
+      transferInstruction_withdrawImpl = transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 transfer.sender
+
+      transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
+      transferInstruction_rejectExtraObservers = transferInstruction_rejectDefaultExtraObservers this
+      transferInstruction_withdrawExtraObservers = transferInstruction_withdrawDefaultExtraObservers this
+
+
 
 -- Transfer instruction evolution
 ---------------------------------

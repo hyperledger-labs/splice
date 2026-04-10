@@ -61,12 +61,12 @@ class TokenStandardV2AllocationIntegrationTest
     emptyChoiceContext,
     emptyMetadata,
   )
+  // although holding fees are not applied anymore, they are still in the checkBalance assertion
+  // TODO (#4094): remove this
   val holdingFeesBound = (BigDecimal(0.0), BigDecimal(1.0))
   val tapAmount = walletUsdToAmulet(1000.0)
   val aliceTransferAmount = walletUsdToAmulet(100.0)
   val bobTransferAmount = walletUsdToAmulet(20.0)
-  val feesReserveMultiplier = 1.1 // fee reserves are 4 x the fees required for the transfer
-  val feesUpperBound = walletUsdToAmulet(1.15)
 
   "Settle a DvP using allocations" in { implicit env =>
     val AllocatedOtcTrade(
@@ -84,7 +84,7 @@ class TokenStandardV2AllocationIntegrationTest
     val settlementInfo = new allocationv2.SettlementInfo(
       java.util.List.of(venueParty.toProtoPrimitive),
       new allocationv2.Reference(
-        "OTCTradeProposal",
+        "OTCTrade",
         java.util.Optional.of(new metadatav1.AnyContract.ContractId(otcTrade.id.contractId)),
       ),
       otcTrade.data.createdAt,
@@ -96,8 +96,8 @@ class TokenStandardV2AllocationIntegrationTest
       settlementInfo,
       otcTrade.data.transferLegs,
       allocations.asJava,
-      /* extraReceiptAuthorizers =*/ List(aliceParty, bobParty).map(basicAccount).asJava,
-      /*actors = */ java.util.List.of(aliceParty.toProtoPrimitive, bobParty.toProtoPrimitive),
+      /* extraReceiptAuthorizers =*/ java.util.List.of(),
+      /*actors = */ java.util.List.of(venueParty.toProtoPrimitive),
       emptyExtraArgs,
     )
     val settlementFactoryWithDisclosures =
@@ -153,7 +153,7 @@ class TokenStandardV2AllocationIntegrationTest
               aliceWalletClient,
               expectedRound = None,
               expectedUnlockedQtyRange = (
-                tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
+                tapAmount - aliceTransferAmount + bobTransferAmount,
                 tapAmount - aliceTransferAmount + bobTransferAmount,
               ),
               expectedLockedQtyRange = (0.0, 0.0),
@@ -165,7 +165,7 @@ class TokenStandardV2AllocationIntegrationTest
               bobWalletClient,
               expectedRound = None,
               expectedUnlockedQtyRange = (
-                tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
+                tapAmount + aliceTransferAmount - bobTransferAmount,
                 tapAmount + aliceTransferAmount - bobTransferAmount,
               ),
               expectedLockedQtyRange = (0.0, 0.0),
@@ -248,7 +248,7 @@ class TokenStandardV2AllocationIntegrationTest
         "The Allocation Request is gone",
         _ => {
           // TODO (#4912): use the listAllocationRequests call
-          // TODO (#4914): the instructions are not being archived by the allocation, so this check won't succeed yet
+          // TODO (#4914): the request is not being archived as part of allocation, so this check won't succeed yet
 //          participant.ledger_api.state.acs
 //            .of_party(
 //              party = bobParty,
@@ -301,7 +301,7 @@ class TokenStandardV2AllocationIntegrationTest
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitJava(
             actAs = Seq(venueParty),
-            commands = mkTestTradeProposal(
+            commands = mkTestTrade(
               dsoParty,
               venueParty,
               aliceParty,
@@ -316,7 +316,7 @@ class TokenStandardV2AllocationIntegrationTest
           )
       },
     )(
-      "There exists a trade proposal visible to the venue's participant",
+      "There exists a trade visible to the venue's participant",
       _ =>
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(tradingappv2.OTCTrade.COMPANION)(
@@ -390,7 +390,7 @@ class TokenStandardV2AllocationIntegrationTest
     CreateAllocationRequestResult(otcTrade, aliceAllocationRequest, bobAllocationRequest)
   }
 
-  def mkTestTradeProposal(
+  def mkTestTrade(
       dso: PartyId,
       venue: PartyId,
       alice: PartyId,

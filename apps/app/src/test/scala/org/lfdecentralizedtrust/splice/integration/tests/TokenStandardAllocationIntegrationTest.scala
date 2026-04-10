@@ -7,10 +7,8 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationinstructionv1,
   allocationrequestv1,
   allocationv1,
-  holdingv1,
   metadatav1,
 }
 import org.lfdecentralizedtrust.splice.environment.DarResources
@@ -21,7 +19,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
-  FactoryChoiceWithDisclosures,
   JavaDecodeUtil,
   TriggerTestUtil,
   WalletTestUtil,
@@ -35,10 +32,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppActivityMarker,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
-import org.lfdecentralizedtrust.splice.console.{
-  ParticipantClientReference,
-  WalletAppClientReference,
-}
+import org.lfdecentralizedtrust.splice.console.{WalletAppClientReference}
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 

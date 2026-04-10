@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
+  ScanRollForwardLsuConfig,
   ScanSynchronizerConfig,
   ScanSynchronizerNodesConfig,
   CacheConfig as SpliceCacheConfig,
@@ -479,8 +480,20 @@ object SpliceConfig {
       deriveReader[SpliceCacheConfig]
     implicit val scanSynchronizerNodes: ConfigReader[ScanSynchronizerNodesConfig] =
       deriveReader[ScanSynchronizerNodesConfig]
+    implicit val scanRollForwardLsuConfigReader: ConfigReader[ScanRollForwardLsuConfig] =
+      deriveReader[ScanRollForwardLsuConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
-      deriveReader[ScanAppBackendConfig]
+      deriveReader[ScanAppBackendConfig].emap { conf =>
+        for {
+          _ <- Either.cond(
+            conf.rollForwardLsu.isEmpty || conf.synchronizerNodes.legacy.isDefined,
+            (),
+            ConfigValidationFailed(
+              "If roll forward LSU is configured, the legacy synchronizer must be configured"
+            ),
+          )
+        } yield conf
+      }
 
     implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
       deriveReader[SvAppClientConfig]
@@ -929,6 +942,8 @@ object SpliceConfig {
       ConfigWriter.forProduct1("p2p-url")(c => c.p2pUrl)
     implicit val scanSynchronizerNodes: ConfigWriter[ScanSynchronizerNodesConfig] =
       deriveWriter[ScanSynchronizerNodesConfig]
+    implicit val scanRollForwardLsuConfigWriter: ConfigWriter[ScanRollForwardLsuConfig] =
+      deriveWriter[ScanRollForwardLsuConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =

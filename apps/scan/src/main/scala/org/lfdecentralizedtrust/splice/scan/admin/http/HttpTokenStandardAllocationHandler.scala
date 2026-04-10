@@ -9,7 +9,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
@@ -51,7 +51,7 @@ class HttpTokenStandardAllocationHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationTransferContext") { _ => _ =>
       for {
-        choiceContext <- getAllocationChoiceContext[
+        choiceContext <- getAllocationChoiceContextV1[
           v1.definitions.DisclosedContract,
           v1.definitions.ChoiceContext,
           V1ChoiceContextBuilder,
@@ -74,7 +74,7 @@ class HttpTokenStandardAllocationHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationCancelContext") { _ => _ =>
       for {
-        choiceContext <- getAllocationChoiceContext[
+        choiceContext <- getAllocationChoiceContextV1[
           v1.definitions.DisclosedContract,
           v1.definitions.ChoiceContext,
           V1ChoiceContextBuilder,
@@ -97,7 +97,7 @@ class HttpTokenStandardAllocationHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationWithdrawContext") { _ => _ =>
       for {
-        choiceContext <- getAllocationChoiceContext[
+        choiceContext <- getAllocationChoiceContextV1[
           v1.definitions.DisclosedContract,
           v1.definitions.ChoiceContext,
           V1ChoiceContextBuilder,
@@ -131,17 +131,17 @@ class HttpTokenStandardAllocationHandler(
                 .asRuntimeException()
             )
         }
-        choiceContextBuilder <- getAmuletRulesTransferContext(
+        choiceContextBuilder <- getExternalPartyTransferContext(
           body.excludeDebugFields.getOrElse(false)
         )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
+        // TODO (#4949): this only lists V2 allocations, but it should also do V1
         allocations <- contractFetcher.lookupContractsById(
           amuletallocationv2.AmuletAllocationV2.COMPANION
         )(settleBatch.allocationCids.asScala.toSeq)
         lockedAmulets <- contractFetcher.lookupContractsById(LockedAmulet.COMPANION)(
           allocations.flatMap(_.payload.lockedAmulet.toScala)
         )
-        // TODO (#4916): Put TransferPreapproval & FeaturedAppRight in the right place
       } yield v2.Resource.GetSettlementFactoryResponseOK(
         v2.definitions
           .FactoryWithChoiceContext(
@@ -155,22 +155,13 @@ class HttpTokenStandardAllocationHandler(
     }
   }
 
-  private def getAmuletRulesTransferContext(excludeDebugFields: Boolean)(implicit
+  private def getExternalPartyTransferContext(excludeDebugFields: Boolean)(implicit
       tc: TraceContext
   ): Future[V2ChoiceContextBuilder] = {
     val now = clock.now
     for {
+      // amuletRules only used to get the active synchronizer
       amuletRules <- store.getAmuletRules()
-      newestOpenRound <- store
-        .lookupLatestUsableOpenMiningRound(now)
-        .map(
-          _.getOrElse(
-            throw io.grpc.Status.NOT_FOUND
-              .withDescription(s"No open usable OpenMiningRound found.")
-              .asRuntimeException()
-          )
-        )
-      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
       externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder = new V2ChoiceContextBuilder(
@@ -181,10 +172,6 @@ class HttpTokenStandardAllocationHandler(
         excludeDebugFields,
       )
       choiceContextBuilder
-        .addContracts(
-          "amulet-rules" -> amuletRules,
-          "open-round" -> newestOpenRound.contract,
-        )
         .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO)
     }
   }
@@ -197,14 +184,13 @@ class HttpTokenStandardAllocationHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationV2CancelContext") { _ => _ =>
       for {
-        choiceContext <- getAllocationChoiceContext[
+        choiceContext <- getAllocationChoiceContextV2[
           v2.definitions.DisclosedContract,
           v2.definitions.ChoiceContext,
           V2ChoiceContextBuilder,
         ](
           allocationId,
           requireLockedAmulet = false,
-          canBeFeatured = false,
           synchronizerId =>
             new V2ChoiceContextBuilder(synchronizerId, body.excludeDebugFields.getOrElse(false)),
         )
@@ -220,14 +206,13 @@ class HttpTokenStandardAllocationHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationV2WithdrawContext") { _ => _ =>
       for {
-        choiceContext <- getAllocationChoiceContext[
+        choiceContext <- getAllocationChoiceContextV2[
           v2.definitions.DisclosedContract,
           v2.definitions.ChoiceContext,
           V2ChoiceContextBuilder,
         ](
           allocationId,
           requireLockedAmulet = false,
-          canBeFeatured = false,
           synchronizerId =>
             new V2ChoiceContextBuilder(synchronizerId, body.excludeDebugFields.getOrElse(false)),
         )
@@ -235,8 +220,8 @@ class HttpTokenStandardAllocationHandler(
     }
   }
 
-  /** Generic method to fetch choice contexts for all choices on an allocation */
-  private def getAllocationChoiceContext[
+  /** Generic method to fetch choice contexts for all choices on an allocation V1 */
+  private def getAllocationChoiceContextV1[
       DisclosedContract,
       ChoiceContext,
       Builder <: util.ChoiceContextBuilder[
@@ -254,8 +239,8 @@ class HttpTokenStandardAllocationHandler(
   ): Future[ChoiceContext] = {
     for {
       amuletAlloc <- contractFetcher
-        .lookupContractById(amuletallocation.AmuletAllocation.COMPANION)(
-          new amuletallocation.AmuletAllocation.ContractId(
+        .lookupContractById(amuletallocationv1.AmuletAllocation.COMPANION)(
+          new amuletallocationv1.AmuletAllocation.ContractId(
             allocationId
           )
         )
@@ -272,12 +257,60 @@ class HttpTokenStandardAllocationHandler(
         Builder,
       ](
         s"AmuletAllocation '$allocationId'",
-        amuletAlloc.payload.lockedAmulet,
-        amuletAlloc.payload.allocation.settlement.settleBefore,
+        Some(amuletAlloc.payload.lockedAmulet),
+        Some(amuletAlloc.payload.allocation.settlement.settleBefore),
         requireLockedAmulet,
         Option.when(canBeFeatured)(
           PartyId.tryFromProtoPrimitive(amuletAlloc.payload.allocation.settlement.executor)
         ),
+        store,
+        contractFetcher,
+        clock,
+        activeSynchronizerId => newBuilder(activeSynchronizerId),
+      )
+    } yield context
+  }
+
+  /** Generic method to fetch choice contexts for all choices on an allocation V2 */
+  private def getAllocationChoiceContextV2[
+      DisclosedContract,
+      ChoiceContext,
+      Builder <: util.ChoiceContextBuilder[
+        DisclosedContract,
+        ChoiceContext,
+        Builder,
+      ],
+  ](
+      allocationId: String,
+      requireLockedAmulet: Boolean,
+      newBuilder: String => Builder,
+  )(implicit
+      tc: TraceContext
+  ): Future[ChoiceContext] = {
+    for {
+      amuletAlloc <- contractFetcher
+        .lookupContractById(amuletallocationv2.AmuletAllocationV2.COMPANION)(
+          new amuletallocationv2.AmuletAllocationV2.ContractId(
+            allocationId
+          )
+        )
+        .map(
+          _.getOrElse(
+            throw io.grpc.Status.NOT_FOUND
+              .withDescription(s"AmuletAllocation '$allocationId' not found.")
+              .asRuntimeException()
+          )
+        )
+      context <- util.ChoiceContextBuilder.getTwoStepTransferContext[
+        DisclosedContract,
+        ChoiceContext,
+        Builder,
+      ](
+        s"AmuletAllocationV2 '$allocationId'",
+        amuletAlloc.payload.lockedAmulet.toScala,
+        amuletAlloc.payload.allocation.settlement.settlementDeadline.toScala,
+        requireLockedAmulet,
+        featuredProvider = None, // Not required. Featured app rights are used in bulk
         store,
         contractFetcher,
         clock,

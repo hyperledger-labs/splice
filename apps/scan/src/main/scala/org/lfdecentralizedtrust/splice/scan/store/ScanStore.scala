@@ -216,6 +216,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
   def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[

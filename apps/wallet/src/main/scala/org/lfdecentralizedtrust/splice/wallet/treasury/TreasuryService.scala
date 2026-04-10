@@ -604,22 +604,10 @@ class TreasuryService(
         _.toInterface(holdingv2.Holding.INTERFACE),
         _.toInterface(holdingv2.Holding.INTERFACE),
       ) { holdings =>
-        val authorizer = operation.specification.authorizer.owner
-        // requirement: Must not provide holding cids for allocations that do not require funding
-        val fundingAmount = operation.specification.transferLegs.asScala.map { leg =>
-          val asSender =
-            if (leg.sender.owner == authorizer) -BigDecimal(leg.amount) else BigDecimal(0)
-          val asReceiver =
-            if (leg.receiver.owner == authorizer) BigDecimal(leg.amount) else BigDecimal(0)
-          asSender + asReceiver
-        }.sum
-        val inputHoldingCids =
-          if (-fundingAmount > 0) holdings else java.util.List.of[holdingv2.Holding.ContractId]()
-
         val choiceArgs = new allocationinstructionv2.AllocationFactory_Allocate(
           operation.specification,
           operation.requestedAt,
-          inputHoldingCids,
+          holdings,
           emptyExtraArgs,
           List(operation.specification.authorizer.owner).asJava,
         )

@@ -13,8 +13,6 @@ import org.lfdecentralizedtrust.splice.scan.util
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, DarResourcesUtil}
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2
-import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2.Resource
-import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2.definitions.GetFactoryRequest
 
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
@@ -54,7 +52,7 @@ class HttpTokenStandardAllocationInstructionHandler(
                 .asRuntimeException()
             )
           )
-        // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+        // TODO(#4950) Don't include amulet rules and newest open round when informees all have vetted the newest version.
         externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
       } yield {
         val activeSynchronizerId =
@@ -84,25 +82,15 @@ class HttpTokenStandardAllocationInstructionHandler(
     }
   }
 
-  override def getAllocationFactory(respond: Resource.GetAllocationFactoryResponse.type)(
-      body: GetFactoryRequest
-  )(extracted: TraceContext): Future[Resource.GetAllocationFactoryResponse] = {
+  override def getAllocationFactory(respond: v2.Resource.GetAllocationFactoryResponse.type)(
+      body: v2.definitions.GetFactoryRequest
+  )(extracted: TraceContext): Future[v2.Resource.GetAllocationFactoryResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationFactory") { _ => _ =>
       val now = clock.now
       for {
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
         amuletRules <- store.getAmuletRules()
-        newestOpenRound <- store
-          .lookupLatestUsableOpenMiningRound(now)
-          .map(
-            _.getOrElse(
-              throw io.grpc.Status.NOT_FOUND
-                .withDescription(s"No open usable OpenMiningRound found.")
-                .asRuntimeException()
-            )
-          )
-        // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
         externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
       } yield {
         val activeSynchronizerId =
@@ -119,10 +107,6 @@ class HttpTokenStandardAllocationInstructionHandler(
           v2.definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             choiceContextBuilder
-              .addContracts(
-                "amulet-rules" -> amuletRules,
-                "open-round" -> newestOpenRound.contract,
-              )
               .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO)
               .disclose(externalPartyAmuletRules.contract)
               .build(),
