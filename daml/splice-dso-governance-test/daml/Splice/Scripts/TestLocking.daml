@@ -1,0 +1,202 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestLocking where
+
+import DA.Assert
+import Daml.Script
+
+import Splice.Types
+import Splice.Scripts.DsoTestUtils
+import Splice.DsoRules
+import Splice.DSO.Locking
+
+
+-- | Test that an SV can declare a locking position.
+testDeclareLocking : Script ()
+testDeclareLocking = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  result <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_DeclareLocking with
+    sv = sv1
+    lockedAmount = 1000.0
+    walletPartyId = "wallet-1"
+    currentRound = Round 0
+
+  -- Verify the declaration was created
+  Some declaration <- queryContractId dso result.lockingDeclaration
+  declaration.info.svParty === sv1
+  declaration.info.svName === "sv1"
+  declaration.info.lockedAmount === 1000.0
+  declaration.info.walletPartyId === "wallet-1"
+  declaration.info.declaredRound === Round 0
+
+-- | Test that an SV can update an existing locking declaration.
+testUpdateLockingDeclaration : Script ()
+testUpdateLockingDeclaration = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- Create initial declaration
+  result <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_DeclareLocking with
+    sv = sv1
+    lockedAmount = 1000.0
+    walletPartyId = "wallet-1"
+    currentRound = Round 0
+
+  -- Update the declaration
+  updateResult <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_UpdateLockingDeclaration with
+    sv = sv1
+    existingDeclarationCid = result.lockingDeclaration
+    newLockedAmount = 2000.0
+    currentRound = Round 1
+
+  -- Verify the updated declaration
+  Some updated <- queryContractId dso updateResult.lockingDeclaration
+  updated.info.lockedAmount === 2000.0
+  updated.info.declaredRound === Round 1
+  -- wallet and SV info should be preserved
+  updated.info.svParty === sv1
+  updated.info.walletPartyId === "wallet-1"
+
+-- | Test that an SV can revoke a locking declaration.
+testRevokeLockingDeclaration : Script ()
+testRevokeLockingDeclaration = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- Create initial declaration
+  result <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_DeclareLocking with
+    sv = sv1
+    lockedAmount = 1000.0
+    walletPartyId = "wallet-1"
+    currentRound = Round 0
+
+  -- Revoke
+  submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_RevokeLockingDeclaration with
+    sv = sv1
+    declarationCid = result.lockingDeclaration
+
+  -- Verify the declaration is gone
+  None <- queryContractId @LockingDeclaration dso result.lockingDeclaration
+  pure ()
+
+-- | Test that a lender can create a delegated lock proposal.
+testLenderCreatesProposal : Script ()
+testLenderCreatesProposal = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  lender <- allocateParty "lender"
+
+  proposalCid <- submit lender $ createCmd DelegatedLockProposal with
+    lender
+    dso
+    svParty = sv1
+    svName = "sv1"
+    lockedAmount = 500.0
+    walletPartyId = "lender-wallet"
+
+  Some proposal <- queryContractId lender proposalCid
+  proposal.lender === lender
+  proposal.svParty === sv1
+  proposal.lockedAmount === 500.0
+
+-- | Test that an SV can accept a delegated lock proposal.
+testAcceptDelegatedLock : Script ()
+testAcceptDelegatedLock = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  lender <- allocateParty "lender"
+
+  -- Lender creates proposal
+  proposalCid <- submit lender $ createCmd DelegatedLockProposal with
+    lender
+    dso
+    svParty = sv1
+    svName = "sv1"
+    lockedAmount = 500.0
+    walletPartyId = "lender-wallet"
+
+  -- SV accepts via DsoRules
+  result <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_AcceptDelegatedLock with
+    sv = sv1
+    proposalCid
+    currentRound = Round 0
+
+  -- Verify the position was created
+  Some position <- queryContractId dso result.delegatedLockingPosition
+  position.lender === lender
+  position.svParty === sv1
+  position.svName === "sv1"
+  position.lockedAmount === 500.0
+  position.walletPartyId === "lender-wallet"
+  position.acceptedRound === Round 0
+
+  -- Verify the proposal was consumed
+  None <- queryContractId @DelegatedLockProposal lender proposalCid
+  pure ()
+
+-- | Test that an SV can release a delegated locking position.
+testReleaseDelegatedLock : Script ()
+testReleaseDelegatedLock = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  lender <- allocateParty "lender"
+
+  -- Create and accept a proposal
+  proposalCid <- submit lender $ createCmd DelegatedLockProposal with
+    lender
+    dso
+    svParty = sv1
+    svName = "sv1"
+    lockedAmount = 500.0
+    walletPartyId = "lender-wallet"
+
+  result <- submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_AcceptDelegatedLock with
+    sv = sv1
+    proposalCid
+    currentRound = Round 0
+
+  -- Release the position
+  submitMulti [dso] [] $ exerciseCmd dsoRulesCid DsoRules_ReleaseDelegatedLock with
+    sv = sv1
+    positionCid = result.delegatedLockingPosition
+
+  -- Verify the position is gone
+  None <- queryContractId @DelegatedLockingPosition dso result.delegatedLockingPosition
+  pure ()
+
+-- | Test that a non-SV party cannot declare a lock (getSvInfo fails).
+testNonSvCannotDeclareLock : Script ()
+testNonSvCannotDeclareLock = do
+  (_, dso, (_, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  nonSv <- allocateParty "nonSv"
+
+  submitMultiMustFail [dso] [] $ exerciseCmd dsoRulesCid DsoRules_DeclareLocking with
+    sv = nonSv
+    lockedAmount = 1000.0
+    walletPartyId = "wallet-1"
+    currentRound = Round 0
+
+-- | Test that a proposal for the wrong SV is rejected.
+testProposalForWrongSvRejected : Script ()
+testProposalForWrongSvRejected = do
+  (_, dso, (sv1, sv2, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  lender <- allocateParty "lender"
+
+  -- Create proposal targeting sv1
+  proposalCid <- submit lender $ createCmd DelegatedLockProposal with
+    lender
+    dso
+    svParty = sv1
+    svName = "sv1"
+    lockedAmount = 500.0
+    walletPartyId = "lender-wallet"
+
+  -- Try to accept as sv2 — should fail
+  submitMultiMustFail [dso] [] $ exerciseCmd dsoRulesCid DsoRules_AcceptDelegatedLock with
+    sv = sv2
+    proposalCid
+    currentRound = Round 0
