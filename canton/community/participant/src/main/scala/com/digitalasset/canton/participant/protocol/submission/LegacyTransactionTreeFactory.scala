@@ -15,7 +15,7 @@ import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, SaltSeed}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
 import com.digitalasset.canton.data.ViewConfirmationParameters.InvalidViewConfirmationParameters
-import com.digitalasset.canton.data.{ // scalafix:ok OrganizeImports
+import com.digitalasset.canton.data.{
   LegacyAssignedKey as AssignedKey,
   LegacyFreeKey as FreeKey,
   LegacySerializableKeyResolution as SerializableKeyResolution,
