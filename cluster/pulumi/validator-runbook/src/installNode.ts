@@ -40,6 +40,7 @@ import {
   getNamespaceConfig,
   standardStorageClassName,
   pvcSuffix,
+  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -60,10 +61,11 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
+  const version = validatorConfig.version ? validatorConfig.version : activeVersion;
   console.error(
-    activeVersion.type === 'local'
+    version.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${activeVersion.version}`
+      : `Using charts from the artifactory by default, version ${version.version}`
   );
 
   const xns = exactNamespace(validatorConfig.namespace, true);
@@ -99,6 +101,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
     otherDeps: [],
+    version,
   });
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
@@ -117,7 +120,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSvIngress: false,
     },
-    activeVersion,
+    version,
     { dependsOn: ingressImagePullDeps.concat([validator]) }
   );
 }
@@ -133,6 +136,7 @@ type ValidatorDeploymentConfig = {
   otherDeps: CnInput<pulumi.Resource>[];
   loopback: pulumi.Resource[] | null;
   backupConfigSecret?: pulumi.Resource;
+  version: CnChartVersion;
 };
 
 async function installValidator(
@@ -148,6 +152,7 @@ async function installValidator(
     backupConfigSecret,
     backupConfig,
     topupConfig,
+    version,
   } = validatorDeploymentConfig;
 
   const participantPruningConfig = validatorConfig?.participantPruningSchedule;
@@ -178,7 +183,7 @@ async function installValidator(
     xns,
     auth0Client.getCfg(),
     false, // We don't currently support non-auth for validator-runbook
-    activeVersion,
+    version,
     postgres,
     {
       dependsOn: imagePullDeps.concat([postgres]),
@@ -304,7 +309,7 @@ async function installValidator(
     'validator',
     'splice-validator',
     validatorValuesWithMaybeTopups,
-    activeVersion,
+    version,
     { dependsOn: dependsOn }
   );
   if (validatorConfig?.partyAllocator.enable) {

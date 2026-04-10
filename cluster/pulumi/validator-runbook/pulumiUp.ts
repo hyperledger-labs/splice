@@ -8,8 +8,9 @@ import { upStack } from '../pulumiOperations';
 export function runAllValidatorsUp(abortController: PulumiAbortController): Operation[] {
   const validatorsToRunFor = deployedValidators.map(validator => {
     return {
-      validator: validator,
-      stackName: validator === 'validator-runbook' ? validator : `validators.${validator}`,
+      validator: validator.name,
+      stackName:
+        validator.name === 'validator-runbook' ? validator.name : `validators.${validator.name}`,
     };
   });
   return validatorsToRunFor.map(validator => {

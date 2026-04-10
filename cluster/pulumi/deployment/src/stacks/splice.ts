@@ -31,13 +31,11 @@ export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   if (deploymentConf.projectsToDeploy.has('multi-validator')) {
     yield { project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` };
   }
-  if (deploymentConf.projectsToDeploy.has('validator-runbook')) {
-    for (const validator of deployedValidators) {
-      yield {
-        project: 'validator-runbook',
-        stack: `${validatorRunbookStackName(validator)}.${CLUSTER_BASENAME}`,
-      };
-    }
+  for (const validator of deployedValidators) {
+    yield {
+      project: 'validator-runbook',
+      stack: `${validatorRunbookStackName(validator.name)}.${CLUSTER_BASENAME}`,
+    };
   }
   if (deploymentConf.projectsToDeploy.has('validator1')) {
     yield { project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` };
