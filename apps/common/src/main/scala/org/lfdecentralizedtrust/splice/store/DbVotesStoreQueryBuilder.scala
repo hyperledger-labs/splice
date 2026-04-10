@@ -37,6 +37,7 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
+      offset: Option[Int] = None,
   ): SqlStreamingAction[Vector[
     TxLogQueries.SelectFromTxLogTableResult
   ], TxLogQueries.SelectFromTxLogTableResult, Effect.Read] = {
@@ -82,11 +83,18 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
     )
     val whereClause = conditions.reduceLeft((a, b) => (a ++ sql""" and """ ++ b).toActionBuilder)
 
+    val offsetClause = offset match {
+      case Some(o) => sql""" offset $o"""
+      case None => sql""""""
+    }
+
     selectFromTxLogTable(
       txLogTableName,
       txLogStoreId,
       where = whereClause.toActionBuilder,
-      orderLimit = sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(limit)}""",
+      orderLimit = (sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(
+          limit
+        )}""" ++ offsetClause).toActionBuilder,
     )
   }
 }

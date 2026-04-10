@@ -2517,6 +2517,7 @@ object HttpScanAppClient {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
+      pageToken: Option[BigInt] = None,
   ) extends InternalBaseCommand[http.ListVoteRequestResultsResponse, Seq[
         DsoRules_CloseVoteRequestResult
       ]] {
@@ -2533,6 +2534,7 @@ object HttpScanAppClient {
           effectiveFrom,
           effectiveTo,
           limit,
+          pageToken,
         ),
         headers = headers,
       )

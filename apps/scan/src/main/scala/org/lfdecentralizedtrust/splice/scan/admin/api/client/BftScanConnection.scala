@@ -430,6 +430,7 @@ class BftScanConnection(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
+      pageToken: Option[Int] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -441,6 +442,7 @@ class BftScanConnection(
       effectiveFrom,
       effectiveTo,
       limit,
+      pageToken,
     )
   )
 

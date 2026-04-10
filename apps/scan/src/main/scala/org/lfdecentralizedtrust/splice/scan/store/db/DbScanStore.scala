@@ -920,6 +920,7 @@ class DbScanStore(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
+      offset: Option[Int] = None,
   )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
     val query = listVoteRequestResultsQuery(
       txLogTableName = ScanTables.txLogTableName,
@@ -935,6 +936,7 @@ class DbScanStore(
       effectiveFrom = effectiveFrom,
       effectiveTo = effectiveTo,
       limit = limit,
+      offset = offset,
     )
     for {
       rows <- storage.query(query, "listVoteRequestResults")

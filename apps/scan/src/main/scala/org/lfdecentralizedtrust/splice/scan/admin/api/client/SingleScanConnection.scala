@@ -555,6 +555,7 @@ class SingleScanConnection private[client] (
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
+      pageToken: Option[Int] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -567,6 +568,7 @@ class SingleScanConnection private[client] (
       effectiveFrom,
       effectiveTo,
       limit,
+      pageToken.map(BigInt(_)),
     ),
   )
 
