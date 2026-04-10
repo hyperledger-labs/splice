@@ -279,7 +279,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
         },
         grafana: {
           fullnameOverride: 'grafana',
-          envFromSecret: 'grafana-pg-secret',
+          envFromSecret: postgres.secretName,
           ingress: {
             enabled: false,
           },
@@ -556,7 +556,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
   );
   createGrafanaAlerting(namespaceName);
   if (!isMainNet) {
-    createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack]);
+    createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack, postgres.pg]);
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
@@ -674,6 +674,7 @@ function createGrafanaServiceAccount(
     },
     {
       provider: grafanaProvider,
+      dependsOn: dependsOn.concat([grafanaProvider, serviceAccountResource]),
     }
   );
   new k8s.core.v1.Secret('grafana-service-account-token-secret', {
@@ -1088,9 +1089,9 @@ function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
 function installPostgres(namespace: ExactNamespace): SplicePostgres {
   return new SplicePostgres(
     namespace,
-    'grafana-pg',
-    'grafana-pg',
-    'grafana-pg-secret',
+    'grafana-postgres',
+    'grafana-postgres',
+    'grafana-postgres-secret',
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
     true, // overrideDbSizeFromValues
     false, // disableProtection

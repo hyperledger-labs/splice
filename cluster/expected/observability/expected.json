@@ -57,12 +57,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "grafana-pg-secret",
+        "name": "grafana-postgres-secret",
         "namespace": "observability"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-observability-grafana-pg-secret",
+    "name": "cn-app-observability-grafana-postgres-secret",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -939,7 +939,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "observability-grafana-pg-passwd",
+    "name": "observability-grafana-postgres-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -947,7 +947,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "observability-grafana-pg",
+    "name": "observability-grafana-postgres",
     "provider": "",
     "type": "canton:network:postgres"
   },
@@ -958,7 +958,7 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
       "compat": "true",
       "maxHistory": 10,
-      "name": "grafana-pg",
+      "name": "grafana-postgres",
       "namespace": "observability",
       "timeout": 600,
       "values": {
@@ -991,7 +991,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
-          "secretName": "grafana-pg-secret"
+          "secretName": "grafana-postgres-secret"
         },
         "tolerations": [
           {
@@ -1003,7 +1003,7 @@
       },
       "version": "0.3.20"
     },
-    "name": "observability-grafana-pg",
+    "name": "observability-grafana-postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1212,11 +1212,11 @@
           "deploymentStrategy": {
             "type": "Recreate"
           },
-          "envFromSecret": "grafana-pg-secret",
+          "envFromSecret": "grafana-postgres-secret",
           "fullnameOverride": "grafana",
           "grafana.ini": {
             "database": {
-              "host": "grafana-pg.observability.svc.cluster.local:5432",
+              "host": "grafana-postgres.observability.svc.cluster.local:5432",
               "name": "cantonnet",
               "password": "${postgresPassword}",
               "type": "postgres",
