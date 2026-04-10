@@ -7,7 +7,7 @@ module Splice.Testing.Tokens.TestTokenV2 where
 import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.List (dedup)
+import DA.List (dedup, dedupSort)
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Set qualified as Set
@@ -186,11 +186,38 @@ template TokenTransferCreation with
       transferInstruction_acceptImpl  _self _arg = fail "TokenTransferCreation: accept not supported"
 
 
+data PendingAction = PendingAction with
+    initiator : Party
+    action : V2.TransferInstructionAction
+  deriving (Eq, Show)
+
+mkAvailableActions : V2.Transfer -> Optional PendingAction -> Map.Map [Party] [V2.TransferInstructionAction]
+mkAvailableActions transfer pendingAction =
+    Map.fromListWithR (++) $
+      [ (senderAuthz, [V2.TIA_Withdraw])
+      , (receiverAuthz, [V2.TIA_Accept, V2.TIA_Reject])
+      ] <>
+      [ ([p], [a]) | p <- senderAuthz, a <- [V2.TIA_Withdraw], pendingAction /= Some (PendingAction p a) ] <>
+      [ ([p], [a]) | p <- receiverAuthz, a <- [V2.TIA_Accept, V2.TIA_Reject], pendingAction /= Some (PendingAction p a) ]
+      -- FIXME: delete action from list
+  where
+    senderAuthz = jointAuthorizers transfer.sender
+    receiverAuthz = jointAuthorizers transfer.receiver
+
+data AccountControl = JointControl | OwnerControl | ProviderControl
+
+accountActors : V2.Account -> [[Party]]
+accountActors account =
+  let authorizers = jointAuthorizers account in
+  authorizers :: [ [p] | p <- authorizers ]
 
 -- | Transfer instruction representing a token transfer offer.
 --
 -- Its input holdings reference the locked tokens.
 template TokenTransferOffer with
+    pendingAction : Optional PendingAction
+      -- ^ Action requiring confirmation by the account authorizer of the sender
+      -- account that did not initiate the action.
     transfer : V2.Transfer
     originalInstructionCid : Optional (ContractId V2.TransferInstruction)
   where
@@ -203,11 +230,7 @@ template TokenTransferOffer with
       view = V2.TransferInstructionView with
         originalInstructionCid = None
         transfer
-        availableActions = Map.fromList
-          [ (jointAuthorizers transfer.sender, [V2.TIA_Withdraw])
-          , (jointAuthorizers transfer.receiver, [V2.TIA_Accept, V2.TIA_Reject])
-          ]
-          -- TODO(#4542): add support for joint authorization steps
+        availableActions = mkAvailableActions transfer pendingAction
         meta = emptyMetadata
 
       transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
@@ -235,16 +258,42 @@ template TokenTransferOffer with
           meta = emptyMetadata
 
       transferInstruction_acceptImpl self arg = do
-        archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
-        archiveLockedHoldingsForTransfer transfer
-        tokenCid <- create Token with
-          holding = (senderHoldingFromTransfer transfer) with
-            account = transfer.receiver
-        pure V2.TransferInstructionResult with
-          senderChangeCids = []
-          output = V2.TransferInstructionResult_Completed with
-            receiverHoldingCids = [toInterfaceContractId tokenCid]
-          meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
+        let actors = arg.actors
+        archiveAndCheckActors self actors (accountActors transfer.receiver)
+        let accept = do
+              archiveLockedHoldingsForTransfer transfer
+              tokenCid <- create Token with
+                holding = (senderHoldingFromTransfer transfer) with
+                  account = transfer.receiver
+              pure V2.TransferInstructionResult with
+                senderChangeCids = []
+                output = V2.TransferInstructionResult_Completed with
+                  receiverHoldingCids = [toInterfaceContractId tokenCid]
+                meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
+
+        if dedupSort actors == jointAuthorizers transfer.receiver
+          then accept
+          else do
+            [actor] <- pure actors -- FIXME: error handling for multiple actors
+            case pendingAction of
+              Some (PendingAction p V2.TIA_Accept)
+                | p == actor -> fail "Cannot initiate pending accept action twice"
+                | otherwise -> accept
+              _ -> do
+                -- create pending action for accept
+                let newOriginalInstructionCid = Some $ fromOptional (toInterfaceContractId self) originalInstructionCid
+                pendingInstrCid <- create this with
+                  -- here we might override the approval from the other party for another action,
+                  -- we're OK with that as that seems a rare case.
+                  -- FIXME: comment
+                  pendingAction = Some (PendingAction actor V2.TIA_Accept)
+                  originalInstructionCid = newOriginalInstructionCid
+                pure V2.TransferInstructionResult with
+                  output = V2.TransferInstructionResult_Pending with
+                    transferInstructionCid = toInterfaceContractId pendingInstrCid
+                  senderChangeCids = []
+                  meta = emptyMetadata
+
 
 
 -- | Template providing all the rules for how the tokens can be changed.
@@ -372,6 +421,7 @@ token_transferFactory_transferImplCore admin originalInstructionCid transfer = d
             context = Some $ "transfer to " <> show transfer.receiver
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+        pendingAction = None -- FIXME: consider how to preapprove the accept as the party that initiated the transfer
         originalInstructionCid
         transfer = transfer with
           inputHoldingCids = [toInterfaceContractId lockedCid]
@@ -480,5 +530,6 @@ senderHoldingFromTransfer transfer = V2.HoldingView with
   lock = None
   meta = emptyMetadata
 
+-- FIXME: Use Set
 jointAuthorizers : V2.Account -> [Party]
-jointAuthorizers = dedup . accountParties
+jointAuthorizers = dedupSort . accountParties

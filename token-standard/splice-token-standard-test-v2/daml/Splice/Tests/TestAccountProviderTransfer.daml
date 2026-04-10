@@ -82,6 +82,7 @@ test_self_transfer_to_account = do
 
   mint alice 1000.0 instrX
   mint alice 1000.0 instrY
+  TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
 
   -- test creating three outgoing transfers in on batch
   at1 <- mkTransfer registries V2.TransferFactory_Transfer with
@@ -115,8 +116,10 @@ test_self_transfer_to_account = do
   as1accept <- acceptTransferOffers registries alice instrX
   WalletClientV2.executeTSABatch alice as1accept
 
+  c1accept <- acceptTransferOffers registries custodian1 instrX
+  WalletClientV2.executeTSABatch custodian1 c1accept
+
   -- test transferring out of the custody account
-  TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 1000.0
   ac1 <- mkTransfer registries V2.TransferFactory_Transfer with
     actors = [alice]
     extraArgs = emptyExtraArgs
