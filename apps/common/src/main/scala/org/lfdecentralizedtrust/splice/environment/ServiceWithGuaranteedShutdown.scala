@@ -75,7 +75,7 @@ class ServiceWithGuaranteedShutdown[S](
     errorLogMessagePrefix = if (retryProvider.isClosing) {
       "Ignoring failure to handle transaction, as we are shutting down"
     } else {
-      "Fatally failed to handle transaction"
+      "Fatally failed to handle element"
     },
   )
 
