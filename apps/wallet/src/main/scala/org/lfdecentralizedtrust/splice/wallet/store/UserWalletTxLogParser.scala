@@ -1074,14 +1074,26 @@ class UserWalletTxLogParser(
                 state
               } else {
                 // After the change to support a 24h submisison delay there is no internal call to AmuletRules_Transfer anymore.
-                State.fromAllocationTransferLeg(
-                  tree.getUpdateId,
-                  exercised.getNodeId,
-                  node.argument.value.allocation.transferLegId,
-                  tree.getEffectiveAt,
-                  node.argument.value.allocation.transferLeg.sender,
-                  node.argument.value.allocation.transferLeg.amount,
+                val transferEntry = TransferTxLogEntry(
+                  eventId =
+                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                  subtype = Some(
+                    TransferTransactionSubtype.Transfer.toProto
+                  ),
+                  date = Some(tree.getEffectiveAt),
+                  sender = Some(
+                    PartyAndAmount(
+                      node.argument.value.allocation.transferLeg.sender,
+                      -node.argument.value.allocation.transferLeg.amount,
+                    )
+                  ),
+                  receivers = Seq.empty, // This only locks CC so there is not actually any receiver
+                  senderHoldingFees = BigDecimal(0.0),
+                  appRewardsUsed = BigDecimal(0.0),
+                  validatorRewardsUsed = BigDecimal(0.0),
+                  svRewardsUsed = Some(BigDecimal(0.0)),
                 )
+                state.appended(State(immutable.Queue(transferEntry)))
               }
             }
           case AllocationFactoryV2Allocate(_) =>
@@ -2066,36 +2078,6 @@ object UserWalletTxLogParser {
         archivedAt = Some(archivedAt),
       )
       State(entries = immutable.Queue(newEntry))
-    }
-
-    def fromAllocationTransferLeg(
-        updateId: String,
-        nodeId: Int,
-        transferLegId: String,
-        effectiveAt: Instant,
-        sender: String,
-        amount: BigDecimal,
-    ) = {
-      val transferEntry = TransferTxLogEntry(
-        // we need to include the transferLegId because of unique constraint on (store_id, tx_log_id, event_id)
-        eventId = EventId.prefixedFromUpdateIdAndNodeId(updateId, nodeId) + ":" + transferLegId,
-        subtype = Some(
-          TransferTransactionSubtype.Transfer.toProto
-        ),
-        date = Some(effectiveAt),
-        sender = Some(
-          PartyAndAmount(
-            sender,
-            -amount,
-          )
-        ),
-        receivers = Seq.empty, // This only locks CC so there is not actually any receiver
-        senderHoldingFees = BigDecimal(0.0),
-        appRewardsUsed = BigDecimal(0.0),
-        validatorRewardsUsed = BigDecimal(0.0),
-        svRewardsUsed = Some(BigDecimal(0.0)),
-      )
-      State(entries = immutable.Queue(transferEntry))
     }
 
     private def getAmuletCreateEvent(tx: Transaction, cid: ContractId[AmuletCreate.T]) =
