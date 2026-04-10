@@ -7,8 +7,8 @@ let
   arch = if pkgs.stdenv.isAarch64 then "arm64" else "amd64";
 
   dpmHashes = {
-    "x86_64-linux" = "sha256:1k9csx67s81jzr02qaa6ggh1hps4m1rd3yrpxrp1ly5mv2w2hwqa";
-    "aarch64-linux" = "sha256:162nasjhrh8vhn2j3hqswi8w7q1xnn7njcqzdkfk9aq8x1gq9lgh";
+    "x86_64-linux" = "sha256:1088zinqiaiz4krmcz7rpw66md4q7wdapshxvb183iggwi10mqia";
+    "aarch64-linux" = "sha256:1dw1qxwpw4vcrh3crknpr3bvxvlzvl8lq4iy8nj440ksnfaskldq";
     "aarch64-darwin" = "sha256:0cg1jdic4nxcqlz5lg4jam2g4xnw12d7y8dwbgiwiz116j5x1kr2";
   };
   dpmHash = dpmHashes.${system} or (throw "Unsupported system: ${system}");
