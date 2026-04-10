@@ -115,6 +115,8 @@ function subcmd_apply() {
         make -C "${SPLICE_ROOT}" cluster/helm/build -j
         _info "Previewing apply for cluster:"
         subcmd_pulumi cluster preview --show-sames --json "${args[@]}"
+        _info "Previewing apply for observability:"
+        subcmd_pulumi observability preview --show-sames --json "${args[@]}"
         _info "Previewing apply for infra:"
         subcmd_pulumi infra preview --show-sames --json "${args[@]}"
         _info "Previewing apply for canton-network:"
@@ -526,6 +528,7 @@ function subcmd_infra_down() {
 
     _info "Deactivating infrastructure Pulumi stack"
 
+    subcmd_pulumi observability down --yes --skip-preview
     subcmd_pulumi infra down --yes --skip-preview
 }
 
@@ -553,6 +556,62 @@ function subcmd_gcp_down() {
     subcmd_pulumi gcp down --yes --skip-preview
 }
 
+
+###
+
+subcommand_whitelist[_init_stack]="Initialize Pulumi stack file(s) for the given project(s) in the current cluster"
+
+function subcmd__init_stack() {
+    if [ "$#" -lt 1 ]; then
+        _error "Usage: $SCRIPTNAME _init_stack <project1> [<project2> ...]"
+    fi
+
+    for project in "$@"; do
+        _info "Initializing stack for project '$project' on cluster '$GCP_CLUSTER_BASENAME'"
+        _uses_pulumi_stack "$project"
+    done
+}
+
+###
+
+subcommand_whitelist[init_stacks]="Initialize Pulumi stack files for the given project(s) across all scratch clusters"
+
+function subcmd_init_stacks() {
+    if [ "$#" -lt 1 ]; then
+        _error "Usage: $SCRIPTNAME init_stacks <project1> [<project2> ...]"
+    fi
+
+    local projects=("$@")
+
+    # move to the deployment directory
+    cd ..
+    if [[ ! $PWD =~ /cluster/deployment$ ]]; then
+        _error "This command must be run from a cluster/deployment subdirectory"
+    fi
+
+    local failed_dirs=()
+    local found_any=0
+    for dir in */ ; do
+        [[ -d $dir ]] || continue
+        if [[ -f "$dir/.envrc" && -f "$dir/.envrc.vars" ]]; then
+            found_any=1
+            _info "Initializing stacks in $dir"
+            if ! direnv exec "$dir" cncluster _init_stack "${projects[@]}"; then
+                failed_dirs+=("$dir")
+            fi
+        fi
+    done
+
+    if [[ $found_any -eq 0 ]]; then
+        _error "No cluster directories found with .envrc and .envrc.vars"
+    fi
+
+    if [[ ${#failed_dirs[@]} -ne 0 ]]; then
+        _error "Failed to initialize stacks in the following directories: ${failed_dirs[*]}"
+    fi
+
+    _info "Successfully initialized stacks for project(s) '${projects[*]}' across all scratch clusters."
+}
 
 ###
 subcommand_whitelist[pulumi_preview_canton]="Preview the changes for the sv-canton migrations"
