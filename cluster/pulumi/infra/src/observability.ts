@@ -569,7 +569,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   );
   createGrafanaAlerting(namespaceName);
   if (!isMainNet) {
-    createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn.concat([prometheusStack]));
+    createGrafanaServiceAccount(
+      namespaceName,
+      adminPassword,
+      dependsOn.concat([prometheusStack, postgres.pg])
+    );
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
@@ -676,7 +680,7 @@ function createGrafanaServiceAccount(
     },
     {
       provider: grafanaProvider,
-      dependsOn: [...dependsOn, grafanaProvider],
+      dependsOn: dependsOn.concat(grafanaProvider),
     }
   );
   const serviceAccountToken = new grafana.ServiceAccountToken(
@@ -687,6 +691,7 @@ function createGrafanaServiceAccount(
     },
     {
       provider: grafanaProvider,
+      dependsOn: dependsOn.concat([serviceAccountResource, grafanaProvider]),
     }
   );
   new k8s.core.v1.Secret('grafana-service-account-token-secret', {
