@@ -27,10 +27,14 @@ final object LsuRollForwardTimestamp {
   implicit val configHint: FieldCoproductHint[LsuRollForwardTimestamp] =
     new FieldCoproductHint[LsuRollForwardTimestamp]("type")
   implicit val timestampReader: ConfigReader[Timestamp] = deriveReader[Timestamp]
-  implicit val timestampFromFileReader: ConfigReader[TimestampFromFile] = deriveReader[TimestampFromFile]
-  implicit val configReader: ConfigReader[LsuRollForwardTimestamp] = deriveReader[LsuRollForwardTimestamp]
+  implicit val timestampFromFileReader: ConfigReader[TimestampFromFile] =
+    deriveReader[TimestampFromFile]
+  implicit val configReader: ConfigReader[LsuRollForwardTimestamp] =
+    deriveReader[LsuRollForwardTimestamp]
 
   implicit val timestampWriter: ConfigWriter[Timestamp] = deriveWriter[Timestamp]
-  implicit val timestampFromFileWriter: ConfigWriter[TimestampFromFile] = deriveWriter[TimestampFromFile]
-  implicit val configWriter: ConfigWriter[LsuRollForwardTimestamp] = deriveWriter[LsuRollForwardTimestamp]
+  implicit val timestampFromFileWriter: ConfigWriter[TimestampFromFile] =
+    deriveWriter[TimestampFromFile]
+  implicit val configWriter: ConfigWriter[LsuRollForwardTimestamp] =
+    deriveWriter[LsuRollForwardTimestamp]
 }

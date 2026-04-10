@@ -118,9 +118,13 @@ class RollForwardLsuInitializer(
         rollForwardConfig.newPhysicalSynchronizerSerial,
         rollForwardConfig.newPhysicalSynchronizerProtocolVersion,
       )
-      (topologyExportTime, trafficExportTime) <- rollForwardConfig.exportTimes match {
+      (topologyExportTime, trafficExportTime, upgradeTime) <- rollForwardConfig.exportTimes match {
         case Some(config) =>
-          val resolved = (config.topologyExportTime.getTimestamp(), config.trafficExportTime.getTimestamp())
+          val resolved = (
+            config.topologyExportTime.getTimestamp(),
+            config.trafficExportTime.getTimestamp(),
+            config.upgradeTime.map(_.getTimestamp()),
+          )
           logger.info(s"Using export timestamps from config: $config, resolved: $resolved")
           Future.successful(resolved)
         case None =>
@@ -132,7 +136,11 @@ class RollForwardLsuInitializer(
             announcements match {
               case Seq(announcement) =>
                 logger.info(s"Using export timestamps from announcement: $announcement")
-                (CantonTimestamp.assertFromInstant(announcement.base.validFrom), announcement.mapping.upgradeTime)
+                (
+                  CantonTimestamp.assertFromInstant(announcement.base.validFrom),
+                  announcement.mapping.upgradeTime,
+                  Some(announcement.mapping.upgradeTime),
+                )
               case _ =>
                 throw new IllegalStateException(
                   s"Expected exactly one LSU announcement but got: $announcements"
@@ -148,7 +156,8 @@ class RollForwardLsuInitializer(
         } else {
           for {
             state <- exporter.exportLSUState(
-              topologyExportTime = rollForwardConfig.exportTimes.map(_.topologyExportTime.getTimestamp())
+              topologyExportTime =
+                rollForwardConfig.exportTimes.map(_.topologyExportTime.getTimestamp())
             )
             _ <- initializer.initializeSynchronizer(
               state,
@@ -179,7 +188,7 @@ class RollForwardLsuInitializer(
             .performManualLsu(
               legacyPhysicalSynchronizerId,
               newPhysicalSynchronizerId,
-              Some(trafficExportTime),
+              upgradeTime,
               Map(
                 sequencerId -> initializer.successorConnection
               ),

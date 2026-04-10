@@ -9,6 +9,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -22,7 +23,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.lsu.LsuRollForwardTimestamp
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.scan.config.ScanRollForwardLsuConfig
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvOnboardingConfig,
   SvSynchronizerNodeConfig,
@@ -75,10 +75,11 @@ class RollForwardLsuDRIntegrationTest
 
   // In theory we just want max sequencing time but Canton then waits for a time proof for that so we instead just use the timestamp of the last topology transaction.
   val topologyExportTimeFile = File.newTemporaryFile()
+  // In theory we just want max sequencing time but the sequencer may not observe an event at that time so we dynamically use the last sequenced observed time
+  val trafficExportTimeFile = File.newTemporaryFile()
 
   // This needs to be long enough in the future that we can start Canton and initialize for SVs.
-  val maxSequencingTime = CantonTimestamp.now().plusSeconds(160)
-  val trafficExportTime = maxSequencingTime
+  val maxSequencingTime = CantonTimestamp.now().plusSeconds(180)
   // 5s chosen by fair dice roll
   val lowerBoundSequencingTimeExclusive = maxSequencingTime.plusSeconds(5)
   val upgradeTime = lowerBoundSequencingTimeExclusive
@@ -137,8 +138,14 @@ class RollForwardLsuDRIntegrationTest
                           ProtocolVersion.v34,
                           exportTimes = Some(
                             SvOnboardingConfig.RollForwardLsuTimestampConfig(
-                              topologyExportTime = LsuRollForwardTimestamp.TimestampFromFile(topologyExportTimeFile.path),
-                              trafficExportTime = LsuRollForwardTimestamp.Timestamp(trafficExportTime),
+                              topologyExportTime = LsuRollForwardTimestamp.TimestampFromFile(
+                                topologyExportTimeFile.path
+                              ),
+                              trafficExportTime = LsuRollForwardTimestamp.TimestampFromFile(
+                                trafficExportTimeFile.path
+                              ),
+                              // Use ledger end, setting this to upgrade time will fail as that timestamp is not observed.
+                              upgradeTime = None,
                             )
                           ),
                         )
@@ -152,8 +159,6 @@ class RollForwardLsuDRIntegrationTest
                   .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
                   .focus(_.synchronizerNodes)
                   .modify(c => c.copy(legacy = c.current.some))
-                  .focus(_.rollForwardLsu)
-                  .replace(Some(ScanRollForwardLsuConfig(upgradeTime = Some(upgradeTime))))
             ),
           ),
         (_, config) => ConfigTransforms.withBftSequencers(_.contains("Local"))(config),
@@ -219,11 +224,29 @@ class RollForwardLsuDRIntegrationTest
       clue("Start nodes before DR") {
         startAllSync(allNodes*)
       }
-      clue("Stop nodes before DR to avoid log warnings") {
+      clue("SVs are connected to their own sequencer") {
+        forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
+          clue(s"sv ${sv.name} is connected to all sequencers") {
+            eventually(90.seconds) {
+              val synchronizerConfig = sv.participantClient.synchronizers
+                .config(sv.config.domains.global.alias)
+                .value
+              val sequencerConnections = synchronizerConfig.sequencerConnections
+              val connection = sequencerConnections.connections.forgetNE.loneElement
+              val endpoints = inside(connection) {
+                case c: data.GrpcSequencerConnection => c.endpoints
+              }
+              endpoints.forgetNE.loneElement shouldBe Endpoint("localhost", sv.config.localSynchronizerNodes.current.sequencer.internalApi.port)
+            }
+          }
+        }
+      }
+      clue("Stop old apps before DR") {
         stopAllAsync(allNodes*).futureValue
       }
 
-      val topologyTxs = sv1Backend.participantClient.topology.transactions.list(decentralizedSynchronizerId)
+      val topologyTxs =
+        sv1Backend.participantClient.topology.transactions.list(decentralizedSynchronizerId)
       val topologyExportTime = topologyTxs.result.map(_.sequenced).max
       logger.info(s"Setting topology export time to $topologyExportTime")
       topologyExportTimeFile.overwrite(topologyExportTime.value.toString)
@@ -254,6 +277,13 @@ class RollForwardLsuDRIntegrationTest
         clue(s"wait for upgrade time $upgradeTime") {
           Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
         }
+
+        val trafficExportTime = sv1Backend.participantClient.testing.fetch_synchronizer_time(
+          decentralizedSynchronizerId,
+          freshnessBound = NonNegativeFiniteDuration.ofSeconds(30),
+        )
+        logger.info(s"Setting traffic export time to $trafficExportTime")
+        trafficExportTimeFile.overwrite(trafficExportTime.toString)
 
         // Restart SV app with roll-forward LSU config
         startAllSync(((allSvLocalBackends: Seq[AppBackendReference]) ++ allScanLocalBackends)*)
