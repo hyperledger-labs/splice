@@ -2,7 +2,7 @@
   "name": "@lfdecentralizedtrust/splice-pulumi-observability",
   "main": "src/index.ts",
   "dependencies": {
-    "@pulumiverse/grafana": "0.16.3",
+    "@pulumiverse/grafana": "2.21.0",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0"
   },
