@@ -25,7 +25,7 @@ data InstrumentId = InstrumentId
 -- a provider to perform some services.
 data Account = Account
   with
-    owner: Party
+    owner : Party
       -- ^ The party that owns the account.
     provider : Optional Party
       -- ^ The provider of the account.

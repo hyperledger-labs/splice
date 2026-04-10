@@ -152,10 +152,8 @@ template ExternalPartyAmuletRules
         in
           settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
-      settlementFactory_settleBatchExtraObservers arg =
-        -- Make all senders and receiver observers, so we get by with a single
-        -- view for batch settlement of Amulet allocations
-        concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) arg.transferLegs
+      settlementFactory_settleBatchExtraObservers =
+        settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 

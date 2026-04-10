@@ -83,3 +83,6 @@ Cleanup performed so far:
 - Extend `BatchingUtilityV2` with support for accepting V2 transfer instructions
 - Add utility functions to create metadata for [V1 transaction history parsing](https://docs.digitalasset.com/integrate/devnet/exchange-integration/txingestion.html#differences-between-1-step-deposits-and-withdrawals)
   to `Splice.TokenStandard.Utils`
+- Change default implementation of `SettlementFactory_SettleBatch` to check uniqueness of transfer leg ids
+  to provide better safety guarantees for code that identifies legs by their ids
+- add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets

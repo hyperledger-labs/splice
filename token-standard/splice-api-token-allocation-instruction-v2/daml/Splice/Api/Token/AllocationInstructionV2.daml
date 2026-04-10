@@ -15,6 +15,7 @@ import Splice.Api.Token.AllocationV2
 -- AllocationInstruction
 ------------------------
 
+-- | Actions to advance the state of an allocation instruction.
 data AllocationInstructionAction
     = AIA_Withdraw
     | -- | Used to represent registry-specific actions that need to happen
@@ -47,9 +48,9 @@ data AllocationInstructionView = AllocationInstructionView with
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     availableActions : Map.Map [Party] [AllocationInstructionAction]
-      -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
+      -- ^ The actions that the wallet can present to the user to advance the allocation instruction.
       --
-      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- This field can be used to inform wallet users whether they can take an action or not;
       -- and which other parties they might be waiting on to take their action.
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
@@ -78,9 +79,12 @@ interface AllocationInstruction where
       actors : [Party]
         -- ^ Parties executing the withdrawal.
         --
-        -- Implementations MUST check these parties to avoid unauthorized settlement execution.
+        -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
-        -- Registries are free to decide on the required authorization for withdrawal. They MUST however report the parties that can withdraw unilaterally via the `AllocationView.canWithdraw` field, so that wallets can show the withdrawal option to the user.
+        -- Registries are free to decide on the required authorization for
+        -- withdrawal. They MUST however report the parties that can withdraw
+        -- unilaterally via the `AllocationInstructionView.availableActions`
+        -- field, so that wallets can show the withdrawal option to the user.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationInstruction_withdrawExtraObservers this arg
@@ -134,7 +138,7 @@ interface AllocationFactory where
         --
         -- Implementations MUST check their concrete values to avoid unauthorized allocation creation.
         --
-        -- Implementations SHOULD allow the initation of the allocation if the `actors`
+        -- Implementations SHOULD allow the initiation of the allocation if the `actors`
         -- is equal to the `authorizer` of the allocation. Likewise, for accounts
         -- where the account provider has the right to allocate funds, the registry
         -- SHOULD allow the initiation of the allocation if the `actors` are
@@ -157,7 +161,7 @@ interface AllocationFactory where
 -- | The result of instructing an allocation or advancing the state of an allocation instruction.
 data AllocationInstructionResult = AllocationInstructionResult with
     output : AllocationInstructionResult_Output
-     -- ^ The output of the step.
+      -- ^ The output of the step.
     authorizerChangeCids : TextMap.TextMap [ContractId Holding]
       -- ^ Holdings owned by the authorizer that were not used to fund the
       -- allocation or that were created to return "change", keyed by

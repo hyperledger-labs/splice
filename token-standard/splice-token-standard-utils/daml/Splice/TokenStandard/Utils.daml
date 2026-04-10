@@ -102,6 +102,10 @@ module Splice.TokenStandard.Utils (
   settlementFactoryV2_settleBatchDefaultImpl,
   settlementFactoryV2_defaultCreateReceiptAllocation,
 
+  -- *** Extra observers
+  settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl,
+  settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl,
+
   -- *** Support for custom batch settlement
   PreparedAllocations(..),
   validateAndPrepareAllocations,
