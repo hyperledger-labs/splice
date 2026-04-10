@@ -31,6 +31,11 @@ import com.digitalasset.canton.mediator.admin.v30.MediatorInitializationServiceG
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHandlerRegistry}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.SequencerConnections
+import com.digitalasset.canton.sequencing.client.pool.{
+  GrpcSequencerConnectionPoolFactory,
+  SequencerConnectionPool,
+}
 import com.digitalasset.canton.sequencing.client.{
   RecordingConfig,
   ReplayConfig,
@@ -38,11 +43,6 @@ import com.digitalasset.canton.sequencing.client.{
   SequencerClient,
   SequencerClientConfig,
   SequencerClientFactory,
-}
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnectionXPoolFactory,
-  SequencerConnectionXPool,
-  SequencerConnections,
 }
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.synchronizer.Synchronizer
@@ -267,11 +267,11 @@ class MediatorNodeBootstrap(
       )
       with GrpcMediatorInitializationService.Callback {
 
-    private val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
+    private val connectionPoolFactory = new GrpcSequencerConnectionPoolFactory(
       clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocols(parameters),
       minimumProtocolVersion = Some(ProtocolVersion.minimum),
       authConfig = parameters.sequencerClient.authToken,
-      keepAliveClientConfigO = parameters.sequencerClient.keepAliveClient,
+      params = parameters.sequencerClient.clientChannelParams(parameters.tracing.propagation),
       member = mediatorId,
       clock = clock,
       crypto = crypto,
@@ -524,11 +524,11 @@ class MediatorNodeBootstrap(
     def getSequencerConnectionFromStore: FutureUnlessShutdown[Option[SequencerConnections]] =
       synchronizerConfigurationStore.fetchConfiguration().map(_.map(_.sequencerConnections))
 
-    val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
+    val connectionPoolFactory = new GrpcSequencerConnectionPoolFactory(
       clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocols(parameters),
       minimumProtocolVersion = Some(ProtocolVersion.minimum),
       authConfig = parameters.sequencerClient.authToken,
-      keepAliveClientConfigO = parameters.sequencerClient.keepAliveClient,
+      params = parameters.sequencerClient.clientChannelParams(parameters.tracing.propagation),
       member = mediatorId,
       clock = clock,
       crypto = crypto.crypto,
@@ -540,7 +540,7 @@ class MediatorNodeBootstrap(
       loggerFactory = synchronizerLoggerFactory,
     )
 
-    val connectionPoolRef = new AtomicReference[Option[SequencerConnectionXPool]](None)
+    val connectionPoolRef = new AtomicReference[Option[SequencerConnectionPool]](None)
 
     val mediatorRuntimeET = for {
       physicalSynchronizerIdx <- EitherT
@@ -587,6 +587,7 @@ class MediatorNodeBootstrap(
         staticSynchronizerParameters,
         crypto,
         cryptoConfig,
+        Some(arguments.metrics.kmsMetrics),
         parameters.batchingConfig.parallelism,
         parameters.cachingConfigs.publicKeyConversionCache,
         timeouts,
@@ -735,6 +736,7 @@ class MediatorNodeBootstrap(
         arguments.metrics,
         config.mediator,
         synchronizerLoggerFactory,
+        arguments.futureSupervisor,
       )
       _ <- mediatorRuntime.start()
     } yield mediatorRuntime

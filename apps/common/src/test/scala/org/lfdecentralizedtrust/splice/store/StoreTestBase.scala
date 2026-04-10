@@ -1431,6 +1431,7 @@ abstract class StoreTestBase
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
       externalTransactionHash,
+      0L, // traffic cost
     )
   }
 
@@ -1467,6 +1468,7 @@ abstract class StoreTestBase
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
       externalTransactionHash,
+      0L, // traffic cost
     )
   }
 

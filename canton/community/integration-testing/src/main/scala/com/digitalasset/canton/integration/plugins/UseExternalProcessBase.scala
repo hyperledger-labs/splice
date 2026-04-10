@@ -72,6 +72,7 @@ trait UseExternalProcessBase[Config]
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit =
     if (shutdownPhase == ShutdownPhase.AfterEnvironment) handler.killAndRemove()
 
+  def crashed(instanceName: String): Unit = handler.crashed(instanceName)
   def kill(instanceName: String, force: Boolean = true): Unit = handler.tryKill(instanceName, force)
   def stop(instanceName: String): Unit = handler.stopAndRemove(instanceName)
   def isRunning(instanceName: String): Boolean = handler.tryIsRunning(instanceName)

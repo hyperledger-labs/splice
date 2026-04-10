@@ -379,6 +379,7 @@ object UpdateHistoryTestBase {
 
       /*recordTime = */ tree.getRecordTime,
       /*externalTransactionHash = */ tree.getExternalTransactionHash,
+      /*paidTrafficCost = */ 0L,
     )
   }
 

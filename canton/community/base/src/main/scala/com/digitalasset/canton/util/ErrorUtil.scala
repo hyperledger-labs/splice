@@ -5,22 +5,13 @@ package com.digitalasset.canton.util
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import io.grpc.{Status, StatusRuntimeException}
 
-import java.io.{PrintWriter, StringWriter}
+import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.control.NonFatal
 
 object ErrorUtil {
-
-  /** Yields a string representation of a throwable (including stack trace and causes).
-    */
-  def messageWithStacktrace(t: Throwable): String = {
-    val result = new StringWriter()
-    t.printStackTrace(new PrintWriter(result))
-    result.toString
-  }
 
   def internalErrorGrpc(msg: String)(implicit loggingContext: ErrorLoggingContext): Nothing = {
     val t = new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
