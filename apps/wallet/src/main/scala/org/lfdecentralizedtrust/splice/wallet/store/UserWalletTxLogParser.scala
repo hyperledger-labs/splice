@@ -110,13 +110,21 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.{
   TransferTransactionSubtype,
 }
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
     endUserParty: PartyId,
+    dsoParty: PartyId,
 ) extends TxLogStore.Parser[TxLogEntry]
     with NamedLogging {
   import UserWalletTxLogParser.*
+
+  private val endUserPartyProtoPrimitive = endUserParty.toProtoPrimitive
+  private val amuletInstrumentId = new holdingv1.InstrumentId(
+    dsoParty.toProtoPrimitive,
+    "Amulet",
+  )
 
   // ignoreUnexpectedAmuletCreateArchive disables the warning when we
   // hit a bare create/archive of an amulet contract.  We use this for
@@ -250,7 +258,7 @@ class UserWalletTxLogParser(
                     // Err on the safe side when parsing log entries before the upgrade that introduced the optEndUserParty
                     // annotation in the batch result.
                     actingEndUserParty.isEmpty || actingEndUserParty
-                      .contains(endUserParty.toProtoPrimitive)
+                      .contains(endUserPartyProtoPrimitive)
                   ) {
                     val details = reason match {
                       case r: ITR_InsufficientFunds =>
@@ -1097,22 +1105,26 @@ class UserWalletTxLogParser(
             now {
               node.argument.value.transferLegs.asScala.foldLeft(State.empty) {
                 case (stateAcc, leg) =>
-                  stateAcc.appended(
-                    State(
-                      immutable.Queue(
-                        BalanceChangeTxLogEntry(
-                          eventId = EventId
-                            .prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
-                          // The sending side should already be handled in AllocationFactoryV2Allocate,
-                          // here we just need to handle the coin unlocking
-                          receiver = leg.receiver.owner,
-                          amount = leg.amount,
-                          subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
-                          date = Some(tree.getEffectiveAt),
+                  if (
+                    leg.instrumentId == amuletInstrumentId && leg.sender.owner == endUserPartyProtoPrimitive || leg.receiver.owner == endUserPartyProtoPrimitive
+                  ) {
+                    stateAcc.appended(
+                      State(
+                        immutable.Queue(
+                          BalanceChangeTxLogEntry(
+                            eventId = EventId
+                              .prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                            // The sending side should already be handled in AllocationFactoryV2Allocate,
+                            // here we just need to handle the coin unlocking
+                            receiver = leg.receiver.owner,
+                            amount = leg.amount,
+                            subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
+                            date = Some(tree.getEffectiveAt),
+                          )
                         )
                       )
                     )
-                  )
+                  } else stateAcc
               }
             }
           case AllocationExecuteTransfer(node) =>
@@ -1218,7 +1230,7 @@ class UserWalletTxLogParser(
             }
 
           case TransferInstructionCreate(create)
-              if create.payload.transfer.receiver == endUserParty.toProtoPrimitive =>
+              if create.payload.transfer.receiver == endUserPartyProtoPrimitive =>
             val sender = create.payload.transfer.sender
             val receiver = create.payload.transfer.receiver
             // We hit this for the receiver which does not see the TransferFactory_Transfer choice.
