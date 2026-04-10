@@ -279,7 +279,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
         },
         grafana: {
           fullnameOverride: 'grafana',
-          envFromSecret: 'grafana-pg-secret',
+          envFromSecret: postgres.secretName,
           ingress: {
             enabled: false,
           },

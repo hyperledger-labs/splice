@@ -1212,7 +1212,7 @@
           "deploymentStrategy": {
             "type": "Recreate"
           },
-          "envFromSecret": "grafana-pg-secret",
+          "envFromSecret": "grafana-postgres-secret",
           "fullnameOverride": "grafana",
           "grafana.ini": {
             "database": {
