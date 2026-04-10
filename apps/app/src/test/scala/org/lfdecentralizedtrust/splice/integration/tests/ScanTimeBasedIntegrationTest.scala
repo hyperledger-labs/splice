@@ -640,7 +640,7 @@ class ScanTimeBasedIntegrationTest
       // Compare bulk storage data to hot storage data from scan
       // TODO(#4788): for now, bulk storage still uses v0, so we use that here as well
       val acsAtMidnightFromScan = sv1ScanBackend
-        .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
+        .getAcsSnapshotAtV1(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
         .createdEvents
       val acsObjUrl = getSnapshotResponse.objectRefs.head.url
@@ -653,7 +653,7 @@ class ScanTimeBasedIntegrationTest
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(
         ByteString(out.toByteArray),
-        io.circe.parser.decode[definitions.CreatedEvent],
+        io.circe.parser.decode[definitions.ActiveContract],
       )
       acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
 
@@ -694,13 +694,12 @@ class ScanTimeBasedIntegrationTest
       updatesFromScan should contain theSameElementsAs updatesFromS3
 
       // Compare acs v0 and v1 endpoints
-      val acsV1AtMidnightFromScan = sv1ScanBackend
-        .getAcsSnapshotAtV1(CantonTimestamp.assertFromInstant(lastMidnight), 0)
+      val acsV0AtMidnightFromScan = sv1ScanBackend
+        .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
         .createdEvents
 
-      compareAcsV0V1(acsAtMidnightFromScan, acsV1AtMidnightFromScan)
-
+      compareAcsV0V1(acsV0AtMidnightFromScan, acsAtMidnightFromScan)
     }
   }
 }
