@@ -1,9 +1,15 @@
 # Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+override-components:
+  damlc:
+    version: $DAML_VERSION
+  daml-script:
+    version: $DAML_VERSION
+  codegen:
+    version: $DAML_VERSION
 build-options:
-- --target=2.1
+- --target=2.2
 name: canton-builtin-admin-workflow-party-replication-alpha
 source: Canton/Internal/PartyReplication.daml
 version: 1.0.0

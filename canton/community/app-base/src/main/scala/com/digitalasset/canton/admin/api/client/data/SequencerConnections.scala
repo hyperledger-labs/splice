@@ -259,7 +259,7 @@ final case class SubmissionRequestAmplification(
     paramIfDefined("confirmationResponsePatience", _.confirmationResponsePatienceO),
   )
 
-  def toInternal: SubmissionRequestAmplificationInternal =
+  private[canton] def toInternal: SubmissionRequestAmplificationInternal =
     this.transformInto[SubmissionRequestAmplificationInternal]
 }
 
@@ -299,7 +299,7 @@ final case class SequencerConnectionPoolDelays(
     param("subscriptionRequestDelay", _.subscriptionRequestDelay),
   )
 
-  def toInternal: SequencerConnectionPoolDelaysInternal =
+  private[canton] def toInternal: SequencerConnectionPoolDelaysInternal =
     this.transformInto[SequencerConnectionPoolDelaysInternal]
 }
 

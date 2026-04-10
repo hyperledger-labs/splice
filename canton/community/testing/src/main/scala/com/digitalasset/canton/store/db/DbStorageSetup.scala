@@ -364,10 +364,9 @@ object DbStorageSetup {
 
     val isCI = sys.env.contains("CI")
     val isMachine = sys.env.contains("MACHINE")
-    val isGha = sys.env.contains("GITHUB_ACTION")
     val useTestContainerByForce = sys.env.contains("DB_FORCE_TEST_CONTAINER") || forceTestContainer
 
-    if (!useTestContainerByForce && ((isCI && !isMachine) || isGha))
+    if (!useTestContainerByForce && (isCI && !isMachine))
       new PostgresCISetup(migrationMode, mkDbConfig, useDbNameO, loggerFactory).initialized()
     else new PostgresTestContainerSetup(migrationMode, mkDbConfig, loggerFactory).initialized()
   }

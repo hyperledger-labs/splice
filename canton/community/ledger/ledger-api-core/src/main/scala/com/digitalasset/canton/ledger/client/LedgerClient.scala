@@ -151,7 +151,7 @@ object LedgerClient {
     token
       .fold(stub)(authorizingStub(stub, _))
       .withInterceptors(TraceContextGrpc.clientInterceptor())
-      .withOption(TraceContextGrpc.TraceContextCallOptionKey, traceContext)
+      .withOption(TraceContextGrpc.TraceContextOptionsKey, traceContext)
 
   /** A convenient shortcut to build a [[LedgerClient]], use [[fromBuilder]] for a more flexible
     * alternative.

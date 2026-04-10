@@ -13,7 +13,6 @@ import com.digitalasset.canton.console.commands.ParticipantCommands
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
-import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment
@@ -43,7 +42,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
-        darDataO: Option[ByteString] = None,
     ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
@@ -57,7 +55,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
             expectedMainPackageId = expectedMainPackageId,
             requestHeaders = requestHeaders,
             logger,
-            darDataO,
           )
       )
       if (synchronizeVetting && vetAllPackages) {

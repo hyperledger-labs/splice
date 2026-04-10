@@ -15,7 +15,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.BftSequencer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PNetworkConfig
 import com.digitalasset.canton.{BaseTest, SequencerAlias, UniquePortGenerator}
-import com.digitalasset.canton.environment.CantonEnvironment
 import eu.rekawek.toxiproxy.ToxiproxyClient
 import monocle.macros.GenLens
 import monocle.macros.syntax.lens.*
@@ -45,7 +44,7 @@ import scala.concurrent.duration.*
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
 final case class UseToxiproxy(toxiproxyConfig: ToxiproxyConfig)
-    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+    extends EnvironmentSetupPlugin
     with BaseTest {
   private val TOXIPROXY_CONTROL_PORT: Int = 8474
   var runningToxiproxy: RunningToxiproxy = _

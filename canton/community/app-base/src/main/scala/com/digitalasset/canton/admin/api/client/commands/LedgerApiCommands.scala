@@ -38,13 +38,13 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
   ListUsersResponse,
   RevokeUserRightsRequest,
   RevokeUserRightsResponse,
+  Right as UserRight,
   UpdateUserIdentityProviderIdRequest,
   UpdateUserIdentityProviderIdResponse,
   UpdateUserRequest,
   UpdateUserResponse,
   User,
   UserManagementServiceGrpc,
-  Right as UserRight,
 }
 import com.daml.ledger.api.v2.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub
 import com.daml.ledger.api.v2.command_completion_service.{

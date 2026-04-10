@@ -113,9 +113,10 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
     lock.exclusive {
       topologyTransactionStore
         .filter(x =>
-          x.from.value < asOfExclusive.value && x.rejected.isEmpty && x.until.forall(
-            _.value >= asOfExclusive.value
-          ) && filter(x)
+          x.from.value < asOfExclusive.value
+            && x.rejected.isEmpty
+            && x.until.forall(_.value >= asOfExclusive.value)
+            && filter(x)
         )
         .map(_.transaction)
         .toSeq
@@ -212,7 +213,8 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       topologyTransactionStore
         .filter { entry =>
           itemsMap.get(entry.indexKey).exists { validUntil =>
-            entry.rejected.isEmpty && entry.until.forall(ts => ts >= validUntil)
+            entry.rejected.isEmpty
+            && entry.until.forall(ts => ts >= validUntil)
           }
         }
         .sortBy(c => (c.until.map(_.value).getOrElse(CantonTimestamp.MaxValue), c.batchIdx))

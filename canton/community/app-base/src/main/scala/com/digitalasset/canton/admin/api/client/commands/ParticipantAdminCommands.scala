@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
-import cats.syntax.option.*
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -189,13 +189,7 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class DarData(
-        darPath: String,
-        description: String,
-        expectedMainPackageId: String,
-        // We sometimes want to upload DARs that are inside JARs, which is hard with just a path.
-        darDataO: Option[ByteString] = None,
-    )
+    final case class DarData(darPath: String, description: String, expectedMainPackageId: String)
     final case class UploadDar(
         dars: Seq[DarData],
         synchronizerId: Option[SynchronizerId],
@@ -209,17 +203,12 @@ object ParticipantAdminCommands {
           .traverse(dar =>
             for {
               _ <- Either.cond(dar.darPath.nonEmpty, (), "Provided DAR path is empty")
-              filenameAndDarData <- dar.darDataO.fold(loadDarData(dar.darPath))(darData =>
-                Right(Paths.get(dar.darPath).getFileName.toString -> darData)
-              )
+              filenameAndDarData <- loadDarData(dar.darPath)
               (filename, darData) = filenameAndDarData
               descriptionOrFilename =
                 if (dar.description.isEmpty)
                   PathUtils.getFilenameWithoutExtension(Path.of(filename))
                 else dar.description
-              _ = logger.info(s"Sending upload dar for ${descriptionOrFilename}")(
-                TraceContext.empty
-              )
             } yield v30.UploadDarRequest.UploadDarData(
               darData,
               Some(descriptionOrFilename),
@@ -283,9 +272,8 @@ object ParticipantAdminCommands {
           expectedMainPackageId: String,
           requestHeaders: Map[String, String],
           logger: TracedLogger,
-          darDataO: Option[ByteString],
       ): UploadDar = UploadDar(
-        Seq(DarData(darPath, description, expectedMainPackageId, darDataO)),
+        Seq(DarData(darPath, description, expectedMainPackageId)),
         synchronizerId,
         vetAllPackages = vetAllPackages,
         synchronizeVetting = synchronizeVetting,
@@ -903,51 +891,6 @@ object ParticipantAdminCommands {
             )
           },
           acsBytes,
-        )
-      }
-
-      override protected def handleResponse(
-          response: v30.ImportAcsResponse
-      ): Either[String, Unit] = Right(())
-    }
-
-    final case class ImportAcsBytes(
-        acsChunk: Seq[ByteString],
-        workflowIdPrefix: String,
-        contractImportMode: ContractImportMode,
-        representativePackageIdOverride: RepresentativePackageIdOverride,
-        excludedStakeholders: Set[PartyId],
-        synchronizerId: SynchronizerId,
-    ) extends GrpcAdminCommand[
-          Unit,
-          v30.ImportAcsResponse,
-          Unit,
-        ] {
-
-      override type Svc = ParticipantRepairServiceStub
-
-      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
-        v30.ParticipantRepairServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, Unit] =
-        Right(())
-
-      override protected def submitRequest(
-          service: ParticipantRepairServiceStub,
-          request: Unit,
-      ): Future[v30.ImportAcsResponse] = {
-        GrpcStreamingUtils.streamToServerChunked(
-          service.importAcs,
-          acsChunk.map(chunk =>
-            v30.ImportAcsRequest(
-              chunk,
-              Some(workflowIdPrefix),
-              Some(contractImportMode.toProtoV30),
-              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-              Some(representativePackageIdOverride.toProtoV30),
-              Some(synchronizerId.toProtoPrimitive),
-            )
-          ),
         )
       }
 
