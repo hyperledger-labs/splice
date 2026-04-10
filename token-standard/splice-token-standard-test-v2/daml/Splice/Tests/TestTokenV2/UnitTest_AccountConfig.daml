@@ -125,7 +125,7 @@ test_requiredApprovers = do
           , [p]
           )
         , ( providerConfirmation
-          , [p]
+          , [o, p] -- owner approval is indirectly required, as the provider cannot initiate an action on their own
           )
         ]
   forA_ testCases $ \((name, config), expectedApprovers) -> do

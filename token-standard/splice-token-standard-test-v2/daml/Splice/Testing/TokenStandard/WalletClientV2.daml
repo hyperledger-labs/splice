@@ -16,6 +16,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     checkHoldingWithAmountExists,
     checkBalanceBounds,
     checkBalance,
+    checkAccountBalance,
     checkBalanceApprox,
     checkHolding,
     checkHoldingBounds,
@@ -73,6 +74,7 @@ import DA.Map qualified as Map
 import DA.Optional (isSome, isNone)
 import DA.Time
 import DA.TextMap qualified as TextMap
+import DA.Text qualified as T
 import DA.Set qualified as Set
 
 import Splice.Api.Token.MetadataV1 as MetadataV1
@@ -176,6 +178,22 @@ checkHoldingApprox p holdingCid approximateAmount = checkHoldingBounds p holding
 checkBalance : Party -> V2.InstrumentId -> Decimal -> Script ()
 checkBalance p instrumentId balance =
   checkBalanceBounds p instrumentId (balance, balance)
+
+checkAccountBalance : Party -> V2.Account -> V2.InstrumentId -> Decimal -> Script ()
+checkAccountBalance actor account instrumentId balance = do
+  holdings <- listVisibleHoldings actor
+  let totalAmount = sum $ do
+        (_, holding) <- holdings
+        guard (holding.account == account && holding.instrumentId == instrumentId)
+        pure holding.amount
+  unless (totalAmount == balance) $ fail $ T.unlines
+    [ "Unexpected account balance:"
+    , "Account: " <> show account
+    , "Instrument: " <> show instrumentId
+    , "Expected balance: " <> show balance
+    , "Actual balance: " <> show totalAmount
+    ]
+
 
 -- Transfer offers
 ------------------

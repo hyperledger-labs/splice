@@ -77,10 +77,17 @@ test_self_transfer_to_account = do
 
   -- mint funds
   TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
-  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 100.0
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 150.0
   TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
 
-  -- define transfers
+
+  -- Check balances
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrY 150.0
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 200.0
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 200.0
+
+
+  -- shared transfer params
   now <- getTime
   let requestedAt = now
   let executeBefore = now `addRelTime` days 1
@@ -98,6 +105,9 @@ test_self_transfer_to_account = do
       requestedAt
       executeBefore
       meta = TSU.reasonToMeta "alice -> aliceSelf - test transfer 1" emptyMetadata
+
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 90.0
+  WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 10.0
 
 {-
   -- test creating three outgoing transfers in on batch

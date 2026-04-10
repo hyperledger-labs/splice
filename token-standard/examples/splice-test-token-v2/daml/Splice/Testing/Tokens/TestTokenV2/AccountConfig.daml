@@ -102,10 +102,13 @@ nextActors previousActor config account =
 
 -- | Parties that must approve an action on the account.
 requiredApprovers : AccountConfig -> V2.Account -> Set.Set Party
-requiredApprovers config account =
+requiredApprovers (AccountConfig with ownerConfig = owner, providerConfig = provider) account =
   Set.fromList $
-    [ account.owner | mustApprove config.ownerConfig ] <>
-    [ p | mustApprove config.providerConfig, Some p <- [account.provider] ]
+    [ account.owner | ownerApproval ] <>
+    [ p | providerApproval, Some p <- [account.provider] ]
+  where
+    ownerApproval = owner.mustApprove || (owner.canInitiate && not provider.canInitiate)
+    providerApproval = provider.mustApprove || (provider.canInitiate && not owner.canInitiate)
 
 -- | Available actions on a transfer instruction.
 --
