@@ -180,8 +180,9 @@ class TokenStandardV2AllocationIntegrationTest
                 },
                 { case logEntry: TransferTxLogEntry =>
                   logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
-                  // No balance is transferred (just locking) here so receivers is empty
-                  logEntry.receivers shouldBe Seq.empty
+                  logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(bobParty.toProtoPrimitive, aliceTransferAmount)
+                  )
                   logEntry.sender shouldBe Some(
                     PartyAndAmount(aliceParty.toProtoPrimitive, -aliceTransferAmount)
                   )
@@ -190,6 +191,14 @@ class TokenStandardV2AllocationIntegrationTest
                   logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
                 },
               ),
+              ignore = {
+                case transfer: TransferTxLogEntry =>
+                  inside(transfer) { _ =>
+                    // ignore merges
+                    transfer.receivers.isEmpty && transfer.sender.value.party == aliceParty.toProtoPrimitive
+                  }
+                case _ => false
+              },
             )
           }
           clue("Check bob's balance") {
@@ -209,24 +218,33 @@ class TokenStandardV2AllocationIntegrationTest
                 { case logEntry: TransferTxLogEntry =>
                   logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
                   logEntry.receivers shouldBe Seq(
+                    PartyAndAmount(aliceParty.toProtoPrimitive, bobTransferAmount)
+                  )
+                  logEntry.sender shouldBe Some(
+                    PartyAndAmount(bobParty.toProtoPrimitive, -bobTransferAmount)
+                  )
+                },
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
+                  logEntry.receivers shouldBe Seq(
                     PartyAndAmount(bobParty.toProtoPrimitive, aliceTransferAmount)
                   )
                   logEntry.sender shouldBe Some(
                     PartyAndAmount(aliceParty.toProtoPrimitive, -aliceTransferAmount)
                   )
                 },
-                { case logEntry: TransferTxLogEntry =>
-                  logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.Transfer.toProto
-                  // No balance is transferred (just locking) here so receivers is empty
-                  logEntry.receivers shouldBe Seq.empty
-                  logEntry.sender shouldBe Some(
-                    PartyAndAmount(bobParty.toProtoPrimitive, -bobTransferAmount)
-                  )
-                },
                 { case logEntry: BalanceChangeTxLogEntry =>
                   logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
                 },
               ),
+              ignore = {
+                case transfer: TransferTxLogEntry =>
+                  inside(transfer) { _ =>
+                    // ignore merges
+                    transfer.receivers.isEmpty && transfer.sender.value.party == bobParty.toProtoPrimitive
+                  }
+                case _ => false
+              },
             )
           }
         }

@@ -121,6 +121,7 @@ class UserWalletTxLogParser(
   import UserWalletTxLogParser.*
 
   private val endUserPartyProtoPrimitive = endUserParty.toProtoPrimitive
+  // TODO (#4973): remove this if/when v1 and v2 InstrumentId are unified
   private val amuletInstrumentIdV2 = new holdingv2.InstrumentId(
     dsoParty.toProtoPrimitive,
     "Amulet",
@@ -1083,29 +1084,11 @@ class UserWalletTxLogParser(
                 )
               }
             }
-          case AllocationFactoryV2Allocate(node) =>
-            // 24h submisison delay is already effective as of Token Standard V2,
-            // so we know (unlike in V1, see above) that there will not be an internal call to AmuletRules_Transfer
+          case AllocationFactoryV2Allocate(_) =>
+            // We deliberately ignore the locking happening here, and letting the full transfer be reported in
+            // the SettlementFactorySettle branch below to avoid double-reporting of amounts as part of locking
             now {
-              node.argument.value.allocation.transferLegs.asScala.foldLeft(State.empty) {
-                case (stateAcc, leg) =>
-                  // Here we only care about the amulet locking, i.e., when sender=enduser
-                  // The transfer itself is handled below in SettlementFactorySettle
-                  if (
-                    leg.instrumentId == amuletInstrumentIdV2 && leg.sender.owner == endUserPartyProtoPrimitive
-                  ) {
-                    stateAcc.appended(
-                      State.fromAllocationTransferLeg(
-                        tree.getUpdateId,
-                        exercised.getNodeId,
-                        leg.transferLegId,
-                        tree.getEffectiveAt,
-                        leg.sender.owner,
-                        leg.amount,
-                      )
-                    )
-                  } else stateAcc
-              }
+              State.empty
             }
           // Using SettlementFactorySettle makes it easier than using AllocationV2Settle,
           // because that one does not (easily) include the transfer legs whereas this one does
@@ -1114,8 +1097,7 @@ class UserWalletTxLogParser(
               node.argument.value.transferLegs.asScala.foldLeft(State.empty) {
                 case (stateAcc, transferLeg) =>
                   if (
-                    // the sender part is handled by AllocationFactoryV2Allocate above
-                    transferLeg.instrumentId == amuletInstrumentIdV2 && transferLeg.receiver.owner == endUserPartyProtoPrimitive
+                    transferLeg.instrumentId == amuletInstrumentIdV2 && (transferLeg.receiver.owner == endUserPartyProtoPrimitive || transferLeg.sender.owner == endUserPartyProtoPrimitive)
                   ) {
                     stateAcc.appended(
                       State(
