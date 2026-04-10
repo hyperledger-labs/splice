@@ -5,16 +5,17 @@ package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ReassignmentRef.ContractIdRef
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.protocol.{ContractInstance, ReassignmentId}
+import com.digitalasset.canton.protocol.{ContractInstance, ReassignmentId, Stakeholders}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ContractValidator, EitherTUtil, MonadUtil, ReassignmentTag}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPackageId, LfPartyId}
 
 import scala.concurrent.ExecutionContext
@@ -65,6 +66,54 @@ object ReassignmentValidation {
       )
     } yield ()
 
+  def checkMultiSynchronizerEnabled(
+      topologySnapshot: TopologySnapshot,
+      stakeholders: Stakeholders,
+      psid: PhysicalSynchronizerId,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] =
+    for {
+      participants <- topologySnapshot
+        .activeParticipantsOfAll(stakeholders.all.toList)
+        .leftMap(inactiveParties =>
+          ReassignmentValidationError.StakeholderHostingErrors(
+            s"The following stakeholders are not active: $inactiveParties"
+          )
+        )
+      _ <- checkMultiSynchronizerEnabled(topologySnapshot, participants, psid)
+    } yield ()
+
+  def checkMultiSynchronizerEnabled(
+      topologySnapshot: TopologySnapshot,
+      participants: Set[ParticipantId],
+      psid: PhysicalSynchronizerId,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] =
+    if (psid.protocolVersion >= ProtocolVersion.v35)
+      for {
+        participantWithMultiSynchronizerEnabled <- EitherT.right(
+          topologySnapshot.participantsWithSupportedFeature(
+            participants,
+            feature = ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer,
+          )
+        )
+        _ <- EitherT.fromEither[FutureUnlessShutdown](
+          Either.cond(
+            participantWithMultiSynchronizerEnabled == participants,
+            (),
+            ReassignmentValidationError.MultiSynchronizerIsNotEnabled(
+              participants.diff(participantWithMultiSynchronizerEnabled),
+              psid,
+            ): ReassignmentValidationError,
+          )
+        )
+      } yield ()
+    else EitherTUtil.unitUS
+
   def authenticateContractAndStakeholders(
       contractValidator: ContractValidator,
       reassignmentRequest: FullReassignmentViewTree,
@@ -93,7 +142,6 @@ object ReassignmentValidation {
         reassignmentRequest.contracts.contracts.forgetNE,
         reassignmentRef = Some(reassignmentRequest.reassignmentRef),
       )
-
     } yield ()
   }
 

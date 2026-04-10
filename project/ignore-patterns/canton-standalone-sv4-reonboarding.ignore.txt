@@ -19,3 +19,4 @@ Failed to send result to sequencer for request .*Unregistered recipients.* unreg
 
 Could not send a time-advancing message
 Unregistered recipients.*::sv4SvReonboarding
+GrpcRequestRefusedByServer: UNAUTHENTICATED.*Authentication token for member .*sv4SvReonboarding.* has expired

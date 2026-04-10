@@ -24,12 +24,14 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.KmsMetrics
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
@@ -106,30 +108,53 @@ object SyncCryptoSigner {
       member: Member,
       crypto: SynchronizerCrypto,
       cryptoConfig: CryptoConfig,
+      kmsMetrics: Option[KmsMetrics],
       publicKeyConversionCacheConfig: CacheConfig,
       futureSupervisor: FutureSupervisor,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): SyncCryptoSigner =
-    if (cryptoConfig.sessionSigningKeys.enabled)
-      new SyncCryptoSignerWithSessionKeys(
-        synchronizerId,
-        staticSynchronizerParameters,
-        member,
-        crypto.privateCrypto,
-        crypto.cryptoPrivateStore,
-        cryptoConfig.sessionSigningKeys,
-        publicKeyConversionCacheConfig,
-        futureSupervisor: FutureSupervisor,
-        timeouts,
-        loggerFactory,
-      )
-    else
-      SyncCryptoSigner.createWithLongTermKeys(
-        member,
-        crypto,
-        loggerFactory,
-      )
+  )(implicit executionContext: ExecutionContext): SyncCryptoSigner = {
+
+    lazy val createLongTermKeySigning = SyncCryptoSigner.createWithLongTermKeys(
+      member,
+      crypto,
+      loggerFactory,
+    )
+
+    if (cryptoConfig.sessionSigningKeys.enabled) {
+      // session signing keys can only be used with PV35+
+      if (staticSynchronizerParameters.protocolVersion >= ProtocolVersion.v35) {
+        // session signing keys
+        new SyncCryptoSignerWithSessionKeys(
+          synchronizerId,
+          staticSynchronizerParameters,
+          member,
+          crypto.privateCrypto,
+          kmsMetrics,
+          crypto.cryptoPrivateStore,
+          cryptoConfig.sessionSigningKeys,
+          publicKeyConversionCacheConfig,
+          futureSupervisor: FutureSupervisor,
+          timeouts,
+          loggerFactory,
+        )
+      } else {
+        // WARN + long term keys
+        loggerFactory
+          .getLogger(getClass)
+          .warn(
+            s"Using a session signing key is not possible with protocol version ${staticSynchronizerParameters.protocolVersion}. " +
+              s"Please use protocol version PV35 or higher, or disable session signing keys. " +
+              s"In the meantime, we will revert to using the long-term key for signing messages."
+          )
+
+        createLongTermKeySigning
+      }
+    } else {
+      // long term keys
+      createLongTermKeySigning
+    }
+  }
 
   /** @param approximateTimestamp
     *   The timestamp used during signing to compute the validity period of session signing keys.
@@ -143,6 +168,9 @@ object SyncCryptoSigner {
     *   Optional timestamp defining the end of the validity period — the latest time at which a
     *   signature verification is expected to succeed. The chosen session signing key may be valid
     *   for longer.
+    *
+    * A validity period end of `CantonTimestamp.MaxValue` indicates that a session signing key is
+    * not expected to be used, so any fallback to the long-term key is not recorded.
     */
   final case class SigningTimestampOverrides(
       approximateTimestamp: CantonTimestamp,

@@ -9,17 +9,11 @@ import com.daml.scalautil.Statement.discard
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.data.Time
-import com.digitalasset.daml.lf.interpretation.NeedKeyContinuationToken
 import com.digitalasset.daml.lf.language.{Ast, LanguageVersion, PackageInterface}
-import com.digitalasset.daml.lf.speedy.SResult._
+import com.digitalasset.daml.lf.speedy.SResult.*
 import com.digitalasset.daml.lf.stablepackages.StablePackages
 import com.digitalasset.daml.lf.testing.parser.ParserParameters
-import com.digitalasset.daml.lf.transaction.{
-  FatContractInstance,
-  GlobalKeyWithMaintainers,
-  NeedKeyProgression,
-  SubmittedTransaction,
-}
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, GlobalKey, NeedKeyProgression, SubmittedTransaction}
 import com.digitalasset.daml.lf.validation.{Validation, ValidationError}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -40,14 +34,12 @@ private[speedy] object SpeedyTestLib {
 
   final case object UnexpectedSResultScenarioX extends Error("unexpected SResultScenarioX")
 
-  case class ContinuationToken(cids: Vector[FatContractInstance]) extends NeedKeyContinuationToken
-
   @throws[SError.SErrorCrash]
   def run(
       machine: Speedy.Machine[Question.Update],
       getPkg: PartialFunction[PackageId, CompiledPackages] = PartialFunction.empty,
       getContract: PartialFunction[Value.ContractId, FatContractInstance] = PartialFunction.empty,
-      getKeys: PartialFunction[GlobalKeyWithMaintainers, Vector[FatContractInstance]] =
+      getKeys: PartialFunction[GlobalKey, Vector[FatContractInstance]] =
         PartialFunction.empty,
       getTime: PartialFunction[Unit, Time.Timestamp] = PartialFunction.empty,
       hashingMethod: ContractId => Hash.HashingMethod = _ => Hash.HashingMethod.TypedNormalForm,
@@ -79,21 +71,11 @@ private[speedy] object SpeedyTestLib {
           case None =>
             throw UnknownPackage(pkg)
         }
-      case Question.Update.NeedKey(key, n, canContinueProgress, _, callback) =>
-        val cids = canContinueProgress match {
-          case NeedKeyProgression.InProgress(ContinuationToken(rest)) =>
-            rest
-          case NeedKeyProgression.Unstarted =>
-            getKeys.lift(key).getOrElse(Vector.empty)
-        }
-        val (returned, kept) = cids.splitAt(n)
-        val startedProgress = if (kept.nonEmpty) {
-          NeedKeyProgression.InProgress(ContinuationToken(kept))
-        } else {
-          NeedKeyProgression.Finished
-        }
+      case Question.Update.NeedKey(key, n, canContinue, _, callback) =>
+        val (returned, hasStarted) =
+          NeedKeyProgression.takeN(canContinue, n, getKeys.lift(key).getOrElse(Vector.empty))
         discard(
-          callback(returned, startedProgress)
+          callback(returned, hasStarted)
         )
     }
     runTxQ(onQuestion, machine) match {
@@ -107,7 +89,7 @@ private[speedy] object SpeedyTestLib {
       machine: Speedy.UpdateMachine,
       getPkg: PartialFunction[PackageId, CompiledPackages] = PartialFunction.empty,
       getContract: PartialFunction[Value.ContractId, FatContractInstance] = PartialFunction.empty,
-      getKeys: PartialFunction[GlobalKeyWithMaintainers, Vector[FatContractInstance]] =
+      getKeys: PartialFunction[GlobalKey, Vector[FatContractInstance]] =
         PartialFunction.empty,
       getTime: PartialFunction[Unit, Time.Timestamp] = PartialFunction.empty,
   ): Either[SError.SError, SubmittedTransaction] =
@@ -121,7 +103,7 @@ private[speedy] object SpeedyTestLib {
       machine: Speedy.UpdateMachine,
       getPkg: PartialFunction[PackageId, CompiledPackages] = PartialFunction.empty,
       getContract: PartialFunction[Value.ContractId, FatContractInstance] = PartialFunction.empty,
-      getKeys: PartialFunction[GlobalKeyWithMaintainers, Vector[FatContractInstance]] =
+      getKeys: PartialFunction[GlobalKey, Vector[FatContractInstance]] =
         PartialFunction.empty,
       getTime: PartialFunction[Unit, Time.Timestamp] = PartialFunction.empty,
   ): Either[SError.SError, SubmittedTransaction] =

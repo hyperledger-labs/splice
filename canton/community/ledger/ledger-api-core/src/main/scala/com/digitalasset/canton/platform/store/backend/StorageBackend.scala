@@ -410,6 +410,7 @@ trait EventStorageBackend {
   def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
       beforeOrAtRecordTimeInclusive: Timestamp,
+      beforeOrAtLedgerEndOffsetInclusive: Offset,
   )(connection: Connection)(implicit traceContext: TraceContext): Option[SynchronizerOffset]
 
   def lastRecordTimeBeforeOrAtSynchronizerOffset(
@@ -499,6 +500,7 @@ object EventStorageBackend {
     final def updateId: String = commonUpdateProperties.updateId
     final def recordTime: Timestamp = commonUpdateProperties.recordTime
     final def traceContext: Array[Byte] = commonUpdateProperties.traceContext
+    final def trafficCost: Option[Long] = commonUpdateProperties.trafficCost
   }
 
   sealed trait RawReassignmentEvent extends RawEvent with RawUpdateEvent {
@@ -553,6 +555,7 @@ object EventStorageBackend {
       commandId: Option[String],
       traceContext: Array[Byte],
       recordTime: Timestamp,
+      trafficCost: Option[Long],
   )
 
   final case class TransactionProperties(

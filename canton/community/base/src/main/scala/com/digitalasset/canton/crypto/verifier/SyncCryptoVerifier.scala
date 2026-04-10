@@ -38,6 +38,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
 import scala.concurrent.ExecutionContext
@@ -352,16 +353,24 @@ class SyncCryptoVerifier(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] =
     signature.signatureDelegation match {
+      case Some(_) if staticSynchronizerParameters.protocolVersion < ProtocolVersion.v35 =>
+        EitherT.leftT[FutureUnlessShutdown, Unit](
+          SignatureCheckError.UnsupportedDelegationSignatureError(
+            s"Session signing keys are not supposed to be used with protocol version " +
+              s"${staticSynchronizerParameters.protocolVersion} and must be used with protocol version " +
+              s"${ProtocolVersion.v35} or higher."
+          )
+        )
       case Some(signatureDelegation) =>
         verifySignatureWithSessionKey(
           signatureDelegation,
-          topologySnapshot: TopologySnapshot,
-          validKeysO: Option[Map[Fingerprint, SigningPublicKey]],
-          hash: Hash,
-          signature: Signature,
-          signers: Seq[Member],
-          signerStr: String,
-          usage: NonEmpty[Set[SigningKeyUsage]],
+          topologySnapshot,
+          validKeysO,
+          hash,
+          signature,
+          signers,
+          signerStr,
+          usage,
         )
       // a signature with no session key delegation, so we run the verification with the long-term key
       case None =>

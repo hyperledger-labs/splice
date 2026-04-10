@@ -46,6 +46,8 @@ export async function runStacksCancel(): Promise<void> {
   operations.push(cancelOperation(operatorStack));
   const infraStack = await stack('infra', 'infra', true, {});
   operations.push(cancelOperation(infraStack));
+  const observabilityStack = await stack('observability', 'observability', true, {});
+  operations.push(cancelOperation(observabilityStack));
   await awaitAllOrThrowAllExceptions(operations);
 }
 
