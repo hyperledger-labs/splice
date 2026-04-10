@@ -51,11 +51,12 @@ test_self_transfer_to_account = do
         party <- allocatePartyExact name
         WalletClientV2.createBatchingUtility party
         pure party
+
   -- party setup
   alice <- mkParty "alice"
   bob <- mkParty "bob"
   custodian1 <- mkParty "custodian1"
-  let allUserParties = [alice, bob]
+
   -- accounts
   let bobSelf = V2.Account with
         owner = bob
@@ -109,9 +110,8 @@ test_self_transfer_to_account = do
   WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 90.0
   WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 10.0
 
-{-
-  -- test creating three outgoing transfers in on batch
-  at1 <- mkTransfer registries V2.TransferFactory_Transfer with
+  -- test transfer to custodied account
+  Some instrCid1 <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
     actors = [alice]
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
@@ -123,53 +123,65 @@ test_self_transfer_to_account = do
       requestedAt
       executeBefore
       meta = TSU.reasonToMeta "alice -> aliceCustody - test transfer 2" emptyMetadata
-  WalletClientV2.executeTSABatch alice (at1) --  <> at2 <> at3)
-  -- FIXME: make TokenV2 perform a direct transfer if authorization of initiate is sufficient for receipt
 
-  as1accept <- acceptTransferOffers registries alice instrX
-  WalletClientV2.executeTSABatch alice as1accept
+  WalletClientV2.acceptTransferOffer registries custodian1 instrCid1
 
-  c1accept <- acceptTransferOffers registries custodian1 instrX
-  WalletClientV2.executeTSABatch custodian1 c1accept
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 70.0
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 220.0
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 220.0
 
-  -- test transferring out of the custody account
-  ac1 <- mkTransfer registries V2.TransferFactory_Transfer with
+  -- test alice initiating transfer out of custody account to a third-party
+  Some instrCid2 <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
     actors = [alice]
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
       sender = aliceCustody
       receiver = bobSelf
-      amount = 10.0
+      amount = 1.0
       instrumentId = instrX
       inputHoldingCids = []
       requestedAt
       executeBefore
-      meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 1" emptyMetadata
+      meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 3" emptyMetadata
 
-
-  WalletClientV2.executeTSABatch alice ac1
-
-  -- [(offerCid, Some offer)] <- queryInterface @V2.TransferInstruction custodian1
-  offers <- queryInterface @V2.TransferInstruction custodian1
-  [(cid0, offer)] <- pure [ (oCid, o) | (oCid, Some o) <- offers, o.transfer.receiver == bobSelf ]
-  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor offer.transfer.sender custodian1 offer.transfer.instrumentId
-  let cid = coerceContractId cid0 : ContractId TokenV2.TokenTransferCreation
-  submit custodian1 $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
+  let cid = coerceContractId instrCid2 : ContractId TokenV2.TokenTransferCreation
+  result <- submit custodian1 $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
     actors = [custodian1]
     inputHoldingCids = holdingCids
-    -- extraArgs = emptyExtraArgs
+  V2.TransferInstructionResult_Pending instrCid3 <- pure result.output
 
+  WalletClientV2.acceptTransferOffer registries bob instrCid3
 
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 219.0
+  WalletClientV2.checkAccountBalance bob bobSelf instrX 1.0
 
-  -- offers <- WalletClientV2.listTransferOffersV2 custodian1 instrX
-  -- length offers === 1
+  -- test custodian initiating transfer out of custody account to themselves
+  Some instrCid4 <- WalletClientV2.transfer registries custodian1 V2.TransferFactory_Transfer with
+    actors = [custodian1]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = aliceCustody
+      receiver = aliceSelf2
+      amount = 2.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "aliceCustody -> aliceSelf2 - test transfer 4" emptyMetadata
 
+  -- once alice acceptss that transfer happens directly
+  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
+  let cid = coerceContractId instrCid4 : ContractId TokenV2.TokenTransferCreation
+  result <- submit alice $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+    actors = [alice]
+    inputHoldingCids = holdingCids
+  V2.TransferInstructionResult_Completed _ <- pure result.output
 
-  baccept <- acceptTransferOffers registries bob instrX
-  WalletClientV2.executeTSABatch bob baccept
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 217.0
+  WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 70.0  -- unchanged
+  WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 12.0
 
-
--}
   pure ()
 
 
