@@ -191,33 +191,117 @@ data PendingAction = PendingAction with
     action : V2.TransferInstructionAction
   deriving (Eq, Show)
 
-mkAvailableActions : V2.Transfer -> Optional PendingAction -> Map.Map [Party] [V2.TransferInstructionAction]
-mkAvailableActions transfer pendingAction =
-    Map.fromListWithR (++) $
-      [ (senderAuthz, [V2.TIA_Withdraw])
-      , (receiverAuthz, [V2.TIA_Accept, V2.TIA_Reject])
-      ] <>
-      [ ([p], [a]) | p <- senderAuthz, a <- [V2.TIA_Withdraw], pendingAction /= Some (PendingAction p a) ] <>
-      [ ([p], [a]) | p <- receiverAuthz, a <- [V2.TIA_Accept, V2.TIA_Reject], pendingAction /= Some (PendingAction p a) ]
-      -- FIXME: delete action from list
+data PartyConfig = PartyConfig with
+    canInitiate : Bool
+    mustApprove : Bool
+  deriving (Eq, Show)
+
+data AccountConfig = AccountConfig with
+    ownerConfig : PartyConfig
+    providerConfig : PartyConfig
+  deriving (Eq, Show)
+
+partyConfigToString : PartyConfig -> Text
+partyConfigToString config =
+  (if config.canInitiate then "i" else "") <>
+  (if config.mustApprove then "a" else "")
+
+accountConfigToString : AccountConfig -> Text
+accountConfigToString config = T.unlines $
+  [ "o", partyConfigToString config.ownerConfig
+  , "p", partyConfigToString config.providerConfig]
+
+accountConfigFromId : Optional Text -> AccountConfig
+accountConfigFromId accountId =
+  accountConfigFromString (fromSomeNote "account id must be set" accountId)
+
+-- | FIXME: report error in pure form; share parsing code
+accountConfigFromString : Text -> AccountConfig
+accountConfigFromString str
+  | "/" `T.isPrefixOf` str'' = AccountConfig with ..
+  | otherwise = error $ "Expected '/' after account config prefixes in: " <> show str
   where
-    senderAuthz = jointAuthorizers transfer.sender
-    receiverAuthz = jointAuthorizers transfer.receiver
+    (ownerInitiate, ownerApproval, len)
+      | "oia" `T.isPrefixOf` str = (True, True, 3)
+      | "oi" `T.isPrefixOf` str = (True, False, 2)
+      | "oa" `T.isPrefixOf` str = (False, True, 2)
+      | "o" `T.isPrefixOf` str = (False, False, 1)
+      | otherwise = error $ "Invalid owner account config prefix: " <> show str
+    ownerConfig = PartyConfig with canInitiate = ownerInitiate, mustApprove = ownerApproval
+    str' = T.drop len str
+    (providerInitiate, providerApproval, len')
+      | "pia" `T.isPrefixOf` str' = (True, True, 3)
+      | "pi" `T.isPrefixOf` str' = (True, False, 2)
+      | "pa" `T.isPrefixOf` str' = (False, True, 2)
+      | "p" `T.isPrefixOf` str' = (False, False, 1)
+      | otherwise = error $ "Invalid provider account config prefix: " <> show str'
+    providerConfig = PartyConfig with canInitiate = providerInitiate, mustApprove = providerApproval
+    str'' = T.drop len' str'
 
-data AccountControl = JointControl | OwnerControl | ProviderControl
+data AccountAction = AccountAction with
+    actor : Party
+    action : V2.TransferInstructionAction
+  deriving (Eq, Show)
 
-accountActors : V2.Account -> [[Party]]
-accountActors account =
-  let authorizers = jointAuthorizers account in
-  authorizers :: [ [p] | p <- authorizers ]
+nextActors : Optional Party -> AccountConfig -> V2.Account -> Set.Set Party
+nextActors previousActor config account =
+    Set.fromList $
+      [ account.owner | canAct config.ownerConfig account.owner ] <>
+      [ p | Some p <- [account.provider], canAct config.providerConfig p ]
+  where
+    hasNotActed p = Some p == previousActor
+    canAct (PartyConfig with canInitiate; mustApprove) p =
+      hasNotActed p &&
+      (canInitiate || isSome previousActor && mustApprove)
+
+approvers : AccountConfig -> V2.Account -> Set.Set Party
+approvers config account =
+  Set.fromList $
+    [ account.owner | mustApprove config.ownerConfig ] <>
+    [ p | mustApprove config.providerConfig, Some p <- [account.provider] ]
+
+data TransferWithConfigs = TransferWithConfigs with
+    transfer : V2.Transfer
+    senderConfig : AccountConfig
+    receiverConfig : AccountConfig
+
+-- | FIXME: propagate parsing errors
+mkTransferWithConfigs : V2.Transfer -> TransferWithConfigs
+mkTransferWithConfigs transfer =
+  TransferWithConfigs with
+    transfer
+    senderConfig = accountConfigFromId transfer.sender.id
+    receiverConfig = accountConfigFromId transfer.receiver.id
+
+
+mkAvailableActions' : Map.Map V2.TransferInstructionAction Party -> TransferWithConfigs -> Map.Map [Party] [V2.TransferInstructionAction]
+mkAvailableActions' existingRequests TransferWithConfigs {..} =
+    Map.fromListWithR (++) $
+      actionsFor V2.TIA_Accept transfer.receiver receiverConfig <>
+      actionsFor V2.TIA_Reject transfer.receiver receiverConfig <>
+      actionsFor V2.TIA_Withdraw transfer.sender senderConfig
+  where
+    actionsFor action account config =
+        (Set.toList $ approvers config account, [action]) ::
+        [ ([actor], [action]) | actor <- Set.toList (nextActors previousActor config account) ]
+      where
+        previousActor = Map.lookup action existingRequests
+
+nextActorsFor : V2.TransferInstructionAction -> Map.Map V2.TransferInstructionAction Party -> AccountConfig -> V2.Account -> [[Party]]
+nextActorsFor action existingRequests config account =
+  Set.toList (approvers config account) ::
+  [ [actor] | actor <- Set.toList (nextActors (Map.lookup action existingRequests) config account) ]
+
+-- FIXME: move to all APIs
+deriving instance Ord V2.TransferInstructionAction
+
 
 -- | Transfer instruction representing a token transfer offer.
 --
 -- Its input holdings reference the locked tokens.
 template TokenTransferOffer with
-    pendingAction : Optional PendingAction
-      -- ^ Action requiring confirmation by the account authorizer of the sender
-      -- account that did not initiate the action.
+    existingRequests : Map.Map V2.TransferInstructionAction Party
+      -- ^ A map from requests for particular actions to happen to the requestor.
     transfer : V2.Transfer
     originalInstructionCid : Optional (ContractId V2.TransferInstruction)
   where
@@ -230,7 +314,7 @@ template TokenTransferOffer with
       view = V2.TransferInstructionView with
         originalInstructionCid = None
         transfer
-        availableActions = mkAvailableActions transfer pendingAction
+        availableActions = mkAvailableActions' existingRequests (mkTransferWithConfigs transfer)
         meta = emptyMetadata
 
       transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
@@ -259,7 +343,8 @@ template TokenTransferOffer with
 
       transferInstruction_acceptImpl self arg = do
         let actors = arg.actors
-        archiveAndCheckActors self actors (accountActors transfer.receiver)
+        let receiverConfig = accountConfigFromId transfer.receiver.id
+        archiveAndCheckActors self actors (nextActorsFor V2.TIA_Accept existingRequests receiverConfig transfer.receiver)
         let accept = do
               archiveLockedHoldingsForTransfer transfer
               tokenCid <- create Token with
@@ -271,28 +356,25 @@ template TokenTransferOffer with
                   receiverHoldingCids = [toInterfaceContractId tokenCid]
                 meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
 
-        if dedupSort actors == jointAuthorizers transfer.receiver
+        --
+        let previousActor = Map.lookup V2.TIA_Accept existingRequests
+        let currentApprovers = Set.fromList $ actors <> optionalToList previousActor
+        let expectedApprovers = approvers receiverConfig transfer.receiver
+
+        if currentApprovers == expectedApprovers
           then accept
           else do
             [actor] <- pure actors -- FIXME: error handling for multiple actors
-            case pendingAction of
-              Some (PendingAction p V2.TIA_Accept)
-                | p == actor -> fail "Cannot initiate pending accept action twice"
-                | otherwise -> accept
-              _ -> do
-                -- create pending action for accept
-                let newOriginalInstructionCid = Some $ fromOptional (toInterfaceContractId self) originalInstructionCid
-                pendingInstrCid <- create this with
-                  -- here we might override the approval from the other party for another action,
-                  -- we're OK with that as that seems a rare case.
-                  -- FIXME: comment
-                  pendingAction = Some (PendingAction actor V2.TIA_Accept)
-                  originalInstructionCid = newOriginalInstructionCid
-                pure V2.TransferInstructionResult with
-                  output = V2.TransferInstructionResult_Pending with
-                    transferInstructionCid = toInterfaceContractId pendingInstrCid
-                  senderChangeCids = []
-                  meta = emptyMetadata
+            -- create pending action for accept
+            let newOriginalInstructionCid = Some $ fromOptional (toInterfaceContractId self) originalInstructionCid
+            pendingInstrCid <- create this with
+              existingRequests = Map.insert V2.TIA_Accept actor existingRequests
+              originalInstructionCid = newOriginalInstructionCid
+            pure V2.TransferInstructionResult with
+              output = V2.TransferInstructionResult_Pending with
+                transferInstructionCid = toInterfaceContractId pendingInstrCid
+              senderChangeCids = []
+              meta = emptyMetadata
 
 
 
@@ -358,6 +440,8 @@ token_transferFactory_transferImpl admin originalInstructionCid actors missingCo
   require' ("actors", actors) isSubsetOfR ("missingConfirmers", missingConfirmers)
   require' ("actors", actors) (notR isEqualR) ("empty list", [])
   require' ("transfer.instrumentId.admin", transfer.instrumentId.admin) isEqualR ("transferFactory.admin", admin)
+  -- FIXME: add ensures clause that parsing works
+  let _ = mkTransferWithConfigs transfer -- validate the transfer and configs can be parsed
   let newMissingConfirmers = Set.fromList missingConfirmers `Set.difference` Set.fromList actors
   if Set.null newMissingConfirmers
     then token_transferFactory_transferImplCore admin originalInstructionCid transfer
@@ -421,7 +505,7 @@ token_transferFactory_transferImplCore admin originalInstructionCid transfer = d
             context = Some $ "transfer to " <> show transfer.receiver
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
-        pendingAction = None -- FIXME: consider how to preapprove the accept as the party that initiated the transfer
+        existingRequests = Map.empty -- FIXME: consider how to preapprove the accept as the party that initiated the transfer
         originalInstructionCid
         transfer = transfer with
           inputHoldingCids = [toInterfaceContractId lockedCid]

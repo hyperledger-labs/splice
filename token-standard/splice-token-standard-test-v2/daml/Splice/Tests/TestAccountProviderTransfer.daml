@@ -48,9 +48,6 @@ test_self_transfer_to_account = do
         id = "Y2"
         admin = env.testTokenV2.admin
 
-  let mint owner amount instrId =
-        void $ TestTokenRegistryV2.mint env.testTokenV2 (basicAccount owner) instrId.id amount
-
   let mkParty name = do
         party <- allocatePartyExact name
         WalletClientV2.createBatchingUtility party
@@ -62,16 +59,22 @@ test_self_transfer_to_account = do
   bob <- mkParty "bob"
 
   custodian1 <- mkParty "custodian1"
-  let aliceBasic = basicAccount alice
-  let bobBasic = basicAccount bob
-  let aliceSelf = V2.Account with
+  let bobSelf = V2.Account with
+        owner = bob
+        provider = None
+        id = Some "oiap/bobself"
+  let aliceSelf1 = V2.Account with
         owner = alice
         provider = None
-        id = Some "acc1"
+        id = Some "oiap/acc1"
+  let aliceSelf2 = V2.Account with
+        owner = alice
+        provider = None
+        id = Some "oiap/acc2"
   let aliceCustody = V2.Account with
         owner = alice
         provider = Some custodian1
-        id = Some "acc2"
+        id = Some "oiapia/acc2"
         -- FIXME: check that "" is not allowed as an account ID for TestTokenV2; consider ruling it out by removing the 'Optional' from the account ID field
   let allParties = [alice, bob]
 
@@ -80,8 +83,8 @@ test_self_transfer_to_account = do
   let requestedAt = now
   let executeBefore = now `addRelTime` days 1
 
-  mint alice 1000.0 instrX
-  mint alice 1000.0 instrY
+  TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
+  -- TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrY.id 100.0
   TestTokenRegistryV2.mint env.testTokenV2 aliceCustody instrX.id 200.0
 
   -- test creating three outgoing transfers in on batch
@@ -89,8 +92,8 @@ test_self_transfer_to_account = do
     actors = [alice]
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
-      sender = aliceBasic
-      receiver = aliceSelf
+      sender = aliceSelf1
+      receiver = aliceSelf2
       amount = 10.0
       instrumentId = instrX
       inputHoldingCids = []
@@ -102,7 +105,7 @@ test_self_transfer_to_account = do
     actors = [alice]
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
-      sender = aliceBasic
+      sender = aliceSelf1
       receiver = aliceCustody
       amount = 20.0
       instrumentId = instrX
@@ -125,13 +128,13 @@ test_self_transfer_to_account = do
     extraArgs = emptyExtraArgs
     transfer = V2.Transfer with
       sender = aliceCustody
-      receiver = bobBasic
+      receiver = bobSelf
       amount = 10.0
       instrumentId = instrX
       inputHoldingCids = []
       requestedAt
       executeBefore
-      meta = TSU.reasonToMeta "aliceCustody -> bobBasic - test transfer 1" emptyMetadata
+      meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 1" emptyMetadata
   {-
   at2 <- mkTransfer SimpleTransfer with
         sender = alice
@@ -153,7 +156,7 @@ test_self_transfer_to_account = do
 
   -- [(offerCid, Some offer)] <- queryInterface @V2.TransferInstruction custodian1
   offers <- queryInterface @V2.TransferInstruction custodian1
-  [(cid0, offer)] <- pure [ (oCid, o) | (oCid, Some o) <- offers, o.transfer.receiver == bobBasic ]
+  [(cid0, offer)] <- pure [ (oCid, o) | (oCid, Some o) <- offers, o.transfer.receiver == bobSelf ]
   holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor offer.transfer.sender custodian1 offer.transfer.instrumentId
   let cid = coerceContractId cid0 : ContractId TokenV2.TokenTransferCreation
   submit custodian1 $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
