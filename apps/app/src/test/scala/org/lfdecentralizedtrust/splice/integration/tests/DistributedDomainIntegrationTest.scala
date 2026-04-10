@@ -82,7 +82,6 @@ class DistributedDomainIntegrationTest
               .map(port =>
                 NonEmpty
                   .mk(Set, Endpoint("localhost", Port.tryCreate(port)))
-                  .toVector
               )
               .toSet
           }
