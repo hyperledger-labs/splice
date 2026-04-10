@@ -352,6 +352,7 @@ sealed trait ScanHttpEncodings {
               .map(_.value)
               .flatMap(HexString.parseToByteString)
               .getOrElse(ByteString.EMPTY),
+            0L,
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
@@ -888,6 +889,7 @@ object ScanHttpEncodings {
       tree.getTraceContext,
       tree.getRecordTime,
       externalTransactionHash,
+      0L,
     )
   }
 }

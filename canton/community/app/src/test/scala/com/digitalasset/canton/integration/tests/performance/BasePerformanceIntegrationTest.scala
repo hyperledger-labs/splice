@@ -18,7 +18,6 @@ import com.digitalasset.canton.performance.PartyRole.{
   DvpTrader,
   Master,
   MasterDynamicConfig,
-  Transfer,
 }
 import com.digitalasset.canton.performance.RateSettings.SubmissionRateSettings
 import com.digitalasset.canton.performance.elements.dvp.TraderDriver
@@ -172,7 +171,6 @@ trait BasePerformanceIntegrationTestCommon
         case role: ActivePartyRole =>
           role match {
             case x: DvpTrader => x.focus(_.settings).replace(whackMe)
-            case x: Transfer => x.focus(_.settings).replace(whackMe)
             case x: DvpIssuer => x
           }
         case m => m

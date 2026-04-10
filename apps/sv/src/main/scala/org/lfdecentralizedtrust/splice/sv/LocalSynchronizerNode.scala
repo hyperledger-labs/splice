@@ -540,8 +540,8 @@ object LocalSynchronizerNode {
 
   // TODO(DACH-NY/canton-network-node#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
-  private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
-    NonEmpty.mk(Seq, toEndpoint(config))
+  private def toEndpoints(config: ClientConfig): NonEmpty[Set[Endpoint]] =
+    NonEmpty.mk(Set, toEndpoint(config))
 
   private def toSequencerConnection(
       config: ClientConfig,

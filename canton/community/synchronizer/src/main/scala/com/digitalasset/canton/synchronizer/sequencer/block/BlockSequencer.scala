@@ -108,7 +108,6 @@ import scala.collection.immutable.SortedSet
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
-
 import BlockSequencerFactory.OrderingTimeFixMode
 
 class BlockSequencer(

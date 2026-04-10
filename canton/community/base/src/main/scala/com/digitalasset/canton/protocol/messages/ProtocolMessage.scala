@@ -232,13 +232,7 @@ object SignedProtocolMessage
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = {
-    val typedMessage = TypedSignedProtocolMessageContent(message)
-
-    mkSignature(typedMessage, cryptoApi, signingTimestampOverrides).map { signature =>
-      SignedProtocolMessage(typedMessage, NonEmpty(Seq, signature))
-    }
-  }
+  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = ???
 
   /** @param signingTimestampOverrides
     *   Optional overrides for selecting an approximate signing timestamp and validity end, used to

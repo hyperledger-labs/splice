@@ -796,6 +796,7 @@ object LedgerClient {
             includeTopologyEvents = None,
           )
         ),
+        descendingOrder = false,
       )
     }
   }

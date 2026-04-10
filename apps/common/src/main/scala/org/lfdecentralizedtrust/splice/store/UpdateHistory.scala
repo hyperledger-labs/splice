@@ -1624,6 +1624,7 @@ class UpdateHistory(
           /*recordTime = */ updateRow.recordTime.toInstant,
           // Import updates are not externally signed, so the transaction has no hash.
           /*externalTransactionHash = */ ByteString.EMPTY,
+          /*paidTrafficCost = */ 0L,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1696,6 +1697,7 @@ class UpdateHistory(
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
           /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
+          /*paidTrafficCost = */ 0L,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),

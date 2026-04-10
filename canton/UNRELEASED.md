@@ -563,6 +563,3 @@ Canton has been tested against the following versions of its dependencies:
 |----------------------------|----------------------------|
 | Java Runtime               | JAVA_VERSION               |
 | Postgres                   | POSTGRES_VERSION           |
-
-
-

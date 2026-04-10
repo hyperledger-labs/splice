@@ -522,7 +522,7 @@ class TopologyStateWriteThroughCache(
             .filter(tx =>
               tx.stored.transaction.isProposal && maxSerial.forall(_ < tx.stored.serial)
             )
-            .map(_.stored.transaction.transaction.hash),
+            .map(_.stored.transaction.transaction.hash)
         )
       }
 
@@ -1322,8 +1322,9 @@ object TopologyStateWriteThroughCache {
         tail.iterator.takeWhile(_.validUntil.exists(_.value >= asOf.value))
       headAndTail.filter { tx =>
         tx.isActiveAsOf(asOf = asOf, asOfInclusive = asOfInclusive) &&
-        !tx.transaction.isProposal && op.forall(_ == tx.transaction.operation)
-        && tx.rejectionReason.isEmpty
+        !tx.transaction.isProposal && op.forall(
+          _ == tx.transaction.operation
+        ) && tx.rejectionReason.isEmpty
       }.toSeq
     }
 

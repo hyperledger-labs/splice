@@ -43,7 +43,7 @@ class ApiClientRequestLogger(
   ): ClientCall[ReqT, RespT] = {
 
     val methodName = method.getFullMethodName
-    val shortMethod = show"${methodName.readableLoggerName(config.maxMethodLength)}"
+    val shortMethod = show"${methodName.readableQualifiedName(config.maxMethodLength)}"
 
     val optCallerContext = TraceContextGrpc.inferCallerTraceContext(callOptions)
     val requestTraceContext = TraceContext.withNewTraceContext(shortMethod)(identity)

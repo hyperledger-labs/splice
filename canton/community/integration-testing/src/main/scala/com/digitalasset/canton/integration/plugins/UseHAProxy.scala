@@ -7,6 +7,7 @@ import better.files.*
 import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.util.BackgroundRunner
 import com.digitalasset.canton.integration.{ConfigTransform, EnvironmentSetupPlugin}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -54,7 +55,7 @@ class UseHAProxy(
     mkConfig: HAProxySetup => HAProxyConfig,
     useLoadBalancer: (String, Port) => ConfigTransform,
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin {
+) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   private var proxy: HAProxy = _
 

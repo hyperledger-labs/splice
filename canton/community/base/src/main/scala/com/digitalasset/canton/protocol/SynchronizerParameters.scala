@@ -534,9 +534,9 @@ object DynamicSynchronizerParameters extends VersioningCompanion[DynamicSynchron
     NonNegativeInt.tryCreate(10 * 1024 * 1024)
   )
 
-  private val defaultConfirmationResponseTimeout: NonNegativeFiniteDuration =
+  val defaultConfirmationResponseTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.tryOfSeconds(30)
-  private val defaultMediatorReactionTimeout: NonNegativeFiniteDuration =
+  val defaultMediatorReactionTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.tryOfSeconds(30)
 
   private val defaultAssignmentExclusivityTimeout: NonNegativeFiniteDuration =

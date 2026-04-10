@@ -665,6 +665,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 ),
                 beginExclusive = 0,
                 endInclusive = None,
+                descendingOrder = false,
               )
             )
 

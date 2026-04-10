@@ -58,7 +58,6 @@ class RequireBlockingTest extends AnyWordSpec with Matchers {
         import x.synchronized as foo
         foo(19)
       }
-
       if (ScalaVersion.isScala3) assertIsErrorSynchronized(result)
       else result.errors shouldBe Seq.empty
     }
