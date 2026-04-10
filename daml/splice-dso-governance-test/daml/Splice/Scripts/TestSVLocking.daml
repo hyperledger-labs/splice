@@ -1,0 +1,380 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSVLocking where
+
+import DA.Assert
+import qualified DA.Map as Map
+import DA.Time
+import Daml.Script
+
+import Splice.DsoRules
+import Splice.DSO.SVLocking
+import Splice.Scripts.DsoTestUtils
+
+
+-- Test helpers
+----------------
+
+mkLockConfig : Party -> Time -> Script (ContractId SVLockConfig)
+mkLockConfig dso now =
+  submit dso $ createCmd SVLockConfig with
+    dso
+    activationDate = addRelTime now (days (-30))
+    tierSchedule = defaultTierSchedule
+    vestingPeriodDays = 365.25
+    weightLossGracePeriodDays = 7
+    permanentLossWindowDays = 30
+    lockExpiryDate = addRelTime now (days 1200)
+
+mkLockState : Party -> Party -> Text -> Decimal -> Decimal -> Int -> Int -> Script (ContractId SVLockState)
+mkLockState dso svParty svName locked lifetime baseWt removed =
+  submit dso $ createCmd SVLockState with
+    dso
+    svParty
+    svName
+    totalLockedAmulet = locked
+    lifetimeRewards = lifetime
+    baseWeight = baseWt
+    permanentlyRemovedWeight = removed
+
+
+-- Tier assignment tests (Year 0 schedule: 70%/45%/35%)
+---------------------------------------------------------
+
+-- | 75% locked >= 70% threshold → Tier 1 → 100% multiplier → full weight
+testTier1Weight : Script ()
+testTier1Weight = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 75000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.lockPercentage === 0.75
+  result.evaluation.tierMultiplier === 1.0
+  result.evaluation.effectiveWeight === 10 * bpsMultiplier
+
+-- | 55% locked >= 45% → Tier 2 → 60% multiplier
+testTier2Weight : Script ()
+testTier2Weight = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 55000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.lockPercentage === 0.55
+  result.evaluation.tierMultiplier === 0.6
+  result.evaluation.effectiveWeight === 60000
+
+-- | 40% locked >= 35% → Tier 3 → 40% multiplier
+testTier3Weight : Script ()
+testTier3Weight = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 40000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.lockPercentage === 0.4
+  result.evaluation.tierMultiplier === 0.4
+  result.evaluation.effectiveWeight === 40000
+
+-- | 20% locked < 35% → below all tiers → 0 multiplier → 0 weight
+testNoTierWeight : Script ()
+testNoTierWeight = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 20000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.lockPercentage === 0.2
+  result.evaluation.tierMultiplier === 0.0
+  result.evaluation.effectiveWeight === 0
+
+-- | Boundary: exactly 70% → Tier 1, exactly 45% → Tier 2, exactly 35% → Tier 3
+testTierBoundaries : Script ()
+testTierBoundaries = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  now <- getTime
+  lockConfigCid <- mkLockConfig dso now
+
+  -- Exactly 70% → Tier 1
+  do
+    [(dsoRulesCid, _)] <- query @DsoRules dso
+    lockStateCid <- mkLockState dso sv1 "sv1" 70000.0 100000.0 (10 * bpsMultiplier) 0
+    result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+      sv = sv1; lockStateCid; lockConfigCid
+    result.evaluation.tierMultiplier === 1.0
+
+  -- Exactly 45% → Tier 2
+  do
+    [(dsoRulesCid, _)] <- query @DsoRules dso
+    lockStateCid <- mkLockState dso sv1 "sv1" 45000.0 100000.0 (10 * bpsMultiplier) 0
+    result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+      sv = sv1; lockStateCid; lockConfigCid
+    result.evaluation.tierMultiplier === 0.6
+
+  -- Exactly 35% → Tier 3
+  do
+    [(dsoRulesCid, _)] <- query @DsoRules dso
+    lockStateCid <- mkLockState dso sv1 "sv1" 35000.0 100000.0 (10 * bpsMultiplier) 0
+    result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+      sv = sv1; lockStateCid; lockConfigCid
+    result.evaluation.tierMultiplier === 0.4
+
+
+-- Annual schedule transition tests
+-------------------------------------
+
+-- | Year 1 schedule: Tier 1 = 65%, Tier 2 = 50%, Tier 3 removed.
+-- 47% locked was Tier 2 in Year 0 (>= 45%) but falls to NoTier in Year 1 (< 50%, Tier 3 gone).
+testYear1ScheduleDropsOff : Script ()
+testYear1ScheduleDropsOff = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- submit dso $ createCmd SVLockConfig with
+    dso
+    activationDate = addRelTime now (days (-400))
+    tierSchedule = defaultTierSchedule
+    vestingPeriodDays = 365.25
+    weightLossGracePeriodDays = 7
+    permanentLossWindowDays = 30
+    lockExpiryDate = addRelTime now (days 800)
+
+  lockStateCid <- mkLockState dso sv1 "sv1" 47000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.tierMultiplier === 0.0
+  result.evaluation.effectiveWeight === 0
+
+-- | Year 1: 52% locked >= 50% → still Tier 2
+testYear1Tier2 : Script ()
+testYear1Tier2 = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- submit dso $ createCmd SVLockConfig with
+    dso
+    activationDate = addRelTime now (days (-400))
+    tierSchedule = defaultTierSchedule
+    vestingPeriodDays = 365.25
+    weightLossGracePeriodDays = 7
+    permanentLossWindowDays = 30
+    lockExpiryDate = addRelTime now (days 800)
+
+  lockStateCid <- mkLockState dso sv1 "sv1" 52000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.tierMultiplier === 0.6
+  result.evaluation.effectiveWeight === 60000
+
+
+-- Permanent weight loss
+--------------------------
+
+-- | permanentlyRemovedWeight reduces effective base before tier multiplier
+testPermanentWeightLoss : Script ()
+testPermanentWeightLoss = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  -- Tier 1 (75% >= 70%), but 20000 bps permanently removed
+  lockStateCid <- mkLockState dso sv1 "sv1" 75000.0 100000.0 (10 * bpsMultiplier) (2 * bpsMultiplier)
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.tierMultiplier === 1.0
+  -- (100000 - 20000) * 1.0 = 80000
+  result.evaluation.effectiveWeight === 80000
+
+-- | permanentlyRemovedWeight exceeding baseWeight floors at 0
+testPermanentWeightLossFloor : Script ()
+testPermanentWeightLossFloor = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 75000.0 100000.0 (10 * bpsMultiplier) (15 * bpsMultiplier)
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  -- max(0, 100000 - 150000) * 1.0 = 0
+  result.evaluation.effectiveWeight === 0
+
+
+-- Lock expiry and pre-activation
+-----------------------------------
+
+-- | After lockExpiryDate: full weight regardless of lock percentage
+testExpiredLockRequirement : Script ()
+testExpiredLockRequirement = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- submit dso $ createCmd SVLockConfig with
+    dso
+    activationDate = addRelTime now (days (-400))
+    tierSchedule = defaultTierSchedule
+    vestingPeriodDays = 365.25
+    weightLossGracePeriodDays = 7
+    permanentLossWindowDays = 30
+    lockExpiryDate = addRelTime now (days (-10))
+
+  -- 20% would normally be NoTier, but lock requirement has expired
+  lockStateCid <- mkLockState dso sv1 "sv1" 20000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.tierMultiplier === 1.0
+  result.evaluation.effectiveWeight === 10 * bpsMultiplier
+
+-- | Before activationDate: full weight (lock requirement not yet active)
+testPreActivation : Script ()
+testPreActivation = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- submit dso $ createCmd SVLockConfig with
+    dso
+    activationDate = addRelTime now (days 30)
+    tierSchedule = defaultTierSchedule
+    vestingPeriodDays = 365.25
+    weightLossGracePeriodDays = 7
+    permanentLossWindowDays = 30
+    lockExpiryDate = addRelTime now (days 1200)
+
+  lockStateCid <- mkLockState dso sv1 "sv1" 0.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.tierMultiplier === 1.0
+  result.evaluation.effectiveWeight === 10 * bpsMultiplier
+
+
+-- Edge cases
+--------------
+
+-- | Zero lifetime rewards → lockPercentage = 0 → NoTier
+testZeroLifetimeRewards : Script ()
+testZeroLifetimeRewards = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso sv1 "sv1" 0.0 0.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  result.evaluation.lockPercentage === 0.0
+  result.evaluation.tierMultiplier === 0.0
+  result.evaluation.effectiveWeight === 0
+
+
+-- Authorization tests
+-----------------------
+
+-- | Non-SV party in lock state causes getSvInfo failure
+testNonSvFails : Script ()
+testNonSvFails = do
+  (_, dso, _) <- initMainNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+  nonSv <- allocateParty "nonSv"
+
+  lockConfigCid <- mkLockConfig dso now
+  lockStateCid <- mkLockState dso nonSv "nonSv" 75000.0 100000.0 (10 * bpsMultiplier) 0
+
+  submitMustFail dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = nonSv
+    lockStateCid
+    lockConfigCid
+
+
+-- DsoRules state verification
+-------------------------------
+
+-- | svRewardWeight in DsoRules.svs is correctly updated after evaluation
+testWeightUpdatedInDsoRules : Script ()
+testWeightUpdatedInDsoRules = do
+  (_, dso, (sv1, _, _, _)) <- initMainNet
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  now <- getTime
+
+  -- Verify initial weight is 10 * bpsMultiplier
+  case Map.lookup sv1 dsoRules.svs of
+    Some info -> info.svRewardWeight === 10 * bpsMultiplier
+    None -> fail "sv1 not found in initial DsoRules"
+
+  lockConfigCid <- mkLockConfig dso now
+  -- 55% → Tier 2 → weight should change from 100000 to 60000
+  lockStateCid <- mkLockState dso sv1 "sv1" 55000.0 100000.0 (10 * bpsMultiplier) 0
+
+  result <- submit dso $ exerciseCmd dsoRulesCid DsoRules_EvaluateSvLockWeight with
+    sv = sv1
+    lockStateCid
+    lockConfigCid
+
+  -- Verify the new DsoRules contract has updated weight
+  Some newRules <- queryContractId dso result.newDsoRules
+  case Map.lookup sv1 newRules.svs of
+    Some info -> info.svRewardWeight === 60000
+    None -> fail "sv1 not found in updated DsoRules"
