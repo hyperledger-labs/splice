@@ -315,7 +315,7 @@ class HttpTokenStandardAllocationHandler(
         amuletAlloc.payload.lockedAmulet.toScala,
         amuletAlloc.payload.allocation.settlement.settlementDeadline.toScala,
         requireLockedAmulet,
-        featuredProvider = None, // Not required. Featured app rights are used in bulk
+        featuredProvider = None, // Not required. Featured app rights are used in bulk, and will go once CIP-104 is live
         store,
         contractFetcher,
         clock,
