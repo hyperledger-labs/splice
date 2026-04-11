@@ -86,3 +86,5 @@ Cleanup performed so far:
 - Change default implementation of `SettlementFactory_SettleBatch` to check uniqueness of transfer leg ids
   to provide better safety guarantees for code that identifies legs by their ids
 - add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets
+- use `Account.id : Text` instead of `Optional Text` to ensure that wallets do not have to deal with
+  two different kinds of defalt accounts (empty string vs None). Use "" as the default account identifier.

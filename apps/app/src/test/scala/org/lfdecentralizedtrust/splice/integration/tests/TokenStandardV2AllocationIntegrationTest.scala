@@ -509,7 +509,7 @@ class TokenStandardV2AllocationIntegrationTest
     new holdingv2.Account(
       party.toProtoPrimitive,
       java.util.Optional.empty(),
-      java.util.Optional.empty(),
+      "",
     )
 }
 

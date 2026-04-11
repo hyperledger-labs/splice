@@ -1113,9 +1113,9 @@ class HttpWalletHandler(
             new holdingv2.Account(
               leg.sender,
               java.util.Optional.empty,
-              java.util.Optional.empty,
+              "",
             ),
-            new holdingv2.Account(leg.receiver, java.util.Optional.empty, java.util.Optional.empty),
+            new holdingv2.Account(leg.receiver, java.util.Optional.empty, ""),
             Codec.tryDecode(Codec.JavaBigDecimal)(leg.amount),
             new holdingv2.InstrumentId(userWallet.store.key.dsoParty.toProtoPrimitive, "Amulet"),
             new metadatav1.Metadata(leg.meta.getOrElse(Map.empty).asJava),
@@ -1124,7 +1124,7 @@ class HttpWalletHandler(
         /*authorizer=*/ new holdingv2.Account(
           authorizer.toProtoPrimitive,
           java.util.Optional.empty,
-          java.util.Optional.empty,
+          "",
         ),
       )
       val dedupConfig = AmuletOperationDedupConfig(
