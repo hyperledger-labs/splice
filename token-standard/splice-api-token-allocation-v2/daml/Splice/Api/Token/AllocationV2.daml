@@ -46,7 +46,7 @@ data SettlementInfo = SettlementInfo
       -- ^ The parties that are responsible for executing the settlement and
       -- guarantee atomic settlement across asset admins.
     settlementRef : Reference
-      -- ^ Reference to the settlement that app would like to execute.
+      -- ^ Reference to the settlement that the app would like to execute.
       --
       -- Executors MUST ensure that they use unique `settlementRef` values for
       -- different settlements to avoid ambiguity or settlement errors.
@@ -67,7 +67,7 @@ data SettlementInfo = SettlementInfo
 -- purpose of a settlement, which often requires the atomic execution of multiple legs.
 data TransferLeg = TransferLeg with
     transferLegId : Text
-      -- ^ an identifier for the transferLeg.
+      -- ^ An identifier for the transfer leg.
     sender : Account
       -- ^ The sender of the transfer.
     receiver : Account
@@ -88,7 +88,7 @@ data TransferLeg = TransferLeg with
 data AllocationSpecification = AllocationSpecification with
     settlement : SettlementInfo
       -- ^ The settlement for which this allocation is made.
-    transferLegs: [TransferLeg]
+    transferLegs : [TransferLeg]
       -- ^ The transfers whose send or receipt is authorized by this allocation.
       --
       -- There MUST be at least one transfer leg. All transfer legs MUST have the
@@ -113,14 +113,14 @@ data AllocationAction
           -- ^ Additional metadata specific to the action, used for extensibility.
     deriving (Show, Eq)
 
--- | View of a contract representing a ready-to settle allocation.
+-- | View of a contract representing a ready-to-settle allocation.
 data AllocationView = AllocationView with
     allocation : AllocationSpecification
       -- ^ The specification of the allocation.
     holdingCids : [ContractId Holding]
       -- ^ The holdings that are backing this allocation.
       --
-      -- Provided so that that wallets can correlate the allocation with the
+      -- Provided so that wallets can correlate the allocation with the
       -- holdings.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
@@ -139,7 +139,7 @@ data AllocationView = AllocationView with
     availableActions : Map.Map [Party] [AllocationAction]
       -- ^ The actions that the wallet can present to the user on the allocation.
       --
-      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- This field can be used to inform wallet users whether they can take an action or not;
       -- and which other parties they might be waiting on to take their action.
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
@@ -199,7 +199,7 @@ interface Allocation where
         --
         -- They SHOULD do so by checking that the actors are equal to the
         -- `defaultAllocation_SettleControllers`, which ensures maximal
-        -- compatibility and proper implemention of the following constraints:
+        -- compatibility and proper implementation of the following constraints:
         --
         -- - The actors MUST always include the settlement executors and the
         --   instrument admin of the transfer legs.
@@ -225,7 +225,7 @@ interface Allocation where
     -- will not be executed.
     --
     -- The choice is nonconsuming to support alternative consumption patterns,
-    -- e.g., by calling the consuming V1.Allocation_Cancel` choice for
+    -- e.g., by calling the consuming V1.Allocation_Cancel choice for
     -- transaction parsing compatibility.
     --
     -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
@@ -238,7 +238,7 @@ interface Allocation where
         --
         -- They SHOULD do so by checking that the actors are equal to the
         -- `defaultAllocation_CancelControllers`, which ensures maximal
-        -- compatibility and proper implemention of the following constraints:
+        -- compatibility and proper implementation of the following constraints:
         --
         -- - The actors MUST always include the settlement executors.
         -- - For V1 allocations, the actors MUST additionally include the owners
@@ -256,7 +256,7 @@ interface Allocation where
     -- allocation.
     --
     -- The choice is nonconsuming to support alternative consumption patterns,
-    -- e.g., by calling the consuming V1.Allocation_Withdraw` choice for
+    -- e.g., by calling the consuming V1.Allocation_Withdraw choice for
     -- transaction parsing compatibility.
     --
     -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
@@ -277,7 +277,7 @@ interface Allocation where
 
 
 
--- result types
+-- Result Types
 ---------------
 
 -- | The result of settling an allocation by exercising the `Allocation_Settle` choice.
@@ -292,8 +292,7 @@ data Allocation_SettleResult = Allocation_SettleResult with
   deriving (Eq, Show)
 
 -- | The result of the `Allocation_Cancel` choice.
-data Allocation_CancelResult = Allocation_CancelResult
-  with
+data Allocation_CancelResult = Allocation_CancelResult with
     authorizerHoldingCids : TextMap.TextMap [ContractId Holding]
       -- ^ The holdings that were released back to the authorizer keyed by
       -- their `instrumentId.id`.
@@ -302,8 +301,7 @@ data Allocation_CancelResult = Allocation_CancelResult
   deriving (Show, Eq)
 
 -- | The result of the `Allocation_Withdraw` choice.
-data Allocation_WithdrawResult = Allocation_WithdrawResult
-  with
+data Allocation_WithdrawResult = Allocation_WithdrawResult with
     authorizerHoldingCids : TextMap.TextMap [ContractId Holding]
       -- ^ The holdings that were released back to the authorizer keyed by
       -- their `instrumentId.id`.
@@ -312,7 +310,7 @@ data Allocation_WithdrawResult = Allocation_WithdrawResult
   deriving (Show, Eq)
 
 
--- Settlement factory
+-- Settlement Factory
 ---------------------
 
 -- | View for `SettlementFactory`.
