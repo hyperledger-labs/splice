@@ -348,7 +348,7 @@ settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocati
 
   -- create transfer events for all transfer legs
   forA_ transferLegs $ \leg ->
-    exercise eventFactoryCid TransferEventsV2.EventLog_LogTransfer with
+    exercise eventFactoryCid TransferEventsV2.EventLog_Transfer with
       observers = accountParties leg.sender <> accountParties leg.receiver
       sender = leg.sender
       receiver = leg.receiver

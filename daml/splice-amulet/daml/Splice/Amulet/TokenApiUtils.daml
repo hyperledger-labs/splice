@@ -274,19 +274,19 @@ logAmuletBurn dso factoryCid sender amount meta = do
   let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
   void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
 
-logWorkflowSuccess : Party -> [Party] -> ContractId t -> Update ()
-logWorkflowSuccess dso observers workflowId =
-  logWorkflowCompleted dso observers workflowId True emptyMetadata
+workflowSuccess : Party -> [Party] -> ContractId t -> Update ()
+workflowSuccess dso observers workflowId =
+  workflowCompleted dso observers workflowId True emptyMetadata
 
-logWorkflowFailed : Party -> [Party] -> ContractId t -> Text -> Update ()
-logWorkflowFailed dso observers workflowId reason =
-  logWorkflowCompleted dso observers workflowId False (reasonMeta reason)
+workflowFailed : Party -> [Party] -> ContractId t -> Text -> Update ()
+workflowFailed dso observers workflowId reason =
+  workflowCompleted dso observers workflowId False (reasonMeta reason)
 
-logWorkflowCompleted : Party -> [Party] -> ContractId t -> Bool -> Metadata -> Update ()
-logWorkflowCompleted dso observers workflowId success meta = do
+workflowCompleted : Party -> [Party] -> ContractId t -> Bool -> Metadata -> Update ()
+workflowCompleted dso observers workflowId success meta = do
   -- FIXME: use contract key lookup to find the one event factory; instead of creating a new one for each event.
   factoryCid <- create AmuletEventLog with dso
-  void $ exercise (toInterfaceContractId @TransferEventsV2.EventLog factoryCid) TransferEventsV2.EventLog_LogWorkflowCompleted with
+  void $ exercise (toInterfaceContractId @TransferEventsV2.EventLog factoryCid) TransferEventsV2.EventLog_WorkflowCompleted with
     provider = dso
     workflowId = coerceContractId workflowId
     success

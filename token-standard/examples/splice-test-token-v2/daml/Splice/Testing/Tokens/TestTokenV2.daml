@@ -213,8 +213,8 @@ template TokenRules with
         admin = admin
         meta = emptyMetadata
 
-      eventFactory_logWorkflowCompletedImpl = eventFactory_logWorkflowCompletedDefaultImpl admin
-      eventFactory_logTransferImpl = eventFactory_logTransferDefaultImpl admin
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl admin
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl admin
 
 
     interface instance V2.SettlementFactory for TokenRules where

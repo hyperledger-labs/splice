@@ -16,10 +16,10 @@ import Splice.Api.Token.HoldingV2
 interface EventLog where
   viewtype EventLogView
 
-  eventFactory_logWorkflowCompletedImpl : ContractId EventLog -> EventLog_LogWorkflowCompleted -> Update EventLog_WorkflowCompletedResult
-  eventFactory_logTransferImpl : ContractId EventLog -> EventLog_LogTransfer -> Update EventLog_TransferResult
+  eventFactory_workflowCompletedImpl : ContractId EventLog -> EventLog_WorkflowCompleted -> Update EventLog_WorkflowCompletedResult
+  eventFactory_transferImpl : ContractId EventLog -> EventLog_Transfer -> Update EventLog_TransferResult
 
-  nonconsuming choice EventLog_LogWorkflowCompleted : EventLog_WorkflowCompletedResult
+  nonconsuming choice EventLog_WorkflowCompleted : EventLog_WorkflowCompletedResult
     -- ^ Signal that a transfer-related workflow completed, e.g., a transfer instruction,
     -- allocation instruction, allocation request, or an allocation.
     with
@@ -41,9 +41,9 @@ interface EventLog where
         -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
     observer observers
     controller provider
-    do eventFactory_logWorkflowCompletedImpl this self arg
+    do eventFactory_workflowCompletedImpl this self arg
 
-  nonconsuming choice EventLog_LogTransfer : EventLog_TransferResult
+  nonconsuming choice EventLog_Transfer : EventLog_TransferResult
     -- ^ Signal that a transfer happened.
     --
     -- Asset admins MUST ensure that all changes to the holding balance of
@@ -76,7 +76,7 @@ interface EventLog where
         -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
     observer observers
     controller instrumentId.admin
-    do eventFactory_logTransferImpl this self arg
+    do eventFactory_transferImpl this self arg
 
 
 -- | View on an event factory contract.

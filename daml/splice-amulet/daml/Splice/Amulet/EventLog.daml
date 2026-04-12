@@ -21,6 +21,6 @@ template AmuletEventLog
         admin = dso
         meta = emptyMetadata
 
-      eventFactory_logWorkflowCompletedImpl = eventFactory_logWorkflowCompletedDefaultImpl dso
-      eventFactory_logTransferImpl = eventFactory_logTransferDefaultImpl dso
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
 

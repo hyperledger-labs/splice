@@ -89,7 +89,7 @@ standardTransferToTwoStepTransfer transfer =
 executeTransferInstr : AmuletTransferInstruction -> ContractId TransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr instrCid extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
-  logWorkflowSuccess instr.transfer.instrumentId.admin (stakeholder instr) instrCid
+  workflowSuccess instr.transfer.instrumentId.admin (stakeholder instr) instrCid
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
@@ -100,7 +100,7 @@ executeTransferInstr instr instrCid extraArgs = do
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ContractId TransferInstruction -> ExtraArgs -> Text -> Update TransferInstructionResult
 abortAmuletTransferInstruction instr self extraArgs reason = do
-  logWorkflowFailed instr.transfer.instrumentId.admin (stakeholder instr) self reason
+  workflowFailed instr.transfer.instrumentId.admin (stakeholder instr) self reason
   let lockExpiresAt = instr.transfer.executeBefore
   senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
@@ -112,7 +112,7 @@ updateAmuletTransferInstruction : AmuletTransferInstruction -> ContractId Transf
 updateAmuletTransferInstruction instr self extraActors extraArgs = do
   require "No extra actors on transfer expiry" (null extraActors)
   assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
-  logWorkflowFailed instr.transfer.instrumentId.admin (stakeholder instr) self "expired"
+  workflowFailed instr.transfer.instrumentId.admin (stakeholder instr) self "expired"
   let lockExpiresAt = instr.transfer.executeBefore
   senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
