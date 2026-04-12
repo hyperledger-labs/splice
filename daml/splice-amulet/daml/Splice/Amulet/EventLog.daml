@@ -1,0 +1,28 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Event log for Amulet.
+-- FIXME: rename to AmuletTransferEventLog and move to Splice.Amulet.TransferEventLog or similar
+module Splice.Amulet.EventLog where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
+
+import Splice.TokenStandard.Utils
+
+-- FIXME: consider moving to the top level
+template AmuletEventLog
+  with
+    dso : Party
+  where
+    signatory dso
+
+    interface instance TransferEventsV2.EventLog for AmuletEventLog where
+      view = TransferEventsV2.EventLogView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl dso
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl dso
+

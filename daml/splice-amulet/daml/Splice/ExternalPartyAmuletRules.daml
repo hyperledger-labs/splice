@@ -27,6 +27,7 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.ExternalPartyConfigState
 import Splice.Types
 import Splice.Util
 
@@ -143,14 +144,17 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl self arg =
+      settlementFactory_settleBatchImpl self arg = do
         let createReceiptAllocation =
               settlementFactoryV2_defaultCreateReceiptAllocation
                 (coerceContractId self)
                 (\account -> [account.owner])
                 arg
-        in
-          settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
+
+        -- FIXME: share context fetching code
+        externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) arg.extraArgs.context externalPartyConfigStateContextKey
+        fetchChecked (ForDso with dso = dso) externalPartyConfigStateCid
+        settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
       settlementFactory_settleBatchExtraObservers =
         settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl

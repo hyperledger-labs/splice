@@ -87,6 +87,11 @@ template AmuletAllocationV2
         archiveAndCheckActors self arg.actors [dso :: allocation.settlement.executors]
         forA_ allocation.settlement.settlementDeadline $ \deadline ->
           assertWithinDeadline "allocation.settlement.settlementDeadline" deadline
+
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso extraArgs.context
+        logAllocationSettleTransferEvents (toInterfaceContractId configStateCid) allocation
+
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
         let netAmount = netAmuletCreditAmount dso (basicAccount authorizer) allocation.transferLegs
@@ -107,7 +112,8 @@ template AmuletAllocationV2
               pure V2.Allocation_SettleResult with
                 authorizerHoldingCids = TextMap.fromList [(amuletInstrumentIdName, [toInterfaceContractId newHoldingCid])]
                 meta = simpleHoldingTxMeta TxKind_Mint (Some reason) None
-                -- TODO(#4550): revisit whether this mint is the right choice once we know how to do tx history parsing v2
+                -- Note: for V1 tx history parsing, it is difficult to do better
+                -- than reporting this as a mint, as explained below for TxKind_Burn.
           else do
             -- No holding change ==> no tx history metadata
             pure V2.Allocation_SettleResult with
@@ -120,11 +126,14 @@ template AmuletAllocationV2
              lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
              requireMatchExpected ("lockedAmulet.amount", lockedAmulet.amulet.amount.initialAmount) (negate netAmount)
 
-          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef
+          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef.id
           pure V2.Allocation_SettleResult with
             authorizerHoldingCids = mempty
             meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
-            -- TODO(#4550): revisit whether this burn is the right choice once we know how to do tx history parsing v2
+            -- Note: for V1 tx history parsing, we can't really do better reporting this as a burn, as we don't
+            -- have the option of reporting all the actual transfers independently, as we do for V2 tx history parsing.
+            -- We accept this short-coming, as wallets can easily start parsing V2 events independently fo doing the work
+            -- to fully support all V2 flows.
 
 
 unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])

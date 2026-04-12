@@ -35,6 +35,8 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   allocationV2_withdrawDefaultImplUsingV1,
   allocationV2_cancelDefaultImplUsingV1,
 
+  logAllocationSettleTransferEvents,
+
   -- * SettlementFactory template implementations
   settlementFactoryV2_settleBatchDefaultImpl,
   settlementFactoryV2_defaultCreateReceiptAllocation,
@@ -74,6 +76,7 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
 
 ) where
 
+import DA.Action (void, when)
 import DA.Foldable (forA_)
 import DA.List (dedupSort, unique)
 import qualified DA.Map as Map
@@ -82,6 +85,7 @@ import qualified DA.Set as Set
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
@@ -209,6 +213,8 @@ allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{
   forA_ result.receiverHoldingCids $ \receiverHoldingCid ->
     archive receiverHoldingCid
 
+  -- FIXME: report events for V2 transaction history parsing
+
   -- construct metadata to aid V1 tx history parsers
   leg <- case thisView.allocation.transferLegs of
     [leg] -> pure leg
@@ -277,6 +283,36 @@ allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{
     meta = emptyMetadata -- empty to avoid duplicating the metadata
 
 
+-- | Log transfer events for the settlement of an allocation.
+logAllocationSettleTransferEvents
+  : ContractId TransferEventsV2.EventLog
+  -> AllocationV2.AllocationSpecification
+  -> Update ()
+logAllocationSettleTransferEvents eventFactoryCid allocation = do
+  forA_ allocation.transferLegs $ \AllocationV2.TransferLeg{..} -> do
+    let observers = accountParties allocation.authorizer
+    when (allocation.authorizer == sender) $
+      void $ exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
+    when (allocation.authorizer == receiver) $
+      void $ exercise eventFactoryCid TransferEventsV2.EventLog_TransferIn with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
+
+
 -- Batch settlement
 -------------------
 
@@ -318,16 +354,16 @@ settlementFactoryV2_settleBatchDefaultImpl
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFactory0 _self arg= do
+settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFactory0 self arg= do
+  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   -- check that executors are part of the actors
   -- additional actors are allowed, and are implicitly checked via authorization context in all steps that require authority
   require'
-    ("settlement.executors", arg.settlement.executors)
+    ("settlement.executors", settlement.executors)
     isSubsetOfR
-    ("SettlementFactory_SettleBatch.actors", arg.actors)
+    ("SettlementFactory_SettleBatch.actors", actors)
 
   -- validate call to factory and retrieve context
-  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   let settlementFactory = toInterface @AllocationV2.SettlementFactory settlementFactory0
   let admin = (view settlementFactory).admin
   prep <- validateAndPrepareAllocations admin arg

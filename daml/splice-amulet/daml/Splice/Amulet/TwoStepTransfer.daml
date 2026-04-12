@@ -89,7 +89,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
     )
 
 executeTwoStepTransfer
-  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  :  TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore

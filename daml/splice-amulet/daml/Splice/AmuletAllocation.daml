@@ -24,6 +24,7 @@ import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
+import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext)
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -87,7 +88,32 @@ template AmuletAllocation
 
       allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
       allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
-      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
+      allocation_settleImpl _self arg = do
+        -- FIXME: share code with AmuletAllocationV2
+        -- FIXME: review why we can't reuse the code from the defaultImplementation
+
+        -- V2 settlement of a V1 allocation
+        let leg = allocation.transferLeg
+        let dso = leg.instrumentId.admin
+        checkActors arg.actors [[dso, allocation.settlement.executor, leg.sender, leg.receiver]]
+        -- Archive locked amulet to execute the debit (extra checks part of defensive programming)
+        la <- fetchAndArchive (ForOwner with dso, owner = leg.sender) lockedAmulet
+        requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
+
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
+        logAllocationSettleTransferEvents (toInterfaceContractId configStateCid) (upcast allocation)
+
+         -- construct metadata to aid V1 tx history parsers
+
+        -- NOTE: exposing the complete set of V2 transfer legs being settled to V1 parsers,
+        -- is very difficult, which is why we settle for this shortcut to represent it as a burn
+        -- with an appropriate reason.
+        let reason = "Debit for settlement " <> show allocation.settlement.settlementRef
+        pure V2.Allocation_SettleResult with
+          authorizerHoldingCids = mempty
+          meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
+
 
     -- Implemented on the concrete template as you cannot upgrade interfaces so we cannot add a choice to the Allocation interface.
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult

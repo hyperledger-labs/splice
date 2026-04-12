@@ -17,6 +17,7 @@ import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils
 
 
@@ -97,6 +98,10 @@ template TokenAllocationV2 with
           archive cid
           require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", allocation.authorizer)
           pure (holding.instrumentId, holding.amount)
+
+        -- log v2 transfer events
+        tokenRulesCid <- getTokenRulesFromContext extraArgs.context
+        logAllocationSettleTransferEvents (toInterfaceContractId tokenRulesCid) allocation
 
         -- prudent engineering: compare debits with expected debits based on the transfer legs, and settle
         let creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
@@ -206,13 +211,28 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
+
+    interface instance TransferEventsV2.EventLog for TokenRules where
+      view = TransferEventsV2.EventLogView with
+        admin = admin
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl admin
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl admin
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl admin
+
+
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
         admin
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl self arg =
-        let createReceiptAllocation =
+      settlementFactory_settleBatchImpl self arg0 =
+        let arg = arg0 with
+              extraArgs = arg0.extraArgs with
+                context = ChoiceContext with
+                  values = textMapSingleton tokenRulesContextKey (AV_ContractId (coerceContractId self))
+            createReceiptAllocation =
               settlementFactoryV2_defaultCreateReceiptAllocation
                 (coerceContractId self)
                 (\account -> [account.owner])
@@ -242,7 +262,7 @@ token_transferFactory_transferImpl
   -> ContractId V2.TransferFactory
   -> V2.TransferFactory_Transfer
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl tokenRules _self arg = do
+token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
   let transfer = arg.transfer
   checkActors arg.actors [jointAuthorizers transfer.sender]
@@ -269,6 +289,28 @@ token_transferFactory_transferImpl tokenRules _self arg = do
           holding = (senderHoldingFromTransfer transfer) with
             amount = remainder
         pure [toInterfaceContractId cid]
+
+  -- report v2 event
+  -- FIXME: share this code as 'Events.logTransfer'
+  let eventLogCid = coerceContractId self : ContractId TransferEventsV2.EventLog
+  exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.sender
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
+  exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.receiver
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
 
   -- create holding for self-transfer, or transfer offer
   if transfer.receiver == transfer.sender
@@ -371,6 +413,8 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 -- Utilities
 ------------
 
+-- FIXME: report workflow failure reason in event log
+
 unlockTokenAllocationV2 : TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
 unlockTokenAllocationV2 tokenAllocation _extraArgs = do
   holdingCids <- forA tokenAllocation.lockedTokens $ \lockedCid -> do
@@ -400,3 +444,15 @@ senderHoldingFromTransfer transfer = V2.HoldingView with
 
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
+
+
+tokenRulesContextKey : Text
+tokenRulesContextKey = "token-rules"
+
+-- | Lookup and decode a value within a choice context.
+getTokenRulesFromContext : ChoiceContext -> Update (ContractId TokenRules)
+getTokenRulesFromContext context = do
+  case TextMap.lookup tokenRulesContextKey context.values of
+    Some (AV_ContractId cid) -> pure (coerceContractId cid)
+    None -> fail $ "Context value for '" <> tokenRulesContextKey <> "' not found"
+    v -> fail $ "Failed to decode context value for '" <> tokenRulesContextKey <> "': " <> show v
