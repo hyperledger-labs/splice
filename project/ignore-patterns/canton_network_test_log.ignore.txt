@@ -121,6 +121,9 @@ Failed to connect to scan of .*ConfigurationProvidedBftScanConnectionIntegration
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 
+# Ignore premature topology assertions.
+List() did not contain element Submission .*PermissionedSynchronizerIntegrationTest
+
 # Log suppression doesn't seem to work here as the tests use a different logger
 GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
