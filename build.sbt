@@ -114,7 +114,7 @@ lazy val root: Project = (project in file("."))
     `splice-api-token-metadata-v1-daml`,
     `splice-api-token-holding-v1-daml`,
     `splice-api-token-holding-v2-daml`,
-    `splice-api-token-events-v2-daml`,
+    `splice-api-token-transfer-events-v2-daml`,
     `splice-api-token-transfer-instruction-v1-daml`,
     `splice-api-token-transfer-instruction-v2-daml`,
     `splice-api-token-allocation-v1-daml`,
@@ -382,9 +382,9 @@ lazy val `splice-api-token-holding-v2-daml` =
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
     )
 
-lazy val `splice-api-token-events-v2-daml` =
+lazy val `splice-api-token-transfer-events-v2-daml` =
   project
-    .in(file("token-standard/splice-api-token-events-v2"))
+    .in(file("token-standard/splice-api-token-transfer-events-v2"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -576,7 +576,7 @@ lazy val `splice-token-standard-utils-daml` =
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-events-v2-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-events-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
@@ -846,7 +846,7 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-events-v2-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-events-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
