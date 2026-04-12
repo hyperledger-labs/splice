@@ -17,8 +17,8 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
 }
 import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  aTrigger,
   TriggerClass,
+  aTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
@@ -48,10 +48,10 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSyncUpgradeTransferTrafficTrigger,
   LogicalSynchronizerUpgradeAnnouncementTrigger,
   LogicalSynchronizerUpgradeSequencingTestTrigger,
   LogicalSynchronizerUpgradeTrigger,
-  LogicalSyncUpgradeTransferTrafficTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
@@ -142,7 +142,15 @@ class SvDsoAutomationService(
     )
 
   // Triggers that require namespace permissions and the existence of the DsoRules and AmuletRules contracts
+
   def registerPostOnboardingTriggers(): Unit = {
+    registerTrigger(
+      new GrantValidatorPermissionTrigger(
+        triggerContext,
+        store,
+        participantAdminConnection,
+      )
+    )
     registerTrigger(
       new SvOnboardingRequestTrigger(
         triggerContext,
@@ -561,6 +569,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
   // registerPostOnboardingTriggers
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
     SpliceAppAutomationService.expectedTriggerClasses ++ Seq(
+      aTrigger[GrantValidatorPermissionTrigger],
       aTrigger[SummarizingMiningRoundTrigger],
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],

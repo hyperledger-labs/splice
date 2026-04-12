@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorpermission.ValidatorPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -67,18 +66,34 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    withClue("require a 2f+1 majority of SVs to authorize the Alice validator") {
-      val aliceParticipantId = aliceValidatorBackend.participantClient.id
-      val quorumSvs = Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend)
+    withClue("Grant validator permission to Alice and verify visibility across all SVs") {
 
-      for (sv <- quorumSvs) {
-        sv.participantClient.topology.participant_synchronizer_permissions
-          .propose(
-            decentralizedSynchronizerId,
-            aliceParticipantId,
-            permission = ParticipantPermission.Submission,
-          )
-      }
+      val aliceParticipantId = aliceValidatorBackend.participantClient.id
+
+      val allSvValidators =
+        Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend, sv4ValidatorBackend)
+
+      actAndCheck(
+        "Grant validator permission to Alice",
+        sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
+      )(
+        "Verify confirmed topology permission across all SVs",
+        _ => {
+          for (svValidator <- allSvValidators) {
+            clue(s"Checking active topology state on ${svValidator.name}") {
+              val permissions =
+                svValidator.participantClient.topology.participant_synchronizer_permissions
+                  .list(
+                    store = decentralizedSynchronizerId,
+                    filterUid = aliceParticipantId.filterString,
+                  )
+              permissions.map(_.item.permission) should contain(
+                ParticipantPermission.Submission
+              ) // reports errors in log for premature checks
+            }
+          }
+        },
+      )
     }
 
     actAndCheck(
@@ -90,28 +105,6 @@ class PermissionedSynchronizerIntegrationTest
         aliceValidatorBackend.onboardUser("TestUser")
       },
     )
-
-    withClue("Grant validator permission to Alice and verify visibility across all SVs") {
-      val aliceParty = aliceValidatorBackend.getValidatorPartyId()
-      val aliceParticipantId = aliceValidatorBackend.participantClient.id
-
-      val allSvs = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-
-      actAndCheck(
-        "Grant validator permission to Alice",
-        sv1Backend.grantValidatorPermission(aliceParty, aliceParticipantId),
-      )(
-        "Verify visibility across all SVs",
-        _ => {
-          for (sv <- allSvs) {
-            clue(s"Checking visibility on ${sv.name}") {
-              sv.participantClientWithAdminToken.ledger_api_extensions.acs
-                .filterJava(ValidatorPermission.COMPANION)(dsoParty) should have size 1
-            }
-          }
-        },
-      )
-    }
 
   }
 }

@@ -114,6 +114,10 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     }
 
     lookupTests("lookupDsoRulesWithOffset")(dsoRules())(_.lookupDsoRulesWithStateWithOffset())
+    lookupTests("lookupValidatorPermissionWithOffset")(
+      create = validatorPermission(dsoParty, storeSvParty, userParty(1), "PAR:v1::namespace"),
+      noise = Seq(validatorPermission(dsoParty, storeSvParty, userParty(2), "PAR:v2::namespace")),
+    )(_.lookupValidatorPermissionWithOffset(userParty(1)))
     lookupTests("lookupAmuletRulesWithOffset")(amuletRules())(_.lookupAmuletRulesWithOffset())
     lookupTests("lookupAnsRulesWithOffset")(ansRules())(
       _.lookupAnsRulesWithOffset()
