@@ -77,6 +77,7 @@ interface EventLog where
     -- Changes to the locked balance of an account are not explained by transfer events,
     -- as the locks themselves carry context about why the balance is locked.
     with
+      -- FIXME: consider how we could share the 'Transfer' type across allocations, events, and transfer instructions
       sender : Account
         -- ^ Account from which the transfer was sent.
       receiver : Account

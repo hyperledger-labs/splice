@@ -262,7 +262,7 @@ token_transferFactory_transferImpl
   -> ContractId V2.TransferFactory
   -> V2.TransferFactory_Transfer
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl tokenRules _self arg = do
+token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
   let transfer = arg.transfer
   checkActors arg.actors [jointAuthorizers transfer.sender]
@@ -289,6 +289,28 @@ token_transferFactory_transferImpl tokenRules _self arg = do
           holding = (senderHoldingFromTransfer transfer) with
             amount = remainder
         pure [toInterfaceContractId cid]
+
+  -- report v2 event
+  -- FIXME: share this code as 'Events.logTransfer'
+  let eventLogCid = coerceContractId self : ContractId TransferEventsV2.EventLog
+  exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.sender
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
+  exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.receiver
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
 
   -- create holding for self-transfer, or transfer offer
   if transfer.receiver == transfer.sender
