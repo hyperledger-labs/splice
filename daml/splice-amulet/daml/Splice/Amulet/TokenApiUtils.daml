@@ -17,7 +17,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
-import Splice.Api.Token.TransferEventsV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 import Splice.Api.Token.HoldingV2 qualified as V2
 
 import Splice.Amulet.EventFactory
@@ -264,12 +264,12 @@ getFromContextU context k = either fail pure $ getFromContext context k
 -- V2 Events
 ------------
 
-logAmuletMint : Party -> ContractId V2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
+logAmuletMint : Party -> ContractId TransferEventsV2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
 logAmuletMint dso factoryCid receiver amount meta = do
   let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
   void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta
 
-logAmuletBurn : Party -> ContractId V2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventFactory -> Party -> Decimal -> Metadata -> Update ()
 logAmuletBurn dso factoryCid sender amount meta = do
   let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
   void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
@@ -286,7 +286,7 @@ logWorkflowCompleted : Party -> [Party] -> ContractId t -> Bool -> Metadata -> U
 logWorkflowCompleted dso observers workflowId success meta = do
   -- FIXME: use contract key lookup to find the one event factory; instead of creating a new one for each event.
   factoryCid <- create AmuletEventFactory with dso
-  void $ exercise (toInterfaceContractId @V2.EventFactory factoryCid) V2.EventFactory_LogWorkflowCompleted with
+  void $ exercise (toInterfaceContractId @TransferEventsV2.EventFactory factoryCid) TransferEventsV2.EventFactory_LogWorkflowCompleted with
     provider = dso
     workflowId = coerceContractId workflowId
     success

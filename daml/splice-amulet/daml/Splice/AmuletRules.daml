@@ -28,7 +28,7 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  (basicAccount, upcast, eventFactory_logWorkflowCompletedDefaultImpl, eventFactory_logTransferDefaultImpl, publicFetchDefaultImpl)
+  (basicAccount, upcast, eventFactory_logWorkflowCompletedDefaultImpl, eventFactory_logTransferDefaultImpl)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils

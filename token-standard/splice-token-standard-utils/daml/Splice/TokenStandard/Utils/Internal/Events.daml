@@ -18,7 +18,7 @@ module Splice.TokenStandard.Utils.Internal.Events (
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
-import Splice.Api.Token.TransferEventsV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
@@ -28,16 +28,16 @@ import Splice.TokenStandard.Utils.Internal.Choices
 --------------------------
 
 eventFactory_logWorkflowCompletedDefaultImpl
-  : Party -> ContractId V2.EventFactory -> V2.EventFactory_LogWorkflowCompleted -> Update V2.EventFactory_WorkflowCompletedResult
+  : Party -> ContractId TransferEventsV2.EventFactory -> TransferEventsV2.EventFactory_LogWorkflowCompleted -> Update TransferEventsV2.EventFactory_WorkflowCompletedResult
 eventFactory_logWorkflowCompletedDefaultImpl admin _self arg = do
   require' ("provider", arg.provider) isEqualR ("admin", admin )
-  pure V2.EventFactory_WorkflowCompletedResult
+  pure TransferEventsV2.EventFactory_WorkflowCompletedResult
 
 eventFactory_logTransferDefaultImpl
-  : Party -> ContractId V2.EventFactory -> V2.EventFactory_LogTransfer -> Update V2.EventFactory_TransferResult
+  : Party -> ContractId TransferEventsV2.EventFactory -> TransferEventsV2.EventFactory_LogTransfer -> Update TransferEventsV2.EventFactory_TransferResult
 eventFactory_logTransferDefaultImpl admin _self arg = do
   require' ("instrumentId.admin", arg.instrumentId.admin) isEqualR ("admin", admin )
-  pure V2.EventFactory_TransferResult
+  pure TransferEventsV2.EventFactory_TransferResult
 
 
 -- utilities to log mint and burn events
@@ -49,9 +49,9 @@ mintAccountId = v2Namespace <> "mint"
 burnAccountId : Text
 burnAccountId = v2Namespace <> "burn"
 
-logMint : ContractId V2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logMint : ContractId TransferEventsV2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventFactory_TransferResult
 logMint factoryCid receiver amount instrumentId meta = do
-  exercise factoryCid V2.EventFactory_LogTransfer with
+  exercise factoryCid TransferEventsV2.EventFactory_LogTransfer with
     sender = V2.Account with
       owner = instrumentId.admin
       provider = None
@@ -62,9 +62,9 @@ logMint factoryCid receiver amount instrumentId meta = do
     observers = accountParties receiver
     extraArgs = ExtraArgs with meta; context = emptyChoiceContext
 
-logBurn : ContractId V2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logBurn : ContractId TransferEventsV2.EventFactory -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventFactory_TransferResult
 logBurn factoryCid sender amount instrumentId meta = do
-  exercise factoryCid V2.EventFactory_LogTransfer with
+  exercise factoryCid TransferEventsV2.EventFactory_LogTransfer with
     receiver = V2.Account with
       owner = instrumentId.admin
       provider = None
