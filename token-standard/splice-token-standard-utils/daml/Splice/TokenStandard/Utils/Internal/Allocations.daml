@@ -82,7 +82,7 @@ import qualified DA.Set as Set
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.EventsV2 qualified as EventsV2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
@@ -313,7 +313,7 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => ContractId EventsV2.EventFactory
+  => ContractId TransferEventsV2.EventFactory
      -- ^ Event log to use for registering the transfer events
   -> (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
      -- ^ How to create the allocation of a missing receipt leg.
@@ -348,7 +348,7 @@ settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocati
 
   -- create transfer events for all transfer legs
   forA_ transferLegs $ \leg ->
-    exercise eventFactoryCid EventsV2.EventFactory_LogTransfer with
+    exercise eventFactoryCid TransferEventsV2.EventFactory_LogTransfer with
       observers = accountParties leg.sender <> accountParties leg.receiver
       sender = leg.sender
       receiver = leg.receiver

@@ -5,7 +5,7 @@
 module Splice.Amulet.EventFactory where
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.EventsV2 as EventsV2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 
 import Splice.TokenStandard.Utils
 
@@ -16,8 +16,8 @@ template AmuletEventFactory
   where
     signatory dso
 
-    interface instance EventsV2.EventFactory for AmuletEventFactory where
-      view = EventsV2.EventFactoryView with
+    interface instance TransferEventsV2.EventFactory for AmuletEventFactory where
+      view = TransferEventsV2.EventFactoryView with
         admin = dso
         meta = emptyMetadata
 

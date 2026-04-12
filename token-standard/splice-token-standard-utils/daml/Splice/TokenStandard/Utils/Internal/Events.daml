@@ -18,7 +18,7 @@ module Splice.TokenStandard.Utils.Internal.Events (
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
-import Splice.Api.Token.EventsV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as V2
 
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices

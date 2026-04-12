@@ -2,8 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Interface to log events related to token standard transfers.
--- FIXME: rename to TransferEvents incl factory and package to make space for other kinds of events
-module Splice.Api.Token.EventsV2 where
+module Splice.Api.Token.TransferEventsV2 where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
