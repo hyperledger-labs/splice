@@ -87,7 +87,9 @@ class PermissionedSynchronizerIntegrationTest
                     store = decentralizedSynchronizerId,
                     filterUid = aliceParticipantId.filterString,
                   )
-              permissions.map(_.item.permission) should contain(ParticipantPermission.Submission)
+              permissions.map(_.item.permission) should contain(
+                ParticipantPermission.Submission
+              ) // reports errors in log for premature checks
             }
           }
         },
