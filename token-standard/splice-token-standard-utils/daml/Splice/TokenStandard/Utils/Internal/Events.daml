@@ -55,7 +55,7 @@ logMint factoryCid receiver amount instrumentId meta = do
     sender = V2.Account with
       owner = instrumentId.admin
       provider = None
-      id = Some mintAccountId
+      id = mintAccountId
     receiver
     instrumentId
     amount
@@ -68,7 +68,7 @@ logBurn factoryCid sender amount instrumentId meta = do
     receiver = V2.Account with
       owner = instrumentId.admin
       provider = None
-      id = Some burnAccountId
+      id = burnAccountId
     instrumentId
     amount
     sender
