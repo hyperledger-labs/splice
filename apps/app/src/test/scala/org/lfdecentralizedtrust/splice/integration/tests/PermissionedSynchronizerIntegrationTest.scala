@@ -67,6 +67,7 @@ class PermissionedSynchronizerIntegrationTest
     }
 
     withClue("Grant validator permission to Alice and verify visibility across all SVs") {
+
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
 
       val allSvValidators =
