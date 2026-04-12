@@ -37,7 +37,6 @@ template ExternalPartyConfigState
 
       eventFactory_logWorkflowCompletedImpl = eventFactory_logWorkflowCompletedDefaultImpl dso
       eventFactory_logTransferImpl = eventFactory_logTransferDefaultImpl dso
-      eventFactory_publicFetchImpl = publicFetchDefaultImpl this
 
 
 instance HasCheckedFetch ExternalPartyConfigState ForDso where

@@ -19,7 +19,6 @@ interface EventFactory where
 
   eventFactory_logWorkflowCompletedImpl : ContractId EventFactory -> EventFactory_LogWorkflowCompleted -> Update EventFactory_WorkflowCompletedResult
   eventFactory_logTransferImpl : ContractId EventFactory -> EventFactory_LogTransfer -> Update EventFactory_TransferResult
-  eventFactory_publicFetchImpl : ContractId EventFactory -> EventFactory_PublicFetch -> Update EventFactoryView
 
   nonconsuming choice EventFactory_LogWorkflowCompleted : EventFactory_WorkflowCompletedResult
     -- ^ Signal that a transfer-related workflow completed, e.g., a transfer instruction,
@@ -79,13 +78,6 @@ interface EventFactory where
     observer observers
     controller instrumentId.admin
     do eventFactory_logTransferImpl this self arg
-
-  nonconsuming choice EventFactory_PublicFetch : EventFactoryView
-    with
-      actors : [Party]
-        -- ^ Parties executing the fetch.
-    controller actors
-    do eventFactory_publicFetchImpl this self arg
 
 
 -- | View on an event factory contract.
