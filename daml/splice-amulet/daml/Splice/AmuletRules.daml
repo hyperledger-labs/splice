@@ -142,8 +142,8 @@ template AmuletRules
     signatory dso
 
     -- FIXME: check whether we even need this -- external party config state could be used
-    interface instance TransferEventsV2.EventFactory for AmuletRules where
-      view = TransferEventsV2.EventFactoryView with
+    interface instance TransferEventsV2.EventLog for AmuletRules where
+      view = TransferEventsV2.EventLogView with
         admin = dso
         meta = emptyMetadata
 
@@ -908,10 +908,10 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : Optional (ContractId TransferEventsV2.EventFactory) -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer optEventFactoryCid config context dso t = do
+executeTransfer : Optional (ContractId TransferEventsV2.EventLog) -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer optEventLogCid config context dso t = do
   -- compute summaries
-  csum <- summarizeAndValidateContext optEventFactoryCid context dso t
+  csum <- summarizeAndValidateContext optEventLogCid context dso t
   executeTransfer' config csum dso t
 
 -- | Execute a transfer for external parties so that the prepared tx remains valid for 24h
@@ -938,7 +938,7 @@ executeTransfer' config csum dso t = do
   issueRewards config csum t.provider t.beneficiaries
   -- record outputs
   (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.optEventFactoryCid csum.openRoundNumber csum.config dso t.sender summary osum
+    createTransferOutputs csum.optEventLogCid csum.openRoundNumber csum.config dso t.sender summary osum
 
   let senderRetainsControl o =
         t.sender == o.receiver &&
@@ -968,7 +968,7 @@ executeTransfer' config csum dso t = do
         fromOptional 0.0 summary.inputValidatorFaucetAmount +
         fromOptional 0.0 summary.inputDevelopmentFundAmount
   when (mintAmount > 0.0) $
-    forA_ csum.optEventFactoryCid $ \eventFactoryCid -> do
+    forA_ csum.optEventLogCid $ \eventFactoryCid -> do
       logAmuletMint dso eventFactoryCid t.sender mintAmount $ Metadata with
         values =
           TextMap.insert reasonMetaKey "mint rewards" $
@@ -997,7 +997,7 @@ data TransferContextSummaryV2 = TransferContextSummaryV2 with
     amuletPrice : Decimal
     issuingMiningRounds : Map Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
-    optEventFactoryCid : Optional (ContractId TransferEventsV2.EventFactory)
+    optEventLogCid : Optional (ContractId TransferEventsV2.EventLog)
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
@@ -1027,8 +1027,8 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     lock : Optional TimeLock -- ^ Whether to lock the amulet or not
   deriving (Eq, Show)
 
-summarizeAndValidateContext : Optional (ContractId TransferEventsV2.EventFactory) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
-summarizeAndValidateContext optEventFactoryCid context dso tf = do
+summarizeAndValidateContext : Optional (ContractId TransferEventsV2.EventLog) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
+summarizeAndValidateContext optEventLogCid context dso tf = do
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
   assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
@@ -1057,7 +1057,7 @@ summarizeAndValidateContext optEventFactoryCid context dso tf = do
     issuingMiningRounds = Map.fromList issuingMiningRounds
     validatorRights = Map.fromList validatorRights
     amuletPrice = openRound.amuletPrice
-    optEventFactoryCid
+    optEventLogCid
 
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
@@ -1079,7 +1079,7 @@ summarizeAndValidateExternalPartyContext context dso tf = do
     -- no minting for long lived transfers
     issuingMiningRounds = Map.empty
     validatorRights = Map.empty
-    optEventFactoryCid = Some (toInterfaceContractId context.externalPartyConfigState)
+    optEventLogCid = Some (toInterfaceContractId context.externalPartyConfigState)
 
 getValidatorRight : TransferContextSummaryV2 -> Party -> Update (ContractId ValidatorRight)
 getValidatorRight csum user =
@@ -1367,9 +1367,9 @@ issueRewards config csum provider beneficiaries = do
     featured = Some provider == csum.featuredAppProvider
 
 createTransferOutputs
-  : Optional (ContractId TransferEventsV2.EventFactory) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  : Optional (ContractId TransferEventsV2.EventLog) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
   -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs optEventFactoryCid currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
+createTransferOutputs optEventLogCid currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
     outputAmulets <- mapA createOutput preprocessedOutputs
     senderChangeAmulet <- createSenderChange
     return (outputAmulets, senderChangeAmulet)
@@ -1389,8 +1389,8 @@ createTransferOutputs optEventFactoryCid currentOpenRound transferConfigAmulet d
 
       -- register transfer events for non-self transfers, if required
       unless (sender == out.owner) $
-        forA_ optEventFactoryCid $ \eventFactoryCid ->
-          exercise eventFactoryCid TransferEventsV2.EventFactory_LogTransfer with
+        forA_ optEventLogCid $ \eventFactoryCid ->
+          exercise eventFactoryCid TransferEventsV2.EventLog_LogTransfer with
             observers = [sender, out.owner]
             instrumentId = upcast (amuletInstrumentId dso)
             sender = basicAccount sender
@@ -1917,7 +1917,7 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-splitAndBurn : ContractId TransferEventsV2.EventFactory -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
+splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
 splitAndBurn eventFactoryCid sender amount inputs context dso usage = do
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with

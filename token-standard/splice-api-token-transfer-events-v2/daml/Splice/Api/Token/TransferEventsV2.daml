@@ -13,13 +13,13 @@ import Splice.Api.Token.HoldingV2
 -- The non-consuming choices of this interface are used by the `reporter` to signal events.
 -- Make sure to only check events from reporters that are trustworthy, e.g., by only transfer
 -- events from a token's instrument admin should be considered as relevant events for a token.
-interface EventFactory where
-  viewtype EventFactoryView
+interface EventLog where
+  viewtype EventLogView
 
-  eventFactory_logWorkflowCompletedImpl : ContractId EventFactory -> EventFactory_LogWorkflowCompleted -> Update EventFactory_WorkflowCompletedResult
-  eventFactory_logTransferImpl : ContractId EventFactory -> EventFactory_LogTransfer -> Update EventFactory_TransferResult
+  eventFactory_logWorkflowCompletedImpl : ContractId EventLog -> EventLog_LogWorkflowCompleted -> Update EventLog_WorkflowCompletedResult
+  eventFactory_logTransferImpl : ContractId EventLog -> EventLog_LogTransfer -> Update EventLog_TransferResult
 
-  nonconsuming choice EventFactory_LogWorkflowCompleted : EventFactory_WorkflowCompletedResult
+  nonconsuming choice EventLog_LogWorkflowCompleted : EventLog_WorkflowCompletedResult
     -- ^ Signal that a transfer-related workflow completed, e.g., a transfer instruction,
     -- allocation instruction, allocation request, or an allocation.
     with
@@ -43,7 +43,7 @@ interface EventFactory where
     controller provider
     do eventFactory_logWorkflowCompletedImpl this self arg
 
-  nonconsuming choice EventFactory_LogTransfer : EventFactory_TransferResult
+  nonconsuming choice EventLog_LogTransfer : EventLog_TransferResult
     -- ^ Signal that a transfer happened.
     --
     -- Asset admins MUST ensure that all changes to the holding balance of
@@ -80,16 +80,16 @@ interface EventFactory where
 
 
 -- | View on an event factory contract.
-data EventFactoryView = EventFactoryView with
+data EventLogView = EventLogView with
     admin : Party
     meta : Metadata
   deriving (Eq, Show)
 
 -- | Result of logging a workflow completion event. Provided for extensibility
 -- in a future where interfaces are upgradeable.
-data EventFactory_WorkflowCompletedResult = EventFactory_WorkflowCompletedResult {}
+data EventLog_WorkflowCompletedResult = EventLog_WorkflowCompletedResult {}
 
 -- | Result of logging a transfer event. Provided for extensibility
 -- in a future where interfaces are upgradeable.
-data EventFactory_TransferResult = EventFactory_TransferResult {}
+data EventLog_TransferResult = EventLog_TransferResult {}
 

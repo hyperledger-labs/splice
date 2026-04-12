@@ -208,8 +208,8 @@ template TokenRules with
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
 
-    interface instance TransferEventsV2.EventFactory for TokenRules where
-      view = TransferEventsV2.EventFactoryView with
+    interface instance TransferEventsV2.EventLog for TokenRules where
+      view = TransferEventsV2.EventLogView with
         admin = admin
         meta = emptyMetadata
 
