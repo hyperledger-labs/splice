@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.RewardComputationSummary
 
 import scala.concurrent.Future
 
@@ -28,5 +29,5 @@ trait ScanAppRewardsStore {
     */
   def computeAndStoreRewards(roundNumber: Long)(implicit
       tc: TraceContext
-  ): Future[Unit]
+  ): Future[RewardComputationSummary]
 }

@@ -79,6 +79,14 @@ object DbScanAppRewardsStore {
       roundNumber: Long,
       rootHash: ByteString,
   )
+
+  /** Summary of a single round's reward computation, for metrics reporting. */
+  final case class RewardComputationSummary(
+      activePartiesCount: Long,
+      activityRecordsCount: Long,
+      rewardedPartiesCount: Long,
+      batchesCreatedCount: Long,
+  )
 }
 
 class DbScanAppRewardsStore(
@@ -174,6 +182,16 @@ class DbScanAppRewardsStore(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
       rootHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
+    )
+  }
+
+  private implicit val getResultRewardComputationSummary
+      : GetResult[DbScanAppRewardsStore.RewardComputationSummary] = GetResult { prs =>
+    DbScanAppRewardsStore.RewardComputationSummary(
+      activePartiesCount = prs.<<[Long],
+      activityRecordsCount = prs.<<[Long],
+      rewardedPartiesCount = prs.<<[Long],
+      batchesCreatedCount = prs.<<[Long],
     )
   }
 
@@ -496,8 +514,11 @@ class DbScanAppRewardsStore(
     */
   def computeAndStoreRewards(
       roundNumber: Long
-  )(implicit tc: TraceContext): Future[Unit] =
-    aggregateActivityTotals(roundNumber)
+  )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] =
+    for {
+      _ <- aggregateActivityTotals(roundNumber)
+      summary <- readComputationSummary(roundNumber)
+    } yield summary
 
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
@@ -633,6 +654,32 @@ class DbScanAppRewardsStore(
       "appRewards.computeRewardTotals",
     )
   }
+
+  // -- Computation summary ----------------------------------------------------
+
+  /** Read back the summary counters for a round that was just computed,
+    * within the same transaction.
+    */
+  private def readComputationSummary(roundNumber: Long)(implicit
+      tc: TraceContext
+  ): Future[DbScanAppRewardsStore.RewardComputationSummary] =
+    runQuery(
+      sql"""select
+            (select active_app_provider_parties_count
+             from #${Tables.appActivityRoundTotals}
+             where history_id = $historyId and round_number = $roundNumber),
+            (select activity_records_count
+             from #${Tables.appActivityRoundTotals}
+             where history_id = $historyId and round_number = $roundNumber),
+            (select coalesce(rewarded_app_provider_parties_count, 0)
+             from #${Tables.appRewardRoundTotals}
+             where history_id = $historyId and round_number = $roundNumber),
+            (select count(*)
+             from #${Tables.appRewardBatchHashes}
+             where history_id = $historyId and round_number = $roundNumber)
+    """.as[DbScanAppRewardsStore.RewardComputationSummary].head,
+      "appRewards.readComputationSummary",
+    )
 
   // -- Private helpers -------------------------------------------------------
 
