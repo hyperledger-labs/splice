@@ -35,6 +35,8 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   allocationV2_withdrawDefaultImplUsingV1,
   allocationV2_cancelDefaultImplUsingV1,
 
+  logAllocationSettleTransferEvents,
+
   -- * SettlementFactory template implementations
   settlementFactoryV2_settleBatchDefaultImpl,
   settlementFactoryV2_defaultCreateReceiptAllocation,
@@ -210,6 +212,8 @@ allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{
   forA_ result.receiverHoldingCids $ \receiverHoldingCid ->
     archive receiverHoldingCid
 
+  -- FIXME: report events for V2 transaction history parsing
+
   -- construct metadata to aid V1 tx history parsers
   leg <- case thisView.allocation.transferLegs of
     [leg] -> pure leg
@@ -276,6 +280,36 @@ allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{
     authorizerHoldingCids = TextMap.fromList
       [ (thisView.allocation.transferLeg.instrumentId.id, map upcast result.senderHoldingCids) ]
     meta = emptyMetadata -- empty to avoid duplicating the metadata
+
+
+-- | Log transfer events for the settlement of an allocation.
+logAllocationSettleTransferEvents
+  : ContractId TransferEventsV2.EventLog
+  -> AllocationV2.AllocationSpecification
+  -> Update ()
+logAllocationSettleTransferEvents eventFactoryCid allocation = do
+  forA_ allocation.transferLegs $ \AllocationV2.TransferLeg{..} -> do
+    let observers = accountParties allocation.authorizer
+    when (authorizer == sender) $
+      exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
+    when (authorizer == receiver) $
+      exercise eventFactoryCid TransferEventsV2.EventLog_TransferIn with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
 
 
 -- Batch settlement
@@ -345,18 +379,6 @@ settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocati
       actors = AllocationV2.defaultAllocation_SettleControllers allocView
       extraArgs
     pure (allocView.allocation.authorizer, result.authorizerHoldingCids)
-
-  -- create transfer events for all transfer legs
-  forA_ transferLegs $ \leg ->
-    exercise eventFactoryCid TransferEventsV2.EventLog_Transfer with
-      observers = accountParties leg.sender <> accountParties leg.receiver
-      sender = leg.sender
-      receiver = leg.receiver
-      amount = leg.amount
-      instrumentId = leg.instrumentId
-      extraArgs = ExtraArgs with
-        meta = leg.meta
-        context = emptyChoiceContext
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with

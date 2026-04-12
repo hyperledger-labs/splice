@@ -89,6 +89,7 @@ template AmuletAllocation
       allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
       allocation_settleImpl _self arg = do
         -- FIXME: share code with AmuletAllocationV2
+        -- FIXME: review why we can't reuse the code from the defaultImplementation
 
         -- V2 settlement of a V1 allocation
         let leg = allocation.transferLeg
@@ -97,6 +98,13 @@ template AmuletAllocation
         -- Archive locked amulet to execute the debit (extra checks part of defensive programming)
         la <- fetchAndArchive (ForOwner with dso, owner = leg.sender) lockedAmulet
         requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
+
+        -- report transfer events for V2 transaction history parsing
+        configStateCid <- getExternalPartyConfigStateFromChoiceContext dso arg.context
+        logAllocationSettleTransferEvents (toInterfaceContractId configStateCid) (upcast allocation)
+
+         -- construct metadata to aid V1 tx history parsers
+
         -- NOTE: exposing the complete set of V2 transfer legs being settled to V1 parsers,
         -- is very difficult, which is why we settle for this shortcut to represent it as a burn
         -- with an appropriate reason.

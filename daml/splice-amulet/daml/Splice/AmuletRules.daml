@@ -1390,8 +1390,17 @@ createTransferOutputs optEventLogCid currentOpenRound transferConfigAmulet dso s
       -- register transfer events for non-self transfers, if required
       unless (sender == out.owner) $
         forA_ optEventLogCid $ \eventFactoryCid ->
-          exercise eventFactoryCid TransferEventsV2.EventLog_Transfer with
-            observers = [sender, out.owner]
+          exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
+            observers = [sender]
+            instrumentId = upcast (amuletInstrumentId dso)
+            sender = basicAccount sender
+            receiver = basicAccount out.owner
+            amount = out.amount
+            extraArgs = ExtraArgs with
+              meta = emptyMetadata -- FIXME: add reason
+              context = emptyChoiceContext
+          exercise eventFactoryCid TransferEventsV2.EventLog_TransferIn with
+            observers = [out.owner]
             instrumentId = upcast (amuletInstrumentId dso)
             sender = basicAccount sender
             receiver = basicAccount out.owner

@@ -11,17 +11,32 @@ import Splice.Api.Token.HoldingV2
 -- | An interface for templates that can be used to report token standard v2 events.
 --
 -- The non-consuming choices of this interface are used by the `reporter` to signal events.
--- Make sure to only check events from reporters that are trustworthy, e.g., by only transfer
+-- Make sure to only check events from reporters that are trustworthy, e.g., only transfer
 -- events from a token's instrument admin should be considered as relevant events for a token.
 interface EventLog where
   viewtype EventLogView
 
   eventFactory_workflowCompletedImpl : ContractId EventLog -> EventLog_WorkflowCompleted -> Update EventLog_WorkflowCompletedResult
-  eventFactory_transferImpl : ContractId EventLog -> EventLog_Transfer -> Update EventLog_TransferResult
+  eventFactory_transferOutImpl : ContractId EventLog -> EventLog_TransferOut -> Update EventLog_TransferOutResult
+  eventFactory_transferInImpl : ContractId EventLog -> EventLog_TransferIn -> Update EventLog_TransferInResult
 
   nonconsuming choice EventLog_WorkflowCompleted : EventLog_WorkflowCompletedResult
-    -- ^ Signal that a transfer-related workflow completed, e.g., a transfer instruction,
+    -- ^ Signal the completion of a transfer workflow, that is: a transfer instruction,
     -- allocation instruction, allocation request, or an allocation.
+    --
+    -- Wallets SHOULD use the following rules to interpret the archival of transfer workflow contracts:
+    --
+    --   1. If a contract with the same workflowId is created in the same transaction
+    --      then the state of the workflow was updated.
+    --   2. Otherwise the workflow completed, and the wallet SHOULD use the information
+    --      in the `EventLog_WorkflowCompleted` event for the workflowId to
+    --      determine whether the workflow succeeded or failed and why.
+    --   3. If there is no `EventLog_WorkflowCompleted` event for the workflowId, then
+    --      the wallet SHOULD assume that the workflow completed successfully.
+    --
+    -- Asset implementations MUST always emit an `EventLog_WorkflowCompleted` event for failed workflows.
+    -- The defaulting to success in Step 3 is an optimization for the common case of successful workflows.
+    --
     with
       provider : Party
         -- ^ App provider party of the workflow that completed. That is the
@@ -29,6 +44,13 @@ interface EventLog where
         -- and allocations; and the app provider party for allocation requests.
       workflowId : AnyContractId
         -- ^ Contract-id of the workflow whose completion is being reported.
+        --
+        -- This SHOULD be the `originalInstructionCid` for transfer and allocation instructions, and
+        -- the `originalRequestCid` for allocation requests, and the `originalAllocationCid` for
+        -- allocations.
+        --
+        -- FIXME: introduce these fields for allocation requests and allocations.
+        -- FIXME: consider renaming these fields to `workflowCid` in all of them, so there's no confusion about which contract-id to use.
       success : Bool
         -- ^ Whether the workflow completed successfully or not.
         -- The failure reason can be included in the metadata.
@@ -43,18 +65,13 @@ interface EventLog where
     controller provider
     do eventFactory_workflowCompletedImpl this self arg
 
-  nonconsuming choice EventLog_Transfer : EventLog_TransferResult
-    -- ^ Signal that a transfer happened.
+  nonconsuming choice EventLog_TransferOut : EventLog_TransferOutResult
+    -- ^ Signal a transfer to the sender.
     --
-    -- Asset admins MUST ensure that all changes to the holding balance of
-    -- an account are explained *exactly* by the transfer events within the same
-    -- transaction visible to the account parties. There must be neither too
-    -- many nor too few transfer events.
-    --
-    -- Asset admins MAY emit multiple transfer events for the same transfer, if
-    -- they need to report the transfers to different sets of observers that should
-    -- not learn about each other. They MUST ensure that the sets of observers are
-    -- disjoint to avoid double-counting of events by observers.
+    -- Asset admins MUST ensure that
+    --   1. every TransferOut has a matching TransferIn event
+    --   2. any account balance changes are fully explained by the TransferOut
+    --      and TransferIn events for that account.
     --
     -- Changes to the locked balance of an account are not explained by transfer events,
     -- as the locks themselves carry context about why the balance is locked.
@@ -68,7 +85,7 @@ interface EventLog where
       amount : Decimal
         -- ^ Amount transferred.
       observers : [Party]
-        -- ^ Parties that should be notified about the transfer.
+        -- ^ Parties that should be notified about the transfer out.
       extraArgs : ExtraArgs
         -- ^ Arguments storing both metadata and additional context information about the event.
         --
@@ -76,7 +93,37 @@ interface EventLog where
         -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
     observer observers
     controller instrumentId.admin
-    do eventFactory_transferImpl this self arg
+    do eventFactory_transferOutImpl this self arg
+
+  nonconsuming choice EventLog_TransferIn : EventLog_TransferInResult
+    -- ^ Signal that a transfer happened to the receiver.
+    --
+    -- Asset admins MUST ensure that
+    --   1. every TransferIn has a matching TransferOut event
+    --   2. any account balance changes are fully explained by the TransferOut and
+    --      TransferIn events for that account.
+    --
+    -- Changes to the locked balance of an account are not explained by transfer events,
+    -- as the locks themselves carry context about why the balance is locked.
+    with
+      sender : Account
+        -- ^ Account from which the transfer was sent.
+      receiver : Account
+        -- ^ Account to which the transfer was sent.
+      instrumentId : InstrumentId
+        -- ^ Instrument of the transfer.
+      amount : Decimal
+        -- ^ Amount transferred.
+      observers : [Party]
+        -- ^ Parties that should be notified about the transfer in.
+      extraArgs : ExtraArgs
+        -- ^ Arguments storing both metadata and additional context information about the event.
+        --
+        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
+        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
+    observer observers
+    controller instrumentId.admin
+    do eventFactory_transferInImpl this self arg
 
 
 -- | View on an event factory contract.
@@ -89,7 +136,10 @@ data EventLogView = EventLogView with
 -- in a future where interfaces are upgradeable.
 data EventLog_WorkflowCompletedResult = EventLog_WorkflowCompletedResult {}
 
--- | Result of logging a transfer event. Provided for extensibility
+-- | Result of logging a transfer out event. Provided for extensibility
 -- in a future where interfaces are upgradeable.
-data EventLog_TransferResult = EventLog_TransferResult {}
+data EventLog_TransferOutResult = EventLog_TransferOutResult {}
 
+-- | Result of logging a transfer in event. Provided for extensibility
+-- in a future where interfaces are upgradeable.
+data EventLog_TransferInResult = EventLog_TransferInResult {}
