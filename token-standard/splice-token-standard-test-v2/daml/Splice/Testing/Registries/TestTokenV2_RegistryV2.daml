@@ -71,6 +71,7 @@ initialize config = do
 mint : TestTokenV2Registry -> V2.Account -> Text -> Decimal -> Script (ContractId V2.Holding)
 mint registry account intrumentName amount = do
   -- TODO(#4813): perform the mint via a transfer from `Account admin "cip-112/mint` once we have transfer support
+  -- FIXM: perform mint in a way that produces the proper transfer events
   tokenCid <- submitMulti (registry.admin :: accountParties account) [] $ createCmd TestTokenV2.Token with
     holding = V2.HoldingView with
       account
