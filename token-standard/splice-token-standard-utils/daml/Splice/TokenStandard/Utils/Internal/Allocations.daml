@@ -76,6 +76,7 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
 
 ) where
 
+import DA.Action (void, when)
 import DA.Foldable (forA_)
 import DA.List (dedupSort, unique)
 import qualified DA.Map as Map
@@ -290,8 +291,8 @@ logAllocationSettleTransferEvents
 logAllocationSettleTransferEvents eventFactoryCid allocation = do
   forA_ allocation.transferLegs $ \AllocationV2.TransferLeg{..} -> do
     let observers = accountParties allocation.authorizer
-    when (authorizer == sender) $
-      exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
+    when (allocation.authorizer == sender) $
+      void $ exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
         observers
         sender
         receiver
@@ -300,8 +301,8 @@ logAllocationSettleTransferEvents eventFactoryCid allocation = do
         extraArgs = ExtraArgs with
           meta
           context = emptyChoiceContext
-    when (authorizer == receiver) $
-      exercise eventFactoryCid TransferEventsV2.EventLog_TransferIn with
+    when (allocation.authorizer == receiver) $
+      void $ exercise eventFactoryCid TransferEventsV2.EventLog_TransferIn with
         observers
         sender
         receiver
@@ -347,15 +348,13 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => ContractId TransferEventsV2.EventLog
-     -- ^ Event log to use for registering the transfer events
-  -> (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
+  => (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
      -- ^ How to create the allocation of a missing receipt leg.
   -> t
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocation settlementFactory0 self arg= do
+settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFactory0 self arg= do
   let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   -- check that executors are part of the actors
   -- additional actors are allowed, and are implicitly checked via authorization context in all steps that require authority

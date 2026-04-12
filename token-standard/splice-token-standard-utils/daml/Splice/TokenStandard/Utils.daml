@@ -68,7 +68,8 @@ module Splice.TokenStandard.Utils (
 
   -- * Events
   eventFactory_workflowCompletedDefaultImpl,
-  eventFactory_transferDefaultImpl,
+  eventFactory_transferOutDefaultImpl,
+  eventFactory_transferInDefaultImpl,
 
   logMint,
   logBurn,
@@ -103,6 +104,8 @@ module Splice.TokenStandard.Utils (
   allocationV2_settleDefaultImplUsingV1,
   allocationV2_withdrawDefaultImplUsingV1,
   allocationV2_cancelDefaultImplUsingV1,
+
+  logAllocationSettleTransferEvents,
 
   -- ** Settlement factory implementation
   settlementFactoryV2_settleBatchDefaultImpl,

@@ -99,6 +99,8 @@ template TokenAllocationV2 with
           require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", allocation.authorizer)
           pure (holding.instrumentId, holding.amount)
 
+        -- FIXME: log events
+
         -- prudent engineering: compare debits with expected debits based on the transfer legs, and settle
         let creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
         let combinedAmounts = mergeAmountMaps debitAmounts creditAmounts
@@ -214,7 +216,8 @@ template TokenRules with
         meta = emptyMetadata
 
       eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl admin
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl admin
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl admin
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl admin
 
 
     interface instance V2.SettlementFactory for TokenRules where
@@ -229,7 +232,7 @@ template TokenRules with
                 (\account -> [account.owner])
                 arg
         in
-          settlementFactoryV2_settleBatchDefaultImpl (coerceContractId self) createReceiptAllocation this self arg
+          settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
       settlementFactory_settleBatchExtraObservers _arg = []

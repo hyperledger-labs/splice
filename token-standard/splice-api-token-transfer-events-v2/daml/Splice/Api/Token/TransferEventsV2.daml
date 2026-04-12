@@ -70,8 +70,9 @@ interface EventLog where
     --
     -- Asset admins MUST ensure that
     --   1. every TransferOut has a matching TransferIn event
-    --   2. any account balance changes are fully explained by the TransferOut
-    --      and TransferIn events for that account.
+    --   2. balance changes to accounts are fully explained by the TransferOut
+    --      and TransferIn events for that account unless the account is owned by the
+    --      instrument admin.
     --
     -- Changes to the locked balance of an account are not explained by transfer events,
     -- as the locks themselves carry context about why the balance is locked.
@@ -100,8 +101,9 @@ interface EventLog where
     --
     -- Asset admins MUST ensure that
     --   1. every TransferIn has a matching TransferOut event
-    --   2. any account balance changes are fully explained by the TransferOut and
-    --      TransferIn events for that account.
+    --   2. balance changes to accounts are fully explained by the TransferOut
+    --      and TransferIn events for that account unless the account is owned by the
+    --      instrument admin.
     --
     -- Changes to the locked balance of an account are not explained by transfer events,
     -- as the locks themselves carry context about why the balance is locked.

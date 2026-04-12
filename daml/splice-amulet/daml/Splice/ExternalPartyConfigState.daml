@@ -36,7 +36,8 @@ template ExternalPartyConfigState
         meta = emptyMetadata
 
       eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl dso
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl dso
 
 
 instance HasCheckedFetch ExternalPartyConfigState ForDso where

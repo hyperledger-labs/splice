@@ -28,7 +28,7 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  (basicAccount, upcast, eventFactory_workflowCompletedDefaultImpl, eventFactory_transferDefaultImpl)
+  (basicAccount, upcast, eventFactory_workflowCompletedDefaultImpl, eventFactory_transferOutDefaultImpl, eventFactory_transferInDefaultImpl)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -148,7 +148,8 @@ template AmuletRules
         meta = emptyMetadata
 
       eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl dso
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl dso
 
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
@@ -1389,7 +1390,7 @@ createTransferOutputs optEventLogCid currentOpenRound transferConfigAmulet dso s
 
       -- register transfer events for non-self transfers, if required
       unless (sender == out.owner) $
-        forA_ optEventLogCid $ \eventFactoryCid ->
+        forA_ optEventLogCid $ \eventFactoryCid -> do
           exercise eventFactoryCid TransferEventsV2.EventLog_TransferOut with
             observers = [sender]
             instrumentId = upcast (amuletInstrumentId dso)

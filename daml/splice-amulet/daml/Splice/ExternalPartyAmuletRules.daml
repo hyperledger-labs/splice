@@ -154,7 +154,7 @@ template ExternalPartyAmuletRules
         -- FIXME: share context fetching code
         externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) arg.extraArgs.context externalPartyConfigStateContextKey
         fetchChecked (ForDso with dso = dso) externalPartyConfigStateCid
-        settlementFactoryV2_settleBatchDefaultImpl (toInterfaceContractId externalPartyConfigStateCid) createReceiptAllocation this self arg
+        settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
       settlementFactory_settleBatchExtraObservers =
         settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl

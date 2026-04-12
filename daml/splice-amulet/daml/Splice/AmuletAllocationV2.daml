@@ -87,6 +87,11 @@ template AmuletAllocationV2
         archiveAndCheckActors self arg.actors [dso :: allocation.settlement.executors]
         forA_ allocation.settlement.settlementDeadline $ \deadline ->
           assertWithinDeadline "allocation.settlement.settlementDeadline" deadline
+
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso extraArgs.context
+        logAllocationSettleTransferEvents (toInterfaceContractId configStateCid) allocation
+
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
         let netAmount = netAmuletCreditAmount dso (basicAccount authorizer) allocation.transferLegs

@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Event log for Amulet.
+-- FIXME: rename to AmuletTransferEventLog and move to Splice.Amulet.TransferEventLog or similar
 module Splice.Amulet.EventLog where
 
 import Splice.Api.Token.MetadataV1
@@ -22,5 +23,6 @@ template AmuletEventLog
         meta = emptyMetadata
 
       eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
-      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+      eventFactory_transferOutImpl = eventFactory_transferOutDefaultImpl dso
+      eventFactory_transferInImpl = eventFactory_transferInDefaultImpl dso
 

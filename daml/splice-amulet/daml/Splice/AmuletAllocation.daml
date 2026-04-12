@@ -24,6 +24,7 @@ import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
+import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext)
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -100,7 +101,7 @@ template AmuletAllocation
         requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
 
         -- report transfer events for V2 transaction history parsing
-        configStateCid <- getExternalPartyConfigStateFromChoiceContext dso arg.context
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
         logAllocationSettleTransferEvents (toInterfaceContractId configStateCid) (upcast allocation)
 
          -- construct metadata to aid V1 tx history parsers
