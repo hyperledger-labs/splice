@@ -40,10 +40,12 @@ ensure_damlc_exists() {
 
 ensure_damlc_exists
 
+# FIXME: we stopped generating docs for the APIs, but we don't want to exclude them from the docs altogether
 DAML_PROJECT_FILES="\
   $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" "$SPLICE_ROOT/token-standard/examples" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
     -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' -not -ipath '*test-trading-app*' \)  \
+    -not -ipath '*-api-*' \
     -not -ipath '*splitwell*' \
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \
