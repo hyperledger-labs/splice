@@ -48,7 +48,8 @@ initiate_reward_processing dryRun = do
   setTime demoTime
 
   -- move the first round through issuance, which will also trigger the reward calculation for this round
-  runNextIssuanceD app 1.0
+  if dryRun then runNextIssuanceD app 1.0 None
+  else runNextIssuanceD app 1.0 (Some 1.2)
 
   -- setup demo data
   let mintingAllowances1 = sortOn (.provider)
