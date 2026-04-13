@@ -10,6 +10,7 @@ import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.mediator.admin.v30
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -126,12 +127,12 @@ class ScanVerdictIngestionService(
                   }
                   .headOption
                   .getOrElse("none")
-                if (errorCodeId == "NO_EVENT_AT_TIMESTAMPS")
+                if (errorCodeId == TrafficControlErrors.NoEventAtTimestamps.id)
                   Future.successful(Seq.empty)
                 else
                   Future.failed(ex)
               }
-          case _ =>
+          case None =>
             Future.successful(Seq.empty)
         }
 
