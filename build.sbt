@@ -1279,6 +1279,7 @@ lazy val `apps-scan` =
             new File(s"apps/scan/src/main/openapi/scan.yaml"),
             pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
+            imports = List("org.lfdecentralizedtrust.splice.scan.admin.http.ScanJsonSupport._"),
             customExtraction = true,
           ),
           ScalaClient(
@@ -1896,6 +1897,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
+    case PathList("META-INF", "okhttp.kotlin_module") => MergeStrategy.first
     case PathList("META-INF", "okio.kotlin_module") => MergeStrategy.last
     case PathList(
           "META-INF",
@@ -1924,6 +1926,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
       MergeStrategy.first
     case PathList("com", "google", _*) => MergeStrategy.first
     case PathList("io", "grpc", _*) => MergeStrategy.first
+    // Copy-pasta from Canton (DACH-NY/canton#31788): Remove this merge strategy once zipkin exporter is removed
+    case PathList("okhttp3", _ @_*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     // Don't really care about the notice file so just take any.
@@ -1949,7 +1953,7 @@ lazy val bundleTask = {
       Seq("-r", "scripts/transform-config.sc", "testResources/transform-config.sc")
     val dashboards = Seq(
       "-r",
-      "cluster/pulumi/infra/grafana-dashboards",
+      "cluster/pulumi/observability/grafana-dashboards",
       "grafana-dashboards",
       "-r",
       "network-health",

@@ -104,7 +104,7 @@ class LocalSequencerConnectionsTrigger(
           val localEndpoint = LocalSynchronizerNode.toEndpoint(internalSequencerClientConfig)
           val localSequencerConnection =
             new GrpcSequencerConnection(
-              NonEmpty.mk(Seq, localEndpoint),
+              NonEmpty.mk(Set, localEndpoint),
               transportSecurity = internalSequencerClientConfig.tlsConfig.isDefined,
               customTrustCertificates = None,
               SequencerAlias.Default,

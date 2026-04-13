@@ -81,8 +81,7 @@ class DistributedDomainIntegrationTest
             endpoints.toSet shouldBe Seq(5108, 5208, 5308, 5408)
               .map(port =>
                 NonEmpty
-                  .mk(Seq, Endpoint("localhost", Port.tryCreate(port)))
-                  .toVector
+                  .mk(Set, Endpoint("localhost", Port.tryCreate(port)))
               )
               .toSet
           }

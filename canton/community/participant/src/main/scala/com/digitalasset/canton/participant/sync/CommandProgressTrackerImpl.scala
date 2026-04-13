@@ -343,6 +343,7 @@ class CommandProgressTrackerImpl(
           deduplicationOffset = None,
           deduplicationDurationSeconds = None,
           deduplicationDurationNanos = None,
+          trafficCost = 0L,
         ),
         updateId = "",
         optStatus = None,
@@ -412,7 +413,7 @@ class CommandProgressTrackerImpl(
         }
 
       case accepted: TransactionLogUpdate.TransactionAccepted =>
-        accepted.completionStreamResponse
+        accepted.completionStreamResponseO
           .flatMap(_.completionResponse.completion)
           .foreach { completion =>
             val key = (

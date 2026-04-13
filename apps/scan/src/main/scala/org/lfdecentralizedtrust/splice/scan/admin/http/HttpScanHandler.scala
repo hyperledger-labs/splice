@@ -1728,132 +1728,213 @@ class HttpScanHandler(
     }
   }
 
+  private def queryWithOptionalAtOrBefore[S, T](
+      migrationId: Long,
+      recordTime: OffsetDateTime,
+      recordTimeIsAtOrBefore: Boolean,
+      exactQuery: CantonTimestamp => Future[S],
+      toResponse: S => T,
+  )(implicit tc: TraceContext): Future[Either[String, T]] = {
+    val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+    if (recordTimeIsAtOrBefore) {
+      val snapshotQueryResult = for {
+        recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+        snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+      } yield snapshotQueryResult
+      snapshotQueryResult.fold[Either[String, T]](
+        Left(s"No snapshots found before $recordTime")
+      )(res => Right(toResponse(res)))
+    } else {
+      exactQuery(recordTimeTs).map(res => Right(toResponse(res)))
+    }
+  }
+
+  // Shared between /v0/state/acs and /v1/state/acs. The only difference between them is in `toResponse`.
+  private def acsSnapshotQuery[T](request: AcsRequest, toResponse: QueryAcsSnapshotResult => T)(
+      implicit tc: TraceContext
+  ): Future[Either[String, T]] = {
+    val AcsRequest(
+      migrationId,
+      recordTime,
+      recordTimeMatch,
+      after,
+      pageSize,
+      partyIds,
+      templates,
+    ) = request
+
+    def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+      .queryAcsSnapshot(
+        migrationId,
+        recordTimeTs,
+        after,
+        PageLimit.tryCreate(pageSize),
+        partyIds
+          .getOrElse(Seq.empty)
+          .map(PartyId.tryFromProtoPrimitive),
+        templates
+          .getOrElse(Seq.empty)
+          .map(_.split(":") match {
+            case Array(packageName, moduleName, entityName) =>
+              PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+            case _ =>
+              throw HttpErrorHandler.badRequest(
+                s"Malformed template_id, expected 'package_name:module_name:entity_name'"
+              )
+          }),
+      )
+
+    queryWithOptionalAtOrBefore(
+      migrationId,
+      recordTime,
+      recordTimeMatch.contains(AcsRequest.RecordTimeMatch.AtOrBefore),
+      exactQuery,
+      toResponse,
+    )
+
+  }
+
+  private def toAcsV0Response(migrationId: Long, result: QueryAcsSnapshotResult)(implicit
+      tc: TraceContext
+  ) = {
+    definitions.AcsResponse(
+      Codec.encode(result.snapshotRecordTime),
+      migrationId,
+      result.createdEventsInPage
+        .map(event =>
+          CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
+            event.eventId,
+            event.event,
+          )
+        ),
+      result.afterToken,
+    )
+  }
+
+  private def toAcsV1Response(migrationId: Long, result: QueryAcsSnapshotResult)(implicit
+      tc: TraceContext
+  ) =
+    definitions.AcsResponseV1(
+      Codec.encode(result.snapshotRecordTime),
+      migrationId,
+      result.createdEventsInPage
+        .map(event =>
+          CompactJsonScanHttpEncodings().javaToHttpActiveContract(
+            event.eventId,
+            event.event,
+          )
+        ),
+      result.afterToken,
+    )
+
   override def getAcsSnapshotAt(respond: ScanResource.GetAcsSnapshotAtResponse.type)(
       body: AcsRequest
   )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
     implicit val tc: TraceContext = extracted
+
+    def toResponse(result: QueryAcsSnapshotResult) =
+      ScanResource.GetAcsSnapshotAtResponseOK(
+        toAcsV0Response(body.migrationId, result)
+      )
+
     withSpan(s"$workflowId.getAcsSnapshotAt") { _ => _ =>
-      val AcsRequest(
-        migrationId,
-        recordTime,
-        recordTimeMatch,
-        after,
-        pageSize,
-        partyIds,
-        templates,
-      ) = body
-
-      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
-        .queryAcsSnapshot(
-          migrationId,
-          recordTimeTs,
-          after,
-          PageLimit.tryCreate(pageSize),
-          partyIds
-            .getOrElse(Seq.empty)
-            .map(PartyId.tryFromProtoPrimitive),
-          templates
-            .getOrElse(Seq.empty)
-            .map(_.split(":") match {
-              case Array(packageName, moduleName, entityName) =>
-                PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
-              case _ =>
-                throw HttpErrorHandler.badRequest(
-                  s"Malformed template_id, expected 'package_name:module_name:entity_name'"
-                )
-            }),
-        )
-
-      def toResponse(result: QueryAcsSnapshotResult) = {
-        ScanResource.GetAcsSnapshotAtResponseOK(
-          definitions.AcsResponse(
-            Codec.encode(result.snapshotRecordTime),
-            migrationId,
-            result.createdEventsInPage
-              .map(event =>
-                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
-                  event.eventId,
-                  event.event,
-                )
-              ),
-            result.afterToken,
+      acsSnapshotQuery(body, toResponse).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetAcsSnapshotAtResponseNotFound(
+            ErrorResponse(errorMessage)
           )
-        )
-      }
-
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
-
-      recordTimeMatch.getOrElse(AcsRequest.RecordTimeMatch.Exact) match {
-        case AcsRequest.RecordTimeMatch.members.Exact =>
-          exactQuery(recordTimeTs).map(toResponse)
-        case AcsRequest.RecordTimeMatch.members.AtOrBefore =>
-          val snapshotQueryResult = for {
-            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
-            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
-          } yield snapshotQueryResult
-          snapshotQueryResult.fold[ScanResource.GetAcsSnapshotAtResponse](
-            ScanResource.GetAcsSnapshotAtResponseNotFound(
-              ErrorResponse(s"No snapshots found before $recordTime")
-            )
-          )(toResponse)
       }
     }
+  }
+
+  override def getAcsSnapshotAtV1(respond: ScanResource.GetAcsSnapshotAtV1Response.type)(
+      body: AcsRequest
+  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtV1Response] = {
+    implicit val tc: TraceContext = extracted
+
+    def toResponse(result: QueryAcsSnapshotResult) = {
+      ScanResource.GetAcsSnapshotAtV1ResponseOK(
+        toAcsV1Response(body.migrationId, result)
+      )
+    }
+
+    withSpan(s"$workflowId.getAcsSnapshotAtV1") { _ => _ =>
+      acsSnapshotQuery(body, toResponse).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetAcsSnapshotAtV1ResponseNotFound(
+            ErrorResponse(errorMessage)
+          )
+      }
+    }
+  }
+
+  private def holdingStateQuery[T](
+      request: HoldingsStateRequest,
+      toResponse: QueryAcsSnapshotResult => T,
+  )(implicit
+      tc: TraceContext
+  ): Future[Either[String, T]] = {
+    val HoldingsStateRequest(
+      migrationId,
+      recordTime,
+      recordTimeMatch,
+      after,
+      pageSize,
+      ownerPartyIds,
+    ) = request
+
+    def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+      .getHoldingsState(
+        migrationId,
+        recordTimeTs,
+        after,
+        PageLimit.tryCreate(pageSize),
+        nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
+      )
+
+    queryWithOptionalAtOrBefore(
+      migrationId,
+      recordTime,
+      recordTimeMatch.contains(HoldingsStateRequest.RecordTimeMatch.AtOrBefore),
+      exactQuery,
+      toResponse,
+    )
   }
 
   override def getHoldingsStateAt(respond: ScanResource.GetHoldingsStateAtResponse.type)(
       body: HoldingsStateRequest
   )(extracted: TraceContext): Future[ScanResource.GetHoldingsStateAtResponse] = {
     implicit val tc: TraceContext = extracted
+    def toResponse(result: QueryAcsSnapshotResult) =
+      ScanResource.GetHoldingsStateAtResponseOK(toAcsV0Response(body.migrationId, result))
+
     withSpan(s"$workflowId.getHoldingsStateAt") { _ => _ =>
-      val HoldingsStateRequest(
-        migrationId,
-        recordTime,
-        recordTimeMatch,
-        after,
-        pageSize,
-        ownerPartyIds,
-      ) = body
-
-      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
-        .getHoldingsState(
-          migrationId,
-          recordTimeTs,
-          after,
-          PageLimit.tryCreate(pageSize),
-          nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
-        )
-
-      def toResponse(result: QueryAcsSnapshotResult) =
-        ScanResource.GetHoldingsStateAtResponseOK(
-          definitions.AcsResponse(
-            Codec.encode(result.snapshotRecordTime),
-            migrationId,
-            result.createdEventsInPage
-              .map(event =>
-                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
-                  event.eventId,
-                  event.event,
-                )
-              ),
-            result.afterToken,
+      holdingStateQuery(body, toResponse).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetHoldingsStateAtResponseNotFound(
+            ErrorResponse(errorMessage)
           )
-        )
+      }
+    }
+  }
 
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+  override def getHoldingsStateAtV1(respond: ScanResource.GetHoldingsStateAtV1Response.type)(
+      body: HoldingsStateRequest
+  )(extracted: TraceContext): Future[ScanResource.GetHoldingsStateAtV1Response] = {
+    implicit val tc: TraceContext = extracted
+    def toResponse(result: QueryAcsSnapshotResult) =
+      ScanResource.GetHoldingsStateAtV1ResponseOK(toAcsV1Response(body.migrationId, result))
 
-      recordTimeMatch.getOrElse(HoldingsStateRequest.RecordTimeMatch.Exact) match {
-        case HoldingsStateRequest.RecordTimeMatch.members.Exact =>
-          exactQuery(recordTimeTs).map(toResponse)
-        case HoldingsStateRequest.RecordTimeMatch.members.AtOrBefore =>
-          val snapshotQueryResult = for {
-            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
-            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
-          } yield snapshotQueryResult
-          snapshotQueryResult.fold[ScanResource.GetHoldingsStateAtResponse](
-            ScanResource.GetHoldingsStateAtResponseNotFound(
-              ErrorResponse(s"No snapshots found before $recordTime")
-            )
-          )(toResponse)
+    withSpan(s"$workflowId.getHoldingsStateAtV1") { _ => _ =>
+      holdingStateQuery(body, toResponse).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetHoldingsStateAtV1ResponseNotFound(
+            ErrorResponse(errorMessage)
+          )
       }
     }
   }
@@ -1918,21 +1999,18 @@ class HttpScanHandler(
           )
         )
 
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
-
-      recordTimeMatch.getOrElse(HoldingsSummaryRequest.RecordTimeMatch.Exact) match {
-        case HoldingsSummaryRequest.RecordTimeMatch.members.Exact =>
-          exactQuery(recordTimeTs).map(toResponse)
-        case HoldingsSummaryRequest.RecordTimeMatch.members.AtOrBefore =>
-          val snapshotQueryResult = for {
-            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
-            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
-          } yield snapshotQueryResult
-          snapshotQueryResult.fold[ScanResource.GetHoldingsSummaryAtResponse](
-            ScanResource.GetHoldingsSummaryAtResponseNotFound(
-              ErrorResponse(s"No snapshots found before $recordTime")
-            )
-          )(toResponse)
+      queryWithOptionalAtOrBefore(
+        migrationId,
+        recordTime,
+        recordTimeMatch.contains(HoldingsSummaryRequest.RecordTimeMatch.AtOrBefore),
+        exactQuery,
+        toResponse,
+      ).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetHoldingsSummaryAtResponseNotFound(
+            ErrorResponse(errorMessage)
+          )
       }
     }
   }

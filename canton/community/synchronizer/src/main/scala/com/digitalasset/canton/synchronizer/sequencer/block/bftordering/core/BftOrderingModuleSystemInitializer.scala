@@ -237,6 +237,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
             dependencies,
             loggerFactory,
             timeouts,
+            config.blockingDbReadTimeout,
           )
           (p2pNetworkOutModule, p2pNetworkOutModule.p2pNetworkManager)
         },
@@ -298,6 +299,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
           new OutputModule(
             outputModuleStartupState,
             orderingTopologyProvider,
+            leaderSelectionPolicyFactory,
             stores.outputStore,
             stores.epochStoreReader,
             blockSubscription,

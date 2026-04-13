@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
 import cats.syntax.functor.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   ContractsReassignmentBatch,
@@ -74,6 +75,7 @@ final case class AssignmentValidationResult private[reassignment] (
       targetSynchronizer: Target[SynchronizerId],
       participantId: ParticipantId,
       recordTime: CantonTimestamp,
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
   ): AcsChangeFactory => InternalContractIds => SequencedEventUpdate = {
@@ -86,6 +88,7 @@ final case class AssignmentValidationResult private[reassignment] (
           commandId = submitterMetadata.commandId,
           optDeduplicationPeriod = None,
           submissionId = submitterMetadata.submissionId,
+          paidTrafficCost = trafficCost,
         )
       )
     (acsChangeFactory: AcsChangeFactory) =>
@@ -150,6 +153,7 @@ object AssignmentValidationResult {
       ],
       submitterCheckResult: Option[ReassignmentValidationError],
       reassignmentIdResult: Option[ReassignmentValidationError],
+      multiSynchronizerFeatureFlagCheckResult: Option[ReassignmentValidationError],
   ) extends ReassignmentValidationResult.CommonValidationResult
 
   final case class ReassigningParticipantValidationResult(

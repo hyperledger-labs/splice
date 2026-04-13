@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.daml.nonempty.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
@@ -34,8 +33,8 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       splitwellBackend.participantClient.synchronizers.config(splitwellUpgradeAlias).value
 
     val url = inside(upgradeConfig.sequencerConnections.connections.forgetNE) {
-      case Seq(GrpcSequencerConnection(topEndpoint +-: _, _, _, _, _)) =>
-        topEndpoint.toURI(false).toString
+      case Seq(GrpcSequencerConnection(endpoints, _, _, _, _)) =>
+        endpoints.head.toURI(false).toString
     }
 
     // This can be a bit slow since it first pushes all vetting transactions before pushing

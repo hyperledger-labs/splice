@@ -128,6 +128,9 @@ monitoring:
         completedDelay:
           # Usually every 30min, we allow up to 1h to avoid false positives.
           seconds: 3600
+        computeDuration:
+          # p99 of the ACS commitment computation time; alert if it exceeds 20min.
+          seconds: 1200
       acsSnapshots:
         # This task repeats every ~3h
         saveLatencyThresholdSeconds: 2700

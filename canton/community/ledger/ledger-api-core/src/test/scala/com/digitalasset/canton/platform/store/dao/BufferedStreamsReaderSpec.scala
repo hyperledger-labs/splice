@@ -621,7 +621,7 @@ object BufferedStreamsReaderSpec {
       effectiveAt = Timestamp.Epoch,
       offset = offset(i),
       events = Vector(null),
-      completionStreamResponse = None,
+      completionStreamResponseO = None,
       synchronizerId = someSynchronizerId.toProtoPrimitive,
       recordTime = Timestamp.Epoch,
       externalTransactionHash = None,

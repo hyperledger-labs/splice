@@ -126,12 +126,13 @@ class AcsSnapshotBulkStorageTest
         val allContractsFromS3 = objectKeys.flatMap(
           readUncompressAndDecode(
             bucketConnection,
-            io.circe.parser.decode[httpApi.CreatedEvent],
+            io.circe.parser.decode[httpApi.ActiveContract],
           )
         )
-        allContractsFromS3.map(
-          new CompactJsonScanHttpEncodings(identity, identity).httpToJavaCreatedEvent
-        ) should contain theSameElementsInOrderAs allContracts.map(_.event)
+        allContracts.map(c =>
+          new CompactJsonScanHttpEncodings(identity, identity)
+            .javaToHttpActiveContract(c.eventId, c.event)
+        ) should contain theSameElementsInOrderAs allContractsFromS3
       }
     }
 
