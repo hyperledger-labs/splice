@@ -233,12 +233,6 @@ object BuildCommon {
             "splice-wallet-test-daml/clean",
             "splitwell-daml/clean",
             "splitwell-test-daml/clean",
-            "splice-api-token-metadata-v1-daml/clean",
-            "splice-api-token-holding-v1-daml/clean",
-            "splice-api-token-transfer-instruction-v1-daml/clean",
-            "splice-api-token-allocation-v1-daml/clean",
-            "splice-api-token-allocation-request-v1-daml/clean",
-            "splice-api-token-allocation-instruction-v1-daml/clean",
             "splice-token-standard-test-daml/clean",
             "apps-frontends/clean",
             "cleanCnDars",
@@ -250,8 +244,6 @@ object BuildCommon {
             "splice-util-token-standard-wallet-test-daml/clean",
             "splice-util-batched-markers-daml/clean",
             "splice-util-batched-markers-test-daml/clean",
-            "splice-featured-app-api-v1-daml/clean",
-            "splice-featured-app-api-v2-daml/clean",
           ).map(";" + _).mkString(""),
         ) ++
         addCommandAlias("splice-clean", "; clean-splice") ++
