@@ -387,11 +387,11 @@ jobs:
   #   with:
   #     commit_sha: ${{ inputs.commit_sha }}
 
-  # docs:
-  #   uses: ./.github/workflows/build.docs.yml
-  #   secrets: inherit
-  #   with:
-  #     commit_sha: ${{ inputs.commit_sha }}
+  docs:
+    uses: ./.github/workflows/build.docs.yml
+    secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   # scala_test_without_canton:
   #   uses: ./.github/workflows/build.scala_test.yml
@@ -434,7 +434,7 @@ jobs:
     # - scala_test_without_canton
     # - ui_tests
     # - ts_cli_tests
-    # - docs
+    - docs
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
