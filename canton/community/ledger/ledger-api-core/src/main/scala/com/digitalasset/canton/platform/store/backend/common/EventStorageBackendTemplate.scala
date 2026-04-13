@@ -86,6 +86,15 @@ object EventStorageBackendTemplate {
     val externalTransactionHash: RowDef[Option[Array[Byte]]] =
       column("external_transaction_hash", byteArray(_).?)
 
+    def trafficCost(
+        stringInterning: StringInterning,
+        allQueryingPartiesO: Option[Set[Party]],
+    ): RowDef[Option[Long]] =
+      (
+        CommonRowDefs.trafficCost.?,
+        submitters(stringInterning).?,
+      ).mapN(filteredTrafficCost(_, _, allQueryingPartiesO))
+
     // event related
     val nodeId: RowDef[Int] =
       column("node_id", int)
@@ -205,6 +214,7 @@ object EventStorageBackendTemplate {
         commandId(stringInterning, allQueryingPartiesO),
         traceContext,
         recordTime,
+        trafficCost(stringInterning, allQueryingPartiesO),
       ).mapN(CommonUpdateProperties.apply)
 
     def transactionPropertiesParser(
@@ -414,18 +424,35 @@ object EventStorageBackendTemplate {
       )
       .toSet
 
+  private def submittersInQueryingParties(
+      allQueryingPartiesO: Option[Set[Party]],
+      submitters: Option[Seq[Party]],
+  ): Boolean = allQueryingPartiesO match {
+    case Some(allQueryingParties) =>
+      submitters.getOrElse(Seq.empty).exists(allQueryingParties)
+    case None => submitters.nonEmpty
+  }
+
   private def filteredCommandId(
       commandId: Option[String],
       submitters: Option[Seq[Party]],
       allQueryingPartiesO: Option[Set[Party]],
-  ): Option[String] = {
-    def submittersInQueryingParties: Boolean = allQueryingPartiesO match {
-      case Some(allQueryingParties) =>
-        submitters.getOrElse(Seq.empty).exists(allQueryingParties)
-      case None => submitters.nonEmpty
-    }
-    commandId.filter(_ != "" && submittersInQueryingParties)
-  }
+  ): Option[String] =
+    commandId
+      .filter(_ != "")
+      .filter(_ => submittersInQueryingParties(allQueryingPartiesO, submitters))
+
+  /** Filter the traffic cost value according to the submitting party: If the value is None, the
+    * cost is unknown, so we stick with that If the value is Some(cost) and the querying party is a
+    * submitting party, keep the cost Otherwise, set the cost to Some(0L)
+    */
+  private def filteredTrafficCost(
+      trafficCost: Option[Long],
+      submitters: Option[Seq[Party]],
+      allQueryingPartiesO: Option[Set[Party]],
+  ): Option[Long] =
+    trafficCost
+      .filter(_ => submittersInQueryingParties(allQueryingPartiesO, submitters))
 }
 
 abstract class EventStorageBackendTemplate(
@@ -683,7 +710,7 @@ abstract class EventStorageBackendTemplate(
       }
 
       logger.info("Finished pruning of Index DB events.")
-    }(connection, logger)
+    }(connection, noTracingLogger)
 
   private def pruneWithLogging(queryDescription: String)(query: SimpleSql[Row])(implicit
       connection: Connection,
@@ -880,42 +907,47 @@ abstract class EventStorageBackendTemplate(
   override def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
       beforeOrAtRecordTimeInclusive: Timestamp,
+      beforeOrAtLedgerEndOffsetInclusive: Offset,
   )(connection: Connection)(implicit traceContext: TraceContext): Option[SynchronizerOffset] = {
-    val ledgerEndOffset = ledgerEndCache().map(_.lastOffset)
-
     logger.debug(
-      s"Querying lastSynchronizerOffset: beforeOrAtRecordTime=$beforeOrAtRecordTimeInclusive, ledgerEndOffset=$ledgerEndOffset, synchronizerId=$synchronizerId"
+      s"Querying lastSynchronizerOffset: beforeOrAtRecordTime=$beforeOrAtRecordTimeInclusive, ledgerEndOffset=$beforeOrAtLedgerEndOffsetInclusive, synchronizerId=$synchronizerId"
     )
 
     val completionQueryResult =
       RowDefs
         .completionSynchronizerOffsetParser(stringInterning)
-        .querySingleOptRow(columns => SQL"""
+        .querySingleOptRow(columns =>
+          SQL"""
         SELECT $columns
         FROM lapi_command_completions
         WHERE
           synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
           record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
-          ${QueryStrategy.offsetIsLessOrEqual("completion_offset", ledgerEndOffset)}
+          ${QueryStrategy
+              .offsetIsLessOrEqual("completion_offset", Some(beforeOrAtLedgerEndOffsetInclusive))}
         ORDER BY synchronizer_id DESC, record_time DESC, completion_offset DESC
         ${QueryStrategy.limitClause(Some(1))}
-        """)(connection)
+        """
+        )(connection)
 
     logger.debug(s"lapi_command_completions query result: $completionQueryResult")
 
     val metaQueryResult =
       RowDefs
         .metaSynchronizerOffsetParser(stringInterning)
-        .querySingleOptRow(columns => SQL"""
+        .querySingleOptRow(columns =>
+          SQL"""
         SELECT $columns
         FROM lapi_update_meta
         WHERE
           synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
           record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
-          ${QueryStrategy.offsetIsLessOrEqual("event_offset", ledgerEndOffset)}
+          ${QueryStrategy
+              .offsetIsLessOrEqual("event_offset", Some(beforeOrAtLedgerEndOffsetInclusive))}
         ORDER BY synchronizer_id DESC, record_time DESC, event_offset DESC
         ${QueryStrategy.limitClause(Some(1))}
-        """)(connection)
+        """
+        )(connection)
 
     logger.debug(s"lapi_update_meta query result: $metaQueryResult")
 

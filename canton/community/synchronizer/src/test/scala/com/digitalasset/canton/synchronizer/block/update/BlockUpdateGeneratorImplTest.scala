@@ -109,11 +109,14 @@ class BlockUpdateGeneratorImplTest
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
             lsuSequencingBounds = Some(
-              LsuSequencingBounds(
-                sequencingTimeLowerBoundExclusive,
-                sequencingTimeLowerBoundExclusive,
-              )
+              LsuSequencingBounds
+                .create(
+                  sequencingTimeLowerBoundExclusive,
+                  sequencingTimeLowerBoundExclusive,
+                )
+                .value
             ),
+            drSequencingTimeUpperBound = None,
             getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
@@ -229,6 +232,7 @@ class BlockUpdateGeneratorImplTest
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
             lsuSequencingBounds = None,
+            drSequencingTimeUpperBound = None,
             getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
@@ -282,6 +286,7 @@ class BlockUpdateGeneratorImplTest
             mock[SequencerRateLimitManager],
             OrderingTimeFixMode.ValidateOnly,
             lsuSequencingBounds = None,
+            drSequencingTimeUpperBound = None,
             getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
@@ -369,6 +374,7 @@ class BlockUpdateGeneratorImplTest
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
               lsuSequencingBounds = None,
+              drSequencingTimeUpperBound = None,
               getAnnouncedLsu = None,
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,
@@ -440,6 +446,7 @@ class BlockUpdateGeneratorImplTest
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
               lsuSequencingBounds = None,
+              drSequencingTimeUpperBound = None,
               getAnnouncedLsu = None,
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,

@@ -249,3 +249,19 @@ The additional synchronizer has the following characteristics:
 - It simulates a **private synchronizer**.
 - Both the ``app-provider`` and ``app-user`` participants are cross-connected
   to the Global Synchronizer and the ``app-synchronizer``.
+
+Using Non-Default Protocol Versions
+-----------------------------------
+
+
+
+The protocol version used in the LocalNet synchronizer and participants can be configured by setting the ``CANTON_PROTOCOL_VERSION``
+environment variable to the required version prior to launching LocalNet. Non-stable protocol versions can be used for
+early testing, but require explicit opt-in. To enable that, export also a
+``ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env`` environment variable.
+
+.. warning::
+   Non-stable protocol versions are unreleased versions that are under development, and are
+   subject to announced breaking changes. One implication of this is that this environment usually cannot
+   be upgraded, and will therefore require a full reset for every change. Use only for early testing and development
+   purposes.

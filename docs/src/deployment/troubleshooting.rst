@@ -126,7 +126,7 @@ UNAUTHENTICATED errors in validator, sv and scan app
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A log of the form below in the SV, scan or validator app logs
-indicates an authenitcation error on the connection to the
+indicates an authentication error on the connection to the
 participant. Check the participant logs which will contain more
 details on why the request got rejected.
 

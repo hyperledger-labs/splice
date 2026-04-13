@@ -62,7 +62,7 @@ final class MediatorVerdictsClient(
         req,
         stub.verdicts,
       )
-      .mapConcat(_.payload.verdict)
+      .mapConcat(_.verdict)
       .mapMaterializedValue(_ => NotUsed)
   }
 }

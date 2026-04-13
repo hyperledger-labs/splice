@@ -58,8 +58,8 @@ import scala.annotation.nowarn
 import scala.collection.immutable.{ArraySeq, HashMap}
 import scala.language.implicitConversions
 
-class EngineTestCidV1 extends EngineTest(LanguageVersion.Major.V2, ContractIdVersion.V1)
-class EngineTestCidV2 extends EngineTest(LanguageVersion.Major.V2, ContractIdVersion.V2)
+class EngineTestCidV1 extends EngineTest(ContractIdVersion.V1)
+class EngineTestCidV2 extends EngineTest(ContractIdVersion.V2)
 
 @SuppressWarnings(
   Array(
@@ -68,7 +68,7 @@ class EngineTestCidV2 extends EngineTest(LanguageVersion.Major.V2, ContractIdVer
     "org.wartremover.warts.Product",
   )
 )
-class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion: ContractIdVersion)
+class EngineTest(contractIdVersion: ContractIdVersion)
     extends AnyWordSpec
     with Matchers
     with TableDrivenPropertyChecks
@@ -76,7 +76,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
     with SecurityTestSuite
     with SuppressingLogging {
 
-  val helpers = new EngineTestHelpers(majorLanguageVersion, contractIdVersion, loggerFactory)
+  val helpers = new EngineTestHelpers(contractIdVersion, loggerFactory)
   import helpers._
 
   "minimal create command" should {
@@ -1627,7 +1627,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
       lookedUpInst.contractId -> lookedUpInst,
       lookerUpInst.contractId -> lookerUpInst,
     )
-    lazy val lookupKey = Map(lookedUpInst.contractKeyWithMaintainers.get -> Vector(lookedUpInst))
+    lazy val lookupKey = Map(lookedUpInst.contractKeyWithMaintainers.get.globalKey -> Vector(lookedUpInst))
 
     def firstLookupNode(tx: Tx): Option[(NodeId, Node.LookupByKey)] =
       tx.nodes.collectFirst { case (nid, nl: Node.LookupByKey) =>
@@ -1880,7 +1880,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
         fetcherInst.contractId -> fetcherInst,
       )
       lazy val lookupKey =
-        Map(withKeyContractInst.contractKeyWithMaintainers.get -> Vector(withKeyContractInst))
+        Map(withKeyContractInst.contractKeyWithMaintainers.get.globalKey -> Vector(withKeyContractInst))
 
       val submitters = Set(alice)
 
@@ -2108,7 +2108,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
     val (exceptionsPkgId, exceptionsPkg, allExceptionsPkgs) =
       // TODO(https://github.com/digital-asset/daml/issues/18457): split key test cases and revert
       //  to non-dev dar
-      loadAndAddPackage(s"Exceptions-v${majorLanguageVersion.pretty}dev.dar")
+      loadAndAddPackage(s"Exceptions-v23.dar")
     val helperId = Identifier(exceptionsPkgId, "Exceptions:Helper")
     val let = Time.Timestamp.now()
     val submissionSeed = hash("rollback")
@@ -2146,7 +2146,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
     )
     val contracts = Map(contract.contractId -> contract)
     lazy val lookupKey =
-      Map(contract.contractKeyWithMaintainers.get -> Vector(contract))
+      Map(contract.contractKeyWithMaintainers.get.globalKey -> Vector(contract))
     def run(cmd: ApiCommand, withKey: Boolean = false) = {
       val submitters = Set(party)
       val Right(cmds) = preprocessor
@@ -2265,9 +2265,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
 
   "action node seeds" should {
     val (exceptionsPkgId, exceptionsPkg, allExceptionsPkgs) =
-      // TODO(https://github.com/digital-asset/daml/issues/18457): split key test cases and revert
-      //  to non-dev dar
-      loadAndAddPackage(s"Exceptions-v${majorLanguageVersion.pretty}dev.dar")
+      loadAndAddPackage(s"Exceptions-v23.dar")
     val seedId = Identifier(exceptionsPkgId, "Exceptions:NodeSeeds")
     val let = Time.Timestamp.now()
     val submissionSeed = hash("rollback")
@@ -2306,7 +2304,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
       )
     val contracts = Map(contract.contractId -> contract)
     lazy val lookupKey =
-      Map(contract.contractKeyWithMaintainers.get -> Vector(contract))
+      Map(contract.contractKeyWithMaintainers.get.globalKey -> Vector(contract))
 
     def run(cmd: ApiCommand, withKey: Boolean) = {
       val submitters = Set(party)
@@ -2356,9 +2354,7 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
 
   "global key lookups" should {
     val (exceptionsPkgId, exceptionsPkg, allExceptionsPkgs) =
-      // TODO(https://github.com/digital-asset/daml/issues/18457): split key test cases and revert
-      //  to non-dev dar
-      loadAndAddPackage(s"Exceptions-v${majorLanguageVersion.pretty}dev.dar")
+      loadAndAddPackage(s"Exceptions-v23.dar")
     val tId = Identifier(exceptionsPkgId, "Exceptions:GlobalLookups")
     val let = Time.Timestamp.now()
     val submissionSeed = hash("global-keys")
@@ -2397,13 +2393,13 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
     )
     val contracts = Map(contract.contractId -> contract)
     lazy val lookupKey =
-      Map(contract.contractKeyWithMaintainers.get -> Vector(contract))
+      Map(contract.contractKeyWithMaintainers.get.globalKey -> Vector(contract))
 
     def run(cmd: ApiCommand): Int = {
       val submitters = Set(party)
       var keyLookups = 0
 
-      val mockedKeyLookup = Function.unlift { (key: GlobalKeyWithMaintainers) =>
+      val mockedKeyLookup = Function.unlift { (key: GlobalKey) =>
         keyLookups += 1
         lookupKey.lift(key)
       }
@@ -2473,8 +2469,8 @@ class EngineTest(majorLanguageVersion: LanguageVersion.Major, contractIdVersion:
 
     val devVersion = LanguageVersion.devLfVersion
     val (_, _, allPackagesDev) =
-      new EngineTestHelpers(majorLanguageVersion, contractIdVersion, loggerFactory).loadAndAddPackage(
-        s"BasicTests-v${majorLanguageVersion.pretty}dev.dar"
+      new EngineTestHelpers(contractIdVersion, loggerFactory).loadAndAddPackage(
+        s"MinimalisticDevPackage.dar"
       )
     val compatibleLanguageVersions = LanguageVersion.allLfVersions
     // Following stable packages are deps of other stable packages, so we sort such that these are preloaded first
@@ -3067,7 +3063,6 @@ class EngineTestAllVersions extends AnyWordSpec with Matchers with TableDrivenPr
 }
 
 class EngineTestHelpers(
-    majorLanguageVersion: LanguageVersion.Major,
     contractIdVersion: ContractIdVersion,
     loggerFactory: NamedLoggerFactory,
 ) {
@@ -3107,9 +3102,7 @@ class EngineTestHelpers(
   }
 
   val (basicTestsPkgId, basicTestsPkg, allPackages) = loadAndAddPackage(
-    // TODO(https://github.com/digital-asset/daml/issues/18457): split key test cases and revert to
-    //  non-dev dar
-    s"BasicTests-v${majorLanguageVersion.pretty}dev.dar"
+    s"BasicTests-v23.dar"
   )
 
   val basicTestsSignatures: PackageInterface =
@@ -3189,14 +3182,14 @@ class EngineTestHelpers(
     )
 
   lazy val defaultKey =
-    Map(withKeyContractInst.contractKeyWithMaintainers.get -> Vector(withKeyContractInst))
+    Map(withKeyContractInst.contractKeyWithMaintainers.get.globalKey -> Vector(withKeyContractInst))
 
   val lookupContract = defaultContracts
 
   val lookupPackage = allPackages
 
   lazy val lookupKey =
-    Map(withKeyContractInst.contractKeyWithMaintainers.get -> Vector(withKeyContractInst))
+    Map(withKeyContractInst.contractKeyWithMaintainers.get.globalKey -> Vector(withKeyContractInst))
 
   def hash(s: String): Hash = crypto.Hash.hashPrivateKey(s)
   def participant: Ref.IdString.ParticipantId = Ref.ParticipantId.assertFromString("participant")
@@ -3247,7 +3240,7 @@ class EngineTestHelpers(
       ledgerEffectiveTime: Time.Timestamp,
       lookupPackages: PartialFunction[PackageId, Package],
       contracts: Map[ContractId, FatContractInstance] = Map.empty,
-      keys: Map[GlobalKeyWithMaintainers, Vector[FatContractInstance]] = Map.empty,
+      keys: Map[GlobalKey, Vector[FatContractInstance]] = Map.empty,
   )(implicit traceContext: TraceContext): Either[Error, (VersionedTransaction, Tx.Metadata)] = {
 
     val nodeSeedMap = txMeta.nodeSeeds.toSeq.toMap
@@ -3324,6 +3317,7 @@ class EngineTestHelpers(
           timeBoundaries = state.timeBoundaries,
           nodeSeeds = state.nodeSeeds.toImmArray,
           globalKeyMapping = Map.empty,
+          contractOrder = List.empty,
         ),
       )
     )
@@ -3331,7 +3325,7 @@ class EngineTestHelpers(
 
   case class ReinterpretState(
       contracts: Map[ContractId, FatContractInstance],
-      keys: Map[GlobalKeyWithMaintainers, Vector[FatContractInstance]],
+      keys: Map[GlobalKey, Vector[FatContractInstance]],
       nodes: HashMap[NodeId, Node] = HashMap.empty,
       roots: BackStack[NodeId] = BackStack.empty,
       timeBoundaries: Time.Range = Time.Range.unconstrained,
@@ -3347,7 +3341,7 @@ class EngineTestHelpers(
           (
             contracts.updated(coinst.contractId, coinst),
             coinst.contractKeyWithMaintainers.fold(keys)(k =>
-              keys.updated(k, keys.getOrElse(k, Vector.empty) :+ coinst)
+              keys.updated(k.globalKey, keys.getOrElse(k.globalKey, Vector.empty) :+ coinst)
             ),
           )
         case (acc, _) => acc

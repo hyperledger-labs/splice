@@ -342,7 +342,6 @@ object BuildCommon {
         `canton-pekko-fork`,
         `canton-magnolify-addon`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-observability`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -354,6 +353,7 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           aws_kms,
           aws_sts,
+          better_files,
           gcp_kms,
           canton_observability_metrics,
           daml_tracing,
@@ -461,6 +461,7 @@ object BuildCommon {
       .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
+        `canton-util-external`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
@@ -616,6 +617,7 @@ object BuildCommon {
           chimney,
           circe_core,
           circe_generic,
+          daml_executors,
           flyway.excludeAll(ExclusionRule("org.apache.logging.log4j")),
           flyway_postgresql,
           grpc_services,
@@ -678,7 +680,8 @@ object BuildCommon {
       .apply("canton-community-testing", file("canton/community/testing"))
       .disablePlugins(WartRemover)
       .dependsOn(
-        `canton-community-base`
+        `canton-community-base`,
+        `canton-util-observability` % "compile->test",
       )
       .settings(
         sharedCantonSettings,
@@ -689,6 +692,7 @@ object BuildCommon {
           better_files,
           cats,
           cats_law,
+          daml_executors,
           jul_to_slf4j,
           mockito_scala,
           opentelemetry_api,
@@ -1376,7 +1380,10 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-sequencer-driver-api", file("canton/community/sequencer-driver"))
-      .dependsOn(`canton-util-external`)
+      .dependsOn(
+        `canton-util-external`,
+        `canton-util-observability`,
+      )
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(

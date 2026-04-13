@@ -136,6 +136,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
       external_transaction_hash: Option[Array[Byte]] = Some(someExternalTransactionHashBinary),
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -161,6 +162,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id = synchronizer_id,
       trace_context = trace_context,
       external_transaction_hash = external_transaction_hash,
+      traffic_cost = traffic_cost,
       event_sequential_id = event_sequential_id,
       node_id = node_id,
       additional_witnesses = additional_witnesses,
@@ -184,6 +186,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -210,6 +213,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       record_time = record_time,
       synchronizer_id = synchronizer_id,
       trace_context = trace_context,
+      traffic_cost = traffic_cost,
       event_sequential_id = event_sequential_id,
       node_id = node_id,
       source_synchronizer_id = source_synchronizer_id,
@@ -238,6 +242,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
       external_transaction_hash: Option[Array[Byte]] = Some(someExternalTransactionHashBinary),
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -273,6 +278,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id = synchronizer_id,
       trace_context = trace_context,
       external_transaction_hash = external_transaction_hash,
+      traffic_cost = traffic_cost,
       event_sequential_id = event_sequential_id,
       node_id = node_id,
       deactivated_event_sequential_id = deactivated_event_sequential_id,
@@ -304,6 +310,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       record_time: Long = 100L,
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -330,6 +337,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       record_time = record_time,
       synchronizer_id = synchronizer_id,
       trace_context = trace_context,
+      traffic_cost = traffic_cost,
       event_sequential_id = event_sequential_id,
       node_id = node_id,
       deactivated_event_sequential_id = deactivated_event_sequential_id,
@@ -358,6 +366,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
       external_transaction_hash: Option[Array[Byte]] = Some(someExternalTransactionHashBinary),
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -384,6 +393,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
         additional_witnesses = additional_witnesses,
         representative_package_id = representative_package_id,
         internal_contract_id = internal_contract_id,
+        traffic_cost = traffic_cost,
       )(
         template_id = template_id
       )
@@ -402,6 +412,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       synchronizer_id: SynchronizerId = someSynchronizerId,
       trace_context: Array[Byte] = serializableTraceContext,
       external_transaction_hash: Option[Array[Byte]] = Some(someExternalTransactionHashBinary),
+      traffic_cost: Option[Long] = Some(8465L),
 
       // event related columns
       event_sequential_id: Long = 500L,
@@ -453,6 +464,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       template_id = template_id,
       package_id = package_id,
       ledger_effective_time = ledger_effective_time,
+      traffic_cost = traffic_cost,
     )
     .toSeq
 
@@ -497,6 +509,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       updateId: Option[Array[Byte]] = Some(new Array[Byte](0)),
       publicationTime: Timestamp = someTime,
       isTransaction: Boolean = true,
+      trafficCost: Long = 0L,
   ): DbDto.CommandCompletion =
     DbDto.CommandCompletion(
       completion_offset = offset.unwrap,
@@ -517,6 +530,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       message_uuid = messageUuid,
       is_transaction = isTransaction,
       trace_context = traceContext,
+      traffic_cost = trafficCost,
     )
 
   def dtoTransactionMeta(
