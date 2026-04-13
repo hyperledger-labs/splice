@@ -4,11 +4,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
+import org.slf4j.event.Level
 
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
@@ -73,26 +75,31 @@ class PermissionedSynchronizerIntegrationTest
       val allSvValidators =
         Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend, sv4ValidatorBackend)
 
-      actAndCheck(
-        "Grant validator permission to Alice",
-        sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
-      )(
-        "Verify confirmed topology permission across all SVs",
-        _ => {
-          for (svValidator <- allSvValidators) {
-            clue(s"Checking active topology state on ${svValidator.name}") {
-              val permissions =
-                svValidator.participantClient.topology.participant_synchronizer_permissions
-                  .list(
-                    store = decentralizedSynchronizerId,
-                    filterUid = aliceParticipantId.filterString,
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+        {
+          actAndCheck(
+            "Grant validator permission to Alice",
+            sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
+          )(
+            "Verify confirmed topology permission across all SVs",
+            _ => {
+              for (svValidator <- allSvValidators) {
+                clue(s"Checking active topology state on ${svValidator.name}") {
+                  val permissions =
+                    svValidator.participantClient.topology.participant_synchronizer_permissions
+                      .list(
+                        store = decentralizedSynchronizerId,
+                        filterUid = aliceParticipantId.filterString,
+                      )
+                  permissions.map(_.item.permission) should contain(
+                    ParticipantPermission.Submission
                   )
-              permissions.map(_.item.permission) should contain(
-                ParticipantPermission.Submission
-              ) // reports errors in log for premature checks
-            }
-          }
+                }
+              }
+            },
+          )
         },
+        _ => succeed,
       )
     }
 

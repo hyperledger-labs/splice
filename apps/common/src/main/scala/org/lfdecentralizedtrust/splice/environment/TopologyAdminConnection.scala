@@ -1545,6 +1545,79 @@ abstract class TopologyAdminConnection(
       },
     )
 
+  def listParticipantSynchronizerPermission(
+      synchronizerId: SynchronizerId,
+      filterUid: String,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[TopologyResult[ParticipantSynchronizerPermission]]] = {
+    runCommand(
+      TopologyStoreId.Synchronizer(synchronizerId),
+      topologyTransactionType,
+      timeQuery,
+      operation = Some(TopologyChangeOp.Replace),
+    )(baseQuery =>
+      TopologyAdminCommands.Read.ListParticipantSynchronizerPermission(
+        baseQuery,
+        filterUid,
+      )
+    )
+  }
+
+  def ensureParticipantSynchronizerPermission(
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+      permission: ParticipantPermission,
+      loginAfter: Option[CantonTimestamp] = None,
+      retryFor: RetryFor,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[TopologyResult[ParticipantSynchronizerPermission]] = {
+    ensureTopologyMappingO(
+      TopologyStoreId.Synchronizer(synchronizerId),
+      s"ParticipantSynchronizerPermission with $permission for $participantId",
+      topologyType =>
+        EitherT
+          .liftF(
+            listParticipantSynchronizerPermission(
+              synchronizerId,
+              participantId.filterString,
+              topologyType,
+            )
+          )
+          .subflatMap { results =>
+            results.headOption match {
+              case Some(result)
+                  if result.mapping.permission == permission && result.mapping.loginAfter == loginAfter =>
+                Right(result)
+              case Some(existing) =>
+                Left(
+                  existing.some
+                )
+              case None =>
+                Left(None)
+            }
+          },
+      update = { _ =>
+        Right(
+          ParticipantSynchronizerPermission(
+            synchronizerId = synchronizerId,
+            participantId = participantId,
+            permission = permission,
+            limits = None,
+            loginAfter = loginAfter,
+          )
+        )
+      },
+      isProposal = true,
+      retryFor = retryFor,
+    )
+  }
+
   def listLsuAnnouncements(synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Future[Seq[TopologyResult[LsuAnnouncement]]] = runCmd(

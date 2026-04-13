@@ -3,8 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.transaction.ParticipantSynchronizerPermission
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -15,7 +16,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
@@ -46,26 +47,29 @@ class GrantValidatorPermissionTrigger(
     val payload = task.payload
     val synchronizerId = task.domain
     val participantId = ParticipantId.tryFromProtoPrimitive(payload.validatorParticipantId)
+    val loginAfter: Option[CantonTimestamp] =
+      if (payload.loginAfter.isPresent)
+        Some(CantonTimestamp.assertFromInstant(payload.loginAfter.get()))
+      else
+        None
     for {
       _ <-
         if (payload.isRevoked) {
           logger.info(
             s"Skipping ValidatorPermission for $participantId because the contract is marked as revoked."
           )
+          // TODO(#4998): add revocation trigger
           Future.unit
         } else {
           logger.info(
             s"Proposing ParticipantSynchronizerPermission (Submission) for $participantId on synchronizer $synchronizerId"
           )
-          participantAdminConnection.proposeMapping(
-            com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-              .Synchronizer(synchronizerId),
-            ParticipantSynchronizerPermission.default(
-              synchronizerId,
-              participantId,
-            ),
-            serial = com.digitalasset.canton.config.RequireTypes.PositiveInt.one,
-            isProposal = true,
+          participantAdminConnection.ensureParticipantSynchronizerPermission(
+            synchronizerId = synchronizerId,
+            participantId = participantId,
+            permission = Submission,
+            loginAfter = loginAfter,
+            retryFor = RetryFor.Automation,
           )
         }
     } yield TaskSuccess(s"Processed ValidatorPermission for participant $participantId")
