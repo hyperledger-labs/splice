@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.admin.http
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2 as amuletAllocationV2Codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
@@ -42,6 +43,7 @@ import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   Codec,
+  Contract,
   ContractWithState,
   DisclosedContracts,
   SpliceUtil,
@@ -50,6 +52,7 @@ import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletServ
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
+import cats.data.Chain
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
@@ -68,6 +71,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationinstructionv2,
   allocationrequestv1,
+  allocationrequestv2,
   allocationv1,
   allocationv2,
   holdingv1,
@@ -1195,12 +1199,23 @@ class HttpWalletHandler(
   override def listAmuletAllocations(
       respond: WalletResource.ListAmuletAllocationsResponse.type
   )()(tUser: WalletUserRequest): Future[WalletResource.ListAmuletAllocationsResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
-    listContracts(
-      amuletAllocationCodegen.AmuletAllocation.COMPANION,
-      userWallet.store,
-      contracts => d0.ListAllocationsResponse(contracts.map(d0.Allocation(_))),
-    )
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
+      for {
+        v1Contracts <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletAllocationCodegen.AmuletAllocation.COMPANION
+        )
+        v2Contracts <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletAllocationV2Codegen.AmuletAllocationV2.COMPANION
+        )
+      } yield {
+        val contracts = HttpWalletHandler.mergeSortedContractLists(
+          v1Contracts.map(_.contract),
+          v2Contracts.map(_.contract),
+        )
+        d0.ListAllocationsResponse(contracts.toVector.map(d0.AmuletAllocation(_)))
+      }
+    }
   }
 
   private def amuletToAmuletPosition(
@@ -1341,17 +1356,22 @@ class HttpWalletHandler(
       respond: WalletResource.ListAllocationRequestsResponse.type
   )()(tuser: WalletUserRequest): Future[WalletResource.ListAllocationRequestsResponse] = {
     implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
-    withSpan(s"$workflowId.listInterfaces") { _ => _ =>
+    withSpan(s"$workflowId.listAllocationRequests") { _ => _ =>
       for {
-        contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
+        v1Contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
           allocationrequestv1.AllocationRequest.INTERFACE
         )
-      } yield d0.ListAllocationRequestsResponse(
-        contracts
-          .map(_.toHttp)
-          .toVector
-          .map(d0.AllocationRequest(_))
-      )
+        v2Contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
+          allocationrequestv2.AllocationRequest.INTERFACE
+        )
+      } yield {
+        // TODO: store ingestion can show the same contract as both a V1 and V2 allocation request because that's what we do with interfaces
+        val contracts = HttpWalletHandler.mergeSortedContractLists(v1Contracts, v2Contracts)
+        d0.ListAllocationRequestsResponse(
+          contracts.toVector
+            .map(d0.AllocationRequest(_))
+        )
+      }
     }
   }
 
@@ -1838,4 +1858,31 @@ class HttpWalletHandler(
       }
     }
   }
+}
+
+object HttpWalletHandler {
+
+  private def mergeSortedContractLists(l1: Seq[Contract[?, ?]], l2: Seq[Contract[?, ?]])(implicit
+      elc: ErrorLoggingContext
+  ): Chain[d0.Contract] = {
+    @scala.annotation.tailrec
+    def go(
+        l1: List[Contract[?, ?]],
+        l2: List[Contract[?, ?]],
+        acc: Chain[d0.Contract],
+    ): Chain[d0.Contract] = {
+      (l1, l2) match {
+        case (Nil, Nil) => acc
+        case (remaining, Nil) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
+        case (Nil, remaining) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
+        case (h1 :: t1, h2 :: t2) =>
+          if (h1.createdAt.isBefore(h2.createdAt))
+            go(t1, l2, acc :+ h1.toHttp)
+          else
+            go(l1, t2, acc :+ h2.toHttp)
+      }
+    }
+    go(l1.toList, l2.toList, Chain.empty)
+  }
+
 }

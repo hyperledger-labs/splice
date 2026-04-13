@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import java.util.Optional
 
@@ -70,9 +71,13 @@ class AmuletAllocationsIntegrationTest
           succeed
         }
 
-        val allocation = aliceWalletClient.listAmuletAllocations().loneElement
+        // TODO: check v1 vs v2
+        val allocation = inside(aliceWalletClient.listAmuletAllocations()) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V1AmuletAllocation) +: Nil =>
+            allocationRequest
+        }
 
-        val specification = allocation.payload.allocation
+        val specification = allocation.contract.payload.allocation
 
         specification should be(
           wantedAllocation(CantonTimestamp.assertFromInstant(specification.settlement.requestedAt))

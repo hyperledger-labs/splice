@@ -1,9 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.javaapi.data.DamlRecord
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedContractEntry
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv2,
@@ -24,6 +21,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardV2Allocati
   CreateAllocationRequestResult,
 }
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   PartyAndAmount,
@@ -293,8 +291,8 @@ class TokenStandardV2AllocationIntegrationTest
 
     val CreateAllocationRequestResult(
       otcTrade,
-      (aliceAllocationRequestCid, aliceAllocationRequest),
-      (bobAllocationRequestCid, bobAllocationRequest),
+      aliceAllocationRequest,
+      bobAllocationRequest,
     ) =
       createAllocationRequestV2ViaOTCTrade(
         aliceParty,
@@ -308,37 +306,15 @@ class TokenStandardV2AllocationIntegrationTest
         walletClient: WalletAppClientReference,
         allocationRequestView: allocationrequestv2.AllocationRequestView,
     ) = {
-      val (allocateResponse, _) = actAndCheck(
-        s"${walletClient.name} accepts the Allocation Request", {
-          val allocateResponse = walletClient.allocateAmulet(
-            new allocationv2.AllocationSpecification(
-              allocationRequestView.settlement,
-              allocationRequestView.transferLegs,
-              allocationRequestView.authorizer,
-            )
+      val allocateResponse = clue(s"${walletClient.name} accepts the Allocation Request") {
+        walletClient.allocateAmulet(
+          new allocationv2.AllocationSpecification(
+            allocationRequestView.settlement,
+            allocationRequestView.transferLegs,
+            allocationRequestView.authorizer,
           )
-          allocateResponse
-        },
-      )(
-        "The Allocation Request is gone",
-        _ => {
-          // TODO (#4912): use the listAllocationRequests call
-          // TODO (#4914): the request is not being archived as part of allocation, so this check won't succeed yet
-//          participant.ledger_api.state.acs
-//            .of_party(
-//              party = bobParty,
-//              filterInterfaces =
-//                Seq(allocationrequestv2.AllocationRequest.TEMPLATE_ID).map(templateId =>
-//                  TemplateId(
-//                    templateId.getPackageId,
-//                    templateId.getModuleName,
-//                    templateId.getEntityName,
-//                  )
-//                ),
-//            ) shouldBe empty
-          succeed
-        },
-      )
+        )
+      }
       allocateResponse.output match {
         case AllocationInstructionResultCompleted(completed) =>
           new allocationv2.Allocation.ContractId(completed.allocationCid)
@@ -347,16 +323,16 @@ class TokenStandardV2AllocationIntegrationTest
       }
     }
 
-    val aliceAllocation = allocate(aliceWalletClient, aliceAllocationRequest)
-    val bobAllocation = allocate(bobWalletClient, bobAllocationRequest)
+    val aliceAllocation = allocate(aliceWalletClient, aliceAllocationRequest.contract.payload)
+    val bobAllocation = allocate(bobWalletClient, bobAllocationRequest.contract.payload)
 
     AllocatedOtcTrade(
       venueParty,
       aliceParty,
       bobParty,
-      aliceAllocationRequestCid,
+      aliceAllocationRequest.contract.contractId,
       aliceAllocation,
-      bobAllocationRequestCid,
+      bobAllocationRequest.contract.contractId,
       bobAllocation,
       otcTrade,
     )
@@ -414,51 +390,20 @@ class TokenStandardV2AllocationIntegrationTest
     )(
       "Sender and receiver see the allocation requests",
       _ => {
-        // TODO (#4912): use the listAllocationRequests call
-        val bobAllocationRequest =
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
-            .of_party(
-              party = bobParty,
-              filterInterfaces =
-                Seq(allocationrequestv2.AllocationRequest.TEMPLATE_ID).map(templateId =>
-                  TemplateId(
-                    templateId.getPackageId,
-                    templateId.getModuleName,
-                    templateId.getEntityName,
-                  )
-                ),
-            )
-            .loneElement
-        val aliceAllocationRequest =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
-            .of_party(
-              party = aliceParty,
-              filterInterfaces =
-                Seq(allocationrequestv2.AllocationRequest.TEMPLATE_ID).map(templateId =>
-                  TemplateId(
-                    templateId.getPackageId,
-                    templateId.getModuleName,
-                    templateId.getEntityName,
-                  )
-                ),
-            )
-            .loneElement
-
-        def toView(ledgerAllocationRequest: WrappedContractEntry) = {
-          val viewValue = ledgerAllocationRequest.event.interfaceViews.loneElement.viewValue
-            .valueOrFail(s"AllocationRequest $ledgerAllocationRequest didn't have a view")
-          new allocationrequestv2.AllocationRequest.ContractId(
-            ledgerAllocationRequest.contractId
-          ) -> allocationrequestv2.AllocationRequestView
-            .valueDecoder()
-            .decode(
-              DamlRecord.fromProto(
-                com.daml.ledger.api.v2.value.Record.toJavaProto(viewValue)
-              )
-            )
+        val bobAllocationRequest = inside(
+          bobWalletClient.listAllocationRequests()
+        ) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V2AllocationRequest) +: Nil =>
+            allocationRequest
+        }
+        val aliceAllocationRequest = inside(
+          aliceWalletClient.listAllocationRequests()
+        ) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V2AllocationRequest) +: Nil =>
+            allocationRequest
         }
 
-        (toView(bobAllocationRequest), toView(aliceAllocationRequest))
+        (bobAllocationRequest, aliceAllocationRequest)
       },
     )
 
@@ -527,13 +472,7 @@ object TokenStandardV2AllocationIntegrationTest {
 
   case class CreateAllocationRequestResult(
       trade: tradingappv2.OTCTrade.Contract,
-      aliceRequest: (
-          allocationrequestv2.AllocationRequest.ContractId,
-          allocationrequestv2.AllocationRequestView,
-      ),
-      bobRequest: (
-          allocationrequestv2.AllocationRequest.ContractId,
-          allocationrequestv2.AllocationRequestView,
-      ),
+      aliceRequest: HttpWalletAppClient.TokenStandard.V2AllocationRequest,
+      bobRequest: HttpWalletAppClient.TokenStandard.V2AllocationRequest,
   )
 }

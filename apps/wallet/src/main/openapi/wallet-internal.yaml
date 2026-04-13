@@ -1913,12 +1913,10 @@ components:
         dummy: # cannot define an empty object for some reason
           type: object
 
-    # TODO (#4912): either add a new endpoint (and fix the description here),
-    #               or edit this type definition to also include AllocationV2 with a type/version tag
     ListAllocationsResponse:
       type: object
       description:
-        Includes all Allocation views (for both Token Standard v1 and v2)
+        Includes all AmuletAllocation views (for both Token Standard v1 and v2)
         where the user is a sender of one of the transferLegs and where
         the involved instrument's admin is the DSO party.
       required:
@@ -1927,10 +1925,13 @@ components:
         allocations:
           type: array
           items:
-            $ref: "#/components/schemas/Allocation"
+            $ref: "#/components/schemas/AmuletAllocation"
 
-    Allocation:
+    AmuletAllocation:
       type: object
+      description:
+        An AmuletAllocation contract, either V1 or V2.
+        You can distinguish the type of the contract by checking the template_id field.
       required:
         - contract
       properties:
@@ -1952,6 +1953,9 @@ components:
 
     AllocationRequest:
       type: object
+      description:
+        A contract implementing the Token Standard (V1 or V2) interface AllocationRequest.
+        You can distinguish the type of the contract by checking the template_id field.
       required:
         - contract
       properties:

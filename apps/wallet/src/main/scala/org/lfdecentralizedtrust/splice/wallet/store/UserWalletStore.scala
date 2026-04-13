@@ -7,7 +7,10 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
@@ -797,9 +800,16 @@ object UserWalletStore {
         mkFilter(amuletTransferInstructionCodegen.AmuletTransferInstruction.COMPANION)(co =>
           co.payload.transfer.instrumentId.admin == dso && (co.payload.transfer.sender == endUser || co.payload.transfer.receiver == endUser)
         )(contract => UserWalletAcsStoreRowData(contract)),
-        mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION) { co =>
+        mkFilter(amuletallocationv1.AmuletAllocation.COMPANION) { co =>
           val transferLeg = co.payload.allocation.transferLeg
           transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
+        } { contract =>
+          UserWalletAcsStoreRowData(contract)
+        },
+        mkFilter(amuletallocationv2.AmuletAllocationV2.COMPANION) { co =>
+          co.payload.allocation.transferLegs.asScala.exists { transferLeg =>
+            transferLeg.instrumentId.admin == dso && transferLeg.sender.owner == endUser
+          }
         } { contract =>
           UserWalletAcsStoreRowData(contract)
         },
@@ -833,7 +843,12 @@ object UserWalletStore {
           co.payload.transferLegs.asScala.exists { case (_, transferLeg) =>
             transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
           }
-        )(contract => UserWalletAcsInterfaceViewRowData(contract))
+        )(contract => UserWalletAcsInterfaceViewRowData(contract)),
+        mkFilterInterface(allocationrequestv2.AllocationRequest.INTERFACE)(co =>
+          co.payload.transferLegs.asScala.exists { transferLeg =>
+            transferLeg.instrumentId.admin == dso && transferLeg.sender.owner == endUser
+          }
+        )(contract => UserWalletAcsInterfaceViewRowData(contract)),
       ),
     )
   }

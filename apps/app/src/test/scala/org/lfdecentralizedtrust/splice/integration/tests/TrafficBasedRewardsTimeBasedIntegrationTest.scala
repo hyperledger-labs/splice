@@ -2,11 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationrequestv1,
-  allocationv1,
-  metadatav1,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{allocationrequestv1, allocationv1, metadatav1}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -16,14 +12,10 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion
-import org.lfdecentralizedtrust.splice.util.{
-  ChoiceContextWithDisclosures,
-  TimeTestUtil,
-  TriggerTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.{ChoiceContextWithDisclosures, TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -344,11 +336,12 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     )(
       show"There exists an allocation from $senderParty",
       _ => {
-        val allocations = walletClient.listAmuletAllocations()
-        allocations should have size 1 withClue "AmuletAllocations"
-        allocations.head
+        inside(walletClient.listAmuletAllocations()) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V1AmuletAllocation) +: Nil =>
+            allocationRequest
+        }
       },
     )
-    new allocationv1.Allocation.ContractId(allocation.contractId.contractId)
+    new allocationv1.Allocation.ContractId(allocation.contract.contractId.contractId)
   }
 }

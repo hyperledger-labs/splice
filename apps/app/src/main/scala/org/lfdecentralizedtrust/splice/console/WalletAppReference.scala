@@ -602,7 +602,7 @@ abstract class WalletAppReference(
   @Help.Description(
     "List all contracts that implement the AllocationRequest interface from the Token Standard."
   )
-  def listAllocationRequests() = {
+  def listAllocationRequests(): Seq[HttpWalletAppClient.TokenStandard.AllocationRequestContract] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.ListAllocationRequests)
     }
