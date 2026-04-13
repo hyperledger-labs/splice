@@ -114,17 +114,21 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    // Disable mediator admin connectivity via proxy before starting scan
-    toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
-
+    // Apps need to start before disabling mediator connection,
+    // otherwise scan will never become healthy and `startAllSync` will fail.
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    clue("Wait until mediator connectivity is really down") {
-      eventually() {
+    actAndCheck(
+      "Disable mediator admin connectivity via proxy",
+      toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1")),
+    )(
+      "Mediator connectivity is really down",
+      _ => {
         // Check that mediator connection really doesn't work anymore.
         sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
-      }
-    }
+      },
+    )
+
     // after this point, scan should be unable to ingest any verdicts
 
     val _ = onboardAliceAndBob()
