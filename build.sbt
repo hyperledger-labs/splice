@@ -111,13 +111,6 @@ lazy val root: Project = (project in file("."))
     `splice-dso-governance-test-daml`,
     `splice-validator-lifecycle-daml`,
     `splice-validator-lifecycle-test-daml`,
-    `splice-api-token-metadata-v1-daml`,
-    `splice-api-token-holding-v1-daml`,
-    `splice-api-token-transfer-instruction-v1-daml`,
-    `splice-api-token-allocation-v1-daml`,
-    `splice-api-token-allocation-request-v1-daml`,
-    `splice-api-token-allocation-instruction-v1-daml`,
-    `splice-api-token-burn-mint-v1-daml`,
     `splice-token-standard-test-daml`,
     `splice-token-test-trading-app-daml`,
     `splice-token-test-dummy-holding-daml`,
@@ -233,14 +226,7 @@ lazy val docs = project
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
-          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-burn-mint-v1-daml` / Compile / damlBuild).value
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value
       cacheDamlDocs(
         damlSources.toSet
       ).toSeq
@@ -308,135 +294,12 @@ lazy val docs = project
     Headers.ApacheDAHeaderSettings,
   )
 
-// Shared token standard code
-lazy val `splice-api-token-metadata-v1-daml`: Project =
-  project
-    .in(file("token-standard/splice-api-token-metadata-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
-      Compile / sourceGenerators +=
-        Def.taskDyn {
-          val tokenMetadataOpenApiFile =
-            baseDirectory.value / "openapi/token-metadata-v1.yaml"
-
-          BuildCommon.TS.generateOpenApiClient(
-            unscopedNpmName = "token-metadata-openapi",
-            openApiSpec = "token-metadata-v1.yaml",
-            cacheFileDependencies = Set(tokenMetadataOpenApiFile),
-            directory = "openapi-ts-client",
-            subPath = "openapi",
-          )
-        },
-      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
-      npmInstallOpenApiDeps := Seq(
-        (
-          (Compile / compile).value,
-          (Compile / baseDirectory).value,
-          false,
-        )
-      ),
-      npmInstallDeps := Seq(
-        baseDirectory.value / "openapi-ts-client" / "package.json"
-      ),
-      npmInstall := BuildCommon.npmInstallTask.value,
-      npmRootDir := baseDirectory.value / "openapi-ts-client",
-    )
-
-lazy val `splice-api-token-holding-v1-daml` =
-  project
-    .in(file("token-standard/splice-api-token-holding-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `splice-api-token-transfer-instruction-v1-daml` =
-  project
-    .in(file("token-standard/splice-api-token-transfer-instruction-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
-      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
-      Compile / sourceGenerators +=
-        Def.taskDyn {
-          val transferInstructionOpenApiFile =
-            baseDirectory.value / "openapi/transfer-instruction-v1.yaml"
-
-          BuildCommon.TS.generateOpenApiClient(
-            unscopedNpmName = "transfer-instruction-openapi",
-            openApiSpec = "transfer-instruction-v1.yaml",
-            cacheFileDependencies = Set(transferInstructionOpenApiFile),
-            directory = "openapi-ts-client",
-            subPath = "openapi",
-          )
-        },
-      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
-    )
-
-lazy val `splice-api-token-allocation-v1-daml` =
-  project
-    .in(file("token-standard/splice-api-token-allocation-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `splice-api-token-allocation-request-v1-daml` =
-  project
-    .in(file("token-standard/splice-api-token-allocation-request-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `splice-api-token-allocation-instruction-v1-daml` =
-  project
-    .in(file("token-standard/splice-api-token-allocation-instruction-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `splice-api-token-burn-mint-v1-daml` =
-  project
-    .in(file("daml/splice-api-token-burn-mint-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
-    )
-
 lazy val `splice-token-test-trading-app-daml` =
   project
     .in(file("token-standard/examples/splice-token-test-trading-app"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-token-standard-test-daml` =
@@ -446,13 +309,7 @@ lazy val `splice-token-standard-test-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
+        (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
@@ -463,11 +320,6 @@ lazy val `splice-token-test-dummy-holding-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := true,
     )
 
@@ -501,34 +353,20 @@ lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
     .dependsOn(
-      `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
-      // all dependencies here for token-metadata are not "real" dependencies,
-      // but rather they prevent npm install from being executed concurrently and breaking everything
-      `splice-api-token-metadata-v1-daml`,
     )
     .settings(
       Headers.TsHeaderSettings,
       npmInstallOpenApiDeps := Seq(
         (
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
-          false,
-        ),
-        (
           (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
           (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
-          false,
-        ),
-        (
-          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
-          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
           false,
         ),
       ),
       npmInstallDeps := Seq(
         baseDirectory.value / "package.json"
-      ) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
+      ),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
@@ -572,17 +410,11 @@ lazy val `party-allocator` =
   project
     .in(file("party-allocator"))
     .dependsOn(
-      `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
     )
     .settings(
       Headers.TsHeaderSettings,
       npmInstallOpenApiDeps := Seq(
-        (
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
-          false,
-        ),
         (
           (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
           (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
@@ -647,38 +479,12 @@ lazy val `splice-util-daml` =
       BuildCommon.damlSettings
     )
 
-lazy val `splice-featured-app-api-v1-daml` =
-  project
-    .in(file("daml/splice-api-featured-app-v1"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings
-    )
-
-lazy val `splice-featured-app-api-v2-daml` =
-  project
-    .in(file("daml/splice-api-featured-app-v2"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings
-    )
-
 lazy val `splice-amulet-daml` =
   project
     .in(file("daml/splice-amulet"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-util-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-amulet-test-daml` =
@@ -765,10 +571,7 @@ lazy val `splice-wallet-daml` =
         (`splice-amulet-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
-          (`splice-util-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
+          (`splice-util-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-featured-app-proxies-daml` =
@@ -777,12 +580,6 @@ lazy val `splice-util-featured-app-proxies-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-token-standard-wallet-daml` =
@@ -791,12 +588,6 @@ lazy val `splice-util-token-standard-wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-featured-app-proxies-test-daml` =
@@ -829,9 +620,6 @@ lazy val `splice-util-batched-markers-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-batched-markers-test-daml` =
@@ -913,16 +701,8 @@ lazy val `apps-common` =
       `splice-validator-lifecycle-daml`,
       `splice-wallet-daml`,
       `splice-wallet-payments-daml`,
-      `splice-api-token-metadata-v1-daml`,
-      `splice-api-token-holding-v1-daml`,
-      `splice-api-token-transfer-instruction-v1-daml`,
-      `splice-api-token-allocation-v1-daml`,
-      `splice-api-token-allocation-request-v1-daml`,
-      `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
-      `splice-featured-app-api-v1-daml`,
-      `splice-featured-app-api-v2-daml`,
       `splice-util-batched-markers-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
@@ -1208,12 +988,10 @@ lazy val `apps-common-frontend` = {
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splice-dso-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
-          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
-          // not implemented by any daml code above
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
+          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value ++ (`token-standard-cli` / Compile / npmInstall).value,
+      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstallOpenApiDeps :=
         Seq(
           (
@@ -1426,13 +1204,6 @@ lazy val `apps-scan-frontend` = {
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
-      npmInstallOpenApiDeps := Seq(
-        (
-          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
-          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
-          false,
-        )
-      ),
     )
 }
 
@@ -1767,13 +1538,6 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value,
-        (`splice-api-token-burn-mint-v1-daml` / Compile / damlBuild).value,
         (`splice-amulet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
         (`splice-dso-governance-daml` / Compile / damlBuild).value,
@@ -1973,16 +1737,8 @@ lazy val `apps-dar-resources-generator` =
       `splice-validator-lifecycle-daml`,
       `splice-wallet-daml`,
       `splice-wallet-payments-daml`,
-      `splice-api-token-metadata-v1-daml`,
-      `splice-api-token-holding-v1-daml`,
-      `splice-api-token-transfer-instruction-v1-daml`,
-      `splice-api-token-allocation-v1-daml`,
-      `splice-api-token-allocation-request-v1-daml`,
-      `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
-      `splice-featured-app-api-v1-daml`,
-      `splice-featured-app-api-v2-daml`,
       `splice-util-batched-markers-daml`,
     )
     .settings(
