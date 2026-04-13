@@ -474,6 +474,28 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+  /v0/onboard/sv/permission:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "grantSvOnboardingPermission"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GrantSvOnboardingPermissionRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GrantSvOnboardingPermissionResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
   /v0/onboard/sv/start:
     post:
       tags: [sv]
@@ -967,7 +989,22 @@ components:
       properties:
         amulet_price:
           type: string
-
+    GrantSvOnboardingPermissionRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: "The signed onboarding token for the SV candidate."
+    GrantSvOnboardingPermissionResponse:
+      type: object
+      required:
+        - validator_permission_contract_id
+      properties:
+        validator_permission_contract_id:
+          type: string
+          description: "The contract ID of the newly created ValidatorPermission contract."
     StartSvOnboardingRequest:
       type: object
       required:

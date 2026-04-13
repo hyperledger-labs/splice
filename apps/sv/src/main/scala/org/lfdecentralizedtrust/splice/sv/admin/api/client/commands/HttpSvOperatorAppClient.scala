@@ -64,6 +64,31 @@ object HttpSvOperatorAppClient {
     }
   }
 
+  case class GrantSvOnboardingPermission(
+      token: String
+  ) extends BaseCommand[http.GrantSvOnboardingPermissionResponse, String] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantSvOnboardingPermissionResponse] =
+      client.grantSvOnboardingPermission(
+        body = definitions.GrantSvOnboardingPermissionRequest(
+          token = token
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.GrantSvOnboardingPermissionResponse.OK(
+            definitions.GrantSvOnboardingPermissionResponse(contractId)
+          ) =>
+        Right(contractId)
+    }
+  }
+
   case class GrantValidatorPermission(
       validatorPartyId: com.digitalasset.canton.topology.PartyId,
       validatorParticipantId: com.digitalasset.canton.topology.ParticipantId,

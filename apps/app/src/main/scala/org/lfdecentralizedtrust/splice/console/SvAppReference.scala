@@ -93,6 +93,18 @@ abstract class SvAppReference(
       httpCommand(HttpSvPublicAppClient.GetDsoInfo)
     }
 
+  @Help.Summary(
+    "Grant SV candidate submission permission (via admin API)"
+  )
+  def grantSvOnboardingPermission(
+      token: String
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvOperatorAppClient.GrantSvOnboardingPermission(token)
+      )
+    }
+
   @Help.Summary("Get the CometBFT node status")
   def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
     consoleEnvironment.run {
