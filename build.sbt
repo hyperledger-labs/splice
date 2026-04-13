@@ -485,6 +485,8 @@ lazy val `splice-amulet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-util-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-amulet-test-daml` =
