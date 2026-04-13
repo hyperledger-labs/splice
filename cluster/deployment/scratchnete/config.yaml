@@ -2,3 +2,6 @@
 multiValidator:
   postgresPvcSize: '500Gi'
   requiresOnboardingSecret: false
+loadTester:
+  enable: true
+  iterationsPerMinute: 1200
