@@ -144,6 +144,16 @@ class UpdateHistoryBulkStorageTest
             .map(
               new CompactJsonScanHttpEncodings(identity, identity).httpToLapiUpdate
             ) should contain theSameElementsInOrderAs segmentUpdates
+          /* We hard-code the expected digests to enforce that the persisted data format does not change.
+             These values must not be modified unless there is a conscious decision to change the persisted format,
+             with a migration plan for how to apply it consistently across SVs. */
+          bucketConnection
+            .getChecksums(objectKeys.toSeq)
+            .futureValue
+            .map(_.checksum) should contain theSameElementsInOrderAs Seq(
+            "MM+DyxPP6UgpAaSCsm99j4ZAtYIK3TIrPmxFyodBrQQ=",
+            "2oWb5Um18xwnJTMkC4yilyrcsUADYoxtV7toJi29VsI=",
+          )
         }
       }
     }
