@@ -19,7 +19,6 @@ import {
   infraAffinityAndTolerations,
   infraPremiumStorageClassName,
   infraStandardStorageClassName,
-  isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
   SPLICE_ROOT,
@@ -555,7 +554,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  if (!isMainNet) {
+  if (monitoringConfig.enableGrafanaServiceAccountToken) {
     createGrafanaServiceAccount(namespaceName, adminPassword, [prometheusStack, postgres.pg]);
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);

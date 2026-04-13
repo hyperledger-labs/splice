@@ -2102,6 +2102,9 @@ function subcmd_silence_grafana_alerts() {
     until=$(date -u -d "+${duration}" '+%FT%TZ')
 
     _info "Fetching token"
+    if ! kubectl get secret -n observability grafana-service-account-token-secret &>/dev/null; then
+        _error "Grafana service account token secret not found. Set monitoring.enableGrafanaServiceAccountToken to true in the cluster config and redeploy the observability stack."
+    fi
     token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
 
     shift 1
