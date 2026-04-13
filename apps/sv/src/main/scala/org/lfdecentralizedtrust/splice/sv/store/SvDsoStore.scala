@@ -1265,6 +1265,31 @@ object SvDsoStore {
           rewardWeight = Some(contract.payload.weight),
         )
       },
+      mkFilter(splice.amulet.RewardCouponV2.COMPANION)(co => co.payload.dso == dso) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.beneficiary)),
+          rewardAmount = Some(contract.payload.amount),
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+        )
+      },
+      mkFilter(splice.amulet.rewardaccountingv2.CalculateRewardsV2.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+        )
+      },
+      mkFilter(splice.amulet.rewardaccountingv2.ProcessRewardsV2.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+        )
+      },
       mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,

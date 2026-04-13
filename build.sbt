@@ -111,6 +111,7 @@ lazy val root: Project = (project in file("."))
     `splice-dso-governance-test-daml`,
     `splice-validator-lifecycle-daml`,
     `splice-validator-lifecycle-test-daml`,
+    `splice-api-featured-app-v1-daml`,
     `splice-api-token-metadata-v1-daml`,
     `splice-api-token-holding-v1-daml`,
     `splice-api-token-transfer-instruction-v1-daml`,
@@ -647,15 +648,18 @@ lazy val `splice-util-daml` =
       BuildCommon.damlSettings
     )
 
-lazy val `splice-featured-app-api-v1-daml` =
+lazy val `splice-api-featured-app-v1-daml` =
   project
     .in(file("daml/splice-api-featured-app-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      // Exclude header check for FeaturedAppRightV1.daml as it exists on main without a header,
+      // and adding one would change its DAR hash, cascading through all dependent packages.
+      Compile / headerSources ~= { _.filterNot(_.getName == "FeaturedAppRightV1.daml") },
     )
 
-lazy val `splice-featured-app-api-v2-daml` =
+lazy val `splice-api-featured-app-v2-daml` =
   project
     .in(file("daml/splice-api-featured-app-v2"))
     .enablePlugins(DamlPlugin)
@@ -677,8 +681,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
+          (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-featured-app-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-amulet-test-daml` =
@@ -781,8 +785,8 @@ lazy val `splice-util-featured-app-proxies-daml` =
         (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
+          (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-featured-app-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-token-standard-wallet-daml` =
@@ -795,8 +799,8 @@ lazy val `splice-util-token-standard-wallet-daml` =
         (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
+          (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-featured-app-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-featured-app-proxies-test-daml` =
@@ -830,8 +834,8 @@ lazy val `splice-util-batched-markers-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
+        (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-featured-app-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-batched-markers-test-daml` =
@@ -921,8 +925,8 @@ lazy val `apps-common` =
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
-      `splice-featured-app-api-v1-daml`,
-      `splice-featured-app-api-v2-daml`,
+      `splice-api-featured-app-v1-daml`,
+      `splice-api-featured-app-v2-daml`,
       `splice-util-batched-markers-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
@@ -1981,8 +1985,8 @@ lazy val `apps-dar-resources-generator` =
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
-      `splice-featured-app-api-v1-daml`,
-      `splice-featured-app-api-v2-daml`,
+      `splice-api-featured-app-v1-daml`,
+      `splice-api-featured-app-v2-daml`,
       `splice-util-batched-markers-daml`,
     )
     .settings(

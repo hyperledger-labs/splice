@@ -34,11 +34,11 @@ module Splice.Testing.Registries.AmuletRegistry
 import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
-import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
-import DA.Time
+import qualified DA.TextMap as TextMap
 import DA.Text qualified as T
+import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
@@ -50,6 +50,7 @@ import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
+import Splice.AmuletConfig (useTrafficBasedAppRewards)
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
@@ -439,8 +440,8 @@ convertAllFeaturedAppActivityMarkers dso = do
 
 -- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the amulet price that can be used immediately
-runNextIssuance : Party -> Decimal -> Script ()
-runNextIssuance dso amuletPrice = do
+runNextIssuance : Party -> Decimal -> Optional Decimal -> Script ()
+runNextIssuance dso amuletPrice appActivityRoundTotal = do
     [(amuletRulesCid, _)] <- query @AmuletRules dso
     advanceToNextRoundChange dso
     -- expire rewards for closed rounds
@@ -484,10 +485,29 @@ runNextIssuance dso amuletPrice = do
     validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord dso (\bc -> bc.round == roundToArchive.round)
     svRewardCoupons <- queryFilter @SvRewardCoupon dso (\bc -> bc.round == roundToArchive.round)
 
+    Some summarizingRound <- queryContractId dso closingRoundCid
+
+    let trafficBasedRewards = useTrafficBasedAppRewards ((.mintingVersion) <$> summarizingRound.rewardConfig)
+
+    -- compute app reward totals: for traffic-based rewards, convert activity (MB) to CC
+    -- via trafficPrice ($/MB) and amuletPrice ($/CC); otherwise use on-ledger coupons
+    (totalFeaturedCC, totalUnfeaturedCC) <-
+      if trafficBasedRewards then
+        case (appActivityRoundTotal, summarizingRound.trafficPrice) of
+          (Some activity, Some trafficPrice) ->
+            pure (activity * trafficPrice / summarizingRound.amuletPrice, 0.0)
+          (None, _) ->
+            fail "appActivityRoundTotal must be specified when using traffic-based app rewards"
+          (_, None) ->
+            fail "trafficPrice must be specified when using traffic-based app rewards"
+      else
+        pure (sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+             , sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)])
+
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
-          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
-          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalFeaturedAppRewardCoupons = totalFeaturedCC
+          totalUnfeaturedAppRewardCoupons = totalUnfeaturedCC
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
           optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
 
