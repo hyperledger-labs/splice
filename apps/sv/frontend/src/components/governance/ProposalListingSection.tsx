@@ -21,7 +21,7 @@ import { CopyableIdentifier, PageSectionHeader, VoteStats } from '../../componen
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
 import dayjs from 'dayjs';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useInView } from 'react-intersection-observer';
 
 export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
@@ -38,6 +38,7 @@ interface ProposalListingSectionProps {
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
+  pageCount?: number;
 }
 
 const getTotalVotes = (item: ProposalListingData): number =>
@@ -83,8 +84,10 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    pageCount,
   } = props;
 
+  const sectionRef = useRef<HTMLDivElement>(null);
   const { ref, inView } = useInView();
 
   useEffect(() => {
@@ -101,7 +104,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
   const supportsInfiniteScroll = fetchNextPage !== undefined;
 
   return (
-    <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
+    <Box ref={sectionRef} sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
       {sortedData.length === 0 && !hasNextPage ? (
@@ -150,8 +153,9 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                py: 2,
-                minHeight: 40,
+                pt: 2,
+                pb: 0,
+                minHeight: 32,
               }}
             >
               {isFetchingNextPage || (inView && hasNextPage) ? (
@@ -160,10 +164,20 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                 <Typography fontSize={14} color="text.secondary">
                   More results available
                 </Typography>
-              ) : sortedData.length > 0 ? (
-                <Typography fontSize={14} color="text.secondary">
-                  No more results
-                </Typography>
+              ) : (pageCount ?? 0) > 1 ? (
+                <Stack alignItems="center" gap={0.5}>
+                  <Typography fontSize={14} color="text.secondary">
+                    You've reached the end
+                  </Typography>
+                  <Typography
+                    fontSize={13}
+                    color="primary.main"
+                    sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                    onClick={() => sectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    Back to top
+                  </Typography>
+                </Stack>
               ) : null}
             </Box>
           )}
