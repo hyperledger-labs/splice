@@ -16,6 +16,7 @@ const GcpQuotasConfigSchema = z.object({
 
 const MonitoringConfigSchema = z
   .object({
+    enableGrafanaServiceAccountToken: z.boolean(),
     alerting: z.object({
       enableNoDataAlerts: z.boolean(),
       alerts: z.object({
