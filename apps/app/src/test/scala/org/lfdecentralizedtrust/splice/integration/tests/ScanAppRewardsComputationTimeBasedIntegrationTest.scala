@@ -78,6 +78,28 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
       clue("Verify 404 for non-existent round") {
         sv1ScanBackend.getRewardAccountingActivityTotals(earliest + 1) shouldBe None
       }
+
+      clue("Verify root hash is available for the computed round") {
+        val rootHash = sv1ScanBackend.getRewardAccountingRootHash(earliest)
+        rootHash shouldBe defined
+        rootHash.value.roundNumber shouldBe earliest
+        rootHash.value.rootHash should have length 64 // hex-encoded SHA-256
+      }
+
+      clue("Verify 404 for root hash of non-existent round") {
+        sv1ScanBackend.getRewardAccountingRootHash(earliest + 1) shouldBe None
+      }
+
+      val rootHashHex = sv1ScanBackend.getRewardAccountingRootHash(earliest).value.rootHash
+
+      clue("Verify batch lookup for root hash returns batch contents") {
+        val batch = sv1ScanBackend.getRewardAccountingBatch(earliest, rootHashHex)
+        batch shouldBe defined
+      }
+
+      clue("Verify 404 for batch lookup with non-existent hash") {
+        sv1ScanBackend.getRewardAccountingBatch(earliest, "0" * 64) shouldBe None
+      }
     }
   }
 }

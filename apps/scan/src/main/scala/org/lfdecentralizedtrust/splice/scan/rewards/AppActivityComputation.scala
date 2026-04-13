@@ -162,4 +162,3 @@ class AppActivityComputation(
     SortedMap.from(perPartyNumerator.view.mapValues(_ / totalFeaturedAppEnvelopesTraffic))
   }
 }
-

@@ -3,8 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.scan.rewards.RewardIssuanceParams
+import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -22,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Row types and store for the CIP-0104 reward accounting tables.
   *
-  * Covers six tables populated by ComputeAppRewardsTrigger:
+  * Covers six tables populated by RewardComputationTrigger:
   *   - app_activity_party_totals / app_activity_round_totals — per-party and per-round
   *     aggregation of traffic-weighted app activity.
   *   - app_reward_party_totals / app_reward_round_totals — per-party minting allowances
@@ -36,7 +35,6 @@ object DbScanAppRewardsStore {
       historyId: Long,
       roundNumber: Long,
       totalAppActivityWeight: Long,
-      appProviderPartySeqNum: Int,
       appProviderParty: String,
       numActivityRecords: Long,
   )
@@ -53,6 +51,7 @@ object DbScanAppRewardsStore {
       historyId: Long,
       roundNumber: Long,
       appProviderPartySeqNum: Int,
+      appProviderParty: String,
       totalAppRewardAmount: BigDecimal,
   )
 
@@ -71,13 +70,13 @@ object DbScanAppRewardsStore {
       batchLevel: Int,
       partySeqNumBeginIncl: Int,
       partySeqNumEndExcl: Int,
-      batchHash: ByteString,
+      batchHash: RewardHash,
   )
 
   final case class AppRewardRootHashT(
       historyId: Long,
       roundNumber: Long,
-      rootHash: ByteString,
+      rootHash: RewardHash,
   )
 
   /** Summary of a single round's reward computation, for metrics reporting. */
@@ -87,6 +86,32 @@ object DbScanAppRewardsStore {
       rewardedPartiesCount: Long,
       batchesCreatedCount: Long,
   )
+
+  /** A SHA-256 hash stored as raw bytes, avoiding unnecessary Array[Byte] ↔
+    * ByteString conversions at the DB boundary. Conversion to hex strings
+    * for the HTTP layer is done via `toHex` / `fromHex`.
+    */
+  final case class RewardHash(bytes: Array[Byte]) {
+    def toHex: String = bytes.map("%02x".format(_)).mkString
+    def size: Int = bytes.length
+
+    override def equals(obj: Any): Boolean = obj match {
+      case other: RewardHash => java.util.Arrays.equals(bytes, other.bytes)
+      case _ => false
+    }
+    override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
+  }
+
+  object RewardHash {
+    def fromHex(hex: String): RewardHash =
+      RewardHash(hex.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray)
+  }
+
+  final case class MintingAllowance(provider: String, amount: BigDecimal)
+
+  sealed trait BatchContents
+  case class BatchOfBatches(childHashes: Seq[RewardHash]) extends BatchContents
+  case class BatchOfMintingAllowances(allowances: Seq[MintingAllowance]) extends BatchContents
 }
 
 class DbScanAppRewardsStore(
@@ -125,7 +150,6 @@ class DbScanAppRewardsStore(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
       totalAppActivityWeight = prs.<<[Long],
-      appProviderPartySeqNum = prs.<<[Int],
       appProviderParty = prs.<<[String],
       numActivityRecords = prs.<<[Long],
     )
@@ -148,6 +172,7 @@ class DbScanAppRewardsStore(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
       appProviderPartySeqNum = prs.<<[Int],
+      appProviderParty = prs.<<[String],
       totalAppRewardAmount = prs.<<[BigDecimal],
     )
   }
@@ -172,7 +197,7 @@ class DbScanAppRewardsStore(
       batchLevel = prs.<<[Int],
       partySeqNumBeginIncl = prs.<<[Int],
       partySeqNumEndExcl = prs.<<[Int],
-      batchHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
+      batchHash = DbScanAppRewardsStore.RewardHash(prs.<<[Array[Byte]]),
     )
   }
 
@@ -181,7 +206,7 @@ class DbScanAppRewardsStore(
     DbScanAppRewardsStore.AppRewardRootHashT(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
-      rootHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
+      rootHash = DbScanAppRewardsStore.RewardHash(prs.<<[Array[Byte]]),
     )
   }
 
@@ -204,12 +229,12 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.totalAppActivityWeight},
-              ${row.appProviderPartySeqNum}, ${row.appProviderParty},
+              ${row.appProviderParty},
               ${row.numActivityRecords})"""
       })
       (sql"""insert into #${Tables.appActivityPartyTotals}(
               history_id, round_number, total_app_activity_weight,
-              app_provider_party_seq_num, app_provider_party,
+              app_provider_party,
               num_activity_records
             ) values """ ++ values).asUpdate
     }
@@ -236,11 +261,11 @@ class DbScanAppRewardsStore(
 
     runQuery(
       sql"""select history_id, round_number, total_app_activity_weight,
-                   app_provider_party_seq_num, app_provider_party,
+                   app_provider_party,
                    num_activity_records
             from #${Tables.appActivityPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
-            order by app_provider_party_seq_num
+            order by app_provider_party
       """.as[DbScanAppRewardsStore.AppActivityPartyTotalT],
       "appRewards.getAppActivityPartyTotalsByRound",
     )
@@ -294,6 +319,14 @@ class DbScanAppRewardsStore(
     )
   }
 
+  /** DBIO action to read the total activity weight for a round. */
+  // .head is safe: only called after aggregateActivityTotalsAction in the same transaction.
+  private def getAppActivityRoundTotalWeightAction(roundNumber: Long) =
+    sql"""select total_round_app_activity_weight
+          from #${Tables.appActivityRoundTotals}
+          where history_id = $historyId and round_number = $roundNumber
+    """.as[Long].head
+
   // -- app_reward_party_totals ----------------------------------------------
 
   private def batchInsertAppRewardPartyTotals(
@@ -303,11 +336,11 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.appProviderPartySeqNum},
-              ${row.totalAppRewardAmount})"""
+              ${row.appProviderParty}, ${row.totalAppRewardAmount})"""
       })
       (sql"""insert into #${Tables.appRewardPartyTotals}(
               history_id, round_number, app_provider_party_seq_num,
-              total_app_reward_amount
+              app_provider_party, total_app_reward_amount
             ) values """ ++ values).asUpdate
     }
   }
@@ -333,7 +366,7 @@ class DbScanAppRewardsStore(
 
     runQuery(
       sql"""select history_id, round_number, app_provider_party_seq_num,
-                   total_app_reward_amount
+                   app_provider_party, total_app_reward_amount
             from #${Tables.appRewardPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
             order by app_provider_party_seq_num
@@ -403,7 +436,7 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.batchLevel},
-              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash.toByteArray})"""
+              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash.bytes})"""
       })
       (sql"""insert into #${Tables.appRewardBatchHashes}(
               history_id, round_number, batch_level,
@@ -451,7 +484,7 @@ class DbScanAppRewardsStore(
     if (items.isEmpty) DBIO.successful(0)
     else {
       val values = sqlCommaSeparated(items.map { row =>
-        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash.toByteArray})"""
+        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash.bytes})"""
       })
       (sql"""insert into #${Tables.appRewardRootHashes}(
               history_id, round_number, root_hash
@@ -488,6 +521,93 @@ class DbScanAppRewardsStore(
     )
   }
 
+  /** Look up the contents of a batch by its hash.
+    *
+    * Returns BatchOfBatches (child hashes) for internal nodes,
+    * or BatchOfMintingAllowances (party + amount) for leaf nodes.
+    * Returns None if no batch with this hash exists for the round.
+    */
+  def lookupBatchByHash(
+      roundNumber: Long,
+      batchHash: DbScanAppRewardsStore.RewardHash,
+  )(implicit tc: TraceContext): Future[Option[DbScanAppRewardsStore.BatchContents]] =
+    for {
+      batchO <- findBatchByHash(roundNumber, batchHash)
+      result <- (batchO match {
+        case None =>
+          Future.successful(Option.empty[DbScanAppRewardsStore.BatchContents])
+        case Some((level, beginIncl, endExcl)) if level > 0 =>
+          getChildBatchHashes(roundNumber, level, beginIncl, endExcl)
+            .map(hashes => Some(DbScanAppRewardsStore.BatchOfBatches(hashes)))
+        case Some((_, beginIncl, endExcl)) =>
+          getLeafAllowances(roundNumber, beginIncl, endExcl)
+            .map(allowances => Some(DbScanAppRewardsStore.BatchOfMintingAllowances(allowances)))
+      })
+    } yield result
+
+  private def findBatchByHash(
+      roundNumber: Long,
+      batchHash: DbScanAppRewardsStore.RewardHash,
+  )(implicit tc: TraceContext): Future[Option[(Int, Int, Int)]] = {
+    import storage.DbStorageConverters.setParameterByteArray
+    runQuerySingle(
+      sql"""select batch_level, party_seq_num_begin_incl, party_seq_num_end_excl
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and batch_hash = ${batchHash.bytes}
+            limit 1
+      """.as[(Int, Int, Int)].headOption,
+      "appRewards.lookupBatchByHash.find",
+    )
+  }
+
+  private def getChildBatchHashes(
+      roundNumber: Long,
+      parentLevel: Int,
+      beginIncl: Int,
+      endExcl: Int,
+  )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.RewardHash]] =
+    runQuery(
+      sql"""select batch_hash
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and batch_level = ${parentLevel - 1}
+              and party_seq_num_begin_incl >= $beginIncl
+              and party_seq_num_end_excl <= $endExcl
+            order by party_seq_num_begin_incl
+      """.as[Array[Byte]],
+      "appRewards.lookupBatchByHash.children",
+    ).map(_.map(DbScanAppRewardsStore.RewardHash(_)))
+
+  /** Retrieve minting allowances for a leaf batch range.
+    *
+    * Serves the contents of a level-0 batch from `lookupBatchByHash`.
+    *
+    * Reads only from `app_reward_party_totals` (stage 2 output) — the
+    * same data source as `insertLeafBatches`, ensuring the returned
+    * party+amount pairs are consistent with the hashes in the Merkle tree.
+    */
+  private def getLeafAllowances(
+      roundNumber: Long,
+      beginIncl: Int,
+      endExcl: Int,
+  )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.MintingAllowance]] =
+    runQuery(
+      sql"""select app_provider_party, total_app_reward_amount
+            from #${Tables.appRewardPartyTotals}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and app_provider_party_seq_num >= $beginIncl
+              and app_provider_party_seq_num < $endExcl
+            order by app_provider_party_seq_num
+      """.as[(String, BigDecimal)],
+      "appRewards.lookupBatchByHash.allowances",
+    ).map(_.map { case (provider, amount) =>
+      DbScanAppRewardsStore.MintingAllowance(provider, amount)
+    })
+
   // -- Aggregation ------------------------------------------------------------
 
   /** Returns the latest round for which reward computation has completed
@@ -505,20 +625,36 @@ class DbScanAppRewardsStore(
     )
   }
 
-  /** Runs the full reward computation pipeline for a single round.
+  /** Runs the full reward computation pipeline for a single round in a single
+    * transaction: aggregation, CC conversion, and Merkle tree hashing.
     *
-    * TODO(#4384): Will be extended to run CC conversion (stage 2) and
-    * Merkle tree hashing (stage 3) in a single transaction.
-    * TODO(#4382): Update argument list so that it can invoke computeRewardTotals
-    * after aggregateActivityTotals.
+    * The precondition check (assertCompleteActivity) runs outside the transaction.
+    * All DB writes are atomic — if any step fails, the entire transaction rolls back.
     */
   def computeAndStoreRewards(
-      roundNumber: Long
-  )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] =
+      roundNumber: Long,
+      batchSize: Int,
+      inputs: RewardComputationInputs,
+  )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] = {
+    import profile.api.jdbcActionExtensionMethods
+
     for {
-      _ <- aggregateActivityTotals(roundNumber)
+      _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
+      _ <- runUpdate(
+        (for {
+          _ <- aggregateActivityTotalsAction(roundNumber)
+          totalWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
+          params = inputs.deriveIssuanceParams(totalWeight)
+          _ <- computeRewardTotalsAction(roundNumber, params)
+          _ <- computeRewardHashesAction(roundNumber, batchSize)
+        } yield ())
+          .map(_ => logger.debug(s"Computed and stored rewards for round $roundNumber."))
+          .transactionally,
+        "appRewards.computeAndStoreRewards",
+      )
       summary <- readComputationSummary(roundNumber)
     } yield summary
+  }
 
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
@@ -532,17 +668,17 @@ class DbScanAppRewardsStore(
     for {
       _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
       _ <- runUpdate(
-        (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
-          ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
-          ++ insertRoundTotals(historyId, roundNumber)).asUpdate
-          .map(_ =>
-            logger.debug(
-              s"Aggregated activity totals for round $roundNumber."
-            )
-          ),
+        aggregateActivityTotalsAction(roundNumber)
+          .map(_ => logger.debug(s"Aggregated activity totals for round $roundNumber.")),
         "appRewards.aggregateActivityTotals",
       )
     } yield ()
+
+  /** DBIO action for aggregating activity totals (no precondition check). */
+  private def aggregateActivityTotalsAction(roundNumber: Long) =
+    (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
+      ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
+      ++ insertRoundTotals(historyId, roundNumber)).asUpdate
 
   /** Unnest per-verdict activity arrays and aggregate weights by party. */
   private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
@@ -560,11 +696,6 @@ class DbScanAppRewardsStore(
                    count(*) as num_activity_records
             from unnested
             group by party
-          ),
-          numbered as (
-            select party, total_weight, num_activity_records,
-                   (row_number() over (order by party) - 1)::int as seq_num
-            from aggregated
           )"""
 
   /** Insert per-party totals and return the inserted weights via RETURNING. */
@@ -574,12 +705,11 @@ class DbScanAppRewardsStore(
               (history_id,
                round_number,
                total_app_activity_weight,
-               app_provider_party_seq_num,
                app_provider_party,
                num_activity_records)
-            select $historyId, $roundNumber, total_weight, seq_num, party,
+            select $historyId, $roundNumber, total_weight, party,
                    num_activity_records
-            from numbered
+            from aggregated
             returning total_app_activity_weight, num_activity_records
           )"""
 
@@ -609,50 +739,65 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
+    // TODO(#4747): assert totalAppRewardAmount <= totalIssuance (with small tolerance)
+    //              and prevent writes if the assertion fails.
+    runUpdate(
+      computeRewardTotalsAction(roundNumber, params)
+        .map(_ => logger.debug(s"Computed reward totals for round $roundNumber."))
+        .transactionally,
+      "appRewards.computeRewardTotals",
+    )
+  }
+
+  /** Stage 2 of the reward computation pipeline.
+    *
+    * Reads per-party activity weights from `app_activity_party_totals` (stage 1
+    * output), converts bytes to CC minting allowances via the issuance rate,
+    * filters out parties below the reward threshold, and assigns contiguous
+    * `app_provider_party_seq_num` values (0..M-1) to the M rewarded parties.
+    *
+    * Writes to `app_reward_party_totals` (per-party rewards with seq_num and
+    * party name) and `app_reward_round_totals` (round-level aggregates).
+    * Downstream stages (`insertLeafBatches`, `getLeafAllowances`) read only
+    * from `app_reward_party_totals`.
+    */
+  private def computeRewardTotalsAction(
+      roundNumber: Long,
+      params: RewardIssuanceParams,
+  ) = {
     val issuance = params.issuancePerFeaturedAppTraffic_CCperMB
     val threshold = params.threshold_CC
     val totalIssuance = params.totalIssuanceForFeaturedAppRewards
     val unclaimed = params.unclaimedAppRewardAmount
 
-    val insertRewardTotals =
-      (sql"""with computed as (
-               select history_id, round_number, app_provider_party_seq_num,
-                      (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
-                        * $issuance as total_app_reward_amount
-               from #${Tables.appActivityPartyTotals}
-               where history_id = $historyId and round_number = $roundNumber
-             ),
-             inserted_parties as (
-               insert into #${Tables.appRewardPartyTotals}
-                 (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
-               select history_id, round_number, app_provider_party_seq_num, total_app_reward_amount
-               from computed
-               where total_app_reward_amount >= $threshold
-               returning total_app_reward_amount
-             )
-             insert into #${Tables.appRewardRoundTotals}
-               (history_id, round_number, total_app_reward_minting_allowance,
-                total_app_reward_thresholded, total_app_reward_unclaimed,
-                rewarded_app_provider_parties_count)
-             select $historyId, $roundNumber,
-               coalesce(sum(total_app_reward_amount), 0),
-               $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
-               $unclaimed,
-               count(*)
-             from inserted_parties""").asUpdate
-
-    // TODO(#4747): assert totalAppRewardAmount <= totalIssuance (with small tolerance)
-    //              and prevent writes if the assertion fails.
-    runUpdate(
-      insertRewardTotals
-        .map(_ =>
-          logger.debug(
-            s"Computed reward totals for round $roundNumber."
-          )
-        )
-        .transactionally,
-      "appRewards.computeRewardTotals",
-    )
+    (sql"""with computed as (
+             select history_id, round_number, app_provider_party,
+                    (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
+                      * $issuance as total_app_reward_amount
+             from #${Tables.appActivityPartyTotals}
+             where history_id = $historyId and round_number = $roundNumber
+           ),
+           inserted_parties as (
+             insert into #${Tables.appRewardPartyTotals}
+               (history_id, round_number, app_provider_party_seq_num,
+                app_provider_party, total_app_reward_amount)
+             select history_id, round_number,
+                    (row_number() over (order by app_provider_party) - 1)::int,
+                    app_provider_party, total_app_reward_amount
+             from computed
+             where total_app_reward_amount >= $threshold
+             returning total_app_reward_amount
+           )
+           insert into #${Tables.appRewardRoundTotals}
+             (history_id, round_number, total_app_reward_minting_allowance,
+              total_app_reward_thresholded, total_app_reward_unclaimed,
+              rewarded_app_provider_parties_count)
+           select $historyId, $roundNumber,
+             coalesce(sum(total_app_reward_amount), 0),
+             $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
+             $unclaimed,
+             count(*)
+           from inserted_parties""").asUpdate
   }
 
   // -- Computation summary ----------------------------------------------------
@@ -680,6 +825,173 @@ class DbScanAppRewardsStore(
     """.as[DbScanAppRewardsStore.RewardComputationSummary].head,
       "appRewards.readComputationSummary",
     )
+
+  // -- Merkle tree hash computation -------------------------------------------
+
+  /** Build Merkle tree of reward hashes for a single round.
+    *
+    * Level 0: hash each batch of MintingAllowances from reward party totals.
+    * Level 1+: hash batches of batches until a single root remains.
+    * All levels run in a single transaction.
+    */
+  private[store] def computeRewardHashes(
+      roundNumber: Long,
+      batchSize: Int,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    runUpdate(
+      computeRewardHashesAction(roundNumber, batchSize).map { case (leafCount, rootLevel) =>
+        val levels = rootLevel + 1
+        logger.info(
+          s"Computed reward hashes for round $roundNumber: $leafCount leaf batches, $levels levels."
+        )
+      }.transactionally,
+      "appRewards.computeRewardHashes",
+    )
+  }
+
+  /** DBIO action for the Merkle tree hash computation.
+    * Used by both `computeRewardHashes` (standalone) and
+    * `computeAndStoreRewards` (as part of the full pipeline transaction).
+    */
+  private def computeRewardHashesAction(
+      roundNumber: Long,
+      batchSize: Int,
+  ) =
+    for {
+      leafCount <- insertLeafBatches(roundNumber, batchSize)
+      rootLevel <-
+        if (leafCount > 0)
+          aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+        else
+          insertEmptyLeafBatch(roundNumber).map(_ => 0)
+      _ <- insertRootHash(roundNumber)
+    } yield (leafCount, rootLevel)
+
+  /** Stage 3 of the reward computation pipeline (level 0 of the Merkle tree).
+    *
+    * Reads only from `app_reward_party_totals` (stage 2 output). Groups
+    * rewarded parties into batches of `batchSize` by integer division on
+    * their contiguous `app_provider_party_seq_num`, assigned in stage 2.
+    *
+    * Hashes each batch as a `BatchOfMintingAllowances` using
+    * `hash_batch_of_minting_allowances`, and writes the resulting entries
+    * to `app_reward_batch_hashes`.
+    *
+    * Returns the number of leaf batches created.
+    */
+  private def insertLeafBatches(
+      roundNumber: Long,
+      batchSize: Int,
+  ) =
+    sql"""insert into #${Tables.appRewardBatchHashes}(
+            history_id, round_number, batch_level,
+            party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+          select
+            $historyId, $roundNumber, 0,
+            min(seq_num), max(seq_num) + 1,
+            decode(hash_batch_of_minting_allowances(
+              array_agg(
+                hash_minting_allowance(party, amount::text)
+                order by seq_num
+              )
+            ), 'hex')
+          from (
+            select
+              app_provider_party_seq_num as seq_num,
+              app_provider_party as party,
+              total_app_reward_amount as amount,
+              (app_provider_party_seq_num / $batchSize) as batch_num
+            from #${Tables.appRewardPartyTotals}
+            where history_id = $historyId and round_number = $roundNumber
+          ) sub
+          group by batch_num
+    """.asUpdate
+
+  /** Aggregate batches at the current level into parent batches at level+1.
+    * Recurses until only one batch remains.
+    */
+  /** @return the level of the root batch (0 if only leaf batches exist) */
+  private def aggregateToRoot(
+      roundNumber: Long,
+      batchSize: Int,
+      level: Int,
+      batchCount: Int,
+  ): DBIOAction[Int, NoStream, Effect.All] =
+    if (batchCount <= 1) DBIO.successful(level)
+    else
+      for {
+        nextCount <- insertNextLevel(roundNumber, batchSize, level)
+        rootLevel <- aggregateToRoot(roundNumber, batchSize, level + 1, nextCount)
+      } yield rootLevel
+
+  /** Insert level+1 batches by grouping level batches into chunks of batchSize,
+    * hashing each chunk as BatchOfBatches.
+    */
+  private def insertNextLevel(
+      roundNumber: Long,
+      batchSize: Int,
+      currentLevel: Int,
+  ) =
+    sql"""insert into #${Tables.appRewardBatchHashes}(
+            history_id, round_number, batch_level,
+            party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+          select
+            $historyId, $roundNumber, ${currentLevel + 1},
+            min(party_seq_num_begin_incl), max(party_seq_num_end_excl),
+            decode(hash_batch_of_batches(
+              array_agg(encode(batch_hash, 'hex') order by party_seq_num_begin_incl)
+            ), 'hex')
+          from (
+            select
+              party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash,
+              (row_number() over (order by party_seq_num_begin_incl) - 1) / $batchSize as batch_num
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId and round_number = $roundNumber
+              and batch_level = $currentLevel
+          ) sub
+          group by batch_num
+    """.asUpdate
+
+  /** The hash of a BatchOfMintingAllowances containing no parties.
+    *
+    * Used for rounds where no parties are above the reward threshold.
+    * Inserting this as a level-0 batch and root hash marks the round as
+    * computed, so that RewardComputationTrigger does not retry it, and
+    * lookupBatchByHash returns BatchOfMintingAllowances(Seq.empty)
+    * rather than None.
+    */
+  private def emptyBatchHash =
+    sql"""decode(hash_batch_of_minting_allowances(ARRAY[]::text[]), 'hex')"""
+
+  /** Insert a level-0 batch for a round with no rewarded parties.
+    *
+    * The batch covers the empty party range [0, 0) and hashes an empty
+    * BatchOfMintingAllowances. This lets insertRootHash find a batch to
+    * copy, and lets lookupBatchByHash return a well-typed empty result.
+    */
+  private def insertEmptyLeafBatch(roundNumber: Long) =
+    (sql"""insert into #${Tables.appRewardBatchHashes}(
+             history_id, round_number, batch_level,
+             party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+           values ($historyId, $roundNumber, 0, 0, 0, """ ++ emptyBatchHash ++ sql")").asUpdate
+
+  /** Copy the single remaining batch hash into the root hashes table.
+    * Reads the highest batch_level to find the root.
+    */
+  private def insertRootHash(
+      roundNumber: Long
+  ) =
+    sql"""insert into #${Tables.appRewardRootHashes}(history_id, round_number, root_hash)
+          select history_id, round_number, batch_hash
+          from #${Tables.appRewardBatchHashes}
+          where history_id = $historyId and round_number = $roundNumber
+            and batch_level = (
+              select max(batch_level) from #${Tables.appRewardBatchHashes}
+              where history_id = $historyId and round_number = $roundNumber
+            )
+    """.asUpdate
 
   // -- Private helpers -------------------------------------------------------
 
