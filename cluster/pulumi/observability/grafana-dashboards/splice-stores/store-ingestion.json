@@ -554,7 +554,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": " time() * 1000 - splice_store_last_ingested_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}",
+              "expr": "(timestamp(splice_store_last_ingested_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}) - (splice_store_last_ingested_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"} > 0) / 1e3)",
               "hide": false,
               "legendFormat": "{{namespace}} {{job}} {{store_name}} {{store_party}} {{synchronizer_id}}",
               "range": true,
@@ -749,7 +749,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": " time() * 1000 - splice_store_last_seen_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}",
+              "expr": "(timestamp(splice_store_last_seen_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}) - (splice_store_last_seen_record_time_ms{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"} > 0) / 1e3)",
               "hide": false,
               "legendFormat": "{{namespace}} {{job}} {{store_name}} {{store_party}} {{synchronizer_id}}",
               "range": true,

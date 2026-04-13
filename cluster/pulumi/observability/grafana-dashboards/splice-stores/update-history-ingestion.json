@@ -420,7 +420,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -448,7 +448,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": " time() * 1000.0 - splice_history_updates_latest_record_time{namespace=~\"$namespace\",node_name=~\"$node_name\"} / 1000",
+          "expr": "timestamp(splice_history_updates_latest_record_time{namespace=~\"$namespace\",node_name=~\"$node_name\"}) -  (splice_history_updates_latest_record_time{namespace=~\"$namespace\",node_name=~\"$node_name\"} > 0) / 1e6",
           "hide": false,
           "legendFormat": "{{namespace}} {{job}} {{store_name}} {{store_party}} {{synchronizer_id}}",
           "range": true,
