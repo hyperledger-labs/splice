@@ -1665,6 +1665,64 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/reward-accounting-process/rounds/{round_number}/root-hash:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingRootHash"
+      description: |
+        SV node internal API (CIP-0104, subject to change).
+        Returns the root hash computed for the specified round.
+      parameters:
+        - name: "round_number"
+          in: "path"
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingRootHashResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/reward-accounting-process/rounds/{round_number}/batches/{batch_hash}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingBatch"
+      description: |
+        SV node internal API (CIP-0104, subject to change).
+        Returns the contents of a reward batch identified by its hash.
+        The response is either a list of child batch hashes (for internal nodes)
+        or a list of minting allowances (for leaf nodes).
+      parameters:
+        - name: "round_number"
+          in: "path"
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: "batch_hash"
+          in: "path"
+          required: true
+          schema:
+            type: string
+            description: Hex-encoded batch hash
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingBatchResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/history/bulk/acs:
     get:
       tags: [ pre-alpha, scan ]
@@ -4061,3 +4119,78 @@ components:
         activity_records_count:
           type: integer
           format: int64
+
+    GetRewardAccountingRootHashResponse:
+      type: object
+      required:
+        - round_number
+        - root_hash
+      properties:
+        round_number:
+          type: integer
+          format: int64
+        root_hash:
+          type: string
+          description: Hex-encoded root hash
+
+    GetRewardAccountingBatchResponse:
+      type: object
+      oneOf:
+        - "$ref": "#/components/schemas/RewardAccountingBatchOfBatches"
+        - "$ref": "#/components/schemas/RewardAccountingBatchOfMintingAllowances"
+      discriminator:
+        propertyName: batch_type
+        mapping:
+          BatchOfBatches: "#/components/schemas/RewardAccountingBatchOfBatches"
+          BatchOfMintingAllowances: "#/components/schemas/RewardAccountingBatchOfMintingAllowances"
+
+    BaseRewardAccountingBatch:
+      type: object
+      required:
+        - batch_type
+      properties:
+        batch_type:
+          type: string
+          description: |
+            The type of batch.
+            BatchOfBatches: Contains child batch hashes.
+            BatchOfMintingAllowances: Contains party + amount pairs.
+
+    RewardAccountingBatchOfBatches:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseRewardAccountingBatch"
+        - type: object
+          required:
+            - child_hashes
+          properties:
+            child_hashes:
+              type: array
+              items:
+                type: string
+              description: Hex-encoded child batch hashes
+
+    RewardAccountingBatchOfMintingAllowances:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseRewardAccountingBatch"
+        - type: object
+          required:
+            - minting_allowances
+          properties:
+            minting_allowances:
+              type: array
+              items:
+                "$ref": "#/components/schemas/RewardAccountingMintingAllowance"
+              description: Party + amount pairs
+
+    RewardAccountingMintingAllowance:
+      type: object
+      required:
+        - provider
+        - amount
+      properties:
+        provider:
+          type: string
+        amount:
+          type: string

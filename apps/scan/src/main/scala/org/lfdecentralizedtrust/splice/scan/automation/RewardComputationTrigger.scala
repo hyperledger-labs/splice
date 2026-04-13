@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.scan.metrics.RewardComputationMetrics
+import org.lfdecentralizedtrust.splice.scan.rewards.RewardComputationInputs
 import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
@@ -22,13 +23,13 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Trigger that drives the CIP-0104 reward computation pipeline via
-  * ScanAppRewardsStore.computeAndStoreRewards, which will eventually run three
+  * ScanAppRewardsStore.computeAndStoreRewards, which runs three
   * computation steps in one transaction:
   *   1. Aggregate activity totals from app activity records
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
-  * TODO(#4384): use ScanRewardsReferenceStore for synchronization when computeAndStoreRewards requires it
+  * TODO(#4383): use ScanRewardsReferenceStore for synchronization
   */
 class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
@@ -58,10 +59,16 @@ class RewardComputationTrigger(
         earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
         latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
         latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
+
+        // TODO(#4383): obtain inputs and batchSize from the appropriate Contracts
+        inputs <- Future.successful(RewardComputationTrigger.placeholderInputs)
+        batchSize <- Future.successful(RewardComputationTrigger.placeholderBatchSize)
       } yield RewardComputationTrigger.nextTask(
         earliestCompleteO,
         latestCompleteO,
         latestComputedO,
+        batchSize,
+        inputs,
       )
   }
 
@@ -69,7 +76,7 @@ class RewardComputationTrigger(
       task: RewardComputationTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     appRewardsStore
-      .computeAndStoreRewards(task.roundNumber)
+      .computeAndStoreRewards(task.roundNumber, task.batchSize, task.inputs)
       .map { summary =>
         rewardMetrics.record(summary)
         TaskSuccess(
@@ -94,7 +101,12 @@ class RewardComputationTrigger(
 }
 
 object RewardComputationTrigger {
-  final case class Task(roundNumber: Long) extends PrettyPrinting {
+
+  final case class Task(
+      roundNumber: Long,
+      batchSize: Int,
+      inputs: RewardComputationInputs,
+  ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("roundNumber", _.roundNumber))
   }
@@ -109,11 +121,38 @@ object RewardComputationTrigger {
       earliestCompleteO: Option[Long],
       latestCompleteO: Option[Long],
       latestComputedO: Option[Long],
+      batchSize: Int,
+      inputs: RewardComputationInputs,
   ): Seq[Task] =
     (earliestCompleteO, latestCompleteO) match {
       case (Some(earliestComplete), Some(latestComplete)) =>
         val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
-        if (start <= latestComplete) Seq(Task(start)) else Seq.empty
+        if (start <= latestComplete)
+          Seq(Task(start, batchSize, inputs))
+        else Seq.empty
       case _ => Seq.empty
     }
+
+  // TODO(#4383): Remove this once it is obtained from the appropriate Contract
+  private[scan] val placeholderBatchSize: Int = 100
+
+  // TODO(#4383): Remove this once the values are obtained from the appropriate Contract
+  // These placeholder values are from MainNet DSO config:
+  //
+  // (Round 89782: Checked in RewardComputationInputsTest).
+  private[scan] val placeholderInputs: RewardComputationInputs = {
+    import RewardComputationInputs.{fromBigDecimal as n}
+    val tickDurationMicros: Long = 600L * 1000000L
+    RewardComputationInputs(
+      amuletToIssuePerYear = n(BigDecimal("10000000000")),
+      appRewardPercentage = n(BigDecimal("0.62")),
+      featuredAppRewardCap = n(BigDecimal("1.5")),
+      unfeaturedAppRewardCap = n(BigDecimal("0.6")),
+      developmentFundPercentage = n(BigDecimal("0.05")),
+      tickDurationMicros = tickDurationMicros,
+      amuletPrice = n(BigDecimal("0.14877")),
+      trafficPrice = n(BigDecimal("60")),
+      appRewardCouponThreshold = n(BigDecimal("0.5")),
+    )
+  }
 }

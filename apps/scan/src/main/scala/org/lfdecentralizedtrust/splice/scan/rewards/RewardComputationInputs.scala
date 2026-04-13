@@ -99,7 +99,7 @@ object RewardComputationInputs {
   private[rewards] def fromLong(x: Long): Numeric =
     damlRight(Numeric.fromLong(scale, x))
 
-  private[rewards] def fromBigDecimal(x: BigDecimal): Numeric =
+  private[scan] def fromBigDecimal(x: BigDecimal): Numeric =
     Numeric.assertFromBigDecimal(scale, x)
 
   private def div(a: Numeric, b: Numeric): Numeric =
