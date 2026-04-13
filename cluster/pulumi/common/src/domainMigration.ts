@@ -36,6 +36,14 @@ export class DecentralizedSynchronizerMigrationConfig {
     if (this.lsuEnabled && this.frozenMigrationId == undefined) {
       throw new Error('frozen migration must be defined when LSU is enabled');
     }
+    if (
+      (this.legacy?.sequencer.enableBftSequencer ||
+        this.active.sequencer.enableBftSequencer ||
+        this.upgrade?.sequencer.enableBftSequencer) &&
+      !this.lsuEnabled
+    ) {
+      throw new Error('LSU must be enabled when using DABFT');
+    }
   }
 
   runningMigrations(): MigrationInfo[] {
