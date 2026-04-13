@@ -478,6 +478,8 @@ template AmuletRules
             amuletPrice = roundToArchive.amuletPrice
             issuanceConfig = roundToArchive.issuanceConfig
             tickDuration = roundToArchive.tickDuration
+            trafficPrice = roundToArchive.trafficPrice
+            rewardConfig = roundToArchive.rewardConfig
 
         -- trigger off-ledger reward calculation if needed
         forA_ roundToArchive.rewardConfig $ \rewardConfig -> do

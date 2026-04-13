@@ -434,6 +434,10 @@ test_switch_to_traffic_based_rewards = do
         length openRounds === 3
         forA_ openRounds $ \(_, openRound) ->
           openRound.rewardConfig === expectedRewardConfig
+  let checkSummarizingRounds expectedRewardConfig = do
+        summarizingRounds <- query @SummarizingMiningRound app.dso
+        forA_ summarizingRounds $ \(_, summarizingRound) ->
+          summarizingRound.rewardConfig === expectedRewardConfig
   let checkExternalPartyConfigs expectedVersion = do
         externalPartyConfigs <- query @ExternalPartyConfigState app.dso
         length externalPartyConfigs === 2
@@ -462,6 +466,9 @@ test_switch_to_traffic_based_rewards = do
   (_, latestRound) <- getLatestActiveOpenRound app
   latestRound.rewardConfig === rewardConfig
 
+  -- SummarizingRounds are still on old config
+  checkSummarizingRounds None
+
   -- external party updates pick up the new config from the round
   passTime (hours 24)
   updateExternalPartyConfigState app
@@ -476,6 +483,6 @@ test_switch_to_traffic_based_rewards = do
   runNextIssuance app
 
   checkOpenRounds rewardConfig
+  checkSummarizingRounds rewardConfig
 
   pure ()
-
