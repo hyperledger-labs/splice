@@ -84,17 +84,16 @@ class PermissionedSynchronizerIntegrationTest
             "Verify confirmed topology permission across all SVs",
             _ => {
               for (svValidator <- allSvValidators) {
-                clue(s"Checking active topology state on ${svValidator.name}") {
-                  val permissions =
-                    svValidator.participantClient.topology.participant_synchronizer_permissions
-                      .list(
-                        store = decentralizedSynchronizerId,
-                        filterUid = aliceParticipantId.filterString,
-                      )
-                  permissions.map(_.item.permission) should contain(
-                    ParticipantPermission.Submission
+                logger.info(s"Checking active topology state on ${svValidator.name}")
+                svValidator.participantClient.topology.participant_synchronizer_permissions
+                  .list(
+                    store = decentralizedSynchronizerId,
+                    filterUid = aliceParticipantId.filterString,
                   )
-                }
+                  .map(_.item.permission) should contain(
+                  ParticipantPermission.Submission
+                )
+
               }
             },
           )
