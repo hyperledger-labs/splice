@@ -105,11 +105,11 @@ timeFromMeta field meta =
 --------------------------
 
 basicAccount : Party -> HoldingV2.Account
-basicAccount p = HoldingV2.Account p None None
+basicAccount p = HoldingV2.Account p None ""
 
 -- | True if the account is a basic account.
 isBasicAccount : HoldingV2.Account -> Bool
-isBasicAccount account = isNone account.provider && isNone account.id
+isBasicAccount account = isNone account.provider && T.isEmpty account.id
 
 -- | The owner and optional provider of an account.
 accountParties : HoldingV2.Account -> [Party]
@@ -126,15 +126,15 @@ idKey field = v2Namespace <> field <> ".id"
 accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
 accountToMeta field account meta =
   Metadata $
+  (if T.isEmpty account.id then identity else TextMap.insert (idKey field) account.id) $
   insertOptional (providerKey field) (partyToText <$> account.provider) $
-  insertOptional (idKey field) account.id $
   meta.values
 
 accountFromMeta : Party -> Text -> Metadata -> HoldingV2.Account
 accountFromMeta owner field meta =
   HoldingV2.Account with
     provider = (TextMap.lookup (providerKey field) meta.values) >>= partyFromText
-    id = TextMap.lookup (idKey field) meta.values
+    id = fromOptional "" $ TextMap.lookup (idKey field) meta.values
     owner
 
 dropAccountMeta : Text -> Metadata -> Metadata
