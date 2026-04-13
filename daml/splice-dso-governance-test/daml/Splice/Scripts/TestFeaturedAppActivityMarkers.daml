@@ -134,8 +134,8 @@ testFeaturedAppActivityMarkers = do
       amount = 50.0 * defaultFeaturedAppActivityMarkerAmount / amuletPrice
 
   -- ensure that the round is in issuing phase
-  runNextIssuanceD app amuletPrice
-  runNextIssuanceD app amuletPrice
+  runNextIssuanceD app amuletPrice None
+  runNextIssuanceD app amuletPrice None
   -- advance until the opensAt
   advanceToNextRoundChange app.dso
   -- Check that coupons are archived, we don't check the detailed minting computations

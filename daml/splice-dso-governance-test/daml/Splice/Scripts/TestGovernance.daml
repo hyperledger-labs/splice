@@ -718,7 +718,7 @@ testAmuletRulesTickDurationChange = do
   round2.tickDuration === initialConfig.tickDuration
   round3.tickDuration === initialConfig.tickDuration
 
-  runNextIssuanceD app 1.2
+  runNextIssuanceD app 1.2 None
 
   -- check that tickDuraction has changed
   [(_, round1), (_, round2), (_, round3)] <- sortOn (._2.round) <$> query @OpenMiningRound dso
@@ -1005,7 +1005,7 @@ testAmuletPriceVoting = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
   -- run a normal issuance so time advances and the amulet price is set to 1.2 for everybody
-  runNextIssuanceD app 1.2
+  runNextIssuanceD app 1.2 None
 
   -- have all SV's adjust their prices
   [(dsoRulesCid, _)] <- query @DsoRules dso

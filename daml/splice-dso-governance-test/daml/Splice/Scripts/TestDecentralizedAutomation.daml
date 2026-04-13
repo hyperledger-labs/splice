@@ -85,7 +85,7 @@ testUnclaimedDevelopmentFundCouponsMerging = do
   (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
 
   -- Mint 5 unclaimed development fund coupons
-  replicateA_ 5 $ runNextIssuanceD app 1.0
+  replicateA_ 5 $ runNextIssuanceD app 1.0 None
 
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   unclaimedDevelopmentFundCouponCids@(cid1 :: _) <- fmap fst <$> query @UnclaimedDevelopmentFundCoupon app.dso
@@ -127,7 +127,7 @@ testDevelopmentFundCouponExpiry = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
   -- Mint 1 unclaimed development fund coupon
-  runNextIssuanceD app 1.0
+  runNextIssuanceD app 1.0 None
   [(unclaimedDevelopmentFundCouponCid, unclaimedDevelopmentFundCoupon)] <- query @UnclaimedDevelopmentFundCoupon app.dso
 
   -- Allocate a development fund coupon
