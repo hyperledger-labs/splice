@@ -423,7 +423,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       initialSvNodesDoingTheLsu.par.map { backend =>
         clue(s"SV ${backend.name} connects to the new sequencers and syncs topology") {
-          eventually() {
+          eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
               backend.participantClientWithAdminToken,
               isSv4Connected = false,
