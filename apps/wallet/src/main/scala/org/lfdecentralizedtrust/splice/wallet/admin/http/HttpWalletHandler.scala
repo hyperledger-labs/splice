@@ -1365,7 +1365,7 @@ class HttpWalletHandler(
           allocationrequestv2.AllocationRequest.INTERFACE
         )
       } yield {
-        // TODO: store ingestion can show the same contract as both a V1 and V2 allocation request because that's what we do with interfaces
+        // If a contract implements both V1 and V2, V2 will win, as per mergeSortedContractLists' docs
         val contracts = HttpWalletHandler.mergeSortedContractLists(v1Contracts, v2Contracts)
         d0.ListAllocationRequestsResponse(
           contracts.toVector
@@ -1862,6 +1862,10 @@ class HttpWalletHandler(
 
 object HttpWalletHandler {
 
+  /** Given two lists that are sorted by `createdAt` (or a field that is linked to it, such as store insertion order),
+    * this will return a list that merges both of them in order. The running cost is O(size(l1) + size(l2)).
+    * In case of duplicates by contract id, the entry from l2 wins.
+    */
   private def mergeSortedContractLists(l1: Seq[Contract[?, ?]], l2: Seq[Contract[?, ?]])(implicit
       elc: ErrorLoggingContext
   ): Chain[d0.Contract] = {
@@ -1876,7 +1880,9 @@ object HttpWalletHandler {
         case (remaining, Nil) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
         case (Nil, remaining) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
         case (h1 :: t1, h2 :: t2) =>
-          if (h1.createdAt.isBefore(h2.createdAt))
+          if (h1.contractId.contractId == h2.contractId.contractId) {
+            go(t1, t2, acc :+ h2.toHttp)
+          } else if (h1.createdAt.isBefore(h2.createdAt))
             go(t1, l2, acc :+ h1.toHttp)
           else
             go(l1, t2, acc :+ h2.toHttp)
