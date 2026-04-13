@@ -52,7 +52,8 @@ create_and_process_reward_batches dryRun = do
   setTime demoTime
 
   -- move the first round through issuance, which will also trigger the reward calculation for this round
-  runNextIssuance app
+  if dryRun then runNextIssuance app
+  else runNextIssuanceWithTrafficBasedAppRewards app 1.2
 
   -- setup demo data
   let mintingAllowances1 = sortOn (.provider)
@@ -202,7 +203,7 @@ test_reward_accounting_v2_only_archive_dry_run = do
   -- pretend that follow up batches fail to process due to hash mismatches
 
   -- move to next round, so there's also a calculate rewards contract
-  runNextIssuance app
+  runNextIssuanceWithTrafficBasedAppRewards app 1.2
 
   -- show that a non-dry run cannot be archived
   processRewards <- query @ProcessRewardsV2 app.dso

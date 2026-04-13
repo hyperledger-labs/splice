@@ -241,11 +241,17 @@ runNextIssuance : AmuletApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
 
+-- | Run the next issuance with an off-ledger calculated app activity round total (in MB of traffic).
+-- Used when the round uses traffic-based app rewards.
+runNextIssuanceWithTrafficBasedAppRewards : AmuletApp -> Decimal -> Script ()
+runNextIssuanceWithTrafficBasedAppRewards app appActivityRoundTotal = do
+    Registry.runNextIssuance app.dso 1.0 (Some appActivityRoundTotal)
+
 -- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the amulet price that can be used immediately
 runNextIssuanceInternal : AmuletApp -> Decimal -> Script ()
 runNextIssuanceInternal app amuletPrice = do
-    Registry.runNextIssuance app.dso amuletPrice
+    Registry.runNextIssuance app.dso amuletPrice None
 
 -- Set time so that at least one mining round is open and usable
 passTimeToRoundOpen : AmuletApp -> Script ()
