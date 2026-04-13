@@ -53,6 +53,8 @@ template SummarizingMiningRound
     amuletPrice : Decimal
     issuanceConfig : IssuanceConfig
     tickDuration : RelTime
+    trafficPrice : Optional Decimal
+    rewardConfig : Optional RewardConfig
   where
     signatory dso
     ensure isDefinedRound round
