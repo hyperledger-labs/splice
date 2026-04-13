@@ -6,15 +6,15 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20260325.14629.0.v2e54bd46"
-  val canton_library_version = "3.5.0-snapshot.20260327.18467.0.ved5cb1a4"
+  val version: String = "3.5.0-snapshot.20260401.14638.0.v9a1531c5"
+  val canton_library_version = "3.5.0-snapshot.20260407.18566.0.v64d1d1e6"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
-  // TODO(DACH-NY/canton#31699) Remove overwrite when java codegen is fixed
-  val daml_java_codegen_version = "3.5.0-snapshot.20260203.14554.0.v07f81520"
+  // Downgrade once version is bumped to a version >= this
+  val daml_java_codegen_version = "3.5.0-snapshot.20260403.14643.0.v6a02ccee"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
@@ -218,14 +218,14 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val opentelemetry_version = "1.43.0"
-  lazy val opentelemetry_java_instrumentation_version = "2.9.0"
+  lazy val opentelemetry_version = "1.60.1"
+  lazy val opentelemetry_java_instrumentation_version = "2.26.1"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_testing =
     "io.opentelemetry" % "opentelemetry-sdk-testing" % opentelemetry_version
   lazy val opentelemetry_sdk_autoconfigure =
-    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % s"$opentelemetry_version"
+    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % opentelemetry_version
   lazy val opentelemetry_prometheus =
     "io.opentelemetry" % "opentelemetry-exporter-prometheus" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_zipkin =

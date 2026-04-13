@@ -148,7 +148,7 @@ i.e., the record time can go back after a hard domain migration.
 Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/main/apps/scan/src/main/openapi/scan.yaml>`_
 to understand how the ``after_migration_id`` field affects the response.
 
-If you don't know what migration ID was active at the chose time,
+If you don't know what migration ID was active at the chosen time,
 start with migration ID 0 and keep incrementing it by one
 until you find the lowest migration id that includes a higher record time than the one you specified in `after_record_time`.
 

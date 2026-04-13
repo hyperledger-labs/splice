@@ -39,7 +39,7 @@ class TransactionServiceCorrectnessIT extends LedgerTestSuite {
             _.endInclusive := endAfterFirstSection
           )
         )
-      firstSection <- ledger.transactions(firstSectionRequest)
+      firstSection <- ledger.transactionsWithVariants(firstSectionRequest)
       _ <- Future.sequence(
         Vector.fill(transactionsToSubmit)(ledger.create(party, new Dummy(party)))
       )
@@ -50,8 +50,8 @@ class TransactionServiceCorrectnessIT extends LedgerTestSuite {
             _.beginExclusive := endAfterFirstSection
           )
         )
-      secondSection <- ledger.transactions(secondSectionRequest)
-      fullSequence <- ledger.transactions(AcsDelta, party)
+      secondSection <- ledger.transactionsWithVariants(secondSectionRequest)
+      fullSequence <- ledger.transactionsWithVariants(AcsDelta, party)
     } yield {
       val concatenation = Vector.concat(firstSection, secondSection)
       assert(
@@ -118,9 +118,9 @@ class TransactionServiceCorrectnessIT extends LedgerTestSuite {
       endOffsetAtTestStart <- ledger.currentEnd()
       _ <- ledger.create(alice, new Dummy(alice))
       _ <- ledger.create(bob, new Dummy(bob))
-      aliceView <- ledger.transactions(LedgerEffects, alice)
-      bobView <- ledger.transactions(LedgerEffects, bob)
-      multiSubscriptionView <- ledger.transactions(LedgerEffects, alice, bob)
+      aliceView <- ledger.transactionsWithVariants(LedgerEffects, alice)
+      bobView <- ledger.transactionsWithVariants(LedgerEffects, bob)
+      multiSubscriptionView <- ledger.transactionsWithVariants(LedgerEffects, alice, bob)
       txReq <- ledger.getTransactionsRequest(
         transactionFormat =
           ledger.transactionFormat(None, transactionShape = LedgerEffects, verbose = true),
@@ -160,6 +160,37 @@ class TransactionServiceCorrectnessIT extends LedgerTestSuite {
           "Single- and multi-party subscription yield different results",
           comparableTransactions(alphaView),
           comparableTransactions(betaView),
+        )
+      }
+  })
+
+  test(
+    "TXExposesPaidTrafficCost",
+    "Traffic cost should be exposed correctly",
+    allocate(SingleParty, SingleParty),
+  )(implicit ec => {
+    case p @ Participants(Participant(alpha, Seq(alice)), Participant(beta, Seq(bob))) =>
+      for {
+        _ <- alpha.create(alice, new AgreementFactory(bob, alice))
+        _ <- p.synchronize
+        alphaView <- alpha.transactions(AcsDelta, alice)
+        alphaBobView <- alpha.transactions(AcsDelta, bob)
+        betaView <- beta.transactions(AcsDelta, bob)
+      } yield {
+        assert(
+          alphaView.headOption.flatMap(_.paidTrafficCost).exists(_ > 0L),
+          s"Submitting node for a submitting party should have a positive paid traffic cost, got ${alphaView.headOption
+              .flatMap(_.paidTrafficCost)}",
+        )
+        assert(
+          alphaBobView.headOption.map(_.paidTrafficCost).exists(_.isEmpty),
+          s"Submitting node for a non submitting party should have an unset paid traffic cost, got ${alphaBobView.headOption
+              .flatMap(_.paidTrafficCost)}",
+        )
+        assert(
+          betaView.headOption.map(_.paidTrafficCost).exists(_.isEmpty),
+          s"Non submitting node should have an unset paid traffic cost, got ${betaView.headOption
+              .flatMap(_.paidTrafficCost)}",
         )
       }
   })
@@ -452,7 +483,7 @@ object TransactionServiceCorrectnessIT {
       case _ => parentTraceId
     }
 
-  // Strip command id, offset, event id, node id and transaction id to yield a transaction comparable across participants
+  // Strip command id, offset, event id, node id, traffic cost and transaction id to yield a transaction comparable across participants
   // Furthermore, makes sure that the order is not relevant for witness parties
   // Sort by updateId as on distributed ledgers updates can occur in different orders
   // Even if updateIds are not the same across distributes ledgers, we still can use them for sorting
@@ -475,6 +506,9 @@ object TransactionServiceCorrectnessIT {
             .map(e => e.copy(event = stripEventFields(e.event)).modifyWitnessParties(_.sorted)),
           updateId = "updateId",
           traceContext = t.traceContext.map(tc => tc.copy(tc.traceparent.map(eraseSpanId))),
+          // clear the traffic cost as we can't know it ahead of time for comparison, and it will
+          // be different on different nodes (only the submitting node exposes the cost)
+          paidTrafficCost = None,
         )
       )
   }

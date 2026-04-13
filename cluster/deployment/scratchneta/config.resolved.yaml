@@ -40,6 +40,11 @@ monitoring:
           seconds: 1200
         completedDelay:
           seconds: 3600
+        computeDuration:
+          seconds: 1200
+      acsSnapshots:
+        saveLatencyThresholdSeconds: 2700
+        updateLatencyThresholdSeconds: 3
       cloudSql:
         maintenance: false
       cometbft:
@@ -52,6 +57,16 @@ monitoring:
         thresholdPerNamespace: 0.05
       deployment:
         pendingPeriodMinutes: 5
+      gcpQuotas:
+        excludedApproachingMetrics: []
+        excludedMetrics:
+          - 'cloudkms.googleapis.com/read_requests'
+          - 'cloudkms.googleapis.com/write_requests'
+          - 'cloudkms.googleapis.com/crypto_requests'
+          - 'cloudkms.googleapis.com/hsm_symmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
+          - 'cloudkms.googleapis.com/hsm_generate_random_requests'
+          - 'cloudkms.googleapis.com/external_kms_requests'
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
@@ -75,6 +90,7 @@ monitoring:
         tolerance: 1.5
     enableNoDataAlerts: false
     loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
+  enableGrafanaServiceAccountToken: true
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
@@ -317,6 +333,12 @@ sv:
           type: 'unlimited'
         /api/scan/v1/domains:
           name: 'domains-v1'
+          type: 'unlimited'
+        /api/scan/v1/holdings:
+          name: 'holdings'
+          type: 'unlimited'
+        /api/scan/v1/state:
+          name: 'state'
           type: 'unlimited'
         /api/scan/v1/updates:
           name: 'v1-updates'

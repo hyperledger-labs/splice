@@ -115,7 +115,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
-        ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000)(config)
+        ConfigTransforms
+          .bumpCantonSyncSuccessorPortsBy(22_000)(config)
       )
       // use the standalone participant
       .addConfigTransforms((_, config) => {
@@ -413,7 +414,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       initialSvNodesDoingTheLsu.par.map { backend =>
         clue(s"SV ${backend.name} connects to the new sequencers and syncs topology") {
-          eventually() {
+          eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
               backend.participantClientWithAdminToken,
               isSv4Connected = false,

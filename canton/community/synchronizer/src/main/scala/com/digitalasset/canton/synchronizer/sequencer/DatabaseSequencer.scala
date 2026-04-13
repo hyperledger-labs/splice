@@ -43,7 +43,10 @@ import com.digitalasset.canton.synchronizer.sequencer.store.{
   SequencerMemberValidator,
   SequencerStore,
 }
-import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
+import com.digitalasset.canton.synchronizer.sequencer.time.{
+  DisasterRecoverySequencingTimeUpperBound,
+  LsuSequencingBounds,
+}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   LsuTrafficState,
@@ -79,6 +82,7 @@ object DatabaseSequencer {
       storage: Storage,
       sequencerStore: SequencerStore,
       lsuSequencingBounds: Option[LsuSequencingBounds],
+      drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
       clock: Clock,
       topologyClientMember: Member,
       cryptoApi: SynchronizerCryptoClient,
@@ -120,6 +124,7 @@ object DatabaseSequencer {
       loggerFactory,
       blockSequencerMode = false,
       lsuSequencingBounds = lsuSequencingBounds,
+      drSequencingTimeUpperBound = drSequencingTimeUpperBound,
       rateLimitManagerO = None,
     )
   }
@@ -145,6 +150,7 @@ class DatabaseSequencer(
     loggerFactory: NamedLoggerFactory,
     blockSequencerMode: Boolean,
     lsuSequencingBounds: Option[LsuSequencingBounds],
+    drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
     rateLimitManagerO: Option[SequencerRateLimitManager],
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
@@ -179,6 +185,7 @@ class DatabaseSequencer(
     loggerFactory,
     blockSequencerMode,
     lsuSequencingBounds,
+    drSequencingTimeUpperBound,
     metrics,
   )
 
@@ -562,7 +569,7 @@ class DatabaseSequencer(
 
   override private[canton] def orderer: Option[BlockOrderer] = None
 
-  override def getLsuTrafficControlState(implicit
+  override def getLsuTrafficControlState(trafficTsOverride: Option[CantonTimestamp] = None)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
     throw new UnsupportedOperationException(

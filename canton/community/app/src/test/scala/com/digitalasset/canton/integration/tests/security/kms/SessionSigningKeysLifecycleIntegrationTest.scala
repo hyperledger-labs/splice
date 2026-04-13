@@ -3,7 +3,9 @@
 
 package com.digitalasset.canton.integration.tests.security.kms
 
+import com.daml.metrics.api.testing.MetricValues.*
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.config.{KmsConfig, SessionSigningKeysConfig}
 import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
@@ -16,46 +18,79 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
 }
 import com.digitalasset.canton.version.ProtocolVersion
+import monocle.Monocle.toAppliedFocusOps
 
-/** TODO(#27529): In some scenarios clock advances still fails due to the current snapshot
-  * approximation problems. For example, since participants rely on the current snapshot
-  * approximation and can sign a message arbitrarily in the past, the verification by the sequencer
-  * will fail if the nodes remain idle for a long time.
-  *
-  * Once everything is working, this test should be merged into
-  * [[SessionSigningKeysIntegrationTest]], and session signing keys should be set as default again.
-  */
 trait SessionSigningKeysLifecycleIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with KmsCryptoIntegrationTestBase {
 
+  private val sessionSigningKeysConfig = SessionSigningKeysConfig.short
+  private val shortDuration = config.NonNegativeFiniteDuration.tryFromDuration(
+    SessionSigningKeysConfig.short.keyValidityDuration.duration.div(2.0)
+  )
+
   override protected def otherConfigTransforms: Seq[ConfigTransform] = Seq(
-    ConfigTransforms.setSessionSigningKeys(SessionSigningKeysConfig.short)
+    ConfigTransforms.setSigningKeysIfPV35OrHigher(sessionSigningKeysConfig),
+    // adjust the max sequencing time offset so requests remain compatible with the short validity
+    // periods of session signing keys.
+    ConfigTransforms.updateAllSequencerConfigs_(
+      _.focus(_.sequencerClient.defaultMaxSequencingTimeOffset)
+        .replace(shortDuration)
+    ),
+    ConfigTransforms.updateAllMediatorConfigs_(
+      _.focus(_.sequencerClient.defaultMaxSequencingTimeOffset)
+        .replace(shortDuration)
+    ),
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.sequencerClient.defaultMaxSequencingTimeOffset)
+        .replace(shortDuration)
+    ),
   )
 
   "verify correct session key lifecycle with clock advances" onlyRunWhen
     testedProtocolVersion >= ProtocolVersion.v35 in { implicit env =>
       import env.*
 
+      // adjust timeouts to ensure requests and responses fit within the very short validity
+      // periods of session signing keys.
+      sequencer1.topology.synchronizer_parameters.propose_update(
+        synchronizerId = daId,
+        _.update(
+          confirmationResponseTimeout = shortDuration,
+          mediatorReactionTimeout = shortDuration,
+          ledgerTimeRecordTimeTolerance = sessionSigningKeysConfig.cutOffDuration,
+        ),
+      )
+
+      // record initial metrics to establish a baseline, as a fallback to the long-term key
+      // may have occurred during bootstrap.
+      val participantKmsMetrics = Seq(participant1, participant2).map(
+        _.underlying.value.metrics.kmsMetrics.sessionSigningKeysFallback.valuesWithContext
+      )
+
       env.nodes.local.foreach { node =>
-        node.config.crypto.sessionSigningKeys shouldBe SessionSigningKeysConfig.short
+        node.config.crypto.sessionSigningKeys shouldBe sessionSigningKeysConfig
       }
 
       assertPingSucceeds(participant1, participant2)
 
       // session signing keys created are still valid
-      Threading.sleep(SessionSigningKeysConfig.short.cutOffDuration.duration.div(2.0).toMillis)
+      Threading.sleep(sessionSigningKeysConfig.cutOffDuration.duration.div(2.0).toMillis)
 
       assertPingSucceeds(participant1, participant2)
 
       // session signing keys have expired; new keys will be generated
-      Threading.sleep(SessionSigningKeysConfig.short.keyValidityDuration.duration.toMillis)
+      Threading.sleep(sessionSigningKeysConfig.keyValidityDuration.duration.toMillis)
 
       assertPingSucceeds(participant1, participant2)
 
+      // we expect that no fallback has been triggered for the ping requests and that
+      // session signing keys have been used and rotated successfully.
+      Seq(participant1, participant2).map(
+        _.underlying.value.metrics.kmsMetrics.sessionSigningKeysFallback.valuesWithContext
+      ) shouldBe participantKmsMetrics
     }
-
 }
 
 class MockKmsDriverSessionSigningKeysLifecycleIntegrationTestPostgres

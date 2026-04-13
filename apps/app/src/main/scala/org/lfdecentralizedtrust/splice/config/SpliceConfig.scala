@@ -103,6 +103,7 @@ case class SpliceConfig(
     ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
+    override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(
       timeouts = TimeoutSettings(
@@ -120,7 +121,6 @@ case class SpliceConfig(
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
-  override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
   override val mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty
   override val remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty
   override val sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty

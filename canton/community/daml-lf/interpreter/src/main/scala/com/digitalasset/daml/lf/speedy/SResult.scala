@@ -5,14 +5,10 @@ package com.digitalasset.daml.lf
 package speedy
 
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref._
+import com.digitalasset.daml.lf.data.Ref.*
 import com.digitalasset.daml.lf.data.Time
-import com.digitalasset.daml.lf.speedy.SError._
-import com.digitalasset.daml.lf.transaction.{
-  FatContractInstance,
-  GlobalKeyWithMaintainers,
-  NeedKeyProgression,
-}
+import com.digitalasset.daml.lf.speedy.SError.*
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, GlobalKey, NeedKeyProgression}
 import com.digitalasset.daml.lf.value.Value.ContractId
 
 object Question {
@@ -40,8 +36,13 @@ object Question {
         callback: CompiledPackages => Unit,
     ) extends Update
 
+    // Requests up to `limit` FatContractInstances matching `key`, delivered via `callback`.
+    // `callback` takes at most `limit` contracts and a progression token:
+    //   - Finished when all matches have been delivered (only valid with strictly fewer than `limit` results),
+    //   - InProgress when more results may follow.
+    // `progression` is Unstarted on the first call, InProgress on continuations.
     final case class NeedKey(
-        key: GlobalKeyWithMaintainers,
+        key: GlobalKey,
         limit: Int,
         progression: NeedKeyProgression.CanContinue,
         committers: Set[Party],

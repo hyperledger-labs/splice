@@ -52,7 +52,7 @@ The preferred option of bypassing the limit is to set up an external
 party either directly through the `Canton APIs for external signing
 <https://docs.digitalasset.com/build/3.4/explanations/external-signing/external_signing_overview.html>`_
 or ``/v0/admin/external-party/topology/{generate,submit}`` on the
-validator API or but *not* use the endpoints under
+validator API but *not* use the endpoints under
 ``/v0/admin/external-party/setup-proposal``.
 
 If you do not need preapprovals, this is sufficient.
