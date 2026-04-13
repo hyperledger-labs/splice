@@ -27,11 +27,11 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
-function isVersionAtLeast(version: CnChartVersion, minVersion: string): boolean {
+function isVersionAtLeastOrSnapshot(version: CnChartVersion, minVersion: string): boolean {
   if (version.type === 'local') {
     return true;
   }
-  return semver.gte(version.version, minVersion);
+  return semver.gte(version.version, minVersion) || version.version.startsWith(minVersion);
 }
 
 export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
@@ -60,7 +60,7 @@ export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   }
   if (
     deploymentConf.projectsToDeploy.has('observability') &&
-    isVersionAtLeast(activeVersion, '0.6.0')
+    isVersionAtLeastOrSnapshot(activeVersion, '0.6.0')
   ) {
     yield { project: 'observability', stack: `observability.${CLUSTER_BASENAME}` };
   }
@@ -118,7 +118,7 @@ export function installSpliceStacks(
   }
   if (
     deploymentConf.projectsToDeploy.has('observability') &&
-    isVersionAtLeast(activeVersion, '0.6.0')
+    isVersionAtLeastOrSnapshot(activeVersion, '0.6.0')
   ) {
     createStackCR(
       'observability',
