@@ -71,7 +71,7 @@ template AmuletAllocationV2
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
-        authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockAmuletAllocationV2 this self extraArgs "withdrawn by sender"
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -79,7 +79,7 @@ template AmuletAllocationV2
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockAmuletAllocationV2 this self extraArgs "cancelled by executor"
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -139,8 +139,11 @@ template AmuletAllocationV2
             -- to fully support all V2 flows.
 
 
-unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
-unlockAmuletAllocationV2 amuletAllocation extraArgs = do
+unlockAmuletAllocationV2 : AmuletAllocationV2 -> ContractId t -> ExtraArgs -> Text -> Update (TextMap.TextMap [ContractId V2.Holding])
+unlockAmuletAllocationV2 amuletAllocation self extraArgs reason = do
+  -- report workflow termination to V2 transaction history parsers
+  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
+  logWorkflowTerminated eventLogCid amuletAllocation.dso self amuletAllocation reason
   case amuletAllocation.lockedAmulet of
     None -> return TextMap.empty
     Some la -> do

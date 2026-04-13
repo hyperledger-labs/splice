@@ -28,7 +28,8 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  ( basicAccount, upcast, eventLog_transferOutDefaultImpl, eventLog_transferInDefaultImpl, reasonToMeta)
+  ( basicAccount, upcast, eventLog_workflowCompletedDefaultImpl, eventLog_transferOutDefaultImpl, eventLog_transferInDefaultImpl
+  , reasonToMeta)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -141,12 +142,12 @@ template AmuletRules
 
     signatory dso
 
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for AmuletRules where
       view = TransferEventsV2.EventLogView with
         admin = dso
         meta = emptyMetadata
 
+      eventLog_workflowCompletedImpl = eventLog_workflowCompletedDefaultImpl dso
       eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
       eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
 
@@ -355,8 +356,7 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
-        logAmuletMint dso (toInterfaceContractId self) receiver amount
-          (reasonToMeta "tapped DevNet faucet" emptyMetadata)
+        logAmuletMint dso (toInterfaceContractId self) receiver amount (reasonMeta "tapped DevNet faucet")
         result <- exercise self AmuletRules_Mint with ..
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
@@ -1962,7 +1962,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
-  logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata)
+  logAmuletBurn dso eventLogCid sender amount (reasonMeta usage)
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso
@@ -2005,6 +2005,14 @@ unfeaturedPaymentContextFromChoiceContext : Party -> Api.Token.MetadataV1.Choice
 unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   context <- externalPartyTransferFromChoiceContext dso choiceContext
   pure context with featuredAppRight = None
+
+-- | Attempt to lookup an EventLog contract from the choice context.
+lookupEventLogFromChoiceContext : Api.Token.MetadataV1.ChoiceContext -> Update (Optional (ContractId TransferEventsV2.EventLog))
+lookupEventLogFromChoiceContext context = do
+  -- TODO(#4992): use contract key lookup to find the an EventLog to make the lookup work when chaining actions in a single Daml transaction
+  optCid <- lookupFromContextU @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
+  -- Note: no admin check required as that is performed as part of all TransferEventsV2.EventLog choice implementations
+  pure (toInterfaceContractId <$> optCid)
 
 getExternalPartyConfigStateFromChoiceContext
   : Party -> Api.Token.MetadataV1.ChoiceContext -> Update (ContractId ExternalPartyConfigState, ExternalPartyConfigState)

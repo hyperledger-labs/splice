@@ -7,6 +7,7 @@
 module Splice.TokenStandard.Utils.Internal.Events (
 
   -- * Default implementation
+  eventLog_workflowCompletedDefaultImpl,
   eventLog_transferOutDefaultImpl,
   eventLog_transferInDefaultImpl,
 
@@ -32,6 +33,12 @@ import Splice.TokenStandard.Utils.Internal.Choices
 
 -- default implementations
 --------------------------
+
+eventLog_workflowCompletedDefaultImpl
+  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_WorkflowCompleted -> Update TransferEventsV2.EventLog_WorkflowCompletedResult
+eventLog_workflowCompletedDefaultImpl admin _self arg = do
+  requireMatchExpected ("arg.admin", arg.admin) admin
+  pure TransferEventsV2.EventLog_WorkflowCompletedResult
 
 eventLog_transferOutDefaultImpl
   : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_TransferOut -> Update TransferEventsV2.EventLog_TransferOutResult

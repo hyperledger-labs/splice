@@ -116,7 +116,6 @@ setupTest = do
           [ ("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")
           , ("splice.lfdecentralizedtrust.org/reason", "test reason")
           ]
-        -- TODO(#5001): use submitTree to test that this metadata is visible as a transfer event
 
   return TestSetup with ..
 
