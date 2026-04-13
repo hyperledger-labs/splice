@@ -29,6 +29,8 @@ template ExternalPartyConfigState
   where
     signatory dso
 
+    -- TODO(#5001): test all calls to this event log using submitTree
+
     -- Note: we use this contract as an event log instance, as it is available in most
     -- contexts where we are transferring amulet.
     interface instance TransferEventsV2.EventLog for ExternalPartyConfigState where
@@ -36,7 +38,6 @@ template ExternalPartyConfigState
         admin = dso
         meta = emptyMetadata
 
-      eventLog_workflowCompletedImpl = eventLog_workflowCompletedDefaultImpl dso
       eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
       eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
 

@@ -290,10 +290,8 @@ registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid
   now <- getTime
   unless (lockedAmuletActive || amuletInstr.transfer.executeBefore <= now) $
     fail "Invariant violation: the locked amulet is archived, but the transfer is not yet expired"
-  -- retrieved to serve the eventlog factory
-  configStateC <- getExternalPartyConfigStateContext registry
   -- this context communicates whether to unlock the amulet
-  let expireLockC = configStateC <> OpenApiChoiceContext with
+  let expireLockC = OpenApiChoiceContext with
         disclosures = mempty
         choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
   if lockedAmuletActive

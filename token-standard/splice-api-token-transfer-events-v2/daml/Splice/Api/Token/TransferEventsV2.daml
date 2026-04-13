@@ -1,7 +1,7 @@
 -- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Interface to log events related to token standard transfers.
+-- | Interface to log events for token standard transfers.
 module Splice.Api.Token.TransferEventsV2 where
 
 import Splice.Api.Token.MetadataV1
@@ -10,58 +10,13 @@ import Splice.Api.Token.HoldingV2
 -- | An interface for templates that can be used to report token standard v2 events.
 --
 -- The non-consuming choices of this interface are used by the instrument admin
--- or the app provider to report transfer-related events.
--- Make sure to only check events from reporters that are trustworthy, e.g., only transfer
--- events from a token's instrument admin should be considered as relevant events for a token.
+-- to report token transfers. Make sure to only consider events from the instrument admin
+-- as token transfer events for a token.
 interface EventLog where
   viewtype EventLogView
 
-  eventLog_workflowCompletedImpl : ContractId EventLog -> EventLog_WorkflowCompleted -> Update EventLog_WorkflowCompletedResult
   eventLog_transferOutImpl : ContractId EventLog -> EventLog_TransferOut -> Update EventLog_TransferOutResult
   eventLog_transferInImpl : ContractId EventLog -> EventLog_TransferIn -> Update EventLog_TransferInResult
-
-  nonconsuming choice EventLog_WorkflowCompleted : EventLog_WorkflowCompletedResult
-    -- ^ Signal the completion of a transfer workflow, that is a transfer instruction,
-    -- allocation instruction, allocation request, or an allocation.
-    --
-    -- Wallets SHOULD use the following rules to interpret the archival of a transfer workflow contract:
-    --
-    --   1. If a contract with the same workflowCid is created in the same transaction
-    --      then the state of the workflow was updated.
-    --   2. Otherwise the workflow completed, and the wallet SHOULD use the information
-    --      in the `EventLog_WorkflowCompleted` event for the workflowCid to
-    --      determine whether the workflow succeeded or failed and why.
-    --   3. If there is no `EventLog_WorkflowCompleted` event for the workflowCid, then
-    --      the wallet SHOULD assume that the workflow completed successfully.
-    --
-    -- Asset implementations MUST always emit an `EventLog_WorkflowCompleted` event for failed workflows.
-    -- The defaulting to success in Step 3 is an optimization for the common case of successful workflows.
-    with
-      admin : Party
-        -- ^ Admin of the workflow that completed. That is the
-        -- instrument admin for transfer instructions, allocation instructions,
-        -- and allocations; and the app provider party for allocation requests.
-      workflowCid : AnyContractId
-        -- ^ Contract-id of the first contract of the transfer workflow whose
-        -- completion is being reported.
-        --
-        -- That is the `originalInstructionCid` for transfer instructions and
-        -- allocation instructions, the `originalAllocationCid` for allocations,
-        -- and the `originalRequestCid` for allocation requests.
-      success : Bool
-        -- ^ Whether the workflow completed successfully or not.
-        -- The failure reason can be included in the metadata using the
-        -- `splice.lfdecentralizedtrust.org/reason` metadata key.
-      observers : [Party]
-        -- ^ Parties that should be notified about the completion of the workflow.
-      extraArgs : ExtraArgs
-        -- ^ Arguments storing both metadata and additional context information about the event.
-        --
-        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
-        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
-    observer observers
-    controller admin
-    do eventLog_workflowCompletedImpl this self arg
 
   nonconsuming choice EventLog_TransferOut : EventLog_TransferOutResult
     -- ^ Signal an outgoing transfer to the sender and the observers.
@@ -134,10 +89,6 @@ data EventLogView = EventLogView with
     admin : Party
     meta : Metadata
   deriving (Eq, Show)
-
--- | Result of logging a workflow completion event. Provided for extensibility
--- in a future where interfaces are upgradeable.
-data EventLog_WorkflowCompletedResult = EventLog_WorkflowCompletedResult {}
 
 -- | Result of logging a transfer out event. Provided for extensibility
 -- in a future where interfaces are upgradeable.

@@ -14,7 +14,6 @@ module Splice.Testing.Registries.TestTokenV2_RegistryV2
   , mint
   ) where
 
-import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -132,18 +131,9 @@ registryApi_getCancelContext
   -> Script OpenApiChoiceContext
 registryApi_getCancelContext registry cid _meta = do
   lockedTokensD <- getLockedTokensForAllocationsD registry cid
-  tokenRulesC <- getTokenRulesContext registry
-  pure $ tokenRulesC <> OpenApiChoiceContext with
+  pure OpenApiChoiceContext with
     disclosures = lockedTokensD
     choiceContext = emptyChoiceContext
-
-getTokenRulesContext : TestTokenV2Registry -> Script OpenApiChoiceContext
-getTokenRulesContext registry = do
-  (tokenRulesCid, tokenRulesD) <- getTokenRulesWithDisclosures registry
-  pure OpenApiChoiceContext with
-    disclosures = tokenRulesD
-    choiceContext = ChoiceContext with
-      values = TextMap.fromList [(tokenRulesContextKey, AV_ContractId (coerceContractId tokenRulesCid))]
 
 getTokenRules : TestTokenV2Registry -> Script (ContractId TestTokenV2.TokenRules, TestTokenV2.TokenRules)
 getTokenRules registry = getTokenRules' registry.admin

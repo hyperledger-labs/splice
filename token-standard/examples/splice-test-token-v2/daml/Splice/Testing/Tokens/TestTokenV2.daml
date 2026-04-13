@@ -4,7 +4,7 @@
 -- | A mock implementation of a test token for the purpose of testing V2 token standard workflows.
 module Splice.Testing.Tokens.TestTokenV2 where
 
-import DA.Action (when, void)
+import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List (dedup)
@@ -72,7 +72,7 @@ template TokenAllocationV2 with
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this self extraArgs "withdrawn by sender"
+        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -80,7 +80,7 @@ template TokenAllocationV2 with
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this self extraArgs "cancelled by executor"
+        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -212,13 +212,12 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
-
+    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for TokenRules where
       view = TransferEventsV2.EventLogView with
         admin = admin
         meta = emptyMetadata
 
-      eventLog_workflowCompletedImpl = eventLog_workflowCompletedDefaultImpl admin
       eventLog_transferOutImpl = eventLog_transferOutDefaultImpl admin
       eventLog_transferInImpl = eventLog_transferInDefaultImpl admin
 
@@ -395,12 +394,8 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 -- Utilities
 ------------
 
--- FIXME: report workflow failure reason in event log
-
-unlockTokenAllocationV2
-  : TokenAllocationV2 -> ContractId V2.Allocation -> ExtraArgs -> Text -> Update (TextMap.TextMap [ContractId V2.Holding])
-unlockTokenAllocationV2 tokenAllocation self extraArgs reason = do
-  logWorkflowTerminated tokenAllocation.admin self tokenAllocation reason extraArgs
+unlockTokenAllocationV2 : TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
+unlockTokenAllocationV2 tokenAllocation _extraArgs = do
   holdingCids <- forA tokenAllocation.lockedTokens $ \lockedCid -> do
     token <- fetch lockedCid
     archive lockedCid
@@ -430,53 +425,18 @@ jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
 
 
-
 -- Event log retrieval
 ----------------------
 
 tokenRulesContextKey : Text
 tokenRulesContextKey = "token-rules"
 
-lookupTokenRulesFromContext : ChoiceContext -> Update (Optional (ContractId TokenRules))
-lookupTokenRulesFromContext context = do
+getTokenRulesFromContext : ChoiceContext -> Update (ContractId TokenRules)
+getTokenRulesFromContext context = do
   case TextMap.lookup tokenRulesContextKey context.values of
-    Some (AV_ContractId cid) -> pure (Some (coerceContractId cid))
-    None -> pure None
+    Some (AV_ContractId cid) -> pure (coerceContractId cid)
+    None -> fail $ "Context value for '" <> tokenRulesContextKey <> "' not found"
     v -> fail $ "Failed to decode context value for '" <> tokenRulesContextKey <> "': " <> show v
 
-lookupEventLogFromContext : ChoiceContext -> Update (Optional (ContractId TransferEventsV2.EventLog))
-lookupEventLogFromContext context = do
-  optRulesCid <- lookupTokenRulesFromContext context
-  pure $ fmap (\cid -> coerceContractId cid : ContractId TransferEventsV2.EventLog) optRulesCid
-
 getEventLogFromContext : ChoiceContext -> Update (ContractId TransferEventsV2.EventLog)
-getEventLogFromContext context =
-  lookupEventLogFromContext context >>= \case
-    Some cid -> pure cid
-    None -> fail $ "Context value for '" <> tokenRulesContextKey <> "' not found"
-
--- | Log the termination of a workflow.
-logWorkflowTerminated
-  : (HasSignatory t, HasObserver t) => Party -> ContractId i -> t -> Text -> ExtraArgs -> Update ()
-logWorkflowTerminated admin self co reason extraArgs = do
-  let logEvent eventLogCid =
-        void $ exercise eventLogCid TransferEventsV2.EventLog_WorkflowCompleted with
-          admin
-          workflowCid = toAnyContractId self
-          observers = stakeholder co
-          success = False
-          extraArgs = ExtraArgs with
-            context = emptyChoiceContext
-            meta = reasonToMeta reason emptyMetadata
-  optEventLogCid <- lookupEventLogFromContext extraArgs.context
-  case optEventLogCid of
-    Some eventLogCid -> logEvent eventLogCid
-    None -> do
-      -- handle the case of a missing event log context-key which can happen when clients are chaining
-      -- multiple token standard actions in a single Daml transaction; e.g.,
-      -- create a transfer and accept it as the receiver.
-
-      -- TODO(tech-debt): use a contract key lookup to find the token rules to handle this chaining case once contract keys are supported on MainNet
-      rulesCid <- create TokenRules with admin
-      logEvent (toInterfaceContractId rulesCid)
-      archive rulesCid
+getEventLogFromContext context = toInterfaceContractId <$> getTokenRulesFromContext context

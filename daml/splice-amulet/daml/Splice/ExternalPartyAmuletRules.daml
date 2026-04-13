@@ -62,14 +62,12 @@ template ExternalPartyAmuletRules
       do
         require ("expectedDso " <> show expectedDso <> " matches the dsoParty " <> show dso) (expectedDso == dso)
 
-        let eventLogCid = Some (toInterfaceContractId self)
         individualResults <- forA inputs $ \input -> do
           alloc <- fetchButArchiveLater (ForDso with dso) input.allocationCid
           require "The dsoParty must be the admin of the allocation's instrument" (alloc.allocation.transferLeg.instrumentId.admin == dso)
 
           exercise input.allocationCid AmuletAllocation_DsoExpire with
             expireLock = input.expireLock
-            eventLogCid
 
         pure ExternalPartyAmuletRules_ExpireAmuletAllocationsResult with
           results = individualResults
@@ -160,12 +158,12 @@ template ExternalPartyAmuletRules
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
+    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for ExternalPartyAmuletRules where
       view = TransferEventsV2.EventLogView with
         admin = dso
         meta = emptyMetadata
 
-      eventLog_workflowCompletedImpl = eventLog_workflowCompletedDefaultImpl dso
       eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
       eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
 

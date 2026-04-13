@@ -21,11 +21,10 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as V1
 import Splice.Api.Token.AllocationV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
-import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext, lookupEventLogFromChoiceContext)
+import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext)
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -63,15 +62,15 @@ template AmuletAllocation
       allocation_executeTransferImpl _self V1.Allocation_ExecuteTransfer{..} =
         transferAmuletAllocation this extraArgs
 
-      allocation_withdrawImpl self V1.Allocation_Withdraw{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "withdrawn by sender"
+      allocation_withdrawImpl _self V1.Allocation_Withdraw{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
         pure V1.Allocation_WithdrawResult
           with
             senderHoldingCids
             meta = emptyMetadata
 
-      allocation_cancelImpl self V1.Allocation_Cancel{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "cancelled by executor"
+      allocation_cancelImpl _self V1.Allocation_Cancel{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
         pure V1.Allocation_CancelResult
           with
             senderHoldingCids
@@ -116,7 +115,6 @@ template AmuletAllocation
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
       with
         expireLock : Bool
-        eventLogCid : Optional (ContractId TransferEventsV2.EventLog)
       controller allocationInstrumentAdmin allocation
       do
         assertDeadlineExceeded "allocation.settlement.settleBefore" allocation.settlement.settleBefore
@@ -126,7 +124,8 @@ template AmuletAllocation
                 values = TextMap.fromList [(expireLockKey, toAnyValue expireLock)]
               meta = emptyMetadata
 
-        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "expired"
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+
         pure AmuletAllocation_DsoExpireResult with
           senderHoldingCids
           meta = TSU.reasonToMeta "expired as settleBefore has passed" emptyMetadata
@@ -167,11 +166,8 @@ transferAmuletAllocation amuletAllocation extraArgs = do
       receiverHoldingCids
       meta
 
-unlockAmuletAllocation : AmuletAllocation -> ContractId t -> ExtraArgs -> Text -> Update [ContractId V1.Holding]
-unlockAmuletAllocation amuletAllocation self extraArgs reason = do
-  let dso = allocationInstrumentAdmin amuletAllocation.allocation
-  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
-  logWorkflowTerminated eventLogCid dso self amuletAllocation reason
+unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId V1.Holding]
+unlockAmuletAllocation amuletAllocation extraArgs = do
   let lockExpiresAt = amuletAllocation.allocation.settlement.settleBefore
   abortTwoStepTransfer lockExpiresAt amuletAllocation.lockedAmulet extraArgs
 
