@@ -595,11 +595,12 @@ paths:
 
   /v0/state/acs:
     post:
-      tags: [external, scan]
+      deprecated: true
+      tags: [ deprecated ]
       x-jvm-package: scan
       operationId: "getAcsSnapshotAt"
       description: |
-        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+        Deprecated. Please use /v1/state/acs instead. Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
       requestBody:
         required: true
         content:
@@ -613,6 +614,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v1/state/acs:
+    post:
+      tags: [ external, scan ]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshotAtV1"
+      description: |
+        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+        Unlike /v0/state/acs, every contract is identified by an (optional) update_id
+        (as opposed to the event ID in /v0/state/acs, which was not BFT-safe).
+        The update_id is the ID of the update in which the contract was created, and can be used to correlate with updates returned by /v2/updates.
+        For contracts created in an earlier migration ID, the update_id will be absent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AcsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -645,9 +677,36 @@ paths:
 
   /v0/holdings/state:
     post:
-      tags: [external, scan]
+      tags: [deprecated]
       x-jvm-package: scan
       operationId: "getHoldingsStateAt"
+      description: |
+        Deprecated. Please use /v1/holdings/state instead. Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsStateRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v1/holdings/state:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsStateAtV1"
       description: |
         Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
       requestBody:
@@ -662,7 +721,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcsResponse"
+                $ref: "#/components/schemas/AcsResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -2638,7 +2697,9 @@ components:
           description: |
             For an externally signed transaction, contains the external transaction hash
             signed by the external party. Can be used to correlate an external submission with a committed transaction.
+            This field is conditionally omitted from JSON when null (see OmitNullString).
           type: string
+          x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     BaseUpdateHistoryTransaction:
       type: object
       required:
@@ -2706,7 +2767,9 @@ components:
               description: |
                 For an externally signed transaction, contains the external transaction hash
                 signed by the external party. Can be used to correlate an external submission with a committed transaction.
+                This field is conditionally omitted from JSON when null (see OmitNullString).
               type: string
+              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     UpdateHistoryTransactionV2WithHash:
       allOf:
         - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
@@ -2719,6 +2782,7 @@ components:
                 For an externally signed transaction, contains the external transaction hash
                 signed by the external party. Can be used to correlate an external submission with a committed transaction.
               type: string
+              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
     TreeEvent:
       type: object
       description: |
@@ -2750,6 +2814,56 @@ components:
           description: |
             The ID of this particular event. Equal to the key of this element of
             the containing `events_by_id` if this is part of a `TreeEvent`.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        create_arguments:
+          description: |
+            The arguments that have been used to create the contract, in the
+            form of JSON representation of a Daml record.
+          type: object
+        created_at:
+          description: |
+            Ledger effective time of the transaction that created the contract.
+          type: string
+          format: date-time
+        signatories:
+          description: |
+            Signatories to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
+    ActiveContract:
+      type: object
+      required:
+        - contract_id
+        - template_id
+        - package_name
+        - create_arguments
+        - created_at
+        - signatories
+        - observers
+      properties:
+        created_in_update_id:
+          description: |
+            The id of the update in which this contract was created.
+            Optional and will be absent for contracts created in prior migration IDs.
           type: string
         contract_id:
           description: |
@@ -3049,6 +3163,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreatedEvent"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as `after`
+            to the `AcsRequest` or `HoldingsStateRequest`.
+            Will be absent when there are no more pages.
+
+    AcsResponseV1:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - created_events
+      properties:
+        record_time:
+          description: The same `record_time` as in the request.
+          type: string
+          format: date-time
+        migration_id:
+          description: The same `migration_id` as in the request.
+          type: integer
+          format: int64
+        created_events:
+          description: |
+            Up to `page_size` contracts in the ACS.
+            `create_arguments` are always encoded as `compact_json`.
+          type: array
+          items:
+            $ref: "#/components/schemas/ActiveContract"
         next_page_token:
           type: integer
           format: int64

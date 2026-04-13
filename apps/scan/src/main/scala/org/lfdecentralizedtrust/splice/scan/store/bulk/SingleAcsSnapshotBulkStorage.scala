@@ -66,7 +66,7 @@ class SingleAcsSnapshotBulkStorage(
       )
     } yield {
       val encoded = snapshot.createdEventsInPage.map(event =>
-        CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(event.eventId, event.event)
+        CompactJsonScanHttpEncodings().javaToHttpActiveContract(event.eventId, event.event)
       )
       val contractsStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
       val contractsBytes = ByteString(contractsStr.getBytes(StandardCharsets.UTF_8))

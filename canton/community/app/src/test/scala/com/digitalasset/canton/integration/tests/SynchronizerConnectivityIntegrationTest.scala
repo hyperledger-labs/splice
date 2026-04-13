@@ -12,6 +12,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   SubmissionRequestAmplification,
   SynchronizerConnectionConfig,
 }
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -32,7 +33,6 @@ import com.digitalasset.canton.participant.sync.SyncServiceError
 import com.digitalasset.canton.participant.sync.SyncServiceError.{
   SyncServiceInconsistentConnectivity,
   SyncServiceSynchronizerDisabledUs,
-  SyncServiceSynchronizerDisconnect,
   SyncServiceUnknownSynchronizer,
 }
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.NotConnectedToAnySynchronizer
@@ -94,7 +94,6 @@ sealed trait SynchronizerConnectivityIntegrationTest
           participant1.synchronizers.connect_local(sequencer1, alias = daName),
           _.shouldBeCommandFailure(SyncServiceInconsistentConnectivity),
         )
-
       }
 
       "Still reported as not available on a second attempt" in { implicit env =>
@@ -329,11 +328,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
               ) or include("Token refresh aborted due to shutdown")
               // the participant might not actually get the dispatched transaction delivered,
               // because the sequencer may cut the participant's connection before delivering the topology broadcast
-              or include regex "Waiting for transaction .* to be observed"
-              or (include(SyncServiceSynchronizerDisconnect.id) and include(
-                // TODO(#30534): Improve the error to explain why the threshold is not reachable.
-                "fatally disconnected because of Trust threshold 1 is no longer reachable"
-              )))
+              or include regex "Waiting for transaction .* to be observed")
           },
         )
 
@@ -471,6 +466,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
 //  registerPlugin(new UseH2(loggerFactory))
 //}
 
+@UnstableTest // TODO(#28493) Remove annotation
 class SynchronizerConnectivityBftOrderingIntegrationTestPostgres
     extends SynchronizerConnectivityIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))

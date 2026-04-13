@@ -28,7 +28,7 @@ import com.digitalasset.canton.integration.tests.*
 import com.digitalasset.canton.integration.tests.benchmarks.BongTestScenarios
 import com.digitalasset.canton.integration.tests.manual.DataContinuityTest.*
 import com.digitalasset.canton.integration.tests.manual.S3Synchronization.ContinuityDumpRef
-import com.digitalasset.canton.integration.util.EntitySyntax
+import com.digitalasset.canton.integration.util.{EntitySyntax, MultiSynchronizerFeatureFlag}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -105,7 +105,15 @@ trait DataContinuityTest
     LogEntry.assertLogSeq(
       Seq.empty,
       // Handle db backend initialization delay
-      Seq(e => assert(e.warningMessage.contains("Failed to initialize pool"))),
+      Seq(
+        e => assert(e.warningMessage.contains("Failed to initialize pool")),
+        e =>
+          assert(
+            e.warningMessage.contains(
+              s"Using a session signing key is not possible with protocol version 34."
+            )
+          ),
+      ),
     )
   )
 
@@ -644,6 +652,9 @@ trait SynchronizerChangeDataContinuityTest extends SynchronizerChangeDataContinu
               S1M1_S1M1.map(updateNetworkTopologyDescription(_, protocolVersion)),
               dumpDirectory.localDownloadPath,
             )
+
+            MultiSynchronizerFeatureFlag.enable(participants, iouSynchronizerId)
+            MultiSynchronizerFeatureFlag.enable(Seq(P4, P5), paintSynchronizerId)
 
             // initialize needed state - sadly unable to decouple this from implementation details of the workflow
             val incompleteUnassignedEvents =

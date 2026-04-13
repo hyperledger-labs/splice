@@ -1,0 +1,4 @@
+name: observability
+runtime: nodejs
+description: Prometheus, Grafana and GCP alerts
+main: "../../../pulumi/observability/src/index.ts"

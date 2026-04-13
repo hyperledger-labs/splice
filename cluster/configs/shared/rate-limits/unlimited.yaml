@@ -65,7 +65,15 @@ rateLimits:
     name: state
     type: unlimited
 
+  /api/scan/v1/state:
+    name: state
+    type: unlimited
+
   /api/scan/v0/holdings:
+    name: holdings
+    type: unlimited
+
+  /api/scan/v1/holdings:
     name: holdings
     type: unlimited
 

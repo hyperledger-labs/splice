@@ -54,6 +54,9 @@ import java.nio.file.Files
   *   which connections should be configured
   * @param removeConnections
   *   if true, then any excess connection will be disabled
+  * @param enableMultiSynchronizerTopologyFeatureFlag
+  *   if true, then the participant will enable multi-synchronizers for all synchronizers it is
+  *   connected to
   */
 final case class DeclarativeParticipantConfig(
     checkSelfConsistency: Boolean = true,
@@ -67,6 +70,7 @@ final case class DeclarativeParticipantConfig(
     removeUsers: Boolean = false,
     connections: Seq[DeclarativeConnectionConfig] = Seq(),
     removeConnections: Boolean = false,
+    enableMultiSynchronizerTopologyFeatureFlag: Boolean = false,
 )
 
 /** Declarative dar definition
@@ -238,7 +242,7 @@ final case class DeclarativeUserConfig(
   *   store can be provided
   */
 final case class DeclarativeSequencerConnectionConfig(
-    endpoints: NonEmpty[Seq[Endpoint]],
+    endpoints: NonEmpty[Set[Endpoint]],
     transportSecurity: Boolean = false,
     customTrustCertificates: Option[File] = None,
 )(customTrustCertificatesFromNode: Option[ByteString] = None) {
@@ -254,7 +258,7 @@ final case class DeclarativeSequencerConnectionConfig(
 
 object DeclarativeSequencerConnectionConfig {
   def create(endpoint: Endpoint): DeclarativeSequencerConnectionConfig =
-    DeclarativeSequencerConnectionConfig(endpoints = NonEmpty.mk(Seq, endpoint))()
+    DeclarativeSequencerConnectionConfig(endpoints = NonEmpty.mk(Set, endpoint))()
 }
 
 /** Declarative synchronizer connection configuration

@@ -40,6 +40,8 @@ monitoring:
           seconds: 1200
         completedDelay:
           seconds: 3600
+        computeDuration:
+          seconds: 1200
       acsSnapshots:
         saveLatencyThresholdSeconds: 2700
         updateLatencyThresholdSeconds: 3
@@ -330,6 +332,12 @@ sv:
           type: 'unlimited'
         /api/scan/v1/domains:
           name: 'domains-v1'
+          type: 'unlimited'
+        /api/scan/v1/holdings:
+          name: 'holdings'
+          type: 'unlimited'
+        /api/scan/v1/state:
+          name: 'state'
           type: 'unlimited'
         /api/scan/v1/updates:
           name: 'v1-updates'

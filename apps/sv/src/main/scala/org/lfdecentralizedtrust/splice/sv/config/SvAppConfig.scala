@@ -365,6 +365,7 @@ case class SvAppBackendConfig(
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
     delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
+    delegatelessAutomationExpiredAmuletAllocationBatchSize: Int = 100,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
