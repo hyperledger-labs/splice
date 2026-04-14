@@ -150,6 +150,20 @@ const splitwellAuth0Config: Auth0NamespaceConfig = {
   },
 };
 
+const validatorStableOldAuth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    validator: 'validator-stable-old-client-id',
+  },
+  uiClientIds: {
+    wallet: 'validator-stable-old-wallet-ui-client-id',
+    cns: 'validator-stable-old-cns-ui-client-id',
+  },
+};
+
 const namespacedConfigs: NamespacedAuth0Configs = {};
 namespacedConfigs['sv-1'] = sv1Auth0Config;
 namespacedConfigs['sv-da-1'] = svDa1Auth0Config;
@@ -158,6 +172,7 @@ namespacedConfigs['sv-3'] = sv3Auth0Config;
 namespacedConfigs['sv-4'] = sv4Auth0Config;
 namespacedConfigs['validator1'] = validator1Auth0Config;
 namespacedConfigs['splitwell'] = splitwellAuth0Config;
+namespacedConfigs['validator-stable-old'] = validatorStableOldAuth0Config;
 
 export const cantonNetworkAuth0Config: Auth0Config = {
   namespacedConfigs: namespacedConfigs,

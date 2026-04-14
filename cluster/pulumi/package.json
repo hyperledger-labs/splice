@@ -54,7 +54,8 @@
         "circleci",
         "gha",
         "policies",
-        "sv"
+        "sv",
+        "validator-stable-old"
     ],
     "dependencies": {
         "@google-cloud/sql": "^0.24.0",

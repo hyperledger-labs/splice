@@ -3,6 +3,7 @@
 import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import * as pulumi from '@pulumi/pulumi';
 import {
+  activeVersion,
   ansDomainPrefix,
   Auth0Client,
   CLUSTER_HOSTNAME,
@@ -39,11 +40,11 @@ export async function installValidatorStableOld(
 
   const validatorPostgres = postgres.installPostgres(
     xns,
-    'validator-pg',
-    'validator-pg',
+    'postgres',
+    'postgres',
     validatorVersion,
     spliceConfig.pulumiProjectConfig.cloudSql,
-    true
+    false
   );
 
   const participant = installParticipant(
@@ -61,11 +62,9 @@ export async function installValidatorStableOld(
 
   const scanAddress = `http://scan-app.sv-1:5012`;
 
-  const validatorDbName = 'val_validator-stable-old';
+  const validatorDbName = 'validator_stable_old';
 
-  const extraDependsOn = imagePullDeps.concat(
-    await installLedgerApiSecret(auth0Client, xns, 'validator')
-  );
+  const extraDependsOn = imagePullDeps;
 
   const participantPruningConfig = validatorStableOldConfig?.participantPruningSchedule;
 
@@ -92,9 +91,9 @@ export async function installValidatorStableOld(
     },
     scanAddress: scanAddress,
     auth0Client: auth0Client,
-    auth0ValidatorAppName: 'old_validator',
+    auth0ValidatorAppName: 'validator-stable-old',
     validatorWalletUsers: pulumi.output([validatorWalletUser]),
-    validatorPartyHint: 'digitalasset-validator-stable-old',
+    validatorPartyHint: 'digitalasset-validator-old',
     nodeIdentifier: 'validator-stable-old',
     logLevel: validatorStableOldConfig.logging?.level,
     logAsync: validatorStableOldConfig.logging?.async,
