@@ -127,6 +127,7 @@ class TokenStandardFetchFallbackIntegrationTest
             },
           )
 
+          // TODO (#4915): check that the fallback also works for V2
           clue("SV-1's Scan sees it (still, even though ingestion is paused)") {
             eventuallySucceeds() {
               sv1ScanBackend.getAllocationTransferContext(
