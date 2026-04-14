@@ -37,6 +37,7 @@ import scala.util.Random
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class TokenStandardV2AllocationIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
+    with TokenStandardV2Test
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil
@@ -448,13 +449,6 @@ class TokenStandardV2AllocationIntegrationTest
       amount.bigDecimal,
       new holdingv2.InstrumentId(dso.toProtoPrimitive, "Amulet"),
       new metadatav1.Metadata(java.util.Map.of("some_leg_meta", UUID.randomUUID().toString)),
-    )
-
-  def basicAccount(party: PartyId): holdingv2.Account =
-    new holdingv2.Account(
-      party.toProtoPrimitive,
-      java.util.Optional.empty(),
-      "",
     )
 }
 
