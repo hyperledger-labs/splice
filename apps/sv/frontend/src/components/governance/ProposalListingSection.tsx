@@ -125,9 +125,9 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                 </TableRow>
               </TableHead>
               <TableBody sx={{ display: 'contents' }}>
-                {sortedData.map(vote => (
+                {sortedData.map((vote, index) => (
                   <VoteRow
-                    key={vote.contractId}
+                    key={index}
                     actionName={vote.actionName}
                     description={vote.description}
                     contractId={vote.contractId}
