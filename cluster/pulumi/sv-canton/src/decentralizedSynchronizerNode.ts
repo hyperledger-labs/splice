@@ -91,6 +91,13 @@ abstract class InStackDecentralizedSynchronizerNode
           type: 'cantonbft';
           externalAddress: string;
           externalPort: number;
+          persistence?: {
+            host: Output<string>;
+            secretName: Output<string>;
+            databaseName: string;
+            port: number;
+            user: string;
+          };
         },
     version: CnChartVersion,
     logLevel?: LogLevel,
@@ -287,6 +294,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
+    const driverUser = dbs.sequencerPostgres.addUser('sequencer_dabft');
     this.installDecentralizedSynchronizer(
       svConfig,
       dbs,
@@ -294,6 +302,13 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
         type: 'cantonbft',
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
         externalPort: 443,
+        persistence: {
+          host: dbs.sequencerPostgres.address,
+          secretName: driverUser.secretName,
+          databaseName: 'sequencer_dabft',
+          port: 5432,
+          user: driverUser.userName,
+        },
       },
       version,
       svConfig.logging?.cantonLogLevel,

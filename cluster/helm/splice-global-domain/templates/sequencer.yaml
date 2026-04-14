@@ -87,16 +87,17 @@ spec:
                   type = "CometBFT"
                 }
         {{- else if eq .Values.sequencer.driver.type "cantonbft"}}
-            # TODO(#930) - use a different database for the bft storage
             - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
               value: |
                 canton.sequencers.sequencer.sequencer {
                   config {
                     storage = ${_storage}
-                    storage.config.properties.serverName = ${?CANTON_DOMAIN_POSTGRES_SERVER}
-                    storage.config.properties.password = ${?CANTON_DOMAIN_POSTGRES_PASSWORD}
+                    storage.config.properties.serverName = "{{ ((.Values.sequencer.driver).persistence).host | default .Values.sequencer.persistence.host }}"
+                    storage.config.properties.user = "{{ ((.Values.sequencer.driver).persistence).user | default "cnadmin" }}"
+                    storage.config.properties.password = ${?SEQUENCER_DRIVER_BFT_POSTGRES_PASSWORD}
                     storage.config.properties.currentSchema = "sequencer"
-                    storage.config.properties.databaseName = ${?CANTON_SEQUENCER_POSTGRES_DB}
+                    storage.config.properties.databaseName = "{{ ((.Values.sequencer.driver).persistence).databaseName | default .Values.sequencer.persistence.databaseName }}"
+                    storage.config.properties.portNumber = {{ ((.Values.sequencer.driver).persistence).port | default .Values.sequencer.persistence.port }}
                     initial-network {
                       endpoint-authentication {
                         enabled = true
@@ -112,6 +113,11 @@ spec:
                   }
                   type = "BFT"
                 }
+            - name: SEQUENCER_DRIVER_BFT_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ((.Values.sequencer.driver).persistence).secretName | default .Values.sequencer.persistence.secretName }}
+                  key: postgresPassword
         {{- end}}
             {{- with .Values.sequencer.tokenExpirationTime }}
             - name: SEQUENCER_TOKEN_EXPIRATION_TIME
@@ -182,6 +188,29 @@ spec:
                 echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
+      {{- if and (eq .Values.sequencer.driver.type "cantonbft") ((.Values.sequencer.driver).persistence) }}
+        - name: pg-init-bft-driver
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.sequencer.driver.persistence.secretName | default .Values.sequencer.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.sequencer.driver.persistence.host | default .Values.sequencer.persistence.host }} -p {{ .Values.sequencer.driver.persistence.port | default .Values.sequencer.persistence.port }} --username={{ .Values.sequencer.driver.persistence.user | default "cnadmin" }} --dbname=cantonnet -c 'create database {{ .Values.sequencer.driver.persistence.databaseName | default .Values.sequencer.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.sequencer.driver.persistence.databaseName | default .Values.sequencer.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.sequencer.driver.persistence.databaseName | default .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

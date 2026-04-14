@@ -168,3 +168,101 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.affinity
+  - it: "cantonbft driver uses sequencer persistence by default"
+    set:
+      sequencer:
+        driver:
+          type: cantonbft
+          externalAddress: "sequencer.example.com"
+          externalPort: 5010
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SEQUENCER_DRIVER_BFT_POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secrets
+                key: postgresPassword
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
+          any: true
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'serverName = "postgres.sv-1.svc.cluster.local"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'user = "cnadmin"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'databaseName = "cantonnet_sequencer"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'portNumber = 5432'
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+      - isSubset:
+          path: spec.template.spec.initContainers[0]
+          content:
+            name: pg-init
+  - it: "cantonbft driver uses custom driver persistence when set"
+    set:
+      sequencer:
+        driver:
+          type: cantonbft
+          externalAddress: "sequencer.example.com"
+          externalPort: 5010
+          persistence:
+            host: custom-pg-host
+            port: 5433
+            secretName: custom-pg-secret
+            databaseName: custom_bft_db
+            user: custom-user
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SEQUENCER_DRIVER_BFT_POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: custom-pg-secret
+                key: postgresPassword
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'serverName = "custom-pg-host"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'user = "custom-user"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'databaseName = "custom_bft_db"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=="ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT")].value
+          pattern: 'portNumber = 5433'
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+      - isSubset:
+          path: spec.template.spec.initContainers[0]
+          content:
+            name: pg-init
+      - isSubset:
+          path: spec.template.spec.initContainers[1]
+          content:
+            name: pg-init-bft-driver
+            image: postgres:14
+            env:
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    key: postgresPassword
+                    name: custom-pg-secret

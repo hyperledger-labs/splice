@@ -166,6 +166,28 @@
       },
       "kind": "Secret",
       "metadata": {
+        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-pg-sequencer-4-pg-sequencer_dabft-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
         "name": "sequencer-1-pg-secrets",
         "namespace": "sv-1"
       },
@@ -408,6 +430,28 @@
       },
       "kind": "Secret",
       "metadata": {
+        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+        "namespace": "sv-da-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-da-1-pg-sequencer-4-pg-sequencer_dabft-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
         "name": "sequencer-1-pg-secrets",
         "namespace": "sv-da-1"
       },
@@ -634,6 +678,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-participant-3-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-pg-sequencer-4-pg-sequencer_dabft-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1651,6 +1717,12 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_dabft",
+              "port": 5432,
+              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+              "user": "sequencer_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -1692,7 +1764,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-1-pg-passwd",
+    "name": "sv-1-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1763,7 +1835,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-2-pg-passwd",
+    "name": "sv-1-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1834,7 +1906,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-3-pg-passwd",
+    "name": "sv-1-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1905,7 +1977,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-4-pg-passwd",
+    "name": "sv-1-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1976,7 +2048,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-1-pg-passwd",
+    "name": "sv-1-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2047,7 +2119,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-2-pg-passwd",
+    "name": "sv-1-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2118,7 +2190,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-3-pg-passwd",
+    "name": "sv-1-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2293,7 +2365,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-1-pg-passwd",
+    "name": "sv-1-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2364,7 +2436,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-2-pg-passwd",
+    "name": "sv-1-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2435,7 +2507,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-3-pg-passwd",
+    "name": "sv-1-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2506,7 +2578,19 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-4-pg-passwd",
+    "name": "sv-1-sequencer-4-pg-cnadmin-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-sequencer-4-pg-sequencer_dabft-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3545,6 +3629,12 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_dabft",
+              "port": 5432,
+              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+              "user": "sequencer_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -3586,7 +3676,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-1-pg-passwd",
+    "name": "sv-da-1-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3657,7 +3747,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-2-pg-passwd",
+    "name": "sv-da-1-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3728,7 +3818,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-3-pg-passwd",
+    "name": "sv-da-1-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3799,7 +3889,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-4-pg-passwd",
+    "name": "sv-da-1-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3870,7 +3960,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-1-pg-passwd",
+    "name": "sv-da-1-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3941,7 +4031,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-2-pg-passwd",
+    "name": "sv-da-1-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4012,7 +4102,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-3-pg-passwd",
+    "name": "sv-da-1-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4212,7 +4302,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-1-pg-passwd",
+    "name": "sv-da-1-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4283,7 +4373,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-2-pg-passwd",
+    "name": "sv-da-1-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4354,7 +4444,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-3-pg-passwd",
+    "name": "sv-da-1-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4425,7 +4515,19 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-4-pg-passwd",
+    "name": "sv-da-1-sequencer-4-pg-cnadmin-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-da-1-sequencer-4-pg-sequencer_dabft-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5075,6 +5177,12 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_dabft",
+              "port": 5432,
+              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
+              "user": "sequencer_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -5116,7 +5224,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-1-pg-passwd",
+    "name": "sv-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5187,7 +5295,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-2-pg-passwd",
+    "name": "sv-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5258,7 +5366,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-3-pg-passwd",
+    "name": "sv-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5329,7 +5437,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-4-pg-passwd",
+    "name": "sv-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5400,7 +5508,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-1-pg-passwd",
+    "name": "sv-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5471,7 +5579,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-2-pg-passwd",
+    "name": "sv-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5542,7 +5650,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-3-pg-passwd",
+    "name": "sv-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5717,7 +5825,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-1-pg-passwd",
+    "name": "sv-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5788,7 +5896,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-2-pg-passwd",
+    "name": "sv-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5859,7 +5967,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-3-pg-passwd",
+    "name": "sv-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5930,7 +6038,19 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-4-pg-passwd",
+    "name": "sv-sequencer-4-pg-cnadmin-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-sequencer-4-pg-sequencer_dabft-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6239,7 +6359,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-1-pg",
+    "name": "user-sv-1-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6253,7 +6373,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-2-pg",
+    "name": "user-sv-1-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6267,7 +6387,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-3-pg",
+    "name": "user-sv-1-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6281,7 +6401,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-4-pg",
+    "name": "user-sv-1-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6295,7 +6415,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-1-pg",
+    "name": "user-sv-1-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6309,7 +6429,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-2-pg",
+    "name": "user-sv-1-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6323,7 +6443,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-3-pg",
+    "name": "user-sv-1-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6337,7 +6457,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-1-pg",
+    "name": "user-sv-1-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6351,7 +6471,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-2-pg",
+    "name": "user-sv-1-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6365,7 +6485,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-3-pg",
+    "name": "user-sv-1-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6379,7 +6499,21 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-4-pg",
+    "name": "user-sv-1-sequencer-4-pg-cnadmin",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "sequencer_dabft",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-1-sequencer-4-pg-sequencer_dabft",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6393,7 +6527,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-1-pg",
+    "name": "user-sv-da-1-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6407,7 +6541,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-2-pg",
+    "name": "user-sv-da-1-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6421,7 +6555,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-3-pg",
+    "name": "user-sv-da-1-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6435,7 +6569,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-4-pg",
+    "name": "user-sv-da-1-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6449,7 +6583,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-1-pg",
+    "name": "user-sv-da-1-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6463,7 +6597,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-2-pg",
+    "name": "user-sv-da-1-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6477,7 +6611,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-3-pg",
+    "name": "user-sv-da-1-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6491,7 +6625,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-1-pg",
+    "name": "user-sv-da-1-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6505,7 +6639,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-2-pg",
+    "name": "user-sv-da-1-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6519,7 +6653,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-3-pg",
+    "name": "user-sv-da-1-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6533,7 +6667,21 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-4-pg",
+    "name": "user-sv-da-1-sequencer-4-pg-cnadmin",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "sequencer_dabft",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-da-1-sequencer-4-pg-sequencer_dabft",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6547,7 +6695,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-1-pg",
+    "name": "user-sv-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6561,7 +6709,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-2-pg",
+    "name": "user-sv-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6575,7 +6723,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-3-pg",
+    "name": "user-sv-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6589,7 +6737,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-4-pg",
+    "name": "user-sv-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6603,7 +6751,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-1-pg",
+    "name": "user-sv-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6617,7 +6765,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-2-pg",
+    "name": "user-sv-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6631,7 +6779,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-3-pg",
+    "name": "user-sv-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6645,7 +6793,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-1-pg",
+    "name": "user-sv-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6659,7 +6807,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-2-pg",
+    "name": "user-sv-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6673,7 +6821,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-3-pg",
+    "name": "user-sv-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -6687,7 +6835,21 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-4-pg",
+    "name": "user-sv-sequencer-4-pg-cnadmin",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "sequencer_dabft",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-sequencer-4-pg-sequencer_dabft",
     "provider": "",
     "type": "gcp:sql/user:User"
   }
