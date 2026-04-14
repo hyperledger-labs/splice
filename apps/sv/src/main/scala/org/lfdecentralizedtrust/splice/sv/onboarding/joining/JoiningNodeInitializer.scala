@@ -166,20 +166,17 @@ class JoiningNodeInitializer(
       )
     )
     for {
-      (dsoPartyId, _) <- (
-        // If we're not onboarded yet, this waits for the sponsoring SV
-        getDsoPartyId(initConnection),
-        // Register domain with manualConnect=true. Confusingly, this still connects the first time.
-        // However, it won't connect if we crash and get here again which is what we're really after.
-        // If the url is unset, we skip this step. This is fine if the node has already initialized its
-        // own sequencer.
-        domainConfigO.traverse_(
-          participantAdminConnection.ensureDomainRegisteredNoHandshake(
-            _,
-            RetryFor.WaitingOnInitDependency,
-          )
-        ),
-      ).tupled
+      dsoPartyId <- getDsoPartyId(initConnection)
+
+      _ <- grantTopologyPermissions(dsoPartyId)
+
+      _ <- domainConfigO.traverse_(
+        participantAdminConnection.ensureDomainRegisteredNoHandshake(
+          _,
+          RetryFor.WaitingOnInitDependency,
+        )
+      )
+
       // It is possible that the participant left disconnected to domains due to a failure in the last SV startup.
       // Reconnect all domains at the beginning of SV initialization in case, but
       // only if we already host the dso party or if we don't see a proposal to host it.
@@ -378,6 +375,47 @@ class JoiningNodeInitializer(
         dsoStore,
         dsoAutomation,
       )
+    }
+  }
+
+  private def grantTopologyPermissions(
+      dsoPartyId: PartyId
+  ): Future[Unit] = {
+    joiningConfig match {
+      case Some(SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKeyString)) =>
+        val joiningSvParty = PartyId(
+          com.digitalasset.canton.topology.UniqueIdentifier.tryCreate(
+            name,
+            participantId.uid.namespace,
+          )
+        )
+        SvUtil.keyPairMatches(publicKey, privateKeyString) match {
+          case Right(privateKey) =>
+            SvOnboardingToken(name, publicKey, joiningSvParty, participantId, dsoPartyId)
+              .signAndEncode(privateKey) match {
+              case Right(token) =>
+                for {
+                  (_, connection) <- svConnection
+                  _ = logger.info(
+                    s"Submitting topology permissions with sponsor for new joining SV $name"
+                  )
+                  _ <- retryProvider.retry(
+                    RetryFor.WaitingOnInitDependency,
+                    "request_onboarding_permission",
+                    "request topology permission",
+                    connection.grantSvOnboardingPermission(token),
+                    logger,
+                  )
+                } yield ()
+              case Left(err) =>
+                Future.failed(new RuntimeException(s"Failed to sign token: $err"))
+            }
+          case Left(reason) =>
+            Future.failed(new RuntimeException(s"Failed parsing provided keys: $reason"))
+        }
+      case None =>
+        logger.info("No joining config provided; skipping topology permission request.")
+        Future.unit
     }
   }
 

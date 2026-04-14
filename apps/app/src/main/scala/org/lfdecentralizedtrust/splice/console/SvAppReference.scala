@@ -101,7 +101,7 @@ abstract class SvAppReference(
   ): String =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvOperatorAppClient.GrantSvOnboardingPermission(token)
+        HttpSvPublicAppClient.GrantSvOnboardingPermission(token)
       )
     }
 

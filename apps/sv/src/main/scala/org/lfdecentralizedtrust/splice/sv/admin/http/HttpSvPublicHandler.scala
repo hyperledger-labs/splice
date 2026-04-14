@@ -159,6 +159,48 @@ class HttpSvPublicHandler(
     }
   }
 
+  /** Intended use: Used by SV candidates to submit their topology permission via the sponsor SV
+    */
+  override def grantSvOnboardingPermission(
+      respond: r0.GrantSvOnboardingPermissionResponse.type
+  )(
+      body: definitions.GrantSvOnboardingPermissionRequest
+  )(extracted: TraceContext): Future[r0.GrantSvOnboardingPermissionResponse] = {
+    implicit val traceContext: TraceContext = extracted
+    withSpan(s"$workflowId.grantSvOnboardingPermission") { _ => _ =>
+      SvOnboardingToken.verifyAndDecode(body.token) match {
+        case Left(error) =>
+          Future.failed(
+            HttpErrorHandler.badRequest(s"Could not verify and decode token: $error")
+          )
+        case Right(token) =>
+          SvApp
+            .grantValidatorPermission(
+              token.candidateParty.toProtoPrimitive,
+              token.candidateParticipantId.toProtoPrimitive,
+              dsoStoreWithIngestion,
+              retryProvider,
+              logger,
+            )
+            .flatMap {
+              case Left(reason) =>
+                Future.failed(
+                  HttpErrorHandler
+                    .internalServerError(s"Could not grant validator permission: $reason")
+                )
+              case Right(permissionCid) =>
+                Future.successful(
+                  r0.GrantSvOnboardingPermissionResponseOK(
+                    definitions.GrantSvOnboardingPermissionResponse(
+                      validatorPermissionContractId = permissionCid.contractId
+                    )
+                  )
+                )
+            }
+      }
+    }
+  }
+
   /** Intended use: Used by other SV operators
     *
     * Protection: Endpoint is protected by IP allowlisting

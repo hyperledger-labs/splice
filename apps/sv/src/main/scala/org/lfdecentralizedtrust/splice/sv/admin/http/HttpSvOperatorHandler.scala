@@ -39,7 +39,7 @@ import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
-import org.lfdecentralizedtrust.splice.sv.util.{Secrets, SvOnboardingToken}
+import org.lfdecentralizedtrust.splice.sv.util.Secrets
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 
@@ -105,49 +105,6 @@ class HttpSvOperatorHandler(
           val f = createScanConnection()
           scanConnectionV = Some(f)
           f
-      }
-    }
-  }
-
-  override def grantSvOnboardingPermission(
-      respond: r0.GrantSvOnboardingPermissionResponse.type
-  )(
-      body: definitions.GrantSvOnboardingPermissionRequest
-  )(
-      extracted: ActAsKnownUserRequest
-  ): Future[r0.GrantSvOnboardingPermissionResponse] = {
-    implicit val ActAsKnownUserRequest(traceContext) = extracted
-    withSpan(s"$workflowId.grantSvOnboardingPermission") { implicit traceContext => _ =>
-      SvOnboardingToken.verifyAndDecode(body.token) match {
-        case Left(error) =>
-          Future.failed(
-            HttpErrorHandler.badRequest(s"Could not verify and decode token: $error")
-          )
-        case Right(token) =>
-          SvApp
-            .grantValidatorPermission(
-              token.candidateParty.toProtoPrimitive,
-              token.candidateParticipantId.toProtoPrimitive,
-              dsoStoreWithIngestion,
-              retryProvider,
-              logger,
-            )
-            .flatMap {
-              case Left(reason) =>
-                Future.failed(
-                  HttpErrorHandler
-                    .internalServerError(s"Could not grant validator permission: $reason")
-                )
-              case Right(permissionCid) =>
-                Future.successful(
-                  r0.GrantSvOnboardingPermissionResponseOK(
-                    definitions.GrantSvOnboardingPermissionResponse(
-                      validatorPermissionContractId = permissionCid.contractId
-                    )
-                  )
-                )
-            }
-
       }
     }
   }

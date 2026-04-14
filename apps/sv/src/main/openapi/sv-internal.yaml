@@ -477,7 +477,7 @@ paths:
   /v0/onboard/sv/permission:
     post:
       tags: [sv]
-      x-jvm-package: sv_operator
+      x-jvm-package: sv_public
       operationId: "grantSvOnboardingPermission"
       requestBody:
         required: true

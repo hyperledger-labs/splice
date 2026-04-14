@@ -4,12 +4,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
-import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 
 class PermissionedSynchronizerIntegrationTest
@@ -46,35 +44,12 @@ class PermissionedSynchronizerIntegrationTest
         (sv4ValidatorBackend, sv4Backend, sv4ScanBackend),
       )
 
-      val dsoParty = sv1Backend.getDsoInfo().dsoParty
-      val publicKey =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
-      val privateKey =
-        "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgxED/gH8AeSwNujZAVLhBRSN55Hx0ntC6FKKhgn+7h92hRANCAARkw2wMmvW5PAxMgiXNRmlR7FMupUYywPtxHhjyyphgViGV1Ux4cbnNK5t/6n5ZlssTIxQJPmcEIIGHSiJRj1ys"
-
       for ((validator, sv, scan) <- followerSvs) {
         clue(
-          s"Authorizing SV ${validator.participantClient.id} using grantSvOnboardingPermission endpoint"
+          s"Starting SV ${validator.participantClient.id}"
         ) {
-          val token = SvOnboardingToken(
-            sv.name,
-            publicKey,
-            PartyId(
-              UniqueIdentifier.tryCreate(
-                sv.name,
-                validator.participantClient.id.uid.namespace,
-              )
-            ),
-            validator.participantClient.id,
-            dsoParty,
-          ).signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value
-
-          sv1Backend.grantSvOnboardingPermission(token)
+          startAllSync(sv, scan, validator)
         }
-
-        logger.info(s"Starting SV ${validator.participantClient.id}")
-        startAllSync(sv, scan, validator)
-
       }
     }
 
