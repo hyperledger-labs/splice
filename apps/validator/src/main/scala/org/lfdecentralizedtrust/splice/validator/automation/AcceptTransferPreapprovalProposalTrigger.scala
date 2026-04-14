@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_AcceptTransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as installCodegen,
@@ -31,6 +30,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser.ParsedInvalidTransferReason
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -86,21 +87,6 @@ class AcceptTransferPreapprovalProposalTrigger(
               ),
             )
             .flatMap {
-              case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
-                failedOperation.invalidTransferReasonValue match {
-                  case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-                    val missingStr = s"(missing ${fundsError.missingAmount} CC)"
-                    val msg = s"Insufficient funds to create transfer pre-approval $missingStr"
-                    logger.info(msg)
-                    Future.failed(Status.ABORTED.withDescription(msg).asRuntimeException())
-
-                  case otherError =>
-                    val msg =
-                      s"Unexpectedly failed to create transfer pre-approval due to $otherError"
-                    // We report this as INTERNAL, as we don't want to retry on this.
-                    Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-
-                }
               case coo: installCodegen.amuletoperationoutcome.COO_AcceptTransferPreapprovalProposal =>
                 Future(
                   TaskSuccess(
@@ -116,6 +102,22 @@ class AcceptTransferPreapprovalProposalTrigger(
                 if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS && ex.getStatus.getDescription
                   .contains("DUPLICATE_COMMAND") =>
               Future.successful(TaskSuccess(s"${ex.getMessage}"))
+
+            case ex: StatusRuntimeException
+                if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
+              InvalidTransferReasonParser.parse(ex.getStatus.getDescription) match {
+                case Some(ParsedInvalidTransferReason.InsufficientFunds(missingAmount)) =>
+                  val missingStr = s"(missing $missingAmount CC)"
+                  val msg = s"Insufficient funds to create transfer pre-approval $missingStr"
+                  logger.info(msg)
+                  Future.failed(Status.ABORTED.withDescription(msg).asRuntimeException())
+
+                case _ =>
+                  val msg =
+                    s"Unexpectedly failed to create transfer pre-approval due to ${ex.getStatus.getDescription}"
+                  // We report this as INTERNAL, as we don't want to retry on this.
+                  Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+              }
           }
       }
     } yield result

@@ -4,10 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.automation
 
 import org.lfdecentralizedtrust.splice.automation.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  TransferPreapproval,
-  invalidtransferreason,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_RenewTransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome
 import org.lfdecentralizedtrust.splice.util.AssignedContract
@@ -16,9 +13,11 @@ import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser.ParsedInvalidTransferReason
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -65,24 +64,27 @@ class RenewTransferPreapprovalTrigger(
                 s"Renewed transfer pre-approval for party ${expiringPreapproval.payload.receiver} with new expiry at $newExpiresAt: $successResult"
               )
             )
-          case failedOperation: amuletoperationoutcome.COO_Error =>
-            failedOperation.invalidTransferReasonValue match {
-              case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-                val missingStr = s"(missing ${fundsError.missingAmount} CC)"
+
+          case unknownResult =>
+            val msg = s"Unexpected amulet-operation result $unknownResult"
+            Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+        }
+        .recoverWith {
+          case ex: StatusRuntimeException
+              if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
+            InvalidTransferReasonParser.parse(ex.getStatus.getDescription) match {
+              case Some(ParsedInvalidTransferReason.InsufficientFunds(missingAmount)) =>
+                val missingStr = s"(missing $missingAmount CC)"
                 val msg = s"Insufficient funds for the transfer pre-approval renewal $missingStr"
                 logger.info(msg)
                 Future.failed(Status.ABORTED.withDescription(msg).asRuntimeException())
 
-              case otherError =>
+              case _ =>
                 val msg =
-                  s"Unexpectedly failed to complete transfer pre-approval renewal for ${expiringPreapproval.payload.receiver} due to $otherError"
+                  s"Unexpectedly failed to complete transfer pre-approval renewal for ${expiringPreapproval.payload.receiver} due to ${ex.getStatus.getDescription}"
                 // We report this as INTERNAL, as we don't want to retry on this.
                 Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-
             }
-          case unknownResult =>
-            val msg = s"Unexpected amulet-operation result $unknownResult"
-            Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
         }
     } yield outcome
   }

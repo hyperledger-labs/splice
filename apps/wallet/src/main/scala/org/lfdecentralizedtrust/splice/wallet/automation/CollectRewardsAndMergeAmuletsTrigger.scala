@@ -5,15 +5,16 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 
 import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_MergeTransferInputs
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
-  COO_Error,
-  COO_MergeTransferInputs,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
 import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryFor}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
-import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
+import org.lfdecentralizedtrust.splice.wallet.util.{
+  InvalidTransferReasonParser,
+  TopupUtil,
+  ValidatorTopupConfig,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -79,15 +80,18 @@ class CollectRewardsAndMergeAmuletsTrigger(
               case outcome: COO_MergeTransferInputs =>
                 // if empty -> no work was done
                 Success(!outcome.optionalValue.isEmpty)
-              case error: COO_Error =>
-                logger.debug(s"received an unexpected COOError: $error - ignoring for now")
-                // given the error, don't retry immediately
-                Success(false)
               case otherwise => sys.error(s"unexpected COO return type: $otherwise")
             }
           case Failure(ex: StatusRuntimeException)
               if ex.getStatus.getCode == Status.Code.UNAVAILABLE =>
             logger.debug("Skipping amulet merge because treasury service is shutting down")
+            // given the error, don't retry immediately
+            Success(false)
+          case Failure(ex: StatusRuntimeException)
+              if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
+            logger.debug(
+              s"received an unexpected InvalidTransferException: ${ex.getStatus.getDescription} - ignoring for now"
+            )
             // given the error, don't retry immediately
             Success(false)
           case Failure(err) => Failure(err)

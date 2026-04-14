@@ -19,9 +19,10 @@ import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -52,8 +53,6 @@ class SubscriptionReadyForPaymentTrigger(
         ]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-
     val stateCid = task.work.contractId
     val operation = new installCodegen.amuletoperation.CO_SubscriptionMakePayment(stateCid)
     treasury
@@ -61,17 +60,20 @@ class SubscriptionReadyForPaymentTrigger(
       .map {
         case _: installCodegen.amuletoperationoutcome.COO_SubscriptionPayment =>
           TaskSuccess("made subscription payment")
-        case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
-          val msg =
-            show"Failed making subscription payment due to Daml exception\n${failedOperation.toValue}"
-          // We're throwing this as INTERNAL to avoid that the polling trigger retries this task in a tight loop.
-          // TODO(DACH-NY/canton-network-node#2034): INTERNAL is not the right option for a ITR_InsufficientFunds error. There we should actually try to create a marker on-ledger to reach out to the user for a decision on whether to continue trying to pay this subscription or not.
-          throw Status.INTERNAL.withDescription(msg).asRuntimeException()
 
         case unknown =>
           throw Status.INTERNAL
             .withDescription(s"Unexpected amulet operation outcome: $unknown")
             .asRuntimeException()
+      }
+      .recoverWith {
+        case ex: StatusRuntimeException
+            if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
+          val msg =
+            show"Failed making subscription payment due to Daml exception\n${ex.getStatus.getDescription}"
+          // We're throwing this as INTERNAL to avoid that the polling trigger retries this task in a tight loop.
+          // TODO(DACH-NY/canton-network-node#2034): INTERNAL is not the right option for a ITR_InsufficientFunds error. There we should actually try to create a marker on-ledger to reach out to the user for a decision on whether to continue trying to pay this subscription or not.
+          throw Status.INTERNAL.withDescription(msg).asRuntimeException()
       }
   }
 }

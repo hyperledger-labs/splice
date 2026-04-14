@@ -8,10 +8,7 @@ import cats.syntax.either.*
 import com.daml.ledger.api.v2.interactive
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  TransferPreapproval,
-  invalidtransferreason,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.ExternalPartySetupProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome
@@ -57,6 +54,8 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.auth.AdminAuthExtractor.AdminUserRequest
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser
+import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser.ParsedInvalidTransferReason
 
 import java.time.Instant
 import java.util.Base64
@@ -524,6 +523,26 @@ class HttpValidatorAdminHandler(
                         )
                       ),
                     )
+                    .recoverWith {
+                      case ex: StatusRuntimeException
+                          if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
+                        InvalidTransferReasonParser.parse(ex.getStatus.getDescription) match {
+                          case Some(ParsedInvalidTransferReason.InsufficientFunds(missingAmount)) =>
+                            val missingStr = s"(missing $missingAmount CC)"
+                            val msg =
+                              s"Insufficient funds for the transfer pre-approval purchase $missingStr"
+                            Future.failed(
+                              Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
+                            )
+
+                          case _ =>
+                            val msg =
+                              s"Unexpectedly failed to create external party setup proposal due to ${ex.getStatus.getDescription}"
+                            Future.failed(
+                              Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
+                            )
+                        }
+                    }
                   result <- outcome match {
                     case successResult: amuletoperationoutcome.COO_CreateExternalPartySetupProposal =>
                       retryProvider
@@ -553,22 +572,6 @@ class HttpValidatorAdminHandler(
                             )
                           )
                         }
-                    case failedOperation: amuletoperationoutcome.COO_Error =>
-                      failedOperation.invalidTransferReasonValue match {
-                        case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-                          val missingStr = s"(missing ${fundsError.missingAmount} CC)"
-                          val msg =
-                            s"Insufficient funds for the transfer pre-approval purchase $missingStr"
-                          Future.failed(
-                            Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
-                          )
-                        case otherError =>
-                          val msg =
-                            s"Unexpectedly failed to create external party setup proposal due to $otherError"
-                          Future.failed(
-                            Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
-                          )
-                      }
                     case unknownResult =>
                       val msg = s"Unexpected amulet-operation result $unknownResult"
                       Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
