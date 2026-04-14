@@ -173,7 +173,8 @@ export const Governance: React.FC = () => {
 
       {actionRequiredRequests.length === 0 &&
       inflightRequests.length === 0 &&
-      voteHistory.length === 0 ? (
+      voteHistory.length === 0 &&
+      !voteResultsInfiniteQuery.hasNextPage ? (
         <EmptyStateSection />
       ) : (
         <>
