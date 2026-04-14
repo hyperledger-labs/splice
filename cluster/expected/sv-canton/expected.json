@@ -166,28 +166,6 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-pg-sequencer-4-pg-sequencer_dabft-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
         "name": "sequencer-1-pg-secrets",
         "namespace": "sv-1"
       },
@@ -430,28 +408,6 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-        "namespace": "sv-da-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-da-1-pg-sequencer-4-pg-sequencer_dabft-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
         "name": "sequencer-1-pg-secrets",
         "namespace": "sv-da-1"
       },
@@ -678,28 +634,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-participant-3-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-pg-sequencer-4-pg-sequencer_dabft-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1718,10 +1652,7 @@
             "externalAddress": "sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft",
-              "port": 5432,
-              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-              "user": "sequencer_dabft"
+              "databaseName": "sequencer_dabft"
             },
             "type": "cantonbft"
           },
@@ -2579,18 +2510,6 @@
       "special": true
     },
     "name": "sv-1-sequencer-4-pg-cnadmin-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-sequencer-4-pg-sequencer_dabft-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3630,10 +3549,7 @@
             "externalAddress": "sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft",
-              "port": 5432,
-              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-              "user": "sequencer_dabft"
+              "databaseName": "sequencer_dabft"
             },
             "type": "cantonbft"
           },
@@ -4520,18 +4436,6 @@
     "type": "random:index/randomPassword:RandomPassword"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-da-1-sequencer-4-pg-sequencer_dabft-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -5178,10 +5082,7 @@
             "externalAddress": "sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft",
-              "port": 5432,
-              "secretName": "pg-sequencer-4-pg-sequencer_dabft-secrets",
-              "user": "sequencer_dabft"
+              "databaseName": "sequencer_dabft"
             },
             "type": "cantonbft"
           },
@@ -6043,18 +5944,6 @@
     "type": "random:index/randomPassword:RandomPassword"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-sequencer-4-pg-sequencer_dabft-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -6507,20 +6396,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "name": "sequencer_dabft",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-1-sequencer-4-pg-sequencer_dabft",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -6675,20 +6550,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "name": "sequencer_dabft",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-da-1-sequencer-4-pg-sequencer_dabft",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -6836,20 +6697,6 @@
       }
     },
     "name": "user-sv-sequencer-4-pg-cnadmin",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "sequencer_dabft",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-sequencer-4-pg-sequencer_dabft",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

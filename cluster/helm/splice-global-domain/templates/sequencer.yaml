@@ -258,6 +258,11 @@ spec:
 ---
 {{- if .Values.enablePostgresMetrics }}
 {{- include "splice-util-lib.postgres-metrics" (dict "name" (print "postgres-" (.Values.sequencer.persistence.databaseName | replace "_" "-" ) "-e") "namespace" .Release.Namespace "persistence" .Values.sequencer.persistence "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
+{{- if and (eq .Values.sequencer.driver.type "cantonbft") ((.Values.sequencer.driver).persistence) (((.Values.sequencer.driver).persistence).databaseName) (ne .Values.sequencer.driver.persistence.databaseName .Values.sequencer.persistence.databaseName) }}
+{{- $driverPersistence := dict "postgresName" (print .Values.sequencer.persistence.postgresName "-driver") "databaseName" .Values.sequencer.driver.persistence.databaseName "host" (.Values.sequencer.driver.persistence.host | default .Values.sequencer.persistence.host) "port" (.Values.sequencer.driver.persistence.port | default .Values.sequencer.persistence.port) "secretName" (.Values.sequencer.driver.persistence.secretName | default .Values.sequencer.persistence.secretName) }}
+---
+{{- include "splice-util-lib.postgres-metrics" (dict "namespace" .Release.Namespace "persistence" $driverPersistence "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
+{{- end }}
 {{- end}}
 {{-  if .Values.pvc }}
 ---

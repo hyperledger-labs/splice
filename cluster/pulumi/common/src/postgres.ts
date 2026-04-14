@@ -119,15 +119,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
               return { name, value: cloudSqlConfig.flags[name] };
             }),
             ...(opts.logicalDecoding ? [{ name: 'cloudsql.logical_decoding', value: 'on' }] : []),
-            ...(cloudSqlConfig.enterprisePlus &&
-            !('bgwriter_lru_multiplier' in cloudSqlConfig.flags)
-              ? [
-                  {
-                    name: 'bgwriter_lru_multiplier',
-                    value: '4.0',
-                  },
-                ]
-              : []),
           ],
           backupConfiguration: {
             enabled: true,

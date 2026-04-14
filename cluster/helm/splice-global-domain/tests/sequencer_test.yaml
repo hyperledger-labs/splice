@@ -211,6 +211,52 @@ tests:
           path: spec.template.spec.initContainers[0]
           content:
             name: pg-init
+  - it: "can enable postgres metrics for cantonbft driver with different databaseName"
+    set:
+      sequencer:
+        persistence:
+          postgresName: sequencer-6
+        driver:
+          type: cantonbft
+          externalAddress: "sequencer.example.com"
+          externalPort: 5010
+          persistence:
+            host: custom-pg-host
+            port: 5433
+            secretName: custom-pg-secret
+            databaseName: custom_bft_db
+            user: custom-user
+      enablePostgresMetrics: true
+    documentIndex: 5
+    asserts:
+      - equal:
+          path: kind
+          value: Deployment
+      - equal:
+          path: metadata.name
+          value: pge-sequencer-6-driver-custom-bft-db
+      - equal:
+          path: metadata.labels.app
+          value: pge-sequencer-6-driver-custom-bft-db
+  - it: "does not enable postgres metrics for cantonbft driver with same databaseName"
+    set:
+      sequencer:
+        persistence:
+          postgresName: sequencer-6
+        driver:
+          type: cantonbft
+          externalAddress: "sequencer.example.com"
+          externalPort: 5010
+          persistence:
+            host: custom-pg-host
+            port: 5433
+            secretName: custom-pg-secret
+            databaseName: cantonnet_sequencer
+            user: custom-user
+      enablePostgresMetrics: true
+    asserts:
+      - hasDocuments:
+          count: 5
   - it: "cantonbft driver uses custom driver persistence when set"
     set:
       sequencer:
