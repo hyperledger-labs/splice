@@ -49,15 +49,15 @@ DAML_PROJECT_FILES="\
     -not -ipath '*splitwell*' \
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \
-    -not -ipath 'splice-api-featured-app-v1' \
-    -not -ipath 'splice-api-featured-app-v2' \
-    -not -ipath 'splice-api-token-allocation-v1' \
-    -not -ipath 'splice-api-token-transfer-instruction-v1' \
-    -not -ipath 'splice-api-token-allocation-instruction-v1' \
-    -not -ipath 'splice-api-token-allocation-request-v1' \
-    -not -ipath 'splice-api-token-metadata-v1' \
-    -not -ipath 'splice-api-token-holding-v1' \
-    -not -ipath 'splice-api-token-burn-mint-v1' \
+    -not -ipath '*splice-api-featured-app-v1*' \
+    -not -ipath '*splice-api-featured-app-v2*' \
+    -not -ipath '*splice-api-token-allocation-v1*' \
+    -not -ipath '*splice-api-token-transfer-instruction-v1*' \
+    -not -ipath '*splice-api-token-allocation-instruction-v1*' \
+    -not -ipath '*splice-api-token-allocation-request-v1*' \
+    -not -ipath '*splice-api-token-metadata-v1*' \
+    -not -ipath '*splice-api-token-holding-v1*' \
+    -not -ipath '*splice-api-token-burn-mint-v1*' \
     -print)"
 for project_file in $DAML_PROJECT_FILES
 do
