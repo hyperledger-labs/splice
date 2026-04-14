@@ -1955,7 +1955,8 @@ components:
       type: object
       description:
         A contract implementing the Token Standard (V1 or V2) interface AllocationRequest.
-        You can distinguish the type of the contract by checking the template_id field.
+        You can distinguish the type of the contract by checking the template_id field,
+        which will contain the template_id of the corresponding (v1,v2) AllocationRequest interface.
       required:
         - contract
       properties:
