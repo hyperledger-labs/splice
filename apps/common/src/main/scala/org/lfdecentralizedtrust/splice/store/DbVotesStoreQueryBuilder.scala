@@ -93,7 +93,7 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
       txLogStoreId,
       where = whereClause.toActionBuilder,
       orderLimit =
-        (sql"""order by vote_completed_at desc, #$effectiveAtColumnName desc nulls last limit ${sqlLimit(
+        (sql"""order by coalesce(entry_data->'result'->>'completedAt', #$effectiveAtColumnName) desc nulls last limit ${sqlLimit(
             limit
           )}""" ++ offsetClause).toActionBuilder,
     )
