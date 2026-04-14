@@ -117,6 +117,9 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
           })
         );
       } else {
+        // Simulate cursor-based pagination using descending synthetic entry_numbers.
+        // Each result is assigned an entry_number equal to (total - index), so the
+        // first result has the highest entry_number and the last has entry_number 1.
         const allResults = voteResultsAmuletRules.dso_rules_vote_results
           .concat(voteResultsDsoRules.dso_rules_vote_results)
           .filter(r => {
@@ -138,13 +141,23 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
               : true;
             return acceptedMatch && effectiveToMatch && effectiveFromMatch;
           });
-        const offset = data.pageToken || 0;
-        const paged = allResults.slice(offset, offset + (data.limit || 10));
+        const total = allResults.length;
+        const cursor = data.pageToken;
+        // Find the starting index: skip results whose entry_number >= cursor
+        const startIndex =
+          cursor !== undefined && cursor !== null
+            ? allResults.findIndex((_, i) => total - i < cursor)
+            : 0;
+        const limit = data.limit || 10;
+        const paged = allResults.slice(startIndex, startIndex + limit);
+        const lastEntryNumber =
+          paged.length > 0 ? total - (startIndex + paged.length - 1) : undefined;
+        const hasMore = startIndex + paged.length < total;
         return res(
           ctx.json<ListDsoRulesVoteResultsResponse>({
             dso_rules_vote_results: paged,
-            ...(offset + paged.length < allResults.length
-              ? { next_page_token: offset + paged.length }
+            ...(hasMore && lastEntryNumber !== undefined
+              ? { next_page_token: lastEntryNumber }
               : {}),
           })
         );

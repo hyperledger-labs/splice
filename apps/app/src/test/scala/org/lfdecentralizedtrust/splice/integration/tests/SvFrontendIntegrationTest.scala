@@ -1567,6 +1567,7 @@ class SvFrontendIntegrationTest
             .filter(_.payload.reason.body == "first request") shouldBe empty
           sv1Backend
             .listVoteRequestResults(None, Some(false), None, None, None, 10)
+            ._1
             .exists(_.request.reason.body == "first request") shouldBe true
         },
       )
@@ -1604,6 +1605,7 @@ class SvFrontendIntegrationTest
             .filter(_.payload.reason.body == "second request") shouldBe empty
           sv1Backend
             .listVoteRequestResults(None, Some(false), None, None, None, 10)
+            ._1
             .count(r =>
               r.request.reason.body == "first request" || r.request.reason.body == "second request"
             ) shouldBe 2
@@ -1612,7 +1614,7 @@ class SvFrontendIntegrationTest
 
       // Verify ordering via backend API: most recently completed first
       clue("vote results are ordered by completion time descending") {
-        val results = sv1Backend.listVoteRequestResults(None, None, None, None, None, 10)
+        val (results, _) = sv1Backend.listVoteRequestResults(None, None, None, None, None, 10)
         val ourResults = results.filter(r =>
           r.request.reason.body == "first request" || r.request.reason.body == "second request"
         )
@@ -1621,13 +1623,16 @@ class SvFrontendIntegrationTest
         ourResults.last.request.reason.body shouldBe "first request"
       }
 
-      // Verify pagination via backend API with limit=1
+      // Verify cursor-based pagination via backend API with limit=1
       clue("pagination returns correct pages") {
-        val firstPage = sv1Backend.listVoteRequestResults(None, None, None, None, None, 1)
+        val (firstPage, firstPageToken) =
+          sv1Backend.listVoteRequestResults(None, None, None, None, None, 1)
         firstPage.size shouldBe 1
         firstPage.head.request.reason.body shouldBe "second request"
+        firstPageToken shouldBe defined
 
-        val secondPage = sv1Backend.listVoteRequestResults(None, None, None, None, None, 1, Some(1))
+        val (secondPage, _) =
+          sv1Backend.listVoteRequestResults(None, None, None, None, None, 1, firstPageToken)
         secondPage.size shouldBe 1
         secondPage.head.request.reason.body shouldBe "first request"
       }

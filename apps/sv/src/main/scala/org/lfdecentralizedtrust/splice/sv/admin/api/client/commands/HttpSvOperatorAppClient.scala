@@ -251,9 +251,13 @@ object HttpSvOperatorAppClient {
       effectiveTo: Option[String],
       limit: BigInt,
       pageToken: Option[BigInt] = None,
-  ) extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
-        DsoRules_CloseVoteRequestResult
-      ]] {
+  ) extends BaseCommand[
+        http.ListVoteRequestResultsResponse,
+        (
+            Seq[DsoRules_CloseVoteRequestResult],
+            Option[BigInt],
+        ),
+      ] {
 
     override def submitRequest(
         client: Client,
@@ -275,18 +279,17 @@ object HttpSvOperatorAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListVoteRequestResultsResponse.OK(response) =>
-      Right(
-        response.dsoRulesVoteResults
-          .map(e =>
-            decoder.decodeValue(
-              DsoRules_CloseVoteRequestResult.valueDecoder(),
-              DsoRules_CloseVoteRequestResult._packageId,
-              "Splice.DsoRules",
-              "DsoRules_CloseVoteRequestResult",
-            )(e)
-          )
-          .toSeq
-      )
+      val results = response.dsoRulesVoteResults
+        .map(e =>
+          decoder.decodeValue(
+            DsoRules_CloseVoteRequestResult.valueDecoder(),
+            DsoRules_CloseVoteRequestResult._packageId,
+            "Splice.DsoRules",
+            "DsoRules_CloseVoteRequestResult",
+          )(e)
+        )
+        .toSeq
+      Right((results, response.nextPageToken))
     }
   }
 

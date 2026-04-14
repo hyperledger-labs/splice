@@ -28,7 +28,7 @@ export const useInfiniteVoteRequestResults = (): UseInfiniteQueryResult<
         undefined,
         undefined,
         undefined,
-        pageParam === 0 ? undefined : pageParam
+        pageParam ?? undefined
       );
       const results = List(DsoRules_CloseVoteRequestResult).decoder.runWithException(
         response.dso_rules_vote_results
@@ -38,7 +38,7 @@ export const useInfiniteVoteRequestResults = (): UseInfiniteQueryResult<
         nextPageToken: response.next_page_token,
       };
     },
-    initialPageParam: 0,
-    getNextPageParam: lastPage => lastPage?.nextPageToken,
+    initialPageParam: null as number | null,
+    getNextPageParam: lastPage => lastPage?.nextPageToken ?? null,
   });
 };

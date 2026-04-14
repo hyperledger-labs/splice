@@ -130,20 +130,16 @@ class HttpSvOperatorHandler(
     withSpan(s"$workflowId.listVoteRequestResults") { _ => _ =>
       for {
         scanConnection <- scanConnectionF
-        voteResults <- scanConnection.listVoteRequestResults(
+        (voteResults, nextPageToken) <- scanConnection.listVoteRequestResults(
           body.actionName,
           body.accepted,
           body.requester,
           body.effectiveFrom,
           body.effectiveTo,
           body.limit.intValue,
-          body.pageToken.map(_.intValue),
+          body.pageToken,
         )
       } yield {
-        val nextPageToken =
-          if (voteResults.size >= body.limit.intValue)
-            Some(BigInt(body.pageToken.map(_.intValue).getOrElse(0) + voteResults.size))
-          else None
         r0.ListVoteRequestResultsResponse.OK(
           definitions.ListDsoRulesVoteResultsResponse(
             voteResults

@@ -342,7 +342,7 @@ components:
         pageToken:
           type: integer
           description: |
-            Offset for pagination. When requesting the next page of results, pass the `next_page_token` from the previous response.
+            Cursor for pagination. When requesting the next page of results, pass the `next_page_token` from the previous response.
 
     ListDsoRulesVoteResultsResponse:
       type: object
@@ -356,7 +356,7 @@ components:
         next_page_token:
           type: integer
           description: |
-            When requesting the next page of results, pass this as `pageToken` in the request.
+            Cursor for the next page of results. Pass this as `pageToken` in the request.
             If absent or `null`, there are no more pages.
 
     ListValidatorLicensesResponse:

@@ -243,7 +243,7 @@ abstract class SvAppReference(
       effectiveTo: Option[String],
       limit: BigInt,
       pageToken: Option[BigInt] = None,
-  ): Seq[DsoRules_CloseVoteRequestResult] = {
+  ): (Seq[DsoRules_CloseVoteRequestResult], Option[BigInt]) = {
     consoleEnvironment.run {
       httpCommand(
         HttpSvOperatorAppClient.ListVoteRequestResults(
