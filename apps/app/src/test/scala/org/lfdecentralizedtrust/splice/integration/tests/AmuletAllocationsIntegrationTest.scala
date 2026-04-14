@@ -105,23 +105,26 @@ class AmuletAllocationsIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(1000)
 
-      actAndCheck(
-        "Create two allocations: one V1 and one V2", {
-          val (v1Spec, v1Response) = createAllocationV1(aliceUserParty)
-          val (v2Spec, v2Response) = createAllocationV2(aliceUserParty)
-          val v1Cid = v1Response.output match {
-            case members.AllocationInstructionResultCompleted(completed) => completed.allocationCid
-            case _ => fail("Expected allocation v1 to complete")
-          }
-          val v2Cid = v2Response.output match {
-            case members.AllocationInstructionResultCompleted(completed) => completed.allocationCid
-            case _ => fail("Expected allocation v2 to complete")
-          }
-          ((v1Spec, v1Cid), (v2Spec, v2Cid))
-        },
-      )(
-        "The allocations can be listed",
-        { case ((v1Spec, v1Cid), (v2Spec, v2Cid)) =>
+      val (v1Spec, v1Cid) = clue("Create Allocation V1") {
+        val (v1Spec, v1Response) = createAllocationV1(aliceUserParty)
+        val v1Cid = v1Response.output match {
+          case members.AllocationInstructionResultCompleted(completed) => completed.allocationCid
+          case _ => fail("Expected allocation v1 to complete")
+        }
+        (v1Spec, v1Cid)
+      }
+
+      val (v2Spec, v2Cid) = clue("Create Allocation V2") {
+        val (v2Spec, v2Response) = createAllocationV2(aliceUserParty)
+        val v2Cid = v2Response.output match {
+          case members.AllocationInstructionResultCompleted(completed) => completed.allocationCid
+          case _ => fail("Expected allocation v2 to complete")
+        }
+        (v2Spec, v2Cid)
+      }
+
+      clue("The allocations can be listed") {
+        eventually() {
           val allocations = aliceWalletClient.listAmuletAllocations()
 
           inside(allocations.toList) {
@@ -134,8 +137,8 @@ class AmuletAllocationsIntegrationTest
               v1.payload.allocation should be(v1Spec)
               v2.payload.allocation should be(v2Spec)
           }
-        },
-      )
+        }
+      }
     }
 
   }
