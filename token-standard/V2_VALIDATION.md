@@ -88,3 +88,5 @@ Cleanup performed so far:
 - add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets
 - use `Account.id : Text` instead of `Optional Text` to ensure that wallets do not have to deal with
   two different kinds of defalt accounts (empty string vs None). Use "" as the default account identifier.
+- Change version numbers of `splice-api-token-*-v2` packages to `1.0.0` to be consistent with the existing
+  `splice-api-featured-app-v2` package, which also has version `1.0.0`
