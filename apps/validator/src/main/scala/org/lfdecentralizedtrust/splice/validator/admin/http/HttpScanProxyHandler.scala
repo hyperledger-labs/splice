@@ -125,6 +125,30 @@ class HttpScanProxyHandler(
     }
   }
 
+  override def getHoldingsSummaryAtV1(
+      respond: v0.ScanproxyResource.GetHoldingsSummaryAtV1Response.type
+  )(
+      body: definitions.HoldingsSummaryRequestV1
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.GetHoldingsSummaryAtV1Response] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
+    withSpan(s"$workflowId.getHoldingsSummaryAtV1") { implicit traceContext => _ =>
+      for {
+        summaryOpt <- scanConnection.getHoldingsSummaryAtV1(
+          CantonTimestamp.assertFromInstant(body.recordTime.toInstant),
+          body.migrationId,
+          body.ownerPartyIds.map(PartyId.tryFromProtoPrimitive),
+          body.recordTimeMatch,
+        )
+      } yield {
+        summaryOpt match {
+          case Some(summary) => respond.OK(summary)
+          case None =>
+            respond.NotFound(definitions.ErrorResponse("Summary not found for given parameters"))
+        }
+      }
+    }
+  }
+
   override def getAmuletRules(respond: v0.ScanproxyResource.GetAmuletRulesResponse.type)()(
       tUser: AuthenticatedRequest
   ): Future[v0.ScanproxyResource.GetAmuletRulesResponse] = {

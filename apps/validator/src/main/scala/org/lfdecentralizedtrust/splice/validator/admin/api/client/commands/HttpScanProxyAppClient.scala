@@ -88,6 +88,32 @@ object HttpScanProxyAppClient {
     }
   }
 
+  case class GetHoldingsSummaryAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequestV1.RecordTimeMatch],
+  ) extends ScanProxyBaseCommand[scanProxy.GetHoldingsSummaryAtV1Response, Option[
+        definitions.HoldingsSummaryResponseV1
+      ]] {
+
+    override def submitRequest(client: ScanproxyClient, headers: List[HttpHeader]) =
+      client.getHoldingsSummaryAtV1(
+        definitions.HoldingsSummaryRequestV1(
+          migrationId,
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          recordTimeMatch,
+          ownerPartyIds.map(_.toProtoPrimitive),
+        ),
+        headers,
+      )
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case scanProxy.GetHoldingsSummaryAtV1Response.OK(response) => Right(Some(response))
+      case scanProxy.GetHoldingsSummaryAtV1Response.NotFound(_) => Right(None)
+    }
+  }
+
   case object GetAnsRules
       extends ScanProxyBaseCommand[
         scanProxy.GetAnsRulesResponse,
