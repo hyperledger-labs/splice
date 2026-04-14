@@ -664,7 +664,7 @@ lazy val `splice-featured-app-api-v1-daml` =
       BuildCommon.damlSettings,
       Compile / damlSkipBuild := true,
       Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-featured-app-api-v1-1.0.0.dar"
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v1-1.0.0.dar"
       ),
     )
 
@@ -676,7 +676,7 @@ lazy val `splice-featured-app-api-v2-daml` =
       BuildCommon.damlSettings,
       Compile / damlSkipBuild := true,
       Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-featured-app-api-v2-1.0.0.dar"
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v2-1.0.0.dar"
       ),
     )
 
