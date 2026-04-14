@@ -196,10 +196,7 @@ class ScanVerdictIngestionService(
   }
 
   private def batchSource[T](source: Source[T, NotUsed]): Source[Seq[T], NotUsed] =
-    source.groupedWithin(
-      math.max(1, config.mediatorVerdictIngestion.batchSize),
-      config.mediatorVerdictIngestion.batchMaxWait.underlying,
-    )
+    source.batch(math.max(1, config.mediatorVerdictIngestion.batchSize.toLong), Vector(_))(_ :+ _)
 
   // Kick-off the ingestion
   start()

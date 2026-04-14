@@ -16,7 +16,6 @@ import definitions.UpdateHistoryItemV2.members.{
 }
 
 import scala.concurrent.duration.*
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
 import monocle.macros.syntax.lens.*
@@ -33,13 +32,10 @@ class ScanEventHistoryIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
           scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            ),
             // Route mediator admin client via toxiproxy
             synchronizerNodes = scanConfig.synchronizerNodes
               .focus(_.current.mediator.port)
-              .modify(p => Port.tryCreate(p.unwrap + 20000)),
+              .modify(p => Port.tryCreate(p.unwrap + 20000))
           )
         )(config)
       )

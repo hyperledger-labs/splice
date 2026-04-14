@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -22,7 +21,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -54,15 +52,6 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
           backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
         }
       })
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
-          scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            )
-          )
-        )(config)
-      )
 
   "App activity records are created for featured app parties" in { implicit env =>
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
