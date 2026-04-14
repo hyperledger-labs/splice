@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.admin.http
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2 as amuletAllocationV2Codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
@@ -68,6 +69,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationinstructionv2,
   allocationrequestv1,
+  allocationrequestv2,
   allocationv1,
   allocationv2,
   holdingv1,
@@ -99,6 +101,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
+import cats.data.Chain
 
 class HttpWalletHandler(
     override protected val walletManager: UserWalletManager,
@@ -1195,12 +1198,23 @@ class HttpWalletHandler(
   override def listAmuletAllocations(
       respond: WalletResource.ListAmuletAllocationsResponse.type
   )()(tUser: WalletUserRequest): Future[WalletResource.ListAmuletAllocationsResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
-    listContracts(
-      amuletAllocationCodegen.AmuletAllocation.COMPANION,
-      userWallet.store,
-      contracts => d0.ListAllocationsResponse(contracts.map(d0.Allocation(_))),
-    )
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
+      for {
+        v1Contracts <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletAllocationCodegen.AmuletAllocation.COMPANION
+        )
+        v2Contracts <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletAllocationV2Codegen.AmuletAllocationV2.COMPANION
+        )
+      } yield {
+        val contracts = (Chain.fromSeq(v2Contracts) ++ Chain.fromSeq(v1Contracts))
+          .map(_.contract.toHttp)
+          .sortBy(_.createdAt)
+          .toVector
+        d0.ListAllocationsResponse(contracts.toVector.map(d0.AmuletAllocation(_)))
+      }
+    }
   }
 
   private def amuletToAmuletPosition(
@@ -1341,17 +1355,26 @@ class HttpWalletHandler(
       respond: WalletResource.ListAllocationRequestsResponse.type
   )()(tuser: WalletUserRequest): Future[WalletResource.ListAllocationRequestsResponse] = {
     implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
-    withSpan(s"$workflowId.listInterfaces") { _ => _ =>
+    withSpan(s"$workflowId.listAllocationRequests") { _ => _ =>
       for {
-        contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
+        v1Contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
           allocationrequestv1.AllocationRequest.INTERFACE
         )
-      } yield d0.ListAllocationRequestsResponse(
-        contracts
+        v2Contracts <- userWallet.store.multiDomainAcsStore.listInterfaceViews(
+          allocationrequestv2.AllocationRequest.INTERFACE
+        )
+      } yield {
+        // If a contract implements both V1 and V2, V2 will win
+        val contracts = (Chain.fromSeq(v2Contracts) ++ Chain.fromSeq(v1Contracts))
           .map(_.toHttp)
+          .distinctBy(_.contractId)
+          .sortBy(_.createdAt)
           .toVector
-          .map(d0.AllocationRequest(_))
-      )
+
+        d0.ListAllocationRequestsResponse(
+          contracts.map(d0.AllocationRequest(_))
+        )
+      }
     }
   }
 

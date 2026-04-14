@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -344,11 +345,12 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     )(
       show"There exists an allocation from $senderParty",
       _ => {
-        val allocations = walletClient.listAmuletAllocations()
-        allocations should have size 1 withClue "AmuletAllocations"
-        allocations.head
+        inside(walletClient.listAmuletAllocations()) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V1AmuletAllocation) +: Nil =>
+            allocationRequest
+        }
       },
     )
-    new allocationv1.Allocation.ContractId(allocation.contractId.contractId)
+    new allocationv1.Allocation.ContractId(allocation.contract.contractId.contractId)
   }
 }

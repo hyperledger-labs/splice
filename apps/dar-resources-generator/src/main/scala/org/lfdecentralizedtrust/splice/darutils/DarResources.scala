@@ -23,44 +23,47 @@ object DarResources {
       DarResource(s"splice-api-token-metadata-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-metadata-v1-1.0.0.dar")),
     )
-    lazy val tokenHolding = PackageResource(
-      DarResource(s"splice-api-token-holding-v1-current.dar"),
-      DarResource(s"splice-api-token-holding-v1-1.0.0.dar"),
-      Seq(DarResource(s"splice-api-token-holding-v1-1.0.0.dar")),
+    def tokenHolding(version: Int) = PackageResource(
+      DarResource(s"splice-api-token-holding-v$version-current.dar"),
+      DarResource(s"splice-api-token-holding-v$version-1.0.0.dar"),
+      Seq(DarResource(s"splice-api-token-holding-v$version-1.0.0.dar")),
     )
-    lazy val tokenTransferInstruction = PackageResource(
-      DarResource(s"splice-api-token-transfer-instruction-v1-current.dar"),
-      DarResource(s"splice-api-token-transfer-instruction-v1-1.0.0.dar"),
-      Seq(DarResource(s"splice-api-token-transfer-instruction-v1-1.0.0.dar")),
+    def tokenTransferInstruction(version: Int) = PackageResource(
+      DarResource(s"splice-api-token-transfer-instruction-v$version-current.dar"),
+      DarResource(s"splice-api-token-transfer-instruction-v$version-1.0.0.dar"),
+      Seq(DarResource(s"splice-api-token-transfer-instruction-v$version-1.0.0.dar")),
     )
-    lazy val tokenAllocation = PackageResource(
-      DarResource(s"splice-api-token-allocation-v1-current.dar"),
-      DarResource(s"splice-api-token-allocation-v1-1.0.0.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-v1-1.0.0.dar")),
+    def tokenAllocation(version: Int) = PackageResource(
+      DarResource(s"splice-api-token-allocation-v$version-current.dar"),
+      DarResource(s"splice-api-token-allocation-v$version-1.0.0.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-v$version-1.0.0.dar")),
     )
-    lazy val tokenAllocationRequest = PackageResource(
-      DarResource(s"splice-api-token-allocation-request-v1-current.dar"),
-      DarResource(s"splice-api-token-allocation-v1-1.0.0.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-request-v1-1.0.0.dar")),
+    def tokenAllocationRequest(version: Int) = PackageResource(
+      DarResource(s"splice-api-token-allocation-request-v$version-current.dar"),
+      DarResource(s"splice-api-token-allocation-v$version-1.0.0.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-request-v$version-1.0.0.dar")),
     )
-    lazy val tokenAllocationInstruction = PackageResource(
-      DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
-      DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar")),
+    def tokenAllocationInstruction(version: Int) = PackageResource(
+      DarResource(s"splice-api-token-allocation-instruction-v$version-current.dar"),
+      DarResource(s"splice-api-token-allocation-instruction-v$version-1.0.0.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-instruction-v$version-1.0.0.dar")),
     )
     lazy val tokenTestTradingApp = PackageResource(
       DarResource(s"splice-token-test-trading-app-current.dar"),
       DarResource(s"splice-token-test-trading-app-1.0.0.dar"),
       Seq(DarResource(s"splice-token-test-trading-app-1.0.0.dar")),
     )
-    lazy val allProductionPackageResources = Seq(
-      tokenMetadata,
-      tokenHolding,
-      tokenTransferInstruction,
-      tokenAllocation,
-      tokenAllocationRequest,
-      tokenAllocationInstruction,
-    )
+    lazy val allProductionPackageResources = tokenMetadata +: (for {
+      version <- Seq(1, 2)
+      pkg <- Seq(
+        tokenHolding(version),
+        tokenTransferInstruction(version),
+        tokenAllocation(version),
+        tokenAllocationRequest(version),
+        tokenAllocationInstruction(version),
+      )
+    } yield pkg)
+
     lazy val allPackageResources = allProductionPackageResources :+ tokenTestTradingApp
   }
 

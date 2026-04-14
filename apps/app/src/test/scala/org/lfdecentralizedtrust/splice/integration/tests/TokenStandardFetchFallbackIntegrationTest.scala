@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.util.{
   TriggerTestUtil,
   WalletTestUtil,
 }
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import java.time.Instant
 import java.util.{Optional, UUID}
@@ -115,19 +116,22 @@ class TokenStandardFetchFallbackIntegrationTest
           )(
             "Alice sees the Allocation",
             _ => {
-              val allocation =
-                aliceWalletClient
-                  .listAmuletAllocations()
-                  .loneElement
-              allocation.payload.allocation.settlement.settlementRef.id should be(referenceId)
+              val allocation = inside(aliceWalletClient.listAmuletAllocations()) {
+                case (allocationRequest: HttpWalletAppClient.TokenStandard.V1AmuletAllocation) +: Nil =>
+                  allocationRequest
+              }
+              allocation.contract.payload.allocation.settlement.settlementRef.id should be(
+                referenceId
+              )
               allocation
             },
           )
 
+          // TODO (#4915): check that the fallback also works for V2
           clue("SV-1's Scan sees it (still, even though ingestion is paused)") {
             eventuallySucceeds() {
               sv1ScanBackend.getAllocationTransferContext(
-                allocation.contractId.toInterface(Allocation.INTERFACE)
+                allocation.contract.contractId.toInterface(Allocation.INTERFACE)
               )
             }
           }
