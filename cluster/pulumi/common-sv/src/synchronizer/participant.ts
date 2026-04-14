@@ -21,12 +21,12 @@ import {
 import { SingleSvConfiguration } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installPostgres, Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
-export function installParticipant(
+export async function installParticipant(
   args: ParticipantArgs,
   customOptions?: SpliceCustomResourceOptions
-): ParticipantOutput {
+): Promise<ParticipantOutput> {
   const { existingDb, migration } = args;
-  const db = existingDb ?? installParticipantPostgres(args);
+  const db = existingDb ?? (await installParticipantPostgres(args));
   const chart =
     migration === undefined || migration.isStillRunning
       ? installParticipantChart(args, db, customOptions)
@@ -48,6 +48,8 @@ export type ParticipantArgs = {
     id: DomainMigrationIndex;
     isStillRunning: boolean;
   };
+  migratingDatabaseInstanceName?: string;
+  yieldManagement?: boolean;
 };
 
 export type ParticipantOutput = {
@@ -55,21 +57,29 @@ export type ParticipantOutput = {
   chart?: InstalledHelmChart;
 };
 
-function installParticipantPostgres({
+async function installParticipantPostgres({
   xns,
   participant,
   version,
   disableProtection,
   migration,
-}: ParticipantArgs): Postgres {
-  return installPostgres(
+  migratingDatabaseInstanceName,
+  yieldManagement,
+}: ParticipantArgs): Promise<Postgres> {
+  return await installPostgres(
     xns,
     `participant${migrationSuffix(migration?.id)}-pg`,
     'participant-pg',
     version,
     participant?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
     true,
-    { isActive: migration?.isStillRunning, migrationId: migration?.id, disableProtection }
+    {
+      isActive: migration?.isStillRunning,
+      migrationId: migration?.id,
+      disableProtection,
+      existingInstanceName: migratingDatabaseInstanceName,
+      yieldManagement,
+    }
   );
 }
 

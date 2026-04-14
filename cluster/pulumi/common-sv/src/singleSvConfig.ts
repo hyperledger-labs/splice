@@ -180,6 +180,7 @@ const SingleSvConfigSchema = z
       .optional(),
     periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
     versionOverride: CnChartVersionSchema.optional(),
+    migrateParticipantFromSvCantonToSv: z.boolean().default(false),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
