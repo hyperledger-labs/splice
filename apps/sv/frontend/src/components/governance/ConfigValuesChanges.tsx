@@ -34,14 +34,18 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
             sx={{ display: 'flex', alignItems: 'center', gap: 2 }}
             data-testid="config-change"
           >
-            <Typography
-              variant="body1"
-              sx={{ minWidth: 200 }}
-              data-testid="config-change-field-label"
-              color={textColor}
-            >
-              {change.label}
-            </Typography>
+            <Box sx={{ minWidth: 200 }}>
+              <Typography variant="body1" data-testid="config-change-field-label" color={textColor}>
+                {change.label}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                data-testid="config-change-field-name"
+              >
+                {change.fieldName}
+              </Typography>
+            </Box>
 
             <Box
               sx={{

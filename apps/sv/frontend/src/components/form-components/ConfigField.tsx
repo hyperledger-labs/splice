@@ -75,9 +75,18 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
           alignItems: 'center',
         }}
       >
-        <Typography variant="body1" data-testid={`config-label-${configChange.fieldName}`}>
-          {configChange.label}
-        </Typography>
+        <Box>
+          <Typography variant="body1" data-testid={`config-label-${configChange.fieldName}`}>
+            {configChange.label}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid={`config-field-name-${configChange.fieldName}`}
+          >
+            {configChange.fieldName}
+          </Typography>
+        </Box>
 
         <Box sx={{ width: 250 }}>
           <MuiTextField
