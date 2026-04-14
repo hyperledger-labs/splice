@@ -34,7 +34,7 @@ export function runSvProjectForSvs<T>(
   operation: string,
   requiresExistingStack: boolean,
   runForStack: (stack: automation.Stack, sv: string) => Promise<T>
-) {
+): Array<{ name: string; promise: Promise<T> }> {
   return svsToRunFor.map(sv => {
     console.error(`Adding operation for sv ${sv}`);
     return {
@@ -70,7 +70,8 @@ export function runSvProjectForAllSvsIfLsu<T>(
   forceSvRunbook: boolean = false
 ): { name: string; promise: Promise<T> }[] {
   const isLsuDeployment =
-    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode ||
+    DecentralizedSynchronizerUpgradeConfig.active.migrateParticipantsFromSvCantonToSv;
   if (!isLsuDeployment) {
     console.log('Not an LSU deployment. Skipping sv stacks.');
     return [];

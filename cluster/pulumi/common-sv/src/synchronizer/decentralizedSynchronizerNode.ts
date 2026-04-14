@@ -7,6 +7,8 @@ import { Resource } from '@pulumi/pulumi';
 export interface SvParticipant {
   readonly asDependencies: pulumi.Resource[];
   readonly internalClusterAddress: pulumi.Output<string>;
+  readonly databaseId?: pulumi.Output<string>;
+  readonly databaseSecretName?: pulumi.Output<string>;
 }
 
 export interface CantonBftSynchronizerNode {
