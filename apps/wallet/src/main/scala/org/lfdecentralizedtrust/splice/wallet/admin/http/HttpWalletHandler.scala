@@ -43,7 +43,6 @@ import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   Codec,
-  ContractList,
   ContractWithState,
   DisclosedContracts,
   SpliceUtil,
@@ -102,6 +101,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
+import cats.data.Chain
 
 class HttpWalletHandler(
     override protected val walletManager: UserWalletManager,
@@ -1208,10 +1208,10 @@ class HttpWalletHandler(
           amuletAllocationV2Codegen.AmuletAllocationV2.COMPANION
         )
       } yield {
-        val contracts = ContractList.mergeSortedContractListsToHttp(
-          v1Contracts.map(_.contract),
-          v2Contracts.map(_.contract),
-        )
+        val contracts = (Chain.fromSeq(v2Contracts) ++ Chain.fromSeq(v1Contracts))
+          .map(_.contract.toHttp)
+          .sortBy(_.createdAt)
+          .toVector
         d0.ListAllocationsResponse(contracts.toVector.map(d0.AmuletAllocation(_)))
       }
     }
@@ -1364,11 +1364,15 @@ class HttpWalletHandler(
           allocationrequestv2.AllocationRequest.INTERFACE
         )
       } yield {
-        // If a contract implements both V1 and V2, V2 will win, as per mergeSortedContractLists' docs
-        val contracts = ContractList.mergeSortedContractListsToHttp(v1Contracts, v2Contracts)
+        // If a contract implements both V1 and V2, V2 will win
+        val contracts = (Chain.fromSeq(v2Contracts) ++ Chain.fromSeq(v1Contracts))
+          .map(_.toHttp)
+          .distinctBy(_.contractId)
+          .sortBy(_.createdAt)
+          .toVector
+
         d0.ListAllocationRequestsResponse(
-          contracts.toVector
-            .map(d0.AllocationRequest(_))
+          contracts.map(d0.AllocationRequest(_))
         )
       }
     }
