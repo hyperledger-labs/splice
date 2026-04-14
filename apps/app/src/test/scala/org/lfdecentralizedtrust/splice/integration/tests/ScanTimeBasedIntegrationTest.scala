@@ -577,7 +577,8 @@ class ScanTimeBasedIntegrationTest
         res.recordTime should be(snapshotAfter.value)
         res.summaries.map(_.partyId).distinct shouldBe (Vector(aliceUserParty.toProtoPrimitive))
         forAll(res.summaries) { summary =>
-          // V1 response should contain coin totals
+          // V1 response should contain non-zero coin totals
+          BigDecimal(summary.totalCoinHoldings) should be > BigDecimal(0)
           BigDecimal(summary.totalCoinHoldings) shouldBe BigDecimal(
             summary.totalUnlockedCoin
           ) + BigDecimal(summary.totalLockedCoin)

@@ -225,7 +225,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/scan-proxy/holdings/summary:
     post:
-      tags: [ scan-proxy ]
+      deprecated: true
+      tags: [ deprecated ]
       x-jvm-package: scanproxy
       operationId: "getHoldingsSummaryAt"
       description: |
