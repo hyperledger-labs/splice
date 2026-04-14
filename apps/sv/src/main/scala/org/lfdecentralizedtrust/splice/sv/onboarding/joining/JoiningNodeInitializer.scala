@@ -403,7 +403,17 @@ class JoiningNodeInitializer(
                     RetryFor.WaitingOnInitDependency,
                     "request_onboarding_permission",
                     "request topology permission",
-                    connection.grantSvOnboardingPermission(token),
+                    connection.grantSvOnboardingPermission(token).recoverWith {
+                      case ex: Throwable
+                          if ex.getMessage
+                            .contains("unknown choice DsoRules_GrantValidatorPermission") =>
+                        Future.failed(
+                          new RuntimeException(
+                            "Sponsor SV is not fully initialized yet (unknown choice). Retrying...",
+                            ex,
+                          )
+                        )
+                    },
                     logger,
                   )
                 } yield ()
