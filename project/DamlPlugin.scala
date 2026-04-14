@@ -465,6 +465,7 @@ object DamlPlugin extends AutoPlugin {
       log,
       optCwd = Some(projectDirectory),
       extraEnv = damlLibsEnv, // env variable set so that damlc finds daml-script dar
+      streamToStdout = true,
     )
 
     val currentDar = outputDirectory / s"$damlProjectName-current.dar"
