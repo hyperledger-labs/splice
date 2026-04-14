@@ -191,7 +191,7 @@ class BootstrapPackageConfigIntegrationTest
       bobValidatorRight.getTemplateId.packageId shouldBe initialAmulet.packageId
     }
 
-    eventuallySucceeds() {
+    eventuallySucceeds(2.minute) {
       aliceWalletClient.tap(50)
     }
 
