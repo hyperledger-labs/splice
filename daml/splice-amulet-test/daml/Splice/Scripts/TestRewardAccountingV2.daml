@@ -42,6 +42,7 @@ create_and_process_reward_batches dryRun = do
       dryRunVersion = if dryRun then Some RewardVersion_TrafficBasedAppRewards else None
       batchSize = 100
       rewardCouponTimeToLive = hours 36
+      appRewardCouponThreshold = 0.5
 
   -- setup users
   alice <- allocateParty "Alice"
@@ -243,6 +244,7 @@ setupAliceWithCoupon' config = do
       dryRunVersion = None
       batchSize = 100
       rewardCouponTimeToLive = hours 36
+      appRewardCouponThreshold = 0.5
   setTime demoTime
   aliceUser <- setupUserWithoutValidatorRight app "Alice"
   let alice = aliceUser.primaryParty
@@ -384,6 +386,7 @@ test_markers_pre_traffic_based = do
       dryRunVersion = None
       batchSize = 100
       rewardCouponTimeToLive = hours 36
+      appRewardCouponThreshold = 0.5
 
   -- two issuance required to make the first round with the updated config active and open
   runNextIssuance app
@@ -455,6 +458,7 @@ test_switch_to_traffic_based_rewards = do
         dryRunVersion = None
         batchSize = 100
         rewardCouponTimeToLive = hours 36
+        appRewardCouponThreshold = 0.5
   updateAmuletConfig app $ \config -> config with rewardConfig
 
   -- validate updated config
