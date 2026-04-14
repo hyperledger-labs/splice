@@ -40,14 +40,24 @@ ensure_damlc_exists() {
 
 ensure_damlc_exists
 
+# We explicitly exclude from the generated docs API packages that were released and must remain stable (thus are also not compiled any more)
+# (make sure that to commit the corresponding generated docs before adding new ignores here by adding exceptions to docs/.gitignore)
 DAML_PROJECT_FILES="\
   $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" "$SPLICE_ROOT/token-standard/examples" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
     -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' -not -ipath '*test-trading-app*' \)  \
-    -not -ipath '*-api-*' \
     -not -ipath '*splitwell*' \
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \
+    -not -ipath 'splice-api-featured-app-v1' \
+    -not -ipath 'splice-api-featured-app-v2' \
+    -not -ipath 'splice-api-token-allocation-v1' \
+    -not -ipath 'splice-api-token-transfer-instruction-v1' \
+    -not -ipath 'splice-api-token-allocation-instruction-v1' \
+    -not -ipath 'splice-api-token-allocation-request-v1' \
+    -not -ipath 'splice-api-token-metadata-v1' \
+    -not -ipath 'splice-api-token-holding-v1' \
+    -not -ipath 'splice-api-token-burn-mint-v1' \
     -print)"
 for project_file in $DAML_PROJECT_FILES
 do

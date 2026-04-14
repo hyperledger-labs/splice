@@ -1,3 +1,11 @@
 src/app_dev/api/*
-!src/app_dev/api/*-api-*
+!src/app_dev/api/splice-api-featured-app-v1
+!src/app_dev/api/splice-api-featured-app-v2
+!src/app_dev/api/splice-api-token-allocation-v1
+!src/app_dev/api/splice-api-token-transfer-instruction-v1
+!src/app_dev/api/splice-api-token-allocation-instruction-v1
+!src/app_dev/api/splice-api-token-allocation-request-v1
+!src/app_dev/api/splice-api-token-metadata-v1
+!src/app_dev/api/splice-api-token-holding-v1
+!src/app_dev/api/splice-api-token-burn-mint-v1
 html/
