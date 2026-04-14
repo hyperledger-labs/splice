@@ -53,11 +53,13 @@ object DamlPlugin extends AutoPlugin {
     val damlCodegenUseProject =
       settingKey[Boolean]("Read config from daml.yaml")
     val damlSkipBuild =
-      settingKey[Boolean]("Skip Daml compilation and use pre-built DARs instead. Pre-built DARs will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not.")
-        .withRank(KeyRanks.Invisible) // TODO: not entirely sure why we need this, we otherwise get warnings on it being unused in canton-community-app
+      settingKey[Boolean](
+        "Skip Daml compilation and use pre-built DARs instead. Pre-built DARs will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not."
+      )
+        .withRank(KeyRanks.Invisible) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
     val damlPrebuiltDars =
       settingKey[Seq[File]]("pre-built DAR files to use when damlSkipBuild is true")
-        .withRank(KeyRanks.Invisible)
+        .withRank(KeyRanks.Invisible) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
 
     val damlGenerateCode = taskKey[Seq[File]]("Generate scala code from Daml")
     val damlDependencies = taskKey[Seq[File]]("Paths to DARs that this project depends on")
@@ -180,23 +182,22 @@ object DamlPlugin extends AutoPlugin {
           }
 
           val cache =
-            FileFunction.cached(cacheDir, FileInfo.hash) {
-              _ =>
-                // we're ignoring the cache as we don't know the dependency
+            FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
+              // we're ignoring the cache as we don't know the dependency
 
-                // build the daml files in a sorted way, using the build order definition
-                val projectFiles = damlProjectFiles.get.toList.sortWith(buildOrder)
-                projectFiles.flatMap { projectFile =>
-                  buildDamlProject(
-                    log,
-                    sourceDirectory,
-                    outputDirectory,
-                    outputLfVersion,
-                    sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
-                    damlCompilerVersion.value,
-                    damlLanguageVersions.value,
-                  )
-                }.toSet
+              // build the daml files in a sorted way, using the build order definition
+              val projectFiles = damlProjectFiles.get.toList.sortWith(buildOrder)
+              projectFiles.flatMap { projectFile =>
+                buildDamlProject(
+                  log,
+                  sourceDirectory,
+                  outputDirectory,
+                  outputLfVersion,
+                  sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
+                  damlCompilerVersion.value,
+                  damlLanguageVersions.value,
+                )
+              }.toSet
             }
 
           cache(allDamlFiles.get.toSet ++ damlProjectFiles.get.toSet ++ dependencies).toSeq

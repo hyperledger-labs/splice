@@ -445,6 +445,35 @@ version checks from from `PackageVersionSupport` will warn for checks
 that are now redundant because the version they are testing against is
 now redundant so you can delete them and the code relying on them.
 
+## Maintaining Daml Interfaces
+
+Daml interfaces need a special treatment, as Daml does not support upgrading
+interfaces. Therefore, a released package that contains interfaces cannot
+be further developed like we do for other Daml code. Development guidelines
+are thus:
+
+1. Develop the API on a separate branch, or if it's a small one, on main is
+   ok, as long as you are certain that all your changes will land before
+   the coming release. Until the code is released, you can use the standard
+   daml build tooling in sbt, etc.
+1. Once a release is cut, the Daml interface is now fixed, and it should be
+   excluded from compilation, so that e.g. a Daml compiler version bump would not
+   introduce new Dar versions. To do so:
+
+    a. In build.sbt, exclude your package from compilation by adding under your
+        package's target:
+      ```
+      Compile / damlSkipBuild := true,
+      Compile / damlPrebuiltDars := Seq(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "<your-dar-filename>"
+      ),
+      ```
+
+    b. Add your package to the list of exclusions in gen-daml-docs.sh
+
+    c. Add your package to the list of exclusions in docs/.gitignore,
+       and commit the docs for your package
+
 # Troubleshooting
 
 ## Nix Issues on MacOS
