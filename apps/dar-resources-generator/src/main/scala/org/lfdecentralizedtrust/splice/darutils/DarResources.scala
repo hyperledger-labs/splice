@@ -277,6 +277,7 @@ object DarResources {
   lazy val wallet_0_1_16 = DarResource("splice-wallet-0.1.16.dar")
   lazy val wallet_0_1_17 = DarResource("splice-wallet-0.1.17.dar")
   lazy val wallet_0_1_18 = DarResource("splice-wallet-0.1.18.dar")
+  lazy val wallet_0_1_19 = DarResource("splice-wallet-0.1.19.dar")
   lazy val wallet_current = DarResource("splice-wallet-current.dar")
   lazy val wallet = PackageResource(
     wallet_current,
@@ -301,6 +302,7 @@ object DarResources {
       wallet_0_1_16,
       wallet_0_1_17,
       wallet_0_1_18,
+      wallet_0_1_19,
     ),
   )
 
