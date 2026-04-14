@@ -846,7 +846,7 @@ object UserWalletStore {
         )(contract => UserWalletAcsInterfaceViewRowData(contract)),
         mkFilterInterface(allocationrequestv2.AllocationRequest.INTERFACE)(co =>
           co.payload.transferLegs.asScala.exists { transferLeg =>
-            transferLeg.instrumentId.admin == dso && transferLeg.sender.owner == endUser
+            transferLeg.instrumentId.admin == dso && (transferLeg.sender.owner == endUser || transferLeg.receiver.owner == endUser)
           }
         )(contract => UserWalletAcsInterfaceViewRowData(contract)),
       ),
