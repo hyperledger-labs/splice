@@ -407,11 +407,16 @@ class JoiningNodeInitializer(
                       case ex: Throwable
                           if ex.getMessage
                             .contains("unknown choice DsoRules_GrantValidatorPermission") =>
+                        // SV1 has booted but its Daml background
+                        // automation hasn't finished upgrading the DsoRules contract to the newest package version yet.
+                        // We throw a gRPC UNAVAILABLE status so the RetryProvider knows it should poll again.
                         Future.failed(
-                          new RuntimeException(
-                            "Sponsor SV is not fully initialized yet (unknown choice). Retrying...",
-                            ex,
-                          )
+                          io.grpc.Status.UNAVAILABLE
+                            .withDescription(
+                              "Sponsor SV has not finished upgrading its DsoRules contract. Retrying..."
+                            )
+                            .withCause(ex)
+                            .asRuntimeException()
                         )
                     },
                     logger,
