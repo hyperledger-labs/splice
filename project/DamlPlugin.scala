@@ -146,7 +146,6 @@ object DamlPlugin extends AutoPlugin {
           prebuiltDars.flatMap { darFile =>
             val destFile = outputDirectory / darFile.getName
             IO.copyFile(darFile, destFile)
-            log.info(s"Using pre-built DAR: ${darFile.getName}")
             // Derive the -current.dar name by stripping the version suffix
             val darName = darFile.getName.stripSuffix(".dar")
             val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
