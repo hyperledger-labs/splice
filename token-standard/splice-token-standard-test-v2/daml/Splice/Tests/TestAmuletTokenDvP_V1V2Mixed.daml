@@ -545,7 +545,8 @@ checkHoldings env description expectedHoldings = do
         TestHolding{..} <- expectedHoldings
         pure (owner, [(amount, locked, mkInstrumentId env instrumentId)])
   forA_ env.allParties $ \owner -> do
-    actualHoldings <- WalletClientV2.listHoldings' owner
+    visibleHoldings <- WalletClientV2.listVisibleHoldings owner
+    let actualHoldings = filter (\(_, h) -> h.account.owner == owner) visibleHoldings
     case Map.lookup owner holdingsByOwner of
       None -> unless (Prelude.null actualHoldings) $
         fail $ T.unlines $
