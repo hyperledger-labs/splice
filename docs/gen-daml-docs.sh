@@ -41,7 +41,7 @@ ensure_damlc_exists() {
 ensure_damlc_exists
 
 # We explicitly exclude from the generated docs API packages that were released and must remain stable (thus are also not compiled any more)
-# (make sure that to commit the corresponding generated docs before adding new ignores here by adding exceptions to docs/.gitignore)
+# (make sure to commit the corresponding generated docs before adding new ignores here, by adding exceptions to docs/.gitignore)
 DAML_PROJECT_FILES="\
   $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" "$SPLICE_ROOT/token-standard/examples" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
