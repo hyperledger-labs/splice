@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for the purpose of supporting the initiation
     of asset transfers; e.g. to settle off-ledger obligations.
-  version: 2.0.0
+  version: 1.0.0
 paths:
 
   /registry/transfer-instruction/v2/transfer-factory:
