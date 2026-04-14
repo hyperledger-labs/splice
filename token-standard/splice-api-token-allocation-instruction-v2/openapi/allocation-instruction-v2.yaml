@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for using and managing
     allocation instructions by wallets.
-  version: 2.0.0
+  version: 1.0.0
 paths:
 
   /registry/allocation-instruction/v2/allocation-factory:

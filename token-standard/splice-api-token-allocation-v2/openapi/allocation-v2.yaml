@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for the purpose of the use and management of
     allocations by wallets and apps orchestrating the settlement of asset transfers.
-  version: 2.0.0
+  version: 1.0.0
 paths:
   /registry/allocation/v2/settlement-factory:
     post:
