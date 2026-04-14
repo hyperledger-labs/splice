@@ -214,9 +214,18 @@ export function svCometBftGovernanceKeySecret(
 
 export function installPostgresPasswordSecret(
   ns: ExactNamespace,
-  password: pulumi.Output<string>,
-  secretName: string
+  password: pulumi.Input<string>,
+  secretName: string,
+  existingSecretName?: string,
+  yieldManagement: boolean = false
 ): k8s.core.v1.Secret {
+  const importOpts =
+    existingSecretName !== undefined
+      ? {
+          import: `${ns.logicalName}/${existingSecretName}`,
+          ignoreChanges: ['metadata.name', 'data.postgresPassword'],
+        }
+      : {};
   return new k8s.core.v1.Secret(
     `cn-app-${ns.logicalName}-${secretName}`,
     {
@@ -226,11 +235,13 @@ export function installPostgresPasswordSecret(
       },
       type: 'Opaque',
       data: {
-        postgresPassword: password.apply(p => btoa(p || '')), // password is undefined in dump-config
+        postgresPassword: pulumi.output(password).apply(p => btoa(p || '')), // password is undefined in dump-config
       },
     },
     {
       dependsOn: [ns.ns],
+      retainOnDelete: yieldManagement,
+      ...importOpts,
     }
   );
 }

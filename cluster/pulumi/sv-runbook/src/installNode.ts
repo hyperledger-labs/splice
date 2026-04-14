@@ -255,7 +255,7 @@ async function installSvAndValidator(
     svRunbookConfig.ingressName
   );
 
-  const appsPg = installPostgres(
+  const appsPg = await installPostgres(
     xns,
     'apps-pg',
     'apps-pg-secret',
