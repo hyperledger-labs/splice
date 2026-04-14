@@ -4,6 +4,7 @@ import {
   activeVersion,
   Auth0Client,
   auth0UserNameEnvVarSource,
+  DecentralizedSynchronizerUpgradeConfig,
   exactNamespace,
   imagePullSecretWithNonDefaultServiceAccount,
   installLedgerApiUserSecret,
@@ -15,19 +16,22 @@ import {
   svConfigs,
   svRunbookConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { StackReferences } from '@lfdecentralizedtrust/splice-pulumi-common/src/stackReferences';
 
-export function installNode(sv: string, auth0Client: Auth0Client): void {
+export async function installNode(sv: string, auth0Client: Auth0Client): Promise<void> {
   const staticConfig = findStaticConfigOrFail(sv);
   const config = configForSv(staticConfig.nodeName);
-  // I don't get this comment VVV
-  // namespace lifecycle is managed by the main canton-network stack
   const xns = exactNamespace(staticConfig.nodeName, true, true);
   const serviceAccountName = 'sv';
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
   const auth0Config = auth0Client.getCfg();
   const ledgerApiUserSecret = installLedgerApiUserSecret(auth0Client, xns, 'sv', 'sv');
   const ledgerApiUserSecretSource = auth0UserNameEnvVarSource('sv', true);
-  installParticipant(
+  const participantMigrationInfo = DecentralizedSynchronizerUpgradeConfig.active
+    .migrateParticipantsFromSvCantonToSv
+    ? await getParticipantMigrationInfo(sv)
+    : undefined;
+  await installParticipant(
     {
       xns,
       participant: config.participant,
@@ -37,6 +41,7 @@ export function installNode(sv: string, auth0Client: Auth0Client): void {
       disableProtection: staticConfig.nodeName === svRunbookConfig.nodeName,
       participantAdminUserNameFrom: ledgerApiUserSecretSource,
       imagePullServiceAccountName: serviceAccountName,
+      migratingDatabaseInstanceName: participantMigrationInfo?.participantDatabaseId,
     },
     { dependsOn: [...imagePullDeps, ledgerApiUserSecret] }
   );
@@ -51,4 +56,14 @@ function findStaticConfigOrFail(sv: string): StaticSvConfig {
   } else {
     return svConfig;
   }
+}
+
+async function getParticipantMigrationInfo(sv: string): Promise<{ participantDatabaseId: string }> {
+  const svCantonRef = StackReferences.svCanton(
+    sv,
+    DecentralizedSynchronizerUpgradeConfig.active.id
+  );
+  return {
+    participantDatabaseId: await svCantonRef.getOutputValue('participantDatabaseId'),
+  };
 }

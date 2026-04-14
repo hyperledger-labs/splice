@@ -25,7 +25,7 @@ import {
 
 import { spliceConfig } from '../../common/src/config/config';
 
-export function installCantonComponents(
+export async function installCantonComponents(
   xns: ExactNamespace,
   migrationId: DomainMigrationIndex,
   auth0Client: Auth0Client,
@@ -54,7 +54,7 @@ export function installCantonComponents(
   opts?: SpliceCustomResourceOptions,
   disableProtection?: boolean,
   imagePullServiceAccountName?: string
-): InstalledMigrationSpecificSv | undefined {
+): Promise<InstalledMigrationSpecificSv | undefined> {
   const isActiveMigration = migrationConfig.active.id === migrationId;
 
   const auth0Config = auth0Client.getCfg();
@@ -81,7 +81,7 @@ export function installCantonComponents(
     : migrationInfo.version;
   const mediatorPostgres =
     dbs?.mediator ||
-    installPostgres(
+    (await installPostgres(
       xns,
       `mediator-${migrationId}-pg`,
       `mediator-pg`,
@@ -93,10 +93,10 @@ export function installCantonComponents(
         migrationId,
         disableProtection,
       }
-    );
+    ));
   const sequencerPostgres =
     dbs?.sequencer ||
-    installPostgres(
+    (await installPostgres(
       xns,
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
@@ -104,27 +104,29 @@ export function installCantonComponents(
       svConfig.sequencer?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
-    );
-  const { chart: participant } = !migrationInfo.enableLogicalSynchronizerDeploymentMode
-    ? installParticipant(
-        {
-          xns,
-          participant: svConfig.participant,
-          logging: svConfig.logging,
-          version,
-          auth0: auth0Config,
-          existingDb: dbs?.participant,
-          disableProtection,
-          participantAdminUserNameFrom: ledgerApiUserSecretSource,
-          imagePullServiceAccountName,
-          migration: {
-            id: migrationId,
-            isStillRunning: migrationStillRunning,
+    ));
+  const { chart: participant, db: participantDb } =
+    !migrationInfo.enableLogicalSynchronizerDeploymentMode
+      ? await installParticipant(
+          {
+            xns,
+            participant: svConfig.participant,
+            logging: svConfig.logging,
+            version,
+            auth0: auth0Config,
+            existingDb: dbs?.participant,
+            disableProtection,
+            participantAdminUserNameFrom: ledgerApiUserSecretSource,
+            imagePullServiceAccountName,
+            migration: {
+              id: migrationId,
+              isStillRunning: migrationStillRunning,
+            },
+            yieldManagement: migrationInfo.migrateParticipantsFromSvCantonToSv,
           },
-        },
-        withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
-      )
-    : { chart: undefined };
+          withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
+        )
+      : { chart: undefined, db: undefined };
   if (migrationStillRunning) {
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
@@ -166,6 +168,7 @@ export function installCantonComponents(
           ? {
               asDependencies: [participant],
               internalClusterAddress: participant.name,
+              databaseId: participantDb.databaseId,
             }
           : {
               asDependencies: [],
