@@ -418,7 +418,7 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
-    val (aliceUserParty, _) = onboardAliceAndBob()
+    val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
 
     clue(
@@ -591,6 +591,22 @@ class ScanTimeBasedIntegrationTest
           v0s.totalUnlockedCoin shouldBe v1s.totalUnlockedCoin
           v0s.totalLockedCoin shouldBe v1s.totalLockedCoin
           v0s.totalCoinHoldings shouldBe v1s.totalCoinHoldings
+        }
+      }
+
+      // V1 multi-party query: querying with both alice and bob exercises
+      // multi-party support at the HTTP endpoint level
+      val holdingsSummaryV1MultiParty = sv1ScanBackend.getHoldingsSummaryAtV1(
+        snapshotAfterCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty, bobUserParty),
+      )
+      inside(holdingsSummaryV1MultiParty) { case Some(res) =>
+        // Alice should appear in the multi-party result with the same values
+        val aliceSummaries = res.summaries.filter(_.partyId == aliceUserParty.toProtoPrimitive)
+        aliceSummaries should not be empty
+        inside(holdingsSummaryV1) { case Some(singleRes) =>
+          aliceSummaries shouldBe singleRes.summaries
         }
       }
 
