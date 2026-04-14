@@ -74,6 +74,9 @@ data RewardConfig = RewardConfig with
     dryRunVersion : Optional RewardVersion -- ^ What scheme to use for dry-running reward minting. If None, dry-runs are disabled.
     batchSize : Int -- ^ Batch size to use for building the Merkle-tree over minting allowances.
     rewardCouponTimeToLive : RelTime -- ^ Time to live for reward coupons, default 36h to support batching of collection across 12h with a 24h prepare-submission delay.
+    appRewardCouponThreshold : Decimal -- ^ Threshold for minting reward coupons, in USD.
+    -- This threshold is not enforced in daml, but it must be used while building the Merkle-tree
+    -- to ignore minting allowances lower than this value.
   deriving (Eq, Show)
 
 
@@ -195,6 +198,7 @@ instance Patchable RewardConfig where
     dryRunVersion = patch new.dryRunVersion base.dryRunVersion current.dryRunVersion
     batchSize = patch new.batchSize base.batchSize current.batchSize
     rewardCouponTimeToLive = patch new.rewardCouponTimeToLive base.rewardCouponTimeToLive current.rewardCouponTimeToLive
+    appRewardCouponThreshold = patch new.appRewardCouponThreshold base.appRewardCouponThreshold current.appRewardCouponThreshold
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
