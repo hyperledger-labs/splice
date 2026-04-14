@@ -150,7 +150,7 @@ export const Governance: React.FC = () => {
         yourVote: computeYourVote(votes, svPartyId),
         status: 'In Progress',
         voteStats: computeVoteStats(votes),
-        acceptanceThreshold: votingThreshold!,
+        acceptanceThreshold: dsoInfosQuery.data.votingThreshold,
       } as ProposalListingData;
     });
 
