@@ -53,6 +53,15 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
+    withClue("Attempting to grant permission with an invalid token fails") {
+      val invalidToken = "not-a-valid-base64-signed-token"
+
+      assertThrowsAndLogsCommandFailures(
+        sv1Backend.grantSvOnboardingPermission(invalidToken),
+        _.errorMessage should include("Could not verify and decode token"),
+      )
+    }
+
     withClue("Grant validator permission to Alice and verify visibility across all SVs") {
 
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
