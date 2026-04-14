@@ -96,7 +96,6 @@ class HttpTokenStandardMetadataHandler(
       totalSupply = optSupply.map(_.amount.toString()),
       totalSupplyAsOf = optSupply.map(_.asOfTimestamp.atOffset(ZoneOffset.UTC)),
       supportedApis = Map(
-        // V1 endpoints have minor version 1 for historical reasons. We don't change it to not break existing clients.
         "splice-api-token-metadata-v1" -> 1,
         "splice-api-token-holding-v1" -> 1,
         "splice-api-token-transfer-instruction-v1" -> 1,
@@ -105,10 +104,9 @@ class HttpTokenStandardMetadataHandler(
         // No burn-mint API, as that's not used for Amulet
         // No alloation-request API, as that's an API used by apps, not registries
 
-        // V2 endpoints have minor version 0
-        "splice-api-token-holding-v2" -> 0,
-        "splice-api-token-allocation-v2" -> 0,
-        "splice-api-token-allocation-instruction-v2" -> 0,
+        "splice-api-token-holding-v2" -> 1,
+        "splice-api-token-allocation-v2" -> 1,
+        "splice-api-token-allocation-instruction-v2" -> 1,
       ),
     )
 
