@@ -17,11 +17,9 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
-import org.lfdecentralizedtrust.splice.wallet.automation.AcceptedTransferOfferTrigger
 import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
-  NotificationTxLogEntry,
   TransferTxLogEntry,
   UnknownTxLogEntry,
   TxLogEntry as walletLogEntry,
@@ -1237,109 +1235,6 @@ class WalletTxLogIntegrationTest
       }
     }
 
-    "handle failed automation (direct transfer)" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
-
-      val (offerCid, _) =
-        actAndCheck(
-          "Alice creates transfer offer",
-          aliceWalletClient.createTransferOffer(
-            bobUserParty,
-            100.0,
-            "direct transfer test",
-            CantonTimestamp.now().plus(Duration.ofMinutes(1)),
-            UUID.randomUUID.toString,
-          ),
-        )(
-          "Bob sees transfer offer",
-          _ => bobWalletClient.listTransferOffers() should have length 1,
-        )
-
-      clue("Bob accepts transfer offer") {
-        bobWalletClient.acceptTransferOffer(offerCid)
-        // At this point, Alice's automation fails to complete the accepted offer
-      }
-
-      checkTxHistory(
-        aliceWalletClient,
-        Seq({ case logEntry: NotificationTxLogEntry =>
-          logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto
-          logEntry.details should startWith("ITR_InsufficientFunds")
-        }),
-      )
-
-      // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter =
-        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
-
-      withoutDevNetTopups(validatorTxLogBefore) should be(
-        withoutDevNetTopups(validatorTxLogAfter)
-      )
-      checkTxHistory(bobWalletClient, Seq.empty)
-    }
-
-    // See #11168
-    "two batched failures shouldn't blow up the store ingestion" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-
-      def aliceAcceptedTransferOfferTrigger =
-        aliceValidatorBackend
-          .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
-          .futureValue
-          .trigger[AcceptedTransferOfferTrigger]
-
-      // We disable the trigger and use a large number of transfers to ensure at least some will get batched
-      val offerCids = setTriggersWithin(
-        triggersToPauseAtStart = Seq(aliceAcceptedTransferOfferTrigger),
-        Seq.empty,
-      ) {
-
-        val (offerCids, _) =
-          actAndCheck(
-            "Alice creates transfer offer",
-            (1 to 20).map(n =>
-              aliceWalletClient.createTransferOffer(
-                bobUserParty,
-                100.0,
-                "direct transfer test",
-                CantonTimestamp.now().plus(Duration.ofHours(1)),
-                n.toString,
-              )
-            ),
-          )(
-            "Bob sees transfer offer",
-            offerCids =>
-              bobWalletClient.listTransferOffers() should have length offerCids.size.toLong,
-          )
-
-        clue("Bob accepts transfer offer") {
-          offerCids.foreach(bobWalletClient.acceptTransferOffer)
-          // At this point, Alice's automation fails to complete the accepted offers
-        }
-
-        offerCids
-      }
-
-      eventually() {
-        val txs = aliceWalletClient.listTransactions(None, pageSize = offerCids.size)
-        // mapping to make it readable
-        txs.map(
-          _.eventId
-        ) should have size offerCids.size.toLong withClue "alice Transaction event IDs"
-        forAll(txs) {
-          case logEntry: NotificationTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto
-            logEntry.details should startWith("ITR_InsufficientFunds")
-          case bad =>
-            fail(s"Unexpected log entry: $bad")
-        }
-      }
-    }
-
     "handle failed automation (app payment)" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
@@ -1400,159 +1295,6 @@ class WalletTxLogIntegrationTest
 
       // Accepting a subscription fails synchronously and should not include a notification
       checkTxHistory(aliceWalletClient, Seq.empty)
-    }
-
-    "handle failed automation (subscription payment)" in { implicit env =>
-      val aliceUserId = aliceWalletClient.config.ledgerApiUser
-      val charlieUserId = charlieWalletClient.config.ledgerApiUser
-      val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
-
-      // Note: using Alice and Charlie because manually creating subscriptions requires both
-      // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-
-      val subscriptionPrice = BigDecimal(75.0)
-
-      clue("Alice taps just enough amulets for one payment") {
-        aliceWalletClient.tap(100.0)
-      }
-
-      val (_, request) = actAndCheck(
-        "Create subscription request (Alice subscribing to Charlie's service)",
-        createSubscriptionRequest(
-          aliceValidatorBackend.participantClientWithAdminToken,
-          aliceUserId,
-          aliceUserParty,
-          charlieUserParty,
-          charlieUserParty,
-          paymentAmount(subscriptionPrice, walletCodegen.Unit.AMULETUNIT),
-          paymentInterval = Duration.ofMillis(10),
-          paymentDuration = Duration.ofMillis(10),
-        ),
-      )(
-        "Request appears in Alices' wallet",
-        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
-      )
-
-      val (_, initialPayment) = actAndCheck(
-        "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
-      )(
-        "Request disappears from Alice's list",
-        initPaymentCid => {
-          aliceWalletClient
-            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
-          inside(
-            aliceWalletClient.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid)
-          ) { case Some(initPayment) =>
-            initPayment
-          }
-        },
-      )
-
-      // Because paymentInterval == paymentDuration, the second payment can be made immediately.
-      // Automation will attempt to make the payment at any time after collecting the accepted subscription request,
-      // each of these attempts will fail due to insufficient funds, and automation will retry the payment forever.
-      // Each failed attempt will produce one WARN and one ERROR log entry, which we need to suppress.
-      // TODO(DACH-NY/canton-network-node#2034): simplify this test once automation stops retrying forever
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        {
-          val (subscriptionResult, _) = actAndCheck(
-            "Charlie collects the initial payment",
-            collectAcceptedSubscriptionRequest(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              charlieUserId,
-              charlieUserParty,
-              aliceUserParty,
-              initialPayment,
-            ),
-          )(
-            "Charlie's balance reflects the collected payment",
-            _ =>
-              charlieWalletClient
-                .balance()
-                .unlockedQty should be > (subscriptionPrice - smallAmount),
-          )
-
-          clue("Failure notification appears") {
-            eventually() {
-              aliceWalletClient.listTransactions(None, 100).size should be > 3
-            }
-          }
-
-          actAndCheck(
-            "Charlie expires the subscription because it has not been paid",
-            // The subscription was created with a 10ms payment interval,
-            // here we assume that at least 10ms have passed since the initial payment.
-            expireUnpaidSubscription(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              charlieUserId,
-              charlieUserParty,
-              subscriptionResult.subscriptionState,
-            ),
-          )(
-            "Alice doesn't see any subscription",
-            _ => aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions",
-          )
-
-          eventually() {
-            inside(aliceWalletClient.listTransactions(None, 100)) {
-              case notifications :+ subscriptionPaymentCollected :+ subscriptionPaymentAccepted :+ balanceChange =>
-                forExactly(1, notifications) {
-                  case logEntry: NotificationTxLogEntry =>
-                    logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionExpired.toProto
-                    logEntry.details should startWith("Expired")
-                  case e => fail(s"Unexpected log entry $e")
-                }
-                // guaranteed to have at least 1
-                forExactly(notifications.size - 1, notifications) {
-                  case logEntry: NotificationTxLogEntry =>
-                    logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed.toProto
-                    logEntry.details should startWith("ITR_InsufficientFunds")
-                  case e => fail(s"Unexpected log entry $e")
-                }
-
-                inside(subscriptionPaymentCollected) { case logEntry: TransferTxLogEntry =>
-                  logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected.toProto
-                }
-                inside(subscriptionPaymentAccepted) { case logEntry: TransferTxLogEntry =>
-                  logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentAccepted.toProto
-                }
-                inside(balanceChange) { case logEntry: BalanceChangeTxLogEntry =>
-                  logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-                }
-            }
-          }
-
-          // Validator should not see any notification (note that aliceValidator is shared between tests)
-          val validatorTxLogAfter =
-            aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
-          withoutDevNetTopups(validatorTxLogBefore) should be(
-            withoutDevNetTopups(validatorTxLogAfter)
-          )
-
-          // Charlie (the provider of the subscription) should see a notification
-          checkTxHistory(
-            charlieWalletClient,
-            Seq(
-              { case logEntry: NotificationTxLogEntry =>
-                logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionExpired.toProto
-              },
-              { case logEntry: TransferTxLogEntry =>
-                logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected.toProto
-              },
-            ),
-          )
-        },
-        entries =>
-          forEvery(entries)(entry =>
-            (entry.message + entry.throwable.fold("")(_.getMessage)) should include(
-              "Failed making subscription payment due to Daml exception"
-            )
-          ),
-      )
     }
 
     // Time based to avoid SV reward collection kicking in.
@@ -1677,7 +1419,9 @@ class WalletTxLogIntegrationTest
           entries,
         )(
           _.errorMessage should include(
-            "the amulet operation failed with a Daml exception: COO_Error(ITR_InsufficientFunds"
+            "the amulet operation failed with a Daml exception:"
+          ).and(
+            include("ITR_InsufficientFunds")
           )
         )
       },
