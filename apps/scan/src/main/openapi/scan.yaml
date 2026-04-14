@@ -731,6 +731,7 @@ paths:
 
   /v0/holdings/summary:
     post:
+      deprecated: true
       tags: [deprecated]
       x-jvm-package: scan
       operationId: "getHoldingsSummaryAt"
@@ -764,7 +765,7 @@ paths:
       operationId: "getHoldingsSummaryAtV1"
       description: |
         Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
-        This is an aggregate of `/v1/holdings/state` by owner party ID with better performance than client-side computation.
+        This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
         Unlike /v0/holdings/summary, this version does not include holding fee fields
         as they do not express a meaningful aggregate value.
       requestBody:
