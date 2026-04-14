@@ -43,7 +43,7 @@ import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   Codec,
-  Contract,
+  ContractList,
   ContractWithState,
   DisclosedContracts,
   SpliceUtil,
@@ -52,7 +52,6 @@ import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletServ
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
-import cats.data.Chain
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
@@ -1209,7 +1208,7 @@ class HttpWalletHandler(
           amuletAllocationV2Codegen.AmuletAllocationV2.COMPANION
         )
       } yield {
-        val contracts = HttpWalletHandler.mergeSortedContractLists(
+        val contracts = ContractList.mergeSortedContractListsToHttp(
           v1Contracts.map(_.contract),
           v2Contracts.map(_.contract),
         )
@@ -1366,7 +1365,7 @@ class HttpWalletHandler(
         )
       } yield {
         // If a contract implements both V1 and V2, V2 will win, as per mergeSortedContractLists' docs
-        val contracts = HttpWalletHandler.mergeSortedContractLists(v1Contracts, v2Contracts)
+        val contracts = ContractList.mergeSortedContractListsToHttp(v1Contracts, v2Contracts)
         d0.ListAllocationRequestsResponse(
           contracts.toVector
             .map(d0.AllocationRequest(_))
@@ -1858,37 +1857,4 @@ class HttpWalletHandler(
       }
     }
   }
-}
-
-object HttpWalletHandler {
-
-  /** Given two lists that are sorted by `createdAt` (or a field that is linked to it, such as store insertion order),
-    * this will return a list that merges both of them in order. The running cost is O(size(l1) + size(l2)).
-    * In case of duplicates by contract id, the entry from l2 wins.
-    */
-  private def mergeSortedContractLists(l1: Seq[Contract[?, ?]], l2: Seq[Contract[?, ?]])(implicit
-      elc: ErrorLoggingContext
-  ): Chain[d0.Contract] = {
-    @scala.annotation.tailrec
-    def go(
-        l1: List[Contract[?, ?]],
-        l2: List[Contract[?, ?]],
-        acc: Chain[d0.Contract],
-    ): Chain[d0.Contract] = {
-      (l1, l2) match {
-        case (Nil, Nil) => acc
-        case (remaining, Nil) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
-        case (Nil, remaining) => acc ++ Chain.fromSeq(remaining.map(_.toHttp))
-        case (h1 :: t1, h2 :: t2) =>
-          if (h1.contractId.contractId == h2.contractId.contractId) {
-            go(t1, t2, acc :+ h2.toHttp)
-          } else if (h1.createdAt.isBefore(h2.createdAt))
-            go(t1, l2, acc :+ h1.toHttp)
-          else
-            go(l1, t2, acc :+ h2.toHttp)
-      }
-    }
-    go(l1.toList, l2.toList, Chain.empty)
-  }
-
 }
