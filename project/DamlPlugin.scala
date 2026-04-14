@@ -56,10 +56,14 @@ object DamlPlugin extends AutoPlugin {
       settingKey[Boolean](
         "Skip Daml compilation and use pre-built DARs instead. Pre-built DARs will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not."
       )
-        .withRank(KeyRanks.Invisible) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
+        .withRank(
+          KeyRanks.Invisible
+        ) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
     val damlPrebuiltDars =
       settingKey[Seq[File]]("pre-built DAR files to use when damlSkipBuild is true")
-        .withRank(KeyRanks.Invisible) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
+        .withRank(
+          KeyRanks.Invisible
+        ) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
 
     val damlGenerateCode = taskKey[Seq[File]]("Generate scala code from Daml")
     val damlDependencies = taskKey[Seq[File]]("Paths to DARs that this project depends on")
