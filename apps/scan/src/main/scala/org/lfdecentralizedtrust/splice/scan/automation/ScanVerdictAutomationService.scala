@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchro
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
-import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
@@ -38,7 +37,6 @@ class ScanVerdictAutomationService(
     migrationId: Long,
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
-    sequencerTrafficClientO: Option[SequencerTrafficClient],
     rewardsReferenceStoreO: Option[ScanRewardsReferenceStore],
 )(implicit
     ec: ExecutionContextExecutor,
@@ -69,7 +67,6 @@ class ScanVerdictAutomationService(
       migrationId = migrationId,
       synchronizerId = synchronizerId,
       ingestionMetrics = ingestionMetrics,
-      sequencerTrafficClientO = sequencerTrafficClientO,
       appActivityComputationO = appActivityComputationO,
       backoffClock = triggerContext.pollingClock,
       retryProvider = triggerContext.retryProvider,

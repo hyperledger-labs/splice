@@ -15,22 +15,23 @@ import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 import io.grpc.protobuf.StatusProto
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
-import org.lfdecentralizedtrust.splice.automation.RetryingService
+import org.lfdecentralizedtrust.splice.automation.{RetryingService, ServiceWithShutdown}
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, ServiceWithGuaranteedShutdown}
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
-import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
@@ -43,7 +44,6 @@ class ScanVerdictIngestionService(
     migrationId: Long,
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
-    sequencerTrafficClientO: Option[SequencerTrafficClient],
     appActivityComputationO: Option[AppActivityComputation],
     backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
@@ -90,7 +90,7 @@ class ScanVerdictIngestionService(
 
   override protected def instantiateService()(implicit
       traceContext: TraceContext
-  ): Future[ServiceWithGuaranteedShutdown[Seq[v30.Verdict]]] =
+  ): Future[ServiceWithShutdown] =
     for {
       _ <- waitForStores()
       ingestionStart <- getIngestionStart()
@@ -103,145 +103,150 @@ class ScanVerdictIngestionService(
         ingestionStart.isAfter(announcement.mapping.upgradeTime) &&
         announcement.mapping.successorSynchronizerId != currentPsid
       }
-      val source = pastUpgradeAnnouncement match {
-        case Some(announcement) =>
-          logger.info(
-            s"Ingestion start $ingestionStart is after LSU upgrade time ${announcement.mapping.upgradeTime}, " +
-              s"skipping current mediator client and using successor directly"
-          )
-          successorMediatorClientO match {
-            case Some(successorMediatorClient) =>
-              successorMediatorClient
-                .streamVerdicts(Some(ingestionStart))
-                .mapMaterializedValue(_ => NotUsed)
-            case None =>
-              logger.error(
-                "Ingestion start is past LSU upgrade time but no successor mediator client is configured"
-              )
-              Source.empty[v30.Verdict]
-          }
-        case None =>
-          logger.info(s"Streaming verdicts starting from $ingestionStart")
-          val currentSource = currentMediatorClient.streamVerdicts(Some(ingestionStart))
-          val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
-          currentSource
-            .mapMaterializedValue { completeFuture =>
-              completeFuture.foreach { result =>
-                completedWithCompleteF.trySuccess(result).discard
-                result match {
-                  case Some(complete) =>
-                    logger.info(
-                      s"Current mediator verdicts stream completed with: $complete, closing current client"
-                    )
-                    currentMediatorClient.close()
-                  case None =>
-                }
-              }(ec)
-              completeFuture.failed.foreach { ex =>
-                completedWithCompleteF.tryFailure(ex)
-              }(ec)
-              NotUsed
-            }
-            .concat(
-              Source
-                .futureSource(
-                  completedWithCompleteF.future.flatMap {
-                    case Some(_) =>
-                      getIngestionStart().map { successorIngestionStart =>
-                        successorMediatorClientO match {
-                          case Some(successorMediatorClient) =>
-                            logger.info(
-                              s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
-                            )
-                            successorMediatorClient
-                              .streamVerdicts(Some(successorIngestionStart))
-                              .mapMaterializedValue(_ => NotUsed)
-                          case None =>
-                            logger.error(
-                              "Current mediator verdicts stream completed but no successor mediator client is configured"
-                            )
-                            Source.empty[v30.Verdict]
-                        }
-                      }
-                    case None =>
-                      Future.successful(Source.empty[v30.Verdict])
-                  }
-                )
-                .mapMaterializedValue(_ => NotUsed)
+      val source: Source[(Seq[v30.Verdict], Seq[DbScanVerdictStore.TrafficSummaryT]), NotUsed] =
+        pastUpgradeAnnouncement match {
+          case Some(announcement) =>
+            logger.info(
+              s"Ingestion start $ingestionStart is after LSU upgrade time ${announcement.mapping.upgradeTime}, " +
+                s"skipping current mediator client and using successor directly"
             )
-      }
+            successorMediatorClientO match {
+              case Some(successorMediatorClient) =>
+                streamVerdictsAndBatchWithTraffic(
+                  ingestionStart,
+                  successorMediatorClient,
+                  synchronizerNodes.successor.flatMap(_.sequencerTrafficClient),
+                )
+                  .mapMaterializedValue(_ => NotUsed)
+              case None =>
+                logger.error(
+                  "Ingestion start is past LSU upgrade time but no successor mediator client is configured"
+                )
+                Source.empty
+            }
+          case None =>
+            logger.info(s"Streaming verdicts starting from $ingestionStart")
+            val currentSource =
+              streamVerdictsAndBatchWithTraffic(
+                ingestionStart,
+                currentMediatorClient,
+                synchronizerNodes.current.sequencerTrafficClient,
+              )
+            val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
+            currentSource
+              .mapMaterializedValue { completeFuture =>
+                completeFuture.foreach { result =>
+                  completedWithCompleteF.trySuccess(result).discard
+                  result match {
+                    case Some(complete) =>
+                      logger.info(
+                        s"Current mediator verdicts stream completed with: $complete, closing current client"
+                      )
+                      currentMediatorClient.close()
+                    case None =>
+                  }
+                }(ec)
+                completeFuture.failed.foreach { ex =>
+                  completedWithCompleteF.tryFailure(ex)
+                }(ec)
+                NotUsed
+              }
+              .concat(
+                Source
+                  .futureSource(
+                    completedWithCompleteF.future.flatMap {
+                      case Some(_) =>
+                        getIngestionStart().map { successorIngestionStart =>
+                          successorMediatorClientO match {
+                            case Some(successorMediatorClient) =>
+                              logger.info(
+                                s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
+                              )
+                              streamVerdictsAndBatchWithTraffic(
+                                successorIngestionStart,
+                                successorMediatorClient,
+                                synchronizerNodes.successor.flatMap(_.sequencerTrafficClient),
+                              )
+                                .mapMaterializedValue(_ => NotUsed)
+                            case None =>
+                              logger.error(
+                                "Current mediator verdicts stream completed but no successor mediator client is configured"
+                              )
+                              Source.empty
+                          }
+                        }
+                      case None =>
+                        Future.successful(Source.empty)
+                    }
+                  )
+                  .mapMaterializedValue(_ => NotUsed)
+              )
+        }
       new ServiceWithGuaranteedShutdown(
-        source = batchSource(source),
+        source = source,
         map = processWhenUnpaused,
         retryProvider = retryProvider,
         loggerFactory = loggerFactory.append("subsClient", this.getClass.getSimpleName),
       )
     }
 
-  private def process(batch: Seq[v30.Verdict])(implicit
+  private def streamVerdictsAndBatchWithTraffic(
+      ingestionStart: CantonTimestamp,
+      successorMediatorClient: MediatorVerdictsClient,
+      sequencerTrafficClient: Option[SequencerTrafficClient],
+  )(implicit tc: TraceContext) = {
+    batchSource(
+      successorMediatorClient
+        .streamVerdicts(Some(ingestionStart))
+    ).mapAsync(1) { batch =>
+      // Extract sequencing times and build view_hash -> view_id correlation map
+      val (sequencingTimes, viewHashToViewIdByTime) = buildViewHashCorrelation(batch)
+
+      // 1. Fetch traffic summaries FIRST (before any DB operations)
+      val trafficSummariesF: Future[Seq[DbScanVerdictStore.TrafficSummaryT]] =
+        sequencerTrafficClient match {
+          case Some(sequencerTrafficClient) =>
+            getTrafficSummaries(
+              sequencerTrafficClient,
+              sequencingTimes,
+              viewHashToViewIdByTime,
+            )
+          case None =>
+            Future.successful(Seq.empty)
+        }
+
+      trafficSummariesF.map(trafficSummaries => (batch, trafficSummaries))
+    }
+  }
+
+  private def process(input: (Seq[v30.Verdict], Seq[DbScanVerdictStore.TrafficSummaryT]))(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    if (batch.isEmpty) {
+    val (verdicts, trafficSummary) = input
+    if (verdicts.isEmpty) {
       logger.error(
         "Received empty batch of verdicts to ingest. This is never supposed to happen."
       )
       Future.successful(())
     } else {
-      // Extract sequencing times and build view_hash -> view_id correlation map
-      val (sequencingTimes, viewHashToViewIdByTime) =
-        DbScanVerdictStore.buildViewHashCorrelation(batch)
 
-      // 1. Fetch traffic summaries FIRST (before any DB operations)
-      val trafficSummariesF: Future[Seq[DbScanVerdictStore.TrafficSummaryT]] =
-        sequencerTrafficClientO match {
-          case Some(sequencerTrafficClient) =>
-            sequencerTrafficClient
-              .getTrafficSummaries(sequencingTimes)
-              .map(_.map { proto =>
-                DbScanVerdictStore
-                  .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
-              })
-              // TODO(#4060): handle missing traffic summaries more robustly. In particular,
-              // note that the whole call will fail if ANY of the requested traffic summaries are missing.
-              // This workaround may therefore drop existing traffic summaries.
-              .recoverWith { case ex @ GrpcException(status, trailers) =>
-                val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
-                val errorDetails = ErrorDetails.from(statusProto)
-                val errorCodeId = errorDetails
-                  .flatMap {
-                    case ed: ErrorDetails.ErrorInfoDetail =>
-                      Some(ed.errorCodeId)
-                    case _ => None
-                  }
-                  .headOption
-                  .getOrElse("none")
-                if (errorCodeId == TrafficControlErrors.NoEventAtTimestamps.id)
-                  Future.successful(Seq.empty)
-                else
-                  Future.failed(ex)
-              }
-          case None =>
-            Future.successful(Seq.empty)
-        }
-
-      // 2. Insert verdicts, traffic summaries, and app activity records in a single transaction
-      for {
-        trafficSummaries <- trafficSummariesF
-
-        // Pair traffic summaries with verdicts by sequencing time
-        summaryByTime = trafficSummaries.map(s => s.sequencingTime -> s).toMap
-        items = batch.map(v =>
+      // Pair traffic summaries with verdicts by sequencing time
+      val summaryByTime = trafficSummary.map(s => s.sequencingTime -> s).toMap
+      val items =
+        verdicts.map(v =>
           DbScanVerdictStore.fromProto(v, migrationId, synchronizerId, summaryByTime)
         )
 
-        // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
-        //
-        // Once #4060 is confirmed, this should simplify, as 'items' will fail
-        // construction if any verdicts did not have a trafficSummary
-        summariesWithVerdicts = batch.flatMap { v =>
-          val recordTime = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
-          summaryByTime.get(recordTime).map(_ -> v)
-        }
+      // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
+      //
+      // Once #4060 is confirmed, this should simplify, as 'items' will fail
+      // construction if any verdicts did not have a trafficSummary
+      val summariesWithVerdicts = verdicts.flatMap { v =>
+        val recordTime = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
+        summaryByTime.get(recordTime).map(_ -> v)
+      }
+      // Insert verdicts, traffic summaries, and app activity records in a single transaction
+      for {
 
         // Compute app activity records (before DB transaction).
         // Records have verdictRowId = DUMMY_VERDICT_ROW_ID
@@ -258,32 +263,89 @@ class ScanVerdictIngestionService(
 
         _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
       } yield {
-        val lastRecordTime = batch.lastOption
+        val lastRecordTime = verdicts.lastOption
           .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
           .getOrElse(CantonTimestamp.MinValue)
         ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
-        ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
-        ingestionMetrics.batchSize.update(batch.size.toLong)(MetricsContext.Empty)
+        ingestionMetrics.verdictCount.mark(verdicts.size.toLong)(MetricsContext.Empty)
+        ingestionMetrics.batchSize.update(verdicts.size.toLong)(MetricsContext.Empty)
         logger.info(
-          s"Inserted ${batch.size} verdicts, ${trafficSummaries.size} traffic summaries, " +
+          s"Inserted ${verdicts.size} verdicts, ${trafficSummary.size} traffic summaries, " +
             s"${appActivityRecords.size} app activity records. " +
             s"Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. " +
-            s"Inserted verdicts: ${batch.map(_.updateId)}"
+            s"Inserted verdicts: ${verdicts.map(_.updateId)}"
         )
       }
     }
   }
 
+  private def getTrafficSummaries(
+      client: SequencerTrafficClient,
+      sequencingTimes: Seq[CantonTimestamp],
+      viewHashToViewIdByTime: Map[CantonTimestamp, Map[ByteString, Int]],
+  )(implicit tc: TraceContext) = {
+    client
+      .getTrafficSummaries(sequencingTimes)
+      .map(_.map { proto =>
+        DbScanVerdictStore
+          .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
+      })
+      // TODO(#4060): handle missing traffic summaries more robustly. In particular,
+      // note that the whole call will fail if ANY of the requested traffic summaries are missing.
+      // This workaround may therefore drop existing traffic summaries.
+      .recoverWith { case ex @ GrpcException(status, trailers) =>
+        val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+        val errorDetails = ErrorDetails.from(statusProto)
+        val errorCodeId = errorDetails
+          .flatMap {
+            case ed: ErrorDetails.ErrorInfoDetail =>
+              Some(ed.errorCodeId)
+            case _ => None
+          }
+          .headOption
+          .getOrElse("none")
+        if (errorCodeId == TrafficControlErrors.NoEventAtTimestamps.id)
+          Future.successful(Seq.empty)
+        else
+          Future.failed(ex)
+      }
+  }
+
+  /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
+    *
+    * Returns a tuple of:
+    * - sequencing times (record_time) from the verdicts, preserving order
+    * - a map from sequencing_time to (view_hash -> view_id) mappings
+    *
+    * The sequencer provides view_hashes in its traffic summaries, which we map
+    * to view_ids from the verdict's transaction views.
+    */
+  def buildViewHashCorrelation(
+      verdicts: Seq[v30.Verdict]
+  ): (Seq[CantonTimestamp], Map[CantonTimestamp, Map[ByteString, Int]]) = {
+    val pairs = verdicts.map { verdict =>
+      val recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid record_time in verdict"))
+      val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
+        case (viewId, txView) if !txView.viewHash.isEmpty =>
+          txView.viewHash -> viewId
+      }.toMap
+      (recordTime, viewHashMap)
+    }
+    (pairs.map(_._1), pairs.toMap)
+  }
+
   private def processWhenUnpaused(
-      batch: Seq[v30.Verdict]
+      input: (Seq[v30.Verdict], Seq[DbScanVerdictStore.TrafficSummaryT])
   )(implicit traceContext: TraceContext): Future[Unit] = {
     // If paused, this step will backpressure the source
     waitForResume().flatMap { _ =>
-      ingestionMetrics.latency.timeFuture(process(batch))
+      ingestionMetrics.latency.timeFuture(process(input))
     }
   }
 
-  private def batchSource[T](source: Source[T, NotUsed]): Source[Seq[T], NotUsed] =
+  private def batchSource[T, Mat](source: Source[T, Mat]): Source[Seq[T], Mat] =
     source.batch(math.max(1, config.mediatorVerdictIngestion.batchSize.toLong), Vector(_))(_ :+ _)
 
   // Kick-off the ingestion

@@ -656,11 +656,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
       clue("mediator verdicts stream works after upgrade") {
         Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
           clue(s"check ${scan.name} streamed post upgrade verdicts") {
-            scan.appState.eventStore.verdictStore
-              .maxVerdictRecordTime(0)
-              .futureValue
-              .value
-              .toInstant should be > beforeBobActivityTimestamp
+            eventually() {
+              scan.appState.eventStore.verdictStore
+                .maxVerdictRecordTime(0)
+                .futureValue
+                .value
+                .toInstant should be > beforeBobActivityTimestamp
+            }
           }
         }
       }

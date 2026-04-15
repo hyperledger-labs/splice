@@ -90,10 +90,11 @@ final class MediatorVerdictsClient(
               )
             }
           case Failure(ex) =>
-            logger.info(
-              s"Mediator verdicts stream terminated with an error",
-              ex,
-            )
+            if (!managedChannel.isClosing)
+              logger.info(
+                s"Mediator verdicts stream terminated with an error",
+                ex,
+              )
             completePromise.tryFailure(ex)
         }
         completePromise.future
