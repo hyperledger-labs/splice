@@ -549,16 +549,14 @@ object DamlPlugin extends AutoPlugin {
     if (damlCodegenUseProject) {
       val damlYaml = readDamlYaml(projectDir / "daml.yaml")
       // We don't have a JSON library easily accessible in SBT code so we opt for the rather hacky option here to drill down fields.
-      val codegenDir = Try(
+      val codegenConfig = Try(
         damlYaml
           .get("codegen")
           .asInstanceOf[JMap[String, Object]]
           .get("java")
           .asInstanceOf[JMap[String, Object]]
-          .get("output-directory")
-          .asInstanceOf[String]
       ) match {
-        case Success(dir) => dir
+        case Success(config) => config
         case Failure(e) =>
           log.error(
             s"Failed to parse codegen config in daml.yaml file: $damlYaml." +
@@ -566,9 +564,29 @@ object DamlPlugin extends AutoPlugin {
           )
           throw e
       }
+      val (codegenDir, packagePrefix, decoderClass) = Try {
+        val outputDir = codegenConfig
+          .get("output-directory")
+          .asInstanceOf[String]
+        val packagePrefix = codegenConfig
+          .get("package-prefix")
+          .asInstanceOf[String]
+        val decoderClass = codegenConfig
+          .get("decoderClass")
+          .asInstanceOf[String]
+        (outputDir, packagePrefix, decoderClass)
+      } match {
+        case Success(dir) => dir
+        case Failure(e) =>
+          log.error(
+            s"Failed to parse codegen config in daml.yaml file: $damlYaml." +
+              s"Missing one of the required fields output-directory, package-prefix or decoderClass in codegen.java config in $projectDir/daml.yaml?"
+          )
+          throw e
+      }
       IO.delete(projectDir / codegenDir)
       BuildUtil.runCommand(
-        Seq("dpm", "codegen-java", "--output-directory", codegenDir, darFile.getAbsolutePath),
+        Seq("dpm", "codegen-java", "--output-directory", codegenDir, s"${darFile.getAbsolutePath}=$packagePrefix", "--decoderClass", decoderClass),
         log,
         optCwd = Some(projectDir),
       )
