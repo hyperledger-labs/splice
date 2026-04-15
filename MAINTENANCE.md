@@ -22,6 +22,9 @@
 
 ## Bumping Daml Compiler version
 
+Before bumping a compiler version, make sure that all API packages are excluded from
+compilation. These are conventionally named `splice-api-*`. See [Maintaining Daml Interfaces](DEVELOPMENT.md#maintaining-daml-interfaces).
+
 1. Update the `version` in `nix/daml-compiler-sources.json` to the new daml compiler version.
    The compiler version is then used in two places:
    1. To build all daml packages using `sbt damlBuild`
