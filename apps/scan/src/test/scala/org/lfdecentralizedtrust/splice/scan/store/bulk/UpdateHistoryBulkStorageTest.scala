@@ -612,7 +612,7 @@ class UpdateHistoryBulkStorageTest
         0L,
         BigDecimal(0.1),
         contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
-        version = DarResources.amulet_0_1_17
+        version = DarResources.amulet_0_1_17,
       )
       val tx = mkCreateTx(
         1, // not used in updates v2
