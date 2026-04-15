@@ -1447,6 +1447,9 @@ object BuildCommon {
 
   import defs._
 
+
+  // FIXME: move damlTsCodegen to damlPlugin (see also damlPlugin in canton)
+
   /** Typescript code generation from daml models.
     * Generates code for all models given in damlTsCodegenSources into the directory specified in damlTsCodegenDir.
     */
@@ -1459,7 +1462,7 @@ object BuildCommon {
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         damlTsCodegenDir.value.delete()
-        BuildUtil.runCommand("daml2js" +: args, log)
+        BuildUtil.runCommand("dpm" +: "codegen-js" +: args, log)
         (baseDirectory.value / "daml.js" ** "*").get.toSet
       }
     cache(dars.toSet).toSeq

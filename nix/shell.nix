@@ -33,7 +33,6 @@ let
     git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
-    daml2js
     hub # Github CLI for todo checker
     jq
     jsonnet
