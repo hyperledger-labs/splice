@@ -13,7 +13,7 @@ pkgs.stdenv.mkDerivation {
 
   src = builtins.fetchurl {
     name = "dpm-sdk-${sources.version}.tar.gz";
-    url = "https://get.digitalasset.com/unstable/install/dpm-sdk/dpm-${sources.version}-${os}-${arch}.tar.gz";
+    url = "https://get.digitalasset.com/install/dpm-sdk/dpm-${sources.version}-${os}-${arch}.tar.gz";
     sha256 = dpmHash;
   };
   nativeBuildInputs = [ pkgs.yq-go ];
@@ -28,6 +28,8 @@ pkgs.stdenv.mkDerivation {
         select(   .key == "damlc"
                or .key == "daml-script"
                or .key == "canton-enterprise"
+               or .key == "codegen-java"
+               or .key == "codegen-js"
                )
               )' \
       $out/sdk-manifest.yaml
