@@ -80,8 +80,9 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             {configChange.label}
           </Typography>
           <Typography
-            variant="caption"
-            color="text.secondary"
+            fontFamily="'Source Code Pro', monospace"
+            color="colors.neutral.70"
+            sx={{ mt: 1 }}
             data-testid={`config-field-name-${configChange.fieldName}`}
           >
             {configChange.fieldName}

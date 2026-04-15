@@ -39,8 +39,9 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
                 {change.label}
               </Typography>
               <Typography
-                variant="caption"
-                color="text.secondary"
+                fontFamily="'Source Code Pro', monospace"
+                color="colors.neutral.70"
+                sx={{ mt: 1 }}
                 data-testid="config-change-field-name"
               >
                 {change.fieldName}
