@@ -85,7 +85,7 @@ object BuildUtil {
     val output = processLogger.output()
     if (exitCode != 0) {
       val errorMsg =
-        s"Running command `$command`$cwdInfo returned non-zero exit code: $exitCode (optLog.isDefined=${optLog.isDefined}, optError.isDefined=${optError.isDefined})"
+        s"Running command `$command`$cwdInfo returned non-zero exit code: $exitCode \n Output:\n$output"
       if (optLog.isDefined) optLog.map(_.error(output))
       if (optError.isDefined && optLog.isDefined)
         if (optLog.isDefined) optLog.map(_.error(optError.getOrElse("")))
