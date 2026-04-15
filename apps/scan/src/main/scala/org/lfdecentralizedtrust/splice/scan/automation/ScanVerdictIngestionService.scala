@@ -341,10 +341,14 @@ class ScanVerdictIngestionService(
   private def batchSource[T, Mat](source: Source[T, Mat]): Source[Seq[T], Mat] =
     source.batch(math.max(1, config.mediatorVerdictIngestion.batchSize.toLong), Vector(_))(_ :+ _)
 
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = super.closeAsync() ++ Seq(
-    SyncCloseable("current mediator", currentMediatorClient.close()),
-    SyncCloseable("successor mediator", successorMediatorClientO.foreach(_.close())),
-  )
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = super
+    .closeAsync()
+    .appendedAll(
+      Seq(
+        SyncCloseable("current mediator", currentMediatorClient.close()),
+        SyncCloseable("successor mediator", successorMediatorClientO.foreach(_.close())),
+      )
+    )
   // Kick-off the ingestion
   start()
 
