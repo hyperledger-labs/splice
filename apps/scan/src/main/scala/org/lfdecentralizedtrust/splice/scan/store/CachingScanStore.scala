@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.store.{
   MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
+  ResultsPage,
   SortOrder,
   SynchronizerStore,
   TxLogStore,
@@ -310,7 +311,8 @@ class CachingScanStore(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] =
+      after: Option[Long] = None,
+  )(implicit tc: TraceContext): Future[ResultsPage[DsoRules_CloseVoteRequestResult]] =
     getCache(
       "listVoteRequestResults",
       cacheConfig.voteRequests,
@@ -323,6 +325,7 @@ class CachingScanStore(
         effectiveFrom,
         effectiveTo,
         limit,
+        after,
       )
     )
 

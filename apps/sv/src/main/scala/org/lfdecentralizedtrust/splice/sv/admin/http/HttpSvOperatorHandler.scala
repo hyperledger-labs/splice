@@ -130,13 +130,14 @@ class HttpSvOperatorHandler(
     withSpan(s"$workflowId.listVoteRequestResults") { _ => _ =>
       for {
         scanConnection <- scanConnectionF
-        voteResults <- scanConnection.listVoteRequestResults(
+        (voteResults, nextPageToken) <- scanConnection.listVoteRequestResults(
           body.actionName,
           body.accepted,
           body.requester,
           body.effectiveFrom,
           body.effectiveTo,
           body.limit.intValue,
+          body.pageToken,
         )
       } yield {
         r0.ListVoteRequestResultsResponse.OK(
@@ -153,7 +154,8 @@ class HttpSvOperatorHandler(
                     ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
                   )
               })
-              .toVector
+              .toVector,
+            nextPageToken,
           )
         )
       }
