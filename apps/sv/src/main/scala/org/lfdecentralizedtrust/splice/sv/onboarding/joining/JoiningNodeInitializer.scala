@@ -168,7 +168,7 @@ class JoiningNodeInitializer(
     for {
       dsoPartyId <- getDsoPartyId(initConnection)
 
-      _ <- grantTopologyPermissions(dsoPartyId)
+      _ <- requestParticipantSynchronizerPermission(dsoPartyId)
 
       _ <- domainConfigO.traverse_(
         participantAdminConnection.ensureDomainRegisteredNoHandshake(
@@ -378,7 +378,7 @@ class JoiningNodeInitializer(
     }
   }
 
-  private def grantTopologyPermissions(
+  private def requestParticipantSynchronizerPermission(
       dsoPartyId: PartyId
   ): Future[Unit] = {
     if (!config.permissionedSynchronizer) {
