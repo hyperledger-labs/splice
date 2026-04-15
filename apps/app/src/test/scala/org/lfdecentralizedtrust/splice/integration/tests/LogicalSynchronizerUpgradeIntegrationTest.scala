@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.{Ignore, TryValues}
+import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
 import java.util.UUID

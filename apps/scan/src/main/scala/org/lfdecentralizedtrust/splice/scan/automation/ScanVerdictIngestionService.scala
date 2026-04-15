@@ -36,7 +36,11 @@ import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
-/** Ingestion for verdict ingestion store. */
+/** Ingestion service for the verdict store.
+  *
+  * Streams verdicts from the current mediator and, if the mediator returns a LSU complete on the stream, continues from the successor.
+  * It also checks the last ingestion compared to the LSU upgrade time to determine whether to start streaming from the current or successor mediator.
+  */
 class ScanVerdictIngestionService(
     config: ScanAppBackendConfig,
     synchronizerNodes: LocalSynchronizerNodes[ScanSynchronizerNode],
