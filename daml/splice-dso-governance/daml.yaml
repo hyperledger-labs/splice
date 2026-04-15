@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-dso-governance
 source: daml
-version: 0.1.24
+version: 0.1.25
 dependencies:
   - daml-prim
   - daml-stdlib

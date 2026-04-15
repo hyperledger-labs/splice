@@ -136,3 +136,4 @@ WARN: InvalidDefaultArgInFrom
 # Temporarily ignore the warnings around deprecated stuff in our daml tests
 Severity: DsWarning
 daml/Splice/Scripts.*warning:
+daml/Splice/Testing.*warning:
