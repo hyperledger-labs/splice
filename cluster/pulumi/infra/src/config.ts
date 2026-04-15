@@ -94,31 +94,6 @@ function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
   }
 }
 
-/*
-TODO: Here is the output of curl -vvv https://scan.sv-1.$GCP_CLUSTER_HOSTNAME/api/scan/readyz:
-16:20:12.528967 [0-x] * [READ] client_reset, clear readers
-<snip>
-16:20:12.737157 [0-0] * Connection #0 to host scan.sv-1.scratchd.network.canton.global:443 left intact
-
-The result of loadIPRanges is used in istio.ts configureInternalGatewayService where they are passed
-to configureGatewayService, then to istioAccessPolicies.
-I want to check the performance of the endpoint routing across a couple dimensions:
-
-1. number of extra IPs
-2. chunkSize used in istioAccessPolicies (currently 100)
-
-Create a separate python script that takes the number of IPs and chunkSize as arguments,
-takes a sampling of 20 calls to the endpoint mentioned above,
-and saves its work to an external file that is read and extended on subsequent runs.
-It shouldn't try to actually reconfigure any of the Pulumi here, just trust
-what is input. If a sample has already been made at a particular IP count or chunk size, error out.
-The HTTPS connections should all be fresh.
-
-When --report is passed, instead the script should take the saved work
-and produce a CSV listing the two input dimensions, average HTTP request time of the 20 calls,
-standard deviation of those 20 calls, and the % difference compared to the baseline of 0 extra IPs and 100 chunk size.
- */
-
 function generateExtraIps(count: number): string[] {
   // 10.24.0.0/14 covers 10.24.0.0 - 10.27.255.255
   const baseOctet2 = 24; // Start at 10.24
