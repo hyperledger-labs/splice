@@ -1652,7 +1652,7 @@
             "externalAddress": "sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft"
+              "databaseName": "sequencer_4_dabft"
             },
             "type": "cantonbft"
           },
@@ -3549,7 +3549,7 @@
             "externalAddress": "sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft"
+              "databaseName": "sequencer_4_dabft"
             },
             "type": "cantonbft"
           },
@@ -5082,7 +5082,7 @@
             "externalAddress": "sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
             "persistence": {
-              "databaseName": "sequencer_dabft"
+              "databaseName": "sequencer_4_dabft"
             },
             "type": "cantonbft"
           },

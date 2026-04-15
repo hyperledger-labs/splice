@@ -302,7 +302,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
         externalPort: 443,
         persistence: {
-          databaseName: 'sequencer_dabft',
+          databaseName: `sequencer_${migrationId}_dabft`,
         },
       },
       version,
