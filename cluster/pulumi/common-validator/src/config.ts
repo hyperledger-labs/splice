@@ -40,6 +40,7 @@ export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
 export const ScanClientConfigSchema = z
   .object({
     scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
+    scanAddress: z.string().optional(),
     threshold: z.number().default(0),
     svNames: z.array(z.string()).default([]),
     seedUrls: z.array(z.string()).min(1, 'seedUrls must contain at least one element.').optional(),
