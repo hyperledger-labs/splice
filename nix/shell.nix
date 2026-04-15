@@ -118,6 +118,7 @@ let
     actionlint
     ammonite
     curl
+    dpm-sdk
     git
     hub # Github CLI for todo checker
     jq
