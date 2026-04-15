@@ -2,7 +2,7 @@
 synchronizerMigration:
   active:
     id: 0
-    version: 0.5.18
+    version: 0.6.0-snapshot.20260415.2477.0.v0b27ede1
     releaseReference:
       repoUrl: https://github.com/hyperledger-labs/splice
       gitReference: refs/heads/mblaze-da/participant-migration-deployment/4173

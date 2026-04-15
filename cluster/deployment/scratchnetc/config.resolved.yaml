@@ -448,7 +448,7 @@ synchronizerMigration:
       pulumiStacksDir: 'cluster/stacks/scratchnets'
       repoUrl: 'https://github.com/hyperledger-labs/splice'
       spliceRoot: '.'
-    version: '0.5.18'
+    version: '0.6.0-snapshot.20260415.2477.0.v0b27ede1'
 validator1:
   deduplicationDuration: '30m'
   logging:
