@@ -22,12 +22,72 @@ Where to find logs
 **When launched locally**, splice-node will create a ``log/`` directory located at the root of the repository and log into ``canton_network.log``.
 Canton logs into ``canton.log``.
 
-.. note::
-    The default log level, initially set to Debug, can be changed using the ``--log-level-canton`` flag, for example: ``splice-node --config "${OUTPUT_CONFIG}" --log-level-canton=DEBUG ...``
-
-**When the node is launched in a kubernetes cluster**, we recommend to setup a log collector so that you can capture logs of at least the last day. For now, the default log level is set to Debug.
-
 We recommend to use ``lnav`` to read the logs. A guideline is provided in `this documentation <https://github.com/hyperledger-labs/splice/blob/main/TESTING.md#setting-up-lnav-to-inspect-canton-and-cometbft-logs>`_.
+
+**When the node is launched in a kubernetes cluster**, we recommend to setup a log collector so that you can capture logs of at least the last day.
+
+.. _configuring-log-levels:
+
+Configuring log levels
+----------------------
+
+The following environment variables control log verbosity. All of them accept standard
+Logback levels: ``TRACE``, ``DEBUG``, ``INFO``, ``WARN``, ``ERROR``, ``OFF``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 55
+
+   * - Variable
+     - Default
+     - Description
+   * - ``LOG_LEVEL_ROOT``
+     - ``INFO``
+     - Root logger level. Controls all loggers not explicitly configured (third-party libraries, etc.).
+   * - ``LOG_LEVEL_CANTON``
+     - ``INFO``
+     - Log level for Canton and Splice application loggers (``com.digitalasset``, ``com.daml``, ``org.lfdecentralizedtrust.splice``).
+   * - ``LOG_LEVEL_STDOUT``
+     - ``INFO``
+     - Minimum level for messages printed to the console (stdout). Log file output is not affected by this setting.
+   * - ``LOG_LEVEL_API_REQUEST``
+     - ``INFO``
+     - Log level for gRPC API request logging (``com.digitalasset.canton.networking.grpc``).
+
+**CLI flags** (alternative to environment variables):
+
+.. code:: bash
+
+    splice-node --config "${CONFIG}" \
+      --log-level-canton=DEBUG \
+      --log-level-root=INFO \
+      --log-level-stdout=INFO
+
+    # Shorthand for common cases:
+    splice-node --config "${CONFIG}" --verbose    # sets Canton logger to DEBUG
+    splice-node --config "${CONFIG}" --debug      # sets root, Canton to DEBUG and stdout to INFO
+
+**Docker Compose**: set the ``LOG_LEVEL`` variable in your shell before running ``docker compose up``.
+This sets both ``LOG_LEVEL_STDOUT`` and ``LOG_LEVEL_CANTON``:
+
+.. code:: bash
+
+    export LOG_LEVEL=DEBUG
+    docker compose up
+
+**Kubernetes (Helm)**: set the log level in your Helm values:
+
+.. code:: yaml
+
+    logLevel: DEBUG
+    logLevelStdout: DEBUG
+
+.. warning::
+    Changing log levels to values lower than the defaults (e.g., ``DEBUG`` or ``TRACE``)
+    significantly increases log volume and may result in higher log aggregation costs.
+    Conversely, raising levels above the defaults (e.g., ``WARN`` or ``ERROR``) reduces
+    log volume but may make it harder for the Splice team to help diagnose issues.
+    We cannot guarantee that we can debug problems when non-default log levels are in use.
 
 .. note::
     Logging in kubernetes (note that this only provides logs for a limited timeframe):
