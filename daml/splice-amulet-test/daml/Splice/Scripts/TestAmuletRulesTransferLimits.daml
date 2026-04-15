@@ -3,35 +3,27 @@
 
 module Splice.Scripts.TestAmuletRulesTransferLimits where
 
-import DA.Action
-import DA.Text as Text
 import DA.Time
-import DA.Exception
 import Daml.Script
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.Scripts.Util
 import Splice.Schedule
+import Splice.Testing.Utils
 
-template CheckError
+template PaymentTransferHarness
   with
     dso : Party
     actors : [Party]
   where
     signatory dso, actors
-    choice Test_Transfer : ()
+    choice Test_Transfer : TransferResult
       with
         context : PaymentTransferContext
         transfer : Transfer
-        expectedError: Text
       controller actors
       do
-        isThrown <-
-          try do
-            exercisePaymentTransfer dso context transfer
-            pure False
-          catch (e : AnyException) -> if expectedError `Text.isInfixOf` message e then pure True else abort ("UnexpectedException" <> message e)
-        unless isThrown (abort "expected exception but didn't get one")
+        exercisePaymentTransfer dso context transfer
 
 testTransferExceedsMaxInputs: Script ()
 testTransferExceedsMaxInputs = do
@@ -41,16 +33,16 @@ testTransferExceedsMaxInputs = do
       pure $ InputAmulet amulet
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of inputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
-      createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
-        transfer = Transfer with
-          sender = alice.primaryParty
-          provider = alice.primaryParty
-          inputs = inputAmulets
-          outputs = []
-          beneficiaries = None
-        context = context
-        expectedError = "More than the maximum number of inputs"
+    submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/maximum-inputs-exceeded")
+      [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+        createAndExerciseCmd (PaymentTransferHarness app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+          transfer = Transfer with
+            sender = alice.primaryParty
+            provider = alice.primaryParty
+            inputs = inputAmulets
+            outputs = []
+            beneficiaries = None
+          context = context
     return ()
 
 testTransferExceedsMaxOutputs: Script ()
@@ -61,16 +53,16 @@ testTransferExceedsMaxOutputs = do
         outputAmulets = map (const outputAmulet) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
-      createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
-        transfer = Transfer with
-          sender = alice.primaryParty
-          provider = alice.primaryParty
-          inputs = [InputAmulet amulet]
-          outputs = outputAmulets
-          beneficiaries = None
-        context = context
-        expectedError = "More than the maximum number of outputs"
+    submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/maximum-outputs-exceeded")
+      [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+        createAndExerciseCmd (PaymentTransferHarness app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+          transfer = Transfer with
+            sender = alice.primaryParty
+            provider = alice.primaryParty
+            inputs = [InputAmulet amulet]
+            outputs = outputAmulets
+            beneficiaries = None
+          context = context
     return ()
 
 testTransferExceedsMaxLockHolders: Script ()
@@ -85,23 +77,23 @@ testTransferExceedsMaxLockHolders = do
     now <- getTime
     let bobParties = map (.primaryParty) bobs
     -- More than the allowed number of lock holders
-    submitMulti ([alice.primaryParty, charlie.primaryParty, app.dso] ++ bobParties) [] $
-      createAndExerciseCmd (CheckError app.dso ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
-      transfer = Transfer with
-        sender = alice.primaryParty
-        provider = alice.primaryParty
-        inputs = [InputAmulet amulet]
-        outputs =
-          [ TransferOutput with
-              receiver = alice.primaryParty
-              amount = 1.0
-              lock = Some TimeLock with
-                holders = bobParties
-                expiresAt = now `addRelTime` (minutes 1)
-                optContext = None
-              receiverFeeRatio = 0.0
-          ]
-        beneficiaries = None
-      context = context
-      expectedError = "Fewer than the allowed number of lock holders"
+    submitMultiMustFail'' (expectMessageContains "Fewer than the allowed number of lock holders")
+      ([alice.primaryParty, charlie.primaryParty, app.dso] ++ bobParties) [] $
+        createAndExerciseCmd (PaymentTransferHarness app.dso ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputAmulet amulet]
+          outputs =
+            [ TransferOutput with
+                receiver = alice.primaryParty
+                amount = 1.0
+                lock = Some TimeLock with
+                  holders = bobParties
+                  expiresAt = now `addRelTime` (minutes 1)
+                  optContext = None
+                receiverFeeRatio = 0.0
+            ]
+          beneficiaries = None
+        context = context
     return ()

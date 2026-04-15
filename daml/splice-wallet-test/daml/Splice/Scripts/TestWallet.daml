@@ -491,7 +491,7 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
   -- trying to fulfill the request for 10,000 Amulet will fail
   context <- getPaymentTransferContext app alice
   -- first command errors, second command is not executed as WalletAppInstall_ExecuteBatch does not catch exceptions
-  submitMultiMustFail'' (expectMessageContains "ITR_InsufficientFunds")
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds")
     [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet]
       operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
@@ -728,10 +728,13 @@ testBuyMemberTraffic = script do
     createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId synchronizerId)
 
   -- test that buying less extra traffic than the configured min topup amount fails
-  let minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
+  let
+    minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
   executeAmuletOperationMustFail app aliceValidator
     (CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid))
-    (expectMessageContains $ "ITR_InsufficientTopupAmount {requestedTopupAmount = " <> show (minTopupAmount-1) <> ", minTopupAmount = " <> show minTopupAmount)
+    (expectFailureStatus \fs ->
+      fs.errorId == "splice.lfdecentralizedtrust.org/insufficient-topup-amount" &&
+        fs.meta == TextMap.fromList [("minTopupAmount", show minTopupAmount), ("requestedTopupAmount", show (minTopupAmount-1))])
 
   -- test that providing an invalid decentralized synchronizer ID fails
   let invalidSynchronizerId = synchronizerId <> "_invalid"
@@ -739,7 +742,9 @@ testBuyMemberTraffic = script do
     createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidSynchronizerId)
   executeAmuletOperationMustFail app aliceValidator
     (CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidSynchronizerId migrationId (minutes 1) (Some invalidTopupStateCid))
-    (expectMessageContains $ "ITR_UnknownSynchronizer {synchronizerId = " <> show invalidSynchronizerId <> "}")
+    (expectFailureStatus \fs ->
+      fs.errorId == "splice.lfdecentralizedtrust.org/unknown-synchronizer" &&
+        fs.meta == TextMap.fromList [("synchronizerId", invalidSynchronizerId)])
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works
@@ -932,10 +937,11 @@ testInsufficientFundsBatchSubscriptions = script do
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
   -- TODO(#2957): remove read-as DSO party.
-  submitMultiMustFail'' (expectMessageContains "ITR_InsufficientFunds") [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [InputAmulet amulet]
-    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
-    context
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds") [alice.primaryParty, validator] [app.dso] $
+    exerciseCmd install WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet]
+      operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+      context
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
@@ -953,10 +959,11 @@ testInsufficientFundsBatchSubscriptions = script do
   runNextIssuance app
   amulet <- tap app alice 5.0
   -- TODO(#2957): remove read-as DSO party.
-  submitMultiMustFail'' (expectMessageContains "ITR_InsufficientFunds") [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [InputAmulet amulet]
-    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
-    context
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds") [alice.primaryParty, validator] [app.dso] $
+    exerciseCmd install WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet]
+      operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+      context
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.

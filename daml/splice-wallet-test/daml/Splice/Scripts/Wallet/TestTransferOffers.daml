@@ -102,7 +102,7 @@ testTransferOffers = script do
   let accepted = accept.acceptedTransferOffer
   transferContext <- getPaymentTransferContext app alice
   [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
-  completeTransferMustFail accepted amulet transferContext (expectMessageContains "ITR_InsufficientFunds")
+  completeTransferMustFail accepted amulet transferContext (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds")
   -- tap more amulet and retry the transfer
   aliceAmuletsBefore <- query @Amulet alice.primaryParty
   tap app alice 100.0  -- chosen such that all amulets of alice are consumed
