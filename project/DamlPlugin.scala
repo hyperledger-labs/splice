@@ -53,7 +53,9 @@ object DamlPlugin extends AutoPlugin {
     val damlCodegenUseProject =
       settingKey[Boolean]("Read config from daml.yaml")
     val damlPrebuiltDar =
-      settingKey[Option[File]]("Skip Daml compilation and use this pre-built DAR instead. The pre-built DAR will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not.")
+      settingKey[Option[File]](
+        "Skip Daml compilation and use this pre-built DAR instead. The pre-built DAR will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not."
+      )
         .withRank(
           KeyRanks.Invisible
         ) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
@@ -178,7 +180,7 @@ object DamlPlugin extends AutoPlugin {
 
           cache(allDamlFiles.get.toSet ++ damlProjectFiles.get.toSet ++ dependencies).toSeq
 
-        }{ prebuiltDarFile =>
+        } { prebuiltDarFile =>
           // Skip compilation and use pre-built DARs
           val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
             // Copy pre-built DARs into the output directory so downstream tasks find them there.

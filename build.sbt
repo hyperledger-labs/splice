@@ -316,7 +316,9 @@ lazy val `splice-api-token-metadata-v1-daml`: Project =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlPrebuiltDar :=
-        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-metadata-v1-1.0.0.dar"),
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-metadata-v1-1.0.0.dar"
+        ),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
@@ -353,7 +355,9 @@ lazy val `splice-api-token-holding-v1-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlPrebuiltDar :=
-        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-holding-v1-1.0.0.dar"),
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-holding-v1-1.0.0.dar"
+        ),
     )
 
 lazy val `splice-api-token-transfer-instruction-v1-daml` =
@@ -363,8 +367,9 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlPrebuiltDar :=
-        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-transfer-instruction-v1-1.0.0.dar")
-      ,
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-transfer-instruction-v1-1.0.0.dar"
+        ),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
