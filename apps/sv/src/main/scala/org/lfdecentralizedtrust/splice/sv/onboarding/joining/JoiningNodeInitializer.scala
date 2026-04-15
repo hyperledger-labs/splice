@@ -403,22 +403,7 @@ class JoiningNodeInitializer(
                     RetryFor.WaitingOnInitDependency,
                     "request_onboarding_permission",
                     "request topology permission",
-                    connection.grantSvOnboardingPermission(token).recoverWith {
-                      case ex: Throwable
-                          if ex.getMessage
-                            .contains("unknown choice DsoRules_GrantValidatorPermission") =>
-                        // SV1 has booted but its Daml background
-                        // automation hasn't finished upgrading the DsoRules contract to the newest package version yet.
-                        // We throw a gRPC UNAVAILABLE status so the RetryProvider knows it should poll again.
-                        Future.failed(
-                          io.grpc.Status.UNAVAILABLE
-                            .withDescription(
-                              "Sponsor SV has not finished upgrading its DsoRules contract. Retrying..."
-                            )
-                            .withCause(ex)
-                            .asRuntimeException()
-                        )
-                    },
+                    connection.grantSvOnboardingPermission(token),
                     logger,
                   )
                 } yield ()
