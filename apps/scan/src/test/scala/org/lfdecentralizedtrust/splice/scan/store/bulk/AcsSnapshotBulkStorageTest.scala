@@ -20,7 +20,7 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Sink
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics}
+import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider, SpliceMetrics}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -327,6 +327,7 @@ class AcsSnapshotBulkStorageTest
                       0L,
                       BigDecimal(0.1),
                       contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+                      version = DarResources.amulet_0_1_17, // ensure packageid determinism
                     )
                     SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
                   }),
