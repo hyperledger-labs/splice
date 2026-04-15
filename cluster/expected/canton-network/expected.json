@@ -341,6 +341,11 @@
       "expectedValidatorOnboardings": [
         {
           "expiresIn": "24h",
+          "name": "validatorstableold2",
+          "secret": "validatorstableoldsecret2"
+        },
+        {
+          "expiresIn": "24h",
           "name": "splitwell2",
           "secret": "splitwellsecret2"
         },
@@ -965,6 +970,28 @@
       "type": "Opaque"
     },
     "name": "splice-app-sv-1-validator-onboarding-validator12",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yc3RhYmxlb2xkc2VjcmV0Mg=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validatorstableold2",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-1-validator-onboarding-validatorstableold2",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2432,6 +2459,16 @@
           "disableOnboardingParticipantPromotionDelay": false,
           "enablePostgresMetrics": true,
           "expectedValidatorOnboardings": [
+            {
+              "expiresIn": "24h",
+              "secretFrom": {
+                "secretKeyRef": {
+                  "key": "secret",
+                  "name": "splice-app-validator-onboarding-validatorstableold2",
+                  "optional": false
+                }
+              }
+            },
             {
               "expiresIn": "24h",
               "secretFrom": {

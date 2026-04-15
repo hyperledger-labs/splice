@@ -23,7 +23,7 @@ export const validator1Onboarding = {
 };
 
 export const validatorStableOldOnboarding = {
-  name: 'validatorStableOld2',
+  name: 'validatorstableold2',
   secret: 'validatorstableoldsecret2',
   expiresIn: '24h',
 };

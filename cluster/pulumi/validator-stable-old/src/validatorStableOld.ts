@@ -93,7 +93,7 @@ export async function installValidatorStableOld(
     auth0Client: auth0Client,
     auth0ValidatorAppName: 'validator-stable-old',
     validatorWalletUsers: pulumi.output([validatorWalletUser]),
-    validatorPartyHint: 'digitalasset-validator-old',
+    validatorPartyHint: 'digitalasset-validator-1',
     nodeIdentifier: 'validator-stable-old',
     logLevel: validatorStableOldConfig.logging?.level,
     logAsync: validatorStableOldConfig.logging?.async,

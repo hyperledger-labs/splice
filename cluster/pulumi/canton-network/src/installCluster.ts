@@ -16,6 +16,7 @@ import {
   splitwellOnboarding,
   standaloneValidatorOnboarding,
   validator1Onboarding,
+  validatorStableOldOnboarding,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
 import { SplitPostgresInstances } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configs';
 import { Resource } from '@pulumi/pulumi';
@@ -46,7 +47,9 @@ export async function installCluster(
   );
 
   const backupConfig = await readBackupConfig();
-  const expectedValidatorOnboardings: ExpectedValidatorOnboarding[] = [];
+  const expectedValidatorOnboardings: ExpectedValidatorOnboarding[] = [
+    validatorStableOldOnboarding,
+  ];
   if (mustInstallSplitwell) {
     expectedValidatorOnboardings.push(splitwellOnboarding);
   }
