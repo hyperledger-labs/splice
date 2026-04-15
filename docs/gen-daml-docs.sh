@@ -41,7 +41,19 @@ ensure_damlc_exists() {
 ensure_damlc_exists
 
 # We explicitly exclude from the generated docs API packages that were released and must remain stable (thus are also not compiled any more)
-# (make sure to commit the corresponding generated docs before adding new ignores here, by adding exceptions to docs/.gitignore)
+# (make sure to commit the corresponding generated docs in a `docs` subfolder of the project)
+NON_COMPILED_DAML_PROJECTS=(
+    "$SPLICE_ROOT/daml/splice-api-featured-app-v1"
+    "$SPLICE_ROOT/daml/splice-api-featured-app-v2"
+    "$SPLICE_ROOT/token-standard/splice-api-token-allocation-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-transfer-instruction-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-allocation-instruction-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-allocation-request-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-metadata-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-holding-v1"
+    "$SPLICE_ROOT/token-standard/splice-api-token-burn-mint-v1"
+)
+
 DAML_PROJECT_FILES="\
   $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" "$SPLICE_ROOT/token-standard/examples" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
@@ -49,18 +61,20 @@ DAML_PROJECT_FILES="\
     -not -ipath '*splitwell*' \
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \
-    -not -ipath '*splice-api-featured-app-v1*' \
-    -not -ipath '*splice-api-featured-app-v2*' \
-    -not -ipath '*splice-api-token-allocation-v1*' \
-    -not -ipath '*splice-api-token-transfer-instruction-v1*' \
-    -not -ipath '*splice-api-token-allocation-instruction-v1*' \
-    -not -ipath '*splice-api-token-allocation-request-v1*' \
-    -not -ipath '*splice-api-token-metadata-v1*' \
-    -not -ipath '*splice-api-token-holding-v1*' \
-    -not -ipath '*splice-api-token-burn-mint-v1*' \
     -print)"
+DAML_PROJECT_FILES=$(printf "%s\n" $DAML_PROJECT_FILES | grep -vf <(printf "%s\n" "${NON_COMPILED_DAML_PROJECTS[@]}" | xargs -n1 basename))
+
 for project_file in $DAML_PROJECT_FILES
 do
     project_dir="$(dirname "${project_file#"$SPLICE_ROOT"/}")"
     gen_project_docs "$project_dir" "$(basename "$project_dir")"
+done
+
+# For projects in NON_COMPILED_DAML_PROJECTS, we just copy the checked in docs
+for project_dir in ${NON_COMPILED_DAML_PROJECTS[@]}
+do
+  project_name="$(basename "$project_dir")"
+  echo "(docs) copying $project_name"
+  mkdir -p "$DOCS_DIR/src/app_dev/api/$project_name"
+  cp "$project_dir"/docs/* "$DOCS_DIR/src/app_dev/api/$project_name/"
 done

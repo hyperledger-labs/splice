@@ -461,18 +461,16 @@ are thus:
    introduce new Dar versions. To do so:
 
     a. In build.sbt, exclude your package from compilation by adding under your
-        package's target:
+       package's target:
       ```
       Compile / damlSkipBuild := true,
       Compile / damlPrebuiltDars := Seq(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "<your-dar-filename>"
       ),
       ```
+    b. Commit the generated docs for your package in a `docs` subdirectory in the package directory
 
-    b. Add your package to the list of exclusions in gen-daml-docs.sh
-
-    c. Add your package to the list of exclusions in docs/.gitignore,
-       and commit the docs for your package
+    c. Add your package to NON_COMPILED_DAML_PROJECTS in gen-daml-docs.sh
 
 # Troubleshooting
 
