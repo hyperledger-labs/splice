@@ -143,20 +143,23 @@ object DamlPlugin extends AutoPlugin {
           if (prebuiltDars.isEmpty) {
             log.warn(s"damlSkipBuild is true but no prebuilt DAR files were specified")
           }
-          // Copy pre-built DARs into the output directory so downstream tasks find them there.
-          // Also create a -current.dar copy to match the convention of buildDamlProject,
-          // which downstream tasks (damlCodeGeneration, copyDarResources) rely on.
-          IO.createDirectory(outputDirectory)
-          prebuiltDars.flatMap { darFile =>
-            val destFile = outputDirectory / darFile.getName
-            IO.copyFile(darFile, destFile)
-            // Derive the -current.dar name by stripping the version suffix
-            val darName = darFile.getName.stripSuffix(".dar")
-            val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
-            val currentDar = outputDirectory / s"$projectName-current.dar"
-            IO.copyFile(darFile, currentDar)
-            Seq(destFile, currentDar)
+          val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
+            // Copy pre-built DARs into the output directory so downstream tasks find them there.
+            // Also create a -current.dar copy to match the convention of buildDamlProject,
+            // which downstream tasks (damlCodeGeneration, copyDarResources) rely on.
+            IO.createDirectory(outputDirectory)
+            prebuiltDars.flatMap { darFile =>
+              val destFile = outputDirectory / darFile.getName
+              IO.copyFile(darFile, destFile)
+              // Derive the -current.dar name by stripping the version suffix
+              val darName = darFile.getName.stripSuffix(".dar")
+              val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
+              val currentDar = outputDirectory / s"$projectName-current.dar"
+              IO.copyFile(darFile, currentDar)
+              Seq(destFile, currentDar)
+            }.toSet
           }
+          cache(prebuiltDars.toSet).toSeq
         } else {
           // All daml files outside of .daml
           val allDamlFiles =
