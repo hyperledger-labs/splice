@@ -22,12 +22,6 @@ export const validator1Onboarding = {
   expiresIn: '24h',
 };
 
-export const validatorStableOldOnboarding = {
-  name: 'validatorstableold2',
-  secret: 'validatorstableoldsecret2',
-  expiresIn: '24h',
-};
-
 export const standaloneValidatorOnboarding: ExpectedValidatorOnboarding | undefined =
   preApproveValidatorRunbook
     ? {

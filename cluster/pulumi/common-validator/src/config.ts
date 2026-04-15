@@ -71,6 +71,7 @@ export const ValidatorAppConfigSchema = z.object({
   scanClient: ScanClientConfigSchema.optional(),
   synchronizer: SynchronizerConfigSchema.optional(),
   resources: K8sResourceSchema,
+  scanAddress: z.string().optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
@@ -129,6 +130,7 @@ export const ValidatorConfigSchema = z
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
     partyAllocator: PartyAllocatorConfigSchema.prefault({ enable: false }),
+    version: z.string().optional(),
   })
   .and(ValidatorNodeConfigSchema);
 

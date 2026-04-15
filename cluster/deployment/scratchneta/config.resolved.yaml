@@ -463,6 +463,12 @@ validator1:
     maxDuration: '5m'
     retention: '1h'
 validators:
+  my-validator:
+    namespace: 'my-validator'
+    partyHint: 'my-validator-1'
+    validatorApp:
+      scanAddress: 'http://scan-app.sv-1:5012'
+    version: '0.5.1'
   validator-runbook:
     namespace: 'validator'
     nodeIdentifier: 'validator-runbook'
