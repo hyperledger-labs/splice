@@ -1447,9 +1447,6 @@ object BuildCommon {
 
   import defs._
 
-
-  // FIXME: move damlTsCodegen to damlPlugin (see also damlPlugin in canton)
-
   /** Typescript code generation from daml models.
     * Generates code for all models given in damlTsCodegenSources into the directory specified in damlTsCodegenDir.
     */
