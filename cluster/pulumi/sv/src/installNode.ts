@@ -27,7 +27,8 @@ export async function installNode(sv: string, auth0Client: Auth0Client): Promise
   const auth0Config = auth0Client.getCfg();
   const ledgerApiUserSecret = installLedgerApiUserSecret(auth0Client, xns, 'sv', 'sv');
   const ledgerApiUserSecretSource = auth0UserNameEnvVarSource('sv', true);
-  const participantMigrationInfo = config.migrateParticipantFromSvCantonToSv
+  const participantMigrationInfo = DecentralizedSynchronizerUpgradeConfig.active
+    .migrateParticipantsFromSvCantonToSv
     ? await getParticipantMigrationInfo(sv)
     : undefined;
   await installParticipant(

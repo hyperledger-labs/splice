@@ -25,10 +25,11 @@ export async function installParticipant(
   args: ParticipantArgs,
   customOptions?: SpliceCustomResourceOptions
 ): Promise<ParticipantOutput> {
-  const { existingDb, migration } = args;
+  const { existingDb, migration, migratingDatabaseInstanceName } = args;
   const db = existingDb ?? (await installParticipantPostgres(args));
   const chart =
-    migration === undefined || migration.isStillRunning
+    (migration === undefined || migration.isStillRunning) &&
+    migratingDatabaseInstanceName === undefined
       ? installParticipantChart(args, db, customOptions)
       : undefined;
   return { db, chart };

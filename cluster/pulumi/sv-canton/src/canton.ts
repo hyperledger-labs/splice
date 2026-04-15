@@ -122,7 +122,7 @@ export async function installCantonComponents(
               id: migrationId,
               isStillRunning: migrationStillRunning,
             },
-            yieldManagement: svConfig.migrateParticipantFromSvCantonToSv,
+            yieldManagement: migrationInfo.migrateParticipantsFromSvCantonToSv,
           },
           withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
         )

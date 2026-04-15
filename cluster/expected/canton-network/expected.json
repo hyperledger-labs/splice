@@ -255,6 +255,7 @@
         "active": {
           "enableLogicalSynchronizerDeploymentMode": false,
           "id": 3,
+          "migrateParticipantsFromSvCantonToSv": false,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
             "gitReference": "refs/heads/release-line-0.3.20",
@@ -277,6 +278,7 @@
           {
             "enableLogicalSynchronizerDeploymentMode": false,
             "id": 1,
+            "migrateParticipantsFromSvCantonToSv": false,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
               "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
@@ -296,6 +298,7 @@
           {
             "enableLogicalSynchronizerDeploymentMode": false,
             "id": 2,
+            "migrateParticipantsFromSvCantonToSv": false,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
               "gitReference": "refs/heads/release-line-0.3.19",
@@ -318,6 +321,7 @@
         "upgrade": {
           "enableLogicalSynchronizerDeploymentMode": true,
           "id": 4,
+          "migrateParticipantsFromSvCantonToSv": false,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
             "gitReference": "refs/heads/release-line-0.3.21",
