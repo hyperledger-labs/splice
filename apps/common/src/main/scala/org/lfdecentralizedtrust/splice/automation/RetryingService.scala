@@ -181,7 +181,7 @@ abstract class RetryingService(
     }
   }
 
-  final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty
     Seq(
       AsyncCloseable(
