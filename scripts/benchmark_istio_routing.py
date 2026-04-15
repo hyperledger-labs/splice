@@ -102,12 +102,14 @@ def generate_report(data: dict) -> str:
 
     baseline_key = _key(0, 100)
     baseline_avg: float | None = None
+    baseline_max: float | None = None
     if baseline_key in samples:
         baseline_avg = statistics.mean(samples[baseline_key]["times"])
+        baseline_max = max(samples[baseline_key]["times"])
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["ip_count", "chunk_size", "avg_time_s", "std_dev_s", "pct_diff_vs_baseline"])
+    writer.writerow(["ip_count", "chunk_size", "avg_time_s", "std_dev_s", "pct_diff_vs_baseline", "max_time_s", "pct_diff_max_vs_baseline"])
 
     for key in sorted(samples, key=lambda k: tuple(int(x) for x in k.split(":"))):
         entry = samples[key]
@@ -116,16 +118,23 @@ def generate_report(data: dict) -> str:
         times = entry["times"]
         avg = statistics.mean(times)
         sd = statistics.stdev(times) if len(times) > 1 else 0.0
+        max_time = max(times)
         if baseline_avg is not None and baseline_avg > 0:
             pct_diff = ((avg - baseline_avg) / baseline_avg) * 100.0
         else:
             pct_diff = float("nan")
+        if baseline_max is not None and baseline_max > 0:
+            pct_diff_max = ((max_time - baseline_max) / baseline_max) * 100.0
+        else:
+            pct_diff_max = float("nan")
         writer.writerow([
             ip_count,
             chunk_size,
             f"{avg:.6f}",
             f"{sd:.6f}",
             f"{pct_diff:.2f}",
+            f"{max_time:.6f}",
+            f"{pct_diff_max:.2f}",
         ])
 
     return buf.getvalue()
