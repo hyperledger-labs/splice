@@ -14,6 +14,8 @@ import DA.Time
 
 import Daml.Script
 
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
+
 import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.CryptoHash qualified as CryptoHash
@@ -27,6 +29,7 @@ import Splice.Scripts.Util
 
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 import Splice.Testing.TokenStandard.WalletClient as WalletClient
+import Splice.Testing.Utils
 
 
 -- Reward accounting tests
@@ -297,6 +300,55 @@ test_mint_of_hidden_coupon = do
 
   -- check balance
   WalletClient.checkBalance alice app.registry.instrumentId 1000.0
+
+
+-- Coupon assignment
+--------------------
+
+test_coupon_assignment : Script ()
+test_coupon_assignment = testCouponAssignment False
+
+test_hidden_coupon_assignment : Script ()
+test_hidden_coupon_assignment = testCouponAssignment True
+
+testCouponAssignment : Bool -> Script ()
+testCouponAssignment hideCoupon = do
+  (app, alice, _) <- setupAliceWithCoupon hideCoupon
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  -- assign part of alice's coupon to bob and charlie
+  let queryParty = if hideCoupon then app.dso else alice
+  [(couponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon queryParty
+  submitMulti [alice] [app.dso] $ exerciseCmd couponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries =
+      [ Api.RewardAssignmentV1.RewardBeneficiary bob 300.0
+      , Api.RewardAssignmentV1.RewardBeneficiary alice 500.0
+      , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
+      ]
+    extraArgs = emptyExtraArgs
+
+  forA_ [(alice, 500.0), (bob, 300.0), (charlie, 200.0)] $ \(beneficiary, amount) -> do
+    let expectedCoupon = RewardCouponV2 with
+          dso = app.dso
+          provider = alice
+          amount
+          round = Round 0
+          expiresAt = demoTime `addRelTime` hours 36
+          providerIsObserver = True
+          beneficiary = Some beneficiary
+    coupons <- query @RewardCouponV2 beneficiary
+    let filtered = DA.List.filter (\c -> c.beneficiary == Some beneficiary) $ map snd coupons
+    filtered === [expectedCoupon]
+
+  -- verify assigned coupons cannot be further assigned by provider
+  [(bobCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon bob
+  submitMustFail alice $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 300.0]
+    extraArgs = emptyExtraArgs
+  -- nor by the beneficiary
+  submitMustFail bob $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 300.0]
+    extraArgs = emptyExtraArgs
 
 
 -- Claiming expired reward coupons
