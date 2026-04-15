@@ -33,7 +33,7 @@ class TokenStandardFetchFallbackIntegrationTest
 
     "TransferInstruction context can be fetched from Scan even if it's not yet ingested into the store" in {
       implicit env =>
-        pauseScanIngestionWithin(sv1ScanBackend) {
+        pauseScanUpdateIngestionWithin(sv1ScanBackend) {
           onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
           val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
           aliceWalletClient.tap(100)
@@ -72,7 +72,7 @@ class TokenStandardFetchFallbackIntegrationTest
 
     "AmuletAllocations context can be fetched from Scan even if it's not yet ingested into the store" in {
       implicit env =>
-        pauseScanIngestionWithin(sv1ScanBackend) {
+        pauseScanUpdateIngestionWithin(sv1ScanBackend) {
           val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
           val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 //        // Allocate venue on separate participant node, we still go through the validator API instead of parties.enable
