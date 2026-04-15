@@ -1014,7 +1014,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-apps-pg-passwd",
+    "name": "sv-apps-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1504,7 +1504,7 @@
         "value": null
       }
     },
-    "name": "user-sv-apps-pg",
+    "name": "user-sv-apps-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },

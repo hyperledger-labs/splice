@@ -59,7 +59,8 @@ export interface SvAdminClient {
     requester?: string,
     effectiveFrom?: string,
     effectiveTo?: string,
-    accepted?: boolean
+    accepted?: boolean,
+    pageToken?: number
   ) => Promise<ListDsoRulesVoteResultsResponse>;
   lookupDsoRulesVoteRequest: (
     voteRequestContractId: string
@@ -143,7 +144,8 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         requester?: string,
         effectiveFrom?: string,
         effectiveTo?: string,
-        accepted?: boolean
+        accepted?: boolean,
+        pageToken?: number
       ): Promise<ListDsoRulesVoteResultsResponse> => {
         const request: ListVoteResultsRequest = {
           actionName: actionName,
@@ -152,6 +154,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           effectiveFrom: effectiveFrom,
           effectiveTo: effectiveTo,
           limit: limit,
+          pageToken: pageToken,
         };
         return await svAdminClient.listVoteRequestResults(request);
       },

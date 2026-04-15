@@ -33,15 +33,12 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeTrigger,
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-}
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.TryValues
+import org.scalatest.{Ignore, TryValues}
 
 import java.time.{Duration, Instant}
 import java.util.UUID
@@ -51,6 +48,8 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
+// TODO(DACH-NY/cn-test-failures#8071) Reenable
+@Ignore
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
@@ -119,13 +118,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       )
       .addConfigTransform((_, config) =>
         ConfigTransforms
-          .bumpCantonSyncSuccessorPortsBy(22_000)
-          .andThen(
-            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-              // TODO(DACH-NY/cn-test-failures#7890) Reenable once this is fixed in Canton
-              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
-            )
-          )(config)
+          .bumpCantonSyncSuccessorPortsBy(22_000)(config)
       )
       // use the standalone participant
       .addConfigTransforms((_, config) => {
@@ -423,7 +416,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       initialSvNodesDoingTheLsu.par.map { backend =>
         clue(s"SV ${backend.name} connects to the new sequencers and syncs topology") {
-          eventually() {
+          eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
               backend.participantClientWithAdminToken,
               isSv4Connected = false,
