@@ -1,5 +1,7 @@
 !include(base.yaml;scratch-default-operator.yaml;scratch-default-synchronizer-migration.yaml;enable-grafana-sa.yaml)
 infra:
+  istio:
+    enableIngressAccessLogging: true
   prometheus:
     retentionDuration: "30d"
     retentionSize: "200GB"
