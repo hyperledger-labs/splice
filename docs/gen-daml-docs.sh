@@ -62,7 +62,7 @@ DAML_PROJECT_FILES="\
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \
     -print)"
-DAML_PROJECT_FILES=$(printf "%s\n" $DAML_PROJECT_FILES | grep -vf <(printf "%s\n" "${NON_COMPILED_DAML_PROJECTS[@]}" | xargs -n1 basename))
+DAML_PROJECT_FILES=$(printf "%s\n" "$DAML_PROJECT_FILES" | grep -vf <(printf "%s\n" "${NON_COMPILED_DAML_PROJECTS[@]}" | xargs -n1 basename))
 
 for project_file in $DAML_PROJECT_FILES
 do
@@ -71,7 +71,7 @@ do
 done
 
 # For projects in NON_COMPILED_DAML_PROJECTS, we just copy the checked in docs
-for project_dir in ${NON_COMPILED_DAML_PROJECTS[@]}
+for project_dir in "${NON_COMPILED_DAML_PROJECTS[@]}"
 do
   project_name="$(basename "$project_dir")"
   echo "(docs) copying $project_name"
