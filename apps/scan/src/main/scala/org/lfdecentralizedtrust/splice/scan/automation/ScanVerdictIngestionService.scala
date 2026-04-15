@@ -8,6 +8,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
@@ -29,7 +30,7 @@ import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
 /** Ingestion for verdict ingestion store. */
 class ScanVerdictIngestionService(
@@ -51,13 +52,23 @@ class ScanVerdictIngestionService(
     esf: ExecutionSequencerFactory,
 ) extends RetryingService(config.automation, backoffClock, "verdict ingestion") {
 
-  private val mediatorClient =
+  private val currentMediatorClient =
     new MediatorVerdictsClient(
       config.synchronizerNodes.current.mediator,
       this,
       grpcClientMetrics,
       loggerFactory,
     )(ec, esf)
+
+  private lazy val successorMediatorClientO =
+    config.synchronizerNodes.successor.map { successorConfig =>
+      new MediatorVerdictsClient(
+        successorConfig.mediator,
+        this,
+        grpcClientMetrics,
+        loggerFactory,
+      )(ec, esf)
+    }
 
   /** Completes when all dependencies are ready to serve data. */
   private def waitForStores(): Future[Unit] =
@@ -82,8 +93,55 @@ class ScanVerdictIngestionService(
       ingestionStart <- getIngestionStart()
     } yield {
       logger.info(s"Streaming verdicts starting from $ingestionStart")
+      val currentSource = currentMediatorClient.streamVerdicts(Some(ingestionStart))
+      val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
+      val source = currentSource
+        .mapMaterializedValue { completeFuture =>
+          completeFuture.foreach { result =>
+            completedWithCompleteF.trySuccess(result).discard
+            result match {
+              case Some(complete) =>
+                logger.info(
+                  s"Current mediator verdicts stream completed with: $complete, closing current client"
+                )
+                currentMediatorClient.close()
+              case None =>
+            }
+          }(ec)
+          completeFuture.failed.foreach { ex =>
+            completedWithCompleteF.tryFailure(ex)
+          }(ec)
+          NotUsed
+        }
+        .concat(
+          Source
+            .futureSource(
+              completedWithCompleteF.future.flatMap {
+                case Some(_) =>
+                  getIngestionStart().map { successorIngestionStart =>
+                    successorMediatorClientO match {
+                      case Some(successorMediatorClient) =>
+                        logger.info(
+                          s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
+                        )
+                        successorMediatorClient
+                          .streamVerdicts(Some(successorIngestionStart))
+                          .mapMaterializedValue(_ => NotUsed)
+                      case None =>
+                        logger.error(
+                          "Current mediator verdicts stream completed but no successor mediator client is configured"
+                        )
+                        Source.empty[v30.Verdict]
+                    }
+                  }
+                case None =>
+                  Future.successful(Source.empty[v30.Verdict])
+              }
+            )
+            .mapMaterializedValue(_ => NotUsed)
+        )
       new ServiceWithGuaranteedShutdown(
-        source = batchSource(mediatorClient.streamVerdicts(Some(ingestionStart))),
+        source = batchSource(source),
         map = processWhenUnpaused,
         retryProvider = retryProvider,
         loggerFactory = loggerFactory.append("subsClient", this.getClass.getSimpleName),
