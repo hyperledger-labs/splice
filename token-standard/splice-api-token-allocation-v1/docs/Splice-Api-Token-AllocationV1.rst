@@ -1,3 +1,8 @@
+..
+   Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+..
+   SPDX-License-Identifier: Apache-2.0
+
 .. _module-splice-api-token-allocationv1-39050:
 
 Splice.Api.Token.AllocationV1
