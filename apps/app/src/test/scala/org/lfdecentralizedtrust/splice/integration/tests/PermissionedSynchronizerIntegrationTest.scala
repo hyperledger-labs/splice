@@ -4,27 +4,36 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
-import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
-import org.slf4j.event.Level
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
+import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SvTestUtil, WalletTestUtil}
 
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs {
-          case (name, c) if name == "sv1" =>
-            c.copy(permissionedSynchronizer = true)
-          case (_, c) => c
+        ConfigTransforms.updateAllSvAppConfigs { case (_, c) =>
+          c.copy(permissionedSynchronizer = true)
+        }(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
+          config.copy(
+            approvedSvIdentities = config.approvedSvIdentities.filter(
+              _.name != getSvName(4)
+            )
+          )
         }(config)
       )
       .withManualStart
@@ -39,33 +48,55 @@ class PermissionedSynchronizerIntegrationTest
       currentParams.onboardingRestriction shouldBe RestrictedOpen
     }
 
-    withClue("allow SV1 to authorize and start follower SVs 2-4 sequentially") {
+    withClue("allow SV1 to authorize and start follower SVs 2-3 sequentially") {
       val followerSvs = Seq(
         (sv2ValidatorBackend, sv2Backend, sv2ScanBackend),
         (sv3ValidatorBackend, sv3Backend, sv3ScanBackend),
-        (sv4ValidatorBackend, sv4Backend, sv4ScanBackend),
       )
 
-      var authorizedSvs = Seq(sv1ValidatorBackend)
-
       for ((validator, sv, scan) <- followerSvs) {
-        for (submitter <- authorizedSvs) {
-          clue(
-            "Submitting participantSynchronizerPermission of " + validator.participantClient.id + " to SV" + submitter.participantClient.id
-          ) {
-            submitter.participantClient.topology.participant_synchronizer_permissions
-              .propose(
-                decentralizedSynchronizerId,
-                validator.participantClientWithAdminToken.id,
-                permission = ParticipantPermission.Submission,
-              )
-          }
-        }
-        clue("Starting SV" + validator.participantClient.id) {
+        clue(
+          s"Starting SV ${validator.participantClient.id}"
+        ) {
           startAllSync(sv, scan, validator)
         }
-        authorizedSvs :+= validator
       }
+    }
+
+    withClue("Attempting to grant permission with an invalid token fails") {
+      val invalidToken = "not-a-valid-base64-signed-token"
+
+      assertThrowsAndLogsCommandFailures(
+        sv1Backend.grantSvOnboardingPermission(invalidToken),
+        _.errorMessage should include("Could not verify and decode token"),
+      )
+    }
+
+    withClue(
+      "Attempting to grant permission from a sponsor that hasn't approved the identity fails"
+    ) {
+      val sv4OnboardingConfig =
+        sv4Backend.config.onboarding.value.asInstanceOf[SvOnboardingConfig.JoinWithKey]
+      val sv4Party = PartyId(
+        UniqueIdentifier.tryCreate(
+          sv4OnboardingConfig.name,
+          sv4ValidatorBackend.participantClient.id.uid.namespace,
+        )
+      )
+      val privateKey = SvUtil.parsePrivateKey(sv4OnboardingConfig.privateKey).value
+      val dsoParty = sv1Backend.getDsoInfo().dsoParty
+
+      val validSv4Token = SvOnboardingToken(
+        sv4OnboardingConfig.name,
+        sv4OnboardingConfig.publicKey,
+        sv4Party,
+        sv4ValidatorBackend.participantClient.id,
+        dsoParty,
+      ).signAndEncode(privateKey).value
+      assertThrowsAndLogsCommandFailures(
+        sv1Backend.grantSvOnboardingPermission(validSv4Token),
+        _.errorMessage should include("Could not approve SV Identity because"),
+      )
     }
 
     withClue("Grant validator permission to Alice and verify visibility across all SVs") {
@@ -73,33 +104,29 @@ class PermissionedSynchronizerIntegrationTest
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
 
       val allSvValidators =
-        Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend, sv4ValidatorBackend)
+        Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend)
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
-        {
-          actAndCheck(
-            "Grant validator permission to Alice",
-            sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
-          )(
-            "Verify confirmed topology permission across all SVs",
-            _ => {
-              for (svValidator <- allSvValidators) {
-                logger.info(s"Checking active topology state on ${svValidator.name}")
-                svValidator.participantClient.topology.participant_synchronizer_permissions
-                  .list(
-                    store = decentralizedSynchronizerId,
-                    filterUid = aliceParticipantId.filterString,
-                  )
-                  .map(_.item.permission) should contain(
-                  ParticipantPermission.Submission
-                )
+      actAndCheck(
+        "Grant validator permission to Alice",
+        sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
+      )(
+        "Verify confirmed topology permission across all SVs",
+        _ => {
+          for (svValidator <- allSvValidators) {
+            logger.info(s"Checking topology state on ${svValidator.name}")
+            svValidator.participantClient.topology.participant_synchronizer_permissions
+              .list(
+                store = decentralizedSynchronizerId,
+                filterUid = aliceParticipantId.filterString,
+              )
+              .map(_.item.permission) should contain(
+              ParticipantPermission.Submission
+            )
 
-              }
-            },
-          )
+          }
         },
-        _ => succeed,
       )
+
     }
 
     actAndCheck(

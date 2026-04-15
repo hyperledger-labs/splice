@@ -44,7 +44,7 @@ import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 
 import java.util.Optional
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 class HttpSvOperatorHandler(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
