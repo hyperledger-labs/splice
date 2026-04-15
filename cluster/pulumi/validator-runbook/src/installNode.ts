@@ -175,7 +175,8 @@ async function installValidator(
     'postgres-secrets',
     postgresValues,
     true,
-    supportsValidatorRunbookReset
+    supportsValidatorRunbookReset,
+    validatorVersion
   );
   const participantAddress = installParticipant(
     validatorConfig,
@@ -262,7 +263,6 @@ async function installValidator(
     additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
     additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
     resources: validatorConfig.validatorApp?.resources,
-    scanAddress: validatorConfig.validatorApp?.scanAddress,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret
