@@ -321,9 +321,9 @@ testCouponAssignment hideCoupon = do
   [(couponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon queryParty
   submitMulti [alice] [app.dso] $ exerciseCmd couponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
     newBeneficiaries =
-      [ Api.RewardAssignmentV1.RewardBeneficiary bob 300.0
-      , Api.RewardAssignmentV1.RewardBeneficiary alice 500.0
-      , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
+      [ Api.RewardAssignmentV1.RewardBeneficiary bob 0.3
+      , Api.RewardAssignmentV1.RewardBeneficiary alice 0.5
+      , Api.RewardAssignmentV1.RewardBeneficiary charlie 0.2
       ]
     extraArgs = emptyExtraArgs
 
@@ -343,11 +343,11 @@ testCouponAssignment hideCoupon = do
   -- verify assigned coupons cannot be further assigned by provider
   [(bobCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon bob
   submitMustFail alice $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
-    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 300.0]
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
     extraArgs = emptyExtraArgs
   -- nor by the beneficiary
   submitMustFail bob $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
-    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 300.0]
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
     extraArgs = emptyExtraArgs
 
 

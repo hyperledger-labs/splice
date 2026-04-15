@@ -31,8 +31,8 @@ data RewardBeneficiary = RewardBeneficiary
   with
     beneficiary : Party
       -- ^ The party that is granted the right to mint amulet for this activity.
-    amount : Decimal
-      -- ^ The amount of amulet that this beneficiary can mint.
+    weight : Decimal
+      -- ^ A weight between 0.0 and 1.0 that defines how much of the reward this beneficiary can mint.
   deriving (Show, Eq, Ord)
 
 -- | A coupon representing the right to mint a certain amount of rewards.
@@ -49,7 +49,7 @@ interface RewardCoupon where
     with
       newBeneficiaries : [RewardBeneficiary]
         -- ^ The new beneficiaries to whom to assign part of the minting amount of the
-        -- coupon. The sum of their amounts MUST be equal to the amount of the original coupon,
+        -- coupon. The weights MUST be between 0.0 and 1.0, add up to 1.0,
         -- and there MUST NOT be duplicate beneficiaries.
         --
         -- There MUST be at most `(view this).maxNumNewBeneficiaries` new beneficiaries in the list.
