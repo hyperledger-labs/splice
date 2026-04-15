@@ -503,6 +503,7 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     .apply(([baseCfg, validator1Cfg, splitwellCfg]) => {
       baseCfg.namespacedConfigs['validator1'] = validator1Cfg;
       baseCfg.namespacedConfigs['splitwell'] = splitwellCfg;
+
       return baseCfg;
     });
 }
