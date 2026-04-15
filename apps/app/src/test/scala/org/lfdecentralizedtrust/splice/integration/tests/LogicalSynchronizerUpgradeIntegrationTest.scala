@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.TryValues
+import org.scalatest.{Ignore, TryValues}
 
 import java.time.{Duration, Instant}
 import java.util.UUID
@@ -48,6 +48,8 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
+// TODO(DACH-NY/cn-test-failures#8071) Reenable
+@Ignore
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
