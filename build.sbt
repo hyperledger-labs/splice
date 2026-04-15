@@ -1852,7 +1852,19 @@ illegalDamlReferencesCheck := {
 lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-amulet`")
 cleanCnDars := {
   val log = streams.value.log
-  runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
+  runCommand(
+    Seq(
+      "find",
+      "apps",
+      "-name",
+      "*.dar",
+      "-not",
+      "-path",
+      "apps/app/src/test/resources/*",
+      "-delete",
+    ),
+    log,
+  )
   // daml/dars contains the versions of all dars that we want to keep committed, so we don't delete them
   runCommand(
     Seq(
