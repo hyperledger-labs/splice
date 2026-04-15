@@ -40,12 +40,20 @@ export function generatePassword(
   );
 }
 
+export interface PostgresUser {
+  readonly userName: string;
+  readonly secretName: pulumi.Output<string>;
+}
+
 export interface Postgres extends pulumi.Resource {
   readonly instanceName: string;
   readonly namespace: ExactNamespace;
 
   readonly address: pulumi.Output<string>;
   readonly secretName: pulumi.Output<string>;
+  readonly userName: string;
+
+  addUser(userName: string): PostgresUser;
 }
 
 export class CloudPostgres extends pulumi.ComponentResource implements Postgres {
@@ -53,10 +61,12 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   secretName: pulumi.Output<string>;
+  userName: string;
   user: gcp.sql.User;
   zone: string;
 
   private readonly pgSvc: gcp.sql.DatabaseInstance;
+  private readonly deletionProtection: boolean;
   // type-limited view of pgSvc
   readonly databaseInstance: pulumi.Resource &
     Pick<gcp.sql.DatabaseInstance, 'name' | 'serviceAccountEmailAddress'>;
@@ -68,7 +78,12 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     secretName: string,
     cloudSqlConfig: CloudSqlConfig,
     active: boolean = true,
-    opts: { disableProtection?: boolean; migrationId?: string; logicalDecoding?: boolean } = {}
+    opts: {
+      disableProtection?: boolean;
+      migrationId?: string;
+      logicalDecoding?: boolean;
+      userName?: string;
+    } = {}
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -80,6 +95,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
     this.instanceName = instanceName;
     this.namespace = xns;
+    this.userName = opts.userName ?? 'cnadmin';
+    this.deletionProtection = deletionProtection;
     const zoneFromEnv = config.optionalEnv('DB_CLOUDSDK_COMPUTE_ZONE') || GCP_ZONE;
     if (!zoneFromEnv) {
       throw new Error(
@@ -165,34 +182,64 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       }
     );
 
-    const password = generatePassword(`${instanceLogicalName}-passwd`, {
-      parent: this,
-      protect: deletionProtection,
-      aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
-    }).result;
-    const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
-    this.secretName = passwordSecret.metadata.name;
+    const defaultUser = this.addUser(this.userName, {
+      secretName,
+      passwordAliases: [
+        { name: `${instanceLogicalName}-passwd` },
+        { name: `${instanceLogicalNameAlias}-passwd` },
+      ],
+      userAliases: [
+        { name: `user-${instanceLogicalName}` },
+        { name: `user-${instanceLogicalNameAlias}` },
+      ],
+    });
+    this.secretName = defaultUser.secretName;
+    this.user = defaultUser.sqlUser;
 
-    this.user = new gcp.sql.User(
-      `user-${instanceLogicalName}`,
+    this.registerOutputs({
+      privateIpAddress: this.pgSvc.privateIpAddress,
+      secretName: this.secretName,
+    });
+  }
+
+  addUser(
+    userName: string,
+    opts?: {
+      secretName?: string;
+      passwordAliases?: pulumi.Alias[];
+      userAliases?: pulumi.Alias[];
+    }
+  ): PostgresUser & { sqlUser: gcp.sql.User } {
+    const resourceName = `${this.namespace.logicalName}-${this.instanceName}-${userName}`;
+    const password = generatePassword(`${resourceName}-passwd`, {
+      parent: this,
+      protect: this.deletionProtection,
+      ...(opts?.passwordAliases ? { aliases: opts.passwordAliases } : {}),
+    }).result;
+    const k8sSecretName = opts?.secretName ?? `pg-${this.instanceName}-${userName}-secrets`;
+    const passwordSecret = installPostgresPasswordSecret(this.namespace, password, k8sSecretName);
+
+    const sqlUser = new gcp.sql.User(
+      `user-${resourceName}`,
       {
         instance: this.pgSvc.name,
-        name: 'cnadmin',
+        name: userName,
         password: password,
       },
       {
         parent: this,
         deletedWith: this.pgSvc,
         dependsOn: [passwordSecret],
-        protect: deletionProtection,
-        aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
+        protect: this.deletionProtection,
+        ...(opts?.userAliases ? { aliases: opts.userAliases } : {}),
       }
     );
 
-    this.registerOutputs({
-      privateIpAddress: this.pgSvc.privateIpAddress,
-      secretName: this.secretName,
-    });
+    return {
+      userName,
+      secretName: passwordSecret.metadata.name,
+      sqlUser,
+    };
   }
 }
 
@@ -202,6 +249,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
   address: pulumi.Output<string>;
   pg: Resource;
   secretName: pulumi.Output<string>;
+  userName: string;
 
   constructor(
     xns: ExactNamespace,
@@ -223,6 +271,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
 
     this.instanceName = instanceName;
     this.namespace = xns;
+    this.userName = 'cnadmin';
     this.address = pulumi.output(
       `${this.instanceName}.${this.namespace.logicalName}.svc.cluster.local`
     );
@@ -298,6 +347,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       secretName: this.secretName,
     });
   }
+
+  addUser(_userName: string): PostgresUser {
+    return {
+      userName: 'cnadmin',
+      secretName: this.secretName,
+    };
+  }
 }
 
 // toplevel
@@ -314,6 +370,7 @@ export function installPostgres(
     migrationId?: number;
     disableProtection?: boolean;
     logicalDecoding?: boolean;
+    userName?: string;
   } = {}
 ): Postgres {
   const o = { isActive: true, ...opts };
@@ -324,6 +381,7 @@ export function installPostgres(
       disableProtection: o.disableProtection,
       migrationId: o.migrationId?.toString(),
       logicalDecoding: o.logicalDecoding,
+      userName: o.userName,
     });
   } else {
     ret = new SplicePostgres(
