@@ -1,18 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import java.io.{File, FileReader, FileWriter, IOException}
-import java.nio.file.Paths
+import java.io.{File, FileReader, FileWriter}
 import java.util.{Map => JMap}
 
 import com.esotericsoftware.yamlbeans.{YamlReader, YamlWriter}
 import sbt.Keys._
-import sbt.util.CacheStoreFactory
-import sbt.util.FileFunction.UpdateFunction
 import sbt.{Def, _}
 
-import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.sys.process._
 import scala.util.{Failure, Success, Try}
 
@@ -255,8 +250,6 @@ object DamlPlugin extends AutoPlugin {
             sourceDirectory ** "daml.yaml"
           val log = streams.value.log
           val damlVersion = damlCompilerVersion.value
-          // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-          val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value, log)
           val damlDebug = sys.env.get("DAML_DEBUG")
           val stdoutLogger = new ProcessLogger {
             // We overwrite this because by default this ends up being an error log
@@ -275,7 +268,6 @@ object DamlPlugin extends AutoPlugin {
                 projectDirectory.toString,
               ) ++ Seq("--debug").filter(_ => damlDebug.isDefined),
               cwd = projectDirectory.toFile,
-              extraEnv = damlLibsEnv: _*,
             ) ! stdoutLogger
             if (result != 0) {
               throw new MessageOnlyException(s"""
@@ -379,32 +371,6 @@ object DamlPlugin extends AutoPlugin {
     IO.copyFile(sourcePath, destinationPath)
   }
 
-  private def artifactoryUrl(damlVersion: String) =
-    s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
-
-  // FIXME: dpm
-  private def ensureDamlLibsEnv(
-      damlVersion: String,
-      damlLanguageVersions: Seq[String],
-      log: Logger,
-  ) = {
-    // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-    val damlLibsDependencyTypes = Seq("daml-script" -> "daml-script")
-    val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq.empty[String])(_ :+ "-" + _)
-    (for {
-      (depType, depName) <- damlLibsDependencyTypes
-      depVersion <- damlLibsDependencyVersions
-    } yield {
-      ensureArtifactAvailable(
-        url = artifactoryUrl(damlVersion) + s"${depType}/",
-        artifactFilename = s"${depName}${depVersion}.dar",
-        damlVersion = damlVersion,
-        localSubdir = Some("daml-libs"),
-        log = log,
-      )
-    }).headOption.map("DAML_SDK" -> _.getParentFile.getParentFile.getAbsolutePath).toSeq
-  }
-
   private def buildDamlProject(
       log: Logger,
       sourceDirectory: File,
@@ -422,9 +388,6 @@ object DamlPlugin extends AutoPlugin {
       s"supplied daml.yaml must exist [${originalDamlProjectFile.absolutePath}]",
     )
     val projectDirectory = originalDamlProjectFile.getAbsoluteFile.getParentFile
-    val url = artifactoryUrl(damlVersion)
-
-    val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions, log)
 
     log.debug(
       s"building ${projectDirectory}"
@@ -448,7 +411,6 @@ object DamlPlugin extends AutoPlugin {
       command,
       log,
       optCwd = Some(projectDirectory),
-      extraEnv = damlLibsEnv, // env variable set so that damlc finds daml-script dar
     )
 
     val currentDar = outputDirectory / s"$damlProjectName-current.dar"
@@ -462,67 +424,6 @@ object DamlPlugin extends AutoPlugin {
     try {
       reader.read(classOf[JMap[String, Object]])
     } finally reader.close()
-  }
-
-  private def ensureArtifactAvailable(
-      url: String,
-      artifactFilename: String,
-      damlVersion: String,
-      log: Logger,
-      tarballPath: Seq[String] = Seq.empty,
-      localSubdir: Option[String] = None,
-  ): File = {
-    import better.files.File
-
-    val root =
-      localSubdir.foldLeft(
-        File(System.getProperty("user.home")) / ".cache" / "daml-build" / damlVersion
-      )(_ / _)
-
-    val artifact =
-      if (tarballPath.nonEmpty) tarballPath.foldLeft(root)(_ / _) else root / artifactFilename
-
-    this.synchronized {
-      if (!artifact.exists) {
-        log.info(s"Downloading missing ${artifactFilename} to ${root.path}")
-        root.createDirectoryIfNotExists(createParents = true)
-        val curlWithBasicOptions =
-          "curl" :: "-sSL" :: "--fail" :: "--retry" :: "3" :: "--retry-connrefused" :: Nil
-        val credentials = url match {
-          case artifactory if artifactory.startsWith("https://digitalasset.jfrog.io/") =>
-            // CircleCI specifies ARTIFACTORY_ env variables
-            val artifactoryUser = Option(System.getenv("ARTIFACTORY_USER")).getOrElse("")
-            val artifactoryPassword = Option(System.getenv("ARTIFACTORY_PASSWORD")).getOrElse("")
-            if (artifactoryUser.nonEmpty && artifactoryPassword.nonEmpty)
-              "-u" :: s"${artifactoryUser}:${artifactoryPassword}" :: Nil
-            else
-              "--netrc" :: Nil // on dev machines look up artifactory credentials in ~/.netrc per https://everything.curl.dev/usingcurl/netrc
-          case _maven => Nil // maven does not require credentials
-        }
-        val fileAndUrl =
-          "-o" :: (root / artifactFilename).toJava.getPath :: (url + artifactFilename) :: Nil
-        BuildUtil.runCommandWithRetries(
-          curlWithBasicOptions ++ credentials ++ fileAndUrl,
-          log,
-          optError = Some(s"Failed to download from ${url + artifactFilename}"),
-        )
-
-        if (tarballPath.nonEmpty) {
-          val tarball = root / artifactFilename
-          log.info(s"Downloaded damlc tarball to ${root.path}. Untarring ${tarball.pathAsString}")
-          BuildUtil.runCommand(
-            "tar" :: "xzf" :: tarball.pathAsString :: Nil,
-            log,
-            optCwd = Some(root.toJava),
-          )
-
-          // best effort removal of tarball no longer needed to save space
-          tarball.delete(swallowIOExceptions = true)
-        }
-      }
-
-      artifact.toJava
-    }
   }
 
   /** Calls the Daml Codegen for the provided DAR file (hence, is suitable to use in a sourceGenerator task)
