@@ -193,7 +193,7 @@ object DamlPlugin extends AutoPlugin {
             val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
             val currentDar = outputDirectory / s"$projectName-current.dar"
             IO.copyFile(prebuiltDarFile, currentDar)
-            Set(destFile, currentDar, prebuiltDarFile)
+            Set(destFile, currentDar)
           }
           cache(Set(prebuiltDarFile)).toSeq
         }
