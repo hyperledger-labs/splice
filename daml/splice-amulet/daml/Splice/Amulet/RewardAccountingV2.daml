@@ -93,11 +93,11 @@ template ProcessRewardsV2 with
                   dso
                   round
                   provider
-                  beneficiary = provider
                   amount
                   expiresAt
-                  beneficiaryIsObserver =
+                  providerIsObserver =
                     not $ Set.member provider providersWithWrongVettingState
+                  beneficiary = None
 
         -- intentionally not returning any information here to save computational overhead
         return ProcessRewardsV2_ProcessBatchResult {}
