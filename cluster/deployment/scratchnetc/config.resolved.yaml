@@ -113,13 +113,13 @@ multiValidator:
 operatorDeployment:
   reference:
     deploymentDir: 'cluster/deployment'
-    gitReference: 'refs/heads/main'
+    gitReference: 'refs/heads/mblaze-da/participant-migration-deployment/4173'
     privateConfigsDir: 'cluster/configs/configs-private'
     publicConfigsDir: 'cluster/configs/configs'
-    pulumiBaseDir: 'splice/cluster/pulumi'
-    pulumiStacksDir: 'cluster/stacks/prod'
-    repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
-    spliceRoot: 'splice'
+    pulumiBaseDir: 'cluster/pulumi'
+    pulumiStacksDir: 'cluster/stacks/scratchnets'
+    repoUrl: 'https://github.com/hyperledger-labs/splice'
+    spliceRoot: '.'
 pulumiProjectConfig:
   default:
     allowDowngrade: true
@@ -441,14 +441,14 @@ synchronizerMigration:
     id: 0
     releaseReference:
       deploymentDir: 'cluster/deployment'
-      gitReference: 'refs/heads/main'
+      gitReference: 'refs/heads/mblaze-da/participant-migration-deployment/4173'
       privateConfigsDir: 'cluster/configs/configs-private'
       publicConfigsDir: 'cluster/configs/configs'
-      pulumiBaseDir: 'splice/cluster/pulumi'
-      pulumiStacksDir: 'cluster/stacks/prod'
+      pulumiBaseDir: 'cluster/pulumi'
+      pulumiStacksDir: 'cluster/stacks/scratchnets'
       repoUrl: 'https://github.com/hyperledger-labs/splice'
-      spliceRoot: 'splice'
-    version: 'local'
+      spliceRoot: '.'
+    version: '0.5.18'
 validator1:
   deduplicationDuration: '30m'
   logging:

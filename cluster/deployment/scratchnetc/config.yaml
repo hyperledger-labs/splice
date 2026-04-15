@@ -1,1 +1,24 @@
-!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml) {}
+!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
+synchronizerMigration:
+  active:
+    id: 0
+    version: 0.5.18
+    releaseReference:
+      repoUrl: https://github.com/hyperledger-labs/splice
+      gitReference: refs/heads/mblaze-da/participant-migration-deployment/4173
+      pulumiBaseDir: "cluster/pulumi"
+      pulumiStacksDir: "cluster/stacks/scratchnets"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
+operatorDeployment:
+  reference:
+    repoUrl: https://github.com/hyperledger-labs/splice
+    gitReference: refs/heads/mblaze-da/participant-migration-deployment/4173
+    pulumiBaseDir: "cluster/pulumi"
+    pulumiStacksDir: "cluster/stacks/scratchnets"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"
