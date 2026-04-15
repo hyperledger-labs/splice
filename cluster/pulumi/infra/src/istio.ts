@@ -100,7 +100,7 @@ function configureIstiod(
       accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
       accessLogEncoding: 'JSON',
       accessLogFormat: JSON.stringify({
-        trace_id: '%REQ(x-b3-traceid)%',
+        trace_id: '%REQ(traceparent)%',
         authority: '%REQ(:AUTHORITY)%',
         bytes_received: '%BYTES_RECEIVED%',
         bytes_sent: '%BYTES_SENT%',
