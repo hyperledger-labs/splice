@@ -52,15 +52,8 @@ object DamlPlugin extends AutoPlugin {
     // so we set this flag to false for Canton.
     val damlCodegenUseProject =
       settingKey[Boolean]("Read config from daml.yaml")
-    val damlSkipBuild =
-      settingKey[Boolean](
-        "Skip Daml compilation and use pre-built DARs instead. Pre-built DARs will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not."
-      )
-        .withRank(
-          KeyRanks.Invisible
-        ) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
-    val damlPrebuiltDars =
-      settingKey[Seq[File]]("pre-built DAR files to use when damlSkipBuild is true")
+    val damlPrebuiltDar =
+      settingKey[Option[File]]("Skip Daml compilation and use this pre-built DAR instead. The pre-built DAR will be copied into the damlDarOutput, so that downstream tasks e.g. codegen don't need to be aware of whether we built the dars or not.")
         .withRank(
           KeyRanks.Invisible
         ) // suppresses unused warnings in canton-community-app where we exclude damlBuild altogether
@@ -92,8 +85,7 @@ object DamlPlugin extends AutoPlugin {
       damlCodeGeneration := Seq(),
       damlEnableJavaCodegen := true,
       damlCodegenUseProject := true,
-      damlSkipBuild := false,
-      damlPrebuiltDars := Seq(),
+      damlPrebuiltDar := None,
       damlGenerateCode := {
         // for the time being we assume if we're using code generation then the DARs must first be built
         val dars = damlBuild.value
@@ -128,8 +120,7 @@ object DamlPlugin extends AutoPlugin {
         cache((settings.map(_._1) ++ damlProjectFiles ++ dars).toSet).toSeq
       },
       damlBuild := {
-        val skipBuild = damlSkipBuild.value
-        val prebuiltDars = damlPrebuiltDars.value
+        val prebuiltDar = damlPrebuiltDar.value
         val dependencies = damlDependencies.value
         val outputDirectory = damlDarOutput.value
         val outputLfVersion = damlDarLfVersion.value
@@ -138,29 +129,7 @@ object DamlPlugin extends AutoPlugin {
         // we don't really know dependencies between daml files, so just assume if any change then we need to rebuild all packages
         val cacheDir = streams.value.cacheDirectory
 
-        if (skipBuild) {
-          // Skip compilation and use pre-built DARs
-          if (prebuiltDars.isEmpty) {
-            log.warn(s"damlSkipBuild is true but no prebuilt DAR files were specified")
-          }
-          val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
-            // Copy pre-built DARs into the output directory so downstream tasks find them there.
-            // Also create a -current.dar copy to match the convention of buildDamlProject,
-            // which downstream tasks (damlCodeGeneration, copyDarResources) rely on.
-            IO.createDirectory(outputDirectory)
-            prebuiltDars.flatMap { darFile =>
-              val destFile = outputDirectory / darFile.getName
-              IO.copyFile(darFile, destFile)
-              // Derive the -current.dar name by stripping the version suffix
-              val darName = darFile.getName.stripSuffix(".dar")
-              val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
-              val currentDar = outputDirectory / s"$projectName-current.dar"
-              IO.copyFile(darFile, currentDar)
-              Seq(destFile, currentDar)
-            }.toSet
-          }
-          cache(prebuiltDars.toSet).toSeq
-        } else {
+        prebuiltDar.fold {
           // All daml files outside of .daml
           val allDamlFiles =
             damlSourceDirectory.value ** "*.daml" --- (damlSourceDirectory.value ** ".daml" ** "*.daml")
@@ -174,6 +143,7 @@ object DamlPlugin extends AutoPlugin {
               val asString = file.toString
               buildDependencies.indexWhere(asString.contains(_))
             }
+
             val fstIdx = indexOf(fst)
             val sndIdx = indexOf(snd)
             if (fstIdx == -1 && sndIdx == -1) {
@@ -207,6 +177,25 @@ object DamlPlugin extends AutoPlugin {
             }
 
           cache(allDamlFiles.get.toSet ++ damlProjectFiles.get.toSet ++ dependencies).toSeq
+
+        }{darFile =>
+          // Skip compilation and use pre-built DARs
+          val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
+            // Copy pre-built DARs into the output directory so downstream tasks find them there.
+            // Also create a -current.dar copy to match the convention of buildDamlProject,
+            // which downstream tasks (damlCodeGeneration, copyDarResources) rely on.
+            IO.createDirectory(outputDirectory)
+
+            val destFile = outputDirectory / darFile.getName
+            IO.copyFile(darFile, destFile)
+            // Derive the -current.dar name by stripping the version suffix
+            val darName = darFile.getName.stripSuffix(".dar")
+            val projectName = darName.replaceAll("-[0-9]+\\.[0-9]+\\.[0-9]+$", "")
+            val currentDar = outputDirectory / s"$projectName-current.dar"
+            IO.copyFile(darFile, currentDar)
+            Set(destFile, currentDar)
+          }
+          cache(Set(darFile)).toSeq
         }
       },
       // Declare dependency so that Daml packages in test scope may depend on packages in compile scope.

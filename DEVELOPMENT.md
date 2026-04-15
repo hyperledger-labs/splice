@@ -460,14 +460,9 @@ are thus:
    excluded from compilation, so that e.g. a Daml compiler version bump would not
    introduce new Dar versions. To do so:
 
-    a. In build.sbt, exclude your package from compilation by adding under your
-       package's target:
-      ```
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "<your-dar-filename>"
-      ),
-      ```
+    a. In build.sbt, exclude your package from compilation by setting `Compile / damlPrebuiltDar`
+       to the committed dar (typically under daml/dars).
+
     b. Commit the generated docs for your package in a `docs` subdirectory in the package directory
 
     c. Add your package to NON_COMPILED_DAML_PROJECTS in gen-daml-docs.sh

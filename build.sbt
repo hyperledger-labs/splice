@@ -315,10 +315,8 @@ lazy val `splice-api-token-metadata-v1-daml`: Project =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-metadata-v1-1.0.0.dar"
-      ),
+      Compile / damlPrebuiltDar :=
+        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-metadata-v1-1.0.0.dar"),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
@@ -354,10 +352,8 @@ lazy val `splice-api-token-holding-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-holding-v1-1.0.0.dar"
-      ),
+      Compile / damlPrebuiltDar :=
+        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-holding-v1-1.0.0.dar"),
     )
 
 lazy val `splice-api-token-transfer-instruction-v1-daml` =
@@ -366,10 +362,9 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
-        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-transfer-instruction-v1-1.0.0.dar"
-      ),
+      Compile / damlPrebuiltDar :=
+        Some((LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-transfer-instruction-v1-1.0.0.dar")
+      ,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
@@ -393,8 +388,7 @@ lazy val `splice-api-token-allocation-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-v1-1.0.0.dar"
       ),
     )
@@ -405,8 +399,7 @@ lazy val `splice-api-token-allocation-request-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-request-v1-1.0.0.dar"
       ),
     )
@@ -417,8 +410,7 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-instruction-v1-1.0.0.dar"
       ),
     )
@@ -429,8 +421,7 @@ lazy val `splice-api-token-burn-mint-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-burn-mint-v1-1.0.0.dar"
       ),
     )
@@ -662,8 +653,7 @@ lazy val `splice-featured-app-api-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v1-1.0.0.dar"
       ),
     )
@@ -674,8 +664,7 @@ lazy val `splice-featured-app-api-v2-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlSkipBuild := true,
-      Compile / damlPrebuiltDars := Seq(
+      Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v2-1.0.0.dar"
       ),
     )
