@@ -11,7 +11,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_BuyMemberTraffic
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_BuyMemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
+  COO_BuyMemberTraffic,
+  COO_Error,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
@@ -140,6 +143,10 @@ class TopupMemberTrafficTrigger(
         .map {
           case outcome: COO_BuyMemberTraffic =>
             TaskSuccess(s"Successfully bought extra traffic: $outcome")
+          case error: COO_Error =>
+            throw Status.ABORTED
+              .withDescription(s"Received an unexpected COOError: $error - ignoring for now")
+              .asRuntimeException()
           case otherwise =>
             throw Status.INTERNAL
               .withDescription(s"Unexpected COO return type: $otherwise")

@@ -51,11 +51,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
-import org.lfdecentralizedtrust.splice.wallet.util.{
-  InvalidTransferReasonParser,
-  TopupUtil,
-  ValidatorTopupConfig,
-}
+import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -1214,15 +1210,6 @@ class HttpWalletHandler(
           extraDisclosedContracts = extraDisclosedContracts,
         )
         .map(processCOO[ExpectedCOO, R](processResponse))
-        .recoverWith {
-          case ex: StatusRuntimeException
-              if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"the amulet operation failed with a Daml exception: ${ex.getStatus.getDescription}."
-              )
-              .asRuntimeException()
-        }
     } yield res
 
   /** Helper function to process a AmuletOperationOutcome.
@@ -1244,6 +1231,12 @@ class HttpWalletHandler(
     val clazz = implicitly[ClassTag[ExpectedCOO]].runtimeClass
     actual match {
       case result: ExpectedCOO if clazz.isInstance(result) => process(result)
+      case failedOperation: amuletoperationoutcome.COO_Error =>
+        throw Status.FAILED_PRECONDITION
+          .withDescription(
+            s"the amulet operation failed with a Daml exception: ${failedOperation}."
+          )
+          .asRuntimeException()
       case _ =>
         ErrorUtil.internalErrorGrpc(
           s"expected to receive a amulet operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"

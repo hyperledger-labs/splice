@@ -368,6 +368,12 @@ class TreasuryService(
       case op => throw new NotImplementedError(show"Unexpected amulet operation: $op")
     }
 
+  private def isErrorOutcome(outcome: installCodegen.AmuletOperationOutcome): Boolean =
+    outcome match {
+      case _: installCodegen.amuletoperationoutcome.COO_Error => true
+      case _ => false
+    }
+
   // Checks an operation for staleness. If it is stale - completes it with a failure, and returns None.
   // Otherwise, returns the operation.
   private def completeIfStale(
@@ -505,7 +511,7 @@ class TreasuryService(
       }
 
       // wait for store to ingest the new amulet holdings, then return all outcomes to the callers
-      _ <- waitForAmuletBatchIngestion(offset).map(_ =>
+      _ <- waitForAmuletBatchIngestion(offset, result).map(_ =>
         batch.completeBatchOperations(result)(logger, tc)
       )
     } yield Done
@@ -617,10 +623,19 @@ class TreasuryService(
       .asJava
   }
 
-  private def waitForAmuletBatchIngestion(offset: Long)(implicit tc: TraceContext): Future[Unit] = {
-    logger.debug(show"Waiting for store to ingest offset ${offset}")
-    userStore.signalWhenIngestedOrShutdown(offset)
-  }
+  private def waitForAmuletBatchIngestion(
+      offset: Long,
+      outcomes: Exercised[WalletAppInstall_ExecuteBatchResult],
+  )(implicit tc: TraceContext): Future[Unit] =
+    if (outcomes.exerciseResult.outcomes.asScala.forall(isErrorOutcome)) {
+      // We must not wait in this case, as the store won't see that offset until the next action comes,
+      // as the transaction filter is in the way
+      // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+      Future.unit
+    } else {
+      logger.debug(show"Waiting for store to ingest offset ${offset}")
+      userStore.signalWhenIngestedOrShutdown(offset)
+    }
 
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,

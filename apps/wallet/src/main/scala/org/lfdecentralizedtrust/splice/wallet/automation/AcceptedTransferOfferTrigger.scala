@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
@@ -23,10 +24,8 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser
-import org.lfdecentralizedtrust.splice.wallet.util.InvalidTransferReasonParser.ParsedInvalidTransferReason
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -72,29 +71,26 @@ class AcceptedTransferOfferTrigger(
     treasury
       .enqueueAmuletOperation(operation)
       .flatMap {
+        case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
+          failedOperation.invalidTransferReasonValue match {
+            case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
+              val missingStr = s"(missing ${fundsError.missingAmount} CC)"
+              val msg = s"Insufficient funds for the transfer $missingStr, aborting transfer offer"
+              logger.info(msg)
+              abortAcceptedTransferOffer(acceptedOffer, s"out of funds $missingStr")
+
+            case otherError =>
+              val msg = s"Unexpectedly failed to accepted transfer due to $otherError"
+              // We report this as INTERNAL, as we don't want to retry on this.
+              Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+
+          }
         case _: installCodegen.amuletoperationoutcome.COO_CompleteAcceptedTransfer =>
           Future(TaskSuccess("completed accepted transfer offer"))
 
         case unknownResult =>
           val msg = s"Unexpected amulet-operation result $unknownResult"
           Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-      }
-      .recoverWith {
-        case ex: StatusRuntimeException
-            if InvalidTransferReasonParser.isInvalidTransferException(ex) =>
-          InvalidTransferReasonParser.parse(ex.getStatus.getDescription) match {
-            case Some(ParsedInvalidTransferReason.InsufficientFunds(missingAmount)) =>
-              val missingStr = s"(missing $missingAmount CC)"
-              val msg = s"Insufficient funds for the transfer $missingStr, aborting transfer offer"
-              logger.info(msg)
-              abortAcceptedTransferOffer(acceptedOffer, s"out of funds $missingStr")
-
-            case _ =>
-              val msg =
-                s"Unexpectedly failed to accepted transfer due to ${ex.getStatus.getDescription}"
-              // We report this as INTERNAL, as we don't want to retry on this.
-              Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-          }
       }
   }
 
