@@ -124,7 +124,7 @@ pulumiProjectConfig:
   default:
     allowDowngrade: true
     cloudSql:
-      enabled: false
+      enabled: true
       enterprisePlus: false
       protected: false
       tier: 'db-custom-2-7680'

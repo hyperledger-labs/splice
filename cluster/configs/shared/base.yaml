@@ -41,7 +41,7 @@ pulumiProjectConfig:
     # We don't want this enabled for the initial deployments in ciclusters as the logs would become a lot noisier
     interAppsDependencies: true
     cloudSql:
-      enabled: false
+      enabled: true
       protected: true
       # default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
       tier: 'db-custom-2-7680'
