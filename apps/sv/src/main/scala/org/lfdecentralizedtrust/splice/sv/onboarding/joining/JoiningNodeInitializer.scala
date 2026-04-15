@@ -381,41 +381,48 @@ class JoiningNodeInitializer(
   private def grantTopologyPermissions(
       dsoPartyId: PartyId
   ): Future[Unit] = {
-    joiningConfig match {
-      case Some(SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKeyString)) =>
-        val joiningSvParty = PartyId(
-          com.digitalasset.canton.topology.UniqueIdentifier.tryCreate(
-            name,
-            participantId.uid.namespace,
+    if (!config.permissionedSynchronizer) {
+      logger.info(
+        "Synchronizer is not permissioned; skipping topology permission request."
+      )
+      Future.unit
+    } else {
+      joiningConfig match {
+        case Some(SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKeyString)) =>
+          val joiningSvParty = PartyId(
+            com.digitalasset.canton.topology.UniqueIdentifier.tryCreate(
+              name,
+              participantId.uid.namespace,
+            )
           )
-        )
-        SvUtil.keyPairMatches(publicKey, privateKeyString) match {
-          case Right(privateKey) =>
-            SvOnboardingToken(name, publicKey, joiningSvParty, participantId, dsoPartyId)
-              .signAndEncode(privateKey) match {
-              case Right(token) =>
-                for {
-                  (_, connection) <- svConnection
-                  _ = logger.info(
-                    s"Submitting topology permissions with sponsor for new joining SV $name"
-                  )
-                  _ <- retryProvider.retry(
-                    RetryFor.WaitingOnInitDependency,
-                    "request_onboarding_permission",
-                    "request topology permission",
-                    connection.grantSvOnboardingPermission(token),
-                    logger,
-                  )
-                } yield ()
-              case Left(err) =>
-                Future.failed(new RuntimeException(s"Failed to sign token: $err"))
-            }
-          case Left(reason) =>
-            Future.failed(new RuntimeException(s"Failed parsing provided keys: $reason"))
-        }
-      case None =>
-        logger.info("No joining config provided; skipping topology permission request.")
-        Future.unit
+          SvUtil.keyPairMatches(publicKey, privateKeyString) match {
+            case Right(privateKey) =>
+              SvOnboardingToken(name, publicKey, joiningSvParty, participantId, dsoPartyId)
+                .signAndEncode(privateKey) match {
+                case Right(token) =>
+                  for {
+                    (_, connection) <- svConnection
+                    _ = logger.info(
+                      s"Submitting topology permissions with sponsor for new joining SV $name"
+                    )
+                    _ <- retryProvider.retry(
+                      RetryFor.WaitingOnInitDependency,
+                      "request_onboarding_permission",
+                      "request topology permission",
+                      connection.grantSvOnboardingPermission(token),
+                      logger,
+                    )
+                  } yield ()
+                case Left(err) =>
+                  Future.failed(new RuntimeException(s"Failed to sign token: $err"))
+              }
+            case Left(reason) =>
+              Future.failed(new RuntimeException(s"Failed parsing provided keys: $reason"))
+          }
+        case None =>
+          logger.info("No joining config provided; skipping topology permission request.")
+          Future.unit
+      }
     }
   }
 
