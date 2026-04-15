@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletResponse,
+  AllocateAmuletV2Response,
   AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
@@ -40,6 +41,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruc
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
+  allocationv2,
   transferinstructionv1,
 }
 
@@ -566,6 +568,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Creates an AmuletAllocation (v2)")
+  @Help.Description(
+    "Create an AmuletAllocationV2, which is an implementation of the Allocation Token Standard V2 for Amulet."
+  )
+  def allocateAmulet(spec: allocationv2.AllocationSpecification): AllocateAmuletV2Response = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.AllocateAmuletV2(spec))
+    }
+  }
+
   @Help.Summary("Withdraws an AmuletAllocation")
   @Help.Description(
     "Withdraw an AmuletAllocation, which is an implementation of the Allocation Token Standard for Amulet."
@@ -590,7 +602,7 @@ abstract class WalletAppReference(
   @Help.Description(
     "List all contracts that implement the AllocationRequest interface from the Token Standard."
   )
-  def listAllocationRequests() = {
+  def listAllocationRequests(): Seq[HttpWalletAppClient.TokenStandard.AllocationRequestContract] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.ListAllocationRequests)
     }

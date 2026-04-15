@@ -25,7 +25,7 @@ import DA.Time
 import Splice.Amulet (AppRewardCoupon(..), FeaturedAppActivityMarker(..))
 import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey, burnedMetaKey)
 
-import Splice.Testing.UtilsV2
+import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
@@ -276,8 +276,8 @@ test_two_step_success = do
 
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
-  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  map coerceInterfaceContractId bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  [(bobInstrCid, bobTransferOffer)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  map coerceInterfaceContractId bobTransferOffer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- bob accepts the transfer
@@ -309,8 +309,8 @@ test_two_step_withdraw = do
 
   -- alice queries the pending transfer through their wallet
   [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
-  map coerceInterfaceContractId aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
+  [(aliceInstrCid, aliceTransferOffer)] <- WalletClient.listTransferOffers alice registry.instrumentId
+  map coerceInterfaceContractId aliceTransferOffer.inputHoldingCids === [ lockedHolding._1 ]
   aliceInstrCid0 === aliceInstrCid
 
   -- alice rejects the transfer
@@ -341,13 +341,13 @@ test_two_step_withdraw_locked_amulet_gone = do
 
   -- alice queries the pending transfer through their wallet
   [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
-  map coerceInterfaceContractId aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
+  [(aliceInstrCid, aliceTransferOffer)] <- WalletClient.listTransferOffers alice registry.instrumentId
+  map coerceInterfaceContractId aliceTransferOffer.inputHoldingCids === [ lockedHolding._1 ]
   aliceInstrCid0 === aliceInstrCid
 
   -- pass time and unlock the amulet as the alice
-  let [lockedCid] = map coerceInterfaceContractId aliceInstrView.transfer.inputHoldingCids
-  setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
+  let [lockedCid] = map coerceInterfaceContractId aliceTransferOffer.inputHoldingCids
+  setTime (aliceTransferOffer.executeBefore `addRelTime` days 1)
   AmuletRegistry.expireLockAsOwner registry lockedCid
 
   -- locked holdings are gone
@@ -356,7 +356,7 @@ test_two_step_withdraw_locked_amulet_gone = do
 
   -- withdraw fails if the time is too early
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
-  setTime (aliceInstrView.transfer.executeBefore `addRelTime` negate (days 1))
+  setTime (aliceTransferOffer.executeBefore `addRelTime` negate (days 1))
   submitWithDisclosuresMustFail' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
     extraArgs = ExtraArgs with
       context = context.choiceContext
@@ -364,7 +364,7 @@ test_two_step_withdraw_locked_amulet_gone = do
     actors = [alice]
 
   -- move time back to the future (TM) so withdrawal can complete
-  setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
+  setTime (aliceTransferOffer.executeBefore `addRelTime` days 1)
 
   -- alice withdraws the transfer
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
@@ -390,8 +390,8 @@ test_two_step_reject = do
 
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
-  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  map coerceInterfaceContractId bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  [(bobInstrCid, bobTransferOffer)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  map coerceInterfaceContractId bobTransferOffer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- bob rejects the transfer
@@ -421,13 +421,13 @@ test_two_step_reject_locked_amulet_gone = do
 
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
-  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  map coerceInterfaceContractId bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  [(bobInstrCid, bobTransferOffer)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  map coerceInterfaceContractId bobTransferOffer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- pass time and unlock the amulet as the owner
-  let [lockedCid] = map coerceInterfaceContractId bobInstrView.transfer.inputHoldingCids
-  setTime (bobInstrView.transfer.executeBefore `addRelTime` days 1)
+  let [lockedCid] = map coerceInterfaceContractId bobTransferOffer.inputHoldingCids
+  setTime (bobTransferOffer.executeBefore `addRelTime` days 1)
   AmuletRegistry.expireLockAsOwner registry lockedCid
 
   -- bob rejects the transfer

@@ -99,6 +99,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 includeCreatedEventBlob = includeCreatedEventBlob,
                 optTimeout = None,
                 tapsMaxPasses = None,
+                customEventFormat = None,
               )
             )
           }

@@ -25,6 +25,8 @@ data InstrumentId = InstrumentId
 -- a provider to perform some services.
 data Account = Account
   with
+    owner : Party
+      -- ^ The party that owns the account.
     provider : Optional Party
       -- ^ The provider of the account.
       --
@@ -33,11 +35,9 @@ data Account = Account
       -- authorization for asset movements is split between providers and
       -- owners. For example, providers MAY have to authorize all movements
       -- requested by the owner.
-    id : Optional Text
+    id : Text
       -- ^ Account number or similar.
-      -- MUST be a non-empty string if set.
-    owner: Party
-      -- ^ The party that owns the account.
+      -- Use the empty string ("") as the default account identifier.
   deriving (Eq, Show, Ord)
 
 -- | Details of a lock.

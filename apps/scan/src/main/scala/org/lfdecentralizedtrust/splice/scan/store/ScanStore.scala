@@ -216,6 +216,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
   def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[
@@ -514,6 +518,16 @@ object ScanStore {
             contract = contract,
             contractExpiresAt =
               Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
+          )
+        },
+        mkFilter(splice.amuletallocationv2.AmuletAllocationV2.COMPANION)(co =>
+          co.payload.allocation.transferLegs.asScala.exists(_.instrumentId.admin == dso)
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = contract.payload.allocation.settlement.settlementDeadline
+              .map(Timestamp.assertFromInstant(_))
+              .toScala,
           )
         },
         mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>

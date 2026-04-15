@@ -54,3 +54,39 @@ Cleanup performed so far:
   may be upgraded
 - Use `authorizerHoldingCids` instead of `senderHoldingCids` in all V2 choice results that
   return holdings of the allocation authorizer
+- Add an explicit `AllocationRequest_Accept` choice to provide a standard way for wallets to signal acceptance
+  and provide replay protection for the creation of the corresponding allocations
+- Add a new `Splice.Util.TokenWallet.BatchingUtilityV2` template with choices that implement the standard
+  logic for accepting V1 and V2 requests in a V2 wallet.
+- Reordered the `HoldingV2.Account` fields to put `owner` first for improved readability of debug output
+- Return "holding change" as `TextMap [ContractId Holding]` where the keys are `instrumentId.id`s, so that
+  callers can identify the holdings for a specific instrument without needing to fetch the holding.
+- Replace buggy `netAllocationCreditAmount` with `netAllocationCreditAmounts` that properly distinguishes
+  between legs of different instruments, and a map of credit amounts by instrument id.
+- Export 'require' and 'isGreaterOrEqualR' and its variants from `Splice.TokenStandard.Utils` to simplify
+  writing validation code in choice bodies.
+- Extend token standard test infrastructure:
+  - Add `TestTokenV1` to simulate settlement involving V1-only tokens
+  - Add `TestTokenV2` to simulate settlement involving tokens with support for
+    accountable holdings and multiple instruments maintained by the same `admin`
+  - Add `MultiRegistry` to simulate the off-ledger APIs of multiple registries in a single test environment
+  - Extend `TradingAppV2` to support mixed version settlement of trades involving V1-only tokens, and V1/V2 tokens
+    whose allocations are created through either a V1 wallet or a V2 wallet
+- Remove redundant `Splice.Testing.UtilsV2` module: use `Splice.Testing.Utils` instead
+- Improve commentary on `V2.AllocationRequest` choices
+- Add missing choice observers to `V2.TransferFactory_Transfer`
+- Renamed `_extraObserverDefaultImpl` to `_extraObserversDefaultImpl` to reflect that it can return multiple observers
+- Clarify that input holdings for `V2.TransferFactory_Transfer` must be of the transferred instrument
+- Extend test infrastructure:
+  - Add transfer support for `TestTokenV2`
+  - `WalletClientV2` support for listing and accepting V1 and V2 transfer offers using the same functions
+- Extend `BatchingUtilityV2` with support for accepting V2 transfer instructions
+- Add utility functions to create metadata for [V1 transaction history parsing](https://docs.digitalasset.com/integrate/devnet/exchange-integration/txingestion.html#differences-between-1-step-deposits-and-withdrawals)
+  to `Splice.TokenStandard.Utils`
+- Change default implementation of `SettlementFactory_SettleBatch` to check uniqueness of transfer leg ids
+  to provide better safety guarantees for code that identifies legs by their ids
+- add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets
+- use `Account.id : Text` instead of `Optional Text` to ensure that wallets do not have to deal with
+  two different kinds of defalt accounts (empty string vs None). Use "" as the default account identifier.
+- Change version numbers of `splice-api-token-*-v2` packages to `1.0.0` to be consistent with the existing
+  `splice-api-featured-app-v2` package, which also has version `1.0.0`

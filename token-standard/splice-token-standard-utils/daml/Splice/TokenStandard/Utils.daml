@@ -15,6 +15,7 @@ module Splice.TokenStandard.Utils (
   ensureNoAccountMeta,
 
   -- ** Requirements checking
+  require,
   require',
   isMemberR,
   isEqualR,
@@ -22,6 +23,10 @@ module Splice.TokenStandard.Utils (
   isSubsetOfR,
   oneOfR,
   notR,
+  isGreaterOrEqualR,
+  isGreaterR,
+  isLessR,
+  isLessOrEqualR,
 
   requireMatchExpected,
   requireUnique,
@@ -34,6 +39,29 @@ module Splice.TokenStandard.Utils (
   -- ** Public fetch implementation
   publicFetchDefaultImpl,
 
+  -- * AnyContractId conversion
+  fromAnyContractId,
+  toAnyContractId,
+
+  -- * Transfer metadata
+  reasonMetaKey,
+  txKindMetaKey,
+  senderMetaKey,
+  reasonFromMeta,
+  reasonToMeta,
+  mkMetaTransferFrom,
+
+  -- * Missing TextMap utilities
+
+  -- TODO(#4865): upstream these to the Daml stdlib
+  textMapUnionWith,
+  textMapSingleton,
+  textMapValues,
+  textMapKeys,
+  textMapZip,
+  textMapZipWithDefault,
+  textMapTraverseWithKey,
+
   -- * API type conversions
   BackwardCompatible(..),
   ForwardCompatible(..),
@@ -42,9 +70,11 @@ module Splice.TokenStandard.Utils (
   -- * Allocation workflows
 
   -- ** Utilities for allocations
-  netAllocationCreditAmount,
+  allocationAdmin,
+  netAllocationCreditAmounts,
+  filterLegsForAccount,
   splitLegsByAdmin,
-  splitLegsByTradingAccount,
+  splitLegsByAuthorizer,
 
   -- ** Allocation implementation
 
@@ -58,6 +88,9 @@ module Splice.TokenStandard.Utils (
   -- *** Available actions
   allocationV1_availableActionsDefault,
   allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
   upcast_v1_v2_Allocation,
 
   -- *** Choices
@@ -68,6 +101,10 @@ module Splice.TokenStandard.Utils (
   -- ** Settlement factory implementation
   settlementFactoryV2_settleBatchDefaultImpl,
   settlementFactoryV2_defaultCreateReceiptAllocation,
+
+  -- *** Extra observers
+  settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl,
+  settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl,
 
   -- *** Support for custom batch settlement
   PreparedAllocations(..),
@@ -98,15 +135,30 @@ module Splice.TokenStandard.Utils (
   -- * Allocation factory implementations
 
   -- ** V2 Choice observers
-  allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl,
-  allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl,
+  allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl,
+  allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl,
+
 
   -- * Transfer factory implementations
+
+  -- * Validation
+  isValidTransferV2,
+
+  -- ** V2 for dual version templates
   transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1,
   transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1,
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
 
   transferFactory_v2_senderActor_transferImpl,
+
+  -- ** TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl,
+
+  -- ** TransferInstruction extra observers
+  transferInstruction_acceptDefaultExtraObservers,
+  transferInstruction_rejectDefaultExtraObservers,
+  transferInstruction_withdrawDefaultExtraObservers,
 ) where
 
 

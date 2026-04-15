@@ -173,7 +173,7 @@ class HttpTokenStandardTransferInstructionHandler(
               .asRuntimeException()
           )
         )
-      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+      // TODO(#4950) Don't include amulet rules and newest open round when informees all have vetted the newest version.
       externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder = new ChoiceContextBuilder(
@@ -226,8 +226,8 @@ class HttpTokenStandardTransferInstructionHandler(
         ChoiceContextBuilder,
       ](
         s"AmuletTransferInstruction '$transferInstructionId'",
-        amuletInstr.payload.lockedAmulet,
-        amuletInstr.payload.transfer.executeBefore,
+        Some(amuletInstr.payload.lockedAmulet),
+        Some(amuletInstr.payload.transfer.executeBefore),
         requireLockedAmulet,
         None,
         store,

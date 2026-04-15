@@ -8,7 +8,7 @@
 -- wallet or custom automation that uses the Ledger API directly.
 module Splice.Api.Token.AllocationRequestV2 where
 
-import DA.Map as Map
+import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -31,8 +31,8 @@ interface AllocationRequest where
   allocationRequest_withdrawImpl
     : ContractId AllocationRequest -> AllocationRequest_Withdraw -> Update AllocationRequest_WithdrawResult
 
-  allocationRequest_rejectExtraObservers : AllocationRequest_Reject -> [Party]
   allocationRequest_acceptExtraObservers : AllocationRequest_Accept -> [Party]
+  allocationRequest_rejectExtraObservers : AllocationRequest_Reject -> [Party]
   allocationRequest_withdrawExtraObservers : AllocationRequest_Withdraw -> [Party]
 
   nonconsuming choice AllocationRequest_Accept : AllocationRequest_AcceptResult
@@ -52,7 +52,7 @@ interface AllocationRequest where
         -- Implementations MUST check these parties to avoid unauthorized acceptance.
         --
         -- Implementations SHOULD allow calling this choice for all parties that
-        -- need to create an allocation for this request.
+        -- can create an allocation matching this request.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_acceptExtraObservers this arg
@@ -62,7 +62,7 @@ interface AllocationRequest where
   nonconsuming choice AllocationRequest_Reject : AllocationRequest_RejectResult
     -- ^ Reject an allocation request to signal that no allocation will be created for it.
     --
-    -- The choice is nonconsuming to support alternative consumption patterns.
+    -- The choice is nonconsuming to support alternative consumption patterns,
     -- e.g., by calling the consuming V1.AllocationRequest_Reject choice for
     -- transaction parsing compatibility.
     --
@@ -75,7 +75,7 @@ interface AllocationRequest where
         -- Implementations MUST check these parties to avoid unauthorized rejection.
         --
         -- Implementations SHOULD allow calling this choice for all parties that
-        -- need to create an allocation for this request.
+        -- can create an allocation matching this request.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_rejectExtraObservers this arg
@@ -97,8 +97,8 @@ interface AllocationRequest where
         --
         -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
-        -- Implementations SHOULD allow the `settlement.executors` to call this
-        -- choice.
+        -- Implementations SHOULD allow the `settlement.executors` to jointly
+        -- call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_withdrawExtraObservers this arg
@@ -138,7 +138,7 @@ data AllocationRequestView = AllocationRequestView with
     availableActions : Map.Map [Party] [AllocationRequestAction]
       -- ^ The actions that the wallet can present to the user on the allocation request.
       --
-      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- This field can be used to inform wallet users whether they can take an action or not;
       -- and which other parties they might be waiting on to take their action.
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
@@ -147,16 +147,19 @@ data AllocationRequestView = AllocationRequestView with
       -- ^ Additional metadata specific to the allocation request, used for extensibility.
   deriving (Show, Eq)
 
+-- | The result of the `AllocationRequest_Accept` choice.
 data AllocationRequest_AcceptResult = AllocationRequest_AcceptResult with
     meta : Metadata
       -- ^ Additional metadata specific to the result of accepting the allocation request, used for extensibility.
   deriving (Show, Eq)
 
+-- | The result of the `AllocationRequest_Reject` choice.
 data AllocationRequest_RejectResult = AllocationRequest_RejectResult with
     meta : Metadata
       -- ^ Additional metadata specific to the result of rejecting the allocation request, used for extensibility.
   deriving (Show, Eq)
 
+-- | The result of the `AllocationRequest_Withdraw` choice.
 data AllocationRequest_WithdrawResult = AllocationRequest_WithdrawResult with
     meta : Metadata
       -- ^ Additional metadata specific to the result of withdrawing the allocation request, used for extensibility.

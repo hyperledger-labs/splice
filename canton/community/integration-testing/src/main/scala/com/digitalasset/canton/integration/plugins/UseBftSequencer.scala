@@ -80,6 +80,7 @@ final class UseBftSequencer(
     maxBatchCreationInterval: FiniteDuration = DefaultMaxBatchCreationInterval,
     maxBatchesPerBlockProposal: Short = DefaultMaxBatchesPerProposal,
     dedicatedExecutionContextDivisor: Option[Int] = DefaultDedicatedExecutionContextDivisor,
+    availabilityMaxProposalCreationDelay: FiniteDuration = 50.millis,
 ) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   private val tmpDir = better.files.File(System.getProperty("java.io.tmpdir"))
@@ -112,6 +113,7 @@ final class UseBftSequencer(
                     maxBatchCreationInterval = maxBatchCreationInterval,
                     maxBatchesPerBlockProposal = maxBatchesPerBlockProposal,
                     dedicatedExecutionContextDivisor = dedicatedExecutionContextDivisor,
+                    availabilityMaxProposalCreationDelay = availabilityMaxProposalCreationDelay,
                   )
                   // server endpoint's lens
                   .focus(_.initialNetwork)
@@ -243,6 +245,7 @@ final class UseBftSequencer(
               initialNetwork = Some(network),
               standalone = standaloneOpt,
               storage = Option.when(shouldUseMemoryStorageForBftOrderer)(Memory()),
+              availabilityMaxProposalCreationDelay = availabilityMaxProposalCreationDelay,
             ),
           )
         }

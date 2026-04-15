@@ -74,8 +74,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
@@ -319,12 +320,51 @@ class SingleScanConnection private[client] (
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListFeaturedAppRightsByProvider(providerPartyId),
+    )
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId),
+    )
+  }
+
+  override def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.ListFeaturedAppRight)
+  }
+
   override def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListDsoSequencers(),
+    )
+  }
+
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupRollForwardLsu(),
     )
   }
 
@@ -671,7 +711,7 @@ class SingleScanConnection private[client] (
     )
 
   def getAllocationTransferContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -718,7 +758,7 @@ class SingleScanConnection private[client] (
     )
 
   def getAllocationCancelContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -729,7 +769,7 @@ class SingleScanConnection private[client] (
     )
 
   def getAllocationWithdrawContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -749,6 +789,18 @@ class SingleScanConnection private[client] (
     ]
   ] =
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactory(choiceArgs))
+
+  def getAllocationFactoryV2(choiceArgs: allocationinstructionv2.AllocationFactory_Allocate)(
+      implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    FactoryChoiceWithDisclosures[
+      allocationinstructionv2.AllocationFactory.ContractId,
+      allocationinstructionv2.AllocationFactory_Allocate,
+    ]
+  ] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactoryV2(choiceArgs))
 
   def getAllocationFactoryRaw(arg: allocationinstruction.v1.definitions.GetFactoryRequest)(implicit
       ec: ExecutionContext,

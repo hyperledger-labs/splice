@@ -13,7 +13,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as Api.TransferInstructionV2
 
-import Splice.TokenStandard.Utils
+import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
@@ -59,9 +59,15 @@ template AmuletTransferInstruction
           ]
         meta = emptyMetadata
 
-      Api.TransferInstructionV2.transferInstruction_acceptImpl = transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1 transfer.receiver
-      Api.TransferInstructionV2.transferInstruction_rejectImpl = transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1 transfer.receiver
-      Api.TransferInstructionV2.transferInstruction_withdrawImpl = transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 transfer.sender
+      transferInstruction_acceptImpl = transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1 transfer.receiver
+      transferInstruction_rejectImpl = transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1 transfer.receiver
+      transferInstruction_withdrawImpl = transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 transfer.sender
+
+      transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
+      transferInstruction_rejectExtraObservers = transferInstruction_rejectDefaultExtraObservers this
+      transferInstruction_withdrawExtraObservers = transferInstruction_withdrawDefaultExtraObservers this
+
+
 
 -- Transfer instruction evolution
 ---------------------------------

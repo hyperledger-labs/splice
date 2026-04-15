@@ -159,9 +159,7 @@ class GrpcSequencerAdministrationService(
           .flatMap { states =>
             val (errors, trafficStates) = states.trafficStatesOrErrors.partitionMap {
               case (member, trafficStateE) =>
-                trafficStateE
-                  .map(member -> _)
-                  .leftMap(member -> _)
+                trafficStateE.map(member -> _).leftMap(member -> _)
             }
             val res: EitherT[FutureUnlessShutdown, TrafficControlError, Map[String, TrafficState]] =
               if (errors.nonEmpty) {
@@ -470,9 +468,17 @@ class GrpcSequencerAdministrationService(
       request: GetLsuTrafficControlStateRequest
   ): Future[GetLsuTrafficControlStateResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val result = sequencer.getLsuTrafficControlState
-      .map(trafficState => GetLsuTrafficControlStateResponse(trafficState.toByteString))
-      .leftMap(_.toCantonRpcError)
+
+    val result = for {
+      trafficTsOverride <- wrapErrUS(request.timestamp.traverse(CantonTimestamp.fromProtoTimestamp))
+
+      result <- sequencer
+        .getLsuTrafficControlState(trafficTsOverride)
+        .map(trafficState => GetLsuTrafficControlStateResponse(trafficState.toByteString))
+        .leftMap(_.toCantonRpcError)
+
+    } yield result
+
     mapErrNewEUS(result)
   }
 

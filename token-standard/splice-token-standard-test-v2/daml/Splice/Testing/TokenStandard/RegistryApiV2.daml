@@ -1,29 +1,21 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Support for using a token compliant registry API in tests.
---
--- These simulate the OpenAPI endpoints that would be served by the backend of the registry implementation.
+-- | A representation of the V2 off-ledger registry API of a token standard V2 compatible asset registry.
 module Splice.Testing.TokenStandard.RegistryApiV2
   ( RegistryApi(..)
 
+  -- * Generic registry support
   , GenericRegistry(..)
   , mkGenericRegistry
-
-  , MultiRegistry
-  , getRegistryFor
-  , getRegistryFor'
   ) where
 
-import DA.Map qualified as Map
-
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
-import Splice.Testing.UtilsV2
+import Splice.Testing.Utils
 
 import Daml.Script
 
@@ -60,38 +52,8 @@ class RegistryApi app where
     : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
 
 
--- Multi-registry support
--------------------------
-
--- TODO(#4515): make use of this as part of testing settlement flows involving the registry of the private asset
-
--- | Type alias for a map of registries, keyed by the party that administers them.
-type MultiRegistry = Map.Map Party GenericRegistry
-
--- | Create a 'GenericRegistry' from any specific registry implementation.
-mkGenericRegistry : (RegistryApi app) => app -> GenericRegistry
-mkGenericRegistry app =
-  GenericRegistry with
-    ggetTransferFactory = getTransferFactory app
-    ggetAllocationFactory = getAllocationFactory app
-    ggetSettlementFactory = getSettlementFactory app
-    ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
-    ggetAllocation_CancelContext = getAllocation_CancelContext app
-    ggetTransferInstruction_AcceptContext = getTransferInstruction_AcceptContext app
-    ggetTransferInstruction_RejectContext = getTransferInstruction_RejectContext app
-    ggetTransferInstruction_WithdrawContext = getTransferInstruction_WithdrawContext app
-
--- | Get the registry for a given admin party.
-getRegistryFor : MultiRegistry -> Party -> Script GenericRegistry
-getRegistryFor multiRegistry admin =
-  case Map.lookup admin multiRegistry of
-    None -> abort ("No registry found for admin " <> show admin)
-    Some registry -> pure registry
-
--- | Get the registry for a given instrument.
-getRegistryFor' : MultiRegistry -> V2.InstrumentId -> Script GenericRegistry
-getRegistryFor' multiRegistry instrumentId =
-  getRegistryFor multiRegistry (instrumentId.admin)
+-- Generic registry support
+---------------------------
 
 -- | Generic type to hold any registry implementation, used for testing multi-registry scenarios.
 --
@@ -127,6 +89,18 @@ data GenericRegistry = GenericRegistry with
   ggetTransferInstruction_WithdrawContext
     : ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
 
+-- | Create a 'GenericRegistry' from any specific registry implementation.
+mkGenericRegistry : (RegistryApi app) => app -> GenericRegistry
+mkGenericRegistry app =
+  GenericRegistry with
+    ggetTransferFactory = getTransferFactory app
+    ggetAllocationFactory = getAllocationFactory app
+    ggetSettlementFactory = getSettlementFactory app
+    ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
+    ggetAllocation_CancelContext = getAllocation_CancelContext app
+    ggetTransferInstruction_AcceptContext = getTransferInstruction_AcceptContext app
+    ggetTransferInstruction_RejectContext = getTransferInstruction_RejectContext app
+    ggetTransferInstruction_WithdrawContext = getTransferInstruction_WithdrawContext app
 
 instance RegistryApi GenericRegistry where
   getTransferFactory registry = registry.ggetTransferFactory

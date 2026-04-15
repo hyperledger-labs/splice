@@ -86,8 +86,9 @@ import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -247,6 +248,12 @@ class BftScanConnection(
     bftCall(_.listDsoSequencers())
   }
 
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    bftCall(_.lookupRollForwardLsu())
+  }
+
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
@@ -266,6 +273,30 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
+  }
+
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.listFeaturedAppRightsByProvider(providerPartyId))
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.lookupFeaturedAppRightByContractId(contractId))
+  }
+
+  override def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.listFeaturedAppRights())
   }
 
   override def getMigrationSchedule()(implicit
@@ -569,7 +600,7 @@ class BftScanConnection(
     bftCall(_.listInstruments(pageSize, pageToken))
 
   def getAllocationTransferContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -604,7 +635,7 @@ class BftScanConnection(
     bftCall(_.getAllocationWithdrawContextRaw(allocationId, body))
 
   def getAllocationCancelContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -612,7 +643,7 @@ class BftScanConnection(
     bftCall(_.getAllocationCancelContext(allocationCid))
 
   def getAllocationWithdrawContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -629,6 +660,18 @@ class BftScanConnection(
     ]
   ] =
     bftCall(_.getAllocationFactory(choiceArgs))
+
+  def getAllocationFactoryV2(choiceArgs: allocationinstructionv2.AllocationFactory_Allocate)(
+      implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    FactoryChoiceWithDisclosures[
+      allocationinstructionv2.AllocationFactory.ContractId,
+      allocationinstructionv2.AllocationFactory_Allocate,
+    ]
+  ] =
+    bftCall(_.getAllocationFactoryV2(choiceArgs))
 
   def getAllocationFactoryRaw(arg: allocationinstruction.v1.definitions.GetFactoryRequest)(implicit
       ec: ExecutionContext,

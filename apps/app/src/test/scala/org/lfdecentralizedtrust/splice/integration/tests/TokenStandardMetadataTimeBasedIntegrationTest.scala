@@ -63,6 +63,9 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         "splice-api-token-transfer-instruction-v1" -> 1,
         "splice-api-token-allocation-v1" -> 1,
         "splice-api-token-allocation-instruction-v1" -> 1,
+        "splice-api-token-holding-v2" -> 1,
+        "splice-api-token-allocation-v2" -> 1,
+        "splice-api-token-allocation-instruction-v2" -> 1,
       ),
     )
 

@@ -1,8 +1,10 @@
 # Token Standard V2 DevNet
 
-Splice version: `0.6.0-snapshot.20260331.2327.0.vfd47ba4e`
+Splice version: `0.6.0-snapshot.20260407.2423.0.v98974cc3`
 
 Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev`
+
+Latest release bundle can be downloaded [here](https://github.com/digital-asset/decentralized-canton-sync/releases/tag/token-standard-v2-upcoming)
 
 This guide explains how to connect to the *Token Standard V2 DevNet*,
 which is a temporary testing network aimed exclusively at organizations

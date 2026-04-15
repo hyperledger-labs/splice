@@ -654,7 +654,7 @@ class InMemoryFanoutBufferSpec
       effectiveAt = Time.Timestamp.Epoch,
       offset = offset,
       events = Vector.empty,
-      completionStreamResponse = None,
+      completionStreamResponseO = None,
       commandId = "",
       synchronizerId = someSynchronizerId.toProtoPrimitive,
       recordTime = Time.Timestamp.Epoch,
@@ -676,7 +676,7 @@ class InMemoryFanoutBufferSpec
       updateId = TestUpdateId(s"reassignment-$idx").toHexString,
       workflowId = s"workflow-$idx",
       offset = offset,
-      completionStreamResponse = None,
+      completionStreamResponseO = None,
       commandId = "",
       recordTime = Time.Timestamp.Epoch,
       reassignmentInfo = ReassignmentInfo(

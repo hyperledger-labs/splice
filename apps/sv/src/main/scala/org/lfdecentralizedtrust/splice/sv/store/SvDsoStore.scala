@@ -209,6 +209,14 @@ trait SvDsoStore
     splice.amulettransferinstruction.AmuletTransferInstruction,
   ]
 
+  /** List amulet allocations that are expired */
+  def listExpiredAmuletAllocations(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amuletallocation.AmuletAllocation.ContractId,
+    splice.amuletallocation.AmuletAllocation,
+  ]
+
   /** List locked amulets that are expired and can never be used as transfer input. */
   def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
@@ -973,6 +981,19 @@ trait SvDsoStore
       splice.amuletrules.TransferPreapproval.COMPANION
     )
 
+  def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]] = lookupExternalPartyAmuletRules().map(
+    _.value.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription("No active ExternalPartyAmuletRules contract")
+        .asRuntimeException()
+    )
+  )
+
   def lookupExternalPartyAmuletRules()(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[ContractWithState[
@@ -1433,6 +1454,15 @@ object SvDsoStore {
           contract,
           contractExpiresAt =
             Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+        )
+      },
+      mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION)(co =>
+        co.payload.allocation.transferLeg.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt =
+            Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
         )
       },
     )

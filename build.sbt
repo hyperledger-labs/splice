@@ -129,6 +129,8 @@ lazy val root: Project = (project in file("."))
     `splice-token-standard-test-v2-daml`,
     `splice-token-test-trading-app-v2-daml`,
     `splice-token-test-dummy-holding-daml`,
+    `splice-test-token-v1-daml`,
+    `splice-test-token-v2-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -512,6 +514,26 @@ lazy val `splice-api-token-burn-mint-v1-daml` =
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
     )
 
+lazy val `splice-test-token-v1-daml` =
+  project
+    .in(file("token-standard/examples/splice-test-token-v1"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `splice-test-token-v2-daml` =
+  project
+    .in(file("token-standard/examples/splice-test-token-v2"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value,
+    )
+
 lazy val `splice-token-test-trading-app-daml` =
   project
     .in(file("token-standard/examples/splice-token-test-trading-app"))
@@ -519,14 +541,7 @@ lazy val `splice-token-test-trading-app-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-util-daml` / Compile / damlBuild).value ++
-          (`splice-amulet-daml` / Compile / damlBuild).value,
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-token-test-trading-app-v2-daml` =
@@ -536,13 +551,7 @@ lazy val `splice-token-test-trading-app-v2-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-request-v2-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v2-daml` / Compile / damlBuild).value ++
-          (`splice-util-daml` / Compile / damlBuild).value ++
-          (`splice-amulet-daml` / Compile / damlBuild).value,
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-token-standard-utils-daml` =
@@ -580,6 +589,7 @@ lazy val `splice-token-standard-test-v1-daml` =
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
+          (`splice-test-token-v1-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
@@ -599,6 +609,9 @@ lazy val `splice-token-standard-test-v2-daml` =
           (`splice-api-token-allocation-instruction-v2-daml` / Compile / damlBuild).value ++
           (`splice-token-standard-test-v1-daml` / Compile / damlBuild).value ++
           (`splice-token-test-trading-app-v2-daml` / Compile / damlBuild).value ++
+          (`splice-test-token-v1-daml` / Compile / damlBuild).value ++
+          (`splice-test-token-v2-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
@@ -945,9 +958,7 @@ lazy val `splice-util-token-standard-wallet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
@@ -972,6 +983,7 @@ lazy val `splice-util-token-standard-wallet-test-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-token-standard-test-v1-daml` / Compile / damlBuild).value ++
+          (`splice-token-standard-test-v2-daml` / Compile / damlBuild).value ++
           (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
@@ -1075,12 +1087,18 @@ lazy val `apps-common` =
       `splice-wallet-payments-daml`,
       `splice-api-token-metadata-v1-daml`,
       `splice-api-token-holding-v1-daml`,
+      `splice-api-token-holding-v2-daml`,
       `splice-api-token-transfer-instruction-v1-daml`,
+      `splice-api-token-transfer-instruction-v2-daml`,
       `splice-api-token-allocation-v1-daml`,
+      `splice-api-token-allocation-v2-daml`,
       `splice-api-token-allocation-request-v1-daml`,
+      `splice-api-token-allocation-request-v2-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
+      `splice-api-token-allocation-instruction-v2-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
+      `splice-token-test-trading-app-v2-daml`,
       `splice-featured-app-api-v1-daml`,
       `splice-featured-app-api-v2-daml`,
       `splice-util-batched-markers-daml`,
@@ -1266,6 +1284,7 @@ lazy val `apps-scan` =
             new File(s"apps/scan/src/main/openapi/scan.yaml"),
             pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
+            imports = List("org.lfdecentralizedtrust.splice.scan.admin.http.ScanJsonSupport._"),
             customExtraction = true,
           ),
           ScalaClient(
@@ -1314,6 +1333,21 @@ lazy val `apps-scan` =
           ),
           ScalaServer(
             new File(
+              "token-standard/splice-api-token-allocation-instruction-v2/openapi/allocation-instruction-v2.yaml"
+            ),
+            pkg = "org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2",
+            modules = List("pekko-http-v1.0.0", "circe"),
+            customExtraction = true,
+          ),
+          ScalaClient(
+            new File(
+              "token-standard/splice-api-token-allocation-instruction-v2/openapi/allocation-instruction-v2.yaml"
+            ),
+            modules = List("pekko-http-v1.0.0", "circe"),
+            pkg = "org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2",
+          ),
+          ScalaServer(
+            new File(
               "token-standard/splice-api-token-allocation-v1/openapi/allocation-v1.yaml"
             ),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v1",
@@ -1326,6 +1360,21 @@ lazy val `apps-scan` =
             ),
             modules = List("pekko-http-v1.0.0", "circe"),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v1",
+          ),
+          ScalaServer(
+            new File(
+              "token-standard/splice-api-token-allocation-v2/openapi/allocation-v2.yaml"
+            ),
+            pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v2",
+            modules = List("pekko-http-v1.0.0", "circe"),
+            customExtraction = true,
+          ),
+          ScalaClient(
+            new File(
+              "token-standard/splice-api-token-allocation-v2/openapi/allocation-v2.yaml"
+            ),
+            modules = List("pekko-http-v1.0.0", "circe"),
+            pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v2",
           ),
           ScalaServer(
             new File(
@@ -1853,6 +1902,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
+    case PathList("META-INF", "okhttp.kotlin_module") => MergeStrategy.first
     case PathList("META-INF", "okio.kotlin_module") => MergeStrategy.last
     case PathList(
           "META-INF",
@@ -1881,6 +1931,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
       MergeStrategy.first
     case PathList("com", "google", _*) => MergeStrategy.first
     case PathList("io", "grpc", _*) => MergeStrategy.first
+    // Copy-pasta from Canton (DACH-NY/canton#31788): Remove this merge strategy once zipkin exporter is removed
+    case PathList("okhttp3", _ @_*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     // Don't really care about the notice file so just take any.
@@ -1906,7 +1958,7 @@ lazy val bundleTask = {
       Seq("-r", "scripts/transform-config.sc", "testResources/transform-config.sc")
     val dashboards = Seq(
       "-r",
-      "cluster/pulumi/infra/grafana-dashboards",
+      "cluster/pulumi/observability/grafana-dashboards",
       "grafana-dashboards",
       "-r",
       "network-health",
@@ -1925,10 +1977,15 @@ lazy val bundleTask = {
       Seq(
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
         (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+        (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value,
         (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value,
+        (`splice-api-token-transfer-instruction-v2-daml` / Compile / damlBuild).value,
         (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
+        (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value,
         (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
+        (`splice-api-token-allocation-request-v2-daml` / Compile / damlBuild).value,
         (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value,
+        (`splice-api-token-allocation-instruction-v2-daml` / Compile / damlBuild).value,
         (`splice-api-token-burn-mint-v1-daml` / Compile / damlBuild).value,
         (`splice-amulet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
@@ -2131,10 +2188,15 @@ lazy val `apps-dar-resources-generator` =
       `splice-wallet-payments-daml`,
       `splice-api-token-metadata-v1-daml`,
       `splice-api-token-holding-v1-daml`,
+      `splice-api-token-holding-v2-daml`,
       `splice-api-token-transfer-instruction-v1-daml`,
+      `splice-api-token-transfer-instruction-v2-daml`,
       `splice-api-token-allocation-v1-daml`,
+      `splice-api-token-allocation-v2-daml`,
       `splice-api-token-allocation-request-v1-daml`,
+      `splice-api-token-allocation-request-v2-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
+      `splice-api-token-allocation-instruction-v2-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,

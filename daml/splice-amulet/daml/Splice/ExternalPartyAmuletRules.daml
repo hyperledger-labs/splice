@@ -18,7 +18,7 @@ import Splice.Api.Token.AllocationInstructionV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
-import Splice.TokenStandard.Utils
+import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -114,6 +114,8 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
+      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
       transferFactory_publicFetchImpl = publicFetchDefaultImpl this
 
@@ -131,7 +133,7 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      allocationFactory_allocateExtraObservers = allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl
+      allocationFactory_allocateExtraObservers = allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
@@ -150,10 +152,8 @@ template ExternalPartyAmuletRules
         in
           settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
-      settlementFactory_settleBatchExtraObservers arg =
-        -- Make all senders and receiver observers, so we get by with a single
-        -- view for batch settlement of Amulet allocations
-        concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) arg.transferLegs
+      settlementFactory_settleBatchExtraObservers =
+        settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
@@ -429,8 +429,8 @@ amulet_allocationFactoryV2_allocateImpl
   -> V2.AllocationFactory_Allocate
   -> Update V2.AllocationInstructionResult
 amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
-  let debitAmount = negate $
-        netAllocationCreditAmount arg.allocation.authorizer arg.allocation.transferLegs
+  let creditAmount = netAmuletCreditAmount externalAmuletRules.dso arg.allocation.authorizer arg.allocation.transferLegs
+  let debitAmount = negate creditAmount
   (lockedAmulet, senderChangeCids, expiresAt, meta) <-
     amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg debitAmount
   allocationCid <- toInterfaceContractId <$> create AmuletAllocationV2 with
@@ -439,7 +439,7 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
     dso = externalAmuletRules.dso
     expiresAt
   pure V2.AllocationInstructionResult with
-    senderChangeCids = map upcast senderChangeCids
+    authorizerChangeCids = TextMap.fromList [(amuletInstrumentIdName, map upcast senderChangeCids)]
     output = V2.AllocationInstructionResult_Completed with allocationCid
     meta
 
@@ -502,8 +502,8 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg fundingAmoun
   -- create locked amulet if required
   if fundingAmount <= 0.0
   then do
-    require "Must not provide holding cids for allocations that do not require funding" (null inputHoldingCids)
-    return (None, [], expiresAt, emptyMetadata)
+    -- return input cids as change, so they can be reused on chaining
+    return (None, map downcast inputHoldingCids, expiresAt, emptyMetadata)
   else do
     require "At least one input holding must be provided for allocations that require funding" (not (null inputHoldingCids))
     -- lock the funds

@@ -130,7 +130,7 @@ export class Auth0Fetch implements Auth0Client {
         namespace: 'default',
       });
 
-      const data = cacheSecret.stringData;
+      const data = cacheSecret.data;
 
       for (const clientId in data) {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));

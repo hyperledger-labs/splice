@@ -9,13 +9,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
-import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   TimeTestUtil,
@@ -23,7 +21,7 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -55,15 +53,6 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
           backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
         }
       })
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
-          scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            )
-          )
-        )(config)
-      )
 
   "App activity records are created for featured app parties" in { implicit env =>
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -86,10 +75,8 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     // Here we perform all settlements with verdict ingestion paused just to
     // confirm that activity record computations does happen properly even when
     // the ingestion is catching up, by reading the Tcs store data for the
-    // archived rounds. ie pausing is not necessary, it merely improves test coverage.
-    val verdictIngestion =
-      sv1ScanBackend.appState.verdictAutomation.trigger[ScanVerdictStoreIngestion]
-
+    // archived rounds. I.e., pausing is not necessary, it merely improves test coverage.
+    //
     // Sequence of actions
     //   Open rounds | Action
     //   ------------+--------------------------------------
@@ -99,7 +86,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     //   6, 7        | settle id3
     //   7, 8        | settle id4
     val (updateId0, updateId1, updateId2, updateId3, updateId4) =
-      setTriggersWithin(triggersToPauseAtStart = Seq(verdictIngestion)) {
+      pauseScanVerdictIngestionWithin(sv1ScanBackend) {
 
         // 3 initial advances to get open rounds with staggered opensAt
         for (round <- 1 to 3) {
@@ -344,11 +331,12 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     )(
       show"There exists an allocation from $senderParty",
       _ => {
-        val allocations = walletClient.listAmuletAllocations()
-        allocations should have size 1 withClue "AmuletAllocations"
-        allocations.head
+        inside(walletClient.listAmuletAllocations()) {
+          case (allocationRequest: HttpWalletAppClient.TokenStandard.V1AmuletAllocation) +: Nil =>
+            allocationRequest
+        }
       },
     )
-    new allocationv1.Allocation.ContractId(allocation.contractId.contractId)
+    new allocationv1.Allocation.ContractId(allocation.contract.contractId.contractId)
   }
 }

@@ -18,6 +18,8 @@ import {
   ListOpenMiningRoundsResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListFeaturedAppRightsByProviderResponse,
+  LookupFeaturedAppRightByContractIdResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -85,6 +87,12 @@ export interface SvAdminClient {
   getMediatorNodeStatus: () => Promise<openapi.NodeStatus>;
   featureSupport: () => Promise<openapi.FeatureSupportResponse>;
   getPartyToParticipant: (partyId: string) => Promise<GetPartyToParticipantResponseV1>;
+  listFeaturedAppRightsByProvider: (
+    providerPartyId: string
+  ) => Promise<ListFeaturedAppRightsByProviderResponse>;
+  lookupFeaturedAppRightByContractId: (
+    contractId: string
+  ) => Promise<LookupFeaturedAppRightByContractIdResponse>;
 }
 
 class ApiMiddleware
@@ -215,6 +223,16 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       getPartyToParticipant: async (partyId: string): Promise<GetPartyToParticipantResponseV1> => {
         return await svAdminClient.getPartyToParticipant(partyId);
+      },
+      listFeaturedAppRightsByProvider: async (
+        providerPartyId: string
+      ): Promise<ListFeaturedAppRightsByProviderResponse> => {
+        return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
+      },
+      lookupFeaturedAppRightByContractId: async (
+        contractId: string
+      ): Promise<LookupFeaturedAppRightByContractIdResponse> => {
+        return await svAdminClient.lookupFeaturedAppRightByContractId(contractId);
       },
     };
   }, [url, userAccessToken]);

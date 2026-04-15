@@ -114,6 +114,7 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
+import scala.util.chaining.*
 
 object SequencerNodeBootstrap {
 
@@ -552,10 +553,31 @@ class SequencerNodeBootstrap(
             }
           }
 
-          lsuSequencingBounds <- EitherT.right[String](
-            LsuSequencingBounds.create(synchronizerTopologyStore)
-          )
-          _ = logger.info(s"Computed lsu sequencing bounds: $lsuSequencingBounds")
+          lsuSequencingBounds <-
+            arguments.config.parameters.lsuRepair.lsuSequencingBoundsOverride match {
+              case Some(lsuSequencingBoundsOverride) =>
+                logger.info(
+                  s"Using config override for lsu sequencing bounds: $lsuSequencingBoundsOverride"
+                )
+                EitherT.fromEither[FutureUnlessShutdown](
+                  LsuSequencingBounds
+                    .create(
+                      lowerBoundSequencingTimeExclusive =
+                        lsuSequencingBoundsOverride.lowerBoundSequencingTimeExclusive,
+                      upgradeTime = lsuSequencingBoundsOverride.upgradeTime,
+                    )
+                    .map(Option(_))
+                )
+
+              case None =>
+                EitherT
+                  .right[String](LsuSequencingBounds.create(synchronizerTopologyStore))
+                  .map(
+                    _.tap(lsuSequencingBounds =>
+                      logger.info(s"Computed lsu sequencing bounds: $lsuSequencingBounds")
+                    )
+                  )
+            }
 
           sequencerSnapshotTimestamp = topologyAndSequencerSnapshot
             .flatMap(_._2)
@@ -638,6 +660,7 @@ class SequencerNodeBootstrap(
               staticSynchronizerParameters,
               crypto,
               cryptoConfig,
+              Some(arguments.metrics.kmsMetrics),
               parameters.batchingConfig.parallelism,
               parameters.cachingConfigs.publicKeyConversionCache,
               parameters.processingTimeouts,
@@ -755,6 +778,7 @@ class SequencerNodeBootstrap(
                 futureSupervisor,
                 config.trafficConfig,
                 lsuSequencingBounds,
+                parameters.drSequencingTimeUpperBound,
                 runtimeReadyPromise.futureUS,
                 topologyAndSequencerSnapshot.flatMap { case (_, sequencerSnapshot) =>
                   sequencerSnapshot
@@ -781,7 +805,7 @@ class SequencerNodeBootstrap(
           )
           _ = sequencerServiceCell.putIfAbsent(sequencerService)
 
-          directPool = new DirectSequencerConnectionXPool(
+          directPool = new DirectSequencerConnectionPool(
             sequencer,
             psid,
             sequencerId,
@@ -792,7 +816,7 @@ class SequencerNodeBootstrap(
 
           _ = addCloseable(sequencedEventStore)
           sequencerClient = new SequencerClientImplPekko[
-            DirectSequencerConnectionX.SubscriptionError
+            DirectSequencerConnection.SubscriptionError
           ](
             psid,
             sequencerId,

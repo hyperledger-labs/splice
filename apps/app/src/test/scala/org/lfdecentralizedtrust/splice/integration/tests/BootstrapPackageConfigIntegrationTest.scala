@@ -10,7 +10,6 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -192,7 +191,9 @@ class BootstrapPackageConfigIntegrationTest
       bobValidatorRight.getTemplateId.packageId shouldBe initialAmulet.packageId
     }
 
-    aliceWalletClient.tap(50)
+    eventuallySucceeds(2.minute) {
+      aliceWalletClient.tap(50)
+    }
 
     clue("Splitwell can complete payment request on old DAR versions") {
       splitwellPaymentRequest(aliceSplitwellClient, aliceWalletClient, key, bobUserParty, 42.0)
@@ -481,17 +482,5 @@ class BootstrapPackageConfigIntegrationTest
     packagesAreVetted(DarResources.amulet.latest, PackageIdResolver.Package.SpliceAmulet)
     // also check wallet because for the sv we have 2 vetting triggers, and the wallet is used in the tap call but it's vetted by the validator trigger (amulet rules can be vetted by any of the triggers)
     packagesAreVetted(DarResources.wallet.latest, PackageIdResolver.Package.SpliceWallet)
-  }
-
-  private def alicesTapsWithPackageId(
-      packageId: String
-  )(implicit env: SpliceTestConsoleEnvironment) = {
-    val tapContractId = aliceValidatorWalletClient.tap(10)
-    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .of_party(Amulet.COMPANION)(dsoParty)
-      .filter(_.contractId == tapContractId.contractId)
-      .loneElement
-      .getTemplateId
-      .packageId shouldBe packageId
   }
 }

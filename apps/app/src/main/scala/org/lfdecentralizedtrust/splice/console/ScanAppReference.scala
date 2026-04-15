@@ -55,6 +55,7 @@ import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
+  allocationv2,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
@@ -257,6 +258,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
+  @Help.Summary("Look up a featured app right by contract ID")
+  def lookupFeaturedAppRightByContractId(
+      contractId: String
+  ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId))
+    }
+
   @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long
@@ -451,6 +460,31 @@ abstract class ScanAppReference(
       )
     }
 
+  def getAcsSnapshotAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch] = Some(
+        definitions.AcsRequest.RecordTimeMatch.Exact
+      ),
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+      templates: Option[Vector[PackageQualifiedName]] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetAcsSnapshotAtV1(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          recordTimeMatch,
+          after,
+          pageSize,
+          partyIds,
+          templates,
+        )
+      )
+    }
+
   def getHoldingsStateAt(
       at: CantonTimestamp,
       migrationId: Long,
@@ -464,6 +498,29 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetHoldingsStateAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          partyIds,
+          recordTimeMatch,
+          after,
+          pageSize,
+        )
+      )
+    }
+
+  def getHoldingsStateAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsStateRequest.RecordTimeMatch.Exact
+      ),
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsStateAtV1(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
           partyIds,
@@ -558,6 +615,14 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetUpdate(updateId, encoding)
+      )
+    }
+  }
+
+  def getUpdateByHash(extTxnHash: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateByHash(extTxnHash, encoding)
       )
     }
   }
@@ -675,6 +740,17 @@ abstract class ScanAppReference(
   ): ChoiceContextWithDisclosures = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetAllocationTransferContext(allocationId))
+    }
+  }
+
+  def getSettlementFactoryV2(
+      choiceArgs: allocationv2.SettlementFactory_SettleBatch
+  ): FactoryChoiceWithDisclosures[
+    allocationv2.SettlementFactory.ContractId,
+    allocationv2.SettlementFactory_SettleBatch,
+  ] = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetSettlementFactoryV2(choiceArgs))
     }
   }
 

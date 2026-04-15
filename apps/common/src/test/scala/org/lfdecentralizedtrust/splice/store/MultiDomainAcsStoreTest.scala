@@ -154,6 +154,10 @@ abstract class MultiDomainAcsStoreTest[
           .lookupContractById(AppRewardCoupon.COMPANION)(c.contract.contractId)
           .map(_ shouldBe Some(c))
       }
+      multiLookupResult <- store.lookupContractsById(AppRewardCoupon.COMPANION)(
+        expected.map(_._1.contractId)
+      )
+      _ = multiLookupResult shouldBe expected_
       _ <- MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(expected_) { c =>
         store
           .lookupContractStateById(c.contract.contractId)

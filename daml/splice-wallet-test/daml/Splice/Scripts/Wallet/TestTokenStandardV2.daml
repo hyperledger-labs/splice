@@ -13,16 +13,18 @@ import qualified Splice.Api.Token.AllocationInstructionV2 as Api.Token.Allocatio
 import qualified Splice.Api.Token.AllocationRequestV2 as Api.Token.AllocationRequestV2
 import qualified Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
 import Splice.Api.Token.MetadataV1
-import Splice.TokenStandard.Utils (basicAccount, netAllocationCreditAmount)
+import Splice.TokenStandard.Utils (basicAccount)
 
+import Splice.AmuletAllocationV2 (netAmuletCreditAmount)
 import Splice.Wallet.Install
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.Apps.TradingAppV2 qualified as TradingAppV2
+import Splice.Testing.Apps.TradingAppV2_Backend qualified as TradingAppV2 (querySettleableTrades, settleWithTradeAgreements)
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
-import Splice.Tests.TestAmuletTokenDvP_V1V2Mixed (querySettleableTrades, settleWithTradeAgreements)
 
 import Daml.Script
 
@@ -148,7 +150,10 @@ testTokenStandardTransfer = script do
 
 testTokenStandardAllocateV2 : Script ()
 testTokenStandardAllocateV2 = script do
-  registry <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
+  -- Note: we only use amulet in the test. We use the multi-registry setup only for convenience,
+  -- as need to pass a multi-registry to the trading app backend.
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let registry = env.amuletV2
 
   venue <- allocateParty "venue"
 
@@ -187,7 +192,7 @@ testTokenStandardAllocateV2 = script do
     reqs <- WalletClientV2.listAllocationRequestsV2 authorizer actor
     [(installCid, _)] <- query @WalletAppInstall actor
     forA_ reqs $ \(reqCid, req) -> do
-      let fundingAmount = negate $ netAllocationCreditAmount authorizer req.transferLegs
+      let fundingAmount = negate $ netAmuletCreditAmount registry.dso authorizer req.transferLegs
       inputHoldingCids <- if fundingAmount > 0.0
         then WalletClientV2.listUnlockedHoldingCidsFor authorizer actor amuletId
         else pure []
@@ -224,8 +229,8 @@ testTokenStandardAllocateV2 = script do
 
   -- venue settles the trade
 
-  [trade] <- querySettleableTrades registry venue
-  settleWithTradeAgreements trade
+  [trade] <- TradingAppV2.querySettleableTrades env.registries venue
+  TradingAppV2.settleWithTradeAgreements trade
 
   -- no allocations are left over
   [] <- queryInterface @Api.Token.AllocationV2.Allocation registry.dso

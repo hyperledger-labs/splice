@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{DecryptionError as _, EncryptionError as _, *}
 import com.digitalasset.canton.data.*
@@ -214,6 +215,14 @@ private[reassignment] class AssignmentProcessingSteps(
         staticSynchronizerParameters.map(_.protocolVersion),
       )
       recipientsSet <- activeParticipantsOfParty(stakeholders.all.toSeq)
+      _ <- ReassignmentValidation
+        .checkMultiSynchronizerEnabled(
+          topologySnapshot.unwrap,
+          recipientsSet,
+          psid.unwrap,
+        )
+        .leftMap(_.toSubmissionValidationError)
+
       contractIds = unassignmentData.contractsBatch.contractIds.toSeq
       recipients <- EitherT.fromEither[FutureUnlessShutdown](
         Recipients
@@ -453,6 +462,7 @@ private[reassignment] class AssignmentProcessingSteps(
         engineAbortStatusF,
         decisionTimeTickRequest,
         publishUpdate,
+        parsedRequest.trafficCost,
       )
 
       StorePendingDataAndSendResponseAndCreateTimeout(
@@ -492,6 +502,7 @@ private[reassignment] class AssignmentProcessingSteps(
       _abortedF,
       _decisionTimeTickRequest,
       _publishUpdate,
+      trafficCost,
     ) = pendingRequestData
 
     def rejected(
@@ -574,6 +585,7 @@ private[reassignment] class AssignmentProcessingSteps(
               psid.map(_.logical),
               participantId,
               requestId.unwrap,
+              trafficCost,
             )
           } yield CommitAndStoreContractsAndPublishEvent(
             commitSetO,
@@ -647,6 +659,7 @@ object AssignmentProcessingSteps {
       override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
       publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
+      trafficCost: NonNegativeLong,
   ) extends PendingReassignment {
 
     override def rootHashO: Option[RootHash] = Some(assignmentValidationResult.rootHash)

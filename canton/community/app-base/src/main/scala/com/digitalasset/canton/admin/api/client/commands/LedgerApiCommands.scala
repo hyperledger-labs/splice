@@ -131,7 +131,11 @@ import com.daml.ledger.api.v2.testing.time_service.{
   SetTimeRequest,
   TimeServiceGrpc,
 }
-import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction
+import com.daml.ledger.api.v2.topology_transaction.TopologyEvent.Event
+import com.daml.ledger.api.v2.topology_transaction.{
+  ParticipantAuthorizationAdded,
+  TopologyTransaction,
+}
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
@@ -1131,6 +1135,11 @@ object LedgerApiCommands {
       override def updateId: String = topologyTransaction.updateId
 
       override def synchronizerId: String = topologyTransaction.synchronizerId
+
+      def participantAuthorizationAdded: Seq[ParticipantAuthorizationAdded] =
+        topologyTransaction.events.map(_.event).collect {
+          case Event.ParticipantAuthorizationAdded(added) => added
+        }
     }
     sealed trait ReassignmentWrapper extends UpdateWrapper {
       override def updateId: String = reassignment.updateId
@@ -1285,6 +1294,7 @@ object LedgerApiCommands {
         beginExclusive: Long,
         endInclusive: Option[Long],
         updateFormat: UpdateFormat,
+        descendingOrder: Boolean,
     )(override implicit val loggingContext: ErrorLoggingContext)
         extends BaseCommand[GetUpdatesRequest, AutoCloseable, AutoCloseable]
         with SubscribeBase[GetUpdatesRequest, GetUpdatesResponse, UpdateWrapper] {
@@ -1306,6 +1316,7 @@ object LedgerApiCommands {
           beginExclusive = beginExclusive,
           endInclusive = endInclusive,
           updateFormat = Some(updateFormat),
+          descendingOrder = descendingOrder,
         )
       }
 
@@ -1773,6 +1784,7 @@ object LedgerApiCommands {
         hashingSchemeVersion: HashingSchemeVersion,
         transactionShape: Option[TransactionShape],
         includeCreatedEventBlob: Boolean,
+        customEventFormat: Option[EventFormat],
     ) extends BaseCommand[
           ExecuteSubmissionAndWaitForTransactionRequest,
           ExecuteSubmissionAndWaitForTransactionResponse,
@@ -1784,21 +1796,23 @@ object LedgerApiCommands {
 
         val transactionFormat = transactionShape.map(transactionShape =>
           TransactionFormat(
-            eventFormat = Some(
-              EventFormat(
-                filtersByParty = Map.empty,
-                filtersForAnyParty = Some(
-                  Filters(
-                    Seq(
-                      CumulativeFilter(
-                        CumulativeFilter.IdentifierFilter.WildcardFilter(
-                          WildcardFilter(includeCreatedEventBlob = includeCreatedEventBlob)
+            eventFormat = customEventFormat.orElse(
+              Some(
+                EventFormat(
+                  filtersByParty = Map.empty,
+                  filtersForAnyParty = Some(
+                    Filters(
+                      Seq(
+                        CumulativeFilter(
+                          CumulativeFilter.IdentifierFilter.WildcardFilter(
+                            WildcardFilter(includeCreatedEventBlob = includeCreatedEventBlob)
+                          )
                         )
                       )
                     )
-                  )
-                ),
-                verbose = true,
+                  ),
+                  verbose = true,
+                )
               )
             ),
             transactionShape = transactionShape,
@@ -1925,6 +1939,7 @@ object LedgerApiCommands {
         includeCreatedEventBlob: Boolean,
         override val tapsMaxPasses: Option[Int],
         optTimeout: Option[NonNegativeDuration],
+        customEventFormat: Option[EventFormat],
     ) extends SubmitCommand
         with BaseCommand[
           SubmitAndWaitForTransactionRequest,
@@ -1939,23 +1954,27 @@ object LedgerApiCommands {
               commands = Some(mkCommand),
               transactionFormat = Some(
                 TransactionFormat(
-                  eventFormat = Some(
-                    EventFormat(
-                      filtersByParty = actAs
-                        .map(
-                          _ -> Filters(
-                            Seq(
-                              CumulativeFilter(
-                                IdentifierFilter.WildcardFilter(
-                                  WildcardFilter(includeCreatedEventBlob = includeCreatedEventBlob)
+                  eventFormat = customEventFormat.orElse(
+                    Some(
+                      EventFormat(
+                        filtersByParty = actAs
+                          .map(
+                            _ -> Filters(
+                              Seq(
+                                CumulativeFilter(
+                                  IdentifierFilter.WildcardFilter(
+                                    WildcardFilter(includeCreatedEventBlob =
+                                      includeCreatedEventBlob
+                                    )
+                                  )
                                 )
                               )
                             )
                           )
-                        )
-                        .toMap,
-                      filtersForAnyParty = None,
-                      verbose = true,
+                          .toMap,
+                        filtersForAnyParty = None,
+                        verbose = true,
+                      )
                     )
                   ),
                   transactionShape = transactionShape,

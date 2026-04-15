@@ -4,7 +4,7 @@
 -- | V2 API to instruct transfers of holdings between accounts.
 module Splice.Api.Token.TransferInstructionV2 where
 
-import qualified DA.Map as Map
+import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -36,6 +36,9 @@ data Transfer = Transfer with
     inputHoldingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
+      -- The holdings MUST be owned by the sender account, and match the
+      -- instrument specified by the transfer.
+      --
       -- MAY be empty if the registry supports automatic selection of holdings for transfers
       -- or does not represent holdings on-ledger.
       --
@@ -50,7 +53,7 @@ data Transfer = Transfer with
 -- | The result of instructing a transfer or advancing the state of a transfer instruction.
 data TransferInstructionResult = TransferInstructionResult with
     output : TransferInstructionResult_Output
-     -- ^ The output of the step.
+      -- ^ The output of the step.
     senderChangeCids : [ContractId Holding]
       -- ^ New holdings owned by the sender created to return "change". Can be used
       -- by actors to batch creating or updating multiple transfer instructions
@@ -113,7 +116,7 @@ data TransferInstructionView = TransferInstructionView with
     availableActions : Map.Map [Party] [TransferInstructionAction]
       -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
       --
-      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- This field can be used to inform wallet users whether they can take an action or not;
       -- and which other parties they might be waiting on to take their action.
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
@@ -130,6 +133,10 @@ interface TransferInstruction where
   transferInstruction_acceptImpl : ContractId TransferInstruction -> TransferInstruction_Accept -> Update TransferInstructionResult
   transferInstruction_rejectImpl : ContractId TransferInstruction -> TransferInstruction_Reject -> Update TransferInstructionResult
   transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
+
+  transferInstruction_acceptExtraObservers : TransferInstruction_Accept -> [Party]
+  transferInstruction_rejectExtraObservers : TransferInstruction_Reject -> [Party]
+  transferInstruction_withdrawExtraObservers : TransferInstruction_Withdraw -> [Party]
 
   nonconsuming choice TransferInstruction_Accept : TransferInstructionResult
     -- ^ Accept the transfer
@@ -151,6 +158,7 @@ interface TransferInstruction where
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
+    observer transferInstruction_acceptExtraObservers this arg
     controller actors
     do transferInstruction_acceptImpl this self arg
 
@@ -170,6 +178,7 @@ interface TransferInstruction where
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
+    observer transferInstruction_rejectExtraObservers this arg
     controller actors
     do transferInstruction_rejectImpl this self arg
 
@@ -189,6 +198,7 @@ interface TransferInstruction where
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
+    observer transferInstruction_withdrawExtraObservers this arg
     controller actors
     do transferInstruction_withdrawImpl this self arg
 
@@ -199,6 +209,8 @@ interface TransferInstruction where
 -- | A factory contract to instruct transfers of holdings between parties.
 interface TransferFactory where
   viewtype TransferFactoryView
+
+  transferFactory_transferExtraObservers : TransferFactory_Transfer -> [Party]
 
   transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferInstructionResult
   transferFactory_publicFetchImpl : ContractId TransferFactory -> TransferFactory_PublicFetch -> Update TransferFactoryView
@@ -220,6 +232,7 @@ interface TransferFactory where
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
+    observer transferFactory_transferExtraObservers this arg
     controller actors
     do transferFactory_transferImpl this self arg
 
