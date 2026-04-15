@@ -257,7 +257,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
         expectedAmulets: Range = 50 to 50,
     ) = {
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
-      walletClient.tap(tapAmount)
+      eventuallySucceeds() {
+        walletClient.tap(tapAmount)
+      }
       clue(s"${validatorBackend.name} has tapped a amulet") {
         checkWallet(
           walletUserParty,
