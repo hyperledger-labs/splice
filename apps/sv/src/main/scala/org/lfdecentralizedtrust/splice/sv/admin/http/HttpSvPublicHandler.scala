@@ -174,29 +174,54 @@ class HttpSvPublicHandler(
             HttpErrorHandler.badRequest(s"Could not verify and decode token: $error")
           )
         case Right(token) =>
-          SvApp
-            .grantValidatorPermission(
-              token.candidateParty.toProtoPrimitive,
-              token.candidateParticipantId.toProtoPrimitive,
-              dsoStoreWithIngestion,
-              retryProvider,
-              logger,
+          if (!SvApp.validateSvNamespace(token.candidateParty, token.candidateParticipantId)) {
+            Future.failed(
+              HttpErrorHandler.badRequest(
+                s"Party ${token.candidateParty} does not have the same namespace than its participant ${token.candidateParticipantId}."
+              )
             )
-            .flatMap {
+          } else {
+            SvApp
+              .isApprovedSvIdentity(
+                token.candidateName,
+                token.candidateParty,
+                body.token,
+                config,
+                svStore,
+                logger,
+              ) match {
               case Left(reason) =>
                 Future.failed(
-                  HttpErrorHandler
-                    .internalServerError(s"Could not grant validator permission: $reason")
-                )
-              case Right(permissionCid) =>
-                Future.successful(
-                  r0.GrantSvOnboardingPermissionResponseOK(
-                    definitions.GrantSvOnboardingPermissionResponse(
-                      validatorPermissionContractId = permissionCid.contractId
-                    )
+                  HttpErrorHandler.unauthorized(
+                    s"Could not approve SV Identity because of reason: $reason"
                   )
                 )
+              case Right(_) =>
+                SvApp
+                  .grantValidatorPermission(
+                    token.candidateParty.toProtoPrimitive,
+                    token.candidateParticipantId.toProtoPrimitive,
+                    dsoStoreWithIngestion,
+                    retryProvider,
+                    logger,
+                  )
+                  .flatMap {
+                    case Left(reason) =>
+                      Future.failed(
+                        HttpErrorHandler
+                          .internalServerError(s"Could not grant validator permission: $reason")
+                      )
+                    case Right(permissionCid) =>
+                      Future.successful(
+                        r0.GrantSvOnboardingPermissionResponseOK(
+                          definitions.GrantSvOnboardingPermissionResponse(
+                            validatorPermissionContractId = permissionCid.contractId
+                          )
+                        )
+                      )
+                  }
             }
+          }
       }
     }
   }
