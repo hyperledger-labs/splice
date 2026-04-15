@@ -23,18 +23,21 @@ import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.RetryingService
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, ServiceWithGuaranteedShutdown}
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
 /** Ingestion for verdict ingestion store. */
 class ScanVerdictIngestionService(
     config: ScanAppBackendConfig,
+    synchronizerNodes: LocalSynchronizerNodes[ScanSynchronizerNode],
     grpcClientMetrics: GrpcClientMetrics,
     store: DbScanVerdictStore,
     migrationId: Long,
@@ -52,7 +55,7 @@ class ScanVerdictIngestionService(
     esf: ExecutionSequencerFactory,
 ) extends RetryingService(config.automation, backoffClock, "verdict ingestion") {
 
-  private val currentMediatorClient =
+  private lazy val currentMediatorClient =
     new MediatorVerdictsClient(
       config.synchronizerNodes.current.mediator,
       this,
@@ -91,55 +94,82 @@ class ScanVerdictIngestionService(
     for {
       _ <- waitForStores()
       ingestionStart <- getIngestionStart()
+      announcements <- synchronizerNodes.current.sequencerAdminConnection
+        .listLsuAnnouncements(synchronizerId)
+      currentPsid <- synchronizerNodes.current.sequencerAdminConnection
+        .getPhysicalSynchronizerId()
     } yield {
-      logger.info(s"Streaming verdicts starting from $ingestionStart")
-      val currentSource = currentMediatorClient.streamVerdicts(Some(ingestionStart))
-      val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
-      val source = currentSource
-        .mapMaterializedValue { completeFuture =>
-          completeFuture.foreach { result =>
-            completedWithCompleteF.trySuccess(result).discard
-            result match {
-              case Some(complete) =>
-                logger.info(
-                  s"Current mediator verdicts stream completed with: $complete, closing current client"
-                )
-                currentMediatorClient.close()
-              case None =>
+      val pastUpgradeAnnouncement = announcements.find { announcement =>
+        ingestionStart.isAfter(announcement.mapping.upgradeTime) &&
+        announcement.mapping.successorSynchronizerId != currentPsid
+      }
+      val source = pastUpgradeAnnouncement match {
+        case Some(announcement) =>
+          logger.info(
+            s"Ingestion start $ingestionStart is after LSU upgrade time ${announcement.mapping.upgradeTime}, " +
+              s"skipping current mediator client and using successor directly"
+          )
+          successorMediatorClientO match {
+            case Some(successorMediatorClient) =>
+              successorMediatorClient
+                .streamVerdicts(Some(ingestionStart))
+                .mapMaterializedValue(_ => NotUsed)
+            case None =>
+              logger.error(
+                "Ingestion start is past LSU upgrade time but no successor mediator client is configured"
+              )
+              Source.empty[v30.Verdict]
+          }
+        case None =>
+          logger.info(s"Streaming verdicts starting from $ingestionStart")
+          val currentSource = currentMediatorClient.streamVerdicts(Some(ingestionStart))
+          val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
+          currentSource
+            .mapMaterializedValue { completeFuture =>
+              completeFuture.foreach { result =>
+                completedWithCompleteF.trySuccess(result).discard
+                result match {
+                  case Some(complete) =>
+                    logger.info(
+                      s"Current mediator verdicts stream completed with: $complete, closing current client"
+                    )
+                    currentMediatorClient.close()
+                  case None =>
+                }
+              }(ec)
+              completeFuture.failed.foreach { ex =>
+                completedWithCompleteF.tryFailure(ex)
+              }(ec)
+              NotUsed
             }
-          }(ec)
-          completeFuture.failed.foreach { ex =>
-            completedWithCompleteF.tryFailure(ex)
-          }(ec)
-          NotUsed
-        }
-        .concat(
-          Source
-            .futureSource(
-              completedWithCompleteF.future.flatMap {
-                case Some(_) =>
-                  getIngestionStart().map { successorIngestionStart =>
-                    successorMediatorClientO match {
-                      case Some(successorMediatorClient) =>
-                        logger.info(
-                          s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
-                        )
-                        successorMediatorClient
-                          .streamVerdicts(Some(successorIngestionStart))
-                          .mapMaterializedValue(_ => NotUsed)
-                      case None =>
-                        logger.error(
-                          "Current mediator verdicts stream completed but no successor mediator client is configured"
-                        )
-                        Source.empty[v30.Verdict]
-                    }
+            .concat(
+              Source
+                .futureSource(
+                  completedWithCompleteF.future.flatMap {
+                    case Some(_) =>
+                      getIngestionStart().map { successorIngestionStart =>
+                        successorMediatorClientO match {
+                          case Some(successorMediatorClient) =>
+                            logger.info(
+                              s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
+                            )
+                            successorMediatorClient
+                              .streamVerdicts(Some(successorIngestionStart))
+                              .mapMaterializedValue(_ => NotUsed)
+                          case None =>
+                            logger.error(
+                              "Current mediator verdicts stream completed but no successor mediator client is configured"
+                            )
+                            Source.empty[v30.Verdict]
+                        }
+                      }
+                    case None =>
+                      Future.successful(Source.empty[v30.Verdict])
                   }
-                case None =>
-                  Future.successful(Source.empty[v30.Verdict])
-              }
+                )
+                .mapMaterializedValue(_ => NotUsed)
             )
-            .mapMaterializedValue(_ => NotUsed)
-        )
+      }
       new ServiceWithGuaranteedShutdown(
         source = batchSource(source),
         map = processWhenUnpaused,

@@ -384,6 +384,7 @@ class ScanApp(
         } else None
       verdictAutomation = new ScanVerdictAutomationService(
         config,
+        syncNodes,
         clock,
         retryProvider,
         loggerFactory,

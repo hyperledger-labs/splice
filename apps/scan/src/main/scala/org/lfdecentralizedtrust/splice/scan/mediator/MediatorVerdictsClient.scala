@@ -90,7 +90,7 @@ final class MediatorVerdictsClient(
               )
             }
           case Failure(ex) =>
-            logger.warn(
+            logger.info(
               s"Mediator verdicts stream terminated with an error",
               ex,
             )
