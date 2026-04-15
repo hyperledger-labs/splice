@@ -9,6 +9,7 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
@@ -137,14 +138,6 @@ class ScanVerdictIngestionService(
               .mapMaterializedValue { completeFuture =>
                 completeFuture.foreach { result =>
                   completedWithCompleteF.trySuccess(result).discard
-                  result match {
-                    case Some(complete) =>
-                      logger.info(
-                        s"Current mediator verdicts stream completed with: $complete, closing current client"
-                      )
-                      currentMediatorClient.close()
-                    case None =>
-                  }
                 }(ec)
                 completeFuture.failed.foreach { ex =>
                   completedWithCompleteF.tryFailure(ex)
@@ -348,6 +341,10 @@ class ScanVerdictIngestionService(
   private def batchSource[T, Mat](source: Source[T, Mat]): Source[Seq[T], Mat] =
     source.batch(math.max(1, config.mediatorVerdictIngestion.batchSize.toLong), Vector(_))(_ :+ _)
 
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = super.closeAsync() ++ Seq(
+    SyncCloseable("current mediator", currentMediatorClient.close()),
+    SyncCloseable("successor mediator", successorMediatorClientO.foreach(_.close())),
+  )
   // Kick-off the ingestion
   start()
 
