@@ -256,7 +256,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-pg-passwd",
+    "name": "sv-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -496,7 +496,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-pg-passwd",
+    "name": "sv-da-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -773,7 +773,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-pg-passwd",
+    "name": "sv-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1050,7 +1050,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-pg",
+    "name": "user-sv-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1064,7 +1064,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-pg",
+    "name": "user-sv-da-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1078,7 +1078,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-pg",
+    "name": "user-sv-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

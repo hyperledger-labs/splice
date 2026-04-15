@@ -631,7 +631,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-participant-pg-passwd",
+    "name": "splitwell-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -773,7 +773,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-sw-pg-passwd",
+    "name": "splitwell-sw-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -843,7 +843,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-validator-pg-passwd",
+    "name": "splitwell-validator-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1085,7 +1085,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-participant-pg",
+    "name": "user-splitwell-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1099,7 +1099,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-sw-pg",
+    "name": "user-splitwell-sw-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1113,7 +1113,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-validator-pg",
+    "name": "user-splitwell-validator-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }
