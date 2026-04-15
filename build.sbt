@@ -680,7 +680,6 @@ lazy val `splice-amulet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      logLevel := Level.Debug,
       Compile / damlDependencies :=
         (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
