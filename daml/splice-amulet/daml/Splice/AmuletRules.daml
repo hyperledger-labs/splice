@@ -677,7 +677,7 @@ template AmuletRules
           coupon <- fetchAndArchive (ForDso with dso) cid
           assertDeadlineExceeded "coupon.expiresAt" coupon.expiresAt
           return coupon
-        let actualBeneficiaries = [ coupon.beneficiary | coupon <- coupons ]
+        let actualBeneficiaries = [ fromOptional coupon.provider coupon.beneficiary | coupon <- coupons ]
         require "beneficiaries match coupons" (sort beneficiaries == dedupSort actualBeneficiaries)
 
         -- create unclaimed reward for the total
@@ -715,10 +715,10 @@ template AmuletRules
         -- unhide coupons
         actualBeneficiaries <- forA rewardCouponCids $ \cid -> do
           coupon <- fetchAndArchive (ForDso with dso) cid
-          require "beneficiary is no observer on the coupon" (not (coupon.beneficiaryIsObserver))
+          require "provider is no observer on the coupon" (not (coupon.providerIsObserver))
           assertWithinDeadline "coupon.expiresAt" coupon.expiresAt
-          create coupon with beneficiaryIsObserver = True
-          pure coupon.beneficiary
+          create coupon with providerIsObserver = True
+          pure coupon.provider
 
         -- check specified beneficiaries match actual beneficiaries of the coupons
         require "beneficiaries match coupons" (dedupSort beneficiaries == dedupSort actualBeneficiaries)
