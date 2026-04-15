@@ -14,7 +14,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.{Done, NotUsed}
-import org.apache.pekko.stream.{KillSwitches, Materializer}
+import org.apache.pekko.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.lfdecentralizedtrust.splice.automation.ServiceWithShutdown
 
@@ -72,11 +72,8 @@ class ServiceWithGuaranteedShutdown[S](
       // If we didn't, we'd get situations where e.g. two ingestions are running simultaneously (and break a lot).
       // For more information, see https://github.com/DACH-NY/canton-network-node/issues/10126.
       .toMat(Sink.ignore)(Keep.both),
-    errorLogMessagePrefix = if (retryProvider.isClosing) {
-      "Ignoring failure to handle transaction, as we are shutting down"
-    } else {
-      "Fatally failed to handle element"
-    },
+    errorLogMessagePrefix = "Fatally failed to handle element",
+    isDone = (_: (UniqueKillSwitch, Future[Done])) => retryProvider.isClosing,
   )
 
   def completed: Future[Done] =
