@@ -451,7 +451,7 @@ object DamlPlugin extends AutoPlugin {
     val versionedDar =
       outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
 
-    val damlcCommand = damlc.getAbsolutePath :: "build" ::
+    val damlcCommand = "dpm" :: "build" ::
       "--project-root" :: projectDirectory.toString ::
       "--output" :: versionedDar.getAbsolutePath ::
       "--enable-multi-package=no" :: Nil
