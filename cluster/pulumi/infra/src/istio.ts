@@ -99,6 +99,9 @@ function configureIstiod(
       // taken from https://github.com/istio/istio/issues/37682
       accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
       accessLogEncoding: 'JSON',
+      // Changing istio access log default format to include trace_id:
+      // - envoy access log configuration: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#config-access-log
+      // - w3c docs for trace context: https://www.w3.org/TR/trace-context/#header-name
       accessLogFormat: JSON.stringify({
         trace_id: '%REQ(traceparent)%',
         authority: '%REQ(:AUTHORITY)%',
