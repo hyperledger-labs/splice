@@ -609,15 +609,24 @@ rewardCouponV2_assignBeneficiariesImpl coupon arg = do
   require ("No more than " <> show maxNumNewCouponV2Beneficiaries <> " beneficiaries assigned")
     (length newBeneficiaries <= maxNumNewCouponV2Beneficiaries)
 
-  -- create coupons for new beneficiaries
-  newBeneficiaryCouponCids <- forA newBeneficiaries $ \newBeneficiary -> do
-    create coupon with
-      amount = coupon.amount * newBeneficiary.weight
-      beneficiary = Some newBeneficiary.beneficiary
-      providerIsObserver = True
+  additionalCoupons <- forA arg.additionalCoupons $ \cid -> do
+    c <- fetchAndArchive (ForOwner with dso = coupon.dso; owner = coupon.provider) (fromInterfaceContractId @RewardCouponV2 cid)
+    require "Additional coupon has not been assigned yet" (isNone c.beneficiary)
+    require "Additional coupon has same provider" (c.provider == coupon.provider)
+    pure c
+
+  let allCoupons = coupon :: additionalCoupons
+
+  -- create coupons for new beneficiaries for each coupon
+  allNewCids <- forA allCoupons $ \c ->
+    forA newBeneficiaries $ \newBeneficiary ->
+      create c with
+        amount = c.amount * newBeneficiary.weight
+        beneficiary = Some newBeneficiary.beneficiary
+        providerIsObserver = True
 
   return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
-    newBeneficiariesCouponCids = map toInterfaceContractId newBeneficiaryCouponCids
+    newBeneficiariesCouponCids = map toInterfaceContractId (concat allNewCids)
 
 
 -- instances

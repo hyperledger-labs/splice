@@ -47,6 +47,8 @@ interface RewardCoupon where
     -- where the party that earns the minting right (the provider) is just an
     -- operational party and the actual beneficiaries are different parties.
     with
+      additionalCoupons : [ContractId RewardCoupon]
+        -- ^ Additional coupons of the provider to share in the same transaction.
       newBeneficiaries : [RewardBeneficiary]
         -- ^ The new beneficiaries to whom to assign part of the minting amount of the
         -- coupon. The weights MUST be between 0.0 and 1.0, add up to 1.0,

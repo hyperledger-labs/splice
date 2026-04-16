@@ -316,37 +316,54 @@ testCouponAssignment hideCoupon = do
   (app, alice, _) <- setupAliceWithCoupon hideCoupon
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
-  -- assign part of alice's coupon to bob and charlie
+
+  -- get the original coupon before creating the extra one
   let queryParty = if hideCoupon then app.dso else alice
   [(couponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon queryParty
+
+  -- create a second coupon with a different amount and round
+  extraCouponCid <- submit app.dso $ createCmd RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        amount = 500.0
+        round = Round 1
+        expiresAt = demoTime `addRelTime` hours 36 `addRelTime` minutes 10
+        providerIsObserver = not hideCoupon
+        beneficiary = None
+
+  -- assign both coupons to bob, alice, and charlie
+  let weights = [(bob, 0.3), (alice, 0.5), (charlie, 0.2)]
   submitMulti [alice] [app.dso] $ exerciseCmd couponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
-    newBeneficiaries =
-      [ Api.RewardAssignmentV1.RewardBeneficiary bob 0.3
-      , Api.RewardAssignmentV1.RewardBeneficiary alice 0.5
-      , Api.RewardAssignmentV1.RewardBeneficiary charlie 0.2
-      ]
+    additionalCoupons = [toInterfaceContractId extraCouponCid]
+    newBeneficiaries = map (uncurry Api.RewardAssignmentV1.RewardBeneficiary) weights
     extraArgs = emptyExtraArgs
 
-  forA_ [(alice, 500.0), (bob, 300.0), (charlie, 200.0)] $ \(beneficiary, amount) -> do
-    let expectedCoupon = RewardCouponV2 with
-          dso = app.dso
-          provider = alice
-          amount
-          round = Round 0
-          expiresAt = demoTime `addRelTime` hours 36
-          providerIsObserver = True
-          beneficiary = Some beneficiary
-    coupons <- query @RewardCouponV2 beneficiary
-    let filtered = DA.List.filter (\c -> c.beneficiary == Some beneficiary) $ map snd coupons
-    filtered === [expectedCoupon]
+  -- both coupons are split by the same weights, preserving their original round and expiresAt
+  let round0Expiry = demoTime `addRelTime` hours 36
+      round1Expiry = demoTime `addRelTime` hours 36 `addRelTime` minutes 10
+      couponSpecs = [(Round 0, 1000.0, round0Expiry), (Round 1, 500.0, round1Expiry)]
+  let mkExpected beneficiary round expiresAt amount = RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        amount
+        round
+        expiresAt
+        providerIsObserver = True
+        beneficiary = Some beneficiary
+  forA_ weights $ \(beneficiary, weight) ->
+    forA_ couponSpecs $ \(round, couponAmount, expiresAt) -> do
+      coupons <- queryFilter @RewardCouponV2 beneficiary (\c -> c.beneficiary == Some beneficiary && c.round == round)
+      map snd coupons === [mkExpected beneficiary round expiresAt (couponAmount * weight)]
 
   -- verify assigned coupons cannot be further assigned by provider
-  [(bobCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon bob
+  (bobCouponCid, _) :: _ <- queryInterface @Api.RewardAssignmentV1.RewardCoupon bob
   submitMustFail alice $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    additionalCoupons = []
     newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
     extraArgs = emptyExtraArgs
   -- nor by the beneficiary
   submitMustFail bob $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    additionalCoupons = []
     newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
     extraArgs = emptyExtraArgs
 
