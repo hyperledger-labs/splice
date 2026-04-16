@@ -266,7 +266,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "",
   "title": "Bulk Storage",
   "uid": "cnxl9bn",
   "version": 3,
