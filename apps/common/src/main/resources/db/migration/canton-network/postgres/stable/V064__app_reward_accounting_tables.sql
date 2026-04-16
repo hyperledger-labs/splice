@@ -90,7 +90,6 @@ create table app_reward_round_totals
 
 
 -- Merkle tree of batched reward commitments for each round.
--- Served on Scan API for the SV app's ProcessRewardsTrigger to expand on-ledger.
 create table app_reward_batch_hashes
 (
     -- History identifier for update history partitioning (same as update_history_id).
