@@ -1419,9 +1419,7 @@ class WalletTxLogIntegrationTest
           entries,
         )(
           _.errorMessage should include(
-            "the amulet operation failed with a Daml exception:"
-          ).and(
-            include("ITR_InsufficientFunds")
+            "the amulet operation failed with a Daml exception: COO_Error(ITR_InsufficientFunds"
           )
         )
       },
