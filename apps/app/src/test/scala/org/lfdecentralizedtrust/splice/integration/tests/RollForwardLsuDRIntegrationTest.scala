@@ -183,18 +183,6 @@ class RollForwardLsuDRIntegrationTest
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
 
-  // There are a few different timestamps involved in DR:
-  // 1. The timestamp at which we export topology.
-  // 2. The timestamp at which we export traffic, this is usually just the last sequenced message.
-  // 3. The timestamp at which we stop accepting messages on the broken synchronizer.
-  //    Assuming the synchronizer didn't explode and stopped fully on its own you configure this in Canton under `max-sequencing-time`.
-  // 4. The time at which new sequenced messages are allowed on the new synchronizer.
-  //    This must be >= the time at which topology is exported. After this time
-  //    LSU sequencing test messages are possible but nothing else.
-  //    This is configured in Canton under `lower-bound-sequencing-time-exclusive` for the new sequencer.
-  // 5. The time at which all traffic resumes on the new synchronizer. This
-  //    is configured in Canton under `upgrade-time` for the new sequencer.
-  // In practice, this can often collapse and 1,2,3 are identical and 4,5 as well.
   "roll forward LSU DR" in { implicit env =>
     withCantonSvNodes(
       (
