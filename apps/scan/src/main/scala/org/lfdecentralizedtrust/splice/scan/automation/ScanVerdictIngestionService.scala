@@ -99,86 +99,55 @@ class ScanVerdictIngestionService(
     for {
       _ <- waitForStores()
       ingestionStart <- getIngestionStart()
-      announcements <- synchronizerNodes.current.sequencerAdminConnection
-        .listLsuAnnouncements(synchronizerId)
-      currentPsid <- synchronizerNodes.current.sequencerAdminConnection
-        .getPhysicalSynchronizerId()
     } yield {
-      val pastUpgradeAnnouncement = announcements.find { announcement =>
-        ingestionStart.isAfter(announcement.mapping.upgradeTime) &&
-        announcement.mapping.successorSynchronizerId != currentPsid
-      }
-      val source: Source[(Seq[v30.Verdict], Seq[DbScanVerdictStore.TrafficSummaryT]), NotUsed] =
-        pastUpgradeAnnouncement match {
-          case Some(announcement) =>
-            logger.info(
-              s"Ingestion start $ingestionStart is after LSU upgrade time ${announcement.mapping.upgradeTime}, " +
-                s"skipping current mediator client and using successor directly"
-            )
-            successorMediatorClientO match {
-              case Some(successorMediatorClient) =>
-                streamVerdictsAndBatchWithTraffic(
-                  ingestionStart,
-                  successorMediatorClient,
-                  synchronizerNodes.successor.flatMap(_.sequencerTrafficClient),
-                )
-                  .mapMaterializedValue(_ => NotUsed)
-              case None =>
-                logger.error(
-                  "Ingestion start is past LSU upgrade time but no successor mediator client is configured"
-                )
-                Source.empty
-            }
-          case None =>
-            logger.info(s"Streaming verdicts starting from $ingestionStart")
-            val currentSource =
-              streamVerdictsAndBatchWithTraffic(
-                ingestionStart,
-                currentMediatorClient,
-                synchronizerNodes.current.sequencerTrafficClient,
-              )
-            val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
-            currentSource
-              .mapMaterializedValue { completeFuture =>
-                completeFuture.foreach { result =>
-                  completedWithCompleteF.trySuccess(result).discard
-                }(ec)
-                completeFuture.failed.foreach { ex =>
-                  completedWithCompleteF.tryFailure(ex)
-                }(ec)
-                NotUsed
-              }
-              .concat(
-                Source
-                  .futureSource(
-                    completedWithCompleteF.future.flatMap {
-                      case Some(_) =>
-                        getIngestionStart().map { successorIngestionStart =>
-                          successorMediatorClientO match {
-                            case Some(successorMediatorClient) =>
-                              logger.info(
-                                s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
-                              )
-                              streamVerdictsAndBatchWithTraffic(
-                                successorIngestionStart,
-                                successorMediatorClient,
-                                synchronizerNodes.successor.flatMap(_.sequencerTrafficClient),
-                              )
-                                .mapMaterializedValue(_ => NotUsed)
-                            case None =>
-                              logger.error(
-                                "Current mediator verdicts stream completed but no successor mediator client is configured"
-                              )
-                              Source.empty
-                          }
-                        }
-                      case None =>
-                        Future.successful(Source.empty)
-                    }
-                  )
-                  .mapMaterializedValue(_ => NotUsed)
-              )
+      logger.info(s"Streaming verdicts starting from $ingestionStart")
+      val currentSource =
+        streamVerdictsAndBatchWithTraffic(
+          ingestionStart,
+          currentMediatorClient,
+          synchronizerNodes.current.sequencerTrafficClient,
+        )
+      val completedWithCompleteF = Promise[Option[v30.VerdictsResponse.Complete]]()
+      val source = currentSource
+        .mapMaterializedValue { completeFuture =>
+          completeFuture.foreach { result =>
+            completedWithCompleteF.trySuccess(result).discard
+          }(ec)
+          completeFuture.failed.foreach { ex =>
+            completedWithCompleteF.tryFailure(ex)
+          }(ec)
+          NotUsed
         }
+        .concat(
+          Source
+            .futureSource(
+              completedWithCompleteF.future.flatMap {
+                case Some(_) =>
+                  getIngestionStart().map { successorIngestionStart =>
+                    successorMediatorClientO match {
+                      case Some(successorMediatorClient) =>
+                        logger.info(
+                          s"Continuing verdict ingestion with successor mediator client from $successorIngestionStart"
+                        )
+                        streamVerdictsAndBatchWithTraffic(
+                          successorIngestionStart,
+                          successorMediatorClient,
+                          synchronizerNodes.successor.flatMap(_.sequencerTrafficClient),
+                        )
+                          .mapMaterializedValue(_ => NotUsed)
+                      case None =>
+                        logger.error(
+                          "Current mediator verdicts stream completed but no successor mediator client is configured"
+                        )
+                        Source.empty
+                    }
+                  }
+                case None =>
+                  Future.successful(Source.empty)
+              }
+            )
+            .mapMaterializedValue(_ => NotUsed)
+        )
       new ServiceWithGuaranteedShutdown(
         source = source,
         map = processWhenUnpaused,
@@ -189,11 +158,11 @@ class ScanVerdictIngestionService(
 
   private def streamVerdictsAndBatchWithTraffic(
       ingestionStart: CantonTimestamp,
-      successorMediatorClient: MediatorVerdictsClient,
+      mediatorClient: MediatorVerdictsClient,
       sequencerTrafficClient: Option[SequencerTrafficClient],
   )(implicit tc: TraceContext) = {
     batchSource(
-      successorMediatorClient
+      mediatorClient
         .streamVerdicts(Some(ingestionStart))
     ).mapAsync(1) { batch =>
       // Extract sequencing times and build view_hash -> view_id correlation map
