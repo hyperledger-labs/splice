@@ -12,7 +12,6 @@ synchronizerMigration:
       spliceRoot: "."
       privateConfigsDir: "cluster/configs/configs-private"
       publicConfigsDir: "cluster/configs/configs"
-    migrateParticipantsFromSvCantonToSv: true
 operatorDeployment:
   reference:
     repoUrl: https://github.com/hyperledger-labs/splice

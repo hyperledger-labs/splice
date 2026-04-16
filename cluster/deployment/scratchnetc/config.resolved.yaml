@@ -439,7 +439,6 @@ svs:
 synchronizerMigration:
   active:
     id: 0
-    migrateParticipantsFromSvCantonToSv: true
     releaseReference:
       deploymentDir: 'cluster/deployment'
       gitReference: 'refs/heads/mblaze-da/participant-migration-deployment/4173'
