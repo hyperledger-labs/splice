@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
