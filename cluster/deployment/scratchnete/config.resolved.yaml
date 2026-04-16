@@ -101,7 +101,7 @@ multiValidator:
     - name: 'MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN'
       value: "canton.participants.participant_INDEX.ledger-api.max-token-lifetime = Inf\n"
   postgresPvcSize: '500Gi'
-  requiresOnboardingSecret: true
+  requiresOnboardingSecret: false
   resources:
     participant:
       limits:
