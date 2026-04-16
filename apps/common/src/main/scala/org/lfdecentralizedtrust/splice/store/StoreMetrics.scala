@@ -39,8 +39,8 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
   val ingestionTimePerBatch: Timer =
     metricsFactory.timer(
       MetricInfo(
-        prefix :+ "entry-ingestion-latency",
-        "How long it takes to ingest a single GetTreeUpdatesResponse.",
+        prefix :+ "batch-ingestion-latency",
+        "How long it takes to ingest a batch of GetTreeUpdatesResponse.",
         Latency,
         "Measures the amount of time it takes to ingest a batch of GetTreeUpdatesResponse. " +
           "Note that it is somewhat affected by the size of the batch, so you should correlate with batchSize.",
