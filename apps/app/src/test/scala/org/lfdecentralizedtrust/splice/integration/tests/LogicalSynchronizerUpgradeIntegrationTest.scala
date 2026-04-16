@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
-import org.scalatest.{Ignore, TryValues}
+import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
 import java.util.UUID
@@ -48,8 +48,6 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
-// TODO(DACH-NY/cn-test-failures#8071) Reenable
-@Ignore
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
@@ -259,7 +257,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
         expectedAmulets: Range = 50 to 50,
     ) = {
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
-      walletClient.tap(tapAmount)
+      eventuallySucceeds() {
+        walletClient.tap(tapAmount)
+      }
       clue(s"${validatorBackend.name} has tapped a amulet") {
         checkWallet(
           walletUserParty,
@@ -625,6 +625,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
         sv1ScanBackend.startSync()
       }
 
+      // this also ensures that sv1 ingested verdicts after the restart
+      val beforeBobActivityTimestamp = Instant.now()
       clue("bob validator local upgrades after upgrade and can tap") {
         runBobValidatorWithStandaloneParticipant("after-upgrade") {
           eventually(60.seconds) {
@@ -647,6 +649,20 @@ class LogicalSynchronizerUpgradeIntegrationTest
               isSv4Connected = true,
               None,
             )
+          }
+        }
+      }
+
+      clue("mediator verdicts stream works after upgrade") {
+        Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
+          clue(s"check ${scan.name} streamed post upgrade verdicts") {
+            eventually() {
+              scan.appState.eventStore.verdictStore
+                .maxVerdictRecordTime(0)
+                .futureValue
+                .value
+                .toInstant should be > beforeBobActivityTimestamp
+            }
           }
         }
       }
