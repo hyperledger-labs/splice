@@ -829,64 +829,6 @@ class ParticipantAdminConnection(
     } yield result
   }
 
-  def ensureHostingParticipantIsPromotedToSubmitter(
-      synchronizerId: SynchronizerId,
-      party: PartyId,
-      participantId: ParticipantId,
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    def promoteParticipantToSubmitter(
-        participants: Seq[HostingParticipant]
-    ): Seq[HostingParticipant] = {
-      val newValue =
-        HostingParticipant(participantId, ParticipantPermission.Submission, onboarding = false)
-      val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
-      participants.updated(oldIndex, newValue)
-    }
-
-    ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.Synchronizer(synchronizerId),
-      s"Participant $participantId is promoted to have Submission permission for party $party",
-      topologyTransactionType =>
-        EitherT(
-          getPartyToParticipant(
-            synchronizerId,
-            party,
-            topologyTransactionType = topologyTransactionType,
-            topologySnapshot = TopologySnapshot.Sequenced,
-          ).map(result => {
-            Either.cond(
-              result.mapping.participants
-                .contains(
-                  HostingParticipant(
-                    participantId,
-                    ParticipantPermission.Submission,
-                    onboarding = false,
-                  )
-                ),
-              result,
-              result,
-            )
-          })
-        ),
-      previous => {
-        Either.cond(
-          previous.participants.exists(_.participantId == participantId), {
-            val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
-            PartyToParticipant.tryCreate(
-              previous.partyId,
-              participants = newHostingParticipants,
-              threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
-            )
-          },
-          show"Participant $participantId does not host party $party",
-        )
-      },
-      retryFor,
-      isProposal = true,
-    )
-  }
-
   def performManualLsu(
       currentPsid: PhysicalSynchronizerId,
       successorPsid: PhysicalSynchronizerId,
