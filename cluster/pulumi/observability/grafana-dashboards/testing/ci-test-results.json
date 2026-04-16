@@ -210,7 +210,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "utc",
+  "timezone": "",
   "title": "CI Test Results",
   "uid": "ci-test-results",
   "version": 1
