@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -104,9 +104,6 @@ object RejectionGenerators {
         case _: LfInterpretationError.FailedAuthorization =>
           CommandExecutionErrors.Interpreter.AuthorizationError
             .Reject(renderedMessage)
-        case e: LfInterpretationError.EffectfulRollback =>
-          CommandExecutionErrors.Interpreter.EffectfulRollback
-            .Reject(renderedMessage)
         case LfInterpretationError.UnresolvedPackageName(packageName) =>
           CommandExecutionErrors.Interpreter.LookupErrors.UnresolvedPackageName
             .Reject(renderedMessage, packageName)
@@ -196,6 +193,11 @@ object RejectionGenerators {
               error: LfInterpretationError.Crypto.MalformedSignature
             ) =>
           CommandExecutionErrors.Interpreter.CryptoError.MalformedSignature
+            .Reject(renderedMessage, error)
+        case LfInterpretationError.Crypto(
+              error: LfInterpretationError.Crypto.MalformedContractId
+            ) =>
+          CommandExecutionErrors.Interpreter.CryptoError.MalformedContractId
             .Reject(renderedMessage, error)
         case LfInterpretationError.Dev(_, err) =>
           CommandExecutionErrors.Interpreter.InterpretationDevError

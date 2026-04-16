@@ -42,11 +42,8 @@ class SequencerOnboarding(
         val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =
           currentSynchronizerConfigs
-            .flatMap(config =>
-              config.sequencerIdentity.toScala
-                .map(_.sequencerId)
-                .orElse(config.sequencer.toScala.map(_.sequencerId))
-            )
+            .flatMap(_.sequencer.toScala)
+            .map(_.sequencerId)
             .flatMap(sequencerId =>
               SequencerId
                 .fromProtoPrimitive(sequencerId, "sequencerId")
@@ -128,7 +125,6 @@ class SvOnboardingSequencerTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[SequencerToOnboard](
       baseContext,
       store,
-      Some(participantAdminConnection),
     ) {
 
   override val reconciler

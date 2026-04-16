@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -16,10 +16,10 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.console.FeatureFlag
 import com.digitalasset.canton.http.{JsonApiConfig, WebsocketConfig}
 import com.digitalasset.canton.participant.config.{
-  AlphaOnlinePartyReplicationConfig,
   ParticipantNodeConfig,
   RemoteParticipantConfig,
   TestingTimeServiceConfig,
+  UnsafeOnlinePartyReplicationConfig,
 }
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
@@ -32,7 +32,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.{
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.{BlockSequencerConfig, SequencerConfig}
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveFiniteDuration}
-import com.digitalasset.canton.version.{EngineMode, ParticipantProtocolVersion, ProtocolVersion}
+import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, UniquePortGenerator, config}
 import com.typesafe.config.ConfigValueFactory
 import monocle.macros.syntax.lens.*
@@ -74,15 +74,6 @@ object ConfigTransforms {
     val enableAlpha = configTransformsWhen(pv.isAlpha)(enableAlphaVersionSupport)
     val enableBeta = configTransformsWhen(pv.isBeta)(setBetaSupport(true))
 
-    val setContractStateMode: Seq[ConfigTransform] = configTransformsWhen(!pv.isStable)(
-      Seq(
-        updateAllParticipantConfigs_(
-          _.focus(_.parameters.engine.contractStateMode)
-            .replace(EngineMode.forProtocolVersion(pv))
-        )
-      )
-    )
-
     val deprecatedPVWarning = if (pv.isDeprecated) dontWarnOnDeprecatedPV else Seq()
 
     val updateParticipants = Seq(
@@ -92,10 +83,12 @@ object ConfigTransforms {
       )
     )
 
-    updateParticipants ++ enableAlpha ++ enableBeta ++ deprecatedPVWarning ++ setContractStateMode
+    val updateInitialProtocolVersion = updateAllInitialProtocolVersion(pv)
+
+    updateParticipants ++ enableAlpha ++ enableBeta ++ deprecatedPVWarning :+ updateInitialProtocolVersion
   }
 
-  val protocolVersionTransforms: Seq[ConfigTransform] = setProtocolVersion(
+  val optSetProtocolVersion: Seq[ConfigTransform] = setProtocolVersion(
     BaseTest.testedProtocolVersion
   )
 
@@ -104,34 +97,11 @@ object ConfigTransforms {
       _.focus(_.ledgerApi.rateLimit).replace(Some(RateLimitingConfig.Default))
     )
 
-  val useFeaturesWithFeatureFlags =
-    Seq(
-      ConfigTransforms.updateAllMediatorConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
-      ConfigTransforms.updateAllSequencerConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
-      ConfigTransforms.updateAllParticipantConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
-    )
-
   /** Config transforms to apply to heavy-weight tests using an [[EnvironmentDefinition]]. For
     * example, these transforms should be applied to toxiproxy tests.
     */
-  val heavyTestDefaults: Seq[ConfigTransform] = protocolVersionTransforms ++
+  val heavyTestDefaults: Seq[ConfigTransform] = optSetProtocolVersion ++
     setBetaSupport(BaseTest.testedProtocolVersion.isBeta) ++
-    useFeaturesWithFeatureFlags ++
     Seq(
       ConfigTransforms.uniqueH2DatabaseNames,
       ConfigTransforms.globallyUniquePorts,
@@ -158,6 +128,7 @@ object ConfigTransforms {
       _.focus(_.monitoring.logging.api.warnBeyondLoad).replace(Some(10000)),
       // disable exit on fatal error in tests
       ConfigTransforms.setExitOnFatalFailures(false),
+      ConfigTransforms.setConnectionPool(true),
     )
 
   lazy val dontWarnOnDeprecatedPV: Seq[ConfigTransform] = Seq(
@@ -228,31 +199,31 @@ object ConfigTransforms {
 
   lazy val enableAlphaVersionSupport: Seq[ConfigTransform] = setAlphaVersionSupport(true)
 
+  val updateLedgerApiSlowProcessWarning: Seq[ConfigTransform] =
+    Seq(
+      ConfigTransforms.updateAllParticipantConfigs_(
+        // extending the timeout for the warning about uninitialised in-memory package metadata view
+        // the default for this value is set to 1 second which is not enough for the canton integration tests
+        _.focus(_.ledgerApi.indexService.preparePackageMetadataTimeOutWarning)
+          .replace(config.NonNegativeFiniteDuration.ofSeconds(10L))
+      )
+    )
+
   /** Default transforms to apply to tests using a [[EnvironmentDefinition]]. Covers the primary
     * ways that distinct concurrent environments may unintentionally collide.
     */
   val defaults: Seq[ConfigTransform] =
-    heavyTestDefaults ++
-      setBetaSupport(BaseTest.testedProtocolVersion.isBeta) ++
-      Seq(
-        // Make unbounded durations bounded for integration tests
+    heavyTestDefaults ++ updateLedgerApiSlowProcessWarning ++
+      setBetaSupport(BaseTest.testedProtocolVersion.isBeta) ++ Seq(
+        // make unbounded duration bounded for our test
         _.focus(_.parameters.timeouts.console.unbounded)
           .replace(config.NonNegativeDuration.tryFromDuration(3.minutes))
           .focus(_.parameters.timeouts.processing.unbounded)
-          .replace(config.NonNegativeDuration.tryFromDuration(3.minutes)),
-
-        // Hypothesis (yves-da): increase teardown timeouts to prevent flaky CI failures caused by resource starvation.
-        // During environment teardown, all nodes (and their Postgres connections) are closed concurrently.
-        // On shared CI runners, creates a massive I/O and CPU spike.
-        // Increase `shutdownProcessing` to prevent internal flush tasks (e.g., sequencer-client-flush-sync)
-        // from breaching the default 10s limit, and bump the outer `closing` timeout to respect the timeout hierarchy.
-        _.focus(_.parameters.timeouts.processing.shutdownProcessing)
-          .replace(config.NonNegativeDuration.tryFromDuration(1.minute))
-          .focus(_.parameters.timeouts.processing.closing) // More time to close `ManagedNodes`
-          .replace(config.NonNegativeDuration.tryFromDuration(2.minute)),
-
-        // Increasing here the default timeout for providing more room for DB Servers under test load to provide a new connection
+          .replace(config.NonNegativeDuration.tryFromDuration(3.minutes))
+          .focus(_.parameters.timeouts.processing.shutdownProcessing)
+          .replace(config.NonNegativeDuration.tryFromDuration(10.seconds)),
         ConfigTransforms.modifyAllStorageConfigs { (_, _, storageConfig) =>
+          // Increasing here the default timeout for providing more room for DB Servers under test load to provide a new connection
           val newConnectionTimeout = config.NonNegativeFiniteDuration.ofSeconds(30)
           storageConfig match {
             case memConfig: StorageConfig.Memory =>
@@ -265,6 +236,11 @@ object ConfigTransforms {
           }
         },
       )
+
+  def updateAllInitialProtocolVersion(pv: ProtocolVersion): ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.initialProtocolVersion).replace(ParticipantProtocolVersion(pv))
+    )
 
   lazy val clearMinimumProtocolVersion: Seq[ConfigTransform] =
     Seq(
@@ -343,7 +319,7 @@ object ConfigTransforms {
   def allInMemory: ConfigTransform =
     modifyAllStorageConfigs((_, _, _) => StorageConfig.Memory())
 
-  /** Use the given crypto config on all nodes with `nodeFilter(name)`.
+  /** Use the given crypto factory config on all nodes with `nodeFilter(name)`.
     */
   def setCrypto(
       cryptoConfig: CryptoConfig,
@@ -359,29 +335,6 @@ object ConfigTransforms {
       case (name, config) if nodeFilter(name) => config.focus(_.crypto).replace(cryptoConfig)
       case (_, config) => config
     }
-
-  /** Use the given session signing keys config on all nodes with `nodeFilter(name)`.
-    */
-  def setSigningKeysIfPV35OrHigher(
-      sessionSigningKeysConfig: SessionSigningKeysConfig,
-      nodeFilter: String => Boolean = _ => true,
-  ): ConfigTransform = {
-    val isPV35orHigher = BaseTest.testedProtocolVersion >= ProtocolVersion.v35
-
-    updateAllParticipantConfigs {
-      case (name, config) if nodeFilter(name) && isPV35orHigher =>
-        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
-      case (_, config) => config
-    } compose updateAllSequencerConfigs {
-      case (name, config) if nodeFilter(name) && isPV35orHigher =>
-        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
-      case (_, config) => config
-    } compose updateAllMediatorConfigs {
-      case (name, config) if nodeFilter(name) && isPV35orHigher =>
-        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
-      case (_, config) => config
-    }
-  }
 
   /** Configure the environment with static time */
   def useStaticTime: ConfigTransform = {
@@ -421,18 +374,8 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration.ofDays(10000))
     )
 
-    val disableSessionKeys =
-      ConfigTransforms.setSigningKeysIfPV35OrHigher(SessionSigningKeysConfig.disabled)
-
-    // Disable retries so that failed pings won't run forever
-    val disablePingRetries = setPingRetries(false)
-
-    mainUpdates compose sequencerWriteBound compose disableSessionKeys compose disablePingRetries
+    mainUpdates compose sequencerWriteBound
   }
-
-  def setPingRetries(enabled: Boolean): ConfigTransform = updateAllParticipantConfigs_(
-    _.focus(_.parameters.adminWorkflow.retries).replace(enabled)
-  )
 
   /** Enable the testing time service in the ledger API */
   def useTestingTimeService: ParticipantNodeConfig => ParticipantNodeConfig =
@@ -756,6 +699,40 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration(targetTimestampForwardTolerance))
     )
 
+  /** Flag the provided participants as being replicated. Keep in mind to actually work they need to
+    * be configured to share the same database (see
+    * [[com.digitalasset.canton.integration.plugins.UseSharedStorage]]).
+    *
+    * Enables replication for all participants if no participants are given
+    */
+  def enableReplicatedParticipants(
+      replicatedParticipantNames: String*
+  ): ConfigTransform =
+    ConfigTransforms.updateAllParticipantConfigs { (name, config) =>
+      if (replicatedParticipantNames.isEmpty || replicatedParticipantNames.contains(name))
+        config
+          .focus(_.replication)
+          .modify(
+            _.map(_.focus(_.enabled).replace(Some(true)))
+              .orElse(Some(ReplicationConfig(enabled = Some(true))))
+          )
+      else config
+    }
+
+  def enableReplicatedMediators(
+      replicatedMediatorNames: String*
+  ): ConfigTransform =
+    ConfigTransforms.updateAllMediatorConfigs { (name, config) =>
+      if (replicatedMediatorNames.isEmpty || replicatedMediatorNames.contains(name))
+        config
+          .focus(_.replication)
+          .modify(
+            _.map(_.focus(_.enabled).replace(Some(true)))
+              .orElse(Some(ReplicationConfig(enabled = Some(true))))
+          )
+      else config
+    }
+
   def setPassiveCheckPeriodMediators(
       passiveCheckPeriod: config.PositiveFiniteDuration,
       mediatorNames: String*
@@ -810,6 +787,12 @@ object ConfigTransforms {
     )
   }
 
+  def enableReplicatedAllNodes: Seq[ConfigTransform] =
+    Seq(
+      enableReplicatedParticipants(),
+      enableReplicatedMediators(),
+    )
+
   def enableSlowQueryLogging(
       slowQuery: PositiveFiniteDuration = PositiveFiniteDuration.tryOfSeconds(30)
   ): ConfigTransform = cantonConfig => {
@@ -857,49 +840,60 @@ object ConfigTransforms {
   }
 
   def defaultsForNodes: Seq[ConfigTransform] =
-    setProtocolVersion(ProtocolVersion.v34)
+    setProtocolVersion(ProtocolVersion.v34) :+
+      ConfigTransforms.updateAllInitialProtocolVersion(ProtocolVersion.v34)
 
   def setTopologyTransactionRegistrationTimeout(
       timeout: config.NonNegativeFiniteDuration
-  ): Seq[ConfigTransform] =
-    updateAllNodesTopologyConfig(_.focus(_.topologyTransactionRegistrationTimeout).replace(timeout))
+  ): Seq[ConfigTransform] = Seq(
+    updateAllParticipantConfigs_(
+      _.focus(_.topology.topologyTransactionRegistrationTimeout).replace(timeout)
+    ),
+    updateAllMediatorConfigs_(
+      _.focus(_.topology.topologyTransactionRegistrationTimeout).replace(timeout)
+    ),
+    updateAllSequencerConfigs_(
+      _.focus(_.topology.topologyTransactionRegistrationTimeout).replace(timeout)
+    ),
+  )
 
-  def updateAllNodesTopologyConfig(update: TopologyConfig => TopologyConfig): Seq[ConfigTransform] =
-    Seq(
-      updateAllParticipantConfigs_(_.focus(_.topology).modify(update)),
-      updateAllMediatorConfigs_(_.focus(_.topology).modify(update)),
-      updateAllSequencerConfigs_(_.focus(_.topology).modify(update)),
-    )
-
-  def enableAlphaOnlinePartyReplicationSupport(
+  def unsafeEnableOnlinePartyReplication(
       participantsWithOnPRInterceptor: Map[
         String,
-        AlphaOnlinePartyReplicationConfig.TestInterceptor,
-      ] = Map.empty,
-      enableUnsafeSequencerChannelSupport: Boolean = false,
-      pauseIndexer: Boolean = true,
-  ): Seq[ConfigTransform] = Seq(updateAllParticipantConfigs { case (name, config) =>
-    config
-      .focus(_.parameters.alphaOnlinePartyReplicationSupport)
-      .replace(
-        Some(
-          AlphaOnlinePartyReplicationConfig(
-            testInterceptor = participantsWithOnPRInterceptor.get(name),
-            unsafeSequencerChannelSupport = enableUnsafeSequencerChannelSupport,
-            pauseSynchronizerIndexingDuringPartyReplication = pauseIndexer,
+        UnsafeOnlinePartyReplicationConfig.TestInterceptor,
+      ] = Map.empty
+  ): Seq[ConfigTransform] = Seq(
+    updateAllParticipantConfigs { case (name, config) =>
+      config
+        .focus(_.parameters.unsafeOnlinePartyReplication)
+        .replace(
+          Some(
+            UnsafeOnlinePartyReplicationConfig(
+              testInterceptor = participantsWithOnPRInterceptor.get(name)
+            )
           )
         )
-      )
-  }) ++ (if (enableUnsafeSequencerChannelSupport)
-           Seq(
-             updateAllSequencerConfigs_(
-               _.focus(_.parameters.unsafeSequencerChannelSupport).replace(true)
-             )
-           )
-         else Seq.empty)
+    },
+    updateAllSequencerConfigs_(
+      _.focus(_.parameters.unsafeEnableOnlinePartyReplication).replace(true)
+    ),
+  )
 
   def setDelayLoggingThreshold(duration: config.NonNegativeFiniteDuration): ConfigTransform =
     _.focus(_.monitoring.logging.delayLoggingThreshold).replace(duration)
+
+  def disableConnectionPool: ConfigTransform = setConnectionPool(false)
+
+  /** Use the new sequencer connection pool if 'value' is true. Otherwise use the former transports.
+    */
+  def setConnectionPool(value: Boolean): ConfigTransform =
+    updateAllSequencerConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }.compose(updateAllMediatorConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    }).compose(updateAllParticipantConfigs { case (_name, config) =>
+      config.focus(_.sequencerClient.useNewConnectionPool).replace(value)
+    })
 
   /** Must be applied before the default config transformers */
   def enableHttpLedgerApi: ConfigTransform = updateAllParticipantConfigs_(
@@ -921,18 +915,4 @@ object ConfigTransforms {
       )
     )
 
-  def enableUnsafeMutiSynchronizerTopologyFeatureFlag: ConfigTransform = {
-    (cantonConfig: CantonConfig) =>
-      cantonConfig.focus(_.parameters.enableAlphaStateViaConfig).replace(true)
-  }.compose(
-    updateAllParticipantConfigs_(
-      _.focus(_.alphaDynamic.enableMultiSynchronizerTopologyFeatureFlag)
-        .replace(true)
-    )
-  )
-
-  val disableOnboardingTopologyValidation: ConfigTransform =
-    updateAllMediatorConfigs_(
-      _.focus(_.topology.validateInitialTopologySnapshot).replace(false)
-    )
 }

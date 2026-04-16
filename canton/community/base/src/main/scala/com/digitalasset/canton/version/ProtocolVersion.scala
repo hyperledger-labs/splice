@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -70,10 +70,10 @@ import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
   *     [[com.digitalasset.canton.buildinfo.BuildInfo.betaProtocolVersions]].
   *
   *   - Check the test jobs for protocol versions: Likely `N` will become the default protocol
-  *     version used by the `test` job, namely from
-  *     [[com.digitalasset.canton.version.ProtocolVersion.forSynchronizer]]. So the separate test
-  *     job for `N` is no longer needed. Conversely, we now need a new job for the previous default
-  *     protocol version. Usually, it is enough to run the previous version only in canton_nightly.
+  *     version used by the `test` job, namely
+  *     [[com.digitalasset.canton.version.ProtocolVersion.latest]]. So the separate test job for `N`
+  *     is no longer needed. Conversely, we now need a new job for the previous default protocol
+  *     version. Usually, it is enough to run the previous version only in canton_nightly.
   */
 // Internal only: for the full background, please refer to the following [design doc](https://docs.google.com/document/d/1kDiN-373bZOWploDrtOJ69m_0nKFu_23RNzmEXQOFc8/edit?usp=sharing).
 // or [code walkthrough](https://drive.google.com/file/d/199wHq-P5pVPkitu_AYLR4V3i0fJtYRPg/view?usp=sharing)
@@ -111,10 +111,6 @@ object ProtocolVersion {
     type Status = S
   }
 
-  type AlphaProtocolVersion = ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha]
-  type BetaProtocolVersion = ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta]
-  type StableProtocolVersion = ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable]
-
   private[version] def createStable(
       v: Int
   ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
@@ -124,7 +120,6 @@ object ProtocolVersion {
       v: Int
   ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     createWithStatus[ProtocolVersionAnnotation.Alpha](v)
-
   private[version] def createBeta(
       v: Int
   ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta] =
@@ -230,6 +225,10 @@ object ProtocolVersion {
 
   final case class InvalidProtocolVersion(override val description: String) extends FailureReason
 
+  // All stable protocol versions supported by this release
+  val stable: NonEmpty[List[ProtocolVersion]] =
+    NonEmptyUtil.fromUnsafe(parseFromBuildInfo(BuildInfo.stableProtocolVersions))
+
   private val deprecated: Seq[ProtocolVersion] = Seq()
 
   private val deleted: NonEmpty[Seq[ProtocolVersion]] =
@@ -246,25 +245,11 @@ object ProtocolVersion {
       ProtocolVersion(33),
     )
 
-  val stable: NonEmpty[List[StableProtocolVersion]] =
-    NonEmpty.mk(List, ProtocolVersion.v34)
+  val alpha: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha]]] =
+    NonEmpty.mk(List, ProtocolVersion.dev)
 
-  // Stable protocol versions supported by this release as printed in the release version information.
-  // Note: Adding a new stable PV above is not enough, it needs to be added to build info key `stableProtocolVersions` in `BuildCommon` as well.
-  private val releaseStable: NonEmpty[List[ProtocolVersion]] =
-    NonEmptyUtil.fromUnsafe(parseFromBuildInfo(BuildInfo.stableProtocolVersions))
-
-  // Ensure that the stable protocol versions defined in this file are in sync with the ones defined in build info
-  assert(
-    stable.toSet == releaseStable.toSet,
-    s"stable protocol versions $stable should be in sync with build info $releaseStable",
-  )
-
-  val alpha: NonEmpty[List[AlphaProtocolVersion]] =
-    NonEmpty.mk(List, ProtocolVersion.v35, ProtocolVersion.dev)
-
-  val beta: List[BetaProtocolVersion] =
-    parseFromBuildInfo(BuildInfo.betaProtocolVersions)
+  val beta: List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta]] =
+    parseFromBuildInfo(BuildInfo.betaProtocolVersions.toSeq)
       .map(pv => ProtocolVersion.createBeta(pv.v))
 
   val supported: NonEmpty[List[ProtocolVersion]] = (alpha ++ beta ++ stable).sorted
@@ -274,14 +259,9 @@ object ProtocolVersion {
   require(
     allProtocolVersions.sizeCompare(allProtocolVersions.distinct) == 0,
     s"All the protocol versions should be distinct." +
-      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted.forgetNE, "beta" -> beta, "alpha" -> alpha.forgetNE, "stable" -> stable.forgetNE)}",
+      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted.forgetNE, "alpha" -> alpha.forgetNE, "stable" -> stable.forgetNE)}",
   )
-
-  /** The latest stable protocol version.
-    *
-    * NOTE: Do not use in tests, use `testedProtocolVersion` instead. To bootstrap a synchronizer
-    * use `forSynchronizer` instead.
-    */
+// All stable protocol versions supported by this release
   val latest: ProtocolVersion = stable.last1
 
   /** The protocol version used to bootstrap a synchronizer.
@@ -292,23 +272,17 @@ object ProtocolVersion {
     * @throws java.lang.RuntimeException
     *   if the environment variable's value cannot be parsed to a protocol version
     */
-  private val CANTON_PROTOCOL_VERSION = "CANTON_PROTOCOL_VERSION"
   val forSynchronizer: ProtocolVersion =
     sys.env
-      .get(CANTON_PROTOCOL_VERSION)
-      .orElse(sys.props.get(CANTON_PROTOCOL_VERSION))
+      .get("CANTON_PROTOCOL_VERSION")
       .map(ProtocolVersion.tryCreate)
-      // TODO(i31167): When PV35 is stable, change the following line to use `latest` instead of `v35`
-      .getOrElse(ProtocolVersion.v35)
+      .getOrElse(ProtocolVersion.latest)
 
   lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     ProtocolVersion.createAlpha(Int.MaxValue)
 
   lazy val v34: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
     ProtocolVersion.createStable(34)
-
-  lazy val v35: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
-    ProtocolVersion.createAlpha(35)
 
   // Minimum stable protocol version introduced
   lazy val minimum: ProtocolVersion = v34

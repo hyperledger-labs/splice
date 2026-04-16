@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.auth
@@ -53,10 +53,9 @@ trait SandboxRequiringAuthorizationFuns {
     scope = Some(defaultScope),
   )
 
-  def defaultExpiresIn = Duration.ofMinutes(5)
   protected def standardToken(
       userId: String,
-      expiresIn: Option[Duration] = Some(defaultExpiresIn),
+      expiresIn: Option[Duration] = Some(Duration.ofMinutes(5)),
       participantId: Option[String] = None,
       issuer: Option[String] = None,
   ): StandardJWTPayload =
@@ -144,11 +143,10 @@ trait SandboxRequiringAuthorizationFuns {
       tokenIssuer: Option[String] = None,
       secret: Option[String] = None,
       primaryParty: String = "",
-      expiresIn: Option[Duration] = Some(defaultExpiresIn),
   )(implicit ec: ExecutionContext): Future[(proto.User, ServiceCallContext)] = {
     val userToken = Option(
       toHeader(
-        tokenModifier(standardToken(userId, issuer = tokenIssuer, expiresIn = expiresIn)),
+        tokenModifier(standardToken(userId, issuer = tokenIssuer)),
         secret = secret.getOrElse(jwtSecret.unwrap),
       )
     )

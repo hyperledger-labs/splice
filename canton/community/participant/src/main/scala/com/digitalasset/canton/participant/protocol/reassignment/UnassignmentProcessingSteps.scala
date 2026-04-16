@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -7,8 +7,6 @@ import cats.data.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{
   HashOps,
   Signature,
@@ -18,9 +16,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.UnassignmentViewType
-import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -52,13 +48,12 @@ import com.digitalasset.canton.participant.store.ActiveContractStore.{
 }
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
-import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
+import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.tracing.TraceContext
@@ -66,7 +61,7 @@ import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ContractValidator, MonadUtil}
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
-import com.digitalasset.canton.{LfPackageId, LfPartyId, RequestCounter, SequencerCounter, checked}
+import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -78,7 +73,6 @@ private[reassignment] class UnassignmentProcessingSteps(
     seedGenerator: SeedGenerator,
     staticSynchronizerParameters: Source[StaticSynchronizerParameters],
     override protected val contractValidator: ContractValidator,
-    clock: Clock,
     val protocolVersion: Source[ProtocolVersion],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -121,7 +115,6 @@ private[reassignment] class UnassignmentProcessingSteps(
       mediator: MediatorGroupRecipient,
       ephemeralState: SyncEphemeralState,
       sourceRecentSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      generateMaxSequencingTime: CantonTimestamp => CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -133,8 +126,6 @@ private[reassignment] class UnassignmentProcessingSteps(
       submitterMetadata,
       contractIds,
       targetSynchronizer,
-      sourceValidationPackageIds,
-      targetValidationPackageIds,
     ) = submissionParam
     val pureCrypto = sourceRecentSnapshot.pureCrypto
 
@@ -192,19 +183,10 @@ private[reassignment] class UnassignmentProcessingSteps(
           newReassignmentCounter <- EitherT.fromEither[FutureUnlessShutdown](
             reassignmentCounter.increment
               .leftMap(_ =>
-                UnassignmentProcessorError.ReassignmentCounterOverflow: ReassignmentProcessorError
+                (UnassignmentProcessorError.ReassignmentCounterOverflow: ReassignmentProcessorError)
               )
           )
-          sourceValidationPackageId = sourceValidationPackageIds
-            .getOrElse(contractId, contract.templateId.packageId)
-          targetValidationPackageId = targetValidationPackageIds
-            .getOrElse(contractId, contract.templateId.packageId)
-        } yield (
-          contract,
-          Source(sourceValidationPackageId),
-          Target(targetValidationPackageId),
-          newReassignmentCounter,
-        )
+        } yield (contract, newReassignmentCounter)
       })
       contracts <- EitherT.fromEither[FutureUnlessShutdown] {
         ContractsReassignmentBatch
@@ -216,7 +198,6 @@ private[reassignment] class UnassignmentProcessingSteps(
         .validated(
           participantId,
           contracts,
-          contractValidator,
           submitterMetadata,
           psid,
           mediator,
@@ -234,22 +215,8 @@ private[reassignment] class UnassignmentProcessingSteps(
       )
 
       rootHash = fullTree.rootHash
-
-      // For a `ReassignmentsSubmission`, we use `clock.now` + `defaultMaxSequencingTimeOffset`
-      // to generate the max sequencing time and determine a valid session signing key to use.
-      now = clock.now
-      maxSequencingTime = generateMaxSequencingTime(now)
-      signingTimestampOverrides = SigningTimestampOverrides(
-        approximateTimestamp = now,
-        validityPeriodEnd = Some(maxSequencingTime),
-      )
-
       submittingParticipantSignature <- sourceRecentSnapshot
-        .sign(
-          rootHash.unwrap,
-          SigningKeyUsage.ProtocolOnly,
-          Some(signingTimestampOverrides),
-        )
+        .sign(rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
         .leftMap(ReassignmentSigningError.apply)
       mediatorMessage = fullTree.mediatorMessage(
         submittingParticipantSignature,
@@ -286,7 +253,6 @@ private[reassignment] class UnassignmentProcessingSteps(
           fullTree,
           (viewKey, viewKeyMap),
           sourceRecentSnapshot,
-          Some(signingTimestampOverrides),
           protocolVersion.unwrap,
         )
         .leftMap[ReassignmentProcessorError](EncryptionError(contracts.contractIds.toSeq, _))
@@ -324,12 +290,7 @@ private[reassignment] class UnassignmentProcessingSteps(
           validated.request.mkReassignmentId,
         )
     } yield (
-      ReassignmentsSubmission(
-        Batch.of(protocolVersion.unwrap, messages*),
-        rootHash,
-        now,
-        maxSequencingTime,
-      ),
+      ReassignmentsSubmission(Batch.of(protocolVersion.unwrap, messages*), rootHash),
       Some(pendingSubmission),
     )
   }
@@ -426,7 +387,6 @@ private[reassignment] class UnassignmentProcessingSteps(
       activenessF: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
-      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -445,17 +405,16 @@ private[reassignment] class UnassignmentProcessingSteps(
       )
     }
 
-    val unassignmentValidation = new UnassignmentValidation(
+    val unassignmentValidation = UnassignmentValidation(
+      isReassigningParticipant,
       participantId,
       contractValidator,
+      activenessF,
       reassignmentCoordination,
     )
 
     for {
-      unassignmentValidationResult <- unassignmentValidation.perform(
-        parsedRequest,
-        activenessF,
-      )
+      unassignmentValidationResult <- unassignmentValidation.perform(parsedRequest)
     } yield {
       val confirmationResponseF =
         if (
@@ -508,8 +467,6 @@ private[reassignment] class UnassignmentProcessingSteps(
         engineController.abort,
         engineAbortStatusF = engineAbortStatusF,
         decisionTimeTickRequest,
-        publishUpdate,
-        parsedRequest.trafficCost,
       )
 
       StorePendingDataAndSendResponseAndCreateTimeout(
@@ -549,8 +506,6 @@ private[reassignment] class UnassignmentProcessingSteps(
       _engineController,
       _abortedF,
       _decisionTimeTickRequest,
-      _publishUpdate,
-      trafficCost,
     ) = pendingRequestData
 
     val isReassigningParticipant = unassignmentValidationResult.assignmentExclusivity.isDefined
@@ -646,7 +601,6 @@ private[reassignment] class UnassignmentProcessingSteps(
               unassignmentValidationResult.createReassignmentAccepted(
                 participantId,
                 requestId.unwrap,
-                trafficCost,
               )
           } yield CommitAndStoreContractsAndPublishEvent(
             commitSetFO,
@@ -756,8 +710,6 @@ object UnassignmentProcessingSteps {
       submitterMetadata: ReassignmentSubmitterMetadata,
       contractIds: Seq[LfContractId],
       targetSynchronizer: Target[PhysicalSynchronizerId],
-      overrideSourceValidationPkgIds: Map[LfContractId, LfPackageId],
-      overrideTargetValidationPkgIds: Map[LfContractId, LfPackageId],
   ) {
     val submittingParty: LfPartyId = submitterMetadata.submitter
   }
@@ -777,8 +729,6 @@ object UnassignmentProcessingSteps {
       override val abortEngine: String => Unit,
       override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
-      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
-      trafficCost: NonNegativeLong,
   ) extends PendingReassignment {
 
     def isReassigningParticipant: Boolean =
@@ -790,9 +740,5 @@ object UnassignmentProcessingSteps {
       unassignmentValidationResult.submitterMetadata
 
     override def cancelDecisionTimeTickRequest(): Unit = decisionTimeTickRequest.cancel()
-
-    override def publishUpdateO
-        : Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]] =
-      Some(publishUpdate)
   }
 }

@@ -33,13 +33,10 @@ function get_cloudsql_id() {
 function get_stack_for_namespace_component() {
   local namespace=$1
   local component=$2
-  local logical_synchronizer_mode=${3:-false}
 
   local stack=""
   if [[ "${namespace}" =~ sv.* ]]; then
-    if [[ "${component}" == "participant" && "$logical_synchronizer_mode" == "true" ]]; then
-      stack="sv"
-    elif [[ "${component}" == "participant" ]]; then
+    if [[ "${component}" == "participant" ]]; then
       stack="sv-canton"
     elif [[ "${component}" == "sequencer" ]]; then
       stack="sv-canton"
@@ -59,11 +56,8 @@ create_component_instance() {
     local component="$1"
     local migration_id="$2"
     local namespace="$3"
-    local logical_synchronizer_mode="${4:-false}"
 
-    if [[ "$component" == "participant" && "$logical_synchronizer_mode" == "true" ]]; then
-        component_instance="${component}"
-    elif [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
+    if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
        && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv") ]]; then
         component_instance="${component}-${migration_id}"
     else

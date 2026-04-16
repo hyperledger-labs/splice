@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.channel
@@ -13,11 +13,10 @@ import com.digitalasset.canton.sequencing.client.channel.endpoint.SequencerChann
 import com.digitalasset.canton.sequencing.protocol.channel.SequencerChannelId
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import io.grpc.Context.CancellableContext
 
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
 import scala.util.Success
 
 /** SequencerChannelClientState holds the set of (static) channel transports and dynamically
@@ -109,9 +108,9 @@ private final class SequencerChannelState(
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
   private val endpoints = new mutable.HashMap[SequencerChannelId, SequencerChannelClientEndpoint]()
-  private val lock = Mutex()
+
   def addChannelEndpoint(endpoint: SequencerChannelClientEndpoint): Either[String, Unit] =
-    (lock.exclusive {
+    blocking(this.synchronized {
       val channelId = endpoint.channelId
       for {
         _ <- endpoints
@@ -125,17 +124,15 @@ private final class SequencerChannelState(
   def closeChannelEndpoint(
       channelId: SequencerChannelId
   ): Either[String, Unit] =
-    (lock
-      .exclusive {
-        endpoints.remove(channelId).toRight(s"Channel $channelId not found")
-      })
-      .map { endpoint =>
+    blocking(this.synchronized {
+      endpoints.remove(channelId).toRight(s"Channel $channelId not found").map { endpoint =>
         logger.debug(s"About to close endpoint ${endpoint.channelId}")(TraceContext.empty)
         endpoint.close()
       }
+    })
 
   def closeChannelsAndTransport(): Unit = {
-    (lock.exclusive {
+    blocking(this.synchronized {
       endpoints.foreach { case (_, endpoint) => endpoint.close() }
     })
     transport.close()

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -38,10 +38,10 @@ trait DbSynchronizerConnectionConfigStoreTest
   }
 }
 
-final class SynchronizerConnectionConfigStoreTestH2
+class SynchronizerConnectionConfigStoreTestH2
     extends DbSynchronizerConnectionConfigStoreTest
     with H2Test
 
-final class SynchronizerConnectionConfigStoreTestPostgres
+class SynchronizerConnectionConfigStoreTestPostgres
     extends DbSynchronizerConnectionConfigStoreTest
     with PostgresTest

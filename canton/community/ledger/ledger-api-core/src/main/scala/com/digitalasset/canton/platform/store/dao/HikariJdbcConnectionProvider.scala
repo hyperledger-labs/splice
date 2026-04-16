@@ -1,11 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
 import com.daml.ledger.resources.ResourceOwner
+import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.daml.scalautil.Statement.discard
-import com.digitalasset.canton.health.{HealthStatus, Healthy, Unhealthy}
+import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy, Unhealthy}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.config.ServerRole
 import com.digitalasset.canton.tracing.TraceContext
@@ -67,14 +68,30 @@ object DataSourceConnectionProvider {
       healthPoller.schedule(checkHealth, 0, HealthPollingSchedule.toMillis)
 
       new JdbcConnectionProvider {
-        override def runSQL[T](block: Connection => T): T = {
+        override def runSQL[T](databaseMetrics: DatabaseMetrics)(block: Connection => T): T = {
           val conn = dataSource.getConnection()
+          conn.setAutoCommit(false)
           try {
-            block(conn)
+            val res = Timed.value(
+              databaseMetrics.queryTimer,
+              block(conn),
+            )
+            Timed.value(
+              databaseMetrics.commitTimer,
+              conn.commit(),
+            )
+            res
           } catch {
             case e: SQLTransientConnectionException =>
               transientFailureCount.incrementAndGet()
+              conn.rollback()
               throw e
+            case NonFatal(t) =>
+              // Log the error in the caller with access to more logging context (such as the sql statement description)
+              conn.rollback()
+              throw t
+          } finally {
+            conn.close()
           }
         }
 

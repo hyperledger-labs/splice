@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -103,7 +103,7 @@ object SequencedEventValidationError {
   ) extends CantonError.Impl(
         cause =
           "The sequencer responded with a different message for the same sequencing timestamp, which means the sequencer forked."
-      )(SequencerSubscriptionError.ForkHappened)
+      )(ResilientSequencerSubscription.ForkHappened)
       with SequencedEventValidationError[Nothing]
       with PrettyPrinting {
     override protected def pretty: Pretty[ForkHappened] = prettyOfClass(

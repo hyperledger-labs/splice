@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -25,7 +25,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import com.google.protobuf.struct.Struct
 import com.google.protobuf.util.JsonFormat
-import com.google.rpc.error_details.{ErrorInfo, RequestInfo, ResourceInfo, RetryInfo}
+import com.google.rpc.error_details.{ErrorInfo, RetryInfo}
 import io.circe
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
@@ -35,7 +35,6 @@ import scalapb.{GeneratedEnumCompanion, UnknownFieldSet}
 import sttp.tapir.CodecFormat.TextPlain
 import sttp.tapir.Schema.SName
 import sttp.tapir.SchemaType.{SProduct, SProductField}
-import sttp.tapir.docs.apispec.{DocsExtension, DocsExtensionAttribute}
 import sttp.tapir.generic.Derived
 import sttp.tapir.generic.auto.*
 import sttp.tapir.{DecodeResult, FieldName, Schema, SchemaType, Validator}
@@ -48,14 +47,10 @@ import scala.util.Try
 /** JSON wrappers that do not belong to a particular service */
 object JsSchema {
 
-  // Marker for oneOf components in OpenAPI docs (used temporarily during openapi generation)
-  val X_ONE_OF = "x-one-of"
-
   val BYTE_STRING_PARSE_ERROR_TEMPLATE = "The string is not a valid Base64: %s"
 
   implicit val config: Configuration = Configuration.default.copy(
-    useDefaults = true,
-    strictDecoding = false,
+    useDefaults = true
   )
 
   def stringEncoderForEnum[T <: scalapb.GeneratedEnum](): Encoder[T] =
@@ -87,27 +82,6 @@ object JsSchema {
       )
     )
 
-  implicit class OneOfSchemaExtension[T](schema: Schema[T]) {
-    def oneOfExtension(): Schema[T] = {
-      implicit val strTapirCodec: sttp.tapir.Codec.JsonCodec[String] =
-        sttp.tapir.Codec.json[String](s => DecodeResult.Value(s))(identity)
-
-      val existingDocsExtensions =
-        schema.attributes
-          .get(DocsExtensionAttribute.docsExtensionAttributeKey)
-          .getOrElse(Vector.empty)
-
-      val updatedAttributes = schema.attributes.put(
-        DocsExtensionAttribute.docsExtensionAttributeKey,
-        existingDocsExtensions :+ DocsExtension.of(X_ONE_OF, "true"),
-      )
-
-      schema.copy(
-        attributes = updatedAttributes
-      )
-    }
-  }
-
   final case class JsTransaction(
       updateId: String,
       commandId: String,
@@ -119,14 +93,13 @@ object JsSchema {
       traceContext: Option[TraceContext],
       recordTime: com.google.protobuf.timestamp.Timestamp,
       externalTransactionHash: Option[String],
-      paidTrafficCost: Option[Long],
   )
 
   final case class JsTransactionTree(
       updateId: String,
       commandId: String,
       workflowId: String,
-      effectiveAt: protobuf.timestamp.Timestamp,
+      effectiveAt: Option[protobuf.timestamp.Timestamp],
       offset: Long,
       eventsById: Map[Int, JsTreeEvent.TreeEvent],
       synchronizerId: String,
@@ -138,7 +111,6 @@ object JsSchema {
       interfaceId: Identifier,
       viewStatus: com.google.rpc.status.Status,
       viewValue: Option[Json],
-      implementationPackageId: Option[String],
   )
   object JsReassignmentEvent {
     sealed trait JsReassignmentEvent
@@ -166,7 +138,6 @@ object JsSchema {
       traceContext: Option[com.daml.ledger.api.v2.trace_context.TraceContext],
       recordTime: com.google.protobuf.timestamp.Timestamp,
       synchronizerId: String,
-      paidTrafficCost: Option[Long],
   )
 
   object JsServicesCommonCodecs {
@@ -244,7 +215,7 @@ object JsSchema {
 
     implicit val identifierFilterSchema
         : Schema[transaction_filter.CumulativeFilter.IdentifierFilter] =
-      Schema.oneOfWrapped[transaction_filter.CumulativeFilter.IdentifierFilter].oneOfExtension()
+      Schema.oneOfWrapped
 
     implicit val filtersByPartyMapSchema: Schema[Map[String, transaction_filter.Filters]] =
       Schema.schemaForMap[transaction_filter.Filters]
@@ -254,7 +225,7 @@ object JsSchema {
 
     @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
     implicit val jsReassignmentEventSchema: Schema[JsReassignmentEvent.JsReassignmentEvent] =
-      Schema.oneOfWrapped[JsReassignmentEvent.JsReassignmentEvent].oneOfExtension()
+      Schema.oneOfWrapped
 
     implicit val topologyTransactionParticipantAuthorizationAddedSchema
         : Schema[lapi.topology_transaction.ParticipantAuthorizationAdded] =
@@ -265,17 +236,12 @@ object JsSchema {
     implicit val topologyTransactionParticipantAuthorizationRevokedSchema
         : Schema[lapi.topology_transaction.ParticipantAuthorizationRevoked] =
       Schema.derived
-    implicit val topologyTransactionParticipantAuthorizationOnboardingSchema
-        : Schema[lapi.topology_transaction.ParticipantAuthorizationOnboarding] =
-      Schema.derived
 
     @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
     implicit val topologyEventEventSchema: Schema[lapi.topology_transaction.TopologyEvent.Event] =
-      Schema.oneOfWrapped
-        .name(
-          SName("TopologyEventEvent")
-        )
-        .oneOfExtension()
+      Schema.oneOfWrapped.name(
+        SName("TopologyEventEvent")
+      ) // Name selected manually otherwise it is generated as Event1
 
   }
 
@@ -288,7 +254,6 @@ object JsSchema {
         contractId: String,
         templateId: Identifier,
         contractKey: Option[Json],
-        contractKeyHash: protobuf.ByteString,
         createArgument: Option[Json],
         createdEventBlob: protobuf.ByteString,
         interfaceViews: Seq[JsInterfaceView],
@@ -387,8 +352,8 @@ object JsSchema {
         retryInfo = decodedCantonError.code.category.retryable.map(_.duration),
         definiteAnswer = decodedCantonError.definiteAnswerO,
       )
-  }
 
+  }
   object DirectScalaPbRwImplicits {
     import sttp.tapir.json.circe.*
     import sttp.tapir.generic.auto.*
@@ -509,29 +474,26 @@ object JsSchema {
         } yield com.google.rpc.status.Status(code, message, details)
     }
 
-    implicit val grpcErrorInfoEncoder: Encoder[ErrorInfo] = deriveCodec
-    implicit val grpcRetryInfoEncoder: Encoder[RetryInfo] = deriveCodec
-    implicit val grpcResourceInfoEncoder: Encoder[ResourceInfo] = deriveCodec
-    implicit val grpcRequestInfoEncoder: Encoder[RequestInfo] = deriveCodec
-
     implicit val grpcAnyEncoder: Encoder[com.google.protobuf.any.Any] = Encoder.instance { any =>
       import io.circe.syntax.*
-      def decodeAny(source: com.google.protobuf.any.Any): Json =
+      def decodeAny(source: com.google.protobuf.any.Any): String =
         try {
-          source match {
-            case detail if detail.is[ErrorInfo] => detail.unpack[ErrorInfo].asJson
-            case detail if detail.is[RetryInfo] => detail.unpack[RetryInfo].asJson
-            case detail if detail.is[ResourceInfo] => detail.unpack[ResourceInfo].asJson
-            case detail if detail.is[RequestInfo] => detail.unpack[RequestInfo].asJson
-            case _ => Json.fromString("Unknown type for decoding")
+          source.typeUrl match {
+            case "type.googleapis.com/google.rpc.ErrorInfo" =>
+              ErrorInfo.parseFrom(source.value.toByteArray).toString
+            case "type.googleapis.com/google.rpc.RetryInfo" =>
+              RetryInfo.parseFrom(source.value.toByteArray).toString
+            case _ =>
+              "Unknown type for decoding"
           }
-        } catch { case e: Exception => Json.fromString(s"Failed to decode: ${e.getMessage}") }
-
+        } catch {
+          case e: Exception => "Failed to decode: " + e.getMessage
+        }
       Json.obj(
         "typeUrl" -> any.typeUrl.asJson,
         "value" -> Base64.getEncoder.encodeToString(any.value.toByteArray).asJson,
-        "valueDecoded" -> decodeAny(any),
         "unknownFields" -> any.unknownFields.asJson,
+        "valueDecoded" -> decodeAny(any).asJson,
       )
     }
 
@@ -621,17 +583,21 @@ object JsSchema {
 
     @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
     implicit val jsEventSchema: Schema[JsEvent.Event] =
-      Schema.oneOfWrapped[JsEvent.Event].oneOfExtension()
+      Schema.oneOfWrapped
 
     @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
     implicit val jsTreeEventSchema: Schema[JsTreeEvent.TreeEvent] =
-      Schema.oneOfWrapped[JsTreeEvent.TreeEvent].oneOfExtension()
+      Schema.oneOfWrapped
 
     implicit val eventsByIdSchema: Schema[Map[Int, JsTreeEvent.TreeEvent]] =
       Schema.schemaForMap[Int, JsTreeEvent.TreeEvent](_.toString)
 
     implicit val jsTransactionTreeSchema: Schema[JsTransactionTree] =
       Schema.derived
+
+    implicit val identifierFilterSchema
+        : Schema[transaction_filter.CumulativeFilter.IdentifierFilter] =
+      Schema.oneOfWrapped
 
     implicit val valueSchema: Schema[com.google.protobuf.struct.Value] = Schema.any
 

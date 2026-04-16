@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer
@@ -13,7 +13,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.*
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -51,15 +50,14 @@ class SequencerBasedRegisterTopologyTransactionHandle(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcast.State]] = {
     val sendCallback = SendCallback.future
-    val now = clock.now
     val maxSequencingTime =
-      now.add(topologyConfig.topologyTransactionRegistrationTimeout.toInternal.duration)
+      clock.now.add(topologyConfig.topologyTransactionRegistrationTimeout.toInternal.duration)
     val request = TopologyTransactionsBroadcast(
       sequencerClient.psid,
       transactions,
     )
     synchronizeWithClosing(functionFullName)(
-      sendRequest(request, now, maxSequencingTime, sendCallback)
+      sendRequest(request, maxSequencingTime, sendCallback)
     )
       .biSemiflatMap(
         { sendAsyncClientError =>
@@ -97,7 +95,6 @@ class SequencerBasedRegisterTopologyTransactionHandle(
 
   private def sendRequest(
       request: TopologyTransactionsBroadcast,
-      approximateTimestampForSigning: CantonTimestamp,
       maxSequencingTime: CantonTimestamp,
       sendCallback: SendCallback,
   )(implicit
@@ -111,11 +108,7 @@ class SequencerBasedRegisterTopologyTransactionHandle(
     )
     sequencerClient.send(
       Batch.of(psid.protocolVersion, (request, Recipients.cc(TopologyBroadcastAddress.recipient))),
-      timestamps = SendRequestTimestamps(
-        topologyTimestamp = None,
-        approximateTimestampForSigning = approximateTimestampForSigning,
-        maxSequencingTime = maxSequencingTime,
-      ),
+      maxSequencingTime = maxSequencingTime,
       callback = sendCallback,
       // Do not amplify because we are running our own retry loop here anyway
       amplify = false,

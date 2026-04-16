@@ -11,27 +11,15 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{
-  ApiLoggingConfig,
-  CantonConfig,
-  CantonFeatures,
-  ClockConfig,
-  DefaultPorts,
-  LoggingConfig,
-  MonitoringConfig,
-  TestingConfigInternal,
-}
+import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.auto.genCantonConfigValidator
 import com.digitalasset.canton.console.{
-  BaseInspection,
   CantonConsoleEnvironment,
   InstanceReference,
+  SequencerReference,
   TestConsoleOutput,
 }
-import com.digitalasset.canton.environment.{
-  CantonEnvironment,
-  CantonNode,
-  CommunityEnvironmentFactory,
-}
+import com.digitalasset.canton.environment.{CantonEnvironment, CommunityEnvironmentFactory}
 import com.digitalasset.canton.integration.bootstrap.{
   InitializedSynchronizer,
   NetworkBootstrapper,
@@ -43,7 +31,7 @@ import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
-import com.digitalasset.canton.{BaseTest, SynchronizerAlias, config}
+import com.digitalasset.canton.{BaseTest, SynchronizerAlias}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import monocle.macros.syntax.lens.*
@@ -81,113 +69,33 @@ final case class EnvironmentDefinition(
   def withManualStart: EnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
 
-  /** Enable traffic control on all configured synchronizers
-    * @param syncSynchronizerOwnersTime
-    *   function that takes a synchronizer node (sequencer or mediator) and waits for its observed
-    *   synchronizer time to be close to wall clock time. This avoids issues when enabling traffic
-    *   control.
-    * @param trafficControlParameters
-    *   parameters to use
-    * @param topUpAllMembers
-    *   whether to top up all known members with maximum traffic credit
-    * @param disableCommitments
-    *   whether to disable ACS commitments to avoid background traffic being used
-    */
   def withTrafficControl(
-      syncSynchronizerOwnersTime: InstanceReference & BaseInspection[? <: CantonNode] => Unit,
       trafficControlParameters: TrafficControlParameters =
-        // By default, give max base traffic which is virtually equivalent to unlimited traffic
+        // Give max base traffic by default which is virtually equivalent to unlimited traffic
         // This works better than topping up members because it works for members not yet connected to the network
         // as it is not possible to top up unknown members
-        TrafficControlParameters.default.copy(maxBaseTrafficAmount = NonNegativeLong.maxValue),
-      topUpAllMembers: Boolean = false,
-      disableCommitments: Boolean = false,
+        TrafficControlParameters.default.copy(maxBaseTrafficAmount = NonNegativeLong.maxValue)
   ): EnvironmentDefinition =
     withSetup { implicit env =>
-      import env.*
-
-      val isSimClock = env.actualConfig.parameters.clock match {
-        case ClockConfig.SimClock => true
-        case _ => false
-      }
-
-      // We first do all updates async
-      runOnEachInitializedSynchronizer { sync =>
-        // If we're not in simclock, wait for synchronizer owners to catch up with a recent wall clock time
-        if (!isSimClock) {
-          sync.synchronizerOwners
-            .collect { case owner: InstanceReference with BaseInspection[CantonNode] =>
-              owner
-            }
-            .foreach(syncSynchronizerOwnersTime)
-        }
-
-        sync.synchronizerOwners.foreach {
-          _.topology.synchronizer_parameters.propose_update(
-            synchronizerId = sync.synchronizerId,
-            original =>
-              original.update(
-                trafficControl = Some(trafficControlParameters),
-                reconciliationInterval =
-                  if (disableCommitments) config.PositiveDurationSeconds.ofDays(365)
-                  else original.reconciliationInterval,
-              ),
-            // Don't synchronize here to run the updates in parallel to speed it up
-            synchronize = None,
-          )
-        }
-      }
-
-      // And then check on all synchronizers that traffic is enabled, to speed things up
-      utils.retry_until_true {
-        runOnEachInitializedSynchronizer { sync =>
-          sync.allSequencerOwners.forall(
-            _.topology.synchronizer_parameters
-              .latest(sync.physicalSynchronizerId)
-              .trafficControl
-              .isDefined
-          )
-        }.forall(_ == true)
-      }
-
-      // Top up members if requested, in the same way (first send all top up requests async,
-      // then wait for all of them to be effective)
-      if (topUpAllMembers) {
-        runOnEachInitializedSynchronizer { sync =>
-          val allPayingMembers =
-            sync.allActiveMediators.map(_.member) ++ sync.allParticipants.map(_.member)
-
-          allPayingMembers.foreach { member =>
-            sync.allSequencerOwners.foreach {
-              _.traffic_control.set_traffic_balance(
-                member,
-                PositiveInt.one,
-                NonNegativeLong.maxValue,
-              )
-            }
+      env.initializedSynchronizers.values.foreach {
+        case InitializedSynchronizer(
+              physicalSynchronizerId,
+              _staticSynchronizerParameters,
+              synchronizerOwners,
+            ) =>
+          val allSequencersOfDomain = synchronizerOwners.collect { case seq: SequencerReference =>
+            seq
           }
-        }
-
-        utils.retry_until_true {
-          runOnEachInitializedSynchronizer { sync =>
-            val allPayingMembers =
-              sync.allActiveMediators.map(_.member) ++ sync.allParticipants.map(_.member)
-
-            val traffic = sync.allSequencerOwners.head.traffic_control
-              .traffic_state_of_members_approximate(allPayingMembers)
-              .trafficStates
-            traffic.sizeIs == allPayingMembers.size && traffic.values.forall(
-              _.extraTrafficPurchased == NonNegativeLong.maxValue
+          import env.*
+          allSequencersOfDomain.foreach {
+            _.topology.synchronizer_parameters.propose_update(
+              synchronizerId = physicalSynchronizerId.logical,
+              _.update(trafficControl = Some(trafficControlParameters)),
+              synchronize = Some(environmentTimeouts.default),
             )
-          }.forall(_ == true)
-        }
+          }
       }
     }
-
-  private def runOnEachInitializedSynchronizer[T](f: InitializedSynchronizer => T)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): List[T] =
-    env.initializedSynchronizers.values.toList.map(f)
 
   def withSetup(
       setup: TestConsoleEnvironment[CantonConfig, CantonEnvironment] => Unit
@@ -325,8 +233,17 @@ object EnvironmentDefinition extends LazyLogging {
       }
       else Map.empty
 
-    EnvironmentDefinition(configWithDefaults)
-      .addConfigTransforms(ConfigTransforms.defaultsForNodes*)
+    EnvironmentDefinition(
+      configWithDefaults
+        .validate(EnterpriseCantonEdition)
+        .fold(
+          err =>
+            throw new IllegalArgumentException(
+              s"Error while validating the config: ${err.mkString(",")}"
+            ),
+          _ => configWithDefaults,
+        )
+    ).addConfigTransforms(ConfigTransforms.defaultsForNodes*)
       .addConfigTransform(c =>
         c.focus(_.remoteParticipants)
           .replace(toRemote(c.participants)(_.toRemoteConfig))
@@ -359,16 +276,14 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S2M1(
-      synchronizerOwnersOverride: Option[Seq[InstanceReference]] = None
-  )(implicit
+  private def S2M1(implicit
       env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
       daName,
-      synchronizerOwners = synchronizerOwnersOverride.getOrElse(Seq(sequencer1, sequencer2)),
+      synchronizerOwners = Seq(sequencer1, sequencer2),
       synchronizerThreshold = PositiveInt.one,
       sequencers = Seq(sequencer1, sequencer2),
       mediators = Seq(mediator1),
@@ -386,20 +301,6 @@ object EnvironmentDefinition extends LazyLogging {
       synchronizerThreshold = PositiveInt.one,
       sequencers = Seq(sequencer1, sequencer2),
       mediators = Seq(mediator1, mediator2),
-    )
-  }
-
-  def S4M4(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): NetworkTopologyDescription = {
-    import env.*
-
-    NetworkTopologyDescription(
-      daName,
-      synchronizerOwners = Seq(sequencer1, sequencer2, sequencer3, sequencer4),
-      synchronizerThreshold = PositiveInt.one,
-      sequencers = Seq(sequencer1, sequencer2, sequencer3, sequencer4),
-      mediators = Seq(mediator1, mediator2, mediator3, mediator4),
     )
   }
 
@@ -548,7 +449,7 @@ object EnvironmentDefinition extends LazyLogging {
     numMediators = 1,
   )
     .withNetworkBootstrap { implicit env =>
-      new NetworkBootstrapper(S2M1())
+      new NetworkBootstrapper(S2M1)
     }
 
   lazy val P0S2M2_Config: EnvironmentDefinition =
@@ -564,16 +465,10 @@ object EnvironmentDefinition extends LazyLogging {
     numMediators = 1,
   )
 
-  lazy val P1S4M4_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+  private lazy val P1S4M4_Config = buildBaseEnvironmentDefinition(
     numParticipants = 1,
     numSequencers = 4,
     numMediators = 4,
-  )
-
-  lazy val P1S5M5_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
-    numParticipants = 1,
-    numSequencers = 5,
-    numMediators = 5,
   )
 
   /**   - 1 participant '''not''' connected to any synchronizer
@@ -624,18 +519,6 @@ object EnvironmentDefinition extends LazyLogging {
       numSequencers = 3,
       numMediators = 3,
     )
-
-  lazy val P2S4M4_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
-    numParticipants = 2,
-    numSequencers = 4,
-    numMediators = 4,
-  )
-
-  lazy val P2S5M5_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
-    numParticipants = 2,
-    numSequencers = 5,
-    numMediators = 5,
-  )
 
   /**   - 2 participants
     *   - 3 sequencers
@@ -692,13 +575,6 @@ object EnvironmentDefinition extends LazyLogging {
       numParticipants = 2,
       numSequencers = 4,
       numMediators = 1,
-    )
-
-  lazy val P2S4M2_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 2,
-      numSequencers = 4,
-      numMediators = 2,
     )
 
   lazy val P2S2M2_Config: EnvironmentDefinition =
@@ -838,27 +714,6 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 1,
     )
 
-  lazy val P3S4M4_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 3,
-      numSequencers = 4,
-      numMediators = 4,
-    )
-
-  lazy val P3S6M6_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 3,
-      numSequencers = 6,
-      numMediators = 6,
-    )
-
-  lazy val P3S8M8_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 3,
-      numSequencers = 8,
-      numMediators = 8,
-    )
-
   /**   - 3 participants '''not''' connected to any synchronizer
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     */
@@ -896,6 +751,16 @@ object EnvironmentDefinition extends LazyLogging {
     .withNetworkBootstrap { implicit env =>
       new NetworkBootstrapper(S2M2)
     }
+
+  /**   - 3 participants '''not''' connected to any synchronizer
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
+    */
+  lazy val P3_S1M1_S1M1_Manual: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 3,
+      numSequencers = 2,
+      numMediators = 2,
+    ).withManualStart
 
   /**   - 4 participants '''not''' connected to any synchronizer
     *   - 1 sequencer
@@ -943,29 +808,14 @@ object EnvironmentDefinition extends LazyLogging {
     }
 
   /**   - 4 participants '''not''' connected to any synchronizer
-    *   - 2 sequencers
-    *   - 2 mediators
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P4S2M2_Manual: EnvironmentDefinition =
+  lazy val P4_S1M1_S1M1_Manual: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 4,
       numSequencers = 2,
       numMediators = 2,
     ).withManualStart
-
-  lazy val P4S3M3_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 4,
-      numSequencers = 3,
-      numMediators = 3,
-    )
-
-  lazy val P4S7M7_Config: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 4,
-      numSequencers = 7,
-      numMediators = 7,
-    )
 
   /**   - 5 participants '''not''' connected to any synchronizer
     *   - 1 synchronizer with 1 sequencer and 1 mediator
@@ -1044,7 +894,7 @@ object EnvironmentDefinition extends LazyLogging {
     numMediators = 1,
   )
     .withNetworkBootstrap { implicit env =>
-      NetworkBootstrapper(Seq(S2M1()))
+      NetworkBootstrapper(Seq(S2M1))
     }
 
   /**   - 2 participants '''not''' connected to any synchronizer
@@ -1106,7 +956,7 @@ object EnvironmentDefinition extends LazyLogging {
   private def loadConfigFromResource(path: String): CantonConfig = {
     val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
     CantonConfig
-      .loadAndValidate(rawConfig, Some(DefaultPorts.create()))
+      .loadAndValidate(rawConfig, EnterpriseCantonEdition, Some(DefaultPorts.create()))
       .valueOr { err =>
         // print a useful error message such that the developer can figure out which file failed
         logger.error(s"Failed to load file $path: $err", new Exception("location"))
@@ -1117,6 +967,7 @@ object EnvironmentDefinition extends LazyLogging {
   def fromFiles(files: File*): EnvironmentDefinition = {
     val config = CantonConfig.parseAndLoadOrExit(
       files.map(_.toJava),
+      EnterpriseCantonEdition,
       Some(DefaultPorts.create()),
     )
     EnvironmentDefinition(baseConfig = config)

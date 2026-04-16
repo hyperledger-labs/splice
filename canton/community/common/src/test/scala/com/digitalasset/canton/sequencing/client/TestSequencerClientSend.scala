@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -7,7 +7,6 @@ import cats.data.{EitherT, Nested}
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.TestSequencerClientSend.Request
 import com.digitalasset.canton.sequencing.protocol.{
   AggregationRule,
@@ -15,7 +14,6 @@ import com.digitalasset.canton.sequencing.protocol.{
   MessageId,
   SequencingSubmissionCost,
 }
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DefaultTestIdentities, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
@@ -25,9 +23,8 @@ import scala.jdk.CollectionConverters.*
 
 /** Test implementation that stores all requests in a queue.
   */
-class TestSequencerClientSend(override protected[canton] val clock: Clock)(implicit
-    val executionContext: ExecutionContext
-) extends SequencerClientSend {
+class TestSequencerClientSend(implicit val executionContext: ExecutionContext)
+    extends SequencerClientSend {
 
   val requestsQueue: java.util.concurrent.BlockingQueue[Request] =
     new java.util.concurrent.LinkedBlockingQueue()
@@ -38,33 +35,24 @@ class TestSequencerClientSend(override protected[canton] val clock: Clock)(impli
 
   override def sendAsync(
       batch: Batch[DefaultOpenEnvelope],
-      timestamps: SendRequestTimestamps,
+      topologyTimestamp: Option[CantonTimestamp],
+      maxSequencingTime: CantonTimestamp,
       messageId: MessageId,
       aggregationRule: Option[AggregationRule],
       callback: SendCallback,
       amplify: Boolean,
-      useConfirmationResponseAmplificationParameters: Boolean,
   )(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): SendAsyncResult = {
     requestsQueue.add(
-      Request(
-        batch,
-        timestamps.topologyTimestamp,
-        timestamps.maxSequencingTime,
-        messageId,
-        aggregationRule,
-        None,
-      )
+      Request(batch, topologyTimestamp, maxSequencingTime, messageId, aggregationRule, None)
     )
 
     Nested(EitherT.pure(EitherTUtil.unitUS[SendAsyncClientError]))
   }
 
-  override def generateMaxSequencingTime(
-      referenceTimestamp: CantonTimestamp
-  ): CantonTimestamp =
+  override def generateMaxSequencingTime: CantonTimestamp =
     CantonTimestamp.MaxValue
 }
 

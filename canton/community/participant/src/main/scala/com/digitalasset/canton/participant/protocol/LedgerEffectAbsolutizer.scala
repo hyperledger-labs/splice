@@ -1,10 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
 import cats.syntax.traverse.*
-import com.digitalasset.canton.data.{KeyResolutionWithMaintainers, ViewParticipantData}
+import com.digitalasset.canton.data.{
+  AssignedKey,
+  FreeKey,
+  SerializableKeyResolution,
+  ViewParticipantData,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.LedgerEffectAbsolutizer.ViewAbsoluteLedgerEffect
 import com.digitalasset.canton.protocol.{
@@ -36,12 +41,12 @@ class LedgerEffectAbsolutizer(absolutizer: ContractIdAbsolutizer) {
       createdInSubviewArchivedInCore <- vpd.createdInSubviewArchivedInCore.toSeq
         .traverse(absolutizer.absolutizeContractId)
         .map(_.toSet)
-      resolvedKeys <- vpd.keyMaintainers.toSeq.traverse { case (gKey, resolution) =>
+      resolvedKeys <- vpd.resolvedKeys.toSeq.traverse { case (gkey, resolution) =>
         for {
-          absolutizedKey <- gKey.key.traverseCid(absolutizer.absolutizeContractId)
+          absolutizedKey <- gkey.key.traverseCid(absolutizer.absolutizeContractId)
           absolutizedResolution <- absolutizeKeyResolution(resolution.unversioned)
         } yield (
-          LfGlobalKey.assertBuild(gKey.templateId, gKey.packageName, absolutizedKey, gKey.hash),
+          LfGlobalKey.assertBuild(gkey.templateId, absolutizedKey, gkey.packageName),
           resolution.copy(unversioned = absolutizedResolution),
         )
       }
@@ -70,10 +75,12 @@ class LedgerEffectAbsolutizer(absolutizer: ContractIdAbsolutizer) {
     } yield absolutizedCreated
 
   def absolutizeKeyResolution(
-      resolution: KeyResolutionWithMaintainers
-  ): Either[String, KeyResolutionWithMaintainers] =
-    resolution.contracts.traverse(absolutizer.absolutizeContractId).map { absolutizedContracts =>
-      resolution.copy(contracts = absolutizedContracts)
+      resolution: SerializableKeyResolution
+  ): Either[String, SerializableKeyResolution] =
+    resolution match {
+      case AssignedKey(cid) =>
+        absolutizer.absolutizeContractId(cid).map(AssignedKey.apply)
+      case free: FreeKey => Right(free)
     }
 }
 
@@ -86,7 +93,7 @@ object LedgerEffectAbsolutizer {
       coreInputs: Map[LfContractId, InputContract],
       createdCore: Seq[CreatedContract],
       createdInSubviewArchivedInCore: Set[LfContractId],
-      resolvedKeys: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
+      resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
       inRollback: Boolean,
       informees: Set[LfPartyId],
   ) extends PrettyPrinting {

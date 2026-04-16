@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer
@@ -18,7 +18,6 @@ import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.{EmptyRootHashMessagePayload, RootHashMessage}
 import com.digitalasset.canton.protocol.{LocalRejectError, RootHash}
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult}
 import com.digitalasset.canton.sequencing.protocol.{
   AggregationRule,
@@ -163,11 +162,6 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
       }
       val ts = env.environment.clock.now
       val maxTs = ts.plusSeconds(300)
-      val timestamps = SendRequestTimestamps(
-        topologyTimestamp = Some(ts.minusSeconds(5)),
-        approximateTimestampForSigning = ts,
-        maxSequencingTime = maxTs,
-      )
       val aggregationRule = AggregationRule(
         NonEmpty(Seq, participant1.id, participant2.id),
         PositiveInt.tryCreate(2),
@@ -188,7 +182,8 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
         val callback = SendCallback.future
         val sendAsync = client.send(
           batch,
-          timestamps = timestamps,
+          topologyTimestamp = Some(ts.minusSeconds(5)),
+          maxSequencingTime = maxTs,
           aggregationRule = Some(aggregationRule),
           callback = callback,
         )

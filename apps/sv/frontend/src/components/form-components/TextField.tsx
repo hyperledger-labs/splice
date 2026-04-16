@@ -14,12 +14,10 @@ export interface TextFieldProps {
   title: string;
   subtitle?: string;
   muiTextFieldProps?: MuiTextFieldProps;
-  onChange?: (value: string) => void;
-  onBlur?: () => void;
 }
 
 export const TextField: React.FC<TextFieldProps> = props => {
-  const { title, subtitle, id, muiTextFieldProps, onChange, onBlur } = props;
+  const { title, subtitle, id, muiTextFieldProps } = props;
   const field = useFieldContext<string>();
   return (
     <Box>
@@ -32,20 +30,14 @@ export const TextField: React.FC<TextFieldProps> = props => {
         variant="outlined"
         autoComplete="off"
         value={field.state.value}
-        onBlur={() => {
-          field.handleBlur();
-          onBlur?.();
-        }}
+        onBlur={field.handleBlur}
         error={!field.state.meta.isValid}
         helperText={
           <Typography variant="caption" id={`${id}-error`} data-testid={`${id}-error`}>
             {field.state.meta.errors?.[0]}
           </Typography>
         }
-        onChange={e => {
-          field.handleChange(e.target.value);
-          onChange?.(e.target.value);
-        }}
+        onChange={e => field.handleChange(e.target.value)}
         inputProps={{ 'data-testid': id }}
         id={id}
         {...muiTextFieldProps}

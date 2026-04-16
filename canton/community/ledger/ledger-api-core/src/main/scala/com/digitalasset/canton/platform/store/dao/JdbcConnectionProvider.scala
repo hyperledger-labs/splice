@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
-import com.digitalasset.canton.health.ReportsHealth
+import com.daml.metrics.DatabaseMetrics
+import com.digitalasset.canton.ledger.api.health.ReportsHealth
 
 import java.sql.Connection
 
@@ -14,5 +15,5 @@ private[platform] trait JdbcConnectionProvider extends ReportsHealth {
     * returned to the pool. The block must not recursively call [[runSQL]], as this could result in
     * a deadlock waiting for a free connection from the same pool.
     */
-  def runSQL[T](block: Connection => T): T
+  def runSQL[T](databaseMetrics: DatabaseMetrics)(block: Connection => T): T
 }

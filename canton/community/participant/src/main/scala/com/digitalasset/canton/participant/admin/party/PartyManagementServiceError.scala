@@ -1,10 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.party
 
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
-import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.PartyManagementServiceErrorGroup
 import com.digitalasset.canton.error.{CantonBaseError, CantonError}
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -33,29 +33,6 @@ object PartyManagementServiceError extends PartyManagementServiceErrorGroup {
         extends CantonError.Impl(reason)
         with PartyManagementServiceError
 
-    final case class SynchronizerOffsetRecordTimeInvariantViolation(
-        offset: Offset,
-        timestamp: CantonTimestamp,
-        recordTime: CantonTimestamp,
-    )(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause = s"Timestamp mismatch: requested=$timestamp != recordTime=$recordTime. " +
-            s"If an event with a record time is known to exist for the requested timestamp (e.g., a topology transaction), please retry the request. " +
-            s"If no event exists with a record time matching exactly the requested timestamp and you intentionally want the highest prior offset, set the 'force' flag to true. " +
-            s"(Context: offset=${offset.unwrap})"
-        )
-        with PartyManagementServiceError
-
-    final case class MissingSynchronizerOffset(
-        offset: Offset,
-        timestamp: CantonTimestamp,
-    )(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause =
-            s"Synchronizer offset not found for offset ${offset.unwrap} as determined by the requested timestamp $timestamp."
-        )
-        with PartyManagementServiceError
-
     final case class AbortAcsExportForMissingOnboardingFlag(
         party: PartyId,
         targetParticipant: ParticipantId,
@@ -63,7 +40,7 @@ object PartyManagementServiceError extends PartyManagementServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"Aborted to export ACS for party $party. " +
-            s"To enable export, the party must be activated on the target participant $targetParticipant with the onboarding flag set."
+            s"To enable export, the party must be activated on the target participant $targetParticipant with the onboarding flag set"
         )
         with PartyManagementServiceError
 
@@ -74,7 +51,7 @@ object PartyManagementServiceError extends PartyManagementServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
-            s"Aborted to complete party onboarding because the activation for $party on the target participant $targetParticipant is missing the onboarding flag."
+            s"Aborted to complete party onboarding because the activation for $party on the target participant $targetParticipant is missing the onboarding flag"
         )
         with PartyManagementServiceError
   }

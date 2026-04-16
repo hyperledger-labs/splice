@@ -710,7 +710,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -740,7 +740,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.mock.yaml",

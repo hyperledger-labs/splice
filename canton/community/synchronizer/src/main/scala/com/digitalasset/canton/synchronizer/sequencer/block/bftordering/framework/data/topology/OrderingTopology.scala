@@ -1,20 +1,18 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology
 
 import com.digitalasset.canton.crypto.Signature
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftKeyId,
   BftNodeId,
-  EpochLength,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
-import com.digitalasset.canton.util.MaxBytesToDecompress
 import com.google.common.annotations.VisibleForTesting
 
 import OrderingTopology.{
@@ -31,20 +29,15 @@ import OrderingTopology.{
   * Being unsorted, sequencer IDs must not be iterated over without sorting first, as the iteration
   * order is not deterministic and could introduce nondeterminism in the protocol and/or simulation
   * testing.
-  *
-  * @param areTherePendingCantonTopologyChanges
-  *   `None` when `getOrderingTopologyAt` is called with `checkPendingChanges` set to `false`.
   */
 final case class OrderingTopology(
     // NOTE: make sure to change `toString` when adding useful information
     nodesTopologyInfo: Map[BftNodeId, NodeTopologyInfo],
-    epochLength: EpochLength,
     sequencingParameters: SequencingParameters,
-    maxBytesToDecompress: MaxBytesToDecompress,
+    maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
     activationTime: TopologyActivationTime,
-    areTherePendingCantonTopologyChanges: Option[Boolean],
-) extends MessageAuthorizer
-    with PrettyPrinting {
+    areTherePendingCantonTopologyChanges: Boolean,
+) extends MessageAuthorizer {
 
   lazy val size: Int = nodesTopologyInfo.size
 
@@ -71,60 +64,53 @@ final case class OrderingTopology(
   override def isAuthorized(from: BftNodeId, keyId: BftKeyId): Boolean =
     nodesTopologyInfo.get(from).exists(_.keyIds.contains(keyId))
 
-  override protected def pretty: Pretty[OrderingTopology.this.type] =
-    prettyOfClass(
-      param("activationTime", _.activationTime.value),
-      param("size", _.size),
-      param("weakQuorum", _.weakQuorum),
-      param("strongQuorum", _.strongQuorum),
-      param(
-        "nodesTopologyInfo",
-        _.nodesTopologyInfo.map { case (node, info) => node.doubleQuoted -> info },
-      ),
-      param("sequencingParameters", _.sequencingParameters),
-      param("maxBytesToDecompress", _.maxBytesToDecompress.limit),
-      param(
-        "areTherePendingCantonTopologyChanges",
-        _.areTherePendingCantonTopologyChanges,
-      ),
-    )
+  override def toString: String = {
+    val nodesWithActivationTime =
+      nodesTopologyInfo.map { case (nodeId, info) =>
+        nodeId -> info.activationTime
+      }
+    s"""OrderingTopology(activation time = $activationTime,
+     | size = $size,
+     | weak quorum = $weakQuorum,
+     | strong quorum = $strongQuorum,
+     | nodes = $nodesWithActivationTime,
+     | sequencing parameters = $sequencingParameters,
+     | max request size to deserialize = $maxRequestSizeToDeserialize,
+     | pending topology changes = $areTherePendingCantonTopologyChanges
+     |)""".stripMargin
+  }
 }
 
 object OrderingTopology {
 
   final case class NodeTopologyInfo(
-      keyIds: Set[BftKeyId]
-  ) extends PrettyPrinting {
-
-    override protected def pretty: Pretty[NodeTopologyInfo] =
-      prettyOfClass(
-        param("keyIds", _.keyIds.map(_.doubleQuoted))
-      )
-  }
+      activationTime: TopologyActivationTime,
+      keyIds: Set[BftKeyId],
+  )
 
   /** A simple constructor for tests so that we don't have to provide timestamps. */
   @VisibleForTesting
   private[bftordering] def forTesting(
       nodes: Set[BftNodeId],
       sequencingParameters: SequencingParameters = SequencingParameters.Default,
-      activationTime: TopologyActivationTime = TestBootstrapTopologyActivationTime,
-      areTherePendingCantonTopologyChanges: Option[Boolean] = Some(false),
+      activationTime: TopologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue),
+      areTherePendingCantonTopologyChanges: Boolean = false,
       nodesTopologyInfos: Map[BftNodeId, NodeTopologyInfo] = Map.empty,
-      epochLength: EpochLength = DefaultEpochLength,
   ): OrderingTopology =
     OrderingTopology(
       nodes.view.map { node =>
         node -> nodesTopologyInfos.getOrElse(
           node,
           NodeTopologyInfo(
-            keyIds = Set(FingerprintKeyId.toBftKeyId(Signature.noSignature.authorizingLongTermKey))
+            activationTime = TopologyActivationTime(CantonTimestamp.MinValue),
+            keyIds = Set(FingerprintKeyId.toBftKeyId(Signature.noSignature.authorizingLongTermKey)),
           ),
         )
       }.toMap,
-      epochLength,
       sequencingParameters,
-      // TODO(i10428) Move this method under BftSequencerBaseTest so we can reuse defaultMaxBytesToDecompress
-      MaxBytesToDecompress.MaxValueUnsafe,
+      MaxRequestSizeToDeserialize.Limit(
+        DynamicSynchronizerParameters.defaultMaxRequestSize.value
+      ),
       activationTime,
       areTherePendingCantonTopologyChanges,
     )

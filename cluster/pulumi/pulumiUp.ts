@@ -6,14 +6,11 @@ import {
   mustInstallValidator1,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
 import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/pulumi';
-import {
-  runSvProjectForAllSvs,
-  runSvProjectForAllSvsIfLsu,
-} from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { upOperation, upStack } from './pulumiOperations';
 import { runAllValidatorsUp } from './validator-runbook/pulumiUp';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 const abortController = new PulumiAbortController();
 
@@ -39,7 +36,7 @@ async function runAllStacksUp() {
     false
   );
   operations = operations.concat(cantonStacks);
-  const svStacks = runSvProjectForAllSvsIfLsu(
+  const svStacks = runSvProjectForAllSvs(
     'up',
     stack => {
       return upStack(stack, abortController);
@@ -58,10 +55,7 @@ async function runAllStacksUp() {
   return awaitAllOrThrowAllExceptions(operations);
 }
 
-runAllStacksUp().catch((err: unknown) => {
-  console.error(
-    `\nPulumi up finished with errors. See the summary above for details.\n` +
-      (err instanceof Error ? err.message : String(err))
-  );
+runAllStacksUp().catch(() => {
+  console.error('Failed to run up');
   process.exit(1);
 });

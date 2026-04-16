@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -8,11 +8,12 @@ import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SH
 import com.daml.ledger.api.v2.value.Identifier.toJavaProto
 import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.Identifier
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.damltests.{dvpassets, dvpoffer}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.util.PartiesAllocator
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -43,8 +44,7 @@ class HeterogeneousDependenciesVettingIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
 
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 
   @volatile var registryParticipant1, registryParticipant2, sellerParticipant,
       buyerParticipant: LocalParticipantReference = _
@@ -356,7 +356,7 @@ class HeterogeneousDependenciesVettingIntegrationTest
           entry => {
             entry.shouldBeCantonErrorCode(NoPreferredPackagesFound)
             entry.message should include regex
-              s"Failed to compute package preferences. Reason: No synchronizer satisfies the vetting requirements.*No package with package-name 'dvp-asset-factory' is consistently vetted by all hosting participants of party ${registry.show}"
+              s"Could not compute valid package preferences. Reason: No synchronizer satisfies the vetting requirements.*Party ${registry.show}.* has no vetted packages for 'dvp-asset-factory'"
           },
         )
       }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
-import { Config } from './config';
 import { spliceConfig } from './config/config';
+import { Config } from './config/configSchema';
 import { MigrationInfoSchema } from './config/migrationSchema';
 
 export class DecentralizedSynchronizerMigrationConfig {
@@ -19,8 +19,6 @@ export class DecentralizedSynchronizerMigrationConfig {
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
   activeDatabaseId?: DomainMigrationIndex;
-  lsuEnabled: boolean;
-  frozenMigrationId?: number;
   public archived: MigrationInfo[];
 
   constructor(config: Config) {
@@ -31,19 +29,6 @@ export class DecentralizedSynchronizerMigrationConfig {
     this.migratingFromActiveId = synchronizerMigration.active.migratingFrom;
     this.activeDatabaseId = synchronizerMigration.activeDatabaseId;
     this.archived = synchronizerMigration.archived || [];
-    this.lsuEnabled = synchronizerMigration.lsuEnabled;
-    this.frozenMigrationId = synchronizerMigration.frozenMigrationId;
-    if (this.lsuEnabled && this.frozenMigrationId == undefined) {
-      throw new Error('frozen migration must be defined when LSU is enabled');
-    }
-    if (
-      (this.legacy?.sequencer.enableBftSequencer ||
-        this.active.sequencer.enableBftSequencer ||
-        this.upgrade?.sequencer.enableBftSequencer) &&
-      !this.lsuEnabled
-    ) {
-      throw new Error('LSU must be enabled when using DABFT');
-    }
   }
 
   runningMigrations(): MigrationInfo[] {
@@ -67,22 +52,13 @@ export class DecentralizedSynchronizerMigrationConfig {
       legacyId?: DomainMigrationIndex;
     };
   } {
-    if (this.lsuEnabled) {
-      return {
-        migration: {
-          id: this.frozenMigrationId!,
-          migrating: false,
-        },
-      };
-    } else {
-      return {
-        migration: {
-          id: this.active.id,
-          migrating: this.isRunningMigration(),
-          legacyId: this.legacy?.id,
-        },
-      };
-    }
+    return {
+      migration: {
+        id: this.active.id,
+        migrating: this.isRunningMigration(),
+        legacyId: this.legacy?.id,
+      },
+    };
   }
 
   get allMigrations(): MigrationInfo[] {
@@ -91,10 +67,6 @@ export class DecentralizedSynchronizerMigrationConfig {
 
   get highestMigrationId(): DomainMigrationIndex {
     return Math.max(...this.allMigrations.map(m => m.id));
-  }
-
-  get activeMigrationId(): DomainMigrationIndex {
-    return this.lsuEnabled ? this.frozenMigrationId! : this.active.id;
   }
 }
 

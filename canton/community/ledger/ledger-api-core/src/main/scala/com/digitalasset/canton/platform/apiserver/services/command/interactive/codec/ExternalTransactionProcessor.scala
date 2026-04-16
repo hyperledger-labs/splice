@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive.codec
@@ -26,13 +26,12 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.platform.apiserver.execution.CommandExecutionResult
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.ExternalTransactionProcessor.PrepareResult
-import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
 import com.digitalasset.canton.platform.store.dao.events.InputContractPackages
 import com.digitalasset.canton.protocol.LfFatContractInst
 import com.digitalasset.canton.protocol.hash.HashTracer
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.collection.MapsUtil
-import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
-import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
+import com.digitalasset.canton.version.HashingSchemeVersion
 import com.digitalasset.daml.lf.transaction.{SubmittedTransaction, Transaction}
 import com.digitalasset.daml.lf.value.Value.ContractId
 
@@ -87,7 +86,6 @@ class ExternalTransactionProcessor(
     enricher: InteractiveSubmissionEnricher,
     contractStore: ContractStore,
     syncService: state.SyncService,
-    config: InteractiveSubmissionServiceConfig,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
   private val encoder = new PreparedTransactionEncoder(loggerFactory)
@@ -199,14 +197,14 @@ class ExternalTransactionProcessor(
       )
         .leftMap(CommandExecutionErrors.InteractiveSubmissionPreparationError.Reject(_))
       // The participant needs to be connected to this synchronizer ID for the transaction to be submitted successfully
-      psid = commandExecutionResult.synchronizerRank.synchronizerId
+      synchronizerId = commandExecutionResult.synchronizerRank.synchronizerId
       transactionData = PrepareTransactionData(
         submitterInfo = commandExecutionResult.commandInterpretationResult.submitterInfo,
         transactionMeta = commandExecutionResult.commandInterpretationResult.transactionMeta,
         transaction = SubmittedTransaction(enrichedTransaction),
         globalKeyMapping = commandExecutionResult.commandInterpretationResult.globalKeyMapping,
         inputContracts = inputContracts,
-        synchronizer = psid.forExternalTransactionHashing,
+        synchronizerId = synchronizerId.logical,
         mediatorGroup = 0,
         transactionUUID = UUID.randomUUID(),
         maxRecordTime = maxRecordTime,
@@ -221,7 +219,6 @@ class ExternalTransactionProcessor(
       contractLookupParallelism: PositiveInt,
       hashTracer: HashTracer,
       maxRecordTime: Option[LfTimestamp],
-      hashingSchemeVersion: HashingSchemeVersion,
   )(implicit
       loggingContextWithTrace: LoggingContextWithTrace,
       executionContext: ExecutionContext,
@@ -248,14 +245,17 @@ class ExternalTransactionProcessor(
         .mapK(FutureUnlessShutdown.outcomeK)
       // Compute the pre-computed hash for convenience
       protocolVersion = commandExecutionResult.synchronizerRank.synchronizerId.protocolVersion
+      hashVersion = HashingSchemeVersion
+        .getHashingSchemeVersionsForProtocolVersion(protocolVersion)
+        .max1
       hash <- EitherT
         .fromEither[FutureUnlessShutdown](
           enriched
-            .computeHash(hashingSchemeVersion, protocolVersion, hashTracer)
+            .computeHash(hashVersion, protocolVersion, hashTracer)
             .leftMap(error => InteractiveSubmissionPreparationError.Reject(error.message))
         )
     } yield {
-      PrepareResult(encoded, hash, hashingSchemeVersion)
+      PrepareResult(encoded, hash, hashVersion)
     }
 
   /** Decodes a prepared transaction, verify its signature and convert it to CommandExecutionResult
@@ -267,44 +267,15 @@ class ExternalTransactionProcessor(
     FutureUnlessShutdown,
     InteractiveSubmissionExecuteError.Reject,
     CommandExecutionResult,
-  ] =
+  ] = {
+    val routingSynchronizerState = syncService.getRoutingSynchronizerState
+
     for {
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        !config.enforceSingleRootNode || executeRequest.preparedTransaction.transaction
-          .forall(_.roots.sizeIs == 1),
-        InteractiveSubmissionExecuteError.Reject(
-          "Transaction with multiple root nodes are not supported"
-        ),
-      )
-      routingSynchronizerState <- EitherT.liftF(syncService.getRoutingSynchronizerState)
       decoded <- EitherT
         .liftF[Future, InteractiveSubmissionExecuteError.Reject, ExecuteTransactionData](
           decoder.decode(executeRequest)
         )
         .mapK(FutureUnlessShutdown.outcomeK)
-      // Check upfront if the synchronizerID format is correct for the PV of the target synchronizer
-      _ <- EitherT.fromEither[FutureUnlessShutdown](
-        syncService
-          .physicalSynchronizerIdForSynchronizerId(decoded.synchronizer.logical)
-          .filter(_.forExternalTransactionHashing != decoded.synchronizer)
-          .map { physicalSynchronizerId =>
-            InteractiveSubmissionExecuteError.Reject(
-              {
-                val protocolVersionOfSelectedSync =
-                  s"The selected synchronizer $physicalSynchronizerId is on Protocol Version ${physicalSynchronizerId.protocolVersion}."
-                physicalSynchronizerId.protocolVersion match {
-                  case atOrBefore34 if atOrBefore34 <= ProtocolVersion.v34 =>
-                    protocolVersionOfSelectedSync +
-                      s" Please use a Logical Synchronizer ID in the prepared transaction metadata on PVs <= 34"
-                  case _ =>
-                    protocolVersionOfSelectedSync +
-                      s" Please use a Physical Synchronizer ID in the prepared transaction metadata on PVs > 34"
-                }
-              }
-            )
-          }
-          .toLeft(())
-      )
       _ <- decoded
         .verifySignature(routingSynchronizerState, logger)
         .leftMap(err => InteractiveSubmissionExecuteError.Reject(err))
@@ -333,4 +304,5 @@ class ExternalTransactionProcessor(
       selectRoutingSynchronizer,
       routingSynchronizerState,
     )
+  }
 }

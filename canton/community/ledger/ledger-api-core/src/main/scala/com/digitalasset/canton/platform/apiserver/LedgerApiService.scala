@@ -1,12 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.tls.TlsServerConfig
-import com.digitalasset.canton.config.KeepAliveServerConfig
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.{KeepAliveServerConfig, TlsServerConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
@@ -23,7 +22,6 @@ object LedgerApiService {
       desiredPort: Port,
       maxInboundMessageSize: Int,
       maxInboundMetadataSize: Int,
-      maxConcurrentStreamsPerConnection: Int,
       address: Option[String],
       tlsConfiguration: Option[TlsServerConfig],
       interceptors: List[ServerInterceptor] = List.empty,
@@ -47,7 +45,6 @@ object LedgerApiService {
           desiredPort,
           maxInboundMessageSize,
           maxInboundMetadataSize,
-          maxConcurrentStreamsPerConnection,
           sslContext,
           interceptors,
           metrics,

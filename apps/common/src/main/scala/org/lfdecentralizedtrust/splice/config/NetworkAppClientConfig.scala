@@ -4,8 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import org.apache.pekko.http.scaladsl.model.Uri
-import com.daml.tls.TlsClientConfig
-import com.digitalasset.canton.config.KeepAliveClientConfig
+import com.digitalasset.canton.config.{KeepAliveClientConfig, TlsClientConfig}
 
 /** A client configuration to a corresponding server configuration
   *  @see [[com.digitalasset.canton.config.ClientConfig]]

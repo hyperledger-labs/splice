@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
 
-import com.digitalasset.canton.crypto.InteractiveSubmission.TransactionMetadataForHashing
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.canton.version.HashingSchemeVersion
@@ -24,6 +23,7 @@ object TransactionHash {
               .getOrElse(nodeHashVersion, Set.empty)
               .mkString(", ")}"
         )
+
     final case class UnsupportedHashingVersion(version: HashingSchemeVersion)
         extends NodeHashingError(
           s"Cannot hash node with hashing version $version. Supported versions: ${NodeBuilder.HashingVersionToSupportedLFSerializationVersionMapping.keySet
@@ -38,32 +38,64 @@ object TransactionHash {
     *   tracer that can be used to debug encoding of the transaction.
     */
   @throws[NodeHashingError]
-  def tryHashTransactionWithMetadata(
-      hashVersion: HashingSchemeVersion,
+  def tryHashTransactionWithMetadataV1(
       versionedTransaction: VersionedTransaction,
       nodeSeeds: Map[NodeId, LfHash],
-      metadata: TransactionMetadataForHashing,
+      metadata: TransactionMetadataHashBuilder.MetadataV1,
       hashTracer: HashTracer = HashTracer.NoOp,
   ): Hash =
     new NodeBuilderV1(
       HashPurpose.PreparedSubmission,
       hashTracer,
       enforceNodeSeedForCreateNodes = true,
-    ).addPurpose()
+    ).addPurpose
       .addHashingSchemeVersion(HashingSchemeVersion.V2)
       .addHash(
-        VersionedTransactionHasher.tryHashTransaction(
-          hashVersion,
-          versionedTransaction,
-          nodeSeeds,
-          hashTracer.subNodeTracer,
-        ),
+        TransactionHash
+          .tryHashTransactionV1(versionedTransaction, nodeSeeds, hashTracer.subNodeTracer),
         "Transaction",
       )
       .addHash(
-        TransactionMetadataHasher.tryHashMetadata(hashVersion, metadata, hashTracer.subNodeTracer),
+        TransactionMetadataHashBuilder
+          .hashTransactionMetadataV1(metadata, hashTracer.subNodeTracer),
         "Metadata",
       )
       .finish()
 
+  /** Deterministically hash a versioned transaction using the Version 1 of the hashing algorithm.
+    *
+    * @param hashTracer
+    *   tracer that can be used to debug encoding of the transaction.
+    */
+  @throws[NodeHashingError]
+  private[hash] def tryHashTransactionV1(
+      versionedTransaction: VersionedTransaction,
+      nodeSeeds: Map[NodeId, LfHash],
+      hashTracer: HashTracer = HashTracer.NoOp,
+  ): Hash =
+    new NodeBuilderV1(
+      HashPurpose.PreparedSubmission,
+      hashTracer,
+      enforceNodeSeedForCreateNodes = true,
+    ).addPurpose
+      .withContext("Serialization Version")(
+        _.add(SerializationVersion.toProtoValue(versionedTransaction.version))
+      )
+      .withContext("Root Nodes")(
+        _.addNodesFromNodeIds(versionedTransaction.roots, versionedTransaction.nodes, nodeSeeds)
+      )
+      .finish()
+
+  // For testing only
+  @throws[NodeHashingError]
+  private[hash] def tryHashNodeV1(
+      node: Node,
+      nodeSeeds: Map[NodeId, LfHash] = Map.empty,
+      nodeSeed: Option[LfHash] = None,
+      subNodes: Map[NodeId, Node] = Map.empty,
+      hashTracer: HashTracer = HashTracer.NoOp,
+      enforceNodeSeedForCreateNodes: Boolean = true,
+  ): Hash =
+    new NodeBuilderV1(HashPurpose.PreparedSubmission, hashTracer, enforceNodeSeedForCreateNodes)
+      .hashNode(node, nodeSeed, subNodes, nodeSeeds)
 }

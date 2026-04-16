@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -6,11 +6,11 @@ package com.digitalasset.canton.synchronizer.mediator
 import cats.data.{EitherT, OptionT}
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
-import cats.syntax.semigroup.*
+import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
-import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SynchronizerCryptoClient,
@@ -18,20 +18,16 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewType}
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.lifecycle.{
-  FlagCloseable,
-  FutureUnlessShutdown,
-  HasCloseContext,
-  PromiseUnlessShutdownFactory,
-}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.sequencing.HandlerResult
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.sequencing.{HandlerResult, UnthrottledAsync}
 import com.digitalasset.canton.synchronizer.mediator.store.MediatorState
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherUtil.RichEither
@@ -42,7 +38,6 @@ import org.slf4j.event.Level
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.DurationConverters.JavaDurationOps
 
 /** Scalable service to validate the received MediatorConfirmationRequests and
   * ConfirmationResponses, derive a verdict, and send ConfirmationResultMessages to informee
@@ -54,11 +49,8 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     crypto: SynchronizerCryptoClient,
     timeTracker: SynchronizerTimeTracker,
     val mediatorState: MediatorState,
-    asynchronousProcessing: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
-    batchingConfig: BatchingConfig,
-    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with Spanning
@@ -68,55 +60,33 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
   private val psid = crypto.psid
 
-  val processingQueue: ProcessingQueue[RequestId] =
-    if (asynchronousProcessing) new ShardedSequentialProcessingQueue
-    else new SynchronousProcessingQueue
-
   override def observeTimestampWithoutEvent(sequencingTimestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): HandlerResult =
-    if (asynchronousProcessing) handleTimeouts(sequencingTimestamp)
-    else HandlerResult.synchronous(handleTimeouts(sequencingTimestamp).flatMap(_.unwrap))
+    HandlerResult.synchronous(handleTimeouts(sequencingTimestamp))
 
   override def handleMediatorEvent(
       event: MediatorEvent
-  )(implicit traceContext: TraceContext): HandlerResult =
-    if (asynchronousProcessing) handleMediatorEventAsynchronous(event)
-    else handleMediatorEventSynchronous(event)
-
-  private def handleMediatorEventAsynchronous(
-      event: MediatorEvent
-  )(implicit traceContext: TraceContext): HandlerResult =
-    for {
-      asyncTimeoutHandling <- handleTimeouts(event.sequencingTimestamp)
-      asyncEventHandling <- doHandleMediatorEvent(event)
-    } yield asyncEventHandling |+| asyncTimeoutHandling
-
-  private def handleMediatorEventSynchronous(
-      event: MediatorEvent
   )(implicit traceContext: TraceContext): HandlerResult = {
-    // to process synchronously, we inline the async results before continuing on to the next step
     val future = for {
-      asyncTimeoutHandling <- handleTimeouts(event.sequencingTimestamp)
-      _ <- asyncTimeoutHandling.unwrap
-      asyncEventHandling <- doHandleMediatorEvent(event)
-      unthrottledAsync <- asyncEventHandling.unwrap
-    } yield unthrottledAsync
+      _ <- handleTimeouts(event.sequencingTimestamp)
+      _ <- doHandleMediatorEvent(event)
+    } yield ()
     HandlerResult.synchronous(future)
   }
 
   private def doHandleMediatorEvent(
       event: MediatorEvent
-  )(implicit traceContext: TraceContext): HandlerResult = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val requestTimestamp = event.requestId.unwrap
     if (requestTimestamp > event.sequencingTimestamp) {
       val error = MediatorError.MalformedMessage.Reject(
         s"Received a mediator message for request $requestTimestamp with earlier sequencing time ${event.sequencingTimestamp}. Discarding the message."
       )
       error.report()
-      HandlerResult.done
+      FutureUnlessShutdown.unit
     } else {
-      val synchronousResult: HandlerResult = for {
+      for {
         snapshot <- crypto.ips.awaitSnapshot(requestTimestamp)
 
         synchronizerParameters <- snapshot
@@ -127,7 +97,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           synchronizerParameters.participantResponseDeadlineForF(requestTimestamp)
         )
         decisionTime <- synchronizerParameters.decisionTimeForF(requestTimestamp)
-        asyncProcessing <- event match {
+        _ <- event match {
           case MediatorEvent.Request(
                 counter,
                 _,
@@ -135,26 +105,14 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                 rootHashMessages,
                 batchAlsoContainsTopologyTransaction,
               ) =>
-            mediatorState.registerTimeoutForRequest(
-              event.requestId,
+            processRequest(
+              RequestId(requestTimestamp),
+              counter,
               participantResponseDeadline,
-            )
-            // processRequest returns FutureUnlessShutdown[FutureUnlessShutdown[Unit]]:
-            //   outer future: completes once the request is registered (releases the queue slot)
-            //   inner future: finalizedPromise — completes only after the verdict is persisted to DB
-            HandlerResult.asynchronous(
-              processingQueue
-                .enqueueForProcessing(event.requestId)(
-                  processRequest(
-                    event.requestId,
-                    counter,
-                    participantResponseDeadline,
-                    decisionTime,
-                    requestEnvelope,
-                    rootHashMessages,
-                    batchAlsoContainsTopologyTransaction,
-                  )
-                )
+              decisionTime,
+              requestEnvelope,
+              rootHashMessages,
+              batchAlsoContainsTopologyTransaction,
             )
           case MediatorEvent.Response(
                 counter,
@@ -163,37 +121,26 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                 topologyTimestamp,
                 recipients,
               ) =>
-            HandlerResult.asynchronousUnit(
-              processingQueue.enqueueForProcessing(responses.message.requestId)(
-                processResponses(
-                  responseTimestamp,
-                  counter,
-                  participantResponseDeadline,
-                  decisionTime,
-                  responses,
-                  topologyTimestamp,
-                  recipients,
-                )
-              )
+            processResponses(
+              responseTimestamp,
+              counter,
+              participantResponseDeadline,
+              decisionTime,
+              responses,
+              topologyTimestamp,
+              recipients,
             )
         }
-      } yield asyncProcessing
-      synchronousResult
+      } yield ()
     }
   }
 
-  private[mediator] def handleTimeouts(
-      timestamp: CantonTimestamp
-  ): HandlerResult =
-    // Determine the timed-out requests in the synchronous processing stage, ...
+  private[mediator] def handleTimeouts(timestamp: CantonTimestamp): FutureUnlessShutdown[Unit] =
     mediatorState
       .pendingTimedoutRequest(timestamp) match {
-      case Nil => HandlerResult.done
+      case Nil => FutureUnlessShutdown.unit
       case nonEmptyTimeouts =>
-        // ... but perform the actual timeout handling in the asynchronous processing stage.
-        // This allows us to wait for the individual requests' previous processing to finish without blocking
-        // the synchronous processing stage of subsequent events.
-        HandlerResult.asynchronousUnit(nonEmptyTimeouts.map(handleTimeout(_, timestamp)).sequence_)
+        nonEmptyTimeouts.map(handleTimeout(_, timestamp)).sequence_
     }
 
   @VisibleForTesting
@@ -202,43 +149,30 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       timestamp: CantonTimestamp,
   ): FutureUnlessShutdown[Unit] = {
     def pendingRequestNotFound: FutureUnlessShutdown[Unit] = {
-      // This is logged at trace, because otherwise this would be logged for each request on DEBUG, which is actually not very helpful and just noise.
-      noTracingLogger.trace(
+      noTracingLogger.debug(
         s"Pending aggregation for request [$requestId] not found. This implies the request has been finalized since the timeout was scheduled."
       )
       FutureUnlessShutdown.unit
     }
 
-    processingQueue.enqueueForProcessing(requestId)(
-      mediatorState.getPending(requestId).fold(pendingRequestNotFound) { responseAggregation =>
-        // the event causing the timeout is likely unrelated to the transaction we're actually timing out,
-        // so use the original request trace context
-        implicit val traceContext: TraceContext = responseAggregation.requestTraceContext
+    mediatorState.getPending(requestId).fold(pendingRequestNotFound) { responseAggregation =>
+      // the event causing the timeout is likely unrelated to the transaction we're actually timing out,
+      // so use the original request trace context
+      implicit val traceContext: TraceContext = responseAggregation.requestTraceContext
 
-        logger.info(
-          s"Phase 6: Request ${requestId.unwrap}: Timeout in state ${responseAggregation.state} at $timestamp"
-        )
+      logger.info(
+        s"Phase 6: Request ${requestId.unwrap}: Timeout in state ${responseAggregation.state} at $timestamp"
+      )
 
-        val timedOut = responseAggregation.timeout(
-          mediatorState.metrics.timeoutNonResponsiveParticipants
-        )
-        MonadUtil.whenM(mediatorState.replace(responseAggregation, timedOut))(
-          sendResultIfDone(timedOut, responseAggregation.decisionTime)
-        )
-      }
-    )
+      val timedOut = responseAggregation.timeout()
+      MonadUtil.whenM(mediatorState.replace(responseAggregation, timedOut))(
+        sendResultIfDone(timedOut, responseAggregation.decisionTime)
+      )
+    }
   }
 
   /** Stores the incoming request in the MediatorStore. Sends a result message if no responses need
     * to be received or if the request is malformed, including if it declares a different mediator.
-    *
-    * Returns a nested future: the outer future completes once the request has been registered in
-    * the mediator state (so the sequential processing queue slot is released). The inner future
-    * completes only after the finalized response has been persisted to the DB — it is
-    * [[ResponseAggregation.finalizedFuture]]. This inner future must be chained into the
-    * [[HandlerResult]] async result *outside* the processing queue, so that the queue slot is free
-    * to accept the confirmation responses that will eventually complete the promise. Awaiting the
-    * inner future inside the queue would deadlock.
     */
   @VisibleForTesting
   private[mediator] def processRequest(
@@ -249,7 +183,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       requestEnvelope: OpenEnvelope[MediatorConfirmationRequest],
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
       batchAlsoContainsTopologyTransaction: Boolean,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnthrottledAsync] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     withSpan("ConfirmationRequestAndResponseProcessor.processRequest") {
       val request = requestEnvelope.protocolMessage
       implicit traceContext =>
@@ -269,12 +203,11 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             )
 
             // Take appropriate actions based on unitOrVerdictO
-            persistedF <- unitOrVerdictO match {
+            _ <- unitOrVerdictO match {
               // Request is well-formed, but not yet finalized
               case Right(()) =>
                 val participantResponseDeadlineTick =
                   timeTracker.requestTick(participantResponseDeadline)
-
                 for {
                   aggregation <- ResponseAggregation.fromRequest(
                     requestId,
@@ -282,45 +215,13 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                     participantResponseDeadline,
                     decisionTime,
                     snapshot.ipsSnapshot,
-                    batchingConfig,
                     Some(participantResponseDeadlineTick),
-                    mkPromise(
-                      s"Request $requestId finalized",
-                      futureSupervisor,
-                      logAfter =
-                        // Extend the default logAfter duration by participantResponseDeadline - requestId.unwrap
-                        // such that we wait until the maximum allowed time for the request to be finalized before
-                        // logging
-                        (participantResponseDeadline - requestId.unwrap)
-                          .plus(PromiseUnlessShutdownFactory.DefaultLogAfterDuration.duration)
-                          .toScala,
-                    ),
                   )
-                  _ <- aggregation.asFinalized(
-                    crypto.staticSynchronizerParameters.protocolVersion
-                  ) match {
-                    case None =>
-                      // in case the aggregation is not finalized, we need to update the mediator state
-                      mediatorState.registerPendingRequest(aggregation)
-                      FutureUnlessShutdown.unit
-                    case Some(finalizedResponse) =>
-                      // if the request is immediately finalized (e.g. zero-threshold), write the result and
-                      // complete the promise ourselves since the aggregation was never registered as pending
-                      // (storeFinalized only completes promises for pending aggregations).
-                      mediatorState.add(finalizedResponse).map { _ =>
-                        aggregation.completeFinalizedPromise()
-                      }
-                  }
+                  _ <- mediatorState.add(aggregation)
                 } yield {
                   logger.info(
-                    show"Phase 2: Registered request=${requestId.unwrap} from submittingParticipant=${request.submittingParticipant} with ${request.informeesAndConfirmationParamsByViewPosition.size} view(s)."
+                    show"Phase 2: Registered request=${requestId.unwrap} with ${request.informeesAndConfirmationParamsByViewPosition.size} view(s). Initial state: ${aggregation.showMergedState}"
                   )
-                  logger.debug(
-                    show"Phase 2: Initial state for request=${requestId.unwrap}: ${aggregation.showMergedState}"
-                  )
-                  // Return the inner future wrapped in an UnthrottledAsync: completes only after the verdict is persisted to DB.
-                  // This is chained into the HandlerResult OUTSIDE the processing queue.
-                  UnthrottledAsync(aggregation.finalizedFuture)
                 }
 
               // Request is finalized, approve / reject immediately
@@ -339,14 +240,14 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                   _ <- mediatorState.add(
                     FinalizedResponse(requestId, request, requestId.unwrap, verdict)(traceContext)
                   )
-                } yield UnthrottledAsync.immediate // Already persisted above; nothing more to wait for
+                } yield ()
 
               // Discard request
               case Left(None) =>
                 logger.debug(show"$requestId: discarding request...")
-                FutureUnlessShutdown.pure(UnthrottledAsync.immediate)
+                FutureUnlessShutdown.pure(None)
             }
-          } yield persistedF
+          } yield ()
     }
 
   /** Validate a mediator confirmation request
@@ -380,47 +281,35 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         },
       )
 
-      submissionTimeTopologySnapshotO <- EitherT.right(
-        getSubmissionTopologySnapshot(requestId, rootHashMessages)
-      )
-
       // Validate signature of submitting participant
-      _ <- checkAndReportMaliciousParticipant(
-        snapshot,
-        submissionTimeTopologySnapshotO,
-      )(
-        _.verifySignature(
+      _ <- snapshot
+        .verifySignature(
           request.rootHash.unwrap,
           request.submittingParticipant,
           request.submittingParticipantSignature,
           SigningKeyUsage.ProtocolOnly,
-        ).leftMap(err =>
-          // The error is logged at the appropriate level by checkAndReportMaliciousParticipant
-          MediatorError.MalformedMessage.Reject(
+        )
+        .leftMap { err =>
+          val reject = MediatorError.MalformedMessage.Reject(
             show"Received a mediator confirmation request with id $requestId from ${request.submittingParticipant} with an invalid signature. Rejecting request.\nDetailed error: $err"
           )
-        )
-      ).leftMap(Option.apply)
+          reject.log()
+          Option(MediatorVerdict.MediatorReject(reject))
+        }
 
       // Validate activeness of informee participants
-      _ <- checkAndReportMaliciousParticipant(snapshot, submissionTimeTopologySnapshotO)(
-        _.ipsSnapshot
-          .allHaveActiveParticipants(request.allInformees)
-          .leftMap(informeesNoParticipant =>
-            // The error is logged at the appropriate level by checkAndReportMaliciousParticipant
-            MediatorError.InvalidMessage.Reject(
-              show"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: $informeesNoParticipant. Rejecting request..."
-            )
+      _ <- topologySnapshot
+        .allHaveActiveParticipants(request.allInformees)
+        .leftMap { informeesNoParticipant =>
+          val reject = MediatorError.InvalidMessage.Reject(
+            show"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: $informeesNoParticipant. Rejecting request..."
           )
-      ).leftMap(Option.apply)
+          reject.log()
+          Option(MediatorVerdict.MediatorReject(reject))
+        }
 
       // Validate declared mediator and the group being active
-      validMediator <- checkDeclaredMediator(
-        requestId,
-        requestEnvelope,
-        snapshot,
-        submissionTimeTopologySnapshotO,
-      )
+      validMediator <- checkDeclaredMediator(requestId, requestEnvelope, topologySnapshot)
 
       // Validate root hash messages
       _ <- checkRootHashMessages(
@@ -428,8 +317,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         requestId,
         request,
         rootHashMessages,
-        snapshot,
-        submissionTimeTopologySnapshotO,
+        topologySnapshot,
       )
         .leftMap(Option.apply)
 
@@ -439,12 +327,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         .leftMap(Option.apply)
 
       // Reject, if the authorized confirming parties cannot attain the threshold
-      _ <- validateAuthorizedConfirmingParties(
-        requestId,
-        request,
-        snapshot,
-        submissionTimeTopologySnapshotO,
-      )
+      _ <- validateAuthorizedConfirmingParties(requestId, request, topologySnapshot)
         .leftMap(Option.apply)
 
       // Reject, if the batch also contains a topology transaction
@@ -466,8 +349,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
   private def checkDeclaredMediator(
       requestId: RequestId,
       requestEnvelope: OpenEnvelope[MediatorConfirmationRequest],
-      topologySnapshot: SynchronizerSnapshotSyncCryptoApi,
-      submissionTimeTopologySnapshotO: Option[SynchronizerSnapshotSyncCryptoApi],
+      topologySnapshot: TopologySnapshot,
   )(implicit
       loggingContext: ErrorLoggingContext
   ): EitherT[FutureUnlessShutdown, Option[
@@ -476,31 +358,31 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
     val request = requestEnvelope.protocolMessage
 
-    def rejectWrongMediator(hint: => String): MediatorError.MalformedMessage.Reject =
-      MediatorError.MalformedMessage
-        .Reject(
-          show"Rejecting mediator confirmation request with $requestId, mediator ${request.mediator}, topology at ${topologySnapshot.ipsSnapshot.timestamp} due to $hint"
+    def rejectWrongMediator(hint: => String): Option[MediatorVerdict.MediatorReject] =
+      Some(
+        MediatorVerdict.MediatorReject(
+          MediatorError.MalformedMessage
+            .Reject(
+              show"Rejecting mediator confirmation request with $requestId, mediator ${request.mediator}, topology at ${topologySnapshot.timestamp} due to $hint"
+            )
+            .reported()
         )
+      )
 
-    def getMediatorGroup(
-        snapshot: SynchronizerSnapshotSyncCryptoApi
-    ): EitherT[FutureUnlessShutdown, MediatorError.MalformedMessage.Reject, MediatorGroup] =
-      for {
-        mediatorGroupO <- EitherT.right(
-          snapshot.ipsSnapshot.mediatorGroup(request.mediator.group)(loggingContext)
-        )
-        mediatorGroup <- EitherT.fromOption[FutureUnlessShutdown](
-          mediatorGroupO,
-          rejectWrongMediator(show"unknown mediator group"),
-        )
-      } yield mediatorGroup
-
-    val submissionTimeIndependentChecks = for {
-      mediatorGroup <- getMediatorGroup(topologySnapshot)
+    for {
+      mediatorGroupO <- EitherT.right(
+        topologySnapshot.mediatorGroup(request.mediator.group)(loggingContext)
+      )
+      mediatorGroup <- EitherT.fromOption[FutureUnlessShutdown](
+        mediatorGroupO,
+        rejectWrongMediator(show"unknown mediator group"),
+      )
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        mediatorGroup.active.contains(mediatorId) || mediatorGroup.passive.contains(
-          mediatorId
-        ),
+        mediatorGroup.isActive,
+        rejectWrongMediator(show"inactive mediator group"),
+      )
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        mediatorGroup.active.contains(mediatorId) || mediatorGroup.passive.contains(mediatorId),
         rejectWrongMediator(show"this mediator not being part of the mediator group"),
       )
       expectedRecipients = Recipients.cc(request.mediator)
@@ -510,25 +392,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           show"wrong recipients (expected $expectedRecipients, actual ${requestEnvelope.recipients})"
         ),
       )
-    } yield ()
-
-    for {
-      _ <- submissionTimeIndependentChecks.leftMap { error =>
-        // log the submission-time independent checks explicitly.
-        Option(MediatorVerdict.MediatorReject(error.reported()))
-      }
-      _ <- checkAndReportMaliciousParticipant(topologySnapshot, submissionTimeTopologySnapshotO)(
-        snapshot =>
-          getMediatorGroup(snapshot).flatMap { mediatorGroup =>
-            EitherTUtil.condUnitET[FutureUnlessShutdown](
-              mediatorGroup.isActive,
-              // The error is logged at the appropriate level by checkAndReportMaliciousParticipant
-              rejectWrongMediator(show"inactive mediator group"),
-            )
-          }
-      )(loggingContext.traceContext).leftMap(Option.apply)
     } yield request.mediator
-
   }
 
   private def checkRootHashMessages(
@@ -536,8 +400,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       requestId: RequestId,
       request: MediatorConfirmationRequest,
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-      sequencingSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      submissionTimeSnapshotO: Option[SynchronizerSnapshotSyncCryptoApi],
+      sequencingTopologySnapshot: TopologySnapshot,
   )(implicit
       loggingContext: ErrorLoggingContext
   ): EitherT[FutureUnlessShutdown, MediatorVerdict.MediatorReject, Unit] = {
@@ -549,8 +412,11 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     )
 
     val rootHashMessagesRecipients = correctRecipients
-      .flatMap(recipients => recipients.collect { case m @ MemberRecipient(_: ParticipantId) => m })
-
+      .flatMap(recipients =>
+        recipients.collect { case m @ MemberRecipient(_: ParticipantId) =>
+          m
+        }
+      )
     def repeatedMembers(recipients: Seq[Recipient]): Seq[Recipient] = {
       val repeatedRecipientsB = Seq.newBuilder[Recipient]
       val seen = new mutable.HashSet[Recipient]()
@@ -560,7 +426,6 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       }
       repeatedRecipientsB.result()
     }
-
     def wrongRootHashes(expectedRootHash: RootHash): Seq[RootHash] =
       rootHashMessages.mapFilter { envelope =>
         val rootHash = envelope.protocolMessage.rootHash
@@ -573,65 +438,185 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     def wrongViewType(expectedViewType: ViewType): Seq[ViewType] =
       rootHashMessages.map(_.protocolMessage.viewType).filterNot(_ == expectedViewType).distinct
 
-    def reportedMediatorReject(reason: String): MediatorVerdict.MediatorReject =
-      MediatorVerdict.MediatorReject(malformedMessage(reason).reported())
+    def checkWrongMembers(
+        wrongMembers: RootHashMessageRecipients.WrongMembers
+    )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, RejectionReason, Unit] =
+      NonEmpty.from(wrongMemberErrors(wrongMembers)) match {
+        // The check using the sequencing topology snapshot reported no error
+        case None => EitherT.pure[FutureUnlessShutdown, RejectionReason](())
 
-    def malformedMessage(reason: String): MediatorError.MalformedMessage.Reject = {
-      val message =
-        s"Received a mediator confirmation request with id $requestId with invalid root hash messages. Rejecting... Reason: $reason"
-      MediatorError.MalformedMessage.Reject(message)
+        case Some(errorsNE) =>
+          val mayBeDueToTopologyChange = errorsNE.forall(_.mayBeDueToTopologyChange)
+
+          val dueToTopologyChangeF = if (mayBeDueToTopologyChange) {
+            // The check reported only errors that may be due to a topology change.
+            val dueToTopologyChangeOF = for {
+              submissionTopologySnapshot <- OptionT(getSubmissionTopologySnapshot)
+
+              // Perform the check using the topology at submission time.
+              wrongMembersAtSubmission <- OptionT.liftF(
+                RootHashMessageRecipients.wrongMembers(
+                  rootHashMessagesRecipients,
+                  request,
+                  submissionTopologySnapshot,
+                )(ec, loggingContext)
+              )
+              // If there are no errors using the topology at submission time, consider that the errors
+              // are due to a topology change.
+            } yield wrongMemberErrors(wrongMembersAtSubmission).isEmpty
+
+            dueToTopologyChangeOF.getOrElse {
+              // We could not obtain a submission topology snapshot.
+              // Consider that the errors are NOT due to a topology change.
+              false
+            }
+          } else {
+            // At least some of the reported errors are not due to a topology change
+            FutureUnlessShutdown.pure(false)
+          }
+
+          // Use the first error for the rejection
+          val firstError = errorsNE.head1
+          EitherT.left[Unit](dueToTopologyChangeF.map(firstError.toRejectionReason))
+      }
+
+    def wrongMemberErrors(
+        wrongMembers: RootHashMessageRecipients.WrongMembers
+    ): Seq[WrongMemberError] = {
+      val missingInformeeParticipantsO = Option.when(
+        wrongMembers.missingInformeeParticipants.nonEmpty
+      )(
+        WrongMemberError(
+          show"Missing root hash message for informee participants: ${wrongMembers.missingInformeeParticipants}",
+          // This may be due to a topology change, e.g. if a party-to-participant mapping is added for an informee
+          mayBeDueToTopologyChange = true,
+        )
+      )
+
+      val superfluousMembersO = Option.when(wrongMembers.superfluousMembers.nonEmpty)(
+        WrongMemberError(
+          show"Superfluous root hash message for members: ${wrongMembers.superfluousMembers}",
+          // This may be due to a topology change, e.g. if a party-to-participant mapping is removed for an informee
+          mayBeDueToTopologyChange = true,
+        )
+      )
+
+      missingInformeeParticipantsO.toList ++ superfluousMembersO
     }
 
-    for {
+    // Retrieve the topology snapshot at submission time. Return `None` in case of error.
+    def getSubmissionTopologySnapshot(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Option[TopologySnapshot]] = {
+      val submissionTopologyTimestamps = rootHashMessages
+        .map(_.protocolMessage.submissionTopologyTimestamp)
+        .distinct
+
+      submissionTopologyTimestamps match {
+        case Seq(submissionTopologyTimestamp) =>
+          val sequencingTimestamp = requestId.unwrap
+          SubmissionTopologyHelper.getSubmissionTopologySnapshot(
+            timeouts,
+            sequencingTimestamp,
+            submissionTopologyTimestamp,
+            crypto,
+          )(loggingContext, ec)
+
+        case Seq() =>
+          // This can only happen if there are no root hash messages.
+          // This will be detected during the wrong members check and logged as a warning, so we can log at info level.
+          logger.info(
+            s"No declared submission topology timestamp found. Inconsistencies will be logged as warnings."
+          )
+          FutureUnlessShutdown.pure(None)
+
+        case _ =>
+          // Log at warning level because this is not detected by another check
+          logger.warn(
+            s"Found ${submissionTopologyTimestamps.size} different declared submission topology timestamps. Inconsistencies will be logged as warnings."
+          )
+          FutureUnlessShutdown.pure(None)
+      }
+    }
+
+    val unitOrRejectionReason = for {
       _ <- EitherTUtil
         .condUnitET[FutureUnlessShutdown](
           wrongRecipients.isEmpty,
-          reportedMediatorReject(
-            show"Root hash messages with wrong recipients tree: $wrongRecipients"
+          RejectionReason(
+            show"Root hash messages with wrong recipients tree: $wrongRecipients",
+            dueToTopologyChange = false,
           ),
         )
       repeated = repeatedMembers(rootHashMessagesRecipients)
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         repeated.isEmpty,
-        reportedMediatorReject(
-          show"Several root hash messages for recipients: $repeated"
+        RejectionReason(
+          show"Several root hash messages for recipients: $repeated",
+          dueToTopologyChange = false,
         ),
       )
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        distinctPayloads.sizeIs <= 1,
-        reportedMediatorReject(
-          show"Different payloads in root hash messages. Sizes: ${distinctPayloads.map(_.bytes.size).mkShow()}."
+        distinctPayloads.sizeCompare(1) <= 0,
+        RejectionReason(
+          show"Different payloads in root hash messages. Sizes: ${distinctPayloads.map(_.bytes.size).mkShow()}.",
+          dueToTopologyChange = false,
         ),
       )
-
       wrongHashes = wrongRootHashes(request.rootHash)
-      _ <- EitherTUtil
-        .condUnitET[FutureUnlessShutdown](
-          wrongHashes.isEmpty,
-          reportedMediatorReject(show"Wrong root hashes: $wrongHashes"),
-        )
-
       wrongViewTypes = wrongViewType(request.viewType)
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        wrongViewTypes.isEmpty,
-        reportedMediatorReject(
-          show"View types in root hash messages differ from expected view type ${request.viewType}: $wrongViewTypes"
-        ),
-      )
-      _ <- checkAndReportMaliciousParticipant(sequencingSnapshot, submissionTimeSnapshotO)(
-        snapshot =>
-          RootHashMessageRecipients
-            .wrongMembers(
-              rootHashMessagesRecipients,
-              request,
-              snapshot.ipsSnapshot,
-            )(ec, loggingContext)
-            // The error is logged at the appropriate level by checkAndReportMaliciousParticipant
-            .leftMap(malformedMessage)
-      )(loggingContext.traceContext)
 
+      wrongMembersF = RootHashMessageRecipients.wrongMembers(
+        rootHashMessagesRecipients,
+        request,
+        sequencingTopologySnapshot,
+      )(ec, loggingContext)
+      _ <- for {
+        _ <- EitherTUtil
+          .condUnitET[FutureUnlessShutdown](
+            wrongHashes.isEmpty,
+            RejectionReason(show"Wrong root hashes: $wrongHashes", dueToTopologyChange = false),
+          )
+        wrongMembers <- EitherT.right(wrongMembersF)
+        _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+          wrongViewTypes.isEmpty,
+          RejectionReason(
+            show"View types in root hash messages differ from expected view type ${request.viewType}: $wrongViewTypes",
+            dueToTopologyChange = false,
+          ),
+        )
+        _ <- checkWrongMembers(wrongMembers)(loggingContext)
+      } yield ()
     } yield ()
+
+    unitOrRejectionReason.leftMap { case RejectionReason(reason, dueToTopologyChange) =>
+      val message =
+        s"Received a mediator confirmation request with id $requestId with invalid root hash messages. Rejecting... Reason: $reason"
+      val rejection = MediatorError.MalformedMessage.Reject(message)
+
+      // If the errors are due to a topology change, we consider the request as non-malicious.
+      // Otherwise, we consider it malicious.
+      if (dueToTopologyChange) logErrorDueToTopologyChange(message)(loggingContext)
+      else rejection.reported()(loggingContext)
+
+      MediatorVerdict.MediatorReject(rejection)
+    }
   }
+
+  private case class WrongMemberError(reason: String, mayBeDueToTopologyChange: Boolean) {
+    def toRejectionReason(dueToTopologyChange: Boolean): RejectionReason =
+      RejectionReason(reason, dueToTopologyChange)
+  }
+
+  private case class RejectionReason(reason: String, dueToTopologyChange: Boolean)
+
+  private def logErrorDueToTopologyChange(
+      error: String
+  )(implicit traceContext: TraceContext): Unit = logger.info(
+    error +
+      """ This error is due to a change of topology state between the declared topology timestamp used
+        | for submission and the sequencing time of the request.""".stripMargin
+  )
 
   private def validateMinimumThreshold(
       requestId: RequestId,
@@ -656,68 +641,62 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
   private def validateAuthorizedConfirmingParties(
       requestId: RequestId,
       request: MediatorConfirmationRequest,
-      sequencingTimeSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      submissionTimeTopologyTimestampO: Option[SynchronizerSnapshotSyncCryptoApi],
+      snapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, MediatorVerdict.MediatorReject, Unit] =
-    checkAndReportMaliciousParticipant(sequencingTimeSnapshot, submissionTimeTopologyTimestampO) {
-      snapshot =>
-        MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(
-          request.informeesAndConfirmationParamsByViewPosition.toList
-        ) { case (viewPosition, viewConfirmationParameters) =>
-          // sorting parties to get deterministic error messages
-          val declaredConfirmingParties =
-            viewConfirmationParameters.confirmers.toSeq.sortBy(pId => pId)
+    request.informeesAndConfirmationParamsByViewPosition.toList
+      .parTraverse_ { case (viewPosition, viewConfirmationParameters) =>
+        // sorting parties to get deterministic error messages
+        val declaredConfirmingParties =
+          viewConfirmationParameters.confirmers.toSeq.sortBy(pId => pId)
 
-          for {
-            hostedConfirmingParties <- EitherT.right[MediatorError](
-              snapshot.ipsSnapshot
-                .isHostedByAtLeastOneParticipantF(
-                  declaredConfirmingParties.toSet,
-                  (_, attr) => attr.canConfirm,
+        for {
+          hostedConfirmingParties <- EitherT.right[MediatorVerdict.MediatorReject](
+            snapshot
+              .isHostedByAtLeastOneParticipantF(
+                declaredConfirmingParties.toSet,
+                (_, attr) => attr.canConfirm,
+              )
+          )
+
+          (authorized, unauthorized) = declaredConfirmingParties.partition(
+            hostedConfirmingParties.contains
+          )
+
+          confirmed = viewConfirmationParameters.quorums.forall { quorum =>
+            // For the authorized informees that belong to each quorum, verify if their combined weight is enough
+            // to meet the quorum's threshold.
+            quorum.confirmers
+              .filter { case (partyId, _) => authorized.contains(partyId) }
+              .values
+              .map(_.unwrap)
+              .sum >= quorum.threshold.unwrap
+          }
+
+          _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+            confirmed, {
+              val insufficientPermissionHint =
+                if (unauthorized.nonEmpty)
+                  show"\nParties without participant having permission to confirm: $unauthorized"
+                else ""
+
+              val authorizedPartiesHint =
+                if (authorized.nonEmpty) show"\nAuthorized parties: $authorized" else ""
+
+              val rejection = MediatorError.MalformedMessage
+                .Reject(
+                  s"Received a mediator confirmation request with id $requestId with insufficient authorized confirming parties for transaction view at $viewPosition. " +
+                    s"Rejecting request." +
+                    insufficientPermissionHint +
+                    authorizedPartiesHint
                 )
-            )
-
-            (authorized, unauthorized) = declaredConfirmingParties.partition(
-              hostedConfirmingParties.contains
-            )
-
-            // TODO(#30923): Remove unnecessary confirmer weight and quorum threshold parameters and simplify/correct check
-            confirmed = viewConfirmationParameters.quorums.forall { quorum =>
-              // For the authorized informees that belong to each quorum, verify if their combined weight is enough
-              // to meet the quorum's threshold.
-              quorum.confirmers
-                .filter { case (partyId, _) => authorized.contains(partyId) }
-                .values
-                .map(_.unwrap)
-                .sum >= quorum.threshold.unwrap
-            }
-
-            _ <- EitherTUtil.condUnitET[FutureUnlessShutdown][MediatorError](
-              confirmed, {
-                val insufficientPermissionHint =
-                  if (unauthorized.nonEmpty)
-                    show"\nParties without participant having permission to confirm: $unauthorized"
-                  else ""
-
-                val authorizedPartiesHint =
-                  if (authorized.nonEmpty) show"\nAuthorized parties: $authorized" else ""
-
-                val rejection = MediatorError.MalformedMessage
-                  .Reject(
-                    s"Received a mediator confirmation request with id $requestId with insufficient authorized confirming parties for transaction view at $viewPosition. " +
-                      s"Rejecting request." +
-                      insufficientPermissionHint +
-                      authorizedPartiesHint
-                  )
-                // The error is logged at the appropriate level by checkAndReportMaliciousParticipant
-                rejection
-              },
-            )
-          } yield ()
-        }
-    }
+                .reported()
+              MediatorVerdict.MediatorReject(rejection)
+            },
+          )
+        } yield ()
+      }
 
   def processResponses(
       ts: CantonTimestamp,
@@ -735,9 +714,8 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
         val responses = signedResponses.message
         logger.info(
-          show"Phase 5: Received ${responses.responses.size} response(s) for request=${responses.requestId.unwrap}."
+          show"Phase 5: Received responses for request=${responses.requestId.unwrap}: $responses"
         )
-        logger.debug(show"Phase 5: Responses for request=${responses.requestId.unwrap}: $responses")
 
         (for {
           snapshot <- OptionT.liftF(crypto.awaitSnapshot(responses.requestId.unwrap))
@@ -789,7 +767,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           }
 
           responseAggregation <- mediatorState.fetch(responses.requestId).orElse {
-            // This can happen as part of an attack.
+            // This can happen after a fail-over or as part of an attack.
             val cause =
               s"Received a confirmation response at $ts by ${responses.sender} with an unknown request id ${responses.requestId}. Discarding response..."
             val error = MediatorError.InvalidMessage.Reject(cause)
@@ -801,7 +779,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           _ <- {
             if (
               // Check that this message was sent to all mediators in the group.
-              // Ignore other recipients of the response so that this check does not rely on any recipients restrictions
+              // Ignore other recipients of the response so that this check does not rely any recipients restrictions
               // that are enforced in the sequencer.
               recipients.allRecipients.contains(responseAggregation.request.mediator)
             ) {
@@ -815,16 +793,10 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
               OptionT.none[FutureUnlessShutdown, Unit]
             }
           }
-          _ = responseAggregation.recordResponseMetric(
-            mediatorState.metrics.responseLatencies,
-            ts,
-            responses.sender,
-          )
           nextResponseAggregation <- OptionT(
-            responseAggregation
-              .validateAndProgress(ts, responses, snapshot.ipsSnapshot, batchingConfig)
+            responseAggregation.validateAndProgress(ts, responses, snapshot.ipsSnapshot)
           )
-          _ <- OptionT(
+          _unit <- OptionT(
             mediatorState
               .replace(responseAggregation, nextResponseAggregation)
               .map(Option.when(_)(()))
@@ -860,7 +832,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     responseAggregation.asFinalized(psid.protocolVersion) match {
       case Some(finalizedResponse) =>
         logger.info(
-          s"Phase 6: Finalized request=${finalizedResponse.requestId} with verdict ${finalizedResponse.verdict} at $decisionTime"
+          s"Phase 6: Finalized request=${finalizedResponse.requestId} with verdict ${finalizedResponse.verdict}"
         )
 
         // We've reached a verdict. Cancel any outstanding request for a tick of the participant response deadline.
@@ -881,87 +853,4 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         /* no op */
         FutureUnlessShutdown.unit
     }
-
-  // Retrieve the topology snapshot at submission time. Return `None` in case of error.
-  private def getSubmissionTopologySnapshot(
-      requestId: RequestId,
-      rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-  )(implicit
-      traceContext: TraceContext,
-      errorLoggingContext: ErrorLoggingContext,
-  ): FutureUnlessShutdown[Option[SynchronizerSnapshotSyncCryptoApi]] = {
-    val submissionTopologyTimestamps = rootHashMessages
-      .map(_.protocolMessage.submissionTopologyTimestamp)
-      .distinct
-
-    submissionTopologyTimestamps match {
-      case Seq(submissionTopologyTimestamp) =>
-        val sequencingTimestamp = requestId.unwrap
-        SubmissionTopologyHelper.getSubmissionTopologySnapshot(
-          timeouts,
-          sequencingTimestamp,
-          submissionTopologyTimestamp,
-          crypto,
-        )
-
-      case Seq() =>
-        // This can only happen if there are no root hash messages.
-        // This will be detected during the wrong members check and logged as a warning, so we can log at info level.
-        logger.info(
-          s"No declared submission topology timestamp found. Inconsistencies will be logged as warnings."
-        )
-        FutureUnlessShutdown.pure(None)
-
-      case _ =>
-        // Log at warning level because this is not detected by another check
-        logger.warn(
-          s"Found ${submissionTopologyTimestamps.size} different declared submission topology timestamps. Inconsistencies will be logged as warnings."
-        )
-        FutureUnlessShutdown.pure(None)
-    }
-  }
-
-  /** Performs a validation based on the sequencing snapshot. In case of failure, checks whether the
-    * validation would have succeeded at the submission topology timestamp.
-    *
-    * If yes, log the rejection at INFO, because this was merely a race between the request and a
-    * topology change.
-    *
-    * If not, log the rejection as WARN because the participant is acting maliciously.
-    *
-    * The request will be rejected regardless, but the rejection will be logged at the appropriate
-    * log level.
-    */
-  private def checkAndReportMaliciousParticipant[Result](
-      sequencingSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      submissionTimeSnapshotO: Option[SynchronizerSnapshotSyncCryptoApi],
-  )(
-      check: SynchronizerSnapshotSyncCryptoApi => EitherT[
-        FutureUnlessShutdown,
-        MediatorError,
-        Result,
-      ]
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, MediatorVerdict.MediatorReject, Result] =
-    check(sequencingSnapshot).leftFlatMap { reject =>
-      val errorLoggedAtAdjustedLevel = submissionTimeSnapshotO.existsM(check(_).isRight).map {
-        validAtSubmissionTopologyTimestamp =>
-          if (validAtSubmissionTopologyTimestamp) {
-            // Log the error at INFO level, since it was just a race between the request and a topology change.
-            logger.info(
-              s"""$reject
-               | This error is due to a change of topology state between the declared topology timestamp used
-               | for submission and the sequencing time of the request.""".stripMargin
-            )
-          } else {
-            // otherwise log the error at the original log level.
-            reject.log()
-          }
-          MediatorVerdict.MediatorReject(reject)
-      }
-
-      EitherT.left(errorLoggedAtAdjustedLevel)
-    }
-
 }

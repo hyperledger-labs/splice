@@ -218,8 +218,6 @@ export async function initDumpConfig(): Promise<void> {
     .stub(pulumi.StackReference.prototype, 'requireOutput')
     .callsFake((name: pulumi.Input<string>) => {
       switch (name.valueOf()) {
-        case 'istioDashboardVersions':
-          return pulumi.output('1234');
         case 'ingressNs':
           return pulumi.output('cn-namespace');
         case 'ingressIp':

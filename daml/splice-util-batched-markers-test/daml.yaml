@@ -8,8 +8,8 @@ dependencies:
   - daml-stdlib
 data-dependencies:
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
-  - ../dars/splice-api-featured-app-v1-1.0.0.dar
-  - ../dars/splice-api-featured-app-v2-1.0.0.dar
+  - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+  - ../splice-api-featured-app-v2/.daml/dist/splice-api-featured-app-v2-current.dar
   - ../splice-util-batched-markers/.daml/dist/splice-util-batched-markers-current.dar
   - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 build-options:

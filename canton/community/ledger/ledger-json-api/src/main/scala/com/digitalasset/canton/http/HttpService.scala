@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http
@@ -7,19 +7,18 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.logging.LoggingContextOf
 import com.daml.metrics.api.MetricHandle.Gauge.CloseableGauge
+import com.daml.metrics.pekkohttp.HttpMetricsInterceptor
 import com.daml.ports.{Port, PortFiles}
-import com.daml.tls.{
+import com.daml.tls.TlsVersion
+import com.digitalasset.canton.auth.AuthInterceptor
+import com.digitalasset.canton.config.{
   ServerAuthRequirementConfig,
-  TlsClientCertificate,
   TlsClientConfig,
   TlsServerConfig,
-  TlsVersion,
 }
-import com.digitalasset.canton.auth.AuthInterceptor
-import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.http.HttpService.HttpServiceHandle
 import com.digitalasset.canton.http.json.v2.V2Routes
-import com.digitalasset.canton.http.metrics.{HttpApiMetrics, HttpMetricsInterceptor}
+import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.http.util.FutureUtil.*
 import com.digitalasset.canton.http.util.Logging.InstanceUUID
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.UserId
@@ -52,14 +51,12 @@ import javax.net.ssl.SSLContext
 import scala.concurrent.Future
 import scala.util.Using
 
-@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class HttpService(
     startSettings: JsonApiConfig,
     httpsConfiguration: Option[TlsServerConfig],
     channel: Channel,
     packageSyncService: PackageSyncService,
     packagePreferenceBackend: PackagePreferenceBackend,
-    apiLoggingConfig: ApiLoggingConfig,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     asys: ActorSystem,
@@ -123,15 +120,20 @@ class HttpService(
           packageSyncService,
           packagePreferenceBackend,
           mat.executionContext,
-          apiLoggingConfig,
           loggerFactory,
+        )
+
+        jsonEndpoints = new Endpoints(
           healthService,
+          v2Routes,
+          startSettings.debugLoggingOfHttpBodies,
+          loggerFactory,
         )
 
         rateDurationSizeMetrics = HttpMetricsInterceptor.rateDurationSizeMetrics(metrics.http)
 
         defaultEndpoints =
-          rateDurationSizeMetrics apply v2Routes.combinedRoutes
+          rateDurationSizeMetrics apply jsonEndpoints.all
 
         allEndpoints: Route = concat(
           defaultEndpoints,
@@ -198,12 +200,14 @@ object HttpService extends NoTracing {
     buildSSLContext(keyStore)
   }
 
+  // TODO(i22574): Remove OptionPartial and Null warts in HttpService
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def buildSSLContext(keyStore: KeyStore): SSLContext = {
     import java.security.SecureRandom
     import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(keyStore, emptyPassword)
+    keyManagerFactory.init(keyStore, null)
 
     val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
     trustManagerFactory.init(keyStore)
@@ -258,32 +262,24 @@ object HttpService extends NoTracing {
       engine
     }
 
+  // TODO(i22574): Remove OptionPartial and Null warts in HttpService
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def buildKeyStore(config: TlsServerConfig): KeyStore = buildKeyStore(
     config.certChainFile.pemStream,
     config.privateKeyFile.pemFile.unwrap.toPath,
-    config.trustCollectionFile
-      .getOrElse(sys.error("unexpected empty value for trustCollectionFile"))
-      .pemStream,
+    config.trustCollectionFile.get.pemStream,
   )
 
-  private def buildKeyStore(config: TlsClientConfig): KeyStore = {
-    val clientCert: TlsClientCertificate =
-      config.clientCert.getOrElse(sys.error("unexpected empty value for clientCert"))
-    buildKeyStore(
-      clientCert.certChainFile.pemStream,
-      clientCert.privateKeyFile.pemFile.unwrap.toPath,
-      config.trustCollectionFile
-        .getOrElse(sys.error("unexpected empty value for trustCollectionFile"))
-        .pemStream,
-    )
-  }
+  // TODO(i22574): Remove OptionPartial and Null warts in HttpService
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def buildKeyStore(config: TlsClientConfig): KeyStore = buildKeyStore(
+    config.clientCert.get.certChainFile.pemStream,
+    config.clientCert.get.privateKeyFile.pemFile.unwrap.toPath,
+    config.trustCollectionFile.get.pemStream,
+  )
 
+  // TODO(i22574): Remove OptionPartial and Null warts in HttpService
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  private def emptyLoadStoreParameter: Null = null
-
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  private def emptyPassword: Null = null
-
   private def buildKeyStore(
       certFile: InputStream,
       privateKeyFile: Path,
@@ -298,10 +294,10 @@ object HttpService extends NoTracing {
     val privateKey = loadPrivateKey(privateKeyFile)
 
     val keyStore = KeyStore.getInstance("PKCS12")
-    keyStore.load(emptyLoadStoreParameter)
+    keyStore.load(null)
     keyStore.setCertificateEntry(alias, cert)
     keyStore.setCertificateEntry(alias, caCert)
-    keyStore.setKeyEntry(alias, privateKey, emptyPassword, Array(cert, caCert))
+    keyStore.setKeyEntry(alias, privateKey, null, Array(cert, caCert))
     keyStore.setCertificateEntry("trusted-ca", caCert)
     keyStore
   }

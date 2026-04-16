@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -32,7 +32,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus.SegmentStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue.{
   DeduplicationStrategy,
@@ -126,18 +125,6 @@ class SegmentState(
       )
     }
 
-  private def highestNewViewWeKnow: Option[SignedMessage[NewView]] =
-    viewChangeState.toIndexedSeq
-      .sortBy(_._1)
-      .view
-      .reverse
-      .flatMap {
-        case (_, vcState) =>
-          vcState.newViewMessage
-        case _ => IndexedSeq.empty
-      }
-      .headOption
-
   @VisibleForTesting
   private[iss] def getViewChangeState =
     viewChangeState.toMap
@@ -170,7 +157,9 @@ class SegmentState(
         processCommitCertificate(msg)
     }
 
-  private def processMessagesStored(pbftMessagesStored: PbftMessagesStored): Seq[ProcessResult] =
+  private def processMessagesStored(pbftMessagesStored: PbftMessagesStored)(implicit
+      traceContext: TraceContext
+  ): Seq[ProcessResult] =
     pbftMessagesStored match {
       case _: PrePrepareStored | _: PreparesStored =>
         val blockIndex = segment.relativeBlockIndex(pbftMessagesStored.blockMetadata.blockNumber)
@@ -227,48 +216,6 @@ class SegmentState(
         segmentBlocks.map(_.status(currentViewNumber)).forgetNE,
       )
 
-  private def addMessages(
-      remoteStatus: ConsensusStatus.SegmentStatus.Incomplete,
-      includeMessages: Boolean,
-      startingRetransmissionResult: RetransmissionResult,
-  ): RetransmissionResult = {
-    val remoteBlockStatus = remoteStatus match {
-      case SegmentStatus.InProgress(viewNumber, blockStatuses) => blockStatuses
-      case SegmentStatus.InViewChange(viewNumber, viewChangeMessagesPresent, areBlocksComplete) =>
-        val allMissing = Seq.fill(membership.sortedNodes.size)(false)
-        val inProgress = ConsensusStatus.BlockStatus.InProgress(
-          prePrepared = true,
-          preparesPresent = allMissing,
-          commitsPresent = allMissing,
-        )
-        areBlocksComplete.map {
-          case true => ConsensusStatus.BlockStatus.Complete
-          case false => inProgress
-        }
-    }
-
-    segmentBlocks
-      .zip(remoteBlockStatus)
-      .collect { case (localBlockState, inProgress: ConsensusStatus.BlockStatus.InProgress) =>
-        (localBlockState, inProgress) // only look at blocks they haven't completed yet
-      }
-      .foldLeft(startingRetransmissionResult) {
-        case (RetransmissionResult(msgs, ccs), (localBlockState, remoteBlockStatus)) =>
-          localBlockState.consensusCertificate match {
-            case Some(cc: CommitCertificate) =>
-              RetransmissionResult(msgs, cc +: ccs)
-            case _ if includeMessages =>
-              val newMsgs = msgs ++ localBlockState.messagesToRetransmit(
-                currentViewNumber,
-                remoteBlockStatus,
-              )
-              RetransmissionResult(newMsgs, ccs)
-            case _ =>
-              RetransmissionResult(msgs, ccs)
-          }
-      }
-  }
-
   def messagesToRetransmit(
       from: BftNodeId,
       remoteStatus: ConsensusStatus.SegmentStatus.Incomplete,
@@ -277,24 +224,16 @@ class SegmentState(
   ): RetransmissionResult = {
     val result = if (remoteStatus.viewNumber > currentViewNumber) {
       logger.debug(
-        s"Node $from is in view ${remoteStatus.viewNumber}, which is higher than our current view $currentViewNumber, so we only retransmit commit certificates" +
-          s" for segment ${segment.firstBlockNumber}."
+        s"Node $from is in view ${remoteStatus.viewNumber}, which is higher than our current view $currentViewNumber, so we can't help with retransmissions"
       )
-      addMessages(
-        remoteStatus,
-        includeMessages = false,
-        RetransmissionResult.Empty,
-      )
+      RetransmissionResult.Empty
     } else if (inViewChange) {
       // if we are in a view change, we help others make progress to complete the view change
       val vcState = viewChangeState(currentViewNumber)
       val msgsToRetransmit = remoteStatus match {
         case status if status.viewNumber < currentViewNumber =>
-          val newView = highestNewViewWeKnow.filter(_.message.viewNumber >= status.viewNumber)
           // if remote node is in an earlier view change, retransmit all view change messages we have
-          (vcState.viewChangeMessagesToRetransmit(Seq.empty): Seq[
-            SignedMessage[PbftViewChangeMessage]
-          ]) ++ newView.toList
+          vcState.viewChangeMessagesToRetransmit(Seq.empty)
         case ConsensusStatus.SegmentStatus.InViewChange(_, remoteVcMsgs, _) =>
           // if remote node is in the same view change, retransmit view change messages we have that they don't
           vcState.viewChangeMessagesToRetransmit(remoteVcMsgs)
@@ -306,26 +245,67 @@ class SegmentState(
       // in the new-view message when the view change completes
       RetransmissionResult(msgsToRetransmit)
     } else {
+      val localBlockStates = segmentBlocks
+
       remoteStatus match {
         // remote node is making progress on the same view, so we send them what we can to help complete blocks
         case ConsensusStatus.SegmentStatus.InProgress(viewNumber, remoteBlocksStatuses)
             if viewNumber == currentViewNumber =>
-          // TODO(#24442): just send a few commits in cases that's enough for remote node to complete quorum
-          addMessages(remoteStatus, includeMessages = true, RetransmissionResult.Empty)
+          localBlockStates
+            .zip(remoteBlocksStatuses)
+            .collect { case (localBlockState, inProgress: ConsensusStatus.BlockStatus.InProgress) =>
+              (localBlockState, inProgress) // only look at blocks they haven't completed yet
+            }
+            .foldLeft(RetransmissionResult.Empty) {
+              case (RetransmissionResult(msgs, ccs), (localBlockState, remoteBlockStatus)) =>
+                localBlockState.consensusCertificate match {
+                  case Some(cc: CommitCertificate) =>
+                    // TODO(#24442): just send a few commits in cases that's enough for remote node to complete quorum
+                    RetransmissionResult(msgs, cc +: ccs)
+                  case _ =>
+                    val newMsgs = msgs ++ localBlockState.messagesToRetransmit(
+                      currentViewNumber,
+                      remoteBlockStatus,
+                    )
+                    RetransmissionResult(newMsgs, ccs)
+                }
+            }
 
         // remote node is either is a previous view, or in the same view but in an unfinished view change that we've completed.
         // so we give them the new-view message and all messages we have for blocks they haven't completed yet
         case _ =>
           val newView = viewChangeState(currentViewNumber).newViewMessage.toList
-          addMessages(
-            // TODO(#24442): rethink commit certs here, considering that some certs will be in the new-view message.
-            // we could either: exclude sending commit certs that are already in the new-view,
-            // not take that into account and just send commit certs regardless (which means we may send the same cert twice),
-            // or not send any certs at all considering that the new-view message will likely contain most if not all of them
-            remoteStatus,
-            includeMessages = true,
-            startingRetransmissionResult = RetransmissionResult(newView),
-          )
+          val remoteBlockStatusNoPreparesOrCommits = {
+            val allMissing = Seq.fill(membership.sortedNodes.size)(false)
+            ConsensusStatus.BlockStatus.InProgress(
+              prePrepared = true,
+              preparesPresent = allMissing,
+              commitsPresent = allMissing,
+            )
+          }
+          localBlockStates
+            .zip(remoteStatus.areBlocksComplete)
+            .collect {
+              case (localBlockState, isRemoteComplete) if !isRemoteComplete => localBlockState
+            }
+            .foldLeft(RetransmissionResult(newView)) {
+              case (RetransmissionResult(msgs, ccs), localBlockState) =>
+                localBlockState.consensusCertificate match {
+                  case Some(cc: CommitCertificate) =>
+                    // TODO(#24442): rethink commit certs here, considering that some certs will be in the new-view message.
+                    // we could either: exclude sending commit certs that are already in the new-view,
+                    // not take that into account and just send commit certs regardless (which means we may send the same cert twice),
+                    // or not send any certs at all considering that the new-view message will likely contain most if not all of them
+                    RetransmissionResult(msgs, cc +: ccs)
+                  case _ =>
+                    val newMsgs =
+                      localBlockState.messagesToRetransmit(
+                        currentViewNumber,
+                        remoteBlockStatusNoPreparesOrCommits,
+                      )
+                    RetransmissionResult(msgs ++ newMsgs, ccs)
+                }
+            }
       }
     }
     retransmittedMessagesCount += result.messages.size
@@ -352,8 +332,7 @@ class SegmentState(
     if (msg.message.viewNumber < currentViewNumber) {
       logger.info(
         s"Segment received PbftNormalCaseMessage with stale view ${msg.message.viewNumber}; " +
-          s"current view = $currentViewNumber; " +
-          s"from = ${msg.from}"
+          s"current view = $currentViewNumber"
       )
       discardedViewMessagesCount += 1
     } else if (msg.message.viewNumber > currentViewNumber || inViewChange) {
@@ -373,8 +352,7 @@ class SegmentState(
         logger.info(
           s"Segment received early PbftNormalCaseMessage; peer = ${msg.from}, actual sender = $actualSender" +
             s"message view = ${msg.message.viewNumber}, " +
-            s"current view = $currentViewNumber, inViewChange = $inViewChange, " +
-            s"for block number = ${msg.message.blockMetadata.blockNumber}"
+            s"current view = $currentViewNumber, inViewChange = $inViewChange"
         )
         futureViewMessagesQueue.enqueue(actualSender, msg) match {
           case EnqueueResult.PerNodeQuotaExceeded(nodeId) =>
@@ -612,7 +590,7 @@ class SegmentState(
   private val sendViewChangeAction = viewChangeActionOpt { case (_, viewState) =>
     Option.when(viewState.newViewMessage.isEmpty)(()).flatMap(_ => viewState.viewChangeFromSelf)
   } { case (_, vc, viewState) =>
-    traceContext =>
+    _ =>
       Seq(
         SendPbftMessage(
           vc,
@@ -621,7 +599,6 @@ class SegmentState(
           } else {
             Some(StoreViewChangeMessage(vc))
           },
-          traceContext,
         )
       )
   }
@@ -671,10 +648,7 @@ class SegmentState(
   private val sendNewViewAction = viewChangeActionOpt { case (_, viewState) =>
     Option.when(viewState.shouldSendNewView)(viewState.newViewMessage).flatten
   } { case (_, newViewMessage, _) =>
-    traceContext =>
-      Seq(
-        SendPbftMessage(newViewMessage, Some(StoreViewChangeMessage(newViewMessage)), traceContext)
-      )
+    _ => Seq(SendPbftMessage(newViewMessage, Some(StoreViewChangeMessage(newViewMessage))))
   }
 
   private val completeViewChangeAction = viewChangeActionOpt { case (viewNumber, viewState) =>

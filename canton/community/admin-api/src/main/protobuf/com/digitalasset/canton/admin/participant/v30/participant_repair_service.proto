@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -6,8 +6,7 @@ syntax = "proto3";
 package com.digitalasset.canton.admin.participant.v30;
 
 import "com/digitalasset/canton/admin/participant/v30/acs_import.proto";
-import "com/digitalasset/canton/admin/participant/v30/synchronizer_connectivity_service.proto";
-import "com/digitalasset/canton/admin/sequencer/v30/sequencer_connection.proto";
+import "com/digitalasset/canton/admin/participant/v30/synchronizer_connectivity.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -19,6 +18,17 @@ import "google/protobuf/timestamp.proto";
  * Note that ACS refers to Active Contract Set.
  */
 service ParticipantRepairService {
+  // Export the ACS for the given parties from the participant
+  // DEPRECATED: Use ExportAcs in the party_management_service.proto instead
+  // TODO(#24610) - Remove, new ExportAcs lives in the party_management_service.proto
+  rpc ExportAcsOld(ExportAcsOldRequest) returns (stream ExportAcsOldResponse) {
+    option deprecated = true;
+  }
+
+  // Import an existing export into the participant
+  // DEPRECATED: Use ImportAcs in this proto file
+  rpc ImportAcsOld(stream ImportAcsOldRequest) returns (ImportAcsOldResponse); // TODO(#24610) - Remove, replaced with ImportAcs below
+
   // Export the ACS from the participant.
   rpc ExportAcs(ExportAcsRequest) returns (stream ExportAcsResponse);
 
@@ -47,17 +57,6 @@ service ParticipantRepairService {
   rpc RollbackUnassignment(RollbackUnassignmentRequest) returns (RollbackUnassignmentResponse);
 
   rpc RepairCommitmentsUsingAcs(RepairCommitmentsUsingAcsRequest) returns (RepairCommitmentsUsingAcsResponse);
-
-  /**
-     Perform a late logical synchronizer upgrade
-     This endpoint should ONLY be used when the following two conditions are met:
-     - The participant node missed the upgrade on the old synchronizer, and
-     - The old synchronizer has been decommissioned in the meantime.
-
-     After the upgrade has been done, other repair operations might need to be done.
-     This includes manually repairing the ACS to account for missed activity on both the old and new synchronizer.
-  */
-  rpc PerformLateLsu(PerformLateLsuRequest) returns (PerformLateLsuResponse);
 }
 
 message PurgeContractsRequest {
@@ -93,8 +92,7 @@ message ChangeAssignationRequest {
   // Required
   string target_synchronizer_alias = 2;
 
-  // Whether to skip inactive contracts.
-  // Note: This should be defaulted to true. However, omitting this field evaluates to false (standard proto3 behavior).
+  // Whether to skip inactive contracts. Default: true.
   bool skip_inactive = 3;
 
   repeated Contract contracts = 4;
@@ -116,23 +114,87 @@ message MigrateSynchronizerRequest {
 
 message MigrateSynchronizerResponse {}
 
+message ExportAcsOldRequest {
+  option deprecated = true;
+
+  // The parties for which the ACS should be exported.
+  // If empty, the ACS of all parties will be exported.
+  // Optional
+  repeated string parties = 1;
+
+  // The IDs of the synchronizers to filter the contracts by
+  // Optional, if set the contracts will be filtered by the exact match of the ID of the synchronizer to which it's assigned
+  string filter_synchronizer_id = 2; // optional; exact match if set
+
+  // The timestamp at which the ACS should be valid. If provided, it will be checked that the ACS is
+  // available at the given timestamp (i.e. the timestamp is considered clean and the ACS has not been
+  // pruned).
+  // Optional, if missing the latest clean timestamp will be used
+  google.protobuf.Timestamp timestamp = 3;
+
+  // Mapping from one synchronizer id and protocol version. If provided, the contracts currently assigned to the synchronizer
+  // ID in the key will be assigned to the synchronizer id and protocol version in the value. This is not a proper synchronizer
+  // migration of contracts and it's supposed to be used only in exceptional cases.
+  // Optional, if not provided the contracts will be exported with the same synchronizer id as they are currently assigned
+  reserved 4; // was map<string, TargetSynchronizer> contract_synchronizer_renames
+
+  // If true, do not check whether the provided timestamp is clean (see `timestamp` field).
+  // NOT FOR PRODUCTION USE.
+  // For this option to yield a consistent snapshot, you need to wait at least
+  // confirmationResponseTimeout + mediatorReactionTimeout after the last submitted request.
+  // Recommended value is `false`
+  bool force = 5;
+
+  // true if the parties will be offboarded after the replication (party migration)
+  // Recommended value is `false`
+  bool parties_offboarding = 6;
+}
+
+message ExportAcsOldResponse {
+  option deprecated = true;
+
+  // The raw binary of the ACS snapshot to be imported
+  // This is meant to be streamed and every message should be a chunk of the snapshot
+  // Required
+  bytes chunk = 1;
+}
+
+message ImportAcsOldRequest {
+  // The raw binary of the ACS snapshot to be imported
+  // Required
+  bytes acs_snapshot = 1;
+  // The synchronizer id prefix to be used for the imported contracts
+  // Optional, if not provided the service will generate a prefix
+  string workflow_id_prefix = 2;
+  // If false, the service will fail if any contract ID suffix doesn't match the scheme
+  // associated to the synchronizer where the contract is being assigned as a result of the import.
+  // If true, any contract ID suffix will be recomputed to match the scheme associated to the synchronizer.
+  // Recommended value is `false`
+  bool allow_contract_id_suffix_recomputation = 3;
+}
+
+message ImportAcsOldResponse {
+  // Mapping from the old contract id to the new contract id
+  map<string, string> contract_id_mapping = 1;
+}
+
 message ExportAcsTargetSynchronizer {
-  // The identifier of the synchronizer to which contracts should be assigned upon exporting the ACS.
+  // The identifier of the synchronizer to which contracts should be assigned upon exporting the
+  // Active Contract Set (ACS).
   // Required.
   string target_synchronizer_id = 1;
 }
 
 message ExportAcsRequest {
-  // The identifiers of the parties for which the ACS will be exported.
-  // If empty, the ACS for all parties hosted by the participant will be exported.
-  // Optional
+  // The identifiers of the parties for which the Active Contract Set (ACS) will be exported.
+  // This field must contain at least one party ID.
+  // Required
   repeated string party_ids = 1;
 
   // The identifier of the synchronizer to filter contracts.
   // Optional. If provided, only contracts assigned to a synchronizer with this exact ID will be included
   // in the exported ACS. If not set (empty string), all contracts for the specified parties will be included.
-  // Optional; filters by exact synchronizer ID if set
-  string synchronizer_id = 2;
+  string synchronizer_id = 2; // Optional; filters by exact synchronizer ID if set
 
   // The ledger offset at which the ACS snapshot should be taken. This determines the point in the
   // ledger history from which the active contracts will be retrieved.
@@ -153,8 +215,8 @@ message ExportAcsRequest {
 }
 
 message ExportAcsResponse {
-  // A chunk of the ACS snapshot. This response is streamed, with each message containing a portion of the complete
-  // ACS data.
+  // A chunk of the Active Contract Set (ACS) snapshot. This response is streamed, with each
+  // message containing a portion of the complete ACS data.
   // The raw binary data within each chunk consists of Ledger API active contract messages, specifically wrapped
   // in `v30.active_contract.ActiveContract` messages. However, a single chunk does not necessarily contain
   // exactly one complete message.
@@ -165,16 +227,15 @@ message ExportAcsResponse {
 
 message ImportAcsRequest {
   // The raw binary of the ACS snapshot to be imported
-  // The binary content does not align on individual active contracts! It may contain bytes that are part of
+  // The binary contents does not align on individual active contracts! It may contain bytes that are part of
   // an active contract, or include several active contracts - depending on how much data fits into the
   // configured gRPC message size.
   // Required
   bytes acs_snapshot = 1;
 
   // Custom prefix for the workflow ID to easily identify all transactions generated by this import.
-  // If left empty, the service will generate a prefix such as `import-<random_UUID>`.
-  // Optional in the first request, ignored in all subsequent request messages.
-  optional string workflow_id_prefix = 2;
+  // Optional. If left empty, the service will generate a prefix such as `import-<random_UUID>`.
+  string workflow_id_prefix = 2;
 
   // How imported contracts should be validated upon import
   //
@@ -183,26 +244,26 @@ message ImportAcsRequest {
   // including INTERNAL errors on Ledger API read queries or incorrect Daml value representations.
   // If unsure, perform the ACS import with ContractImportMode set to CONTRACT_IMPORT_MODE_VALIDATION to ensure
   // that the assigned representative package IDs correctly validate the imported contracts.
-  // Required in the first request, ignored in any subsequent request messages.
-  optional ContractImportMode contract_import_mode = 3;
+  //
+  // Required
+  ContractImportMode contract_import_mode = 3;
 
   // A list of party IDs to exclude from the import.
   // Any contract that has one or more of these parties as a stakeholder will be omitted during the import.
-  // Optional in the first request, ignored in all subsequent request messages.
+  // Optional
   repeated string excluded_stakeholder_ids = 4;
 
   // The representative package ID override rules to be applied during import.
-  // Optional in the first request, ignored in any subsequent request messages.
-  optional RepresentativePackageIdOverride representative_package_id_override = 5;
-
-  // The identifier of the synchronizer managing the contracts to be imported.
-  // Only contracts in the snapshot assigned to this exact synchronizer ID will be imported.
-  // Any contract that is assigned to another synchronizer will be ignored.
-  // Required in the first request, ignored in all subsequent request messages.
-  optional string synchronizer_id = 6;
+  //
+  // Optional
+  RepresentativePackageIdOverride representative_package_id_override = 5;
 }
 
-message ImportAcsResponse {}
+message ImportAcsResponse {
+  // Maps old contract IDs to newly recomputed contract IDs iff the recomputation contract ID import mode has
+  // been selected, empty otherwise.
+  map<string, string> contract_id_mappings = 1;
+}
 
 message PurgeDeactivatedSynchronizerRequest {
   // Alias of the deactivated synchronizer to purge data from
@@ -283,21 +344,3 @@ message RepairCommitmentsStatus {
     google.protobuf.Timestamp completed_repair_timestamp = 3;
   }
 }
-
-message PerformLateLsuRequest {
-  message Successor {
-    string physical_synchronizer_id = 1;
-
-    // Value should be provided by synchronizer owners
-    google.protobuf.Timestamp announced_upgrade_time = 2;
-
-    SynchronizerConnectionConfig config = 3;
-
-    com.digitalasset.canton.admin.sequencer.v30.SequencerConnectionValidation sequencer_connection_validation = 4;
-  }
-
-  string physical_synchronizer_id = 1;
-  Successor successor = 2;
-}
-
-message PerformLateLsuResponse {}

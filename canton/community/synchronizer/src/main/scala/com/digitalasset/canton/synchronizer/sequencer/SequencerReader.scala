@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -12,7 +12,15 @@ import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidationError,
+  CantonConfigValidator,
+  CantonEdition,
+  CustomCantonConfigValidation,
+  EnterpriseCantonEdition,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.crypto.SyncCryptoError.KeyNotAvailable
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SynchronizerSuccessor}
@@ -30,19 +38,21 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.sequencing.{GroupAddressResolver, SequencedSerializedEvent}
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
 import com.digitalasset.canton.store.db.DbDeserializationException
-import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.ReadState
+import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.{
+  OngoingSynchronizerUpgrade,
+  ReadState,
+}
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
-import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.EffectiveTime
-import com.digitalasset.canton.topology.{MediatorId, Member, ParticipantId, SequencerId}
+import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{BatchN, EitherTUtil, ErrorUtil}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.*
@@ -50,7 +60,6 @@ import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
 import org.apache.pekko.{Done, NotUsed}
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 
 /** Configuration for the database based sequence reader.
@@ -71,21 +80,31 @@ import scala.concurrent.ExecutionContext
   * @param eventGenerationParallelism
   *   how many events will be generated from the fetched payloads in parallel
   */
-@nowarn("cat=deprecation")
 final case class SequencerReaderConfig(
     readBatchSize: Int = SequencerReaderConfig.defaultReadBatchSize,
     checkpointInterval: config.NonNegativeFiniteDuration =
       SequencerReaderConfig.defaultCheckpointInterval,
     pollingInterval: Option[config.NonNegativeFiniteDuration] = None,
     payloadBatchSize: Int = SequencerReaderConfig.defaultPayloadBatchSize,
-    @deprecated("This config option is not used anymore", "3.5.0")
     payloadBatchWindow: config.NonNegativeFiniteDuration =
       SequencerReaderConfig.defaultPayloadBatchWindow,
     payloadFetchParallelism: Int = SequencerReaderConfig.defaultPayloadFetchParallelism,
     eventGenerationParallelism: Int = SequencerReaderConfig.defaultEventGenerationParallelism,
-)
+) extends CustomCantonConfigValidation {
+  override protected def doValidate(edition: CantonEdition): Seq[CantonConfigValidationError] =
+    Option
+      .when(pollingInterval.nonEmpty && edition != EnterpriseCantonEdition)(
+        CantonConfigValidationError(
+          s"Configuration polling-interval is supported only in $EnterpriseCantonEdition"
+        )
+      )
+      .toList
+}
 
 object SequencerReaderConfig {
+  implicit val sequencerReaderConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerReaderConfig] =
+    CantonConfigValidatorDerivation[SequencerReaderConfig]
 
   val defaultReadBatchSize: Int = 100
   val defaultCheckpointInterval: config.NonNegativeFiniteDuration =
@@ -108,8 +127,6 @@ class SequencerReader(
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
     eventSignaller: EventSignaller,
     topologyClientMember: Member,
-    lsuSequencingBounds: Option[LsuSequencingBounds],
-    metrics: SequencerMetrics,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext, tracer: Tracer)
@@ -121,29 +138,25 @@ class SequencerReader(
   private val psid = syncCryptoApi.psid
   private val protocolVersion: ProtocolVersion = psid.protocolVersion
 
-  private val announcedLsu: AtomicReference[Option[AnnouncedLsu]] =
+  private val ongoingSynchronizerUpgrade: AtomicReference[Option[OngoingSynchronizerUpgrade]] =
     new AtomicReference(None)
 
-  def updateLsuSuccessor(
+  def updateSynchronizerSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit = {
     logger.info(
-      s"Updating LSU information, setting new successor from ${announcedLsu.get()} to $successorO"
+      s"Updating synchronizer upgrade information, setting new successor from ${ongoingSynchronizerUpgrade
+          .get()} to $successorO"
     )
     successorO match {
       case Some(successor) =>
-        announcedLsu.set(
-          Some(AnnouncedLsu(successor, announcementEffectiveTime, loggerFactory))
+        ongoingSynchronizerUpgrade.set(
+          Some(OngoingSynchronizerUpgrade(successor, announcementEffectiveTime, loggerFactory))
         )
-      case None => announcedLsu.set(None)
+      case None => ongoingSynchronizerUpgrade.set(None)
     }
   }
-
-  def readPayloadsByIdWithoutCacheLoading(payloadIds: Seq[PayloadId])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] =
-    store.readPayloadsByIdWithoutCacheLoading(payloadIds)
 
   def read(member: Member, requestedTimestampInclusive: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
@@ -175,77 +188,53 @@ class SequencerReader(
       _ = logger.debug(
         s"Current safe watermark is $safeWatermarkTimestampO"
       )
-      memberRegisteredFrom = registeredMember.registeredFrom
-      _ = logger.debug(s"Member $member was registered at $memberRegisteredFrom")
+      _ = logger.debug(
+        s"Member $member was registered at ${registeredMember.registeredFrom}"
+      )
 
       // It can happen that a member switching between sequencers runs into a sequencer that is catching up.
       // In this situation, the sequencer has to wait for the watermark to catch up to the requested timestamp.
       // To address this we start reading from the watermark timestamp itself, and use the dropWhile filter
       // of the `reader.from` to only release events that are at or after the requested timestamp to the subscriber.
-      safeReadFromTimestampInclusive = {
-        val readFromTimestampInclusive =
-          if (safeWatermarkTimestampO < requestedTimestampInclusive) {
-            logger.debug(
-              s"Safe watermark $safeWatermarkTimestampO is before the requested timestamp. Will commence reading from the safe watermark and skip events until requested timestamp $requestedTimestampInclusive (inclusive)."
-            )
-            safeWatermarkTimestampO
-          } else {
-            requestedTimestampInclusive
-          }
-
-        val predecessorSequencingTimeUpperBoundExclusive =
-          lsuSequencingBounds.map(_.lowerBoundSequencingTimeExclusive.immediateSuccessor)
-
-        readFromTimestampInclusive.max(predecessorSequencingTimeUpperBoundExclusive)
-      }
-
+      readFromTimestampInclusive =
+        if (safeWatermarkTimestampO < requestedTimestampInclusive) {
+          logger.debug(
+            s"Safe watermark $safeWatermarkTimestampO is before the requested timestamp. Will commence reading from the safe watermark and skip events until requested timestamp $requestedTimestampInclusive (inclusive)."
+          )
+          safeWatermarkTimestampO
+        } else {
+          requestedTimestampInclusive
+        }
       lowerBoundExclusiveO <- EitherT.right(store.fetchLowerBound())
-      safeLatestTopologyClientRecipientTimestampO <- EitherT.right(
+      latestTopologyClientRecipientTimestampO <- EitherT.right(
         store
           .latestTopologyClientRecipientTimestamp(
-            member = topologyClientMember, // this is the sequencer itself
+            member = topologyClientMember,
             timestampExclusive =
-              safeReadFromTimestampInclusive // this is correct as we query for latest timestamp before `timestampInclusive`
-                .filter(_ > memberRegisteredFrom)
-                // the member did not specify a starting timestamp. the lowest possible sequencing time for an event addressed
-                // to the member is `memberRegisteredFrom.immediateSuccessor`.
-                // Therefore, we pass `memberRegisteredFrom.immediateSuccessor` as the timestampExclusive, effectively stating
-                // that any topology transaction up to the onboarding transaction of the member is the latest topology state relevant for
-                // processing the events on the sequencer side.
-                .getOrElse(memberRegisteredFrom.immediateSuccessor),
+              readFromTimestampInclusive // this is correct as we query for latest timestamp before `timestampInclusive`
+                .filter(_ >= registeredMember.registeredFrom)
+                .getOrElse(registeredMember.registeredFrom),
           )
-          .map { latestTopologyClientTimestampFromStore =>
-            val fromStoreOrLowerBound = latestTopologyClientTimestampFromStore.orElse {
+          .map(
+            _.orElse(
               // Fall back to the lower bound's topology client addressed timestamp
               lowerBoundExclusiveO.flatMap { case (_, lowerBoundTopologyClientAddressedTimestamp) =>
                 lowerBoundTopologyClientAddressedTimestamp
               }
-            }
-
-            val lowerBoundSequencingTimeForMember = member match {
-              case _: ParticipantId => lsuSequencingBounds.map(_.upgradeTime)
-              case _: MediatorId | _: SequencerId =>
-                lsuSequencingBounds.map(_.lowerBoundSequencingTimeExclusive)
-            }
-
-            logger.debug(
-              s"For the safeLatestTopologyClientRecipientTimestamp using max($fromStoreOrLowerBound, $lowerBoundSequencingTimeForMember)"
             )
-            fromStoreOrLowerBound.max(lowerBoundSequencingTimeForMember)
-          }
+          )
       )
 
-      previousEventTimestamp <- EitherT.right(safeReadFromTimestampInclusive.flatTraverse {
-        timestamp =>
-          store.previousEventTimestamp(
-            registeredMember.memberId,
-            timestampExclusive =
-              timestamp, // this is correct as we query for latest timestamp before `timestampInclusive`
-          )
+      previousEventTimestamp <- EitherT.right(readFromTimestampInclusive.flatTraverse { timestamp =>
+        store.previousEventTimestamp(
+          registeredMember.memberId,
+          timestampExclusive =
+            timestamp, // this is correct as we query for latest timestamp before `timestampInclusive`
+        )
       })
       _ = logger.debug(
         s"New subscription for $member will start with previous event timestamp = $previousEventTimestamp " +
-          s"and latest topology client timestamp = $safeLatestTopologyClientRecipientTimestampO"
+          s"and latest topology client timestamp = $latestTopologyClientRecipientTimestampO"
       )
 
       // validate we are in the bounds of the data that this sequencer can serve
@@ -258,29 +247,29 @@ class SequencerReader(
             case (None, Some((lowerBoundExclusive, _))) =>
               // require that the member is registered above the lower bound
               // unless it's this sequencer's own self-subscription from the beginning
-              memberRegisteredFrom > lowerBoundExclusive || topologyClientMember == member
+              registeredMember.registeredFrom > lowerBoundExclusive || topologyClientMember == member
             // Reading from a specified timestamp, with no lower bound
             case (Some(requestedTimestampInclusive), None) =>
-              // require that the requested timestamp is above the member registration time
-              requestedTimestampInclusive > memberRegisteredFrom
+              // require that the requested timestamp is above or at the member registration time
+              requestedTimestampInclusive >= registeredMember.registeredFrom
             // Reading from a specified timestamp, with a lower bound present
             case (Some(requestedTimestampInclusive), Some((lowerBoundExclusive, _))) =>
               // require that the requested timestamp is above the lower bound
-              // and above the member registration time
+              // and above or at the member registration time
               requestedTimestampInclusive > lowerBoundExclusive &&
-              requestedTimestampInclusive > memberRegisteredFrom
+              requestedTimestampInclusive >= registeredMember.registeredFrom
           },
           (), {
             val lowerBoundText = lowerBoundExclusiveO
               .map { case (lowerBound, _) => lowerBound.toString }
               .getOrElse("epoch")
-            val timestampText = safeReadFromTimestampInclusive
+            val timestampText = readFromTimestampInclusive
               .map(timestamp => s"$timestamp (inclusive)")
               .getOrElse("the beginning")
             val errorMessage =
               show"Subscription for $member would require reading data from $timestampText, " +
                 show"but this sequencer cannot serve timestamps at or before ${lowerBoundText.unquoted} " +
-                show"or at or before the member's registration timestamp $memberRegisteredFrom."
+                show"or below the member's registration timestamp ${registeredMember.registeredFrom}."
 
             // Logging at INFO level because this can happen during normal operations for a decentralized synchronizer
             // where a participant updates its sequencer connection config before it has caught up to the point
@@ -288,7 +277,7 @@ class SequencerReader(
             // TODO(#28184) Make sure that this cannot happen due to misconfiguration of sequencer connections
             logger.info(errorMessage)
             CreateSubscriptionError
-              .EventsUnavailableForTimestamp(safeReadFromTimestampInclusive, errorMessage)
+              .EventsUnavailableForTimestamp(readFromTimestampInclusive, errorMessage)
           },
         )
         .leftWiden[CreateSubscriptionError]
@@ -303,18 +292,15 @@ class SequencerReader(
       val initialReadState = ReadState(
         member,
         registeredMember.memberId,
-        memberRegisteredFrom,
         // This is a "reading watermark" meaning that "we have read up to and including this timestamp",
         // so if we want to grab the event exactly at timestampInclusive, we do -1 here
-        nextReadTimestamp = safeReadFromTimestampInclusive
+        nextReadTimestamp = readFromTimestampInclusive
           .map(_.immediatePredecessor)
           .getOrElse(
-            safeWatermarkTimestampO
-              .map(_.min(memberRegisteredFrom))
-              .getOrElse(memberRegisteredFrom)
+            registeredMember.registeredFrom
           ),
         nextPreviousEventTimestamp = previousEventTimestamp,
-        latestTopologyClientRecipientTimestamp = safeLatestTopologyClientRecipientTimestampO,
+        latestTopologyClientRecipientTimestamp = latestTopologyClientRecipientTimestampO,
       )
       reader.from(
         event => requestedTimestampInclusive.exists(event.unvalidatedEvent.timestamp < _),
@@ -340,8 +326,6 @@ class SequencerReader(
     ): Source[(PreviousEventTimestamp, Sequenced[IdOrPayload]), NotUsed] =
       eventSignaller
         .readSignalsForMember(member, registeredMember.memberId)
-        // always trigger a read upon subscription
-        .prepend(Source.single(ReadSignal))
         .via(
           FetchLatestEventsFlow[
             (PreviousEventTimestamp, Sequenced[IdOrPayload]),
@@ -393,7 +377,7 @@ class SequencerReader(
       }
     }
 
-    private def latestTopologyClientTimestampAfter(
+    def latestTopologyClientTimestampAfter(
         topologyClientTimestampBefore: Option[CantonTimestamp],
         event: Sequenced[?],
     ): Option[CantonTimestamp] = {
@@ -405,7 +389,7 @@ class SequencerReader(
       else topologyClientTimestampBefore
     }
 
-    private val emptyBatch = Batch.empty[ClosedUncompressedEnvelope](protocolVersion)
+    private val emptyBatch = Batch.empty[ClosedEnvelope](protocolVersion)
     private type TopologyClientTimestampAfter = Option[CantonTimestamp]
 
     case class ValidatedSnapshotWithEvent[P](
@@ -616,19 +600,13 @@ class SequencerReader(
         traceContext: TraceContext
     ): Flow[WithKillSwitch[ValidatedSnapshotWithEvent[IdOrPayload]], UnsignedEventData, NotUsed] =
       Flow[WithKillSwitch[ValidatedSnapshotWithEvent[IdOrPayload]]]
-        .batchN(
-          config.payloadBatchSize,
-          config.payloadFetchParallelism,
-          BatchN.MaximizeBatchSize,
-        )
+        .groupedWithin(config.payloadBatchSize, config.payloadBatchWindow.underlying)
         .mapAsyncAndDrainUS(config.payloadFetchParallelism) { snapshotsWithEvent =>
           // fetch payloads in bulk
           val idOrPayloads =
             snapshotsWithEvent.flatMap(_.value.unvalidatedEvent.event.payloadO.toList)
-          // determine if this is a catch up where we are reading lots of old events or whether we read recent ones
-          val readFromBuffer = snapshotsWithEvent.forall(x => !x.value.unvalidatedEvent.fromStore)
           store
-            .readPayloads(idOrPayloads.toSeq, member, recentEvents = readFromBuffer)
+            .readPayloads(idOrPayloads, member)
             .map { loadedPayloads =>
               snapshotsWithEvent.map(snapshotWithEvent =>
                 snapshotWithEvent.map(_.mapEventPayload {
@@ -639,8 +617,7 @@ class SequencerReader(
                         s"Event ${snapshotWithEvent.value.unvalidatedEvent.event.messageId} specified payloadId $id but no corresponding payload was found."
                       ),
                     )
-                  case payload: BytesPayload =>
-                    payload.decodeBatchAndTrim(protocolVersion, member)
+                  case payload: BytesPayload => payload.decodeBatchAndTrim(protocolVersion, member)
                 })
               )
             }
@@ -685,16 +662,8 @@ class SequencerReader(
           // Neither do we have evidence that parallel processing helps, as a single sequencer reader
           // will typically serve many subscriptions in parallel.
           parallelism = 1
-        )(unsignedEventData =>
-          signValidatedEvent(unsignedEventData).value.map { errorOrEvent =>
-            // Update subscription last timestamp metric on successful event delivery
-            errorOrEvent.foreach { signedEvent =>
-              metrics.publicApi
-                .subscriptionLastTimestamp(metricsContext)
-                .updateValue(signedEvent.timestamp.toMicros)
-            }
-            errorOrEvent
-          }
+        )(
+          signValidatedEvent(_).value
         )
     }
 
@@ -709,7 +678,6 @@ class SequencerReader(
         readEvents <- store.readEvents(
           readState.memberId,
           readState.member,
-          readState.memberRegisteredFrom,
           readState.nextReadTimestamp.some,
           config.readBatchSize,
         )
@@ -720,6 +688,11 @@ class SequencerReader(
         val eventsWithPreviousTimestamps = previousTimestamps.zip(readEvents.events).toSeq
 
         val newReadState = readState.update(readEvents, config.readBatchSize)
+        if (newReadState.nextReadTimestamp < readState.nextReadTimestamp) {
+          ErrorUtil.invalidState(
+            s"Read state is going backwards in time: ${newReadState.changeString(readState)}"
+          )
+        }
         if (logger.underlying.isDebugEnabled) {
           newReadState.changeString(readState).foreach(logger.debug(_))
         }
@@ -740,9 +713,7 @@ class SequencerReader(
             topologySnapshot.pureCrypto,
             topologySnapshot,
             event,
-            timestampOfSigningKey = None,
-            // this is a sequenced event, so we know the exact timestamp to use and do not need an approximate one.
-            signingTimestampOverrides = None,
+            None,
             HashPurpose.SequencedEventSignature,
             protocolVersion,
           )
@@ -781,9 +752,7 @@ class SequencerReader(
         topologyClientTimestampBeforeO: Option[
           CantonTimestamp
         ], // None for until the first topology event, otherwise contains the latest topology event timestamp
-    )(implicit
-        traceContext: TraceContext
-    ): FutureUnlessShutdown[SequencedEvent[ClosedEnvelope]] = {
+    )(implicit traceContext: TraceContext): FutureUnlessShutdown[SequencedEvent[ClosedEnvelope]] = {
       val timestamp = event.timestamp
       event.event match {
         case DeliverStoreEvent(
@@ -800,7 +769,7 @@ class SequencerReader(
           val groupRecipients = batch.allRecipients.collect { case x: GroupRecipient =>
             x
           }
-          val synchronizerUpgradeO = announcedLsu.get()
+          val synchronizerUpgradeO = ongoingSynchronizerUpgrade.get()
           for {
             topologySnapshot <- topologySnapshotO.fold(
               SyncCryptoClient
@@ -812,24 +781,21 @@ class SequencerReader(
                 .map(_.ipsSnapshot)
             )(FutureUnlessShutdown.pure)
             resolvedGroupAddresses <- {
-              val resolvedMember =
-                if (groupRecipients.contains(AllMembersOfSynchronizer)) {
+              groupRecipients match {
+                case x if x.isEmpty =>
+                  // an optimization in case there are no group addresses
+                  FutureUnlessShutdown.pure(Map.empty[GroupRecipient, Set[Member]])
+                case x if x.sizeCompare(1) == 0 && x.contains(AllMembersOfSynchronizer) =>
                   // an optimization to avoid group address resolution on topology txs
-                  Map(AllMembersOfSynchronizer -> Set(member))
-                } else Map.empty
-
-              val otherGroupsToMembers =
-                // An optimization to resolve others only when necessary
-                if (groupRecipients.exists(_ != AllMembersOfSynchronizer)) {
-                  GroupAddressResolver.resolveMediatorAndSequencerGroupRecipients(
+                  FutureUnlessShutdown.pure(
+                    Map[GroupRecipient, Set[Member]](AllMembersOfSynchronizer -> Set(member))
+                  )
+                case _ =>
+                  GroupAddressResolver.resolveGroupsToMembers(
                     groupRecipients,
                     topologySnapshot,
                   )
-                } else {
-                  FutureUnlessShutdown.pure(Map.empty[GroupRecipient, Set[Member]])
-                }
-
-              otherGroupsToMembers.map(_ ++ resolvedMember)
+              }
             }
             _ <- synchronizerUpgradeO.fold(FutureUnlessShutdown.unit)(
               _.computeAndCacheTimeOffset(syncCryptoApi, timestamp)
@@ -838,14 +804,14 @@ class SequencerReader(
             val memberGroupRecipients = resolvedGroupAddresses.collect {
               case (groupRecipient, groupMembers) if groupMembers.contains(member) => groupRecipient
             }.toSet
-            val previousTimestampWithLsuOffset =
+            val previousTimestampWithLSUOffset =
               synchronizerUpgradeO.fold(previousTimestamp)(_.maybeOffsetTime(previousTimestamp))
-            val timestampWithLsuOffset =
+            val timestampWithLSUOffset =
               synchronizerUpgradeO.fold(timestamp)(_.maybeOffsetTime(timestamp))
             val filteredBatch = Batch.filterClosedEnvelopesFor(batch, member, memberGroupRecipients)
             val deliver = Deliver.create[ClosedEnvelope](
-              previousTimestampWithLsuOffset,
-              timestampWithLsuOffset,
+              previousTimestampWithLSUOffset,
+              timestampWithLSUOffset,
               psid,
               messageIdO,
               filteredBatch,
@@ -865,8 +831,8 @@ class SequencerReader(
                 "Delivering an empty event instead of the original, because it was sequenced at or after the upgrade time."
               )
               Deliver.create[ClosedEnvelope](
-                previousTimestampWithLsuOffset,
-                timestampWithLsuOffset,
+                previousTimestampWithLSUOffset,
+                timestampWithLSUOffset,
                 psid,
                 None,
                 emptyBatch,
@@ -884,7 +850,7 @@ class SequencerReader(
               trafficReceiptO,
             ) =>
           FutureUnlessShutdown.pure(
-            Deliver.create[ClosedUncompressedEnvelope](
+            Deliver.create[ClosedEnvelope](
               previousTimestamp,
               timestamp,
               psid,
@@ -921,7 +887,6 @@ object SequencerReader {
   private[SequencerReader] final case class ReadState(
       member: Member,
       memberId: SequencerMemberId,
-      memberRegisteredFrom: CantonTimestamp,
       nextReadTimestamp: CantonTimestamp,
       latestTopologyClientRecipientTimestamp: Option[CantonTimestamp],
       lastBatchWasFull: Boolean = false,
@@ -949,8 +914,8 @@ object SequencerReader {
     def update(
         readEvents: ReadEvents,
         batchSize: Int,
-    )(implicit errorLoggingContext: ErrorLoggingContext): ReadState = {
-      val result = copy(
+    ): ReadState =
+      copy(
         // set the previous event timestamp to the last event we've read or keep the current one if we got no results
         nextPreviousEventTimestamp = readEvents.events.lastOption match {
           case Some(event) => Some(event.timestamp)
@@ -962,18 +927,10 @@ object SequencerReader {
         // the case > is there as events query can return more events than requested in multi-instance setups
         lastBatchWasFull = readEvents.events.sizeCompare(batchSize) >= 0,
       )
-      if (result.nextReadTimestamp < nextReadTimestamp) {
-        ErrorUtil.invalidState(
-          s"Read state is going backwards in time: ${result.changeString(previous = this)}"
-        )
-      }
-      result
-    }
 
     override protected def pretty: Pretty[ReadState] = prettyOfClass(
       param("member", _.member),
       param("memberId", _.memberId),
-      param("memberRegisteredFrom", _.memberRegisteredFrom),
       param("nextReadTimestamp", _.nextReadTimestamp),
       param("latestTopologyClientRecipientTimestamp", _.latestTopologyClientRecipientTimestamp),
       param("lastBatchWasFull", _.lastBatchWasFull),
@@ -988,4 +945,65 @@ object SequencerReader {
       latestTopologyClientTimestamp: Option[CantonTimestamp],
       eventTraceContext: TraceContext,
   )
+
+  private[SequencerReader] final case class OngoingSynchronizerUpgrade(
+      successor: SynchronizerSuccessor,
+      announcementEffectiveTime: EffectiveTime,
+      override val loggerFactory: NamedLoggerFactory,
+  ) extends NamedLogging {
+
+    private lazy val postUpgradeTimeOffset: AtomicReference[Option[NonNegativeFiniteDuration]] =
+      new AtomicReference(None)
+
+    def computeAndCacheTimeOffset(
+        syncCrypto: SyncCryptoClient[SyncCryptoApi],
+        currentTimestamp: CantonTimestamp,
+    )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Unit] =
+      if (LogicalUpgradeTime.canProcessKnowingSuccessor(Some(successor), currentTimestamp)) {
+        // short-circuit before we actually need the offset
+        FutureUnlessShutdown.unit
+      } else {
+        postUpgradeTimeOffset.get() match {
+          case Some(_) => FutureUnlessShutdown.unit
+          case None =>
+            for {
+              upgradeAnnouncementEffectiveTimeTopology <- syncCrypto.snapshot(
+                announcementEffectiveTime.value
+              )
+              upgradeAnnouncementTimeParameterChanges <-
+                upgradeAnnouncementEffectiveTimeTopology.ipsSnapshot
+                  .listDynamicSynchronizerParametersChanges()
+            } yield {
+              val upgradeOffsetComputed = SequencerUtils.timeOffsetPastSynchronizerUpgrade(
+                upgradeTime = successor.upgradeTime,
+                parameterChanges = upgradeAnnouncementTimeParameterChanges,
+              )
+              logger.info(
+                s"Computed synchronizer upgrade time offset: $upgradeOffsetComputed"
+              )
+              postUpgradeTimeOffset.set(Some(upgradeOffsetComputed))
+            }
+        }
+      }
+
+    def maybeOffsetTime(
+        timestamp: CantonTimestamp
+    )(implicit elc: ErrorLoggingContext): CantonTimestamp =
+      if (LogicalUpgradeTime.canProcessKnowingSuccessor(Some(successor), timestamp)) {
+        timestamp
+      } else {
+        timestamp + postUpgradeTimeOffset
+          .get()
+          .getOrElse(
+            ErrorUtil.invalidState(
+              "postUpgradeTimeOffset is expected to be initialized at this point."
+            )
+          )
+      }
+
+    def maybeOffsetTime(timestamp: Option[CantonTimestamp])(implicit
+        elc: ErrorLoggingContext
+    ): Option[CantonTimestamp] =
+      timestamp.map(maybeOffsetTime)
+  }
 }

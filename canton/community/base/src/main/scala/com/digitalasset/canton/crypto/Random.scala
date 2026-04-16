@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
 
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.{
   DefaultDeserializationError,
   DeserializationError,
@@ -32,18 +31,10 @@ trait RandomOps {
   */
 final case class SecureRandomness private[crypto] (unwrap: ByteString)
     extends HasCryptographicEvidence
-    with HasToByteString
-    with PrettyPrinting {
+    with HasToByteString {
   override def toByteString: ByteString = getCryptographicEvidence
 
   override def getCryptographicEvidence: ByteString = unwrap
-
-  /** Indicates how to pretty print this instance. See `PrettyPrintingTest` for examples on how to
-    * implement this method.
-    */
-  override protected def pretty: Pretty[SecureRandomness.this.type] = prettyOfClass(
-    unnamedParam(_.unwrap)
-  )
 }
 
 /** Cryptographically-secure randomness */

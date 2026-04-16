@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.declarative
@@ -20,13 +20,14 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.console.GrpcAdminCommandRunner
-import com.digitalasset.canton.console.declarative.DeclarativeApi.{
+import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
+import com.digitalasset.canton.console.declarative.DeclarativeApi.UpdateResult
+import com.digitalasset.canton.console.declarative.DeclarativeParticipantApi.{
   Err,
   NotFound,
   QueryResult,
-  UpdateResult,
 }
+import com.digitalasset.canton.console.{CommandSuccessful, GrpcAdminCommandRunner}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api
 import com.digitalasset.canton.ledger.api.IdentityProviderId
@@ -40,13 +41,10 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnectionValidation}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
   PartyToParticipant,
-  SignedTopologyTransaction,
-  SynchronizerTrustCertificate,
   TopologyChangeOp,
 }
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
@@ -76,7 +74,6 @@ class DeclarativeParticipantApi(
 
   private val adminApiRunner = runnerFactory(CantonGrpcUtil.ApiName.AdminApi)
   private val ledgerApiRunner = runnerFactory(CantonGrpcUtil.ApiName.LedgerApi)
-
   closeContext.context
     .runOnOrAfterClose(new RunOnClosing {
       override def name: String = "stop-declarative-api"
@@ -89,6 +86,25 @@ class DeclarativeParticipantApi(
     .discard
 
   override protected def activeAdminToken: Option[CantonAdminToken] = adminToken
+
+  private def queryApi[Result](
+      runner: GrpcAdminCommandRunner,
+      cfg: ClientConfig,
+      command: GrpcAdminCommand[?, ?, Result],
+  )(implicit traceContext: TraceContext): Either[QueryResult, Result] = if (
+    closeContext.context.isClosing
+  )
+    Left(Err("Node is shutting down"))
+  else
+    activeAdminToken.fold(Left(Err("Node instance is passive")): Either[QueryResult, Result])(
+      token =>
+        runner.runCommandWithExistingTrace(name, command, cfg, Some(token.secret)) match {
+          case CommandSuccessful(value) => Right(value)
+          case GenericCommandError(cause) if cause.contains("NOT_FOUND/") =>
+            Left(NotFound(cause))
+          case c: CommandError => Left(Err(c.cause))
+        }
+    )
 
   private def queryAdminApi[Result](
       command: GrpcAdminCommand[?, ?, Result]
@@ -155,77 +171,7 @@ class DeclarativeParticipantApi(
         config.checkSelfConsistency,
         config.fetchedDarDirectory,
       )
-      featureFlags <- enableMultiSynchronizerFeatureFlagIfNeeded(config, context)
-    } yield Seq(connections, idps, parties, users, dars, featureFlags).foldLeft(UpdateResult())(
-      _.merge(_)
-    )
-
-  private def enableMultiSynchronizerFeatureFlagIfNeeded(
-      config: DeclarativeParticipantConfig,
-      participantId: ParticipantId,
-  )(implicit
-      traceContext: TraceContext
-  ): Either[String, UpdateResult] = {
-    def baseQuery(synchronizerId: SynchronizerId): BaseQuery =
-      BaseQuery(
-        store = synchronizerId,
-        proposals = false,
-        timeQuery = TimeQuery.HeadState,
-        ops = TopologyChangeOp.Replace.some,
-        filterSigningKey = "",
-        protocolVersion = None,
-      )
-
-    def fetchSynchronizerTrustCertificate(synchronizerId: SynchronizerId) = queryAdminApi(
-      TopologyAdminCommands.Read.ListSynchronizerTrustCertificate(
-        baseQuery(synchronizerId),
-        filterUid = participantId.filterString,
-      )
-    )
-
-    def proposeEnableMultiSynchronizerFeatureFlag(
-        synchronizerId: SynchronizerId,
-        oldFeatureFlags: Seq[ParticipantTopologyFeatureFlag],
-    ): Either[String, SignedTopologyTransaction[TopologyChangeOp, SynchronizerTrustCertificate]] = {
-      val mapping = SynchronizerTrustCertificate(
-        participantId,
-        synchronizerId,
-        featureFlags =
-          (ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer +: oldFeatureFlags),
-      )
-      queryAdminApi(
-        TopologyAdminCommands.Write.Propose(
-          mapping,
-          signedBy = Seq.empty,
-          store = synchronizerId,
-          mustFullyAuthorize = true,
-          waitToBecomeEffective = Some(consistencyTimeout),
-        )
-      )
-    }
-
-    if (config.enableMultiSynchronizerTopologyFeatureFlag) {
-      queryAdminApi(ListConnectedSynchronizers())
-        .flatMap { synchronizerIds =>
-          synchronizerIds.traverse { sid =>
-            for {
-              current <- fetchSynchronizerTrustCertificate(sid.synchronizerId)
-              currentFeatureFlags = current.headOption.map(_.item.featureFlags).getOrElse(Seq.empty)
-              shouldUpdate = !currentFeatureFlags.contains(
-                ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer
-              )
-              done <-
-                if (shouldUpdate) {
-                  proposeEnableMultiSynchronizerFeatureFlag(sid.synchronizerId, currentFeatureFlags)
-                    .map(_ => UpdateResult(updated = 1))
-                } else Right(UpdateResult())
-            } yield done
-
-          }
-        }
-        .map(results => results.foldLeft(UpdateResult())(_.merge(_)))
-    } else Right(UpdateResult())
-  }
+    } yield Seq(connections, idps, parties, users, dars).foldLeft(UpdateResult())(_.merge(_))
 
   private def createDarDirectoryIfNecessary(
       fetchedDarDirectory: File,
@@ -296,7 +242,6 @@ class DeclarativeParticipantApi(
           Seq(
             HostingParticipant(participantId, permission)
           ),
-          partySigningKeysWithThreshold = None,
         )
         _ <- queryAdminApi(
           TopologyAdminCommands.Write.Propose(
@@ -753,7 +698,7 @@ class DeclarativeParticipantApi(
         synchronizerConnectionConfig <- config.toSynchronizerConnectionConfig
         _ <- queryAdminApi(
           ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
-            // TODO(#25344) Allow to specify the psid for declarative configs
+            // TODO(#25344) Allow to specify the PSId for declarative configs
             synchronizerId = None,
             synchronizerConnectionConfig,
             sequencerConnectionValidation = SequencerConnectionValidation.Active,
@@ -1021,4 +966,13 @@ class DeclarativeParticipantApi(
       }
     }
 
+}
+
+object DeclarativeParticipantApi {
+
+  private sealed trait QueryResult {
+    def str: String
+  }
+  private final case class Err(str: String) extends QueryResult
+  private final case class NotFound(str: String) extends QueryResult
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -45,7 +45,7 @@ object Pruning {
       show"Unsafe to prune offset $offset due to the event for $synchronizerId with record time $recordTime"
   }
 
-  final case class LedgerPruningNotPossibleDuringUpgrade(
+  final case class LedgerPruningNotPossibleDuringHardMigration(
       synchronizerId: SynchronizerId,
       status: SynchronizerConnectionConfigStore.Status,
   ) extends LedgerPruningError {

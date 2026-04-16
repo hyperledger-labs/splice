@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.traffic
@@ -40,10 +40,6 @@ class TrafficStateController(
     metrics: TrafficConsumptionMetrics,
     synchronizerId: PhysicalSynchronizerId,
 ) extends NamedLogging {
-  logger.debug(
-    s"Initializing TrafficStateController for member $member with initial traffic state: $initialTrafficState"
-  )(TraceContext.empty)
-
   private val currentTrafficPurchased =
     new AtomicReference[Option[TrafficPurchased]](initialTrafficState.toTrafficPurchased(member))
   private val trafficConsumedManager = new TrafficConsumedManager(
@@ -186,14 +182,14 @@ class TrafficStateController(
         )
     } yield {
       val costDetails = eventCostCalculator.computeEventCost(
-        batch.map(_.toClosedUncompressedEnvelope),
+        batch.map(_.closeEnvelope),
         trafficControl.readVsWriteScalingFactor,
         groupToMembers,
         protocolVersion,
         trafficControl.baseEventCost,
       )
       if (logCost) {
-        logger.info(
+        logger.debug(
           s"Computed following cost for submission request using topology at ${snapshot.timestamp}: $costDetails"
         )
       }

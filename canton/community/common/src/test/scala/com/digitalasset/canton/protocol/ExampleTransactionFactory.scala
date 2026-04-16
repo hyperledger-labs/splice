@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -180,12 +180,7 @@ object ExampleTransactionFactory {
   ): Versioned[LfGlobalKey] =
     LfVersioned(
       serializationVersion,
-      LfGlobalKey.assertBuild(
-        templateId,
-        packageName,
-        value,
-        com.digitalasset.daml.lf.crypto.Hash.hashPrivateKey(value.toString),
-      ),
+      LfGlobalKey.assertBuild(templateId, value, packageName),
     )
 
   def globalKeyWithMaintainers(
@@ -357,7 +352,7 @@ object ExampleTransactionFactory {
   def suffixedId(
       discriminator: Int,
       suffix: Int,
-      contractIdVersion: CantonContractIdVersion = CantonContractIdVersion.maxV1,
+      contractIdVersion: CantonContractIdVersion = AuthenticatedContractIdVersionV11,
   ): LfContractId =
     contractIdVersion match {
       case v1: CantonContractIdV1Version =>
@@ -443,6 +438,7 @@ object ExampleTransactionFactory {
   val submitters: List[LfPartyId] = List(submitter)
 
   // Request metadata
+
   val userId: UserId = DefaultDamlValues.userId()
   val commandId: CommandId = DefaultDamlValues.commandId()
   val workflowId: WorkflowId = WorkflowId.assertFromString("testWorkflowId")
@@ -508,7 +504,7 @@ class ExampleTransactionFactory(
     val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch,
     val preparationTime: CantonTimestamp = CantonTimestamp.Epoch.minusMillis(9),
     val topologySnapshot: TopologySnapshot = defaultTopologySnapshot,
-    val cantonContractIdVersion: CantonContractIdVersion = CantonContractIdVersion.maxV1,
+    val cantonContractIdVersion: CantonContractIdVersion = AuthenticatedContractIdVersionV11,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends EitherValues {
 
@@ -752,7 +748,7 @@ class ExampleTransactionFactory(
       consumed: Set[LfContractId],
       coreInputs: Seq[GenContractInstance],
       created: Seq[NewContractInstance],
-      resolvedKeys: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
+      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
       seed: Option[LfHash],
       packagePreference: Set[LfPackageId],
       subviews: Seq[TransactionView],
@@ -791,13 +787,14 @@ class ExampleTransactionFactory(
         LfTransactionUtil.lightWeight(node),
         seed,
         packagePreference = packagePreference,
+        protocolVersion,
       )
 
     val viewParticipantData = ViewParticipantData.tryCreate(cryptoOps)(
       coreInputContracts,
       createWithSerialization,
       createdInSubviewArchivedInCore,
-      resolvedKeys,
+      resolvedKeys.fmap(LfVersioned(serializationVersion, _)),
       actionDescription,
       RollbackContext.empty,
       participantDataSalt(viewIndex),
@@ -819,7 +816,7 @@ class ExampleTransactionFactory(
       consumed: Set[LfContractId],
       coreInputs: Seq[GenContractInstance],
       created: Seq[NewContractInstance],
-      resolvedKeys: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
+      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
       seed: Option[LfHash],
       isRoot: Boolean,
       packagePreference: Set[LfPackageId],
@@ -859,7 +856,7 @@ class ExampleTransactionFactory(
       consumed: Set[LfContractId],
       coreInputs: Seq[ContractInstance],
       created: Seq[NewContractInstance],
-      resolvedKeys: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
+      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
       seed: Option[LfHash],
       isRoot: Boolean,
       packagePreference: Set[LfPackageId],
@@ -1197,9 +1194,7 @@ class ExampleTransactionFactory(
       mkMetadata(nodeSeed.fold(Map.empty[LfNodeId, LfHash])(seed => Map(nodeId -> seed)))
 
     override def keyResolver: LfKeyResolver =
-      node.gkeyOpt.fold(Map.empty: LfKeyResolver)(k =>
-        Map(k -> LfTransactionUtil.contractIds(node))
-      )
+      node.gkeyOpt.fold(Map.empty: LfKeyResolver)(k => Map(k -> LfTransactionUtil.contractId(node)))
 
     override lazy val versionedUnsuffixedTransaction: LfVersionedTransaction =
       transaction(Seq(0), lfNode)

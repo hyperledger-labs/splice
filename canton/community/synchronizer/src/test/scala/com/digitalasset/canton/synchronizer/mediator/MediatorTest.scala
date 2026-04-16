@@ -1,15 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
-import com.daml.nonempty.NonEmpty
+import cats.data.NonEmptySeq
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParametersWithValidity,
   TestSynchronizerParameters,
 }
+import com.digitalasset.canton.synchronizer.mediator.Mediator.{Safe, SafeUntil}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec
@@ -26,7 +27,7 @@ class MediatorTest extends AnyWordSpec with BaseTest {
   private val origin = CantonTimestamp.now()
   private def relTime(offset: Long): CantonTimestamp = origin.plusSeconds(offset)
 
-  "Mediator.latestSafePruningTsForSynchronizerParameters" should {
+  "Mediator.checkPruningStatus" should {
     "deal with current synchronizer parameters" in {
       val parameters =
         DynamicSynchronizerParametersWithValidity(
@@ -38,10 +39,9 @@ class MediatorTest extends AnyWordSpec with BaseTest {
       val cleanTimestamp = CantonTimestamp.now()
       val earliestPruningTimestamp = cleanTimestamp - defaultTimeout
 
-      Mediator.latestSafePruningTsForSynchronizerParameters(
-        parameters,
-        cleanTimestamp,
-      ) shouldBe earliestPruningTimestamp
+      Mediator.checkPruningStatus(parameters, cleanTimestamp) shouldBe SafeUntil(
+        earliestPruningTimestamp
+      )
     }
 
     "cap the time using SynchronizerParameters.WithValidity[DynamicSynchronizerParameters].validFrom" in {
@@ -56,15 +56,14 @@ class MediatorTest extends AnyWordSpec with BaseTest {
           )
 
         // Capping happen
-        Mediator.latestSafePruningTsForSynchronizerParameters(
-          parameters,
-          validFrom.plusSeconds(1),
-        ) shouldBe validFrom
+        Mediator.checkPruningStatus(parameters, validFrom.plusSeconds(1)) shouldBe SafeUntil(
+          validFrom
+        )
 
-        Mediator.latestSafePruningTsForSynchronizerParameters(
+        Mediator.checkPruningStatus(
           parameters,
           validFrom + defaultTimeout + NonNegativeFiniteDuration.tryOfSeconds(1),
-        ) shouldBe validFrom.plusSeconds(1)
+        ) shouldBe SafeUntil(validFrom.plusSeconds(1))
       }
 
       test(validUntil = None)
@@ -79,11 +78,10 @@ class MediatorTest extends AnyWordSpec with BaseTest {
           None,
         )
 
-      val cleanTimestamp = origin - NonNegativeFiniteDuration.tryOfSeconds(10)
-      Mediator.latestSafePruningTsForSynchronizerParameters(
+      Mediator.checkPruningStatus(
         parameters,
-        cleanTimestamp,
-      ) shouldBe cleanTimestamp
+        origin - NonNegativeFiniteDuration.tryOfSeconds(10),
+      ) shouldBe Safe
     }
 
     "deal with past synchronizer parameters" in {
@@ -98,18 +96,18 @@ class MediatorTest extends AnyWordSpec with BaseTest {
 
       {
         val cleanTimestamp = dpChangeTs + NonNegativeFiniteDuration.tryOfSeconds(1)
-        Mediator.latestSafePruningTsForSynchronizerParameters(
+        Mediator.checkPruningStatus(
           parameters,
           cleanTimestamp,
-        ) shouldBe (cleanTimestamp - defaultTimeout)
+        ) shouldBe SafeUntil(cleanTimestamp - defaultTimeout)
       }
 
       {
         val cleanTimestamp = dpChangeTs + defaultTimeout
-        Mediator.latestSafePruningTsForSynchronizerParameters(
+        Mediator.checkPruningStatus(
           parameters,
           cleanTimestamp,
-        ) shouldBe cleanTimestamp
+        ) shouldBe Safe
       }
     }
   }
@@ -128,8 +126,7 @@ class MediatorTest extends AnyWordSpec with BaseTest {
     val dpChangeTs1 = relTime(20)
     val dpChangeTs2 = relTime(40)
 
-    val parameters = NonEmpty.mk(
-      Seq,
+    val parameters = NonEmptySeq.of(
       DynamicSynchronizerParametersWithValidity(
         defaultParameters,
         origin,
@@ -153,12 +150,12 @@ class MediatorTest extends AnyWordSpec with BaseTest {
       Mediator.latestSafePruningTsBefore(
         parameters,
         origin + defaultTimeout - NonNegativeFiniteDuration.tryOfSeconds(1),
-      ) shouldBe origin // capping happens
+      ) shouldBe Some(origin) // capping happens
 
       Mediator.latestSafePruningTsBefore(
         parameters,
         dpChangeTs1,
-      ) shouldBe (dpChangeTs1 - defaultTimeout)
+      ) shouldBe Some(dpChangeTs1 - defaultTimeout)
     }
 
     "query in the second slice" in {
@@ -167,7 +164,7 @@ class MediatorTest extends AnyWordSpec with BaseTest {
         Mediator.latestSafePruningTsBefore(
           parameters,
           cleanTs,
-        ) shouldBe (cleanTs - defaultTimeout) // effect of the first synchronizer parameters
+        ) shouldBe Some(cleanTs - defaultTimeout) // effect of the first synchronizer parameters
       }
 
       {
@@ -175,7 +172,7 @@ class MediatorTest extends AnyWordSpec with BaseTest {
         Mediator.latestSafePruningTsBefore(
           parameters,
           cleanTs,
-        ) shouldBe dpChangeTs1
+        ) shouldBe Some(dpChangeTs1)
       }
     }
 
@@ -184,50 +181,20 @@ class MediatorTest extends AnyWordSpec with BaseTest {
       Mediator.latestSafePruningTsBefore(
         parameters,
         relTime(40),
-      ) shouldBe dpChangeTs1
+      ) shouldBe Some(dpChangeTs1)
 
       // We cannot allow any request in second slice to be issued -> dpChangeTs1
       Mediator.latestSafePruningTsBefore(
         parameters,
         relTime(60),
-      ) shouldBe dpChangeTs1
+      ) shouldBe Some(dpChangeTs1)
 
       // If enough time elapsed since huge timeout was revoked, we are fine again
       val endOfHugeTimeoutEffect = dpChangeTs2 + hugeTimeout
       Mediator.latestSafePruningTsBefore(
         parameters,
         endOfHugeTimeoutEffect,
-      ) shouldBe (endOfHugeTimeoutEffect - defaultTimeout)
-    }
-
-    "query non-overlapping future synchronizer parameters" in {
-      val cleanTimestamp = CantonTimestamp.ofEpochSecond(10)
-      Mediator.latestSafePruningTsBefore(
-        NonEmpty.mk(
-          Seq,
-          DynamicSynchronizerParametersWithValidity(
-            defaultParameters,
-            CantonTimestamp.ofEpochSecond(20),
-            None,
-          ),
-        ),
-        cleanTimestamp,
-      ) shouldBe cleanTimestamp
-    }
-
-    "query non-overlapping synchronizer parameters expired before max response timeout" in {
-      val cleanTimestamp = CantonTimestamp.ofEpochSecond(40)
-      Mediator.latestSafePruningTsBefore(
-        NonEmpty.mk(
-          Seq,
-          DynamicSynchronizerParametersWithValidity(
-            parametersWith(NonNegativeFiniteDuration.tryOfSeconds(10)),
-            CantonTimestamp.ofEpochSecond(10),
-            Some(CantonTimestamp.ofEpochSecond(20)),
-          ),
-        ),
-        cleanTimestamp,
-      ) shouldBe cleanTimestamp
+      ) shouldBe Some(endOfHugeTimeoutEffect - defaultTimeout)
     }
   }
 }

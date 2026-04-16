@@ -3,9 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
-import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.data.CantonTimestamp
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -26,12 +24,15 @@ trait BaseScanAppConfig {}
 final case class ScanSynchronizerConfig(
     sequencer: FullClientConfig,
     mediator: FullClientConfig,
-    bftSequencerConfig: Option[BftSequencerConfig],
 )
 
 final case class MediatorVerdictIngestionConfig(
     /** Max verdicts items for DB insert batch. */
-    batchSize: Int = 50
+    batchSize: Int = 50,
+    /** Max time window to wait for DB insert batch. */
+    batchMaxWait: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
+    /** Delay before restart on stream failure. */
+    restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
 )
 
 final case class BulkStorageConfig(
@@ -52,7 +53,8 @@ case class ScanAppBackendConfig(
     override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    synchronizerNodes: ScanSynchronizerNodesConfig,
+    sequencerAdminClient: FullClientConfig,
+    mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     enableAppActivityRecordAndTrafficIngestion: Boolean = true,
@@ -70,6 +72,7 @@ case class ScanAppBackendConfig(
     updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
+    bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
@@ -79,8 +82,6 @@ case class ScanAppBackendConfig(
     // TODO(#4249): use on-ledger synchronization for switching record times
     externalTransactionHashThresholdTime: Option[Instant] =
       ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
-    globalSynchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("global"),
-    rollForwardLsu: Option[ScanRollForwardLsuConfig] = None,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -89,22 +90,10 @@ case class ScanAppBackendConfig(
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
-final case class ScanRollForwardLsuConfig(
-    upgradeTime: Option[
-      CantonTimestamp
-    ] // If not set, we assume that there is an LsuAnnouncement on the legacy synchronizer.
-)
-
 object ScanAppBackendConfig {
   val DefaultExternalTransactionHashThresholdTime: Option[Instant] =
     Some(java.time.Instant.parse("2030-01-01T00:00:00Z"))
 }
-
-final case class ScanSynchronizerNodesConfig(
-    current: ScanSynchronizerConfig,
-    successor: Option[ScanSynchronizerConfig],
-    legacy: Option[ScanSynchronizerConfig],
-)
 
 final case class ScanCacheConfig(
     svNodeState: CacheConfig = CacheConfig(

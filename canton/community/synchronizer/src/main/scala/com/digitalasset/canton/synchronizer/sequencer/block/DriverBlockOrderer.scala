@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -15,7 +15,7 @@ import com.digitalasset.canton.synchronizer.block.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SenderSigned
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerServiceDefinition
 import org.apache.pekko.stream.*
 import org.apache.pekko.stream.scaladsl.Source
@@ -34,11 +34,8 @@ class DriverBlockOrderer(
 
   override def subscribe()(implicit
       traceContext: TraceContext
-  ): Source[Traced[RawLedgerBlock], KillSwitch] =
-    // The trace context being assigned to blocks in this subscription is not correct.
-    // A different one should be assigned to each block as part of the driver's implementation.
-    // But because drivers will be discontinued soon, there are no plans to properly implement that.
-    driver.subscribe().map(Traced(_))
+  ): Source[RawLedgerBlock, KillSwitch] =
+    driver.subscribe()
 
   override def send(
       signedSubmissionRequest: SenderSigned[SubmissionRequest]

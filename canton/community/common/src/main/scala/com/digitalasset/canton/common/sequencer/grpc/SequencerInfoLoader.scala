@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer.grpc
@@ -22,7 +22,6 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.networking.grpc.ClientChannelParams
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeResponse}
 import com.digitalasset.canton.sequencing.{
@@ -34,7 +33,7 @@ import com.digitalasset.canton.sequencing.{
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.NoExceptionRetryPolicy
@@ -51,7 +50,7 @@ import scala.concurrent.{ExecutionContextExecutor, Promise}
 
 class SequencerInfoLoader(
     timeouts: ProcessingTimeout,
-    params: ClientChannelParams,
+    traceContextPropagation: TracingConfig.Propagation,
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
     dontWarnOnDeprecatedPV: Boolean,
@@ -69,7 +68,7 @@ class SequencerInfoLoader(
         synchronizerAlias,
         config,
         timeouts,
-        params,
+        traceContextPropagation,
         loggerFactory,
       )
   }
@@ -89,13 +88,13 @@ class SequencerInfoLoader(
     logger.debug(s"Querying bootstrap information for synchronizer $synchronizerAlias")
     for {
       bootstrapInfo <- client
-        .getSynchronizerClientBootstrapInfo()
+        .getSynchronizerClientBootstrapInfo(synchronizerAlias)
         .leftMap(SequencerInfoLoader.fromSequencerConnectClientError(synchronizerAlias))
 
       _ <- performHandshake(client, synchronizerAlias, sequencerAlias)
 
       synchronizerParameters <- client
-        .getSynchronizerParameters()
+        .getSynchronizerParameters(synchronizerAlias.unwrap)
         .leftMap(SequencerInfoLoader.fromSequencerConnectClientError(synchronizerAlias))
 
       _ = logger.info(
@@ -184,6 +183,7 @@ class SequencerInfoLoader(
     for {
       success <- sequencerConnectClient
         .handshake(
+          alias,
           HandshakeRequest(
             clientProtocolVersions,
             minimumProtocolVersion,
@@ -272,7 +272,7 @@ class SequencerInfoLoader(
     val connections = if (loadAllEndpoints) {
       sequencerConnections.connections.flatMap { case connection: GrpcSequencerConnection =>
         connection.endpoints.map(endpoint =>
-          connection.copy(endpoints = NonEmpty.mk(Set, endpoint))
+          connection.copy(endpoints = NonEmpty.mk(Seq, endpoint))
         )
       }
     } else
@@ -442,16 +442,16 @@ object SequencerInfoLoader {
           synchronizerClientBootstrapInfo: SynchronizerClientBootstrapInfo,
           staticSynchronizerParameters: StaticSynchronizerParameters,
       ): Either[InconsistentConnectivity, Valid] = {
-        val providedPsid = synchronizerClientBootstrapInfo.psid
-        val expectedPsid =
-          PhysicalSynchronizerId(providedPsid.logical, staticSynchronizerParameters)
+        val providedPSId = synchronizerClientBootstrapInfo.psid
+        val expectedPSId =
+          PhysicalSynchronizerId(providedPSId.logical, staticSynchronizerParameters)
 
         Either
           .cond(
-            providedPsid == expectedPsid,
+            providedPSId == expectedPSId,
             (),
             InconsistentConnectivity(
-              s"Provided physical synchronizer id `$providedPsid` is inconsistent with static synchronizer parameters"
+              s"Provided physical synchronizer id `$providedPSId` is inconsistent with static synchronizer parameters"
             ),
           )
           .map(_ =>
@@ -508,7 +508,7 @@ object SequencerInfoLoader {
     * changes
     */
   def validateNewSequencerConnectionResults(
-      expectedPsid: Option[PhysicalSynchronizerId],
+      expectedPSId: Option[PhysicalSynchronizerId],
       sequencerConnectionValidation: SequencerConnectionValidation,
       sequencerTrustThreshold: PositiveInt,
       logger: TracedLogger,
@@ -562,10 +562,10 @@ object SequencerInfoLoader {
           )
           // check that physical synchronizer id matches expected
           _ <- Either.cond(
-            expectedPsid.forall(_ == valid.synchronizerClientBootstrapInfo.psid),
+            expectedPSId.forall(_ == valid.synchronizerClientBootstrapInfo.psid),
             (),
             SequencerInfoLoaderError.InconsistentConnectivity(
-              show"Synchronizer id ${valid.synchronizerClientBootstrapInfo.psid} does not match expected $expectedPsid"
+              show"Synchronizer id ${valid.synchronizerClientBootstrapInfo.psid} does not match expected $expectedPSId"
             ),
           )
 

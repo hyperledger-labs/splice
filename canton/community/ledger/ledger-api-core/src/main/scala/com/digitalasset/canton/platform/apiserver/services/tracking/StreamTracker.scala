@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.tracking
@@ -16,7 +16,6 @@ import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
@@ -97,8 +96,6 @@ private[tracking] class StreamTrackerImpl[Key, Item](
   private[tracking] val pending =
     TrieMap.empty[Key, (ErrorLoggingContext, Promise[Item])]
 
-  private val pendingSize = new AtomicInteger(0)
-
   override def track(
       key: Key,
       timeout: NonNegativeFiniteDuration,
@@ -111,13 +108,11 @@ private[tracking] class StreamTrackerImpl[Key, Item](
       tracer: Tracer,
       errors: StreamTracker.Errors[Key],
   ): Future[Item] =
-    inFlightCounter.check(pendingSize.get()) {
+    inFlightCounter.check(pending.size) {
       val promise = Promise[Item]()
       pending.putIfAbsent(key, (errorLoggingContext, promise)) match {
         case Some(_) => promise.failure(errors.duplicated(key)(errorLoggingContext))
-        case None =>
-          pendingSize.incrementAndGet().discard
-          trackWithCancelTimeout(key, timeout, promise, start)
+        case None => trackWithCancelTimeout(key, timeout, promise, start)
       }
       promise.future
     }
@@ -148,7 +143,7 @@ private[tracking] class StreamTrackerImpl[Key, Item](
           "An internal error occurred while trying to register the cancellation timeout. Aborting..",
           err,
         )
-        pending.remove(key).foreach(_ => pendingSize.decrementAndGet().discard)
+        pending.remove(key).discard
         promise.tryFailure(err).discard
       case Success(cancelTimeout) =>
         withSpan("StreamTracker.track") { childContext => _ =>
@@ -164,7 +159,7 @@ private[tracking] class StreamTrackerImpl[Key, Item](
           // register timeout cancellation and removal from map
           withSpan("StreamTracker.complete") { _ => _ =>
             cancelTimeout.close()
-            pending.remove(key).foreach(_ => pendingSize.decrementAndGet().discard)
+            pending.remove(key)
           }
         }
     }

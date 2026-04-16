@@ -129,7 +129,6 @@ export const ValidatorConfigSchema = z
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
     partyAllocator: PartyAllocatorConfigSchema.prefault({ enable: false }),
-    version: z.string().optional(),
   })
   .and(ValidatorNodeConfigSchema);
 

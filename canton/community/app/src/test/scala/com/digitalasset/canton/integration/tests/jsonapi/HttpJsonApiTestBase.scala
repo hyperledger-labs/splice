@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
@@ -11,10 +11,9 @@ import com.daml.jwt.{
   StandardJWTPayload,
   StandardJWTTokenFormat,
 }
-import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, PositiveInt}
-import com.digitalasset.canton.config.{AuthServiceConfig, PemFile}
+import com.digitalasset.canton.config.{AuthServiceConfig, PemFile, TlsServerConfig}
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.integration.tests.jsonapi.HttpServiceTestFixture.UseTls
@@ -113,6 +112,7 @@ trait HttpJsonApiTestBase extends CantonFixture {
         createChannel(participant1)
         darFiles.foreach(path => participant1.dars.upload(path.toFile.getAbsolutePath))
       }
+
   def adHocHttp(participantSelector: ParticipantSelector, token: Option[String] = None)(implicit
       env: TestConsoleEnvironment
   ): Future[AbstractHttpServiceIntegrationTestFuns.HttpServiceTestFixtureData] = {
@@ -211,7 +211,7 @@ trait HttpJsonApiTestBase extends CantonFixture {
     )
     val header = """{"alg": "HS256", "typ": "JWT"}"""
     val jwt =
-      DecodedJwt[String](header, AuthServiceJWTCodec.writePayload(payload).noSpaces)
+      DecodedJwt[String](header, AuthServiceJWTCodec.writePayload(payload).compactPrint)
     JwtSigner.HMAC256.sign(jwt, secret) match {
       case Right(a) => a.value
       case Left(e) => throw new IllegalStateException(e.toString)

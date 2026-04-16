@@ -1,33 +1,24 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
-import com.digitalasset.canton.http.json.JsHealthService
-import com.digitalasset.canton.http.json.v2.JsSchema.X_ONE_OF
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.services.VersionFile
+import com.digitalasset.canton.tracing.TraceContext
 import com.softwaremill.quicklens.*
-import monocle.macros.syntax.lens.*
-import org.semver4j.Semver
 import sttp.apispec
-import sttp.apispec.asyncapi.{AsyncAPI, ChannelItem, ReferenceOr}
-import sttp.apispec.openapi.{OpenAPI, Operation, PathItem}
+import sttp.apispec.asyncapi.AsyncAPI
+import sttp.apispec.openapi.OpenAPI
 import sttp.apispec.{Schema, SchemaLike, asyncapi, openapi}
-import sttp.tapir.AnyEndpoint
 import sttp.tapir.docs.asyncapi.AsyncAPIInterpreter
 import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
+import sttp.tapir.{AnyEndpoint, headers}
 
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListMap, SortedMap}
 
 class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
-
-  private val releaseNote = """
-    |This specification version fixes the API inconsistencies where certain fields marked as required in the spec are in fact optional.
-    |If you use code generation tool based on this file, you might need to adjust the existing application code to handle those fields as optional.
-    |If you do not want to change your client code, continue using the OpenAPI specification for the latest Canton 3.4 patch release.
-    |""".stripMargin.trim
 
   /** Endpoints used for static documents generation - should match with the live endpoints
     * @see
@@ -46,147 +37,29 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
         JsUserManagementService,
         JsIdentityProviderService,
         JsInteractiveSubmissionService,
-        JsHealthService,
-        JsContractService,
       )
     services.flatMap(service => service.documentation)
   }
 
-  private def supplyProtoDocs(
-      initial: openapi.OpenAPI,
-      proto: ProtoInfo,
-      minimalCantonVersion: String,
-  ): openapi.OpenAPI = {
+  private def supplyProtoDocs(initial: openapi.OpenAPI, proto: ProtoInfo): openapi.OpenAPI = {
 
     val updatedComponents = initial.components.map(component => supplyComponents(component, proto))
-    val updatedPaths =
-      initial.paths.pathItems.map { case (path, pathItem) =>
-        (path, supplyPathItem(pathItem, proto))
-      }
-    initial
-      .focus(_.components)
-      .replace(updatedComponents)
-      .focus(_.paths.pathItems)
-      .replace(updatedPaths)
-      .focus(_.info.description)
-      .replace(Some(s"$releaseNote\nMINIMUM_CANTON_VERSION=$minimalCantonVersion"))
-  }
-  private def supplyPathItem(pathItem: PathItem, proto: ProtoInfo) =
-    pathItem.copy(
-      get = pathItem.get.map(withSuppliedServiceDescription(_, proto)),
-      put = pathItem.put.map(withSuppliedServiceDescription(_, proto)),
-      post = pathItem.post.map(withSuppliedServiceDescription(_, proto)),
-      delete = pathItem.delete.map(withSuppliedServiceDescription(_, proto)),
-      options = pathItem.options.map(withSuppliedServiceDescription(_, proto)),
-      head = pathItem.head.map(withSuppliedServiceDescription(_, proto)),
-      patch = pathItem.patch.map(withSuppliedServiceDescription(_, proto)),
-      trace = pathItem.trace.map(withSuppliedServiceDescription(_, proto)),
-    )
-
-  private def supplyServiceDescriptions(description: String, proto: ProtoInfo) = {
-    val lines: Seq[String] = description
-      .split("\n")
-      .toSeq
-      .flatMap { (line: String) =>
-        line match {
-          case ProtoLink(protoFile, serviceName, methodName) =>
-            Seq(proto.findServiceDescription(protoFile, serviceName, methodName))
-          case other => Seq(other)
-        }
-      }
-    lines.mkString("\n")
+    initial.copy(components = updatedComponents)
   }
 
-  private def withSuppliedServiceDescription(operation: Operation, proto: ProtoInfo) =
-    operation.focus(_.description).some.modify(supplyServiceDescriptions(_, proto))
-
-  private def supplyProtoDocs(
-      initial: asyncapi.AsyncAPI,
-      proto: ProtoInfo,
-      minimalCantonVersion: String,
-  ): asyncapi.AsyncAPI = {
+  private def supplyProtoDocs(initial: asyncapi.AsyncAPI, proto: ProtoInfo): asyncapi.AsyncAPI = {
     val updatedComponents = initial.components.map(component => supplyComponents(component, proto))
-    val updateChannels = initial.channels.map { case (channelName, channel) =>
-      (channelName, updateChannel(channel, proto))
-    }
-    initial
-      .focus(_.components)
-      .replace(updatedComponents)
-      .focus(_.channels)
-      .replace(updateChannels)
-      .focus(_.info.description)
-      .replace(Some(s"$releaseNote\nMINIMUM_CANTON_VERSION=$minimalCantonVersion"))
-  }
-
-  private def updateChannel(
-      channel: ReferenceOr[ChannelItem],
-      proto: ProtoInfo,
-  ): ReferenceOr[ChannelItem] = {
-    def fixOpDescription(operation: Option[asyncapi.Operation], ch: ChannelItem) = operation.map {
-      op =>
-        op.copy(
-          description = if (op.description == ch.description) {
-            // Remove redundant descriptions
-            None
-          } else {
-            op.description.map(description => supplyServiceDescriptions(description, proto))
-          }
-        )
-    }
-    channel.map { ch =>
-      val subscribe = fixOpDescription(ch.subscribe, ch)
-      val publish = fixOpDescription(ch.publish, ch)
-
-      // format: off
-      ch.focus(_.description).some.modify(supplyServiceDescriptions(_, proto))
-        .focus(_.subscribe).replace(subscribe)
-        .focus(_.publish).replace(publish)
-      // format: on
-    }
+    initial.copy(components = updatedComponents)
   }
 
   private def supplyComponents(
       component: openapi.Components,
       proto: ProtoInfo,
   ): openapi.Components = {
-    val schemasInOneOfWithExtension = findSchemasInOneOfWithExtension(component.schemas)
-
     val updatedSchemas: ListMap[String, SchemaLike] =
-      component.schemas.map(s =>
-        importSchemaLike(
-          component = s,
-          proto = proto,
-          parentComponent = findUniqueParent(s, component.schemas),
-          schemasInOneOfWithExtension = schemasInOneOfWithExtension,
-        )
-      )
-
-    val schemasWithoutXOneOf: ListMap[String, SchemaLike] = updatedSchemas.map {
-      case (name, schema: Schema) => (name, removeXOneOfExtension(schema))
-      case other => other
-    }
-
-    component.copy(schemas = schemasWithoutXOneOf)
+      component.schemas.map(s => importSchemaLike(s, proto, findUniqueParent(s, component.schemas)))
+    component.copy(schemas = updatedSchemas)
   }
-
-  private def findSchemasInOneOfWithExtension(schemas: ListMap[String, SchemaLike]): Set[String] =
-    schemas
-      .collect {
-        case (_, parent: Schema) if parent.oneOf.nonEmpty && parent.extensions.exists {
-              case (key, value) =>
-                key == X_ONE_OF && value.toString.contains("true")
-            } =>
-          parent.oneOf.flatMap {
-            case variantSchema: Schema =>
-              variantSchema.properties.values.collect {
-                case propSchema: Schema if propSchema.$ref.isDefined =>
-                  propSchema.$ref.fold("")(_.split("/").lastOption.getOrElse(""))
-              }
-            case _ => Nil
-          }
-      }
-      .flatten
-      .toSet
 
   private def findUniqueParent(
       component: (String, SchemaLike),
@@ -214,27 +87,18 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       component: asyncapi.Components,
       proto: ProtoInfo,
   ): asyncapi.Components = {
-    val schemasInOneOfWithExtension = findSchemasInOneOfWithExtension(component.schemas)
-
     val updatedSchemas: ListMap[String, Schema] =
-      component.schemas.map(s => importSchema(s._1, s._2, proto, None, schemasInOneOfWithExtension))
-
-    val schemasWithoutXOneOf: ListMap[String, Schema] = updatedSchemas.map { case (name, schema) =>
-      (name, removeXOneOfExtension(schema))
-    }
-
-    component.copy(schemas = schemasWithoutXOneOf)
+      component.schemas.map(s => importSchema(s._1, s._2, proto))
+    component.copy(schemas = updatedSchemas)
   }
 
   private def importSchemaLike(
       component: (String, SchemaLike),
       proto: ProtoInfo,
       parentComponent: Option[String],
-      schemasInOneOfWithExtension: Set[String],
   ): (String, SchemaLike) =
     component._2 match {
-      case schema: Schema =>
-        importSchema(component._1, schema, proto, parentComponent, schemasInOneOfWithExtension)
+      case schema: Schema => importSchema(component._1, schema, proto, parentComponent)
       case _ => component
     }
 
@@ -242,23 +106,11 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       componentName: String,
       componentSchema: Schema,
       proto: ProtoInfo,
-      parentComponent: Option[String],
-      schemasInOneOfWithExtension: Set[String],
+      parentComponent: Option[String] = None,
   ): (String, Schema) =
     proto
       .findMessageInfo(componentName, parentComponent)
       .map { message =>
-        val required = componentSchema.required.filter { fieldName =>
-          message.isFieldRequired(fieldName)
-        }
-
-        val requiredFieldsWronglyAssumedOptional = componentSchema.properties.keys.filter {
-          propertyName =>
-            message.isFieldRequired(propertyName) &&
-            !componentSchema.required.contains(propertyName)
-        }
-        val allRequired = (required ++ requiredFieldsWronglyAssumedOptional).toList.distinct
-
         val properties = componentSchema.properties.map { case (propertyName, propertySchema) =>
           message
             .getFieldComment(propertyName)
@@ -266,80 +118,34 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
               (
                 propertyName,
                 propertySchema match {
-                  case pSchema: Schema => pSchema.copy(description = Some(comments))
+                  case pSchema: Schema =>
+                    pSchema.copy(description = Some(comments))
                   case _ => propertySchema
                 },
               )
             }
-            .getOrElse((propertyName, propertySchema))
-        }
-
-        val finalRequired =
-          if (
-            shouldMakeValueRequired(
-              componentSchema,
-              message,
-              allRequired,
-              componentName,
-              schemasInOneOfWithExtension,
+            .getOrElse(
+              (propertyName, propertySchema)
             )
-          ) {
-            (allRequired :+ "value").distinct
-          } else {
-            allRequired
-          }
-
+        }
         (
           componentName,
-          componentSchema.copy(
-            description = message.getComments(),
-            properties = properties,
-            required = finalRequired,
-          ),
+          componentSchema.copy(description = message.getComments(), properties = properties),
         )
       }
       .getOrElse((componentName, componentSchema))
 
-  private def shouldMakeValueRequired(
-      schema: Schema,
-      message: MessageInfo,
-      currentRequired: List[String],
-      componentName: String,
-      schemasInOneOfWithExtension: Set[String],
-  ): Boolean = {
-    val isInOneOfWithExtension = schemasInOneOfWithExtension.contains(componentName)
-    val hasSingleValueProperty =
-      schema.properties.sizeIs == 1 && schema.properties.contains("value")
-    val valueNotAlreadyRequired = !currentRequired.contains("value")
-    val protoDoesntSpecifyValue =
-      !message.isFieldRequired("value") && !message.isFieldOptional("value")
-
-    isInOneOfWithExtension && hasSingleValueProperty && valueNotAlreadyRequired && protoDoesntSpecifyValue
-  }
-
-  private def removeXOneOfExtension(schema: Schema): Schema = {
-    val cleanedExtensions = schema.extensions.filterNot { case (key, _) => key == X_ONE_OF }
-
-    val cleanedProperties = schema.properties.map {
-      case (propName, propSchema: Schema) => (propName, removeXOneOfExtension(propSchema))
-      case other => other
-    }
-
-    val cleanedOneOf = schema.oneOf.map {
-      case variantSchema: Schema => removeXOneOfExtension(variantSchema)
-      case other => other
-    }
-
-    schema.copy(
-      extensions = cleanedExtensions,
-      properties = cleanedProperties,
-      oneOf = cleanedOneOf,
-    )
-  }
-
-  def loadProtoData(): ProtoInfo =
+  def loadProtoData()(implicit traceContext: TraceContext): ProtoInfo =
     ProtoInfo
       .loadData()
+      .fold(
+        error => {
+          logger.warn(s"Cannot load proto data for documentation $error")
+          // If we cannot load protoInfo data then we  generate docs with no supplemented comments
+          ProtoInfo(ExtractedProtoComments(SortedMap.empty, SortedMap.empty))
+        },
+        identity,
+      )
 
   def createDocs(
       lapiVersion: String,
@@ -354,8 +160,7 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       )
       .openapi("3.0.3")
 
-    val cantonVersion = new Semver(lapiVersion).withClearedPreReleaseAndBuild().toString
-    val supplementedOpenApi = supplyProtoDocs(openApiDocs, protoData, cantonVersion)
+    val supplementedOpenApi = supplyProtoDocs(openApiDocs, protoData)
     import sttp.apispec.openapi.circe.yaml.*
 
     val asyncApiDocs: AsyncAPI = AsyncAPIInterpreter().toAsyncAPI(
@@ -363,7 +168,7 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       "JSON Ledger API WebSocket endpoints",
       lapiVersion,
     )
-    val supplementedAsyncApi = supplyProtoDocs(asyncApiDocs, protoData, cantonVersion)
+    val supplementedAsyncApi = supplyProtoDocs(asyncApiDocs, protoData)
     import sttp.apispec.asyncapi.circe.yaml.*
 
     val fixed3_0_3Api: OpenAPI = OpenAPI3_0_3Fix.fixTupleDefinition(supplementedOpenApi)
@@ -377,10 +182,12 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
   def createStaticDocs(protoInfo: ProtoInfo): ApiDocs =
     createDocs(
       VersionFile.readVersion().getOrElse("unknown"),
-      staticDocumentationEndpoints,
+      staticDocumentationEndpoints.map(addHeaders),
       protoInfo,
     )
 
+  private def addHeaders(endpoint: AnyEndpoint) =
+    endpoint.in(headers)
 }
 
 final case class ApiDocs(openApi: String, asyncApi: String)

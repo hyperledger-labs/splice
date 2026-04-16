@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.db
 
-import com.daml.tls.{TlsClientCertificate, TlsClientConfig}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
@@ -21,7 +20,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.P2PEndpointsStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import slick.jdbc.GetResult
+import slick.jdbc.{GetResult, SetParameter}
 
 import scala.concurrent.ExecutionContext
 
@@ -76,6 +75,10 @@ final class DbP2PEndpointsStore(
         P2PGrpcNetworking.PlainTextP2PEndpoint(address, port)
       }
     }
+
+  private implicit val setOptionalBlobParameter: SetParameter[Option[ByteString]] =
+    (maybeByteString, positionedParameter) =>
+      positionedParameter >> maybeByteString.map(_.toByteArray)
 
   private val profile = storage.profile
 

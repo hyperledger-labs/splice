@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -26,11 +26,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListPartiesResult,
   MediatorStatus,
   NodeStatus,
-  SequencerConnectionPoolDelays,
-  SequencerConnectionValidation,
-  SequencerConnections,
   SequencerStatus,
-  SubmissionRequestAmplification,
   TemplateId,
 }
 import com.digitalasset.canton.concurrent.Threading
@@ -49,6 +45,12 @@ import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionPoolDelays,
+  SequencerConnectionValidation,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
@@ -89,17 +91,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Reflective inspection of object arguments, handy to inspect case class objects")
     @Help.Description(
-      """Return the list field names of the given object.
-        |
-        |Helpful function when inspecting the return result."""
+      "Return the list field names of the given object. Helpful function when inspecting the return result."
     )
     def object_args[T: TypeTag](@unused obj: T): List[String] = type_args[T]
 
-    @Help.Summary("Reflective inspection of type arguments")
+    @Help.Summary("Reflective inspection of type arguments, handy to inspect case class types")
     @Help.Description(
-      """Return the list of field names of the given type.
-        |
-        |Helpful function when creating new objects for requests."""
+      "Return the list of field names of the given type. Helpful function when creating new objects for requests."
     )
     def type_args[T: TypeTag]: List[String] =
       typeOf[T].members.collect {
@@ -108,8 +106,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Wait for a condition to become true, using default timeouts")
     @Help.Description("""
-        |Wait until condition becomes true, with a timeout taken from the
-        |parameters.timeouts.console.bounded configuration parameter.""")
+        |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded
+        |configuration parameter.""")
     final def retry_until_true(
         condition: => Boolean
     )(implicit
@@ -120,13 +118,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
 
     @Help.Summary("Wait for a condition to become true")
-    @Help.Description(
-      """Wait `timeout` duration until `condition` becomes true.
-        |
-        |Retry evaluating `condition` with an exponentially increasing back-off up to
-        |`maxWaitPeriod` duration between retries.
-        """
-    )
+    @Help.Description("""Wait `timeout` duration until `condition` becomes true.
+        | Retry evaluating `condition` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries.
+        |""")
     @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
     final def retry_until_true(
         timeout: NonNegativeDuration,
@@ -243,10 +237,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Create a participants config for Daml script")
     @Help.Description(
-      """The generated config can be passed to `daml script` via the `participant-config`
-        |parameter.
-        |
-        |Parameters:
+      """The generated config can be passed to `daml script` via the `participant-config` parameter.
+        |More information about the file format can be found in the `documentation <https://docs.daml.com/daml-script/index.html#using-daml-script-in-distributed-topologies>`_:
+        |It takes three arguments:
         |- file (default to "participant-config.json")
         |- useParticipantAlias (default to true): participant aliases are used instead of UIDs
         |- defaultParticipant (default to None): adds a default participant if provided
@@ -272,13 +265,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         environment.environment.addUserCloseable(closeable)
       )
 
-    @Help.Summary("Writes several Protobuf messages to a file")
+    @Help.Summary("Writes several Protobuf messages to a file.")
     def write_to_file(data: Seq[scalapb.GeneratedMessage], fileName: String): Unit =
       File(fileName).outputStream.foreach { os =>
         data.foreach(_.writeDelimitedTo(os))
       }
 
-    @Help.Summary("Reads several Protobuf messages from a file")
+    @Help.Summary("Reads several Protobuf messages from a file.")
     @Help.Description("Fails with an exception, if the file can't be read or parsed.")
     def read_all_messages_from_file[A <: scalapb.GeneratedMessage](
         fileName: String
@@ -290,11 +283,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           }
         }
 
-    @Help.Summary("Writes a Protobuf message to a file")
+    @Help.Summary("Writes a Protobuf message to a file.")
     def write_to_file(data: scalapb.GeneratedMessage, fileName: String): Unit =
       write_to_file(Seq(data), fileName)
 
-    @Help.Summary("Reads a single Protobuf message from a file")
+    @Help.Summary("Reads a single Protobuf message from a file.")
     @Help.Description("Fails with an exception, if the file can't be read or parsed.")
     def read_first_message_from_file[A <: scalapb.GeneratedMessage](
         fileName: String
@@ -307,11 +300,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           )
         )
 
-    @Help.Summary("Writes a ByteString to a file")
+    @Help.Summary("Writes a ByteString to a file.")
     def write_to_file(data: ByteString, fileName: String): Unit =
       BinaryFileUtil.writeByteStringToFile(fileName, data)
 
-    @Help.Summary("Reads a ByteString from a file")
+    @Help.Summary("Reads a ByteString from a file.")
     @Help.Description("Fails with an exception, if the file can't be read.")
     def read_byte_string_from_file(fileName: String)(implicit env: ConsoleEnvironment): ByteString =
       env.runE(BinaryFileUtil.readByteStringFromFile(fileName))
@@ -348,7 +341,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       val x: Value.Sum = value match {
         case x: Int => Value.Sum.Int64(x.toLong)
         case x: Long => Value.Sum.Int64(x)
-        case x: Party => Value.Sum.Party(x.toLf)
+        case x: PartyId => Value.Sum.Party(x.toLf)
         case x: Float => Value.Sum.Numeric(s"$x")
         case x: Double => Value.Sum.Numeric(s"$x")
         case x: String => Value.Sum.Text(x)
@@ -467,6 +460,20 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @Help.Summary("Determine current logging level")
     def get_level(loggerName: String = "com.digitalasset.canton"): Option[Level] =
       Option(NodeLoggingUtil.getLogger(loggerName).getLevel)
+
+    @Help.Summary("Returns the last errors (trace-id -> error event) that have been logged locally")
+    def last_errors(): Map[String, String] =
+      NodeLoggingUtil.lastErrors().getOrElse {
+        logger.error(s"Log appender for last errors not found/configured")
+        throw new CommandFailure()
+      }
+
+    @Help.Summary("Returns log events for an error with the same trace-id")
+    def last_error_trace(traceId: String): Seq[String] =
+      NodeLoggingUtil.lastErrorTrace(traceId).getOrElse {
+        logger.error(s"No events found for last error trace-id $traceId")
+        throw new CommandFailure()
+      }
   }
 
   @Help.Summary("Configure behaviour of console")
@@ -475,17 +482,19 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Yields the timeout for running console commands")
     @Help.Description(
-      """When the timeout has elapsed, the console stops waiting for the command result.
-        |The command will continue running in the background."""
+      "Yields the timeout for running console commands. " +
+        "When the timeout has elapsed, the console stops waiting for the command result. " +
+        "The command will continue running in the background."
     )
     def command_timeout(implicit env: ConsoleEnvironment): NonNegativeDuration =
       env.commandTimeouts.bounded
 
-    @Help.Summary("Sets the timeout for running console commands")
+    @Help.Summary("Sets the timeout for running console commands.")
     @Help.Description(
-      """When the timeout has elapsed, the console stops waiting for the command result.
-        |The command will continue running in the background.
-        |The new timeout must be positive."""
+      "Sets the timeout for running console commands. " +
+        "When the timeout has elapsed, the console stops waiting for the command result. " +
+        "The command will continue running in the background. " +
+        "The new timeout must be positive."
     )
     def set_command_timeout(newTimeout: NonNegativeDuration)(implicit
         env: ConsoleEnvironment
@@ -507,13 +516,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Bootstraps a decentralized namespace for the provided owners")
     @Help.Description(
-      """Returns the decentralized namespace, the fully authorized transaction of its definition,
-        |as well as all root certificates of the owners. This allows other nodes to import and
+      """Returns the decentralized namespace, the fully authorized transaction of its definition, as well
+        |as all root certificates of the owners. This allows other nodes to import and
         |fully validate the decentralized namespace definition.
-        |
-        |After this call has finished successfully, all of the owners have stored the co-owners'
-        |identity topology transactions as well as the fully authorized decentralized namespace
-        |definition in the specified topology store."""
+        |After this call has finished successfully, all of the owners have stored the co-owners' identity topology
+        |transactions as well as the fully authorized decentralized namespace definition in the specified topology store."""
     )
     def decentralized_namespace(
         owners: Seq[InstanceReference],
@@ -784,12 +791,10 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Bootstraps a local synchronizer using default arguments")
     @Help.Description(
-      """This is a convenience method for bootstrapping a local synchronizer.
-        |
-        |The synchronizer will include all sequencers and mediators that are currently running.
-        |It will be owned by the sequencers, while the mediator threshold will be set to require
-        |all mediators to confirm.
-        |"""
+      "This is a convenience method for bootstrapping a local synchronizer." +
+        "The synchronizer will include all sequencers and mediators that are currently running." +
+        "It will be owned by the sequencers, while the mediator threshold will be set to require" +
+        "all mediators to confirm."
     )
     def synchronizer_local(
         synchronizerName: String = "local"
@@ -831,11 +836,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       ).logical
     }
 
-    @Help.Summary("Bootstraps a new synchronizer")
+    @Help.Summary(
+      "Bootstraps a new synchronizer."
+    )
     @Help.Description(
       """Bootstraps a new synchronizer with the given static synchronizer parameters and members.
-        |Any participants as synchronizer owners must still manually connect to the synchronizer
-        |afterwards.
+        |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
         """
     )
     def synchronizer(
@@ -860,16 +866,16 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         mediatorThreshold,
       )
 
-    @Help.Summary("Bootstraps a new synchronizer")
+    @Help.Summary(
+      "Bootstraps a new synchronizer."
+    )
     @Help.Description(
       """Bootstraps a new synchronizer with the given static synchronizer parameters and members.
-        |Any participants as synchronizer owners must still manually connect to the synchronizer
-        |afterwards.
+        |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
         |
         |Parameters:
-        |- mediatorsToSequencers: Map of mediator reference to a tuple of a sequence of sequencer
-        |  references, the sequencer trust threshold and the liveness margin for the given
-        |  mediator.
+        |  mediatorsToSequencers: map of mediator reference to a tuple of a sequence of sequencer references,
+        |                         the sequencer trust threshold and the liveness margin for the given mediator.
         """
     )
     def synchronizer(
@@ -920,8 +926,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       }
     }
 
-    @Help.Summary("Onboards a new Sequencer node")
-    @Help.Description("Onboards a new Sequencer node using an existing node from the network.")
+    @Help.Summary(
+      "Onboards a new Sequencer node."
+    )
+    @Help.Description(
+      "Onboards a new Sequencer node using an existing node from the network."
+    )
     def onboard_new_sequencer(
         synchronizerId: SynchronizerId,
         newSequencer: SequencerReference,
@@ -932,99 +942,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )(implicit consoleEnvironment: ConsoleEnvironment): Unit = {
       import consoleEnvironment.*
 
-      upload_new_sequencer_identity_transactions(synchronizerId, newSequencer, existingSequencer)
-
-      propose_new_sequencer_state(
-        synchronizerId,
-        newSequencer,
-        existingSequencer,
-        synchronizerOwners,
-        Some(consoleEnvironment.commandTimeouts.unbounded),
-      )
-
-      wait_for_sequencer_state_to_be_effective(
-        synchronizerId,
-        newSequencer,
-        existingSequencer,
-        isBftSequencer,
-        customCommandTimeout.getOrElse(commandTimeouts.bounded),
-      )
-
-      complete_new_sequencer_initialization(newSequencer, existingSequencer)
-    }
-
-    @Help.Summary("Upload new sequencer's identity transactions")
-    @Help.Description(
-      "First step of sequencer onboarding. In most cases, the onboarding command is preferred."
-    )
-    def upload_new_sequencer_identity_transactions(
-        synchronizerId: SynchronizerId,
-        newSequencer: SequencerReference,
-        existingSequencer: SequencerReference,
-    ): Unit = {
-      // extract onboarding sequencer's identity transactions
-      val onboardingSequencerIdentity =
-        newSequencer.topology.transactions.identity_transactions()
-
-      // upload onboarding sequencer's identity transactions
-      existingSequencer.topology.transactions
-        .load(onboardingSequencerIdentity, synchronizerId, ForceFlag.AlienMember)
-
-      logger.info("Uploaded a new sequencer identity")
-    }
-
-    @Help.Summary("Propose new sequencer state")
-    @Help.Description(
-      "Second step of sequencer onboarding. In most cases, the onboarding command is preferred."
-    )
-    def propose_new_sequencer_state(
-        synchronizerId: SynchronizerId,
-        newSequencer: SequencerReference,
-        existingSequencer: SequencerReference,
-        synchronizerOwners: Set[InstanceReference],
-        synchronize: Option[NonNegativeDuration],
-    )(implicit consoleEnvironment: ConsoleEnvironment): Unit = {
-      import consoleEnvironment.*
-
-      val synchronizerOwnersNE = NonEmpty
-        .from(synchronizerOwners)
-        .getOrElse(raiseError("synchronizerOwners must not be empty"))
-
-      // fetch the latest SequencerSynchronizerState mapping
-      val seqState1 = existingSequencer.topology.sequencers
-        .list(store = synchronizerId)
-        .headOption
-        .getOrElse(raiseError("No sequencer state found"))
-        .item
-
-      // propose the SequencerSynchronizerState that adds the new sequencer
-      synchronizerOwnersNE
-        .foreach(
-          _.topology.sequencers
-            .propose(
-              synchronizerId,
-              threshold = seqState1.threshold,
-              active = seqState1.active :+ newSequencer.id,
-              synchronize = synchronize,
-            )
-            .discard
-        )
-
-      logger.info("Proposed a sequencer synchronizer state with the new sequencer")
-    }
-
-    @Help.Summary("Wait for new sequencer state to be effective")
-    @Help.Description(
-      "Third step of sequencer onboarding. In most cases, the onboarding command is preferred."
-    )
-    def wait_for_sequencer_state_to_be_effective(
-        synchronizerId: SynchronizerId,
-        newSequencer: SequencerReference,
-        existingSequencer: SequencerReference,
-        isBftSequencer: Boolean,
-        commandTimeout: config.NonNegativeDuration,
-    )(implicit consoleEnvironment: ConsoleEnvironment): Unit = {
-      import consoleEnvironment.*
+      val commandTimeout = customCommandTimeout.getOrElse(commandTimeouts.bounded)
 
       def synchronizeTopologyAfterAddingSequencer(
           newSequencerId: SequencerId,
@@ -1047,6 +965,41 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           existingSequencer.bft.get_ordering_topology().sequencerIds.contains(newSequencerId)
         }
 
+      val synchronizerOwnersNE = NonEmpty
+        .from(synchronizerOwners)
+        .getOrElse(raiseError("synchronizerOwners must not be empty"))
+
+      // extract onboarding sequencer's identity transactions
+      val onboardingSequencerIdentity =
+        newSequencer.topology.transactions.identity_transactions()
+
+      // upload onboarding sequencer's identity transactions
+      existingSequencer.topology.transactions
+        .load(onboardingSequencerIdentity, synchronizerId, ForceFlag.AlienMember)
+
+      logger.info("Uploaded a new sequencer identity")
+
+      // fetch the latest SequencerSynchronizerState mapping
+      val seqState1 = existingSequencer.topology.sequencers
+        .list(store = synchronizerId)
+        .headOption
+        .getOrElse(raiseError("No sequencer state found"))
+        .item
+
+      // propose the SequencerSynchronizerState that adds the new sequencer
+      synchronizerOwnersNE
+        .foreach(
+          _.topology.sequencers
+            .propose(
+              synchronizerId,
+              threshold = seqState1.threshold,
+              active = seqState1.active :+ newSequencer.id,
+            )
+            .discard
+        )
+
+      logger.info("Proposed a sequencer synchronizer state with the new sequencer")
+
       // wait for SequencerSynchronizerState to be observed by the sequencer
       ConsoleMacros.utils.retry_until_true(commandTimeout) {
         val sequencerStates =
@@ -1059,22 +1012,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         sequencerState.item.active.contains(newSequencer.id)
       }
       logger.info("New sequencer synchronizer state has been observed")
+
       if (isBftSequencer) {
         synchronizeTopologyAfterAddingBftSequencer(newSequencer.id, existingSequencer)
         logger.info("The new sequencer is part of the ordering topology")
       } else {
         synchronizeTopologyAfterAddingSequencer(newSequencer.id, existingSequencer)
       }
-    }
 
-    @Help.Summary("Complete new sequencer initialization")
-    @Help.Description(
-      "Fourth step of sequencer onboarding. In most cases, the onboarding command is preferred."
-    )
-    def complete_new_sequencer_initialization(
-        newSequencer: SequencerReference,
-        existingSequencer: SequencerReference,
-    ): Unit = {
       // now we can establish the sequencer snapshot
       val onboardingState =
         existingSequencer.setup.onboarding_state_for_sequencerV2(newSequencer.id)
@@ -1092,11 +1037,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
   @Help.Group("Pruning")
   object pruning extends Helpful {
 
-    @Help.Summary("Sets the pruning schedule on prunable nodes")
-    @Help.Description(
-      """Sets the pruning schedule on all participants, mediators, and database sequencers in the
-        |environment.
-        """
+    @Help.Summary(
+      "Sets the pruning schedule on all participants, mediators, and database sequencers in the environment"
     )
     def set_schedule(
         cron: String,
@@ -1108,11 +1050,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         logger.info(s"Enabled pruning of node $name at $cron")
       }
 
-    @Help.Summary("Deactivates scheduled pruning on all prunable nodes")
-    @Help.Description(
-      """Deactivates scheduled pruning on all participants, mediators, and database sequencers in
-        |the environment.
-        """
+    @Help.Summary(
+      "Deactivates scheduled pruning on all participants, mediators, and database sequencers in the environment"
     )
     def clear_schedule()(implicit env: ConsoleEnvironment): Unit =
       allPrunableNodes.foreach { case (name, prunable) =>
@@ -1152,19 +1091,6 @@ object DebuggingHelpers extends LazyLogging {
       alias => ref.testing.pcs_search(alias, activeSet = true, limit = limit),
     )
 
-  /** Helper to query the ACS as seen via the Ledger API and the canton-internal sync state useful
-    * to have the caller compare the contract ids and associated template ids for mismatches.
-    * @param ref
-    *   local or remote participant reference
-    * @param state
-    *   the sync state inspection used to query canton-internal sync state
-    * @param limit
-    *   the maximum number of expected contracts, needs to be large enough to avoid any false
-    *   mismatch warning entries
-    * @return
-    *   a tuple of two maps: first the sync state contract-id to template-id map, second the ledger
-    *   api contract-id to template-id map
-    */
   def get_active_contracts_from_internal_db_state(
       ref: ParticipantReference,
       state: SyncStateInspection,

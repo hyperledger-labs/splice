@@ -109,7 +109,6 @@ class InMemorySynchronizerStore(
     )
   }
 
-  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   private def updateState[T](
       f: InMemorySynchronizerStore.State => (InMemorySynchronizerStore.State, T)
   ): Future[T] = {

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -6,26 +6,14 @@ package com.digitalasset.canton.participant.protocol
 import cats.Monoid
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
+import com.digitalasset.canton.ledger.participant.state.Update.SequencerIndexMoved
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
-import com.digitalasset.canton.participant.protocol.MessageDispatcher.TicksAfter.{
-  EventPublicationData,
-  FutureEventPublication,
-}
 import com.digitalasset.canton.participant.protocol.MessageDispatcher.{
   ParticipantTopologyProcessor,
   RequestProcessors,
-  TickDecision,
-  TickMoment,
-  TicksAfter,
-}
-import com.digitalasset.canton.participant.protocol.ParallelMessageDispatcher.{
-  NoEventPublication,
-  Runner,
-  tickDecisionAsynchronousMayTickRequestTracker,
-  tickDecisionSynchronousMayTickTopologyProcessor,
 }
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionSynchronizerTracker
@@ -38,7 +26,6 @@ import com.digitalasset.canton.sequencing.{
   HandlerResult,
   OrdinaryProtocolEvent,
   PossiblyIgnoredProtocolEvent,
-  UnthrottledAsync,
 }
 import com.digitalasset.canton.store.SequencedEventStore.{
   IgnoredSequencedEvent,
@@ -47,7 +34,7 @@ import com.digitalasset.canton.store.SequencedEventStore.{
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
-import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, MonadUtil}
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -72,10 +59,9 @@ class ParallelMessageDispatcher(
     override protected val recordOrderPublisher: RecordOrderPublisher,
     override protected val badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
     override protected val inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
-    processAsynchronously: ViewType => Boolean,
+    processAsyncronously: ViewType => Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     override val metrics: ConnectedSynchronizerMetrics,
-    override protected val promiseFactory: PromiseUnlessShutdownFactory,
 )(override implicit val ec: ExecutionContext, tracer: Tracer)
     extends MessageDispatcher
     with NamedLogging
@@ -83,78 +69,76 @@ class ParallelMessageDispatcher(
 
   import MessageDispatcher.*
 
-  override protected type ProcessingAsyncResult = AsyncResult[UnthrottledAsync]
-  override protected def processingAsyncResultMonoid: Monoid[ProcessingAsyncResult] =
-    Monoid[ProcessingAsyncResult]
+  override protected type ProcessingAsyncResult = AsyncResult[TickDecision]
+  override protected implicit val processingAsyncResultMonoid: Monoid[ProcessingAsyncResult] =
+    new Monoid[ProcessingAsyncResult] {
+      override def empty: ProcessingAsyncResult = AsyncResult.pure(TickDecision())
+      override def combine(
+          x: ProcessingAsyncResult,
+          y: ProcessingAsyncResult,
+      ): ProcessingAsyncResult =
+        AsyncResult(
+          for {
+            xResult <- x.unwrap
+            yResult <- y.unwrap
+          } yield xResult combine yResult
+        )
+    }
 
   override protected def doProcess(
       kind: MessageKind
   ): ProcessingResult = {
-    @inline def runSynchronously(run: () => FutureUnlessShutdown[Unit])(
-        tickDecision: TickDecision,
-        futureEventPublication: Option[FutureEventPublication],
-    ): FutureUnlessShutdown[(AsyncResult[UnthrottledAsync], TicksAfter)] =
-      run().map { _ =>
-        val asyncF = AsyncResult.immediate
-        asyncF -> TicksAfter.fromTickDecision(tickDecision, asyncF, futureEventPublication)
-      }
+    def runAsynchronously[T](
+        run: () => FutureUnlessShutdown[AsyncResult[T]]
+    ): FutureUnlessShutdown[AsyncResult[T]] =
+      run()
 
-    @inline def runAsynchronously(run: () => HandlerResult): Runner =
-      new Runner {
-        override def apply(
-            tickDecision: TickDecision,
-            futureEventPublication: Option[FutureEventPublication],
-        ): FutureUnlessShutdown[(AsyncResult[UnthrottledAsync], TicksAfter)] =
-          run().map { result =>
-            result -> TicksAfter.fromTickDecision(
-              tickDecision,
-              result,
-              futureEventPublication,
-            )
-          }
-      }
+    def runSynchronously[T](
+        run: () => FutureUnlessShutdown[T]
+    ): FutureUnlessShutdown[AsyncResult[T]] =
+      run().map(AsyncResult.pure)
 
-    @inline def forceRunSynchronously(run: () => HandlerResult): Runner =
-      new Runner {
-        override def apply(
-            tickDecision: TickDecision,
-            futureEventPublication: Option[FutureEventPublication],
-        ): FutureUnlessShutdown[(AsyncResult[UnthrottledAsync], TicksAfter)] =
-          run().flatMap(_.unwrap).map { unthrottledAsync =>
-            val asyncF = AsyncResult.pure(unthrottledAsync)
-            asyncF -> TicksAfter.fromTickDecision(tickDecision, asyncF, futureEventPublication)
-          }
-      }
+    def forceRunSynchronously[T](
+        run: () => FutureUnlessShutdown[AsyncResult[T]]
+    ): FutureUnlessShutdown[AsyncResult[T]] =
+      runSynchronously(() => run().flatMap(_.unwrap))
+
+    def tick(res: AsyncResult[Unit]): ProcessingAsyncResult =
+      res.map(_ => TickDecision())
+
+    // The RecordOrderPublisher will be ticked at result processing
+    def noRecordOrderPublisherTick(res: AsyncResult[Unit]): ProcessingAsyncResult =
+      res.map(_ =>
+        TickDecision(
+          tickRecordOrderPublisher = false
+        )
+      )
+
+    // The TopologyProcessor does not need to be ticked again
+    def noTopologyTick(res: AsyncResult[Unit]): ProcessingAsyncResult =
+      res.map(_ =>
+        TickDecision(
+          tickTopologyProcessor = false
+        )
+      )
 
     // Explicitly enumerate all cases for type safety
     kind match {
-      case TopologyTransaction(run) =>
-        runAsynchronously(run)(tickDecisionSynchronousMayTickTopologyProcessor, NoEventPublication)
-      case TrafficControlTransaction(run) =>
-        // Traffic control messages are processed synchronously, so we can tick synchronously
-        runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
-      case AcsCommitment(run) =>
-        runAsynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
-      case MalformedMessage(run) =>
-        runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
-      case UnspecifiedMessageKind(run) =>
-        runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
-      case RequestKind(viewType, futureEventPublication, run) =>
-        val runner =
-          if (processAsynchronously(viewType)) runAsynchronously(run)
-          else forceRunSynchronously(run)
-        runner(
-          tickDecisionAsynchronousMayTickRequestTracker,
-          Some(FutureEventPublication(Some(futureEventPublication))),
-        )
+      // The identity processor must run sequential on all delivered events and identity stuff needs to be
+      // processed before any other transaction (as it might have changed the topology state the
+      // other envelopes are referring to)
+      case TopologyTransaction(run) => runAsynchronously(run).map(noTopologyTick)
+      case TrafficControlTransaction(run) => runSynchronously(run).map(tick)
+      case AcsCommitment(run) => runAsynchronously(run).map(tick)
+      case CausalityMessageKind(run) => runSynchronously(run).map(tick)
+      case MalformedMessage(run) => runSynchronously(run).map(tick)
+      case UnspecifiedMessageKind(run) => runSynchronously(run).map(tick)
+      case RequestKind(viewType, run) =>
+        (if (processAsyncronously(viewType)) runAsynchronously(run)
+         else forceRunSynchronously(run)).map(noRecordOrderPublisherTick)
       case ResultKind(viewType, run) =>
-        if (processAsynchronously(viewType))
-          runAsynchronously(run)(tickDecisionAsynchronousMayTickRequestTracker, NoEventPublication)
-        else
-          forceRunSynchronously(run)(
-            tickDecisionAsynchronousMayTickRequestTracker,
-            NoEventPublication,
-          )
+        (if (processAsyncronously(viewType)) runAsynchronously(run)
+         else forceRunSynchronously(run)).map(tick)
       case DeliveryMessageKind(run) =>
         // TODO(#6914) Figure out the required synchronization to run this asynchronously.
         //  We must make sure that the observation of having been sequenced runs before the tick to the record order publisher.
@@ -162,7 +146,7 @@ class ParallelMessageDispatcher(
         //   with an external queue to ensure serial execution for these
         //   with generating an input async message kind for each of the event's in the batch which would be also put in to the single handling to wait for before ticking
         //   we could do this async
-        runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
+        runSynchronously(run).map(tick)
     }
   }
 
@@ -171,21 +155,17 @@ class ParallelMessageDispatcher(
   ): HandlerResult =
     tracedEvents.withTraceContext { implicit batchTraceContext => events =>
       for {
-        observeSequencingAndTicks <- observeSequencing(
+        observeSequencing <- observeSequencing(
           events.collect { case WithOpeningErrors(e: OrdinaryProtocolEvent, _) =>
             e.signedEvent.content
           }
-        )
-        (observeSequencing, ticks) = observeSequencingAndTicks
-        process <- MonadUtil.sequentialTraverseMonoid(events)(handle(ticks, _))
+        ).map(_.map(_ => ())) // moving back to HandlerResult / not caring about the tick info
+        process <- MonadUtil.sequentialTraverseMonoid(events)(handle)
       } yield Monoid.combine(observeSequencing, process)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def handle(
-      ticksObserveSequencing: TicksAfter,
-      eventE: WithOpeningErrors[PossiblyIgnoredProtocolEvent],
-  ): HandlerResult = {
+  private def handle(eventE: WithOpeningErrors[PossiblyIgnoredProtocolEvent]): HandlerResult = {
     implicit val traceContext: TraceContext = eventE.event.traceContext
 
     withSpan("MessageDispatcher.handle") { implicit traceContext => _ =>
@@ -197,18 +177,14 @@ class ParallelMessageDispatcher(
         case _: IgnoredSequencedEvent[?] =>
           pureProcessingResult
       }
-      processingResult.map { case (asyncResult, ticksAfter) =>
-        val ticksF = tickTrackers(
-          sc = eventE.event.counter,
-          ts = eventE.event.timestamp,
-          ticksObserveSequencing.combine(ticksAfter),
+      processingResult.map(
+        _.flatMapFUS(
+          tickTrackers(
+            sc = eventE.event.counter,
+            ts = eventE.event.timestamp,
+          )
         )
-        // TODO(i31797): This needs to be reworked if / when we start making use of
-        // UnthrottledAsync in the protocol processor
-        asyncResult.flatMapFUS { (unthrottled: UnthrottledAsync) =>
-          ticksF.map(_ => unthrottled)
-        }
-      }
+      )
     }(traceContext, tracer)
   }
 
@@ -254,79 +230,37 @@ class ParallelMessageDispatcher(
   private def tickTrackers(
       sc: SequencerCounter,
       ts: CantonTimestamp,
-      ticksAfter: TicksAfter,
+  )(
+      tickDecision: TickDecision
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     def topologyProcessorTickAsyncF(): HandlerResult =
-      ticksAfter.tickTopologyProcessorAfter.flatMap((_: Unit) =>
+      if (tickDecision.tickTopologyProcessor)
         topologyProcessor(sc, SequencedTime(ts), None, Traced(List.empty))
-      )
-
+      else
+        Monoid[HandlerResult].empty
     def recordOrderPublisherTickF(): FutureUnlessShutdown[Unit] =
-      ticksAfter.tickRecordOrderPublisherAfter.flatMap { futureEventPublication =>
-        futureEventPublication.futureEventO match {
-          case None =>
-            val event = sequencerIndexMovedEvent(ts)
-            recordOrderPublisher.tick(event, sc, None).onShutdown {
-              logger.debug("Skipping record order publisher tick due to shutdown.")
-            }
-          case Some(futureEvent) =>
-            val tickF =
-              futureEvent.subflatMap { case EventPublicationData(event, rc) =>
-                recordOrderPublisher.tick(event, sc, Some(rc))
-              }
-            // We cannot await the ticking of the record order publisher here because the ticking happens only
-            // when the request is decided, i.e., after a mediator verdict arrives or whan a timeout happens.
-            // This decision therefore is triggered by a later sequenced event. If we were to await this here,
-            // message processing could deadlock as we allow only a bounded number of concurrently processed
-            // sequenced events.
-            //
-            // The memory constraints are enforced by the same mechanism as for the in-flight requests:
-            // The decision time is bounded and from this we can derive a bound on the number of in-flight
-            // requests via the bound on the rate of requests.
-            FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-              tickF,
-              s"ticking record order publisher for ts=$ts / sc=$sc",
-            )
-        }
-        // Incorporate backpressure signal from the indexer via the record order publisher into the protocol processing,
-        // where it takes effect via the throttling of asynchronous processing.
-        recordOrderPublisher.backpressure()
+      if (tickDecision.tickRecordOrderPublisher) {
+        recordOrderPublisher.tick(
+          SequencerIndexMoved(
+            synchronizerId = synchronizerId.logical,
+            recordTime = ts,
+          ),
+          sequencerCounter = sc,
+          rcO = None,
+        )
+      } else {
+        FutureUnlessShutdown.unit
       }
-
-    def requestTrackerTick(): FutureUnlessShutdown[Unit] =
-      ticksAfter.tickRequestTrackerAfter.map { (_: Unit) =>
-        requestTracker.tick(sc, ts)
-      }
-
+    def requestTrackerTick(): Unit =
+      if (tickDecision.tickRequestTracker) requestTracker.tick(sc, ts)
+    // Signal to the topology processor that all messages up to timestamp `ts` have arrived
+    // Publish the tick only afterwards as this may trigger an ACS commitment computation which accesses the topology state.
     for {
-      // Signal to the topology processor that all messages up to timestamp `ts` have arrived
-      // Publish the tick only afterwards as this may trigger an ACS commitment computation which accesses the topology state.
       topologyAsync <- topologyProcessorTickAsyncF()
-      _ <- requestTrackerTick()
-      // waiting for the topologyAsync as well before we tick the ROP for crash recovery
-      _ <- topologyAsync.unwrap
+      _ = requestTrackerTick()
       _ <- recordOrderPublisherTickF()
+      // waiting for the topologyAsync as well
+      _ <- topologyAsync.unwrap
     } yield ()
   }
-}
-
-object ParallelMessageDispatcher {
-  private sealed trait Runner {
-    def apply(
-        tickDecision: TickDecision,
-        futureEventPublication: Option[FutureEventPublication],
-    ): FutureUnlessShutdown[(AsyncResult[UnthrottledAsync], TicksAfter)]
-  }
-
-  private val NoEventPublication: Option[FutureEventPublication] = None
-
-  private val tickDecisionSynchronousMayTickTopologyProcessor = TickDecision(
-    tickTopologyProcessor = TickMoment.TickMayHappenDuringProcessing,
-    tickRequestTracker = TickMoment.AfterSynchronous,
-  )
-
-  private val tickDecisionAsynchronousMayTickRequestTracker = TickDecision(
-    tickTopologyProcessor = TickMoment.AfterSynchronous,
-    tickRequestTracker = TickMoment.TickMayHappenDuringProcessing,
-  )
 }

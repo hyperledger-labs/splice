@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -7,10 +7,10 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Security.SecurityTest.Property.Authorization
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction
-import com.digitalasset.canton.annotations.UnstableTest
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceSynchronizerDisabledUs
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError.InitialOnboardingError
@@ -18,7 +18,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import io.scalaland.chimney.dsl.*
 import org.slf4j.event.Level
 
-sealed trait PermissionedSynchronizerTest
+trait PermissionedSynchronizerTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with HasCycleUtils
@@ -265,12 +265,10 @@ sealed trait PermissionedSynchronizerTest
 }
 
 //class PermissionedSynchronizerTestDefault extends PermissionedSynchronizerTest {
-//  registerPlugin(new UseH2(loggerFactory))
-//  registerPlugin(new UseBftSequencer(loggerFactory))
+//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 //}
 
-@UnstableTest // TODO(#24337)
-final class PermissionedSynchronizerTestPostgres extends PermissionedSynchronizerTest {
-  registerPlugin(new UseBftSequencer(loggerFactory))
+class PermissionedSynchronizerTestPostgres extends PermissionedSynchronizerTest {
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   registerPlugin(new UsePostgres(loggerFactory))
 }

@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.*
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletAllocationTrigger
 
 import scala.concurrent.ExecutionContext
 
@@ -65,9 +64,6 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpiredLockedAmuletTrigger(config, triggerContext, svTaskContext))
     registerTrigger(
       new ExpiredAmuletTransferInstructionTrigger(config, clock, triggerContext, svTaskContext)
-    )
-    registerTrigger(
-      new ExpiredAmuletAllocationTrigger(config, clock, triggerContext, svTaskContext)
     )
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
@@ -156,7 +152,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredAmuletTrigger],
     aTrigger[ExpiredLockedAmuletTrigger],
     aTrigger[ExpiredAmuletTransferInstructionTrigger],
-    aTrigger[ExpiredAmuletAllocationTrigger],
     aTrigger[ExpiredSvOnboardingRequestTrigger],
     aTrigger[CloseVoteRequestTrigger],
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],

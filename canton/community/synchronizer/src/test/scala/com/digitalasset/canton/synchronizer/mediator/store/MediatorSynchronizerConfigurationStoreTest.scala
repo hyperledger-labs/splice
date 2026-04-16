@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -37,7 +37,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
     "when set returns set value" in {
       val store = mkStore
       val connection = GrpcSequencerConnection(
-        NonEmpty(Set, Endpoint("sequencer", Port.tryCreate(100))),
+        NonEmpty(Seq, Endpoint("sequencer", Port.tryCreate(100))),
         transportSecurity = true,
         None,
         SequencerAlias.Default,
@@ -65,7 +65,7 @@ trait MediatorSynchronizerConfigurationStoreTest {
       val defaultParams = defaultStaticSynchronizerParameters
       def connection(sequencerId: Option[SequencerId] = None) = GrpcSequencerConnection(
         NonEmpty(
-          Set,
+          Seq,
           Endpoint("sequencer", Port.tryCreate(200)),
           Endpoint("sequencer", Port.tryCreate(300)),
         ),

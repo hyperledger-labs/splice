@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
@@ -6,10 +6,10 @@ package com.digitalasset.canton.integration.tests.jsonapi
 import com.daml.jwt.{Jwt, StandardJWTPayload, StandardJWTTokenFormat}
 import com.daml.ledger.api.v2.admin.{identity_provider_config_service, user_management_service}
 import com.digitalasset.base.error.ErrorsAssertions
-import com.digitalasset.canton.config.{AuthServiceConfig, CantonConfig}
+import com.digitalasset.canton.config.{AuthServiceConfig, CantonConfig, DbConfig}
 import com.digitalasset.canton.http.json.v2.JsIdentityProviderCodecs.*
 import com.digitalasset.canton.http.json.v2.JsUserManagementCodecs.*
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.tests.jsonapi.AbstractHttpServiceIntegrationTestFuns.HttpServiceTestFixtureData
 import com.digitalasset.canton.integration.tests.ledgerapi.SuppressionRules.ApiUserManagementServiceSuppressionRule
 import com.digitalasset.canton.integration.tests.ledgerapi.auth.ServiceCallContext
@@ -23,6 +23,7 @@ import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, StatusCodes, Uri}
 import org.scalatest.Assertion
+import spray.json.JsonParser
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -37,8 +38,7 @@ class JsonUserApiTest
     with ErrorsAssertions {
 
   registerPlugin(ExpectedScopeOverrideConfig(loggerFactory))
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   override val defaultScope: String = ExpectedScope
 
@@ -52,10 +52,9 @@ class JsonUserApiTest
     scope = Some(defaultScope),
   )
 
-  lazy val adminHeaders: List[HttpHeader] =
-    HttpServiceTestFixture.authorizationHeader(
-      Jwt(toScopeContext(adminToken).token.getOrElse(""))
-    )
+  lazy val adminHeaders = HttpServiceTestFixture.authorizationHeader(
+    Jwt(toScopeContext(adminToken).token.getOrElse(""))
+  )
 
   "Json api" should {
     "return current user using data from token" in httpTestFixture { fixture =>
@@ -91,19 +90,22 @@ class JsonUserApiTest
         _ <- fixture
           .postJsonRequest(
             Uri.Path("/v2/idps"),
-            identity_provider_config_service
-              .CreateIdentityProviderConfigRequest(
-                Some(
-                  identity_provider_config_service.IdentityProviderConfig(
-                    identityProviderId = "idp-1",
-                    isDeactivated = false,
-                    issuer = "user-idp-test",
-                    jwksUrl = "https://localhost",
-                    audience = "",
+            JsonParser(
+              identity_provider_config_service
+                .CreateIdentityProviderConfigRequest(
+                  Some(
+                    identity_provider_config_service.IdentityProviderConfig(
+                      identityProviderId = "idp-1",
+                      isDeactivated = false,
+                      issuer = "user-idp-test",
+                      jwksUrl = "https://localhost",
+                      audience = "",
+                    )
                   )
                 )
-              )
-              .asJson,
+                .asJson
+                .toString()
+            ),
             adminHeaders,
           )
           .map { case (status, result) =>
@@ -112,13 +114,16 @@ class JsonUserApiTest
         _ <- fixture
           .postJsonRequest(
             Uri.Path("/v2/users"),
-            user_management_service
-              .CreateUserRequest(
-                user =
-                  Some(user_management_service.User(randomUserInIdp, "", false, None, "idp-1")),
-                rights = Nil,
-              )
-              .asJson,
+            JsonParser(
+              user_management_service
+                .CreateUserRequest(
+                  user =
+                    Some(user_management_service.User(randomUserInIdp, "", false, None, "idp-1")),
+                  rights = Nil,
+                )
+                .asJson
+                .toString()
+            ),
             adminHeaders,
           )
           .map { case (status, result) =>
@@ -168,12 +173,15 @@ class JsonUserApiTest
       _ <- fixture
         .postJsonRequest(
           Uri.Path("/v2/users"),
-          user_management_service
-            .CreateUserRequest(
-              user = Some(user_management_service.User(randomUser, "", false, None, "")),
-              rights = Nil,
-            )
-            .asJson,
+          JsonParser(
+            user_management_service
+              .CreateUserRequest(
+                user = Some(user_management_service.User(randomUser, "", false, None, "")),
+                rights = Nil,
+              )
+              .asJson
+              .toString()
+          ),
           adminHeaders,
         )
         .map { case (status, _) =>

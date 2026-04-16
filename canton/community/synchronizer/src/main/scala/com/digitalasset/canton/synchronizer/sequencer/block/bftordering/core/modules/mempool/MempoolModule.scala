@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.mempool
@@ -7,7 +7,6 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.WriteReadiness
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.shortType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
@@ -54,11 +53,10 @@ class MempoolModule[E <: Env[E]](
 
       case Mempool.Start =>
         scheduleMempoolBatchCreationClockTick()
-
       // From clients
       case r @ Mempool.OrderRequest(tracedTx, from, sender) =>
         val orderingRequest = tracedTx.value
-        val span = startSpan("BFTOrderer.Mempool")._1
+        val span = startSpan("BFTOrderer.Mempool")
 
         val outcome: IngressLabelOutcome = // Help type inference
           if (!canDisseminate) {
@@ -69,14 +67,14 @@ class MempoolModule[E <: Env[E]](
             metrics.ingress.labels.outcome.values.P2PNotReady
           } else if (mempoolState.receivedOrderRequests.sizeIs == config.maxQueueSize) {
             val rejectionMessage =
-              s"Mempool received client request but the queue is full (${config.maxQueueSize}), rejecting"
+              s"mempool received client request but the queue is full (${config.maxQueueSize}), rejecting"
             logger.info(rejectionMessage)
             from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
             span.setStatus(StatusCode.ERROR, "queue_full"); span.end()
             metrics.ingress.labels.outcome.values.QueueFull
           } else if (config.checkTags && !orderingRequest.isTagValid) {
             val rejectionMessage =
-              s"Mempool received a client request with an invalid tag '${orderingRequest.tag}', " +
+              s"mempool received a client request with an invalid tag '${orderingRequest.tag}', " +
                 s"valid tags are: (${OrderingRequest.ValidTags.mkString(", ")}), rejecting"
             logger.warn(rejectionMessage)
             from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
@@ -86,16 +84,13 @@ class MempoolModule[E <: Env[E]](
             val payloadSize = orderingRequest.payload.size()
             if (payloadSize > config.maxRequestPayloadBytes) {
               val rejectionMessage =
-                s"Mempool received client request of size $payloadSize " +
+                s"mempool received client request of size $payloadSize " +
                   s"but it exceeds the maximum (${config.maxRequestPayloadBytes}), rejecting"
               logger.warn(rejectionMessage)
               from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
               span.setStatus(StatusCode.ERROR, "max_request_size_exceeded"); span.end()
               metrics.ingress.labels.outcome.values.RequestTooBig
             } else {
-              logger.debug(
-                s"Mempool accepting client request with tag '${orderingRequest.tag}' of size $payloadSize"
-              )
               mempoolState.receivedOrderRequests.enqueue((r, span))
               from.foreach(_.asyncSend(SequencerNode.RequestAccepted))
               if (mempoolState.receivedOrderRequests.sizeIs >= config.minRequestsInBatch.toInt) {
@@ -113,7 +108,7 @@ class MempoolModule[E <: Env[E]](
       // From local availability
       case Mempool.CreateLocalBatches(atMost) =>
         logger.debug(
-          s"$messageType: mempool received batch request from local availability " +
+          s"$messageType mempool received batch request from local availability " +
             s"(maxRequestsInBatch: ${config.maxRequestsInBatch})"
         )
 
@@ -125,28 +120,16 @@ class MempoolModule[E <: Env[E]](
         createAndSendBatches()
         emitStateStats(metrics, mempoolState)
 
-      // From P2P output module
-      case Mempool.P2PConnectivityUpdate(membership, authenticatedCountIncludingSelf) =>
-        weakQuorum = membership.orderingTopology.weakQuorum
-        authenticatedCount = authenticatedCountIncludingSelf
-
-      // Admin
-      case Mempool.Admin.GetWriteReadiness(reply) =>
-        val p2p = WriteReadiness.P2P(authenticatedCount, weakQuorum)
-        val readiness =
-          if (canDisseminate)
-            WriteReadiness.Ready(p2p)
-          else
-            WriteReadiness.P2PNotReady(p2p)
-        reply(readiness)
-
-      // Internal
       case Mempool.MempoolBatchCreationClockTick =>
         logger.trace(
           s"Mempool received batch creation clock tick (maxRequestsInBatch: ${config.maxRequestsInBatch})"
         )
         createAndSendBatches()
         scheduleMempoolBatchCreationClockTick()
+
+      case Mempool.P2PConnectivityUpdate(membership, authenticatedCountIncludingSelf) =>
+        weakQuorum = membership.orderingTopology.weakQuorum
+        authenticatedCount = authenticatedCountIncludingSelf
     }
   }
 

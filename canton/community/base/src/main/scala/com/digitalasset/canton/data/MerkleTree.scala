@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -14,9 +14,8 @@ import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.HasProtocolVersionedWrapper
-import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
-import monocle.{Lens, Prism, Traversal}
+import monocle.Lens
 
 import scala.collection.mutable
 
@@ -148,7 +147,7 @@ abstract class MerkleTreeInnerNode[+A](val hashOps: HashOps) extends MerkleTree[
   this: A =>
 
   override lazy val rootHash: RootHash = {
-    val hashBuilder = hashOps.build(HashPurpose.MerkleTreeInnerNode).addInt(subtrees.length)
+    val hashBuilder = hashOps.build(HashPurpose.MerkleTreeInnerNode).add(subtrees.length)
     subtrees.foreach { subtree =>
       // All hashes within a Merkle tree use the same hash algorithm and are therefore of fixed length,
       // so no length prefix is needed.
@@ -186,8 +185,8 @@ abstract class MerkleTreeLeaf[+A <: HasCryptographicEvidence](val hashOps: HashO
     }
     val hash = hashOps
       .build(hashPurpose)
-      .addByteString(salt.forHashing)
-      .addByteString(tryUnwrap.getCryptographicEvidence)
+      .add(salt.forHashing)
+      .add(tryUnwrap.getCryptographicEvidence)
       .finish()
     RootHash(hash)
   }
@@ -258,15 +257,4 @@ object MerkleTree {
 
   def tryUnwrap[A <: MerkleTree[A]]: Lens[MerkleTree[A], A] =
     Lens[MerkleTree[A], A](_.tryUnwrap)(unwrapped => _ => unwrapped)
-
-  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
-  @VisibleForTesting
-  object Optics {
-    def unblinded[M <: MerkleTree[M]]: Prism[MerkleTree[M], M] =
-      Prism[MerkleTree[M], M](_.unwrap.toOption)(identity)
-
-    def unblindedSeq[M <: MerkleTree[M]]: Traversal[Seq[MerkleTree[M]], M] =
-      Traversal.fromTraverse[Seq, MerkleTree[M]].andThen(unblinded)
-  }
-
 }

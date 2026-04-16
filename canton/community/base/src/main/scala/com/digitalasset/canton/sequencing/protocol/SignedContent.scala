@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -9,7 +9,6 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -116,7 +115,7 @@ object SignedContent
 
   override def name: String = "SignedContent"
 
-  override val versioningTable: VersioningTable = VersioningTable(
+  override def versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SignedContent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
@@ -181,26 +180,11 @@ object SignedContent
       Some(originalByteString),
     )
 
-  /** @param timestampOfSigningKey
-    *   indicates which topology snapshot’s timestamp was used when producing the signature. Leave
-    *   as [[scala.None$]] if the content itself provides enough information to deduce this
-    *   timestamp. This timestamp is currently only used by the traffic-cost primitives. During
-    *   traffic-cost validation, it is compared against the most recent known synchronizer timestamp
-    *   to decide whether to reject the request, use the current snapshot, or wait for a future one.
-    *   The value reflects the last perceived topology state rather than the "current" time, which
-    *   is why using `approximateTimestampForSigning` (that takes the value 'clock.now') does not
-    *   make sense and would require adjusting the validation logic to also rely on the current time
-    *   of the validator node.
-    * @param signingTimestampOverrides
-    *   Optional overrides for selecting an approximate signing timestamp and validity end, used to
-    *   select the correct session signing key whenever session signing keys are enabled.
-    */
   def create[A <: HasCryptographicEvidence](
       cryptoApi: CryptoPureApi,
       cryptoPrivateApi: SyncCryptoApi,
       content: A,
       timestampOfSigningKey: Option[CantonTimestamp],
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       purpose: HashPurpose,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -211,11 +195,7 @@ object SignedContent
     // so fine to call once for the hash here and then again when serializing to protobuf
     val hash = hashContent(cryptoApi, content, purpose)
     cryptoPrivateApi
-      .sign(
-        hash,
-        SigningKeyUsage.ProtocolOnly,
-        signingTimestampOverrides,
-      )
+      .sign(hash, SigningKeyUsage.ProtocolOnly)
       .map(signature => SignedContent(content, signature, timestampOfSigningKey, protocolVersion))
   }
 
@@ -231,7 +211,6 @@ object SignedContent
       cryptoPrivateApi: SyncCryptoApi,
       content: A,
       timestampOfSigningKey: Option[CantonTimestamp],
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       purpose: HashPurpose,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -243,7 +222,6 @@ object SignedContent
       cryptoPrivateApi,
       content,
       timestampOfSigningKey,
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       purpose,
       protocolVersion,
     )

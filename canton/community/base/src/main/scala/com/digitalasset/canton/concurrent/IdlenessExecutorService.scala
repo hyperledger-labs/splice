@@ -1,12 +1,13 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
 
-import com.daml.executors.executors.NamedExecutionContextExecutorService
+import com.daml.executors.QueueAwareExecutorService
 
 import java.util.concurrent.*
 import scala.annotation.tailrec
+import scala.concurrent.ExecutionContextExecutorService
 import scala.concurrent.duration.FiniteDuration
 
 trait IdlenessExecutorService extends ExecutorService {
@@ -51,36 +52,34 @@ trait IdlenessExecutorService extends ExecutorService {
 }
 
 abstract class ExecutionContextIdlenessExecutorService(
-    delegate: ExecutorService,
+    executorService: ExecutorService,
     name: String,
-    reporter: Throwable => Unit,
-) extends NamedExecutionContextExecutorService(delegate, name, reporter)
-    with IdlenessExecutorService {
-
-  def queueSize: Long
-}
+) extends QueueAwareExecutorService(executorService, name)
+    with IdlenessExecutorService
+    with ExecutionContextExecutorService
 
 class ForkJoinIdlenessExecutorService(
     pool: ForkJoinPool,
-    monitoredPool: ExecutorService,
+    delegate: ExecutorService,
     reporter: Throwable => Unit,
     name: String,
-) extends ExecutionContextIdlenessExecutorService(monitoredPool, name, reporter) {
+) extends ExecutionContextIdlenessExecutorService(delegate, name) {
+  override def reportFailure(cause: Throwable): Unit = reporter(cause)
 
   override protected[concurrent] def awaitIdlenessOnce(timeout: FiniteDuration): Boolean =
     pool.awaitQuiescence(timeout.toMillis, TimeUnit.MILLISECONDS)
 
   override def toString: String = s"ForkJoinIdlenessExecutorService-$name: $pool"
 
-  override def queueSize: Long = pool.getQueuedTaskCount
 }
 
 class ThreadPoolIdlenessExecutorService(
     pool: ThreadPoolExecutor,
-    monitoredPool: ExecutorService,
     reporter: Throwable => Unit,
-    name: String,
-) extends ExecutionContextIdlenessExecutorService(monitoredPool, name, reporter) {
+    override val name: String,
+) extends ExecutionContextIdlenessExecutorService(pool, name) {
+
+  override def reportFailure(cause: Throwable): Unit = reporter(cause)
 
   override protected[concurrent] def awaitIdlenessOnce(timeout: FiniteDuration): Boolean = {
     val deadline = timeout.fromNow
@@ -101,6 +100,4 @@ class ThreadPoolIdlenessExecutorService(
 
     go(minSleep)
   }
-
-  override def queueSize: Long = pool.getQueue.size().toLong
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
@@ -6,7 +6,7 @@ package com.digitalasset.canton.participant.protocol.party
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld
 import com.digitalasset.canton.participant.protocol.party.PartyReplicationSourceParticipantMessage.DataOrStatus
 import com.digitalasset.canton.participant.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -48,7 +48,7 @@ object PartyReplicationSourceParticipantMessage
         Left(ProtoDeserializationError.FieldNotSet("data_or_status"))
       case v30.PartyReplicationSourceParticipantMessage.DataOrStatus.AcsBatch(batchP) =>
         for {
-          contracts <- batchP.contracts.toList.traverse(ActiveContract.fromProtoV30)
+          contracts <- batchP.contracts.toList.traverse(ActiveContractOld.fromProtoV30)
           nonEmptyContracts <- NonEmpty
             .from(contracts)
             .toRight(
@@ -57,7 +57,7 @@ object PartyReplicationSourceParticipantMessage
             )
         } yield AcsBatch(nonEmptyContracts)
       case v30.PartyReplicationSourceParticipantMessage.DataOrStatus
-            .EndOfAcs(v30.PartyReplicationSourceParticipantMessage.EndOfAcs()) =>
+            .EndOfAcs(v30.PartyReplicationSourceParticipantMessage.EndOfACS()) =>
         Right(EndOfACS)
     }
   } yield PartyReplicationSourceParticipantMessage(dataOrStatus)(rpv)
@@ -66,7 +66,7 @@ object PartyReplicationSourceParticipantMessage
     def toProtoV30: v30.PartyReplicationSourceParticipantMessage.DataOrStatus
   }
 
-  final case class AcsBatch(contracts: NonEmpty[Seq[ActiveContract]]) extends DataOrStatus {
+  final case class AcsBatch(contracts: NonEmpty[Seq[ActiveContractOld]]) extends DataOrStatus {
     override def toProtoV30: v30.PartyReplicationSourceParticipantMessage.DataOrStatus =
       v30.PartyReplicationSourceParticipantMessage.DataOrStatus.AcsBatch(
         v30.PartyReplicationSourceParticipantMessage
@@ -77,7 +77,7 @@ object PartyReplicationSourceParticipantMessage
   object EndOfACS extends DataOrStatus {
     override def toProtoV30: v30.PartyReplicationSourceParticipantMessage.DataOrStatus =
       v30.PartyReplicationSourceParticipantMessage.DataOrStatus.EndOfAcs(
-        v30.PartyReplicationSourceParticipantMessage.EndOfAcs()
+        v30.PartyReplicationSourceParticipantMessage.EndOfACS()
       )
   }
 

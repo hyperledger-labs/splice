@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.examples
@@ -7,8 +7,14 @@ import better.files.*
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CantonConfig, DefaultPorts, TestingConfigInternal}
+import com.digitalasset.canton.config.{
+  CantonConfig,
+  DefaultPorts,
+  EnterpriseCantonEdition,
+  TestingConfigInternal,
+}
 import com.digitalasset.canton.console.{LocalInstanceReference, RemoteInstanceReference}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
@@ -19,7 +25,7 @@ import monocle.macros.syntax.lens.*
 
 class ReferenceConfigSandboxExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(
@@ -73,7 +79,7 @@ class ReferenceConfigSandboxExampleIntegrationTest
 // The values from the UsePostgres script are not adopted by the external reference config.
 class ReferenceConfigExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(new UsePostgres(loggerFactory))
@@ -202,6 +208,7 @@ class AdvancedConfigFilesTest extends BaseTestWordSpec {
       val files = config.map(file => (referenceConfiguration / file).toJava)
       CantonConfig.parseAndLoadOrExit(
         files,
+        EnterpriseCantonEdition,
         Some(DefaultPorts.create()),
       )
     }

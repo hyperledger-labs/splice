@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage}
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -90,5 +91,9 @@ trait KeyRotationWithMultipleSequencersIntegrationTest
 class KeyRotationWithMultipleSequencersReferenceIntegrationTestPostgres
     extends KeyRotationWithMultipleSequencersIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
+      loggerFactory
+    )
+  )
 }

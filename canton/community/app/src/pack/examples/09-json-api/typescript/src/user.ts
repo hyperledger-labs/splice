@@ -78,8 +78,15 @@ export async function createUser(user: string, party: string): Promise<string> {
             ]
         }
     });
-    let data:components["schemas"]["CreateUserResponse"]  = await valueOrError(resp);
-    return data.user!.primaryParty!;
+    return valueOrError(resp).then(
+        data => {
+            if (data.user !== undefined) {
+                return Promise.resolve(data.user.primaryParty);
+            } else {
+                return Promise.reject("cannot create user");
+            }
+        }
+    );
 }
 
 export async function allocatePartyAndCreateUser(user: string): Promise<string> {
@@ -98,7 +105,7 @@ export async function allocatePartyAndCreateUser(user: string): Promise<string> 
 async function getParticipantNamespace(): Promise<string> {
     const {data, error} = await client.GET("/v2/parties/participant-id");
     if (data !== undefined) {
-        const namespace = data.participantId!.split("::")[1];
+        const namespace = data.participantId.split("::")[1];
         return Promise.resolve(namespace);
     } else {
         return Promise.reject(error);

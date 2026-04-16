@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.daml.lf
@@ -12,7 +12,7 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.digitalasset.daml.lf.language.Ast
+import com.digitalasset.daml.lf.language.{Ast, LanguageMajorVersion}
 import com.digitalasset.daml.lf.speedy.Compiler
 
 /** As part of upstream Daml-LF refactoring, previously accessible capabilities have become
@@ -33,7 +33,7 @@ object CantonOnly {
   ): PureCompiledPackages =
     PureCompiledPackages.assertBuild(
       darMap,
-      if (enableLfDev) Compiler.Config.Dev
-      else Compiler.Config.Default,
+      if (enableLfDev) Compiler.Config.Dev(LanguageMajorVersion.V2)
+      else Compiler.Config.Default(LanguageMajorVersion.V2),
     )
 }

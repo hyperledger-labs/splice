@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 set -e -o pipefail
@@ -11,16 +11,16 @@ set -e -o pipefail
 if git rev-parse --is-inside-work-tree &>/dev/null || false; then
     ROOT_PATH=$(git rev-parse --show-toplevel)
     COMMUNITY_PROTO_PATH=$ROOT_PATH/community/base/src/main/protobuf
-    LEDGER_API_PROTO_PATH=$ROOT_PATH/community/ledger-api-proto/src/main/protobuf
+    LEDGER_API_PROTO_PATH=$ROOT_PATH/community/ledger-api/src/main/protobuf
     ADMIN_API_PROTO_PATH=$ROOT_PATH/community/admin-api/src/main/protobuf
-    LAPI_VALUE_PROTO_PATH=$ROOT_PATH/community/daml-lf/ledger-api-value-proto/src/main/protobuf/com/daml/ledger/api/v2/value.proto
+    LAPI_VALUE_PROTO_PATH=$ROOT_PATH/community/lib/ledger-api-value/target/protobuf_external/com/daml/ledger/api/v2/value.proto
 else
     # Otherwise assume we're running from the release artifact, in which case the protobuf folder is a few levels above
     ROOT_PATH=../../protobuf
     COMMUNITY_PROTO_PATH=$ROOT_PATH/community
-    LEDGER_API_PROTO_PATH=$ROOT_PATH/ledger-api-proto
+    LEDGER_API_PROTO_PATH=$ROOT_PATH/ledger-api
     ADMIN_API_PROTO_PATH=$ROOT_PATH/admin-api
-    LAPI_VALUE_PROTO_PATH=$ROOT_PATH/ledger-api-value-proto/com/daml/ledger/api/v2/value.proto
+    LAPI_VALUE_PROTO_PATH=$LEDGER_API_PROTO_PATH/com/daml/ledger/api/v2/value.proto
 fi
 
 COMMUNITY_CANTON_PROTO_PATH=$COMMUNITY_PROTO_PATH/com/digitalasset/canton
@@ -46,7 +46,6 @@ mkdir -p "com/daml/ledger/api/v2" && cp "$LAPI_VALUE_PROTO_PATH" "com/daml/ledge
 # Google and scalapb common protos also not directly packaged in canton
 download_if_not_exists "https://raw.githubusercontent.com/googleapis/googleapis/3597f7db2191c00b100400991ef96e52d62f5841/google/rpc/status.proto" "google/rpc/status.proto"
 download_if_not_exists "https://raw.githubusercontent.com/protocolbuffers/protobuf/407aa2d9319f5db12964540810b446fecc22d419/src/google/protobuf/empty.proto" "google/protobuf/empty.proto"
-download_if_not_exists "https://raw.githubusercontent.com/protocolbuffers/protobuf/407aa2d9319f5db12964540810b446fecc22d419/src/google/protobuf/field_mask.proto" "google/protobuf/field_mask.proto"
 download_if_not_exists "https://raw.githubusercontent.com/scalapb/ScalaPB/6291978a7ca8b48bd69cc98aa04cb28bc18a44a9/protobuf/scalapb/scalapb.proto" "scalapb/scalapb.proto"
 download_if_not_exists "https://raw.githubusercontent.com/googleapis/googleapis/9415ba048aa587b1b2df2b96fc00aa009c831597/google/rpc/error_details.proto" "google/rpc/error_details.proto"
 
@@ -75,7 +74,6 @@ generate_grpc_service() {
 
 # Generate gRPC client code and proto classes for python
 echo "Generating python code from protobuf definitions"
-generate_grpc_code "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/admin/object_meta.proto"
 generate_grpc_code "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/commands.proto"
 generate_grpc_code "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/completion.proto"
 generate_grpc_code "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/crypto.proto"
@@ -100,12 +98,10 @@ generate_grpc_service "$ADMIN_API_PROTO_PATH" "$ADMIN_API_CANTON_PROTO_PATH/admi
 generate_grpc_code "." "scalapb/scalapb.proto"
 generate_grpc_code "." "google/rpc/status.proto"
 generate_grpc_code "." "google/protobuf/empty.proto"
-generate_grpc_code "." "google/protobuf/field_mask.proto"
 generate_grpc_code "." "google/rpc/error_details.proto"
 generate_grpc_code "." "com/daml/ledger/api/v2/value.proto"
 
 # gRPC services
-generate_grpc_service "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/admin/party_management_service.proto"
 generate_grpc_service "$COMMUNITY_PROTO_PATH" "$TOPOLOGY_ADMIN_PROTO_PATH/topology_manager_write_service.proto"
 generate_grpc_service "$COMMUNITY_PROTO_PATH" "$TOPOLOGY_ADMIN_PROTO_PATH/topology_manager_read_service.proto"
 generate_grpc_service "$LEDGER_API_PROTO_PATH" "$LEDGER_API_V2_PATH/interactive/interactive_submission_service.proto"

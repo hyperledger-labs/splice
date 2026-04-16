@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -10,12 +10,14 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.crypto.provider.jce.JcePrivateCrypto
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPrivateStoreExtended}
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
   CryptoParseAndValidationError,
@@ -198,13 +200,6 @@ final case class AsymmetricEncrypted[+M](
 
   override protected def companionObj: AsymmetricEncrypted.type = AsymmetricEncrypted
 
-  @VisibleForTesting
-  private[canton] def copy[M2](
-      ciphertext: ByteString = ciphertext,
-      encryptionAlgorithmSpec: EncryptionAlgorithmSpec = encryptionAlgorithmSpec,
-      encryptedFor: Fingerprint = encryptedFor,
-  ) = new AsymmetricEncrypted[M2](ciphertext, encryptionAlgorithmSpec, encryptedFor)
-
   def toProtoV30: v30.AsymmetricEncrypted = v30.AsymmetricEncrypted(
     ciphertext,
     encryptionAlgorithmSpec.toProtoEnum,
@@ -219,9 +214,9 @@ final case class AsymmetricEncrypted[+M](
   private[canton] def computeHash(hashAlgorithm: HashAlgorithm): Hash =
     HashBuilderFromMessageDigest
       .apply(hashAlgorithm, HashPurpose.EncryptedSessionKey)
-      .addByteString(ciphertext)
-      .addByteString(DeterministicEncoding.encodeInt(encryptionAlgorithmSpec.toProtoEnum.value))
-      .addByteString(DeterministicEncoding.encodeString(encryptedFor.toProtoPrimitive))
+      .add(ciphertext)
+      .add(DeterministicEncoding.encodeInt(encryptionAlgorithmSpec.toProtoEnum.value))
+      .add(DeterministicEncoding.encodeString(encryptedFor.toProtoPrimitive))
       .finish()
 
 }
@@ -251,7 +246,11 @@ object AsymmetricEncrypted extends HasVersionedMessageCompanion[AsymmetricEncryp
 }
 
 /** An encryption key specification. */
-sealed trait EncryptionKeySpec extends Product with Serializable with PrettyPrinting {
+sealed trait EncryptionKeySpec
+    extends Product
+    with Serializable
+    with PrettyPrinting
+    with UniformCantonConfigValidation {
   def name: String
   def toProtoEnum: v30.EncryptionKeySpec
   override val pretty: Pretty[this.type] = prettyOfString(_.name)
@@ -261,6 +260,9 @@ object EncryptionKeySpec {
 
   implicit val encryptionKeySpecOrder: Order[EncryptionKeySpec] =
     Order.by[EncryptionKeySpec, String](_.name)
+
+  implicit val encryptionKeySpecCantonConfigValidator: CantonConfigValidator[EncryptionKeySpec] =
+    CantonConfigValidatorDerivation[EncryptionKeySpec]
 
   /** Elliptic Curve Key from the P-256 curve (aka Secp256r1) as defined in
     * https://doi.org/10.6028/NIST.FIPS.186-4
@@ -332,7 +334,11 @@ object EncryptionKeySpec {
 }
 
 /** Algorithm schemes for asymmetric/hybrid encryption. */
-sealed trait EncryptionAlgorithmSpec extends Product with Serializable with PrettyPrinting {
+sealed trait EncryptionAlgorithmSpec
+    extends Product
+    with Serializable
+    with PrettyPrinting
+    with UniformCantonConfigValidation {
   def name: String
   def supportDeterministicEncryption: Boolean
   def supportedEncryptionKeySpecs: NonEmpty[Set[EncryptionKeySpec]]
@@ -344,6 +350,10 @@ object EncryptionAlgorithmSpec {
 
   implicit val encryptionAlgorithmSpecOrder: Order[EncryptionAlgorithmSpec] =
     Order.by[EncryptionAlgorithmSpec, String](_.name)
+
+  implicit val encryptionAlgorithmSpecCantonConfigValidator
+      : CantonConfigValidator[EncryptionAlgorithmSpec] =
+    CantonConfigValidatorDerivation[EncryptionAlgorithmSpec]
 
   /* This hybrid scheme (https://www.secg.org/sec1-v2.pdf) from JCE/Bouncy Castle is intended to be used to encrypt
    * the key for the view payload data and can be made deterministic (e.g. using the hash(message ++ public key)
@@ -446,7 +456,11 @@ object RequiredEncryptionSpecs {
 }
 
 /** Key schemes for symmetric encryption. */
-sealed trait SymmetricKeyScheme extends Product with Serializable with PrettyPrinting {
+sealed trait SymmetricKeyScheme
+    extends Product
+    with Serializable
+    with PrettyPrinting
+    with UniformCantonConfigValidation {
   def name: String
   def toProtoEnum: v30.SymmetricKeyScheme
   def keySizeInBytes: Int
@@ -457,6 +471,9 @@ object SymmetricKeyScheme {
 
   implicit val symmetricKeySchemeOrder: Order[SymmetricKeyScheme] =
     Order.by[SymmetricKeyScheme, String](_.name)
+
+  implicit val symmetricKeySchemeCantonConfigValidator: CantonConfigValidator[SymmetricKeyScheme] =
+    CantonConfigValidatorDerivation[SymmetricKeyScheme]
 
   /** AES with 128bit key in GCM */
   case object Aes128Gcm extends SymmetricKeyScheme {
@@ -917,12 +934,12 @@ object EncryptionError {
     """Reduce the size of the payloads or increase the max request size in the dynamic synchronizer parameters."""
   )
   final case class MaxViewSizeExceeded(
-      viewSizeBytes: Int,
-      maxRequestSizeBytes: NonNegativeInt,
+      viewSize: Int,
+      maxRequestSize: MaxRequestSizeToDeserialize.Limit,
   ) extends EncryptionError {
     override protected def pretty: Pretty[MaxViewSizeExceeded] = prettyOfClass(
-      param("view size (bytes)", _.viewSizeBytes),
-      param("max request size configured (bytes)", _.maxRequestSizeBytes),
+      param("view size", _.viewSize),
+      param("max request size configured", _.maxRequestSize.value),
     )
   }
 }

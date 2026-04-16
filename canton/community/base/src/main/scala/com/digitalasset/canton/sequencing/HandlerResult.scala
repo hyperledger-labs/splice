@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -12,7 +12,7 @@ object HandlerResult {
   /** Denotes that the synchronous processing stage for an event has completed and there is no
     * asynchronous processing for this stage.
     */
-  val done: HandlerResult = FutureUnlessShutdown.pure(AsyncResult.pure(UnthrottledAsync.immediate))
+  val done: HandlerResult = FutureUnlessShutdown.pure(AsyncResult.immediate)
 
   /** The given [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] shall be run
     * synchronously, i.e., later stages of processing the request will not start until this future
@@ -23,18 +23,10 @@ object HandlerResult {
     * [[com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown]], the sequencer
     * client will close the subscription.
     */
-  def synchronousUnit(future: FutureUnlessShutdown[Unit])(implicit
+  def synchronous(future: FutureUnlessShutdown[Unit])(implicit
       ec: ExecutionContext
   ): HandlerResult =
     future.map(_ => AsyncResult.immediate)
-
-  /** Similar to [[synchronous]] but the input future returns an [[UnthrottledAsync]] to build the
-    * resulting [[HandlerResult]]
-    */
-  def synchronous(future: FutureUnlessShutdown[UnthrottledAsync])(implicit
-      ec: ExecutionContext
-  ): HandlerResult =
-    future.map(AsyncResult.pure)
 
   /** Embeds an evaluated [[com.digitalasset.canton.lifecycle.UnlessShutdown]] into a
     * [[synchronous]] [[HandlerResult]].
@@ -44,7 +36,7 @@ object HandlerResult {
 
   /** Shorthand for `synchronous(FutureUnlessShutdown.outcomeF(future))` */
   def fromFuture(future: Future[Unit])(implicit ec: ExecutionContext): HandlerResult =
-    synchronousUnit(FutureUnlessShutdown.outcomeF(future))
+    synchronous(FutureUnlessShutdown.outcomeF(future))
 
   /** The given [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] is an asynchronous
     * processing part for the event. It can run in parallel with any of the following: * Earlier
@@ -56,14 +48,6 @@ object HandlerResult {
     * [[com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown]], the sequencer
     * client will eventually close the subscription.
     */
-  def asynchronousUnit(future: FutureUnlessShutdown[Unit])(implicit
-      ec: ExecutionContext
-  ): HandlerResult =
-    FutureUnlessShutdown.pure(AsyncResult(future))
-
-  /** Similar to [[asynchronous]] but the input future returns an [[UnthrottledAsync]] to build the
-    * resulting [[HandlerResult]]
-    */
-  def asynchronous(future: FutureUnlessShutdown[UnthrottledAsync]): HandlerResult =
+  def asynchronous(future: FutureUnlessShutdown[Unit]): HandlerResult =
     FutureUnlessShutdown.pure(AsyncResult(future))
 }

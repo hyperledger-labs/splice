@@ -1,16 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.health
 
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.IdentityConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{DbConfig, IdentityConfig}
 import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -88,7 +88,7 @@ sealed trait StatusIntegrationTest
         assertSequencerUnconnectedStatus(
           health.status().sequencerStatus(sequencer1.name),
           connectedMediators = List(mediator1.id),
-          sequencer1.id,
+          daName,
           testedProtocolVersion,
         )
       }
@@ -99,7 +99,7 @@ sealed trait StatusIntegrationTest
       assertSequencerUnconnectedStatus(
         sequencer1.health.status.trySuccess,
         connectedMediators = Nil,
-        sequencer1.id,
+        daName,
         testedProtocolVersion,
       )
 
@@ -108,7 +108,7 @@ sealed trait StatusIntegrationTest
         assertSequencerUnconnectedStatus(
           sequencer1.health.status.trySuccess,
           connectedMediators = List(mediator1.id),
-          sequencer1.id,
+          daName,
           testedProtocolVersion,
         )
       }
@@ -158,14 +158,12 @@ sealed trait StatusIntegrationTest
       assertSequencerUnconnectedStatus(
         sequencer1.health.status.trySuccess,
         connectedMediators = List(mediator1.id),
-        sequencer1.id,
+        daName,
         testedProtocolVersion,
       )
     }
 
     participant1.synchronizers.connect_local(sequencer1, alias = daName)
-
-    sequencer1.health.status.trySuccess.uid shouldBe sequencer1.id.uid
 
     eventually() {
       assertNodesAreConnected(
@@ -180,5 +178,5 @@ sealed trait StatusIntegrationTest
 
 class StatusReferenceIntegrationTestPostgres extends StatusIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

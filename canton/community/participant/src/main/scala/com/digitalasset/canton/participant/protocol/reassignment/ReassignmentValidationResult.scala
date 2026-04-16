@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -42,8 +42,7 @@ private[reassignment] trait ReassignmentValidationResult {
       reassigningParticipantValidationResult.errors.isEmpty &&
       contractAuthenticationResult.isRight &&
       commonValidationResult.submitterCheckResult.isEmpty &&
-      commonValidationResult.reassignmentIdResult.isEmpty &&
-      commonValidationResult.multiSynchronizerFeatureFlagCheckResult.isEmpty
+      commonValidationResult.reassignmentIdResult.isEmpty
 
 }
 
@@ -64,7 +63,6 @@ private[reassignment] object ReassignmentValidationResult {
         : EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit]
     def submitterCheckResult: Option[ReassignmentValidationError]
     def reassignmentIdResult: Option[ReassignmentValidationError]
-    def multiSynchronizerFeatureFlagCheckResult: Option[ReassignmentValidationError]
   }
 
   private[reassignment] trait ReassigningParticipantValidationResult {

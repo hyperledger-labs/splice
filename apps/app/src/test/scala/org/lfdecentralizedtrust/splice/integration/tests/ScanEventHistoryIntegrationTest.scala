@@ -16,9 +16,9 @@ import definitions.UpdateHistoryItemV2.members.{
 }
 
 import scala.concurrent.duration.*
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
-import monocle.macros.syntax.lens.*
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
@@ -32,10 +32,13 @@ class ScanEventHistoryIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
           scanConfig.copy(
+            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
+              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
+            ),
             // Route mediator admin client via toxiproxy
-            synchronizerNodes = scanConfig.synchronizerNodes
-              .focus(_.current.mediator.port)
-              .modify(p => Port.tryCreate(p.unwrap + 20000))
+            mediatorAdminClient = scanConfig.mediatorAdminClient.copy(
+              port = Port.tryCreate(scanConfig.mediatorAdminClient.port.unwrap + 20000)
+            ),
           )
         )(config)
       )
@@ -110,21 +113,17 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    // Apps need to start before disabling mediator connection,
-    // otherwise scan will never become healthy and `startAllSync` will fail.
+    // Disable mediator admin connectivity via proxy before starting scan
+    toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
+
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    actAndCheck(
-      "Disable mediator admin connectivity via proxy",
-      toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1")),
-    )(
-      "Mediator connectivity is really down",
-      _ => {
+    clue("Wait until mediator connectivity is really down") {
+      eventually() {
         // Check that mediator connection really doesn't work anymore.
         sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
-      },
-    )
-
+      }
+    }
     // after this point, scan should be unable to ingest any verdicts
 
     val _ = onboardAliceAndBob()

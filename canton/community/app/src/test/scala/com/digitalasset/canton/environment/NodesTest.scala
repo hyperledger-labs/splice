@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -7,11 +7,10 @@ import better.files.File
 import cats.Applicative
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.daml.metrics.{ExecutorServiceMetrics, HealthMetrics, OnDemandMetricsReader}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.{
@@ -22,6 +21,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel
 import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{
   DependenciesHealthService,
@@ -35,21 +35,20 @@ import com.digitalasset.canton.metrics.{
   DbStorageMetrics,
   DeclarativeApiMetrics,
   LedgerApiServerMetrics,
+  OnDemandMetricsReader,
 }
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
-import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.{Storage, StorageSingleFactory}
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
-import com.digitalasset.canton.time.{SimClock, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.admin.grpc.PsidLookup
+import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.{
   AuthorizedTopologyManager,
   Member,
-  PhysicalSynchronizerId,
   SynchronizerTopologyManager,
   UniqueIdentifier,
 }
@@ -81,7 +80,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
     override def nodeTypeName: String = "test-node"
     override def clientAdminApi = adminApi.clientConfig
-    override def withDefaults(ports: Option[DefaultPorts]): TestNodeConfig =
+    override def withDefaults(ports: Option[DefaultPorts], edition: CantonEdition): TestNodeConfig =
       this
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
     override val topology: TopologyConfig = TopologyConfig.NotUsed
@@ -100,7 +99,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       loggingConfig: LoggingConfig = LoggingConfig(),
       enableAdditionalConsistencyChecks: Boolean = false,
       enablePreviewFeatures: Boolean = false,
-      enableTestingFeatures: Boolean = false,
       processingTimeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing,
       sequencerClient: SequencerClientConfig = SequencerClientConfig(),
       cachingConfigs: CachingConfigs = CachingConfigs(),
@@ -129,7 +127,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       healthMetrics: HealthMetrics = LedgerApiServerMetrics.ForTesting.health,
       storageMetrics: DbStorageMetrics = CommonMockMetrics.dbStorage,
   ) extends BaseMetrics {
-
     override val declarativeApiMetrics: DeclarativeApiMetrics =
       new DeclarativeApiMetrics(prefix, openTelemetryMetricsFactory)(MetricsContext.Empty)
   }
@@ -141,7 +138,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       parameters = new TestNodeParameters,
       clock = clock,
       metrics = TestMetrics(),
-      executorServiceMetrics = new ExecutorServiceMetrics(NoOpMetricsFactory),
       testingConfig = TestingConfigInternal(),
       futureSupervisor = FutureSupervisor.Noop,
       loggerFactory = loggerFactory,
@@ -157,7 +153,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
   def arguments(config: TestNodeConfig) = factoryArguments(config)
     .toCantonNodeBootstrapCommonArguments(
       storageFactory = new StorageSingleFactory(StorageConfig.Memory()),
-      Option.empty[ReplicaManager],
+      cryptoPrivateStoreFactory = CryptoPrivateStoreFactory.withoutKms(),
     )
     .value
 
@@ -205,18 +201,15 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     override def start(): EitherT[Future, String, Unit] =
       EitherT.pure[Future, String](())
     override protected def lookupTopologyClient(
-        psid: PhysicalSynchronizerId
+        storeId: TopologyStoreId
     ): Option[SynchronizerTopologyClientWithInit] = ???
-    override protected def lookupSynchronizerTimeTracker(
-        psid: PhysicalSynchronizerId
-    ): Option[SynchronizerTimeTracker] = ???
 
     override protected def sequencedTopologyStores
         : Seq[TopologyStore[TopologyStoreId.SynchronizerStore]] = Nil
 
     override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] = Nil
 
-    override protected def lookupActivePsid: PsidLookup =
+    override protected def lookupActivePSId: PSIdLookup =
       _ => None
   }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -6,25 +6,18 @@ package com.digitalasset.canton.ledger.participant.state
 import com.daml.logging.entries.{LoggingEntry, LoggingValue, ToLoggingValue}
 import com.digitalasset.base.error.GrpcStatuses
 import com.digitalasset.canton.RepairCounter
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.RejectionReasonTemplate
-import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
-import com.digitalasset.canton.platform.indexer.TransactionTraversalUtils
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{LfHash, UpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
-import com.digitalasset.canton.util.ShowUtil
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.engine.Blinding
-import com.digitalasset.daml.lf.transaction.{
-  BlindingInfo,
-  CommittedTransaction,
-  TransactionNodeStatistics,
-}
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import com.digitalasset.daml.lf.value.Value
 import com.google.rpc.status.Status as RpcStatus
 
@@ -58,42 +51,57 @@ import scala.concurrent.Promise
   * earlier's [[Update.TransactionAccepted]]. A [[Update.CommandRejected]] completion does not
   * trigger deduplication and implementations SHOULD process such resubmissions normally.
   */
-sealed trait Update extends Product with Serializable with PrettyPrinting with HasTraceContext
-
-/** Update which defines a recordTime, synchronizerId and SynchronizerIndex.
-  */
-sealed trait SynchronizerUpdate extends Update {
+sealed trait Update extends Product with Serializable with PrettyPrinting with HasTraceContext {
 
   /** The record time at which the state change was committed. */
   def recordTime: CantonTimestamp
+}
 
+// TODO(i25076) this will be removed later as Topology Event project progresses
+sealed trait ParticipantUpdate extends Update {
+  def withRecordTime(recordTime: CantonTimestamp): Update
+
+  def persisted: Promise[Unit]
+}
+
+sealed trait SynchronizerUpdate extends Update {
   def synchronizerId: SynchronizerId
-
-  def synchronizerIndex: SynchronizerIndex
 }
 
-sealed trait SequencedUpdate extends SynchronizerUpdate {
-  final override def synchronizerIndex: SynchronizerIndex =
-    SynchronizerIndex.forSequencedUpdate(recordTime)
+/** Update which defines a SynchronizerIndex, and therefore contribute to SynchronizerIndex moving
+  * ahead.
+  */
+sealed trait SynchronizerIndexUpdate extends SynchronizerUpdate {
+  def repairCounterO: Option[RepairCounter]
+
+  def sequencerIndexO: Option[SequencerIndex]
+
+  final def synchronizerIndex: (SynchronizerId, SynchronizerIndex) =
+    synchronizerId -> SynchronizerIndex(
+      repairCounterO.map(RepairIndex(recordTime, _)),
+      sequencerIndexO,
+      recordTime,
+    )
 }
 
-sealed trait FloatingUpdate extends SynchronizerUpdate {
-  final override def synchronizerIndex: SynchronizerIndex =
-    SynchronizerIndex.forFloatingUpdate(recordTime)
+sealed trait SequencedUpdate extends SynchronizerIndexUpdate {
+  final override def sequencerIndexO: Option[SequencerIndex] = Some(SequencerIndex(recordTime))
+
+  final override def repairCounterO: Option[RepairCounter] = None
 }
 
-sealed trait SequencedEventUpdate extends SequencedUpdate
+sealed trait FloatingUpdate extends SynchronizerIndexUpdate {
+  final override def sequencerIndexO: Option[SequencerIndex] = None
 
-sealed trait RepairUpdate extends SynchronizerUpdate {
+  final override def repairCounterO: Option[RepairCounter] = None
+}
+
+sealed trait RepairUpdate extends SynchronizerIndexUpdate {
   def repairCounter: RepairCounter
 
-  final override def synchronizerIndex: SynchronizerIndex =
-    SynchronizerIndex.forRepairUpdate(
-      RepairIndex(
-        timestamp = recordTime,
-        counter = repairCounter,
-      )
-    )
+  final override def repairCounterO: Option[RepairCounter] = Some(repairCounter)
+
+  final override def sequencerIndexO: Option[SequencerIndex] = None
 }
 
 object Update {
@@ -104,6 +112,62 @@ object Update {
     */
   def noOpSeed: LfHash =
     LfHash.assertFromString("00" * LfHash.underlyingHashLength)
+
+  /** Signal that a party is hosted at a participant.
+    *
+    * Repeated `PartyAddedToParticipant` updates are interpreted in the order of their offsets as
+    * follows:
+    *   - set-union semantics for `participantId`; i.e., parties can only be added to, but not
+    *     removed from a participant The `recordTime` and `submissionId` are always metadata for
+    *     their specific `PartyAddedToParticipant` update.
+    *
+    * @param party
+    *   The party identifier.
+    * @param participantId
+    *   The participant that this party was added to.
+    * @param recordTime
+    *   The ledger-provided timestamp at which the party was allocated.
+    * @param submissionId
+    *   The submissionId of the command which requested party to be added.
+    */
+  final case class PartyAddedToParticipant(
+      party: Ref.Party,
+      participantId: Ref.ParticipantId,
+      recordTime: CantonTimestamp,
+      submissionId: Option[Ref.SubmissionId],
+      persisted: Promise[Unit] = Promise(),
+  )(implicit override val traceContext: TraceContext)
+      extends ParticipantUpdate {
+    override protected def pretty: Pretty[PartyAddedToParticipant] =
+      prettyOfClass(
+        param("recordTime", _.recordTime),
+        param("party", _.party),
+        param("participantId", _.participantId),
+        indicateOmittedFields,
+      )
+
+    override def withRecordTime(recordTime: CantonTimestamp): Update =
+      this.copy(recordTime = recordTime)
+  }
+
+  object PartyAddedToParticipant {
+    implicit val `PartyAddedToParticipant to LoggingValue`
+        : ToLoggingValue[PartyAddedToParticipant] = {
+      case PartyAddedToParticipant(
+            party,
+            participantId,
+            recordTime,
+            submissionId,
+            _,
+          ) =>
+        LoggingValue.Nested.fromEntries(
+          Logging.recordTime(recordTime.toLf),
+          Logging.submissionIdOpt(submissionId),
+          Logging.participantId(participantId),
+          Logging.party(party),
+        )
+    }
+  }
 
   final case class TopologyTransactionEffective(
       updateId: UpdateId,
@@ -117,10 +181,15 @@ object Update {
     override def recordTime: CantonTimestamp = effectiveTime
 
     override def pretty: Pretty[TopologyTransactionEffective] =
-      TopologyTransactionEffective.pretty
+      prettyOfClass(
+        param("effectiveTime", _.effectiveTime),
+        param("synchronizerId", _.synchronizerId),
+        param("updateId", _.updateId.tryAsLedgerTransactionId),
+        indicateOmittedFields,
+      )
   }
 
-  object TopologyTransactionEffective extends PrettyUtil {
+  object TopologyTransactionEffective {
 
     sealed trait AuthorizationLevel
     object AuthorizationLevel {
@@ -140,7 +209,6 @@ object Update {
       final case class Added(level: AuthorizationLevel) extends ActiveAuthorization
       final case class ChangedTo(level: AuthorizationLevel) extends ActiveAuthorization
       final case object Revoked extends AuthorizationEvent
-      final case class Onboarding(level: AuthorizationLevel) extends ActiveAuthorization
     }
 
     sealed trait TopologyEvent
@@ -160,23 +228,15 @@ object Update {
         Logging.synchronizerId(topologyTransactionEffective.synchronizerId),
       )
     }
-
-    val pretty: Pretty[TopologyTransactionEffective] =
-      prettyOfClass(
-        param("effectiveTime", _.effectiveTime),
-        param("synchronizerId", _.synchronizerId),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        indicateOmittedFields,
-      )
   }
 
-  sealed trait AcsChangeSequencedUpdate extends SynchronizerUpdate {
+  sealed trait AcsChangeSequencedUpdate extends SynchronizerIndexUpdate {
     def acsChangeFactory: AcsChangeFactory
   }
 
   /** Signal the acceptance of a transaction.
     */
-  trait TransactionAccepted extends SynchronizerUpdate {
+  trait TransactionAccepted extends SynchronizerIndexUpdate {
 
     /** The information provided by the submitter of the command that created this transaction. It
       * must be provided if this participant hosts one of the [[SubmitterInfo.actAs]] parties and
@@ -187,30 +247,55 @@ object Update {
       */
     def completionInfoO: Option[CompletionInfo]
 
-    /** Traffic cost paid by this node for the sequencing of the corresponding transaction event
-      */
-    def paidTrafficCost: Option[NonNegativeLong] = completionInfoO.map(_.paidTrafficCost)
-
     /** The metadata of the transaction that was provided by the submitter. It is visible to all
       * parties that can see the transaction.
       */
     def transactionMeta: TransactionMeta
 
-    def transactionInfo: TransactionAccepted.TransactionInfo
+    /** The view of the transaction that was accepted. This view must include at least the
+      * projection of the accepted transaction to the set of all parties hosted at this participant.
+      * See https://docs.daml.com/concepts/ledger-model/ledger-privacy.html on how these views are
+      * computed.
+      *
+      * Note that ledgers with weaker privacy models can decide to forgo projections of transactions
+      * and always show the complete transaction.
+      */
+    def transaction: CommittedTransaction
 
     def updateId: UpdateId
 
-    /** Transaction hash signed by the external party to authorize the transaction. Only on
-      * externally signed transactions
+    /** For each contract created in this transaction, this map may contain contract authentication
+      * data assigned by the ledger implementation. This data is opaque and can only be used in
+      * [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s when submitting transactions
+      * trough the [[SyncService]]. If a contract created by this transaction is not element of this
+      * map, its authentication data is equal to the empty byte array.
       */
+    def contractAuthenticationData: Map[Value.ContractId, Bytes]
+
+    /** The representative package-ids for the contracts created in this transaction See
+      * [[TransactionAccepted.RepresentativePackageIds]] for more details.
+      */
+    def representativePackageIds: RepresentativePackageIds
+
     def externalTransactionHash: Option[Hash]
 
     def isAcsDelta(contractId: Value.ContractId): Boolean
 
-    /** Maps each contract id (of created or archived events of the transaction) to the
-      * corresponding [[ContractInfo]].
-      */
-    def contractInfos: Map[Value.ContractId, ContractInfo]
+    def internalContractIds: Map[Value.ContractId, Long]
+
+    lazy val blindingInfo: BlindingInfo = Blinding.blind(transaction)
+
+    override protected def pretty: Pretty[TransactionAccepted] =
+      prettyOfClass(
+        param("recordTime", _.recordTime),
+        paramIfDefined("repairCounter", _.repairCounterO),
+        param("updateId", _.updateId.tryAsLedgerTransactionId),
+        param("transactionMeta", _.transactionMeta),
+        paramIfDefined("completion", _.completionInfoO),
+        param("nodes", _.transaction.nodes.size),
+        param("roots", _.transaction.roots.length),
+        indicateOmittedFields,
+      )
   }
 
   object TransactionAccepted {
@@ -232,102 +317,57 @@ object Update {
       * package-id guarantee is required for ensuring correct rendering of contract create values on
       * the gRPC/JSON Ledger API read queries.
       */
-    sealed trait RepresentativePackageId extends Product with Serializable
-    object RepresentativePackageId {
+    sealed trait RepresentativePackageIds extends Product with Serializable
+    object RepresentativePackageIds {
+      def from(
+          representativePackageIds: Map[Value.ContractId, Ref.PackageId]
+      ): DedicatedRepresentativePackageIds =
+        DedicatedRepresentativePackageIds(representativePackageIds)
 
-      /** Signals that the representative package-id of the created contract referenced in this
+      /** Signals that the representative package-id of the created contracts referenced in this
         * transaction are the same as the contract's creation package-id.
         */
-      case object SameAsContractPackageId extends RepresentativePackageId
+      case object SameAsContractPackageId extends RepresentativePackageIds
 
-      final case class DedicatedRepresentativePackageId(
-          representativePackageId: Ref.PackageId
-      ) extends RepresentativePackageId
-    }
-
-    final case class TransactionInfo(
-        blindingInfo: BlindingInfo,
-        executionOrder: Seq[TransactionTraversalUtils.NodeInfo],
-        statistics: TransactionNodeStatistics,
-        noOfNodes: Int,
-        noOfRootNodes: Int,
-    )
-    object TransactionInfo {
-      def apply(transaction: CommittedTransaction): TransactionInfo = TransactionInfo(
-        blindingInfo = Blinding.blind(transaction),
-        executionOrder = TransactionTraversalUtils
-          .executionOrderTraversalForIngestion(transaction.transaction)
-          .toVector,
-        statistics = TransactionNodeStatistics(
-          transaction,
-          Set.empty[Ref.PackageId],
-        ),
-        noOfNodes = transaction.nodes.size,
-        noOfRootNodes = transaction.roots.length,
-      )
+      final case class DedicatedRepresentativePackageIds(
+          representativePackageIds: Map[Value.ContractId, Ref.PackageId]
+      ) extends RepresentativePackageIds
+      val Empty: DedicatedRepresentativePackageIds = DedicatedRepresentativePackageIds(Map.empty)
     }
   }
-
-  /** Information about a contract needed for indexing.
-    *
-    * @param internalContractId
-    *   The internal contract id assigned to the contract.
-    * @param contractAuthenticationData
-    *   Contract authentication data assigned by the ledger implementation. This data is opaque and
-    *   can only be used in [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s when
-    *   submitting transactions through the [[SyncService]].
-    * @param representativePackageId
-    *   The representative package-id for the contract, if the contract is created in this
-    *   transaction. See [[TransactionAccepted.RepresentativePackageId]] for more details.
-    */
-  final case class ContractInfo(
-      internalContractId: Long,
-      contractAuthenticationData: Bytes,
-      representativePackageId: RepresentativePackageId,
-  )
 
   final case class SequencedTransactionAccepted(
       completionInfoO: Option[CompletionInfo],
       transactionMeta: TransactionMeta,
-      transactionInfo: TransactionAccepted.TransactionInfo,
+      transaction: CommittedTransaction,
       updateId: UpdateId,
+      contractAuthenticationData: Map[Value.ContractId, Bytes],
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
       acsChangeFactory: AcsChangeFactory,
-      contractInfos: Map[Value.ContractId, ContractInfo],
+      internalContractIds: Map[Value.ContractId, Long],
       externalTransactionHash: Option[Hash] = None,
   )(implicit override val traceContext: TraceContext)
       extends TransactionAccepted
-      with SequencedEventUpdate
+      with SequencedUpdate
       with AcsChangeSequencedUpdate {
     override def isAcsDelta(contractId: Value.ContractId): Boolean =
       acsChangeFactory.contractActivenessChanged(contractId)
 
-    override protected def pretty: Pretty[TransactionAccepted] =
-      SequencedTransactionAccepted.pretty
-  }
-
-  object SequencedTransactionAccepted extends PrettyUtil {
-    val pretty: Pretty[TransactionAccepted] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        param("transactionMeta", _.transactionMeta),
-        paramIfDefined("completion", _.completionInfoO),
-        param("nodes", _.transactionInfo.noOfNodes),
-        param("roots", _.transactionInfo.noOfRootNodes),
-        indicateOmittedFields,
-      )
+    override val representativePackageIds: RepresentativePackageIds.SameAsContractPackageId.type =
+      RepresentativePackageIds.SameAsContractPackageId
   }
 
   final case class RepairTransactionAccepted(
       transactionMeta: TransactionMeta,
-      transactionInfo: TransactionAccepted.TransactionInfo,
+      transaction: CommittedTransaction,
       updateId: UpdateId,
+      contractAuthenticationData: Map[Value.ContractId, Bytes],
+      representativePackageIds: RepresentativePackageIds,
       synchronizerId: SynchronizerId,
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
-      contractInfos: Map[Value.ContractId, ContractInfo],
+      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends TransactionAccepted
       with RepairUpdate {
@@ -337,26 +377,9 @@ object Update {
 
     // Repair transactions have only contracts which affect the ACS.
     override def isAcsDelta(contractId: Value.ContractId): Boolean = true
-
-    override protected def pretty: Pretty[RepairTransactionAccepted] =
-      RepairTransactionAccepted.pretty
   }
 
-  object RepairTransactionAccepted extends PrettyUtil {
-    val pretty: Pretty[RepairTransactionAccepted] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("repairCounter", _.repairCounter),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        param("transactionMeta", _.transactionMeta),
-        paramIfDefined("completion", _.completionInfoO),
-        param("nodes", _.transactionInfo.noOfNodes),
-        param("roots", _.transactionInfo.noOfRootNodes),
-        indicateOmittedFields,
-      )
-  }
-
-  trait ReassignmentAccepted extends SynchronizerUpdate {
+  trait ReassignmentAccepted extends SynchronizerIndexUpdate {
 
     /** The information provided by the submitter of the command that created this reassignment. It
       * must be provided if this participant hosts the submitter and shall output a completion event
@@ -364,10 +387,6 @@ object Update {
       * command to the [[SyncService]].
       */
     def optCompletionInfo: Option[CompletionInfo]
-
-    /** Traffic cost paid by this node for the sequencing of the corresponding transaction event
-      */
-    def paidTrafficCost: Option[NonNegativeLong] = optCompletionInfo.map(_.paidTrafficCost)
 
     /** A submitter-provided identifier used for monitoring and to traffic-shape the work handled by
       * Daml applications
@@ -384,9 +403,18 @@ object Update {
 
     def reassignment: Reassignment.Batch
 
-    def kind: String = if (reassignmentInfo.sourceSynchronizer.unwrap == synchronizerId)
-      "unassignment"
-    else "assignment"
+    def internalContractIds: Map[Value.ContractId, Long]
+
+    override protected def pretty: Pretty[ReassignmentAccepted] =
+      prettyOfClass(
+        param("recordTime", _.recordTime),
+        paramIfDefined("repairCounter", _.repairCounterO),
+        param("updateId", _.updateId.tryAsLedgerTransactionId),
+        paramIfDefined("completion", _.optCompletionInfo),
+        param("source", _.reassignmentInfo.sourceSynchronizer),
+        param("target", _.reassignmentInfo.targetSynchronizer),
+        indicateOmittedFields,
+      )
   }
 
   final case class SequencedReassignmentAccepted(
@@ -398,27 +426,11 @@ object Update {
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
       acsChangeFactory: AcsChangeFactory,
+      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
-      with SequencedEventUpdate
-      with AcsChangeSequencedUpdate {
-
-    override protected def pretty: Pretty[SequencedReassignmentAccepted] =
-      SequencedReassignmentAccepted.pretty
-  }
-
-  object SequencedReassignmentAccepted extends PrettyUtil with ShowUtil {
-    val pretty: Pretty[SequencedReassignmentAccepted] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        paramIfDefined("completion", _.optCompletionInfo),
-        param("source", _.reassignmentInfo.sourceSynchronizer),
-        param("target", _.reassignmentInfo.targetSynchronizer),
-        param("kind", _.kind.unquoted),
-        indicateOmittedFields,
-      )
-  }
+      with SequencedUpdate
+      with AcsChangeSequencedUpdate
 
   final case class RepairReassignmentAccepted(
       workflowId: Option[Ref.WorkflowId],
@@ -428,27 +440,11 @@ object Update {
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
+      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with RepairUpdate {
     override def optCompletionInfo: Option[CompletionInfo] = None
-
-    override protected def pretty: Pretty[RepairReassignmentAccepted] =
-      RepairReassignmentAccepted.pretty
-  }
-
-  object RepairReassignmentAccepted extends PrettyUtil with ShowUtil {
-    val pretty: Pretty[RepairReassignmentAccepted] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("repairCounter", _.repairCounter),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        paramIfDefined("completion", _.optCompletionInfo),
-        param("source", _.reassignmentInfo.sourceSynchronizer),
-        param("target", _.reassignmentInfo.targetSynchronizer),
-        param("kind", _.kind.unquoted),
-        indicateOmittedFields,
-      )
   }
 
   final case class OnPRReassignmentAccepted(
@@ -460,28 +456,12 @@ object Update {
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
       acsChangeFactory: AcsChangeFactory,
+      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with RepairUpdate
       with AcsChangeSequencedUpdate {
     override def optCompletionInfo: Option[CompletionInfo] = None
-
-    override protected def pretty: Pretty[OnPRReassignmentAccepted] =
-      OnPRReassignmentAccepted.pretty
-  }
-
-  object OnPRReassignmentAccepted extends PrettyUtil with ShowUtil {
-    val pretty: Pretty[OnPRReassignmentAccepted] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("repairCounter", _.repairCounter),
-        param("updateId", _.updateId.tryAsLedgerTransactionId),
-        paramIfDefined("completion", _.optCompletionInfo),
-        param("source", _.reassignmentInfo.sourceSynchronizer),
-        param("target", _.reassignmentInfo.targetSynchronizer),
-        param("kind", _.kind.unquoted),
-        indicateOmittedFields,
-      )
   }
 
   object ReassignmentAccepted {
@@ -492,14 +472,13 @@ object Update {
           Logging.completionInfo(reassignmentAccepted.optCompletionInfo),
           Logging.updateId(reassignmentAccepted.updateId),
           Logging.workflowIdOpt(reassignmentAccepted.workflowId),
-          Logging.optionalTrafficCost(reassignmentAccepted.paidTrafficCost),
         )
     }
   }
 
   /** Signal that a command submitted via [[SyncService]] was rejected.
     */
-  sealed trait CommandRejected extends SynchronizerUpdate {
+  sealed trait CommandRejected extends SynchronizerIndexUpdate {
 
     /** The completion information for the submission
       */
@@ -517,9 +496,13 @@ object Update {
     final def definiteAnswer: Boolean = reasonTemplate.definiteAnswer
 
     override protected def pretty: Pretty[CommandRejected] =
-      CommandRejected.pretty
-
-    def isTransaction: Boolean
+      prettyOfClass(
+        param("recordTime", _.recordTime),
+        param("completion", _.completionInfo),
+        paramIfTrue("definiteAnswer", _.definiteAnswer),
+        param("reason", _.reasonTemplate.message.singleQuoted),
+        param("synchronizerId", _.synchronizerId.uid),
+      )
   }
 
   final case class SequencedCommandRejected(
@@ -527,10 +510,9 @@ object Update {
       reasonTemplate: RejectionReasonTemplate,
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
-      isTransaction: Boolean,
   )(implicit override val traceContext: TraceContext)
       extends CommandRejected
-      with SequencedEventUpdate
+      with SequencedUpdate
 
   final case class UnSequencedCommandRejected(
       completionInfo: CompletionInfo,
@@ -538,12 +520,11 @@ object Update {
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
       messageUuid: UUID,
-      isTransaction: Boolean,
   )(implicit override val traceContext: TraceContext)
       extends CommandRejected
       with FloatingUpdate
 
-  object CommandRejected extends PrettyUtil with ShowUtil {
+  object CommandRejected {
 
     implicit val `CommandRejected to LoggingValue`: ToLoggingValue[CommandRejected] = {
       case commandRejected: CommandRejected =>
@@ -557,15 +538,6 @@ object Update {
           Logging.synchronizerId(commandRejected.synchronizerId),
         )
     }
-
-    val pretty: Pretty[CommandRejected] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("completion", _.completionInfo),
-        paramIfTrue("definiteAnswer", _.definiteAnswer),
-        param("reason", _.reasonTemplate.message.singleQuoted),
-        param("synchronizerId", _.synchronizerId.uid),
-      )
 
     /** A template for generating gRPC status codes.
       */
@@ -619,43 +591,35 @@ object Update {
       )
   }
 
-  object SequencerIndexMoved extends PrettyUtil {
+  object SequencerIndexMoved {
     implicit val `SequencerIndexMoved to LoggingValue`: ToLoggingValue[SequencerIndexMoved] =
       seqIndexMoved =>
         LoggingValue.Nested.fromEntries(
           Logging.synchronizerId(seqIndexMoved.synchronizerId),
           "sequencerTimestamp" -> seqIndexMoved.recordTime.toInstant,
         )
-
-    val pretty: Pretty[SequencerIndexMoved] =
-      prettyOfClass(
-        param("synchronizerId", _.synchronizerId.uid),
-        param("sequencerTimestamp", _.recordTime),
-      )
   }
 
-  final case class LsuTimeReached(
+  final case class LogicalSynchronizerUpgradeTimeReached(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
   )(implicit override val traceContext: TraceContext)
       extends FloatingUpdate {
-    override protected def pretty: Pretty[LsuTimeReached] =
-      LsuTimeReached.pretty
-  }
-
-  object LsuTimeReached extends PrettyUtil {
-    implicit val `LsuTimeReached to LoggingValue`: ToLoggingValue[LsuTimeReached] =
-      lsuTimeReached =>
-        LoggingValue.Nested.fromEntries(
-          Logging.synchronizerId(lsuTimeReached.synchronizerId),
-          "sequencerTimestamp" -> lsuTimeReached.recordTime.toInstant,
-        )
-
-    val pretty: Pretty[LsuTimeReached] =
+    override protected def pretty: Pretty[LogicalSynchronizerUpgradeTimeReached] =
       prettyOfClass(
         param("synchronizerId", _.synchronizerId.uid),
         param("sequencerTimestamp", _.recordTime),
       )
+  }
+
+  object LogicalSynchronizerUpgradeTimeReached {
+    implicit val `LogicalSynchronizerUpgradeTimeReached to LoggingValue`
+        : ToLoggingValue[LogicalSynchronizerUpgradeTimeReached] =
+      logicalSynchronizerUpgradeTimeReached =>
+        LoggingValue.Nested.fromEntries(
+          Logging.synchronizerId(logicalSynchronizerUpgradeTimeReached.synchronizerId),
+          "sequencerTimestamp" -> logicalSynchronizerUpgradeTimeReached.recordTime.toInstant,
+        )
   }
 
   final case class EmptyAcsPublicationRequired(
@@ -664,10 +628,13 @@ object Update {
   )(implicit override val traceContext: TraceContext)
       extends FloatingUpdate {
     override protected def pretty: Pretty[EmptyAcsPublicationRequired] =
-      EmptyAcsPublicationRequired.pretty
+      prettyOfClass(
+        param("synchronizerId", _.synchronizerId.uid),
+        param("sequencerTimestamp", _.recordTime),
+      )
   }
 
-  object EmptyAcsPublicationRequired extends PrettyUtil {
+  object EmptyAcsPublicationRequired {
     implicit val `EmptyAcsPublicationRequired to LoggingValue`
         : ToLoggingValue[EmptyAcsPublicationRequired] =
       emptyAcsPublicationRequired =>
@@ -675,21 +642,19 @@ object Update {
           Logging.synchronizerId(emptyAcsPublicationRequired.synchronizerId),
           "sequencerTimestamp" -> emptyAcsPublicationRequired.recordTime.toInstant,
         )
-
-    val pretty: Pretty[EmptyAcsPublicationRequired] =
-      prettyOfClass(
-        param("synchronizerId", _.synchronizerId.uid),
-        param("sequencerTimestamp", _.recordTime),
-      )
   }
 
   final case class CommitRepair()(implicit override val traceContext: TraceContext) extends Update {
     val persisted: Promise[Unit] = Promise()
 
     override protected def pretty: Pretty[CommitRepair] = prettyOfClass()
+
+    override val recordTime: CantonTimestamp = CantonTimestamp.now()
   }
 
   implicit val `Update to LoggingValue`: ToLoggingValue[Update] = {
+    case update: PartyAddedToParticipant =>
+      PartyAddedToParticipant.`PartyAddedToParticipant to LoggingValue`.toLoggingValue(update)
     case update: TopologyTransactionEffective =>
       TopologyTransactionEffective.`TopologyTransactionEffective to LoggingValue`.toLoggingValue(
         update
@@ -704,8 +669,8 @@ object Update {
       EmptyAcsPublicationRequired.`EmptyAcsPublicationRequired to LoggingValue`.toLoggingValue(
         update
       )
-    case update: LsuTimeReached =>
-      LsuTimeReached.`LsuTimeReached to LoggingValue`
+    case update: LogicalSynchronizerUpgradeTimeReached =>
+      LogicalSynchronizerUpgradeTimeReached.`LogicalSynchronizerUpgradeTimeReached to LoggingValue`
         .toLoggingValue(
           update
         )
@@ -768,12 +733,6 @@ object Update {
 
     def synchronizerId(synchronizerId: SynchronizerId): LoggingEntry =
       "synchronizerId" -> synchronizerId.toString
-
-    def trafficCost(trafficCost: NonNegativeLong): LoggingEntry =
-      "trafficCost" -> trafficCost.value.toString
-
-    def optionalTrafficCost(trafficCost: Option[NonNegativeLong]): LoggingEntry =
-      "trafficCost" -> trafficCost.map(_.value.toString)
   }
 
 }

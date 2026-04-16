@@ -52,15 +52,11 @@ testSynchronizerMigration = do
         sequencerId = "sequencer-id-" <> partyToText sv
         url = "sequencer.address:1234"
         availableAfter = Some now
-      sequencerIdentity = Some SequencerIdentityConfig with
-        sequencerId = "sequencer-id-" <> partyToText sv
-        availableAfter = Some now
       mediator = Some MediatorConfig with
         mediatorId = "mediator-id-" <> partyToText sv
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
-      physicalSynchronizers = None
 
   -- SVs mark the synchronizer as operational
   executeDsoRulesConfigChange app $ \config ->

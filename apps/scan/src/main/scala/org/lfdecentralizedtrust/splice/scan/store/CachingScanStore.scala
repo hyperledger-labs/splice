@@ -37,7 +37,6 @@ import org.lfdecentralizedtrust.splice.store.{
   MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
-  ResultsPage,
   SortOrder,
   SynchronizerStore,
   TxLogStore,
@@ -210,11 +209,6 @@ class CachingScanStore(
       store.lookupFeaturedAppRight,
     ).get(providerPartyId)
 
-  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
-      tc: TraceContext
-  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    store.listFeaturedAppRightsByProvider(providerPartyId)
-
   override def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[AnsEntry.ContractId, AnsEntry]]] =
@@ -311,8 +305,7 @@ class CachingScanStore(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
-      after: Option[Long] = None,
-  )(implicit tc: TraceContext): Future[ResultsPage[DsoRules_CloseVoteRequestResult]] =
+  )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] =
     getCache(
       "listVoteRequestResults",
       cacheConfig.voteRequests,
@@ -325,7 +318,6 @@ class CachingScanStore(
         effectiveFrom,
         effectiveTo,
         limit,
-        after,
       )
     )
 
@@ -371,9 +363,7 @@ class CachingScanStore(
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
 
-  @SuppressWarnings(
-    Array("org.wartremover.warts.AsInstanceOf", "com.digitalasset.canton.RequireBlocking")
-  )
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def getCache[Key, Value](
       cacheName: String,
       cacheConfig: CacheConfig,

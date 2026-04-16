@@ -1,10 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
 
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   ExecutionContextMonitor,
@@ -62,8 +60,8 @@ trait HasExecutorServiceGeneric extends NamedLogging {
     val service = Threading.newExecutionContext(
       executionContextName,
       noTracingLogger,
+      None,
       threads,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
       exitOnFatal = exitOnFatal,
     )
     val monitor =

@@ -1,17 +1,20 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.admin.api.client.data.{
-  GrpcSequencerConnection,
-  SynchronizerConnectionConfig,
-}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
+  UsePostgres,
+  UseReferenceBlockSequencer,
+}
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.google.protobuf.ByteString
 
 trait SynchronizerConnectivityIsolatedIntegrationTest
@@ -29,7 +32,10 @@ trait SynchronizerConnectivityIsolatedIntegrationTest
       participant1.synchronizers.active(daName) shouldBe true
 
       participant2.synchronizers.connect_by_config(
-        SynchronizerConnectionConfig(daName, sequencer1)
+        SynchronizerConnectionConfig(
+          daName,
+          SequencerConnections.single(sequencer1.sequencerConnection),
+        )
       )
       participant2.synchronizers.active(daName) shouldBe true
       participant2.synchronizers.disconnect(daName)
@@ -41,7 +47,7 @@ trait SynchronizerConnectivityIsolatedIntegrationTest
       participant3.synchronizers.connect_by_config(
         SynchronizerConnectionConfig(
           daName,
-          sequencer1,
+          SequencerConnections.single(sequencer1.sequencerConnection),
           manualConnect = true,
         )
       )
@@ -56,7 +62,12 @@ trait SynchronizerConnectivityIsolatedIntegrationTest
       Seq(participant1, participant2).foreach(_.synchronizers.active(daName) shouldBe true)
 
       Seq(participant3, participant4).synchronizers
-        .register(SynchronizerConnectionConfig(daName, sequencer1))
+        .register(
+          SynchronizerConnectionConfig(
+            daName,
+            SequencerConnections.single(sequencer1.sequencerConnection),
+          )
+        )
       Seq(participant3, participant4).foreach(_.synchronizers.active(daName) shouldBe false)
       Seq(participant3, participant4).synchronizers.reconnect_all()
       Seq(participant3, participant4).foreach(_.synchronizers.active(daName) shouldBe true)
@@ -70,7 +81,7 @@ trait SynchronizerConnectivityIsolatedIntegrationTest
         .register(
           SynchronizerConnectionConfig(
             acmeName,
-            sequencer2,
+            SequencerConnections.single(sequencer2.sequencerConnection),
             manualConnect = true,
           )
             .withCertificates(SequencerAlias.Default, acmeCertificate)
@@ -83,6 +94,22 @@ trait SynchronizerConnectivityIsolatedIntegrationTest
 
 //class SynchronizerConnectivityIsolatedReferenceIntegrationTestDefault
 //  extends SynchronizerConnectivityIsolatedIntegrationTests
+
+class SynchronizerConnectivityIsolatedReferenceIntegrationTestPostgres
+    extends SynchronizerConnectivityIsolatedIntegrationTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
+      loggerFactory,
+      sequencerGroups = MultiSynchronizer(
+        Seq(
+          Set(InstanceName.tryCreate("sequencer1")),
+          Set(InstanceName.tryCreate("sequencer2")),
+        )
+      ),
+    )
+  )
+}
 
 class SynchronizerConnectivityIsolatedBftOrderingIntegrationTestPostgres
     extends SynchronizerConnectivityIsolatedIntegrationTest {

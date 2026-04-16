@@ -1,23 +1,18 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.bftsynchronizer
 
-import com.digitalasset.canton.admin.api.client.data.{
-  ComponentHealthState,
-  ComponentStatus,
-  SequencerConnection,
-  SequencerConnections,
-}
+import com.digitalasset.canton.admin.api.client.data.{ComponentHealthState, ComponentStatus}
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -28,6 +23,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
+import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import monocle.macros.syntax.lens.*
 
@@ -100,8 +96,8 @@ trait SequencerOnboardingTombstoneTest
     onboardNewSequencer(
       // synchronizerId,
       initializedSynchronizers(daName).physicalSynchronizerId,
-      newSequencer = sequencer2,
-      existingSequencer = sequencer1,
+      newSequencerReference = sequencer2,
+      existingSequencerReference = sequencer1,
       synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
     )
 
@@ -136,6 +132,8 @@ trait SequencerOnboardingTombstoneTest
         participant1,
         sequencer2.sequencerConnection.withAlias(SequencerAlias.tryCreate("seq2x")),
       )
+
+      val usingPool = participant1.config.sequencerClient.useNewConnectionPool
 
       loggerFactory.assertLogsUnorderedOptional(
         {
@@ -190,19 +188,27 @@ trait SequencerOnboardingTombstoneTest
         ),
         (
           LogEntryOptionality.Required,
-          (entry: LogEntry) => {
-            entry.loggerName should include("SequencerSubscription")
-            entry.warningMessage should (include(
-              "Permanently closing sequencer subscription due to error"
-            ) and include(
-              "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
-            ))
-          },
+          (entry: LogEntry) =>
+            if (usingPool) {
+              entry.loggerName should include("SequencerSubscriptionX")
+              entry.warningMessage should (include(
+                "Permanently closing sequencer subscription due to error"
+              ) and include(
+                "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
+              ))
+            } else {
+              entry.loggerName should include("ResilientSequencerSubscription")
+              entry.warningMessage should (include(
+                "Closing resilient sequencer subscription due to error"
+              ) and include(
+                "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
+              ))
+            },
         ),
         (
           LogEntryOptionality.OptionalMany,
           (entry: LogEntry) => {
-            entry.loggerName should include("GrpcConnection")
+            entry.loggerName should include("GrpcConnectionX")
             entry.warningMessage should include(
               "Request failed for server-seq2x-0"
             )
@@ -282,12 +288,6 @@ trait SequencerOnboardingTombstoneTest
 }
 
 class SequencerOnboardingTombstoneTestPostgres extends SequencerOnboardingTombstoneTest {
-  val plugin = new UseBftSequencer(
-    loggerFactory,
-    dynamicallyOnboardedSequencerNames = Seq(InstanceName.tryCreate("sequencer2")),
-  )
-  override val bftSequencerPlugin: Option[UseBftSequencer] = Some(plugin)
-
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(plugin)
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

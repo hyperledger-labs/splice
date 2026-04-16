@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -36,13 +36,13 @@ trait RoutingSynchronizerState {
     *   error if the requested synchronizer is not connected
     */
   def getTopologySnapshotFor(
-      psid: PhysicalSynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   ): Either[UnableToQueryTopologySnapshot.Failed, TopologySnapshotLoader]
 
   def getTopologySnapshotFor(
-      targetPsid: Target[PhysicalSynchronizerId]
+      synchronizerId: Target[PhysicalSynchronizerId]
   ): Either[UnableToQueryTopologySnapshot.Failed, Target[TopologySnapshotLoader]] =
-    getTopologySnapshotFor(targetPsid.unwrap).map(Target(_))
+    getTopologySnapshotFor(synchronizerId.unwrap).map(Target(_))
 
   def getSynchronizersOfContracts(
       coids: Seq[LfContractId]

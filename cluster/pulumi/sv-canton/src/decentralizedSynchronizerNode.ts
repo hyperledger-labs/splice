@@ -91,13 +91,6 @@ abstract class InStackDecentralizedSynchronizerNode
           type: 'cantonbft';
           externalAddress: string;
           externalPort: number;
-          persistence?: {
-            host?: Output<string>;
-            secretName?: Output<string>;
-            databaseName?: string;
-            port?: number;
-            user?: string;
-          };
         },
     version: CnChartVersion,
     logLevel?: LogLevel,
@@ -301,9 +294,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
         type: 'cantonbft',
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
         externalPort: 443,
-        persistence: {
-          databaseName: `sequencer_${migrationId}_dabft`,
-        },
       },
       version,
       svConfig.logging?.cantonLogLevel,

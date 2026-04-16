@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.ha
 
 import com.digitalasset.canton.platform.store.backend.DBLockStorageBackend
-import com.digitalasset.canton.util.Mutex
 
 import java.sql.{
   Blob,
@@ -79,7 +78,7 @@ class TestDBLockStorageBackend extends DBLockStorageBackend {
 
   private def removeClosedConnectionRelatedLocks(): Unit =
     locks = locks.collect {
-      case (dblock, conns) if conns.exists(!_.isClosed) => (dblock, conns.filter(!_.isClosed))
+      case (lock, conns) if conns.exists(!_.isClosed) => (lock, conns.filter(!_.isClosed))
     }
 
   override def lock(id: Int): DBLockStorageBackend.LockId =
@@ -100,8 +99,6 @@ class TestDBLockStorageBackend extends DBLockStorageBackend {
 final case class TestLockId(id: Int) extends DBLockStorageBackend.LockId
 
 class TestConnection extends Connection {
-  private val lock = new Mutex()
-
   override def createStatement(): Statement = throw new UnsupportedOperationException
 
   override def prepareStatement(s: String): PreparedStatement =
@@ -121,11 +118,11 @@ class TestConnection extends Connection {
 
   private var _closed: Boolean = false
 
-  override def close(): Unit = (lock.exclusive {
+  override def close(): Unit = blocking(synchronized {
     _closed = true
   })
 
-  override def isClosed: Boolean = (lock.exclusive(_closed))
+  override def isClosed: Boolean = blocking(synchronized(_closed))
 
   override def getMetaData: DatabaseMetaData = throw new UnsupportedOperationException
 

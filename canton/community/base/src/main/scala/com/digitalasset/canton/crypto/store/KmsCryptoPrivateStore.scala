@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
 
 import cats.data.{EitherT, OptionT}
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout}
@@ -36,13 +37,6 @@ class KmsCryptoPrivateStore(
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, KmsMetadata] =
     OptionT(metadataStore.get(keyId))
-
-  private def getKeysMetadataInternal(
-      keyIds: Seq[Fingerprint]
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[Fingerprint, Option[KmsMetadata]]] =
-    metadataStore.getAll(keyIds)
 
   protected[crypto] def getKeyMetadata(
       keyId: Fingerprint
@@ -122,15 +116,11 @@ class KmsCryptoPrivateStore(
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Seq[Fingerprint]] =
     for {
       signingKeys <- EitherT.right {
-        lock
-          .withReadLock {
-            getKeysMetadataInternal(signingKeyIds)
+        signingKeyIds.forgetNE.parTraverseFilter(signingKeyId =>
+          lock.withReadLock {
+            getKeyMetadataInternal(signingKeyId).value
           }
-          .map { results =>
-            signingKeyIds.forgetNE.flatMap { keyId =>
-              results.get(keyId).flatten
-            }
-          }
+        )
       }
       filteredSigningKeys =
         signingKeys
@@ -177,11 +167,21 @@ object KmsCryptoPrivateStore {
       kmsCacheConfig: CacheConfig,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext): KmsCryptoPrivateStore =
+  )(implicit ec: ExecutionContext): CryptoPrivateStore =
     new KmsCryptoPrivateStore(
       kms,
       KmsMetadataStore.create(storage, kmsCacheConfig, timeouts, loggerFactory),
       loggerFactory,
     )
 
+  def fromCryptoPrivateStore(
+      cryptoPrivateStore: CryptoPrivateStore
+  ): Either[String, KmsCryptoPrivateStore] =
+    cryptoPrivateStore match {
+      case store: KmsCryptoPrivateStore => Right(store)
+      case _ =>
+        Left(
+          s"The crypto private store is not set as an external KMS crypto private store"
+        )
+    }
 }

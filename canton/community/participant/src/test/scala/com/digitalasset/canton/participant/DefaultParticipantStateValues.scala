@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
 
 import cats.syntax.option.*
 import com.digitalasset.canton.DefaultDamlValues.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.protocol.*
@@ -45,7 +44,6 @@ object DefaultParticipantStateValues {
       commandId: CommandId = DefaultDamlValues.commandId(),
       optDeduplicationPeriod: Option[DeduplicationPeriod] = Some(deduplicationDuration),
       submissionId: Option[Ref.SubmissionId] = DefaultDamlValues.submissionId().some,
-      paidTrafficCost: NonNegativeLong = NonNegativeLong.zero,
   ): CompletionInfo =
     CompletionInfo(
       actAs,
@@ -53,7 +51,6 @@ object DefaultParticipantStateValues {
       commandId.unwrap,
       optDeduplicationPeriod,
       submissionId,
-      paidTrafficCost,
     )
 
   def transactionMeta(

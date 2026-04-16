@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -174,23 +174,18 @@ final case class TransactionView private (
     subviews = Some(subviews.toProtoV30),
   )
 
-  /** The global key inputs that the
-    * [[com.digitalasset.daml.lf.transaction.LegacyContractStateMachine]] computes while
-    * interpreting the root action of the view, enriched with the maintainers of the key and the
-    * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing the key.
+  /** The global key inputs that the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]]
+    * computes while interpreting the root action of the view, enriched with the maintainers of the
+    * key and the [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing
+    * the key.
     *
     * @throws java.lang.IllegalStateException
     *   if the [[ViewParticipantData]] of this view or any subview is blinded
     */
-  def keyMaintainers(implicit
+  def globalKeyInputs(implicit
       loggingContext: NamedLoggingContext
   ): Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]] =
     _globalKeyInputs.get
-
-  def legacyGlobalKeyInputs(implicit
-      loggingContext: NamedLoggingContext
-  ): Map[LfGlobalKey, LfVersioned[LegacyKeyResolutionWithMaintainers]] =
-    _globalKeyInputs.get.fmap(_.map(LegacyKeyResolutionWithMaintainers.tryFromNextGen))
 
   private[this] val _globalKeyInputs
       : NamedLoggingLazyVal[Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]]] =
@@ -202,10 +197,10 @@ final case class TransactionView private (
           s"Global key inputs of view $viewHash can be computed only if all subviews are unblinded, but $hash is blinded"
         )
 
-        subviews.unblindedElements.foldLeft(viewParticipantData.keyMaintainers) { (acc, subview) =>
-          val subviewGki = subview.keyMaintainers
-          // TODO(#31527): SPM review this use
-          MapsUtil.mergeWith(acc, subviewGki)((accRes, _) => accRes)
+        subviews.unblindedElements.foldLeft(viewParticipantData.resolvedKeysWithMaintainers) {
+          (acc, subview) =>
+            val subviewGki = subview.globalKeyInputs
+            MapsUtil.mergeWith(acc, subviewGki)((accRes, _) => accRes)
         }
     }
 
@@ -344,7 +339,7 @@ object TransactionView
       (HashOps, ProtocolVersion),
     ] {
   override def name: String = "TransactionView"
-  override val versioningTable: VersioningTable = VersioningTable(
+  override def versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewNode)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
@@ -421,14 +416,13 @@ object TransactionView
 
   /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
-  object Optics {
-    val subviewsUnsafe: Lens[TransactionView, TransactionSubviews] =
-      GenLens[TransactionView](_.subviews)
-    val viewCommonDataUnsafe: Lens[TransactionView, MerkleTree[ViewCommonData]] =
-      GenLens[TransactionView](_.viewCommonData)
-    val viewParticipantDataUnsafe: Lens[TransactionView, MerkleTree[ViewParticipantData]] =
-      GenLens[TransactionView](_.viewParticipantData)
-  }
+  val viewCommonDataUnsafe: Lens[TransactionView, MerkleTree[ViewCommonData]] =
+    GenLens[TransactionView](_.viewCommonData)
+
+  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
+  @VisibleForTesting
+  val viewParticipantDataUnsafe: Lens[TransactionView, MerkleTree[ViewParticipantData]] =
+    GenLens[TransactionView](_.viewParticipantData)
 
   private def fromProtoV30(
       context: (HashOps, ProtocolVersion),

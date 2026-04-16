@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
@@ -48,45 +48,44 @@ class RawStringInterningSpec extends AnyFlatSpec with Matchers {
 
   it should "return an empty result if the input and previous state is empty" in {
     val current = RawStringInterning.from(Nil)
-    val newEntries = RawStringInterning.newEntries(Vector.empty, current)
+    val newEntries = RawStringInterning.newEntries(Iterator.empty, current)
     newEntries shouldBe empty
   }
 
   it should "return an empty result if the input is empty" in {
     val current = RawStringInterning(Map("one" -> 1), Map(1 -> "one"), 1)
-    val newEntries = RawStringInterning.newEntries(Vector.empty, current)
+    val newEntries = RawStringInterning.newEntries(Iterator.empty, current)
     newEntries shouldBe empty
   }
 
   it should "return an empty result if the input only contains duplicates" in {
     val current = RawStringInterning(Map("one" -> 1), Map(1 -> "one"), 1)
-    val newEntries = RawStringInterning.newEntries(Vector("one"), current)
+    val newEntries = RawStringInterning.newEntries(List("one").iterator, current)
     newEntries shouldBe empty
   }
 
   it should "return a new entry if the input is an unknown string" in {
     val current = RawStringInterning(Map("one" -> 1), Map(1 -> "one"), 1)
-    val newEntries = RawStringInterning.newEntries(Vector("two"), current)
+    val newEntries = RawStringInterning.newEntries(List("two").iterator, current)
     newEntries shouldBe Vector(2 -> "two")
   }
 
   it should "not return a new entry for known strings" in {
     val current = RawStringInterning(Map("one" -> 1), Map(1 -> "one"), 1)
-    val newEntries = RawStringInterning.newEntries(Vector("one", "two"), current)
+    val newEntries = RawStringInterning.newEntries(List("one", "two").iterator, current)
     newEntries shouldBe Vector(2 -> "two")
   }
 
-  it should "not handle duplicate unknown strings" in {
+  it should "handle duplicate unknown strings" in {
     val current = RawStringInterning(Map("one" -> 1), Map(1 -> "one"), 1)
-    val newEntries =
-      RawStringInterning.newEntries(Vector("two", "two", "two"), current)
-    newEntries shouldBe Vector(2 -> "two", 3 -> "two", 4 -> "two")
+    val newEntries = RawStringInterning.newEntries(List("two", "two", "two").iterator, current)
+    newEntries shouldBe Vector(2 -> "two")
   }
 
   it should "handle mixed input" in {
     val current = RawStringInterning(Map("one" -> 1, "two" -> 2), Map(1 -> "one", 2 -> "two"), 2)
     val newEntries = RawStringInterning.newEntries(
-      Vector("one", "three", "two", "four"),
+      List("one", "three", "two", "four", "two", "four").iterator,
       current,
     )
     newEntries shouldBe Vector(3 -> "three", 4 -> "four")

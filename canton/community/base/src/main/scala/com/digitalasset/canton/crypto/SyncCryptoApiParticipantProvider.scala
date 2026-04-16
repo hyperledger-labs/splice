@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -14,13 +14,11 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{CacheConfig, CryptoConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SyncCryptoError.{KeyNotAvailable, SyncCryptoEncryptionError}
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.verifier.SyncCryptoVerifier
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.KmsMetrics
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.topology.*
@@ -55,7 +53,6 @@ class SyncCryptoApiParticipantProvider(
     val ips: IdentityProvidingServiceClient,
     val crypto: Crypto,
     cryptoConfig: CryptoConfig,
-    kmsMetrics: Option[KmsMetrics],
     verificationParallelismLimit: PositiveInt,
     publicKeyConversionCacheConfig: CacheConfig,
     timeouts: ProcessingTimeout,
@@ -95,7 +92,6 @@ class SyncCryptoApiParticipantProvider(
       staticSynchronizerParameters,
       SynchronizerCrypto(crypto, staticSynchronizerParameters),
       cryptoConfig,
-      kmsMetrics,
       verificationParallelismLimit,
       publicKeyConversionCacheConfig,
       timeouts,
@@ -209,9 +205,9 @@ object SyncCryptoClient {
       loggingContext.debug(
         s"Waiting for topology snapshot at $timestamp; desired=$desiredTimestamp, known until ${client.topologyKnownUntilTimestamp}; previous $previousTimestampO"
       )
-      client.awaitHypotheticalSnapshotUSSupervised(
+      client.awaitSnapshotUSSupervised(
         s"requesting topology snapshot at $timestamp; desired=$desiredTimestamp, previousO=$previousTimestampO, known until=${client.topologyKnownUntilTimestamp}"
-      )(timestamp, desiredTimestamp)
+      )(timestamp)
     }
   }
 
@@ -289,6 +285,19 @@ class SynchronizerCryptoClient private (
   ): FutureUnlessShutdown[SynchronizerSnapshotSyncCryptoApi] =
     ips.hypotheticalSnapshot(timestamp, desiredTimestamp).map(create)
 
+  override def trySnapshot(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): SynchronizerSnapshotSyncCryptoApi =
+    create(ips.trySnapshot(timestamp))
+
+  override def tryHypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit
+      traceContext: TraceContext
+  ): SynchronizerSnapshotSyncCryptoApi =
+    create(ips.tryHypotheticalSnapshot(timestamp, desiredTimestamp))
+
   override def headSnapshot(implicit
       traceContext: TraceContext
   ): SynchronizerSnapshotSyncCryptoApi =
@@ -298,14 +307,6 @@ class SynchronizerCryptoClient private (
       traceContext: TraceContext
   ): FutureUnlessShutdown[SynchronizerSnapshotSyncCryptoApi] =
     ips.awaitSnapshot(timestamp).map(create)
-
-  override def awaitHypotheticalSnapshot(
-      timestamp: CantonTimestamp,
-      desiredTimestamp: CantonTimestamp,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[SynchronizerSnapshotSyncCryptoApi] =
-    ips.awaitHypotheticalSnapshot(timestamp, desiredTimestamp).map(create)
 
   def create(snapshot: TopologySnapshot): SynchronizerSnapshotSyncCryptoApi =
     new SynchronizerSnapshotSyncCryptoApi(
@@ -357,8 +358,8 @@ class SynchronizerCryptoClient private (
 
   override def currentSnapshotApproximation(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SynchronizerSnapshotSyncCryptoApi] =
-    ips.currentSnapshotApproximation.map(create)
+  ): SynchronizerSnapshotSyncCryptoApi =
+    create(ips.currentSnapshotApproximation)
 
   override def topologyKnownUntilTimestamp: CantonTimestamp = ips.topologyKnownUntilTimestamp
 
@@ -375,8 +376,6 @@ class SynchronizerCryptoClient private (
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
     ips.awaitMaxTimestamp(sequencedTime)
-
-  override def latestTopologyChangeTimestamp: CantonTimestamp = ips.latestTopologyChangeTimestamp
 }
 
 object SynchronizerCryptoClient {
@@ -431,7 +430,6 @@ object SynchronizerCryptoClient {
       staticSynchronizerParameters: StaticSynchronizerParameters,
       synchronizerCrypto: SynchronizerCrypto,
       cryptoConfig: CryptoConfig,
-      kmsMetrics: Option[KmsMetrics],
       verificationParallelismLimit: PositiveInt,
       publicKeyConversionCacheConfig: CacheConfig,
       timeouts: ProcessingTimeout,
@@ -446,7 +444,6 @@ object SynchronizerCryptoClient {
       member,
       synchronizerCrypto,
       cryptoConfig,
-      kmsMetrics,
       publicKeyConversionCacheConfig,
       futureSupervisor,
       timeouts,
@@ -492,16 +489,10 @@ class SynchronizerSnapshotSyncCryptoApi(
   override def sign(
       hash: Hash,
       usage: NonEmpty[Set[SigningKeyUsage]],
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature] =
-    syncCryptoSigner.sign(
-      ipsSnapshot,
-      signingTimestampOverrides,
-      hash,
-      usage,
-    )
+    syncCryptoSigner.sign(ipsSnapshot, hash, usage)
 
   override def verifySignature(
       hash: Hash,
@@ -510,14 +501,6 @@ class SynchronizerSnapshotSyncCryptoApi(
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] =
     syncCryptoVerifier.verifySignature(ipsSnapshot, hash, signer, signature, usage)
-
-  override def verifyKeyUsage(
-      signer: Member,
-      signedBy: Fingerprint,
-      signatureDelegation: Option[SignatureDelegation],
-      usage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] =
-    syncCryptoVerifier.verifyKeyUsage(ipsSnapshot, signer, signedBy, signatureDelegation, usage)
 
   override def verifySignatures(
       hash: Hash,

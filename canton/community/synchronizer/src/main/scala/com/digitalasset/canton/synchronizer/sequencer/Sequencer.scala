@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -12,13 +12,11 @@ import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
-import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.serialization.HasCryptographicEvidence
-import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.IndividualThroughputCapConfig
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
@@ -28,7 +26,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.errors.*
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
-  LsuTrafficState,
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficStatus,
@@ -163,20 +160,11 @@ trait Sequencer
     * will depend on current time. To get the state at a specific timestamp, use
     * [[getTrafficStateAt]] instead. If the list is empty, return the status of all members.
     * Requested members who are not registered in the Sequencer will not be in the response.
-    * Registered members with no sent or received event will return an empty status. Returns an
-    * error if the sequencer is awaiting LSU traffic state initialization.
+    * Registered members with no sent or received event will return an empty status.
     */
   def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus]
-
-  /** Retrieve traffic summaries for the events at the provided timestamps
-    * @param timestamps
-    *   timestamps for which to get traffic summaries for
-    */
-  def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]]
+  ): FutureUnlessShutdown[SequencerTrafficStatus]
 
   /** Sets the traffic purchased of a member to the new provided value. This will only become
     * effective if / when properly authorized by enough sequencers according to the synchronizer
@@ -210,40 +198,10 @@ trait Sequencer
 
   /** To be called by the topology processing to set/update/remove a synchronizer upgrade
     */
-  private[sequencer] def updateLsuSuccessor(
+  private[sequencer] def updateSynchronizerSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit
-
-  /** Get the traffic state for LSU.
-    *
-    * @param trafficTsOverride
-    *   MUST be empty for regular LSUs. For regular LSUs, traffic should be taken at upgrade time
-    *   and an error should be returned if no LSU is announced. However, in the context of roll
-    *   forward (DR), the caller might want to get the traffic state at a given timestamp even if no
-    *   LSU is announced.
-    */
-  def getLsuTrafficControlState(trafficTsOverride: Option[CantonTimestamp] = None)(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState]
-
-  def setLsuTrafficControlState(
-      state: LsuTrafficState
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
-
-  /** Query current throughput caps */
-  def getThroughputCap(requestType: SubmissionRequestType): Option[IndividualThroughputCapConfig] =
-    None
-
-  /** Set current throughput caps */
-  def setThroughputCap(
-      requestType: SubmissionRequestType,
-      config: Option[IndividualThroughputCapConfig],
-  )(implicit traceContext: TraceContext): Unit = ()
-
-  def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 }
 
 /** Sequencer pruning interface.

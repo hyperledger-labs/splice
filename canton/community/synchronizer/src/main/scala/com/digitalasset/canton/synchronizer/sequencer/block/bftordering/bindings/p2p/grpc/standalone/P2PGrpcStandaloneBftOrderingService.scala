@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.standalone
@@ -10,6 +10,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
   completeGrpcStreamObserver,
   failGrpcStreamObserver,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.mutex
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.standalone.v1.{
   Ordered as ProtoOrdered,
   ReadOrderedRequest,
@@ -21,7 +22,6 @@ import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.sta
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.stub.StreamObserver
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.concurrent.Future
 
@@ -32,37 +32,38 @@ class P2PGrpcStandaloneBftOrderingService(
     with NamedLogging
     with AutoCloseable {
 
-  private val readersRef =
-    new AtomicReference[Seq[(Long, StreamObserver[ReadOrderedResponse])]](Seq.empty)
+  private val readers = mutable.ListBuffer[(Long, StreamObserver[ReadOrderedResponse])]()
 
   def push(block: BlockFormat.Block): Unit = {
     val failed = mutable.ListBuffer[StreamObserver[ReadOrderedResponse]]()
-    readersRef.get().foreach { case (minHeight, peerSender) =>
-      if (block.blockHeight >= minHeight) {
-        val response =
-          ReadOrderedResponse(
-            block.blockHeight,
-            block.requests.map(r => ProtoOrdered(r.value.tag, r.value.body)),
-          )
-        try {
-          peerSender.onNext(response)
-        } catch {
-          case e: Throwable =>
-            logger.error(
-              s"Failed to push block ${block.blockHeight} to reader $peerSender " +
-                s"with minHeight $minHeight: ${e.getMessage}",
-              e,
-            )(TraceContext.empty)
-            failGrpcStreamObserver(peerSender, e, logger)(TraceContext.empty)
-            failed.addOne(peerSender).discard
+    mutex(this) {
+      readers.foreach { case (minHeight, peerSender) =>
+        if (block.blockHeight >= minHeight) {
+          val response =
+            ReadOrderedResponse(
+              block.blockHeight,
+              block.requests.map(r => ProtoOrdered(r.value.tag, r.value.body)),
+            )
+          try {
+            peerSender.onNext(response)
+          } catch {
+            case e: Throwable =>
+              logger.error(
+                s"Failed to push block ${block.blockHeight} to reader $peerSender " +
+                  s"with minHeight $minHeight: ${e.getMessage}",
+                e,
+              )(TraceContext.empty)
+              failGrpcStreamObserver(peerSender, e, logger)(TraceContext.empty)
+              failed.addOne(peerSender).discard
+          }
         }
       }
     }
-    readersRef.updateAndGet { readers =>
-      readers.filter { case (_, peerSender) =>
+    mutex(this) {
+      readers.filterInPlace { case (_, peerSender) =>
         !failed.contains(peerSender)
-      }
-    }.discard
+      }.discard
+    }
   }
 
   override def send(request: SendRequest): Future[SendResponse] =
@@ -71,13 +72,15 @@ class P2PGrpcStandaloneBftOrderingService(
   override def readOrdered(
       request: ReadOrderedRequest,
       peerSender: StreamObserver[ReadOrderedResponse],
-  ): Unit =
-    readersRef.updateAndGet { readers =>
-      (request.startHeight -> peerSender) +: readers
-    }.discard
+  ): Unit = mutex(this) {
+    readers.addOne(request.startHeight -> peerSender).discard
+  }
 
   override def close(): Unit =
-    readersRef.getAndUpdate(_ => Seq.empty).foreach { case (_, peerSender) =>
-      completeGrpcStreamObserver(peerSender, logger)(TraceContext.empty)
+    mutex(this) {
+      readers.foreach { case (_, peerSender) =>
+        completeGrpcStreamObserver(peerSender, logger)(TraceContext.empty)
+      }
+      readers.clear()
     }
 }

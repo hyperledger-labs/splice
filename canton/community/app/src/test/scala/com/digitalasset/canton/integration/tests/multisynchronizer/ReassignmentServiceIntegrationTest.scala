@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
@@ -10,13 +10,14 @@ import com.daml.test.evidence.tag.EvidenceTag
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.data.ReassignmentRef
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.examples.java.iou.Iou
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.GrpcAdminCommandSupport.*
 import com.digitalasset.canton.integration.util.GrpcServices.ReassignmentsService
@@ -31,7 +32,6 @@ import com.digitalasset.canton.integration.util.{
   AcsInspection,
   HasCommandRunnersHelpers,
   HasReassignmentCommandsHelpers,
-  TestUtils,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -40,7 +40,6 @@ import com.digitalasset.canton.integration.{
   EnvironmentSetupPlugin,
   SharedEnvironment,
   TestConsoleEnvironment,
-  TrafficTestUtils,
 }
 import com.digitalasset.canton.ledger.participant.state.ReassignmentCommandsBatch.{
   DifferingSynchronizers,
@@ -91,8 +90,7 @@ abstract class ReassignmentServiceIntegrationTest
     EnvironmentDefinition.P3_S1M1_S1M1_S1M1
       .addConfigTransforms(
         // Ensure reassignments are not tripped up by some participants being a little behind.
-        ConfigTransforms.updateTargetTimestampForwardTolerance(30.seconds),
-        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
+        ConfigTransforms.updateTargetTimestampForwardTolerance(30.seconds)
       )
       .withSetup { implicit env =>
         import env.*
@@ -149,12 +147,6 @@ abstract class ReassignmentServiceIntegrationTest
           )
         )
       }
-      .withTrafficControl(
-        TestUtils.waitForTargetTimeOnSynchronizerNode(wallClock.now, logger),
-        TrafficTestUtils.predictableTraffic,
-        topUpAllMembers = true,
-        disableCommitments = true,
-      )
 
   "ReassignmentService" should {
     /*
@@ -678,12 +670,6 @@ abstract class ReassignmentServiceIntegrationTest
       submittingParty = submittingParty.toLf,
       participantOverride = submittingParticipantOverride,
     )
-    // Get the unassignment cost from the source synchronizer sequencer (sequencer1)
-    // to compare it with the cost exposed on the unassignment event and completion
-    val unassignCost = sequencer1.traffic_control
-      .traffic_summaries(Seq(unassignmentCompletion.synchronizerTime.value.recordTime.value))
-      .loneElement
-      .totalTrafficCost
 
     val templateId = Iou.TEMPLATE_ID_WITH_PACKAGE_ID
     val expectedTemplateId = Some(
@@ -730,7 +716,6 @@ abstract class ReassignmentServiceIntegrationTest
       traceContext = unassignmentCompletion.traceContext,
       offset = 0L,
       synchronizerTime = None,
-      paidTrafficCost = unassignCost,
     )
 
     unassignmentCompletion.copy(
@@ -754,12 +739,6 @@ abstract class ReassignmentServiceIntegrationTest
       submittingParty = submittingParty.toLf,
       participantOverride = submittingParticipantOverride,
     )
-    // Get the unassignment cost from the target synchronizer sequencer (sequencer2)
-    // to compare it with the cost exposed on the assignment event and completion
-    val assignCost = sequencer2.traffic_control
-      .traffic_summaries(Seq(assignmentCompletion.synchronizerTime.value.recordTime.value))
-      .loneElement
-      .totalTrafficCost
 
     val ledgerEndAfterAssignment =
       submittingParticipantOverride.getOrElse(participant1).ledger_api.state.end()
@@ -797,7 +776,6 @@ abstract class ReassignmentServiceIntegrationTest
       traceContext = assignmentCompletion.traceContext,
       offset = 0L,
       synchronizerTime = None,
-      paidTrafficCost = assignCost,
     )
 
     assignmentCompletion.copy(
@@ -819,7 +797,7 @@ abstract class ReassignmentServiceIntegrationTest
 
 class ReferenceReassignmentServiceIntegrationTest extends ReassignmentServiceIntegrationTest {
   override protected lazy val plugin =
-    new UseBftSequencer(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

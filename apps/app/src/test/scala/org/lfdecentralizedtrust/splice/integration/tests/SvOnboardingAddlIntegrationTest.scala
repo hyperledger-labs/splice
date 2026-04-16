@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
@@ -9,6 +8,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.SvOnboardingStatus
@@ -215,8 +215,9 @@ class SvOnboardingAddlIntegrationTest
 
         clue("published sequencer information can be seen via scan") {
           inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>
+            domainSequencers.sequencers should have size 4 withClue "dsoSequencers.sequencers"
             domainSequencers.sequencers.find(s =>
-              s.svName == nodeState.svName && s.url == localSequencerUrl
+              s.svName == nodeState.svName && s.url == localSequencerUrl.toString
             ) should not be empty withClue "matching localSequencer"
           }
         }

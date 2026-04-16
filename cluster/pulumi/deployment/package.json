@@ -3,8 +3,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
-    "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
-    "semver": "^7.6.0"
+    "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

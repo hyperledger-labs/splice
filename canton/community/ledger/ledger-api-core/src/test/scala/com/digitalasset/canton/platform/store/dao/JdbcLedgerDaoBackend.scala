@@ -1,19 +1,19 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.daml.resources.PureResource
-import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.ParticipantId
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.withNewLoggingContext
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.metrics.{LedgerApiServerHistograms, LedgerApiServerMetrics}
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
 import com.digitalasset.canton.platform.config.{
   ActiveContractsServiceStreamsConfig,
@@ -22,7 +22,7 @@ import com.digitalasset.canton.platform.config.{
 }
 import com.digitalasset.canton.platform.store.DbSupport.{ConnectionPoolConfig, DbConfig}
 import com.digitalasset.canton.platform.store.backend.StorageBackendFactory
-import com.digitalasset.canton.platform.store.cache.{AchsStateCache, MutableLedgerEndCache}
+import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.dao.JdbcLedgerDaoBackend.TestParticipantId
 import com.digitalasset.canton.platform.store.dao.events.{
   CompressionStrategy,
@@ -34,14 +34,13 @@ import com.digitalasset.canton.platform.store.{
   DbSupport,
   DbType,
   FlywayMigrations,
-  LedgerApiContractStoreImpl,
   PruningOffsetService,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.{Engine, EngineConfig}
-import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.language.{LanguageMajorVersion, LanguageVersion}
 import io.opentelemetry.api.OpenTelemetry
 import org.scalatest.Suite
 
@@ -125,11 +124,11 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
       )
     } yield {
       val engine = Some(
-        new Engine(EngineConfig(LanguageVersion.stableLfVersionsRange), loggerFactory)
+        new Engine(EngineConfig(LanguageVersion.StableVersions(LanguageMajorVersion.V2)))
       )
-      new JdbcLedgerWriteDao(
-        dbDispatcher = dbSupport.dbDispatcher,
-        sequentialIndexer = SequentialWriteDao(
+      JdbcLedgerDao.writeForTests(
+        dbSupport = dbSupport,
+        sequentialWriteDao = SequentialWriteDao(
           participantId = JdbcLedgerDaoBackend.TestParticipantIdRef,
           metrics = metrics,
           compressionStrategy = CompressionStrategy.none(metrics),
@@ -140,15 +139,11 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
             storageBackendFactory.createParameterStorageBackend(stringInterningView),
           loggerFactory = loggerFactory,
         ),
-        queryExecutionContext = ec,
-        commandExecutionContext = ec,
+        servicesExecutionContext = ec,
         metrics = metrics,
         participantId = JdbcLedgerDaoBackend.TestParticipantIdRef,
-        readStorageBackend = dbSupport.storageBackendFactory
-          .readStorageBackend(ledgerEndCache, stringInterningView, loggerFactory),
-        parameterStorageBackend =
-          dbSupport.storageBackendFactory.createParameterStorageBackend(stringInterningView),
         ledgerEndCache = ledgerEndCache,
+        stringInterning = stringInterningView,
         completionsPageSize = 1000,
         activeContractsServiceStreamsConfig = ActiveContractsServiceStreamsConfig(
           maxPayloadsPerPayloadsPage = eventsPageSize,
@@ -164,7 +159,6 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
         globalMaxEventPayloadQueries = 10,
         tracer = OpenTelemetry.noop().getTracer("test"),
         loggerFactory = loggerFactory,
-        incompleteOffsets = (_, _, _) => FutureUnlessShutdown.pure(Vector.empty),
         contractLoader = contractLoader,
         lfValueTranslation = new LfValueTranslation(
           metrics = metrics,
@@ -174,16 +168,15 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
         ),
         pruningOffsetService = pruningOffsetService,
         contractStore = contractStore,
-        achsStateCache = new AchsStateCache(loggerFactory),
       )
     }
   }
 
-  type LedgerDao = LedgerReadDao & LedgerWriteDao
+  type LedgerDao = LedgerReadDao with LedgerWriteDaoForTests
 
   protected final var ledgerDao: LedgerDao = _
   protected var ledgerEndCache: MutableLedgerEndCache = _
-  protected var contractStore: LedgerApiContractStoreImpl = _
+  protected var contractStore: ContractStore = _
   protected var stringInterningView: StringInterningView = _
   protected val pruningOffsetService: PruningOffsetService = mock[PruningOffsetService]
   when(pruningOffsetService.pruningOffset(any[TraceContext]))
@@ -197,12 +190,7 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
     // We use the dispatcher here because the default Scalatest execution context is too slow.
     implicit val resourceContext: ResourceContext = ResourceContext(system.dispatcher)
     ledgerEndCache = MutableLedgerEndCache()
-    val inMemoryContractStore = new InMemoryContractStore(timeouts, loggerFactory)
-    contractStore = LedgerApiContractStoreImpl(
-      inMemoryContractStore,
-      loggerFactory,
-      LedgerApiServerMetrics.ForTesting,
-    )
+    contractStore = new InMemoryContractStore(timeouts, loggerFactory)
     stringInterningView = new StringInterningView(loggerFactory)
     resource = withNewLoggingContext() { implicit loggingContext =>
       for {

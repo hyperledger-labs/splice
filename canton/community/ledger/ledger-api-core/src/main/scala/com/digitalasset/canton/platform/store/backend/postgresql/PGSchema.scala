@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.postgresql
@@ -15,24 +15,24 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 
 private[postgresql] object PGSchema {
   private val PGFieldStrategy = new FieldStrategy {
-    override def stringArray[From](
-        extractor: StringInterning => From => Iterable[String]
-    ): Field[From, Iterable[String], ?] =
+    override def stringArray[FROM](
+        extractor: StringInterning => FROM => Iterable[String]
+    ): Field[FROM, Iterable[String], ?] =
       PGStringArray(extractor)
 
-    override def smallint[From](
-        extractor: StringInterning => From => Int
-    ): Field[From, Int, ?] =
+    override def smallint[FROM](
+        extractor: StringInterning => FROM => Int
+    ): Field[FROM, Int, ?] =
       PGSmallint(extractor)
 
-    override def smallintOptional[From](
-        extractor: StringInterning => From => Option[Int]
-    ): Field[From, Option[Int], ?] =
+    override def smallintOptional[FROM](
+        extractor: StringInterning => FROM => Option[Int]
+    ): Field[FROM, Option[Int], ?] =
       PGSmallintOptional(extractor)
 
-    override def insert[From](tableName: String)(
-        fields: (String, Field[From, ?, ?])*
-    ): Table[From] =
+    override def insert[FROM](tableName: String)(
+        fields: (String, Field[FROM, ?, ?])*
+    ): Table[FROM] =
       PGTable.transposedInsert(tableName)(fields*)
   }
 

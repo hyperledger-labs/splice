@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.ha
@@ -6,10 +6,10 @@ package com.digitalasset.canton.platform.indexer.ha
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import org.apache.pekko.stream.KillSwitch
 
 import java.util.{Timer, TimerTask}
+import scala.concurrent.blocking
 import scala.util.{Failure, Success, Try}
 
 /** A simple host of checking.
@@ -35,7 +35,6 @@ class PollingChecker(
     extends AutoCloseable
     with NamedLogging {
   private val timer = new Timer("ha-polling-checker-timer-thread", true)
-  private val lock = new Mutex()
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var closed: Boolean = false
@@ -54,7 +53,7 @@ class PollingChecker(
   // Current usage of this class does not necessarily motivate further optimizations: used from HaCoordinator
   // to check Indexer Main Lock seems to be sufficiently fast even in peak scenario: the initialization of the
   // complete pool.
-  def check(): Unit = (lock.exclusive {
+  def check(): Unit = blocking(synchronized {
     logger.debug(s"Checking...")
     if (closed) {
       val errorMsg =
@@ -66,7 +65,7 @@ class PollingChecker(
     }
   })
 
-  private def scheduledCheck(): Unit = (lock.exclusive {
+  private def scheduledCheck(): Unit = blocking(synchronized {
     logger.trace(s"Scheduled checking...")
     // Timer can fire at most one additional TimerTask after being cancelled. This is to safeguard that corner case.
     if (!closed) {
@@ -74,7 +73,7 @@ class PollingChecker(
     }
   })
 
-  private def checkInternal(): Unit = (lock.exclusive {
+  private def checkInternal(): Unit = blocking(synchronized {
     Try(checkBody) match {
       case Success(_) =>
         logger.trace(s"Check successful.")
@@ -86,7 +85,7 @@ class PollingChecker(
     }
   })
 
-  def close(): Unit = (lock.exclusive {
+  def close(): Unit = blocking(synchronized {
     closed = true
     timer.cancel()
   })

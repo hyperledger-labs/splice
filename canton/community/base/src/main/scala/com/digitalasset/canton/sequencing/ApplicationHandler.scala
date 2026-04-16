@@ -1,9 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
 
-import cats.syntax.apply.*
+import cats.Monoid
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -14,9 +14,9 @@ import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
 
-/** An application handler processes boxed envelopes and returns a [[GenericHandlerResult]] */
-trait ApplicationHandler[-Box[+_ <: Envelope[?]], -Env <: Envelope[?], +A]
-    extends (BoxedEnvelope[Box, Env] => GenericHandlerResult[A]) {
+/** An application handler processes boxed envelopes and returns a [[HandlerResult]] */
+trait ApplicationHandler[-Box[+_ <: Envelope[?]], -Env <: Envelope[?]]
+    extends (BoxedEnvelope[Box, Env] => HandlerResult) {
 
   /** Human-readable name of the application handler for logging and debugging */
   def name: String
@@ -36,9 +36,9 @@ trait ApplicationHandler[-Box[+_ <: Envelope[?]], -Env <: Envelope[?], +A]
   /** Replaces the application handler's processing with `f` and leaves the [[subscriptionStartsAt]]
     * logic and the name the same.
     */
-  def replace[Box2[+_ <: Envelope[?]], Env2 <: Envelope[?], A2](
-      f: BoxedEnvelope[Box2, Env2] => GenericHandlerResult[A2]
-  ): ApplicationHandler[Box2, Env2, A2] = new ApplicationHandler[Box2, Env2, A2] {
+  def replace[Box2[+_ <: Envelope[?]], Env2 <: Envelope[?]](
+      f: BoxedEnvelope[Box2, Env2] => HandlerResult
+  ): ApplicationHandler[Box2, Env2] = new ApplicationHandler[Box2, Env2] {
 
     override def name: String = ApplicationHandler.this.name
 
@@ -50,16 +50,16 @@ trait ApplicationHandler[-Box[+_ <: Envelope[?]], -Env <: Envelope[?], +A]
     ): FutureUnlessShutdown[Unit] =
       ApplicationHandler.this.subscriptionStartsAt(start, synchronizerTimeTracker)
 
-    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): GenericHandlerResult[A2] =
+    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): HandlerResult =
       f(boxedEnvelope)
   }
 
   /** Run the `other` ApplicationHandler after `this`. */
-  def combineWith[Box2[+X <: Envelope[?]] <: Box[X], Env2 <: Env, A2, A3](
-      other: ApplicationHandler[Box2, Env2, A2]
-  )(f: (A, A2) => A3)(implicit
+  def combineWith[Box2[+X <: Envelope[?]] <: Box[X], Env2 <: Env](
+      other: ApplicationHandler[Box2, Env2]
+  )(implicit
       ec: ExecutionContext
-  ): ApplicationHandler[Box2, Env2, A3] = new ApplicationHandler[Box2, Env2, A3] {
+  ): ApplicationHandler[Box2, Env2] = new ApplicationHandler[Box2, Env2] {
 
     override def name: String =
       s"${ApplicationHandler.this.name}+${other.name}"
@@ -73,11 +73,11 @@ trait ApplicationHandler[-Box[+_ <: Envelope[?]], -Env <: Envelope[?], +A]
         _ <- other.subscriptionStartsAt(start, synchronizerTimeTracker)
       } yield ()
 
-    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): GenericHandlerResult[A3] =
+    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): HandlerResult =
       for {
         r1 <- ApplicationHandler.this.apply(boxedEnvelope: BoxedEnvelope[Box, Env])
         r2 <- other.apply(boxedEnvelope)
-      } yield (r1, r2).mapN(f)
+      } yield Monoid[AsyncResult[Unit]].combine(r1, r2)
   }
 }
 
@@ -86,11 +86,11 @@ object ApplicationHandler {
   /** Creates an application handler that runs `f` on the boxed envelopes and ignores the
     * [[ApplicationHandler.subscriptionStartsAt]] notifications
     */
-  def create[Box[+_ <: Envelope[?]], Env <: Envelope[?], A](name: String)(
-      f: BoxedEnvelope[Box, Env] => GenericHandlerResult[A]
-  ): ApplicationHandler[Box, Env, A] = {
+  def create[Box[+_ <: Envelope[?]], Env <: Envelope[?]](name: String)(
+      f: BoxedEnvelope[Box, Env] => HandlerResult
+  ): ApplicationHandler[Box, Env] = {
     val handlerName = name
-    new ApplicationHandler[Box, Env, A] {
+    new ApplicationHandler[Box, Env] {
 
       override val name: String = handlerName
 
@@ -102,19 +102,16 @@ object ApplicationHandler {
       ): FutureUnlessShutdown[Unit] =
         FutureUnlessShutdown.unit
 
-      override def apply(boxedEnvelope: BoxedEnvelope[Box, Env]): GenericHandlerResult[A] = f(
-        boxedEnvelope
-      )
+      override def apply(boxedEnvelope: BoxedEnvelope[Box, Env]): HandlerResult = f(boxedEnvelope)
     }
   }
 
   /** Application handler that does nothing and always succeeds */
   @VisibleForTesting
-  def success[Box[+_ <: Envelope[?]], Env <: Envelope[?], A](
-      empty: A,
-      name: String = "success",
-  ): ApplicationHandler[Box, Env, A] =
-    ApplicationHandler.create(name)(_ => FutureUnlessShutdown.pure(AsyncResult.pure(empty)))
+  def success[Box[+_ <: Envelope[?]], Env <: Envelope[?]](
+      name: String = "success"
+  ): ApplicationHandler[Box, Env] =
+    ApplicationHandler.create(name)(_ => HandlerResult.done)
 }
 
 /** Information passed by the [[com.digitalasset.canton.sequencing.client.SequencerClient]] to the

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.client
@@ -13,32 +13,28 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.TopologyTransactionRejection.Authorization.NoSignatureProvided
 import com.digitalasset.canton.topology.store.db.DbTopologyStoreHelper
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{
-  NoPackageDependencies,
   TopologyStore,
   TopologyStoreId,
-  TopologyTransactionRejection,
   ValidatedTopologyTransaction,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
-import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext, SequencerCounter}
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.{
+  BaseTest,
+  FailOnShutdown,
+  HasExecutionContext,
+  LfPartyId,
+  SequencerCounter,
+}
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
-
-object EffectiveTimeTestHelpers {
-
-  import scala.language.implicitConversions
-
-  implicit def toSequencedTime(ts: CantonTimestamp): SequencedTime = SequencedTime(ts)
-  implicit def toEffectiveTime(ts: CantonTimestamp): EffectiveTime = EffectiveTime(ts)
-
-}
 
 @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
 trait StoreBasedTopologySnapshotTest
@@ -80,45 +76,38 @@ trait StoreBasedTopologySnapshotTest
       )
     )
 
-    class Fixture(val useTimeProofsToObserveEffectiveTime: Boolean = true) {
-
+    class Fixture {
       val store: TopologyStore[TopologyStoreId.SynchronizerStore] = mk()
-      def mkClient() =
+      val client =
         new StoreBasedSynchronizerTopologyClient(
           mock[Clock],
           defaultStaticSynchronizerParameters,
           store,
-          NoPackageDependencies,
-          TopologyConfig(useTimeProofsToObserveEffectiveTime = useTimeProofsToObserveEffectiveTime),
+          StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+          TopologyConfig(),
           DefaultProcessingTimeouts.testing,
           FutureSupervisor.Noop,
           loggerFactory,
         )
 
-      val client: StoreBasedSynchronizerTopologyClient = mkClient()
-
       def add(
-          sequencedTimestamp: CantonTimestamp,
+          timestamp: CantonTimestamp,
           transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-          effectiveTimestamp: Option[CantonTimestamp] = None,
-          rejectionReason: Option[TopologyTransactionRejection] = None,
-      ): FutureUnlessShutdown[Unit] = {
-        val et = effectiveTimestamp.getOrElse(sequencedTimestamp)
+      ): FutureUnlessShutdown[Unit] =
         for {
           _ <- store.update(
-            SequencedTime(sequencedTimestamp),
-            EffectiveTime(et),
+            SequencedTime(timestamp),
+            EffectiveTime(timestamp),
             removals = transactions
               .groupBy(_.mapping.uniqueKey)
               .map { case (kk, txs) =>
                 kk -> (txs.map(_.serial).maxOption, Set.empty[TxHash])
               },
-            additions = transactions.map(ValidatedTopologyTransaction(_, rejectionReason)),
+            additions = transactions.map(ValidatedTopologyTransaction(_)),
           )
           _ <- client
-            .observed(sequencedTimestamp, et, SequencerCounter(1), transactions)
+            .observed(timestamp, timestamp, SequencerCounter(1), transactions)
         } yield ()
-      }
 
       def observed(ts: CantonTimestamp): Unit =
         observed(SequencedTime(ts), EffectiveTime(ts))
@@ -127,103 +116,15 @@ trait StoreBasedTopologySnapshotTest
         client
           .observed(st, et, SequencerCounter(0), List())
           .futureValueUS
-    }
 
-    "client initialization" should {
-      "get head state from store" in {
-        val fixture = new Fixture()
-        import fixture.*
-        val ts1 = CantonTimestamp.Epoch.plusSeconds(60)
-        val ts2 = ts1.plusSeconds(60)
-        val ts3 = ts2.plusSeconds(60)
-        val ts4 = ts3.plusSeconds(60)
-        val ts5 = ts4.plusSeconds(60)
-        val ts6 = ts5.plusSeconds(60)
-        for {
-          // Populate the store
-          _ <- add(sequencedTimestamp = ts1, Seq(dpc1, p1_otk, p1_dtc, party1participant1))
-          _ <- add(sequencedTimestamp = ts2, Seq(p2_otk, p2_dtc, party2participant1_2))
-          // we expect the rejections and proposals to not affect the latestTopologyChangeTimestamp
-          _ <- add(
-            sequencedTimestamp = ts2.plusMillis(100),
-            Seq(p3_otk.copy(isProposal = true), p3_dtc.copy(isProposal = true)),
-          )
-          _ <- add(
-            sequencedTimestamp = ts2.plusMillis(200),
-            Seq(p2_pdp_confirmation),
-            rejectionReason = Some(NoSignatureProvided),
-          )
-          // Get a new client and initialize it
-          newClient = mkClient()
-          _ <- newClient.initialize()
-          // Check that it initialized correctly
-          _ = newClient.topologyKnownUntilTimestamp shouldBe ts2.plusMillis(200).immediateSuccessor
-          _ = newClient.latestTopologyChangeTimestamp shouldBe ts2.immediateSuccessor
-          // Check that initialization works idempotently
-          _ <- newClient.initialize()
-          _ = newClient.topologyKnownUntilTimestamp shouldBe ts2.plusMillis(200).immediateSuccessor
-          _ = newClient.latestTopologyChangeTimestamp shouldBe ts2.immediateSuccessor
-          // Check that subsequent updates work correctly
-          _ = newClient.updateHead(
-            SequencedTime(ts3),
-            EffectiveTime(ts3),
-            ApproximateTime(ts3),
-          )
-          _ = newClient.topologyKnownUntilTimestamp shouldBe ts3.immediateSuccessor
-          _ = newClient.latestTopologyChangeTimestamp shouldBe ts2.immediateSuccessor
-          _ <- newClient.observed(
-            SequencedTime(ts4),
-            EffectiveTime(ts4),
-            SequencerCounter(0),
-            List(p1_nsk2),
-          )
-          // Check that late initialization does not change the state
-          _ <- newClient.initialize()
-          _ = newClient.topologyKnownUntilTimestamp shouldBe ts4.immediateSuccessor
-          _ = newClient.latestTopologyChangeTimestamp shouldBe ts4.immediateSuccessor
-
-          // Check that synchronizer upgrade is taken into account
-          newClient2 = mkClient()
-          _ <- newClient2.initialize(
-            sequencerSnapshotTimestamp = Some(ts5),
-            synchronizerUpgradeTime = Some(ts5),
-          )
-          _ =
-            newClient2.topologyKnownUntilTimestamp shouldBe (ts5 + defaultStaticSynchronizerParameters.topologyChangeDelay).immediateSuccessor
-          _ =
-            newClient2.latestTopologyChangeTimestamp shouldBe ts2.immediateSuccessor // from the store
-
-          // Check that sequencer snapshot is taken into account
-          newClient3 = mkClient()
-          _ <- newClient3.initialize(
-            sequencerSnapshotTimestamp = Some(ts6),
-            synchronizerUpgradeTime = Some(ts5),
-          )
-          _ = newClient3.topologyKnownUntilTimestamp shouldBe ts6.immediateSuccessor
-          _ =
-            newClient3.latestTopologyChangeTimestamp shouldBe ts2.immediateSuccessor // from the store
-
-          // Check that sequencer snapshot is taken into account for sequencing time even if there
-          //  are topology transactions with greater effective time
-          f = loggerFactory.assertLogs(SuppressionRule.Level(Level.WARN))(
-            add(
-              sequencedTimestamp = ts6,
-              effectiveTimestamp = Some(ts6.plusMillis(100)),
-              transactions = Seq(p2_pdp_submission),
-            ).unwrap,
-            _.message should include(
-              "Not advancing approximate time to effective time using the time tracker as it's unavailable"
-            ),
-          )
-          _ <- FutureUnlessShutdown.outcomeF(f)
-          newClient4 = mkClient()
-          _ <- newClient4.initialize(
-            sequencerSnapshotTimestamp = Some(ts6.plusMillis(50))
-          )
-          _ = newClient4.latestSequencedTimestamp shouldBe ts6.plusMillis(50)
-          _ = newClient4.approximateTimestamp shouldBe ts6.plusMillis(50).immediateSuccessor
-        } yield succeed
-      }
+      def updateHead(
+          st: SequencedTime,
+          et: EffectiveTime,
+          at: ApproximateTime,
+          potentialTopologyChange: Boolean,
+      ): Unit =
+        client
+          .updateHead(st, et, at, potentialTopologyChange)
     }
 
     "waiting for snapshots" should {
@@ -276,58 +177,45 @@ trait StoreBasedTopologySnapshotTest
         awaitSequencedTimestampF.isCompleted shouldBe true
       }
 
-      "await tick when effective time is in the future only when enabled" in {
-        forEvery(Table("useTimeProofsToObserveEffectiveTime", true, false)) {
-          useTimeProofsToObserveEffectiveTime =>
-            val fixture = new Fixture(useTimeProofsToObserveEffectiveTime)
-            import fixture.*
+      "await tick when effective time is in the future" in {
+        val fixture = new Fixture()
+        import fixture.*
 
-            // given
-            val timeTracker = mock[SynchronizerTimeTracker]
-            when(timeTracker.awaitTick(ts2)).thenReturn(None)
-            client.setSynchronizerTimeTracker(timeTracker)
+        // given
+        val timeTracker = mock[SynchronizerTimeTracker]
+        when(timeTracker.awaitTick(ts2)).thenReturn(None)
+        client.setSynchronizerTimeTracker(timeTracker)
 
-            // when
-            observed(SequencedTime(ts1), EffectiveTime(ts2))
+        // when
+        observed(SequencedTime(ts1), EffectiveTime(ts2))
 
-            // then
-            val howOften = if (fixture.useTimeProofsToObserveEffectiveTime) times(1) else never
-            verify(timeTracker, howOften).awaitTick(ts2)
-            succeed
-        }
+        // then
+        verify(timeTracker).awaitTick(ts2)
+        succeed
       }
 
       "correctly get notified on updateHead" in {
-        val fixture = new Fixture()
-        import fixture.*
-        val awaitSequencedTimestampF =
-          client.awaitSequencedTimestamp(ts2).getOrElse(fail("expected future"))
+        Table("potential topology change", true, false).forEvery { potentialTopologyChange =>
+          val fixture = new Fixture()
+          import fixture.*
+          val awaitSequencedTimestampF =
+            client.awaitSequencedTimestamp(ts2).getOrElse(fail("expected future"))
 
-        client
-          .observed(
+          updateHead(
             SequencedTime(ts1),
             EffectiveTime(ts1),
-            SequencerCounter(0),
-            List(p1_nsk2),
+            ApproximateTime(ts1),
+            potentialTopologyChange,
           )
-          .futureValueUS
-
-        awaitSequencedTimestampF.isCompleted shouldBe false
-        client.topologyKnownUntilTimestamp shouldBe ts1.immediateSuccessor
-        client.latestTopologyChangeTimestamp shouldBe ts1.immediateSuccessor
-        client.updateHead(
-          SequencedTime(ts2),
-          EffectiveTime(ts1),
-          ApproximateTime(ts1),
-        )
-        awaitSequencedTimestampF.isCompleted shouldBe true
-        client.updateHead(
-          SequencedTime(ts2),
-          EffectiveTime(ts2),
-          ApproximateTime(ts2),
-        )
-        client.topologyKnownUntilTimestamp shouldBe ts2.immediateSuccessor
-        client.latestTopologyChangeTimestamp shouldBe ts1.immediateSuccessor
+          awaitSequencedTimestampF.isCompleted shouldBe false
+          updateHead(
+            SequencedTime(ts2),
+            EffectiveTime(ts1),
+            ApproximateTime(ts1),
+            potentialTopologyChange,
+          )
+          awaitSequencedTimestampF.isCompleted shouldBe true
+        }
       }
 
       "just return None if sequenced time already known" in {
@@ -341,7 +229,7 @@ trait StoreBasedTopologySnapshotTest
     "work with empty store" in {
       val fixture = new Fixture()
       import fixture.*
-      val _ = client.currentSnapshotApproximation.futureValueUS
+      val _ = client.currentSnapshotApproximation
       val mrt = client.approximateTimestamp
       val sp = client.trySnapshot(mrt)
       for {
@@ -366,7 +254,7 @@ trait StoreBasedTopologySnapshotTest
       val fixture = new Fixture()
       for {
         _ <- fixture.add(
-          sequencedTimestamp = ts,
+          ts,
           Seq(
             dpc1,
             p1_nsk2,
@@ -383,7 +271,7 @@ trait StoreBasedTopologySnapshotTest
           SequencerCounter(0),
           Seq(),
         )
-        recent <- fixture.client.currentSnapshotApproximation
+        recent = fixture.client.currentSnapshotApproximation
         party1Mappings <- recent.activeParticipantsOf(party1.toLf)
         party2Mappings <- recent.activeParticipantsOf(party2.toLf)
         keys <- recent.signingKeys(participant1, SigningKeyUsage.All)
@@ -403,10 +291,7 @@ trait StoreBasedTopologySnapshotTest
     "properly deals with participants with lower synchronizer privileges" in {
       val fixture = new Fixture()
       for {
-        _ <- fixture.add(
-          sequencedTimestamp = ts,
-          Seq(dpc1, p1_otk, p1_dtc, party1participant1, p1_pdp_observation),
-        )
+        _ <- fixture.add(ts, Seq(dpc1, p1_otk, p1_dtc, party1participant1, p1_pdp_observation))
         _ = fixture.client.observed(
           ts.immediateSuccessor,
           ts.immediateSuccessor,
@@ -425,7 +310,7 @@ trait StoreBasedTopologySnapshotTest
       val ts2 = ts1.plusSeconds(1)
       for {
         _ <- fixture.add(
-          sequencedTimestamp = ts,
+          ts,
           Seq(
             seq_okm_k2,
             dpc1,
@@ -436,7 +321,7 @@ trait StoreBasedTopologySnapshotTest
           ),
         )
         _ <- fixture.add(
-          sequencedTimestamp = ts1,
+          ts1,
           Seq(
             mkRemoveTx(seq_okm_k2),
             med_okm_k3,
@@ -446,10 +331,7 @@ trait StoreBasedTopologySnapshotTest
             p2_pdp_confirmation,
           ),
         )
-        _ <- fixture.add(
-          sequencedTimestamp = ts2,
-          Seq(mkRemoveTx(p1_pdp_observation), mkRemoveTx(p1_dtc)),
-        )
+        _ <- fixture.add(ts2, Seq(mkRemoveTx(p1_pdp_observation), mkRemoveTx(p1_dtc)))
         _ = fixture.client.observed(
           ts2.immediateSuccessor,
           ts2.immediateSuccessor,
@@ -500,6 +382,224 @@ trait StoreBasedTopologySnapshotTest
         compareMappings(admin1b, Map(participant1 -> ParticipantPermission.Observation))
       }
     }
+
+    "filter out participants without stc" in {
+      val fixture = new Fixture()
+      val party1participant1 = mkAdd(
+        PartyToParticipant.tryCreate(
+          party1,
+          PositiveInt.one,
+          Seq(
+            HostingParticipant(participant1, Submission)
+          ),
+        )
+      )
+
+      val party3participant1_3 = mkAdd(
+        PartyToParticipant.tryCreate(
+          party3,
+          PositiveInt.one,
+          Seq(
+            HostingParticipant(participant1, Submission),
+            HostingParticipant(participant3, Submission),
+          ),
+        )
+      )
+      val lfParty1 = party1.toLf
+
+      val lfParty3 = party3.toLf
+      val allParticipants = Seq(participant1, participant3)
+      val allParties = Seq(party1, party3).map(_.toLf)
+      val allPartiesAndParticipants =
+        Seq((party1, participant1), (party3, participant3))
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        {
+          for {
+            _ <- fixture.add(
+              ts,
+              Seq(
+                dpc1,
+                p1_otk, // we have OTK for P1, but no STC
+                p3_otk,
+                p3_dtc,
+                party1participant1,
+                party3participant1_3,
+              ),
+            )
+            _ = fixture.client.observed(
+              ts.immediateSuccessor,
+              ts.immediateSuccessor,
+              SequencerCounter(0),
+              Seq(),
+            )
+            snapshot <- fixture.client.snapshot(ts.immediateSuccessor)
+            // PartyKeyTopologySnapshotClient
+            activeParticipantsOfParties <- snapshot.activeParticipantsOfParties(allParties)
+            activeParticipantsOfPartiesWithInfo <- snapshot.activeParticipantsOfPartiesWithInfo(
+              allParties
+            )
+            activeParticipantsOf <- MonadUtil
+              .sequentialTraverse(allParties)(p =>
+                snapshot.activeParticipantsOf(p).map(r => (p, r))
+              )
+              .map(_.toMap)
+            allHaveActiveParticipants <- MonadUtil
+              .sequentialTraverse(allParties)(p =>
+                snapshot.allHaveActiveParticipants(Set(p)).value.map((p, _))
+              )
+              .map(_.toMap)
+            isHostedByAtLeastOneParticipantF <- MonadUtil
+              .sequentialTraverse(allParties)(p =>
+                snapshot
+                  .isHostedByAtLeastOneParticipantF(Set(p), { case (_, _) => true })
+                  .map((p, _))
+              )
+              .map(_.toMap)
+            hostedOn <- MonadUtil
+              .sequentialTraverse(Seq(participant1, participant3))(par =>
+                snapshot.hostedOn(allParties.toSet, par).map((par, _))
+              )
+              .map(_.toMap)
+            allHostedOn <- MonadUtil
+              .sequentialTraverse(
+                allPartiesAndParticipants
+              ) { case (party, participant) =>
+                snapshot.allHostedOn(Set(party.toLf), participant).map((party, _))
+              }
+              .map(_.toMap)
+            canConfirm <- MonadUtil
+              .sequentialTraverse(allPartiesAndParticipants) { case (party, participant) =>
+                snapshot.canConfirm(participant, Set(party.toLf)).map((party, _))
+              }
+              .map(_.toMap)
+            hasNoConfirmer <- MonadUtil
+              .sequentialTraverse(allParties)(p =>
+                snapshot
+                  .hasNoConfirmer(Set(p))
+                  .map((p, _))
+              )
+              .map(_.toMap)
+            canNotSubmit <- MonadUtil
+              .sequentialTraverse(allPartiesAndParticipants) { case (party, participant) =>
+                snapshot.canNotSubmit(participant, Seq(party.toLf)).map(c => (party, c.toSeq))
+              }
+              .map(_.toMap)
+            activeParticipantsOfAll <- MonadUtil
+              .sequentialTraverse(allParties)(p =>
+                snapshot.activeParticipantsOfAll(List(p)).value.map((p, _))
+              )
+              .map(_.toMap)
+            knownParties <- snapshot.inspectKnownParties(filterParty = "", filterParticipant = "")
+            // KeyTopologySnapshotClient
+            signingKeys <- MonadUtil
+              .sequentialTraverse(allParticipants)(p =>
+                snapshot
+                  .signingKeys(
+                    p,
+                    filterUsage = SigningKeyUsage.ProtocolWithProofOfOwnership,
+                  )
+                  .map((p, _))
+              )
+              .map(_.toMap)
+            encryptionKeys <- MonadUtil
+              .sequentialTraverse(allParticipants)(p => snapshot.encryptionKeys(p).map((p, _)))
+              .map(_.toMap)
+            // ParticipantTopologySnapshotClient
+            isParticipantActive <- MonadUtil
+              .sequentialTraverse(allParticipants)(p => snapshot.isParticipantActive(p).map((p, _)))
+              .map(_.toMap)
+            isParticipantActiveAndCanLoginAt <- MonadUtil
+              .sequentialTraverse(allParticipants)(p =>
+                snapshot.isParticipantActiveAndCanLoginAt(p, ts.plusSeconds(1)).map((p, _))
+              )
+              .map(_.toMap)
+            // MembersTopologySnapshotClient
+            allMembers <- snapshot.allMembers()
+            isMemberKnown <- MonadUtil
+              .sequentialTraverse(allParticipants)(p => snapshot.isMemberKnown(p).map((p, _)))
+              .map(_.toMap)
+          } yield {
+            activeParticipantsOfParties shouldBe Map(
+              lfParty1 -> Set.empty,
+              lfParty3 -> Set(participant3),
+            )
+            activeParticipantsOfPartiesWithInfo shouldBe Map(
+              lfParty1 -> PartyInfo(threshold = PositiveInt.one, participants = Map()),
+              lfParty3 -> PartyInfo(
+                threshold = PositiveInt.one,
+                participants =
+                  Map(participant3 -> ParticipantAttributes(ParticipantPermission.Submission)),
+              ),
+            )
+            activeParticipantsOf shouldBe Map(
+              lfParty1 -> Map(),
+              lfParty3 -> Map(
+                participant3 -> ParticipantAttributes(ParticipantPermission.Submission)
+              ),
+            )
+            allHaveActiveParticipants shouldBe Map(
+              lfParty1 -> Left(Set(lfParty1)),
+              lfParty3 -> Right(()),
+            )
+            isHostedByAtLeastOneParticipantF shouldBe Map(
+              lfParty1 -> Set.empty[LfPartyId],
+              lfParty3 -> Set(lfParty3),
+            )
+            hostedOn shouldBe Map(
+              participant1 -> Map(),
+              participant3 -> Map(
+                lfParty3 -> ParticipantAttributes(ParticipantPermission.Submission)
+              ),
+            )
+            allHostedOn shouldBe Map(party1 -> false, party3 -> true)
+            canConfirm shouldBe Map(
+              party1 -> Set.empty,
+              party3 -> Set(lfParty3),
+            )
+            hasNoConfirmer shouldBe Map(
+              lfParty1 -> Set(lfParty1),
+              lfParty3 -> Set.empty,
+            )
+            canNotSubmit shouldBe Map(
+              party1 -> List(lfParty1),
+              party3 -> List.empty,
+            )
+            activeParticipantsOfAll shouldBe Map(
+              lfParty1 -> Left(Set(lfParty1)),
+              lfParty3 -> Right(Set(participant3)),
+            )
+            knownParties shouldBe Set(participant3.adminParty, party3)
+            signingKeys(participant1) should not be empty
+            signingKeys(participant3) should not be empty
+            encryptionKeys(participant1) should not be empty
+            encryptionKeys(participant3) should not be empty
+            isParticipantActive shouldBe Map(
+              participant1 -> false,
+              participant3 -> true,
+            )
+            isParticipantActiveAndCanLoginAt shouldBe Map(
+              participant1 -> false,
+              participant3 -> true,
+            )
+            allMembers should contain(participant3)
+            allMembers should not contain (participant1)
+            isMemberKnown shouldBe Map(
+              participant1 -> false,
+              participant3 -> true,
+            )
+            succeed
+          }
+        },
+        seq => {
+          forAll(seq) { msg =>
+            msg.warningMessage should include(
+              "has a synchronizer trust certificate, but no keys on synchronizer"
+            )
+          }
+        },
+      )
+    }
+
   }
 }
 

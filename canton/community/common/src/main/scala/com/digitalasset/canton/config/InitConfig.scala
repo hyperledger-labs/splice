@@ -1,9 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config.InitConfigBase.NodeIdentifierConfig
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 import java.io.File
 import java.util.UUID
@@ -14,10 +15,13 @@ object InitConfigBase {
     def identifierName: Option[String]
   }
   object NodeIdentifierConfig {
+    implicit val nodeIdentifierConfigCantonConfigValidator
+        : CantonConfigValidator[NodeIdentifierConfig] =
+      CantonConfigValidatorDerivation[NodeIdentifierConfig]
 
     /** Generates a random UUID as a name for the node identifier
       */
-    case object Random extends NodeIdentifierConfig {
+    case object Random extends NodeIdentifierConfig with UniformCantonConfigValidation {
       lazy val identifierName: Option[String] = Some(UUID.randomUUID().toString)
     }
 
@@ -25,13 +29,15 @@ object InitConfigBase {
       * @param name
       *   name to use as identifier
       */
-    final case class Explicit(name: String) extends NodeIdentifierConfig {
+    final case class Explicit(name: String)
+        extends NodeIdentifierConfig
+        with UniformCantonConfigValidation {
       override val identifierName: Option[String] = Some(name)
     }
 
     /** Uses the node name from the configuration as identifier (default)
       */
-    case object Config extends NodeIdentifierConfig {
+    case object Config extends NodeIdentifierConfig with UniformCantonConfigValidation {
       override val identifierName: Option[String] = None
     }
   }
@@ -66,21 +72,26 @@ object IdentityConfig {
       identifier: String,
       namespace: Option[String] = None,
       certificates: Seq[File] = Seq.empty,
-  ) extends IdentityConfig {
+  ) extends IdentityConfig
+      with UniformCantonConfigValidation {
     def isManual: Boolean = false
   }
 
   /** Automatically generate a namespace key and initialize the node id */
   final case class Auto(
       identifier: NodeIdentifierConfig = NodeIdentifierConfig.Config
-  ) extends IdentityConfig {
+  ) extends IdentityConfig
+      with UniformCantonConfigValidation {
     def isManual: Boolean = false
   }
 
   /** Manually wait for the node-id to be configured via API */
-  final case object Manual extends IdentityConfig {
+  final case object Manual extends IdentityConfig with UniformCantonConfigValidation {
     def isManual: Boolean = true
   }
+
+  implicit val identityConfigCantonConfigValidator: CantonConfigValidator[IdentityConfig] =
+    CantonConfigValidatorDerivation[IdentityConfig]
 
 }
 
@@ -105,3 +116,9 @@ final case class InitConfig(
     generateIntermediateKey: Boolean = false,
     generateTopologyTransactionsAndKeys: Boolean = true,
 ) extends InitConfigBase
+    with UniformCantonConfigValidation
+
+object InitConfig {
+  implicit val initConfigCantonConfigValidator: CantonConfigValidator[InitConfig] =
+    CantonConfigValidatorDerivation[InitConfig]
+}

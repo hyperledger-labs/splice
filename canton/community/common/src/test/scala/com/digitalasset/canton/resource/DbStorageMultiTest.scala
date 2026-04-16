@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -17,7 +17,7 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   HasCloseContext,
 }
-import com.digitalasset.canton.logging.{SuppressionRule, TracedLogger}
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CommonMockMetrics
 import com.digitalasset.canton.resource.DbLockedConnection.State
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
@@ -131,8 +131,9 @@ trait DbStorageMultiTest
 
   protected def createStorage(
       customClock: Option[Clock] = None,
-      onActive: TracedLogger => FutureUnlessShutdown[Unit] = _ => FutureUnlessShutdown.unit,
-      onPassive: TracedLogger => FutureUnlessShutdown[Unit] = _ => FutureUnlessShutdown.unit,
+      onActive: () => FutureUnlessShutdown[Unit] = () => FutureUnlessShutdown.unit,
+      onPassive: () => FutureUnlessShutdown[Option[CloseContext]] = () =>
+        FutureUnlessShutdown.pure(None),
       name: String,
       mainLockCounter: DbLockCounter,
       poolLockCounter: DbLockCounter,
@@ -143,7 +144,6 @@ trait DbStorageMultiTest
       withWriteConnectionPool = true,
       withMainConnection = false,
     )
-    val unusedSessionContext = CloseContext(FlagCloseable(logger, timeouts))
     DbStorageMulti
       .create(
         setup.config,
@@ -154,7 +154,6 @@ trait DbStorageMultiTest
         poolLockCounter,
         onActive,
         onPassive,
-        mustStayActive = false,
         CommonMockMetrics.dbStorage,
         None,
         customClock,
@@ -163,16 +162,12 @@ trait DbStorageMultiTest
         exitOnFatalFailures = true,
         futureSupervisor,
         loggerFactory.append("storageId", name),
-        () => unusedSessionContext,
       )
       .valueOrFailShutdown("create DB storage")
   }
 
-  protected def setBoolean(
-      ref: AtomicBoolean,
-      active: Boolean,
-  ): TracedLogger => FutureUnlessShutdown[Unit] =
-    _ => FutureUnlessShutdown.pure(ref.set(active))
+  protected def setBoolean(ref: AtomicBoolean, active: Boolean): () => FutureUnlessShutdown[Unit] =
+    () => FutureUnlessShutdown.pure(ref.set(active))
 
   def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     val clock = new SimClock(loggerFactory = loggerFactory)
@@ -182,8 +177,8 @@ trait DbStorageMultiTest
     val storage =
       createStorage(
         name = "fixture",
-        onPassive = _ => {
-          setBoolean(onPassiveCalled, active = true)(logger).map(_ => None)
+        onPassive = () => {
+          setBoolean(onPassiveCalled, active = true)().map(_ => None)
         },
         customClock = Some(clock),
         mainLockCounter = mainLockCounter,
@@ -245,8 +240,8 @@ trait DbStorageMultiTest
   ): DbStorageMulti = {
     val storage = createStorage(
       onActive = setBoolean(replicaActive, active = true),
-      onPassive = _ => {
-        setBoolean(replicaActive, active = false)(logger).map(_ => None)
+      onPassive = () => {
+        setBoolean(replicaActive, active = false)().map(_ => None)
       },
       name = "failover",
       mainLockCounter = mainLockCounter,

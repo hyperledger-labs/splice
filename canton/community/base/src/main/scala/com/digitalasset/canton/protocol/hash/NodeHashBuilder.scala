@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
 
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.protocol.LfHash
+import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.protocol.hash.NodeBuilder.NodeEncodingV1
 import com.digitalasset.canton.version.HashingSchemeVersion
 import com.digitalasset.daml.lf.data.ImmArray
@@ -13,12 +14,12 @@ import com.digitalasset.daml.lf.value.Value
 
 import TransactionHash.*
 
-/** Hash builder with additional methods to encode and hash nodes.
+/** Hash builder with additional methods to encode and hash nodes
   */
 private sealed abstract class NodeHashBuilder(
     purpose: HashPurpose,
     hashTracer: HashTracer,
-) extends LfValueHashBuilder(purpose, hashTracer) {
+) extends LfValueBuilder(purpose, hashTracer) {
 
   def addHashingSchemeVersion(hashingSchemeVersion: HashingSchemeVersion): this.type =
     addByte(
@@ -47,7 +48,7 @@ private sealed abstract class NodeHashBuilder(
   ): Hash
 
   @throws[NodeHashingError]
-  private def addNodeFromNodeId(
+  protected def addNodeFromNodeId(
       nodes: Map[NodeId, Node],
       nodeSeeds: Map[NodeId, LfHash],
   ): (this.type, NodeId) => this.type =
@@ -64,7 +65,7 @@ private sealed abstract class NodeHashBuilder(
       nodes: Map[NodeId, Node],
       nodeSeeds: Map[NodeId, LfHash],
   ): this.type =
-    addArray(nodeIds)(addNodeFromNodeId(nodes, nodeSeeds))
+    iterateOver(nodeIds)(addNodeFromNodeId(nodes, nodeSeeds))
 }
 
 private object NodeBuilder {
@@ -140,13 +141,13 @@ private class NodeBuilderV1(
         ) =>
       if (keyOpt.isDefined) notSupported("keyOpt in Create node") // 2.dev feature
       addContext("Create Node")
-        .withContext("Node Version")(_.addString(SerializationVersion.toProtoValue(version)))
+        .withContext("Node Version")(_.add(SerializationVersion.toProtoValue(version)))
         .addByte(NodeBuilder.NodeTag.CreateTag.tag, _ => "Create Node Tag")
         .withContext("Node Seed")(
           _.addOptional(nodeSeed, builder => seed => builder.addLfHash(seed, "node seed"))
         )
         .withContext("Contract Id")(_.addCid(coid))
-        .withContext("Package Name")(_.addString(packageName))
+        .withContext("Package Name")(_.add(packageName))
         .withContext("Template Id")(_.addIdentifier(templateId))
         .withContext("Arg")(_.addTypedValue(arg))
         .withContext("Signatories")(_.addStringSet(signatories))
@@ -167,12 +168,12 @@ private class NodeBuilderV1(
           version,
         ) =>
       if (keyOpt.nonEmpty) notSupported("keyOpt in Fetch node") // 2.dev feature
-      if (byKey) notSupported("byKey in Fetch node") // 2.dev feature
+      if (byKey == true) notSupported("byKey in Fetch node") // 2.dev feature
       addContext("Fetch Node")
-        .withContext("Node Version")(_.addString(SerializationVersion.toProtoValue(version)))
+        .withContext("Node Version")(_.add(SerializationVersion.toProtoValue(version)))
         .addByte(NodeBuilder.NodeTag.FetchTag.tag, _ => "Fetch Node Tag")
         .withContext("Contract Id")(_.addCid(coid))
-        .withContext("Package Name")(_.addString(packageName))
+        .withContext("Package Name")(_.add(packageName))
         .withContext("Template Id")(_.addIdentifier(templateId))
         .withContext("Signatories")(_.addStringSet(signatories))
         .withContext("Stakeholders")(_.addStringSet(stakeholders))
@@ -207,19 +208,19 @@ private class NodeBuilderV1(
       if (choiceAuthorizers.nonEmpty)
         notSupported("choiceAuthorizers in Exercise node") // 2.dev feature
       if (keyOpt.nonEmpty) notSupported("keyOpt in Exercise node") // 2.dev feature
-      if (byKey) notSupported("byKey in Exercise node") // 2.dev feature
+      if (byKey == true) notSupported("byKey in Exercise node") // 2.dev feature
       addContext("Exercise Node")
-        .withContext("Node Version")(_.addString(SerializationVersion.toProtoValue(version)))
+        .withContext("Node Version")(_.add(SerializationVersion.toProtoValue(version)))
         .addByte(NodeBuilder.NodeTag.ExerciseTag.tag, _ => "Exercise Node Tag")
         .withContext("Node Seed")(_.addLfHash(nodeSeed, "seed"))
         .withContext("Contract Id")(_.addCid(targetCoid))
-        .withContext("Package Name")(_.addString(packageName))
+        .withContext("Package Name")(_.add(packageName))
         .withContext("Template Id")(_.addIdentifier(templateId))
         .withContext("Signatories")(_.addStringSet(signatories))
         .withContext("Stakeholders")(_.addStringSet(stakeholders))
         .withContext("Acting Parties")(_.addStringSet(actingParties))
         .withContext("Interface Id")(_.addOptional(interfaceId, _.addIdentifier))
-        .withContext("Choice Id")(_.addString(choiceId))
+        .withContext("Choice Id")(_.add(choiceId))
         .withContext("Chosen Value")(_.addTypedValue(chosenValue))
         .withContext("Consuming")(_.addBool(consuming))
         .withContext("Exercise Result")(
@@ -263,12 +264,12 @@ private class NodeBuilderV1(
       notSupported(s"LookupByKey node")
   }
 
-  private[this] def notSupported(str: String): Nothing =
+  private[this] def notSupported(str: String) =
     throw NodeHashingError.UnsupportedFeature(
       s"$str is not supported in version ${HashingSchemeVersion.V2.index}"
     )
 
-  private[this] def missingNodeSeed(node: Node): Nothing =
+  private[this] def missingNodeSeed(node: Node) =
     throw NodeHashingError.MissingNodeSeed(
       s"Missing node seed for node $node"
     )

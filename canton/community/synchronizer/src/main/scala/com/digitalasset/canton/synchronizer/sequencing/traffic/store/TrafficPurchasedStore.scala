@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.traffic.store
@@ -102,11 +102,4 @@ trait TrafficPurchasedStore extends AutoCloseable {
   def getInitialTimestamp(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[CantonTimestamp]]
-
-  /** Truncates the entire traffic purchased store. To be used only on sequencer initialization to
-    * clean up partial state.
-    */
-  def truncate()(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
 }

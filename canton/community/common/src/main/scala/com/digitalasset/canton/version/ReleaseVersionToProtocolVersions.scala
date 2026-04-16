@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -11,23 +11,21 @@ import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
   *   - generateReferenceJson
   */
 object ReleaseVersionToProtocolVersions {
-
-  // Former stable/beta protocol versions
-  private val v2 = ProtocolVersion.createStable(2)
-  private val v3 = ProtocolVersion.createStable(3)
-  private val v4 = ProtocolVersion.createStable(4)
-  private val v5 = ProtocolVersion.createStable(5)
-  private val v6 = ProtocolVersion.createBeta(6)
-  private val v30 = ProtocolVersion.createStable(30)
-  private val v31 = ProtocolVersion.createStable(31)
-  private val v32 = ProtocolVersion.createStable(32)
-  private val v33 = ProtocolVersion.createStable(33)
+  private val v2 = ProtocolVersion(2)
+  private val v3 = ProtocolVersion(3)
+  private val v4 = ProtocolVersion(4)
+  private val v5 = ProtocolVersion(5)
+  private val v6 = ProtocolVersion(6)
+  private val v30 = ProtocolVersion(30)
+  private val v31 = ProtocolVersion(31)
+  private val v32 = ProtocolVersion(32)
+  private val v33 = ProtocolVersion(33)
 
   import ProtocolVersion.*
 
   // For each (major, minor) the list of supported protocol versions
   // Don't make this variable private because it's used in `console-reference.canton`
-  val majorMinorToStableProtocolVersions: Map[(Int, Int), NonEmpty[List[StableProtocolVersion]]] =
+  val majorMinorToStableProtocolVersions: Map[(Int, Int), NonEmpty[List[ProtocolVersion]]] =
     Map(
       ReleaseVersions.v2_0_0 -> List(v2),
       ReleaseVersions.v2_1_0 -> List(v2),
@@ -43,11 +41,10 @@ object ReleaseVersionToProtocolVersions {
       ReleaseVersions.v3_1_0 -> List(v31),
       ReleaseVersions.v3_2_0 -> List(v32),
       ReleaseVersions.v3_3_0 -> List(v33),
-      ReleaseVersions.v3_4_0 -> List(v34),
-      ReleaseVersions.v3_5_0_snapshot -> List(v34),
+      ReleaseVersions.v3_4_0_snapshot -> List(v34),
     ).map { case (release, pvs) => (release.majorMinor, NonEmptyUtil.fromUnsafe(pvs)) }
 
-  val majorMinorToBetaProtocolVersions: Map[(Int, Int), NonEmpty[List[BetaProtocolVersion]]] = Map(
+  val majorMinorToBetaProtocolVersions: Map[(Int, Int), NonEmpty[List[ProtocolVersion]]] = Map(
     ReleaseVersions.v2_9_0 -> List(v6)
   ).map { case (release, pvs) => (release.majorMinor, NonEmptyUtil.fromUnsafe(pvs)) }
 

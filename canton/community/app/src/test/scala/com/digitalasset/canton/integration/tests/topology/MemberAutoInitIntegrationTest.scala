@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -9,9 +9,9 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.NodeStatus.NotInitialized
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, ParticipantStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.IdentityConfig
 import com.digitalasset.canton.config.InitConfigBase.NodeIdentifierConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{DbConfig, IdentityConfig}
 import com.digitalasset.canton.console.{
   LocalInstanceReference,
   LocalParticipantReference,
@@ -20,7 +20,11 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
+  UsePostgres,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -267,6 +271,19 @@ trait MemberAutoInitIntegrationTest
       testParticipantCanConnect(participant2, sequencer2, daName)
     }
   }
+
+}
+
+class MemberAutoInitReferenceIntegrationTestPostgres extends MemberAutoInitIntegrationTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
+      loggerFactory,
+      MultiSynchronizer(
+        Seq(Set(InstanceName.tryCreate("sequencer1")), Set(InstanceName.tryCreate("sequencer2")))
+      ),
+    )
+  )
 }
 
 class MemberAutoInitBftOrderingIntegrationTestPostgres extends MemberAutoInitIntegrationTest {

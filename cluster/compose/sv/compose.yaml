@@ -243,7 +243,7 @@ services:
       - ADDITIONAL_CONFIG_MIGRATION_ID=canton.sv-apps.sv.domain-migration-id = 0
       - |
         ADDITIONAL_CONFIG_SV_DOMAIN=
-                canton.sv-apps.sv.local-synchronizer-nodes.current {
+                canton.sv-apps.sv.local-synchronizer-node {
                   sequencer {
                     admin-api {
                       address = sequencer-mediator

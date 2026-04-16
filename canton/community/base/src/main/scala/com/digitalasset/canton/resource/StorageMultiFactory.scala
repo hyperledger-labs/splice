@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -7,13 +7,8 @@ import cats.data.EitherT
 import cats.syntax.functor.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.lifecycle.{
-  CloseContext,
-  FlagCloseable,
-  FutureUnlessShutdown,
-  UnlessShutdown,
-}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -25,14 +20,13 @@ class StorageMultiFactory(
     val config: StorageConfig,
     exitOnFatalFailures: Boolean,
     replicationConfig: Option[ReplicationConfig],
-    onActive: TracedLogger => FutureUnlessShutdown[Unit],
-    onPassive: TracedLogger => FutureUnlessShutdown[Unit],
-    mustStayActive: Boolean,
+    onActive: () => FutureUnlessShutdown[Unit],
+    onPassive: () => FutureUnlessShutdown[Option[CloseContext]],
     mainLockCounter: DbLockCounter,
     poolLockCounter: DbLockCounter,
     futureSupervisor: FutureSupervisor,
     override protected val loggerFactory: NamedLoggerFactory,
-    getSessionContextO: Option[() => CloseContext],
+    initialSessionContext: Option[CloseContext] = None,
 ) extends StorageFactory
     with NamedLogging {
 
@@ -68,10 +62,6 @@ class StorageMultiFactory(
                 withMainConnection = false,
               )
 
-            val getSessionContext = getSessionContextO.getOrElse {
-              val ctx = CloseContext(FlagCloseable(logger, timeouts))
-              () => ctx
-            }
             DbStorageMulti
               .create(
                 dbConfig,
@@ -82,7 +72,6 @@ class StorageMultiFactory(
                 poolLockCounter,
                 onActive,
                 onPassive,
-                mustStayActive,
                 metrics,
                 logQueryCost,
                 None,
@@ -91,7 +80,7 @@ class StorageMultiFactory(
                 exitOnFatalFailures = exitOnFatalFailures,
                 futureSupervisor,
                 loggerFactory,
-                getSessionContext,
+                initialSessionContext,
               )
               .widen[Storage]
           case _ =>

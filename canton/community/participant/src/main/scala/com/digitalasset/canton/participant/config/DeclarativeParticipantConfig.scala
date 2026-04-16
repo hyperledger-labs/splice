@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.config
@@ -8,8 +8,14 @@ import cats.syntax.either.*
 import com.daml.jwt.JwksUrl
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.ConfidentialConfigWriter
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  CantonConfigValidatorInstances,
+  ConfidentialConfigWriter,
+  UniformCantonConfigValidation,
+}
 import com.digitalasset.canton.ledger.api.IdentityProviderId
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -27,7 +33,6 @@ import com.google.protobuf.ByteString
 import pureconfig.error.CannotConvert
 
 import java.io.File
-import java.nio.file.Files
 
 /** Declarative participant config
   *
@@ -54,13 +59,10 @@ import java.nio.file.Files
   *   which connections should be configured
   * @param removeConnections
   *   if true, then any excess connection will be disabled
-  * @param enableMultiSynchronizerTopologyFeatureFlag
-  *   if true, then the participant will enable multi-synchronizers for all synchronizers it is
-  *   connected to
   */
 final case class DeclarativeParticipantConfig(
     checkSelfConsistency: Boolean = true,
-    fetchedDarDirectory: File = Files.createTempDirectory("fetched-dars").toFile,
+    fetchedDarDirectory: File = new File("fetched-dars"),
     dars: Seq[DeclarativeDarConfig] = Seq(),
     parties: Seq[DeclarativePartyConfig] = Seq(),
     removeParties: Boolean = false,
@@ -70,8 +72,7 @@ final case class DeclarativeParticipantConfig(
     removeUsers: Boolean = false,
     connections: Seq[DeclarativeConnectionConfig] = Seq(),
     removeConnections: Boolean = false,
-    enableMultiSynchronizerTopologyFeatureFlag: Boolean = false,
-)
+) extends UniformCantonConfigValidation
 
 /** Declarative dar definition
   *
@@ -87,9 +88,9 @@ final case class DeclarativeDarConfig(
     requestHeaders: Map[String, String] = Map(),
     expectedMainPackage: Option[String] = None,
     synchronizers: Seq[String] = Seq.empty,
-)
+) extends UniformCantonConfigValidation
 
-sealed trait ParticipantPermissionConfig {
+sealed trait ParticipantPermissionConfig extends UniformCantonConfigValidation {
   def toNative: ParticipantPermission
 }
 object ParticipantPermissionConfig {
@@ -125,7 +126,7 @@ final case class DeclarativePartyConfig(
     party: String,
     synchronizers: Seq[String] = Seq.empty,
     permission: ParticipantPermissionConfig = ParticipantPermissionConfig.Submission,
-)
+) extends UniformCantonConfigValidation
 
 /** Declarative user rights definition
   *
@@ -149,7 +150,7 @@ final case class DeclarativeUserRightsConfig(
     executeAsAnyParty: Boolean = false,
     participantAdmin: Boolean = false,
     identityProviderAdmin: Boolean = false,
-)
+) extends UniformCantonConfigValidation
 
 /** Declarative Idp config
   */
@@ -159,7 +160,7 @@ final case class DeclarativeIdpConfig(
     jwksUrl: String,
     issuer: String,
     audience: Option[String] = None,
-) {
+) extends UniformCantonConfigValidation {
   // TODO(#25043) move to config validation
   def apiIdentityProviderId: IdentityProviderId.Id =
     IdentityProviderId.Id.assertFromString(identityProviderId)
@@ -189,7 +190,8 @@ final case class DeclarativeUserConfig(
     annotations: Map[String, String] = Map.empty,
     identityProviderId: String = "",
     rights: DeclarativeUserRightsConfig = DeclarativeUserRightsConfig(),
-)(val resourceVersion: String = "") {
+)(val resourceVersion: String = "")
+    extends UniformCantonConfigValidation {
 
   /** map party names to namespace
     */
@@ -242,10 +244,11 @@ final case class DeclarativeUserConfig(
   *   store can be provided
   */
 final case class DeclarativeSequencerConnectionConfig(
-    endpoints: NonEmpty[Set[Endpoint]],
+    endpoints: NonEmpty[Seq[Endpoint]],
     transportSecurity: Boolean = false,
     customTrustCertificates: Option[File] = None,
-)(customTrustCertificatesFromNode: Option[ByteString] = None) {
+)(customTrustCertificatesFromNode: Option[ByteString] = None)
+    extends UniformCantonConfigValidation {
   def customTrustCertificatesAsByteString: Either[String, Option[ByteString]] =
     customTrustCertificates
       .traverse(x => BinaryFileUtil.readByteStringFromFile(x.getPath))
@@ -258,7 +261,7 @@ final case class DeclarativeSequencerConnectionConfig(
 
 object DeclarativeSequencerConnectionConfig {
   def create(endpoint: Endpoint): DeclarativeSequencerConnectionConfig =
-    DeclarativeSequencerConnectionConfig(endpoints = NonEmpty.mk(Set, endpoint))()
+    DeclarativeSequencerConnectionConfig(endpoints = NonEmpty.mk(Seq, endpoint))()
 }
 
 /** Declarative synchronizer connection configuration
@@ -287,7 +290,7 @@ final case class DeclarativeConnectionConfig(
     initializeFromTrustedSynchronizer: Boolean = false,
     trustThreshold: PositiveInt = PositiveInt.one,
     livenessMargin: NonNegativeInt = NonNegativeInt.zero,
-) {
+) extends UniformCantonConfigValidation {
 
   def isEquivalent(other: DeclarativeConnectionConfig): Boolean = {
     val areConnectionsEquivalent = connections.keySet == other.connections.keySet &&
@@ -348,6 +351,36 @@ object DeclarativeConnectionConfig {
 }
 
 object DeclarativeParticipantConfig {
+
+  import CantonConfigValidatorInstances.*
+  lazy implicit val declarativeDarConfigCantonConfigValidator
+      : CantonConfigValidator[DeclarativeDarConfig] =
+    CantonConfigValidatorDerivation[DeclarativeDarConfig]
+  lazy implicit val declarativeUserRightsConfig
+      : CantonConfigValidator[DeclarativeUserRightsConfig] =
+    CantonConfigValidatorDerivation[DeclarativeUserRightsConfig]
+  lazy implicit val declarativeUserConfigCantonConfigValidator
+      : CantonConfigValidator[DeclarativeUserConfig] =
+    CantonConfigValidatorDerivation[DeclarativeUserConfig]
+  lazy implicit val declarativeIdpConfigCantonConfigValidator
+      : CantonConfigValidator[DeclarativeIdpConfig] =
+    CantonConfigValidatorDerivation[DeclarativeIdpConfig]
+  lazy implicit val declarativeParticipantPermissionConfigValidator
+      : CantonConfigValidator[ParticipantPermissionConfig] =
+    CantonConfigValidatorDerivation[ParticipantPermissionConfig]
+  lazy implicit val declarativePartyConfigCantonConfigValidator
+      : CantonConfigValidator[DeclarativePartyConfig] =
+    CantonConfigValidatorDerivation[DeclarativePartyConfig]
+  lazy implicit val declarativeSequencerConnectionConfigValidator
+      : CantonConfigValidator[DeclarativeSequencerConnectionConfig] =
+    CantonConfigValidatorDerivation[DeclarativeSequencerConnectionConfig]
+  lazy implicit val declarativeConnectionConfigValidator
+      : CantonConfigValidator[DeclarativeConnectionConfig] =
+    CantonConfigValidatorDerivation[DeclarativeConnectionConfig]
+
+  lazy implicit val declarativeParticipantCantonConfigValidator
+      : CantonConfigValidator[DeclarativeParticipantConfig] =
+    CantonConfigValidatorDerivation[DeclarativeParticipantConfig]
 
   object Readers {
     import com.daml.nonempty.NonEmptyUtil.instances.*

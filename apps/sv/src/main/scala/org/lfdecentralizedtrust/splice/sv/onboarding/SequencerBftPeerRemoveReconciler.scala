@@ -8,7 +8,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome, TaskSuccess}
-import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SequencerAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -20,8 +20,8 @@ class SequencerBftPeerRemoveReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     val loggerFactory: NamedLoggerFactory,
     scanConnection: AggregatingScanConnection,
-    retryProvider: RetryProvider,
-) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection, retryProvider) {
+    migrationId: Long,
+) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection, migrationId) {
 
   override def reconcileTask(
       task: BftPeerDifference

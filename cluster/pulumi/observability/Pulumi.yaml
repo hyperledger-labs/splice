@@ -1,3 +1,0 @@
-name: observability
-runtime: nodejs
-description: Prometheus, Grafana and GCP alerts

@@ -1,11 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
 
 import com.daml.ledger.resources.ResourceOwner
-import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.daml.timer.Timeout.*
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -16,12 +16,10 @@ import com.digitalasset.canton.platform.DispatcherState.{
   DispatcherStateShutdown,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import io.grpc.StatusRuntimeException
 
-import java.util.concurrent.ScheduledExecutorService
-import scala.concurrent.Future
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Future, blocking}
 import scala.util.{Failure, Success}
 
 /** Life-cycle manager for the Ledger API streams offset dispatcher. */
@@ -29,31 +27,30 @@ class DispatcherState(
     dispatcherShutdownTimeout: Duration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    traceContext: TraceContext,
-    scheduler: ScheduledExecutorService,
+    traceContext: TraceContext
 ) extends NamedLogging {
 
   private val ServiceName = "Ledger API offset dispatcher"
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var dispatcherStateRef: DispatcherState.State = DispatcherNotRunning
-  private val lock = new Mutex()
+
   private val directEc = DirectExecutionContext(noTracingLogger)
 
-  def isRunning: Boolean = (lock.exclusive {
+  def isRunning: Boolean = blocking(synchronized {
     dispatcherStateRef match {
       case DispatcherRunning(_) => true
       case DispatcherNotRunning | DispatcherStateShutdown => false
     }
   })
 
-  def getDispatcher: Dispatcher[Offset] = (lock.exclusive {
+  def getDispatcher: Dispatcher[Offset] = blocking(synchronized {
     dispatcherStateRef match {
       case DispatcherStateShutdown | DispatcherNotRunning => throw dispatcherNotRunning
       case DispatcherRunning(dispatcher) => dispatcher
     }
   })
 
-  def startDispatcher(initializationOffset: Option[Offset]): Unit = (lock.exclusive {
+  def startDispatcher(initializationOffset: Option[Offset]): Unit = blocking(synchronized {
     dispatcherStateRef match {
       case DispatcherNotRunning =>
         val activeDispatcher = buildDispatcher(initializationOffset)
@@ -71,7 +68,7 @@ class DispatcherState(
   })
 
   def stopDispatcher(): Future[Unit] = {
-    val dispatcherToCancel = (lock.exclusive {
+    val dispatcherToCancel = blocking(synchronized {
       dispatcherStateRef match {
         case DispatcherNotRunning | DispatcherStateShutdown =>
           logger.debug(s"$ServiceName already stopped, shutdown or never started.")
@@ -100,7 +97,7 @@ class DispatcherState(
 
   private[platform] def shutdown(): Future[Unit] = {
     logger.info(s"Shutting down $ServiceName state.")
-    val currentDispatcherState = (lock.exclusive {
+    val currentDispatcherState = blocking(synchronized {
       val currentDispatcherState = dispatcherStateRef
       dispatcherStateRef = DispatcherStateShutdown
       currentDispatcherState
@@ -113,24 +110,21 @@ class DispatcherState(
         logger.info(s"$ServiceName already shutdown.")
         Future.unit
       case DispatcherRunning(dispatcher) =>
-        new FutureSupervisor.Impl(
-          NonNegativeDuration(dispatcherShutdownTimeout + 1.seconds),
-          loggerFactory,
-        ).supervised(
-          description = s"Shutdown $ServiceName",
-          warnAfter = dispatcherShutdownTimeout,
-        )(
-          dispatcher
-            .shutdown()
-            .transform {
-              case success @ Success(_) =>
-                logger.info(s"Shutdown $ServiceName.")
-                success
-              case f @ Failure(failure) =>
-                logger.warn(s"Error during $ServiceName shutdown", failure)
-                f
-            }(directEc)
-        )
+        dispatcher
+          .shutdown()
+          .withTimeout(dispatcherShutdownTimeout)(
+            logger.warn(
+              s"Shutdown of existing Ledger API streams did not finish in ${dispatcherShutdownTimeout.toSeconds} seconds."
+            )
+          )
+          .transform {
+            case success @ Success(_) =>
+              logger.info(s"$ServiceName shutdown.")
+              success
+            case f @ Failure(failure) =>
+              logger.warn(s"Error during $ServiceName shutdown", failure)
+              f
+          }(directEc)
     }
   }
 
@@ -160,12 +154,8 @@ object DispatcherState {
   private final case object DispatcherStateShutdown extends State
   private final case class DispatcherRunning(dispatcher: Dispatcher[Offset]) extends State
 
-  def owner(
-      apiStreamShutdownTimeout: Duration,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit
-      traceContext: TraceContext,
-      scheduler: ScheduledExecutorService,
+  def owner(apiStreamShutdownTimeout: Duration, loggerFactory: NamedLoggerFactory)(implicit
+      traceContext: TraceContext
   ): ResourceOwner[DispatcherState] = ResourceOwner.forReleasable(() =>
     new DispatcherState(apiStreamShutdownTimeout, loggerFactory)
   )(_.shutdown())

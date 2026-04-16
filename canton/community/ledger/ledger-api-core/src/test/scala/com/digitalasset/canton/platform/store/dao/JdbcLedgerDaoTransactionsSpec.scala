@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -169,7 +169,7 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
     val stakeholders = Set(alice, bob, charlie) // Charlie is only stakeholder
     val actAs = List(alice, bob, david) // David is submitter but not signatory
     for {
-      (_, tx) <- store(singleCreate(createNode(signatories, stakeholders), actAs))
+      (_, tx) <- store(singleCreate(createNode(_, signatories, stakeholders), actAs))
       // Response 1: querying as all submitters
       result1 <- ledgerDao.updateReader
         .lookupUpdateBy(
@@ -200,7 +200,7 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
     val stakeholders = Set(alice, bob, charlie) // Charlie is only stakeholder
     val actAs = List(alice, bob, david) // David is submitter but not signatory
     for {
-      (offset, tx) <- store(singleCreate(createNode(signatories, stakeholders), actAs))
+      (offset, tx) <- store(singleCreate(createNode(_, signatories, stakeholders), actAs))
       // Response 1: querying as all submitters
       result1 <- ledgerDao.updateReader
         .lookupUpdateBy(
@@ -231,7 +231,7 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
     val stakeholders = Set(alice, bob, charlie) // Charlie is only stakeholder
     val actAs = List(alice, bob, david) // David is submitter but not signatory
     for {
-      (offset, tx) <- store(singleCreate(createNode(signatories, stakeholders), actAs))
+      (offset, tx) <- store(singleCreate(createNode(_, signatories, stakeholders), actAs))
       resultById <- ledgerDao.updateReader
         .lookupUpdateBy(
           LookupKey.ByUpdateId(tx.updateId),
@@ -278,7 +278,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
     } yield {
@@ -313,7 +312,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
       resultForBob <- transactionsOf(
@@ -327,7 +325,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
       resultForCharlie <- transactionsOf(
@@ -341,7 +338,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
     } yield {
@@ -379,7 +375,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
     } yield {
@@ -420,7 +415,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
       resultPartyWildcard <- transactionsOf(
@@ -437,7 +431,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
 
@@ -452,11 +445,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
         create.witnessParties.loneElement shouldBe alice
         create.templateId.value shouldBe LfEngineToApi.toApiIdentifier(otherTemplateId)
       }
-      // clear out commandId and paidTrafficCost since submitter is not in the querying parties for flat transactions in the non-wildcard query
-      resultPartyWildcard.loneElement.copy(
-        commandId = "",
-        paidTrafficCost = None,
-      ) shouldBe result.loneElement
+      // clear out commandId since submitter is not in the querying parties for flat transactions in the non-wildcard query
+      resultPartyWildcard.loneElement.copy(commandId = "") shouldBe result.loneElement
     }
   }
 
@@ -491,7 +481,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
       resultPartyWildcard <- transactionsOf(
@@ -511,7 +500,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
     } yield {
@@ -560,7 +548,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
       resultPartyWildcard <- transactionsOf(
@@ -579,7 +566,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
       )
     } yield {
@@ -593,11 +579,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
         create.witnessParties.loneElement shouldBe alice
         create.templateId.value shouldBe LfEngineToApi.toApiIdentifier(otherTemplateId)
       }
-      // clear out commandId and paidTrafficCost since submitter is not in the querying parties for flat transactions in the non-wildcard query
-      resultPartyWildcard.loneElement.copy(
-        commandId = "",
-        paidTrafficCost = None,
-      ) shouldBe result.loneElement
+      // clear out commandId since submitter is not in the querying parties for flat transactions in the non-wildcard query
+      resultPartyWildcard.loneElement.copy(commandId = "") shouldBe result.loneElement
     }
   }
 
@@ -617,7 +600,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           ),
-          descendingOrder = false,
         )
         .runWith(Sink.seq)
     } yield {
@@ -654,7 +636,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           ),
-          descendingOrder = false,
         )
         .runWith(Sink.seq)
 
@@ -689,7 +670,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
               verbose = true
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           ),
-          descendingOrder = false,
         )
         .runWith(Sink.seq)
         .failed
@@ -750,7 +730,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                 verbose = true
               )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
             ),
-            descendingOrder = false,
           )
           .runWith(Sink.seq)
       )(ResourceContext(executionContext))
@@ -804,7 +783,6 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
                   verbose = true
                 )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
               ),
-              descendingOrder = false,
             )
             .runWith(Sink.seq)
           readOffsets = response flatMap { case (_, gtr) => Seq(gtr.getTransaction.offset) }
@@ -915,8 +893,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
       Mk(
         "singleWildcardParty",
         TemplatePartiesFilter(Map.empty, Some(Set(alice))),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(bob))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(bob))),
         ce => (ce.signatories ++ ce.observers) contains alice,
       ),
       Mk(
@@ -925,16 +903,16 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
           Map(someTemplateIdFull.toNameTypeConRef -> Some(Set(alice))),
           Some(Set.empty),
         ),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(bob))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(bob))),
         ce =>
           ((ce.signatories ++ ce.observers) contains alice), // TODO(i12297): && ce.templateId == Some(someTemplateId.toString)
       ),
       Mk(
         "onlyWildcardParties",
         TemplatePartiesFilter(Map.empty, Some(Set(alice, bob))),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(charlie))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(charlie))),
         ce => (ce.signatories ++ ce.observers) exists Set(alice, bob),
       ),
       Mk(
@@ -943,8 +921,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
           Map(someTemplateIdFull.toNameTypeConRef -> Some(Set(alice, bob))),
           Some(Set.empty),
         ),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(charlie))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(charlie))),
         ce => (ce.signatories ++ ce.observers) exists Set(alice, bob),
       ),
       Mk(
@@ -956,8 +934,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
           ),
           Some(Set.empty),
         ),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(charlie))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(charlie))),
         ce => (ce.signatories ++ ce.observers) exists Set(alice, bob),
       ),
       Mk(
@@ -966,8 +944,8 @@ private[dao] trait JdbcLedgerDaoTransactionsSpec extends OptionValues with Insid
           Map(someTemplateIdFull.toNameTypeConRef -> Some(Set(alice))),
           Some(Set(bob)),
         ),
-        () => singleCreate(create(signatories = Set(alice))),
-        () => singleCreate(create(signatories = Set(charlie))),
+        () => singleCreate(create(_, signatories = Set(alice))),
+        () => singleCreate(create(_, signatories = Set(charlie))),
         ce => (ce.signatories ++ ce.observers) exists Set(alice, bob),
       ),
     )

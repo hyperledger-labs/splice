@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation
@@ -259,7 +259,7 @@ class RetransmissionMessageValidatorTest extends AnyWordSpec with BftSequencerBa
 object RetransmissionMessageValidatorTest {
   val epochLength = EpochLength(8L)
   val epochInfo =
-    EpochInfo.forTesting(
+    EpochInfo.mk(
       number = EpochNumber.First,
       startBlockNumber = BlockNumber.First,
       length = epochLength,

@@ -1,16 +1,15 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
 
 import cats.syntax.either.*
-import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, TestingConfigInternal}
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
@@ -28,7 +27,6 @@ final case class NodeFactoryArguments[
     parameters: ParameterConfig,
     clock: Clock,
     metrics: Metrics,
-    executorServiceMetrics: ExecutorServiceMetrics,
     testingConfig: TestingConfigInternal,
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
@@ -40,7 +38,7 @@ final case class NodeFactoryArguments[
 
   def toCantonNodeBootstrapCommonArguments(
       storageFactory: StorageFactory,
-      replicaManager: Option[ReplicaManager],
+      cryptoPrivateStoreFactory: CryptoPrivateStoreFactory,
   ): Either[String, CantonNodeBootstrapCommonArguments[NodeConfig, ParameterConfig, Metrics]] =
     InstanceName
       .create(name)
@@ -52,9 +50,8 @@ final case class NodeFactoryArguments[
           testingConfig,
           clock,
           metrics,
-          executorServiceMetrics,
           storageFactory,
-          replicaManager,
+          cryptoPrivateStoreFactory,
           futureSupervisor,
           loggerFactory,
           writeHealthDumpToFile,

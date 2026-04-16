@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders
@@ -36,11 +36,6 @@ trait LeaderSelectionPolicy[E <: Env[E]] {
     * replaying old blocks this will return [[scala.None$]].
     */
   def firstBlockWeNeedToAdd: Option[BlockNumber]
-
-  /** The current epoch that all [[addBlock]] need to be in (None means we can [[addBlock]] from any
-    * epoch)
-    */
-  def currentEpoch: Option[EpochNumber]
 
   def getHistoricState(
       epochNumber: EpochNumber

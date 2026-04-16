@@ -38,7 +38,6 @@ import {
   validateExpiration,
   validateExpiryEffectiveDate,
   validateNextScheduledSynchronizerUpgrade,
-  validateNextScheduledLogicalSynchronizerUpgrade,
   validateSummary,
   validateUrl,
 } from './formValidators';
@@ -145,23 +144,11 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
         const syncMigrationId = formData.config.nextScheduledSynchronizerUpgradeMigrationId.value;
         const effectiveDate = formData.common.effectiveDate.effectiveDate;
 
-        const synchronizerUpgradeError = validateNextScheduledSynchronizerUpgrade(
+        return validateNextScheduledSynchronizerUpgrade(
           syncUpgradeTime,
           syncMigrationId,
           effectiveDate
         );
-        if (synchronizerUpgradeError) return synchronizerUpgradeError;
-        const logicalSynchronizerUpgradeError = validateNextScheduledLogicalSynchronizerUpgrade(
-          formData.config.nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime.value,
-          formData.config.nextScheduledLogicalSynchronizerUpgradeUpgradeTime.value,
-          formData.config.nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial
-            .value,
-          formData.config
-            .nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion.value,
-          effectiveDate
-        );
-        if (logicalSynchronizerUpgradeError) return logicalSynchronizerUpgradeError;
-        return false;
       },
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);

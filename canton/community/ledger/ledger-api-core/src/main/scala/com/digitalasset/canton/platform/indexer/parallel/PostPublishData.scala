@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
@@ -67,7 +67,7 @@ object PostPublishData {
         )
 
       // but: we pass into deduplication and inflight tracking both the transactions and the reassignments upon rejection
-      case u: SequencedCommandRejected if u.isTransaction =>
+      case u: SequencedCommandRejected =>
         Some(
           from(
             synchronizerId = u.synchronizerId,
@@ -77,7 +77,7 @@ object PostPublishData {
           )
         )
 
-      case u: UnSequencedCommandRejected if u.isTransaction =>
+      case u: UnSequencedCommandRejected =>
         Some(
           from(
             synchronizerId = u.synchronizerId,

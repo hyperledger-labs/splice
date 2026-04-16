@@ -1,15 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
 
 import cats.implicits.catsSyntaxSemigroup
+import com.daml.timer.FutureCheck.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{
-  NonNegativeDuration,
-  PackageMetadataViewConfig,
-  ProcessingTimeout,
-}
+import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTimeout}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.error.{CommonErrors, PackageServiceErrors}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
@@ -28,9 +25,7 @@ import com.digitalasset.daml.lf.archive.{DamlLf, Decode}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 /** In-memory view of Daml-related package metadata (see
@@ -38,7 +33,6 @@ import scala.concurrent.{ExecutionContext, Future}
   * current participant.
   */
 trait PackageMetadataView extends AutoCloseable {
-  def packageStore: DamlPackageStore
   def getSnapshot(implicit errorLoggingContext: ErrorLoggingContext): PackageMetadata
   val packageUpgradeValidator: PackageUpgradeValidator
 }
@@ -47,7 +41,6 @@ trait PackageMetadataView extends AutoCloseable {
   * initialization and on new package uploads.
   */
 trait MutablePackageMetadataView extends PackageMetadataView {
-  def packageStore: DamlPackageStore
 
   /** Update the current package metadata view by merging the series of `newPackageMetadata` into
     * it.
@@ -62,18 +55,15 @@ trait MutablePackageMetadataView extends PackageMetadataView {
 
 class MutablePackageMetadataViewImpl(
     clock: Clock,
-    val packageStore: DamlPackageStore,
+    damlPackageStore: DamlPackageStore,
     val packageUpgradeValidator: PackageUpgradeValidator,
     val loggerFactory: NamedLoggerFactory,
     packageMetadataViewConfig: PackageMetadataViewConfig,
     val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
     exitOnFatalFailures: Boolean,
-)(implicit
-    actorSystem: ActorSystem,
-    executionContext: ExecutionContext,
-    scheduler: ScheduledExecutorService,
-) extends MutablePackageMetadataView
+)(implicit val actorSystem: ActorSystem, executionContext: ExecutionContext)
+    extends MutablePackageMetadataView
     with FlagCloseable
     with NamedLogging {
   private val loggingSubject = "Package Metadata View"
@@ -120,7 +110,7 @@ class MutablePackageMetadataViewImpl(
     def elapsedDurationMillis(): Long = (clock.now - startedTime).toMillis
 
     val initializationFUS =
-      packageStore
+      damlPackageStore
         .listPackages()
         .flatMap(packages =>
           FutureUnlessShutdown.outcomeF(
@@ -138,23 +128,24 @@ class MutablePackageMetadataViewImpl(
           )
         )
 
-    new FutureSupervisor.Impl(
-      NonNegativeDuration(packageMetadataViewConfig.initTakesTooLongInitialDelay + 1.seconds),
-      loggerFactory,
-    ).supervisedUS(
-      description = s"$loggingSubject initialization",
-      warnAfter = packageMetadataViewConfig.initTakesTooLongInitialDelay,
-    )(
-      FutureUnlessShutdown(
-        initializationFUS.unwrap
-          .map { result =>
-            logger.info(
-              s"$loggingSubject has been initialized (${elapsedDurationMillis()} ms)"
-            )
-            result
-          }
-      )
+    FutureUnlessShutdown(
+      initializationFUS.unwrap
+        .checkIfComplete(
+          packageMetadataViewConfig.initTakesTooLongInitialDelay,
+          packageMetadataViewConfig.initTakesTooLongInterval,
+        ) {
+          logger.warn(
+            s"$loggingSubject initialization takes too long (${elapsedDurationMillis()} ms)"
+          )
+        }
+        .map { result =>
+          logger.info(
+            s"$loggingSubject has been initialized (${elapsedDurationMillis()} ms)"
+          )
+          result
+        }
     )
+
   }
 
   def getSnapshot(implicit errorLoggingContext: ErrorLoggingContext): PackageMetadata =
@@ -166,10 +157,8 @@ class MutablePackageMetadataViewImpl(
           .asGrpcError
       )
 
-  override def onClosed(): Unit = {
+  override def onClosed(): Unit =
     LifeCycle.close(mutatePackageMetadataExecutionQueue)(logger)
-    LifeCycle.close(packageStore)(logger)
-  }
 
   private def decodePackageMetadata(
       archive: DamlLf.Archive
@@ -184,7 +173,7 @@ class MutablePackageMetadataViewImpl(
   private def fetchPackage(
       packageId: LfPackageId
   )(implicit tc: TraceContext): FutureUnlessShutdown[DamlLf.Archive] =
-    packageStore
+    damlPackageStore
       .getPackage(packageId)
       .flatMap {
         case Some(pkg) => FutureUnlessShutdown.pure(pkg)

@@ -146,13 +146,12 @@ describe('Review Proposal Component', () => {
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
     expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
-    expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider Party ID');
+    expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider');
     expect(screen.getByTestId('grantRight-field').textContent).toBe(provider);
   });
 
   test('should render review proposal component for unfeature application', () => {
     const actionName = 'UnFeature Application';
-    const providerPartyId = 'a-party-id::1014912492';
     const contractId = 'bcde123456';
 
     render(
@@ -163,7 +162,6 @@ describe('Review Proposal Component', () => {
         expiryDate={expiryDate}
         effectiveDate={effectiveDate}
         formType="revoke-right"
-        providerPartyId={providerPartyId}
         revokeRight={contractId}
         onEdit={() => {}}
         onSubmit={() => {}}
@@ -185,11 +183,8 @@ describe('Review Proposal Component', () => {
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
     expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
-    expect(screen.getByTestId('revokeProviderPartyId-title').textContent).toBe('Provider Party ID');
-    expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(providerPartyId);
-
     expect(screen.getByTestId('revokeRight-title').textContent).toBe(
-      'Featured Application Contract ID'
+      'Featured Application Right Contract Id'
     );
     expect(screen.getByTestId('revokeRight-field').textContent).toBe(contractId);
   });

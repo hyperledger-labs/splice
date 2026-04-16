@@ -256,23 +256,18 @@ object DsoRulesStore {
           .lookupContractById(splice.dso.svstate.SvNodeState.COMPANION)(svNodeState.contractId)
       } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
 
-    def lookupActiveSequencerIdConfigFor(
+    def lookupSequencerConfigFor(
         decentralizedSynchronizerId: SynchronizerId,
         domainTimeLowerBound: Instant,
         migrationId: Long,
-    ): Option[String] = {
+    ): Option[splice.dso.decentralizedsynchronizer.SequencerConfig] = {
       for {
         synchronizerNodeConfig <- svNodeState.payload.state.synchronizerNodes.asScala
           .get(decentralizedSynchronizerId.toProtoPrimitive)
-        (identity, availableAfter) <- synchronizerNodeConfig.sequencerIdentity.toScala
-          .map(identity => identity.sequencerId -> identity.availableAfter.toScala)
-          .orElse(
-            synchronizerNodeConfig.sequencer.toScala
-              .filter(config => config.migrationId == migrationId && config.url.nonEmpty)
-              .map(config => config.sequencerId -> config.availableAfter.toScala)
-          )
-        if availableAfter.exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
-      } yield identity
+        sequencerConfig <- synchronizerNodeConfig.sequencer.toScala
+        if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
+          .exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
+      } yield sequencerConfig
     }
   }
 

@@ -106,7 +106,7 @@ class ParticipantPartyMigrator(
         case None =>
           logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(synchronizerId, partiesToMigrateFinal.parties, getAcsSnapshot)
+            _ <- importAcs(partiesToMigrateFinal.parties, getAcsSnapshot)
             _ <- configProvider.clearPartiesToMigrate()
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
@@ -284,12 +284,14 @@ class ParticipantPartyMigrator(
         s"Removing party mapping for $adminPartyId (was mapping to $oldParticipantId)"
       )
       _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
+        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         adminPartyId,
         oldParticipantId,
       )
       _ = logger.info("Removing domain trust certificate.")
       _ <- participantAdminConnection.ensureSynchronizerTrustCertificateRemoved(
+        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         oldParticipantId.member,
       )
@@ -382,7 +384,6 @@ class ParticipantPartyMigrator(
   }
 
   private def importAcs(
-      synchronizerId: SynchronizerId,
       partyIds: Set[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
   ): Future[Unit] = {
@@ -392,7 +393,7 @@ class ParticipantPartyMigrator(
       _ <- MonadUtil.sequentialTraverse(partyIds.toSeq) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
-          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot), synchronizerId)
+          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
         } yield ()
       }
       _ <- participantAdminConnection.reconnectAllDomains()

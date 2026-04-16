@@ -3,9 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.scan.metrics
 
-import com.daml.metrics.api.MetricHandle.{Gauge, Histogram, LabeledMetricsFactory, Meter, Timer}
+import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Meter}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
-import com.daml.metrics.api.MetricQualification.{Latency, Saturation, Traffic}
+import com.daml.metrics.api.MetricQualification.Traffic
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
@@ -31,23 +31,21 @@ class ScanMediatorVerdictIngestionMetrics(metricsFactory: LabeledMetricsFactory)
     )
   )(MetricsContext.Empty)
 
-  val latency: Timer =
-    metricsFactory.timer(
-      MetricInfo(
-        name = prefix :+ "latency",
-        summary = "How long it takes to ingest a batch of verdicts",
-        qualification = Latency,
-      )
-    )(MetricsContext.Empty)
+  val errors: Meter = metricsFactory.meter(
+    MetricInfo(
+      name = prefix :+ "errors",
+      summary = "Count of ingestion stream errors",
+      qualification = Traffic,
+    )
+  )(MetricsContext.Empty)
 
-  val batchSize: Histogram =
-    metricsFactory.histogram(
-      MetricInfo(
-        name = prefix :+ "batch-size",
-        summary = "Number of verdicts ingested in a batch",
-        qualification = Saturation,
-      )
-    )(MetricsContext.Empty)
+  val restartErrors: Meter = metricsFactory.meter(
+    MetricInfo(
+      name = prefix :+ "restart_errors",
+      summary = "Count of ingestion restart errors",
+      qualification = Traffic,
+    )
+  )(MetricsContext.Empty)
 
   override def close(): Unit = {
     lastIngestedRecordTime.close()

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state.metrics
@@ -9,7 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
-import com.digitalasset.canton.health.HealthStatus
+import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
   EnrichedVettedPackages,
   ListVettedPackagesOpts,
@@ -32,16 +32,15 @@ import com.digitalasset.canton.protocol.{
   LfSubmittedTransaction,
   LfVersionedTransaction,
 }
-import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
   ParticipantId,
-  PartyId,
   PhysicalSynchronizerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId}
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -49,12 +48,11 @@ import com.digitalasset.daml.lf.data.{ImmArray, Ref}
 import com.digitalasset.daml.lf.transaction.SubmittedTransaction
 import com.google.protobuf.ByteString
 
+import java.util.concurrent.CompletionStage
 import scala.concurrent.Future
 
 final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetrics)
     extends SyncService {
-
-  import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.TimerOnShutdownSyntax
 
   override def submitTransaction(
       transaction: SubmittedTransaction,
@@ -68,8 +66,8 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       processedDisclosedContracts: ImmArray[LfFatContractInst],
   )(implicit
       traceContext: TraceContext
-  ): Future[SubmissionResult] =
-    Timed.timedAndTrackedFuture(
+  ): CompletionStage[SubmissionResult] =
+    Timed.timedAndTrackedCompletionStage(
       metrics.services.write.submitTransaction,
       metrics.services.write.submitTransactionRunning,
       delegate.submitTransaction(
@@ -93,8 +91,8 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       reassignmentCommands: Seq[ReassignmentCommand],
   )(implicit
       traceContext: TraceContext
-  ): Future[SubmissionResult] =
-    Timed.timedAndTrackedFuture(
+  ): CompletionStage[SubmissionResult] =
+    Timed.timedAndTrackedCompletionStage(
       metrics.services.write.submitReassignment,
       metrics.services.write.submitReassignmentRunning,
       delegate.submitReassignment(
@@ -121,26 +119,25 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
     )
 
   override def allocateParty(
-      partyId: PartyId,
+      hint: Ref.Party,
       submissionId: Ref.SubmissionId,
       synchronizerIdO: Option[SynchronizerId],
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SubmissionResult] =
-    Timed.futureUS(
+    Timed.future(
       metrics.services.write.allocateParty,
-      delegate.allocateParty(partyId, submissionId, synchronizerIdO, externalPartyOnboardingDetails),
+      delegate.allocateParty(hint, submissionId, synchronizerIdO, externalPartyOnboardingDetails),
     )
 
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: Ref.SubmissionId,
-      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
-  ): Future[PruningResult] =
-    Timed.future(
+  ): CompletionStage[PruningResult] =
+    Timed.completionStage(
       metrics.services.write.prune,
-      delegate.prune(pruneUpToInclusive, submissionId, safeToPruneCommitmentState),
+      delegate.prune(pruneUpToInclusive, submissionId),
     )
 
   override def currentHealth(): HealthStatus =
@@ -149,7 +146,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   override def getConnectedSynchronizers(
       request: ConnectedSynchronizerRequest
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ConnectedSynchronizerResponse] =
-    Timed.futureUS(
+    Timed.future(
       metrics.services.read.getConnectedSynchronizers,
       delegate.getConnectedSynchronizers(request),
     )
@@ -157,7 +154,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   override def incompleteReassignmentOffsets(validAt: Offset, stakeholders: Set[LfPartyId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Vector[Offset]] =
-    Timed.futureUS(
+    Timed.future(
       metrics.services.read.getConnectedSynchronizers,
       delegate.incompleteReassignmentOffsets(validAt, stakeholders),
     )
@@ -233,7 +230,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PhysicalSynchronizerId, Map[LfPartyId, Set[PackageId]]]] =
-    Timed.futureUS(
+    Timed.future(
       metrics.services.read.computePartyVettingMap,
       delegate.computePartyVettingMap(
         submitters,
@@ -255,7 +252,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, PhysicalSynchronizerId] =
     EitherT(
-      Timed.futureUS(
+      Timed.future(
         metrics.services.read.computeHighestRankedSynchronizerFromAdmissible,
         delegate
           .computeHighestRankedSynchronizerFromAdmissible(
@@ -282,7 +279,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionError, SynchronizerRank] =
     EitherT(
-      Timed.futureUS(
+      Timed.future(
         metrics.services.read.selectRoutingSynchronizer,
         delegate
           .selectRoutingSynchronizer(
@@ -300,7 +297,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
 
   override def getRoutingSynchronizerState(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[RoutingSynchronizerState] =
+  ): RoutingSynchronizerState =
     delegate.getRoutingSynchronizerState
 
   override def estimateTrafficCost(
@@ -324,10 +321,9 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       costHints,
     )
 
-  override def physicalSynchronizerIdForSynchronizerId(
+  override def protocolVersionForSynchronizerId(
       synchronizerId: SynchronizerId
-  ): Option[PhysicalSynchronizerId] =
-    delegate.physicalSynchronizerIdForSynchronizerId(synchronizerId)
+  ): Option[ProtocolVersion] = delegate.protocolVersionForSynchronizerId(synchronizerId)
 
   override def hashOps: HashOps = delegate.hashOps
 

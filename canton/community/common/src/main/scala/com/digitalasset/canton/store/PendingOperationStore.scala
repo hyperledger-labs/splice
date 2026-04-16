@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store
@@ -6,28 +6,24 @@ package com.digitalasset.canton.store
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.store.PendingOperation.ConflictingPendingOperationError
-import com.digitalasset.canton.store.db.DbPendingOperationsStore
-import com.digitalasset.canton.store.memory.InMemoryPendingOperationStore
-import com.digitalasset.canton.topology.Synchronizer
+import com.digitalasset.canton.store.PendingOperation.{
+  ConflictingPendingOperationError,
+  PendingOperationTriggerType,
+}
+import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{HasProtocolVersionedWrapper, VersioningCompanion}
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
-
-import scala.concurrent.ExecutionContext
 
 /** @tparam Op
   *   A protobuf message that implements
   *   [[com.digitalasset.canton.version.HasProtocolVersionedWrapper]] that contains the relevant
   *   data for executing the pending operation.
   */
-trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchronizer]
-    extends AutoCloseable {
+trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op]] {
 
   protected def opCompanion: VersioningCompanion[Op]
 
@@ -45,38 +41,16 @@ trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchr
     *
     * @param operation
     *   The `PendingOperation` to insert.
+    * @param traceContext
+    *   The context for tracing and logging.
     * @return
     *   An `EitherT` that completes with:
     *   - `Right(())` if the operation was successfully stored or an identical one already existed.
     *   - `Left(ConflictingPendingOperationError)` if a conflicting operation was found.
     */
-  def insert(operation: PendingOperation[Op, SId])(implicit
+  def insert(operation: PendingOperation[Op])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ConflictingPendingOperationError, Unit]
-
-  /** Updates a pending operation identified by its unique composite key (`synchronizerId`,
-    * `operationKey`, `operationName`) if such a pending operation already exists, else no update is
-    * applied.
-    *
-    * @param operation
-    *   The new value of the operation to update.
-    * @param synchronizer
-    *   The synchronizer id (logical or physical) scoping the operation application.
-    * @param operationName
-    *   The name of the operation to be executed.
-    * @param operationKey
-    *   A key to distinguish between multiple instances of the same operation.
-    * @return
-    *   A future that completes when the update has finished.
-    */
-  def updateOperation(
-      operation: Op,
-      synchronizer: SId,
-      operationName: NonEmptyString,
-      operationKey: String,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
 
   /** Deletes a pending operation identified by its unique composite key (`synchronizerId`,
     * `operationKey`, `operationName`).
@@ -84,17 +58,19 @@ trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchr
     * This operation is '''idempotent'''. It succeeds regardless of whether the record existed prior
     * to the call.
     *
-    * @param synchronizer
-    *   The synchronizer id (logical or physical) scoping the operation application.
+    * @param synchronizerId
+    *   The ID of the synchronizer scoping the operation application.
     * @param operationKey
     *   A key to distinguish between multiple instances of the same operation.
     * @param operationName
     *   The name of the operation to be executed.
+    * @param traceContext
+    *   The context for tracing and logging.
     * @return
     *   A future that completes when the deletion has finished.
     */
   def delete(
-      synchronizer: SId,
+      synchronizerId: SynchronizerId,
       operationKey: String,
       operationName: NonEmptyString,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
@@ -102,8 +78,8 @@ trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchr
   /** Fetches a pending operation by its unique composite key (`synchronizerId`, `operationKey`,
     * `operationName`).
     *
-    * @param synchronizer
-    *   The synchronizer id (logical or physical) scoping the operation application.
+    * @param synchronizerId
+    *   The ID of the synchronizer scoping the operation application.
     * @param operationKey
     *   A key to distinguish between multiple instances of the same operation.
     * @param operationName
@@ -115,43 +91,11 @@ trait PendingOperationStore[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchr
     *   fails with a `DbDeserializationException` if the stored data is corrupt.
     */
   def get(
-      synchronizer: SId,
+      synchronizerId: SynchronizerId,
       operationKey: String,
       operationName: NonEmptyString,
-  )(implicit traceContext: TraceContext): OptionT[FutureUnlessShutdown, PendingOperation[Op, SId]]
+  )(implicit traceContext: TraceContext): OptionT[FutureUnlessShutdown, PendingOperation[Op]]
 
-  /** Fetches all pending operations matching the given criteria.
-    *
-    * @param operationName
-    *   The name of the operation to be executed.
-    * @param synchronizerId
-    *   Optional synchronizer id to filter by.
-    * @param operationKey
-    *   Optional operation key to filter by.
-    * @return
-    *   A future that completes with `Set(operations)` of operations matching the above criteria,
-    *   fails with a `DbDeserializationException` if the stored data is corrupt.
-    */
-  def getAll(
-      operationName: NonEmptyString,
-      synchronizerId: Option[SId] = None,
-      operationKey: Option[String] = None,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PendingOperation[Op, SId]]]
-}
-
-object PendingOperationStore {
-  def apply[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchronizer](
-      storage: Storage,
-      timeouts: ProcessingTimeout,
-      loggerFactory: NamedLoggerFactory,
-      opCompanion: VersioningCompanion[Op],
-      sidParser: String => Either[String, SId],
-  )(implicit executionContext: ExecutionContext): PendingOperationStore[Op, SId] =
-    storage match {
-      case _: MemoryStorage => new InMemoryPendingOperationStore[Op, SId](opCompanion)
-      case jdbc: DbStorage =>
-        new DbPendingOperationsStore[Op, SId](jdbc, timeouts, loggerFactory, opCompanion, sidParser)
-    }
 }
 
 /** @tparam Op
@@ -159,38 +103,74 @@ object PendingOperationStore {
   *   [[com.digitalasset.canton.version.HasProtocolVersionedWrapper]] that contains the relevant
   *   data for executing the pending operation.
   */
-final case class PendingOperation[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchronizer](
+final case class PendingOperation[Op <: HasProtocolVersionedWrapper[Op]] private (
+    trigger: PendingOperationTriggerType,
     name: NonEmptyString,
     key: String,
     operation: Op,
-    synchronizer: SId,
+    synchronizerId: SynchronizerId,
 ) {
-  private[store] def compositeKey: (SId, String, NonEmptyString) =
-    (synchronizer, key, name)
+
+  /** Standard `copy` but with less strict visibility for testing purposes.
+    */
+  @VisibleForTesting
+  private[store] def cp(
+      trigger: PendingOperationTriggerType = this.trigger,
+      name: NonEmptyString = this.name,
+      key: String = this.key,
+      operation: Op = this.operation,
+      synchronizerId: SynchronizerId = this.synchronizerId,
+  ): PendingOperation[Op] =
+    this.copy(trigger, name, key, operation, synchronizerId)
+
+  private[store] def compositeKey: (SynchronizerId, String, NonEmptyString) =
+    (synchronizerId, key, name)
+
 }
 
 object PendingOperation {
 
-  private[store] def create[Op <: HasProtocolVersionedWrapper[Op], SId <: Synchronizer](
+  private[store] def create[Op <: HasProtocolVersionedWrapper[Op]](
+      trigger: String,
       name: String,
       key: String,
       operationBytes: ByteString,
       operationDeserializer: ByteString => ParsingResult[Op],
-      synchronizer: SId,
-  ): Either[String, PendingOperation[Op, SId]] =
+      synchronizerId: String,
+  ): Either[String, PendingOperation[Op]] =
     for {
+      validTrigger <- PendingOperationTriggerType.fromString(trigger)
       validName <- NonEmptyString
         .create(name)
         .leftMap(_ => s"Missing pending operation name (blank): $name")
       validOperation <- operationDeserializer(operationBytes).leftMap(error =>
         s"Failed to deserialize pending operation byte string: $error"
       )
+      validUniqueId <- UniqueIdentifier
+        .fromProtoPrimitive(synchronizerId, "synchronizerId")
+        .leftMap(error => s"Failed to deserialize synchronizer ID string: ${error.message}")
     } yield PendingOperation(
+      validTrigger,
       validName,
       key,
       validOperation,
-      synchronizer,
+      SynchronizerId(validUniqueId),
     )
+
+  sealed trait PendingOperationTriggerType extends Product with Serializable {
+    def asString: String
+  }
+
+  object PendingOperationTriggerType {
+    case object SynchronizerReconnect extends PendingOperationTriggerType {
+      override def asString: String = "synchronizer_reconnect"
+    }
+
+    def fromString(s: String): Either[String, PendingOperationTriggerType] = s match {
+      case "synchronizer_reconnect" => Right(SynchronizerReconnect)
+      case _ => Left(s"Unknown pending operation trigger type: $s")
+    }
+  }
 
   /** Signals a failed attempt to insert a pending operation because it conflicts with an existing
     * one.
@@ -198,16 +178,17 @@ object PendingOperation {
     * A conflict occurs when an operation with the same unique key (`synchronizerId`, `key`, `name`)
     * already exists in the store but contains different data.
     *
-    * @param synchronizer
-    *   The synchronizer id (logical or physical) that owns the operation.
+    * @param synchronizerId
+    *   The unique identifier of the synchronizer that owns the operation.
     * @param key
     *   The key that uniquely identifies the pending operation within its scope.
     * @param name
     *   The name describing the type of pending operation.
     */
   final case class ConflictingPendingOperationError(
-      synchronizer: Synchronizer,
+      synchronizerId: SynchronizerId,
       key: String,
       name: NonEmptyString,
   )
+
 }

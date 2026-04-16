@@ -5,5 +5,4 @@ directories:
   - community
   - synchronizer
   - ledger-api
-  - ledger-api-value
   - lib

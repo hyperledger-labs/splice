@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -20,13 +20,10 @@ import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
-import io.grpc.stub.StreamObserver
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
@@ -37,11 +34,9 @@ import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, query, webSocketBody}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsStateService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
-    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -83,47 +78,35 @@ class JsStateService(
       callerContext: CallerContext
   ): TracedInput[(Option[String], Option[String], Option[String])] => Future[
     Either[JsCantonError, state_service.GetConnectedSynchronizersResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-
-    req =>
-      stateServiceClient(callerContext.token())
-        .getConnectedSynchronizers(
-          state_service
-            .GetConnectedSynchronizersRequest(
-              party = req.in._1.getOrElse(""),
-              participantId = req.in._2.getOrElse(""),
-              identityProviderId = req.in._3.getOrElse(""),
-            )
-        )
-        .resultToRight
-  }
+  ] = req =>
+    stateServiceClient(callerContext.token())(req.traceContext)
+      .getConnectedSynchronizers(
+        state_service
+          .GetConnectedSynchronizersRequest(
+            party = req.in._1.getOrElse(""),
+            participantId = req.in._2.getOrElse(""),
+            identityProviderId = req.in._3.getOrElse(""),
+          )
+      )
+      .resultToRight
 
   private def getLedgerEnd(
       callerContext: CallerContext
   ): TracedInput[Unit] => Future[
     Either[JsCantonError, state_service.GetLedgerEndResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-
-    _ =>
-      stateServiceClient(callerContext.token())
-        .getLedgerEnd(state_service.GetLedgerEndRequest())
-        .resultToRight
-  }
+  ] = req =>
+    stateServiceClient(callerContext.token())(req.traceContext)
+      .getLedgerEnd(state_service.GetLedgerEndRequest())
+      .resultToRight
 
   private def getLatestPrunedOffsets(
       callerContext: CallerContext
   ): TracedInput[Unit] => Future[
     Either[JsCantonError, state_service.GetLatestPrunedOffsetsResponse]
-  ] = {
-    implicit val traceContext: TraceContext = callerContext.traceContext()
-
-    _ =>
-      stateServiceClient(callerContext.token())
-        .getLatestPrunedOffsets(state_service.GetLatestPrunedOffsetsRequest())
-        .resultToRight
-  }
+  ] = req =>
+    stateServiceClient(callerContext.token())(req.traceContext)
+      .getLatestPrunedOffsets(state_service.GetLatestPrunedOffsetsRequest())
+      .resultToRight
 
   private def getActiveContractsStream(
       caller: CallerContext
@@ -132,16 +115,13 @@ class JsStateService(
     JsGetActiveContractsResponse,
     NotUsed,
   ] =
-    _ => {
-      implicit val tc: TraceContext = caller.traceContext()
+    req => {
+      implicit val tc = req.traceContext
       Flow[LegacyDTOs.GetActiveContractsRequest].map {
         toGetActiveContractsRequest
       } via
         prepareSingleWsStream(
-          (
-              req: state_service.GetActiveContractsRequest,
-              obs: StreamObserver[state_service.GetActiveContractsResponse],
-          ) => stateServiceClient(caller.token()).getActiveContracts(req, obs),
+          stateServiceClient(caller.token())(TraceContext.empty).getActiveContracts,
           (r: state_service.GetActiveContractsResponse) =>
             protocolConverters.GetActiveContractsResponse.toJson(r),
         )
@@ -167,7 +147,6 @@ class JsStateService(
         state_service.GetActiveContractsRequest(
           activeAtOffset = req.activeAtOffset,
           eventFormat = req.eventFormat,
-          streamContinuationToken = req.streamContinuationToken,
         )
       case (None, None, _) =>
         throw RequestValidationErrors.InvalidArgument
@@ -185,7 +164,6 @@ class JsStateService(
               verbose = verbose,
             )
           ),
-          streamContinuationToken = req.streamContinuationToken,
         )
     }
 
@@ -193,7 +171,6 @@ class JsStateService(
 
 object JsStateService extends DocumentationEndpoints {
   import Endpoints.*
-  import JsSchema.JsServicesCommonCodecs.*
   import JsStateServiceCodecs.*
 
   private lazy val state = v2Endpoint.in(sttp.tapir.stringToPath("state"))
@@ -208,20 +185,18 @@ object JsStateService extends DocumentationEndpoints {
         CodecFormat.Json,
       ](PekkoStreams)
     )
-    .protoRef(state_service.StateServiceGrpc.METHOD_GET_ACTIVE_CONTRACTS)
+    .description("Get active contracts stream")
 
   val activeContractsListEndpoint = state.post
     .in(sttp.tapir.stringToPath("active-contracts"))
     .in(jsonBody[LegacyDTOs.GetActiveContractsRequest])
     .out(jsonBody[Seq[JsGetActiveContractsResponse]])
     .description(
-      s"""Query active contracts list (blocking call).
+      """Query active contracts list (blocking call).
         |Querying active contracts is an expensive operation and if possible should not be repeated often.
         |Consider querying active contracts initially (for a given offset)
         |and then repeatedly call one of `/v2/updates/...`endpoints  to get subsequent modifications.
         |You can also use websockets to get updates with better performance.
-        |
-        |${createProtoRef(state_service.StateServiceGrpc.METHOD_GET_ACTIVE_CONTRACTS)}
         |""".stripMargin
     )
     .inStreamListParamsAndDescription()
@@ -232,17 +207,17 @@ object JsStateService extends DocumentationEndpoints {
     .in(query[Option[String]]("participantId"))
     .in(query[Option[String]]("identityProviderId"))
     .out(jsonBody[state_service.GetConnectedSynchronizersResponse])
-    .protoRef(state_service.StateServiceGrpc.METHOD_GET_CONNECTED_SYNCHRONIZERS)
+    .description("Get connected synchronizers")
 
   val getLedgerEndEndpoint = state.get
     .in(sttp.tapir.stringToPath("ledger-end"))
     .out(jsonBody[state_service.GetLedgerEndResponse])
-    .protoRef(state_service.StateServiceGrpc.METHOD_GET_LEDGER_END)
+    .description("Get ledger end")
 
   val getLastPrunedOffsetsEndpoint = state.get
     .in(sttp.tapir.stringToPath("latest-pruned-offsets"))
     .out(jsonBody[state_service.GetLatestPrunedOffsetsResponse])
-    .protoRef(state_service.StateServiceGrpc.METHOD_GET_LATEST_PRUNED_OFFSETS)
+    .description("Get latest pruned offsets")
 
   override def documentation: Seq[AnyEndpoint] = Seq(
     activeContractsEndpoint,
@@ -282,7 +257,6 @@ final case class JsAssignedEvent(
 final case class JsGetActiveContractsResponse(
     workflowId: String,
     contractEntry: JsContractEntry,
-    streamContinuationToken: ByteString,
 )
 
 object JsStateServiceCodecs {
@@ -328,8 +302,7 @@ object JsStateServiceCodecs {
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsContractEntrySchema: Schema[JsContractEntry] =
-    Schema.oneOfWrapped[JsContractEntry].oneOfExtension()
+  implicit val jsContractEntrySchema: Schema[JsContractEntry] = Schema.oneOfWrapped
 
   implicit val connectedSynchronizerSchema
       : Schema[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =

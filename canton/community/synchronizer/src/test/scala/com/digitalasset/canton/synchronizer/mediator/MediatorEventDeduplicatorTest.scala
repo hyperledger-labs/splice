@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -9,8 +9,8 @@ import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTime
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory, SuppressionRule}
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
@@ -30,7 +30,6 @@ import com.digitalasset.canton.util.{DelayUtil, MonadUtil}
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{BaseTestWordSpec, HasExecutionContext}
 import org.scalatest.Assertion
-import org.slf4j.event.Level
 
 import java.time.Duration
 import java.util.UUID
@@ -72,6 +71,7 @@ class MediatorEventDeduplicatorTest
       timeouts,
       loggerFactory,
     )
+    state.initialize(CantonTimestamp.MinValue).futureValueUS
 
     val deduplicator = new DefaultMediatorEventDeduplicator(
       state,
@@ -79,7 +79,6 @@ class MediatorEventDeduplicatorTest
       _ => FutureUnlessShutdown.outcomeF(delayed(deduplicationTimeout)),
       _ => FutureUnlessShutdown.outcomeF(delayed(decisionTime)),
       testedProtocolVersion,
-      MediatorTestMetrics,
       loggerFactory,
     )
     (deduplicator, verdictSender, store)
@@ -154,9 +153,8 @@ class MediatorEventDeduplicatorTest
     val rejects = envelopes.map { envelope =>
       val request = envelope.protocolMessage
       val reject = MediatorVerdict.MediatorReject(
-        MediatorError.DuplicateConfirmationRequest.Reject(
-          request.requestUuid,
-          expireAfter,
+        MediatorError.MalformedMessage.Reject(
+          s"The request uuid (${request.requestUuid}) must not be used until $expireAfter."
         )
       )
       Result(
@@ -201,20 +199,9 @@ class MediatorEventDeduplicatorTest
       // submit same event with same requestTime
       // This should not occur in production, as the sequencer creates unique timestamps and
       // the deduplication state is cleaned up during initialization.
-      val (isUnique2, storeF2) = loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
+      val (isUnique2, storeF2) = loggerFactory.assertLogs(
         deduplicateRequests(deduplicator)(0),
-        LogEntry.assertLogSeq(
-          Seq(
-            (
-              _.shouldBeCantonErrorCode(MediatorError.DuplicateConfirmationRequest),
-              "expected duplicate request",
-            )
-          ),
-          Seq(
-            // Accept other info level messages
-            _.level shouldBe Level.INFO
-          ),
-        ),
+        _.shouldBeCantonErrorCode(MediatorError.MalformedMessage),
       )
       isUnique2 shouldBe Seq(false)
 
@@ -225,20 +212,9 @@ class MediatorEventDeduplicatorTest
       verdictSender.sentResults shouldBe empty
 
       // submit same event with increased requestTime
-      val (isUnique3, storeF3) = loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
+      val (isUnique3, storeF3) = loggerFactory.assertLogs(
         deduplicateRequests(deduplicator, ts(2))(0),
-        LogEntry.assertLogSeq(
-          Seq(
-            (
-              _.shouldBeCantonErrorCode(MediatorError.DuplicateConfirmationRequest),
-              "expected duplicate request",
-            )
-          ),
-          Seq(
-            // Accept other info level messages
-            _.level shouldBe Level.INFO
-          ),
-        ),
+        _.shouldBeCantonErrorCode(MediatorError.MalformedMessage),
       )
       isUnique3 shouldBe Seq(false)
 
@@ -290,11 +266,7 @@ class MediatorEventDeduplicatorTest
 
         storeF1.futureValueUS
         storeF2.futureValueUS
-        assertNextSentVerdict(
-          verdictSender,
-          requestTime = requestTime.plusSeconds(i.toLong),
-          expireAfter = ts(i).plus(deduplicationTimeout),
-        )(
+        assertNextSentVerdict(verdictSender, requestTime = requestTime.plusSeconds(i.toLong))(
           request(i)
         )
       }
@@ -363,6 +335,8 @@ class MediatorEventDeduplicatorTest
       loggerFactory,
     )
 
+    state.initialize(CantonTimestamp.MinValue).futureValueUS
+
     val verdictSender = new VerdictSender {
       override def sendResult(
           requestId: RequestId,
@@ -397,7 +371,6 @@ class MediatorEventDeduplicatorTest
       _ => FutureUnlessShutdown.pure(deduplicationTimeout),
       _ => FutureUnlessShutdown.pure(decisionTime),
       testedProtocolVersion,
-      MediatorTestMetrics,
       loggerFactory,
     )
   }

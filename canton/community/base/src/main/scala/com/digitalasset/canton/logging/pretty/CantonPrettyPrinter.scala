@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.pretty.Pretty.{
   DefaultShowFieldNames,
   DefaultWidth,
 }
-import com.digitalasset.canton.util.ThrowableUtil
+import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.ByteString
 import pprint.{PPrinter, Tree}
 
@@ -26,7 +26,7 @@ class CantonPrettyPrinter(maxStringLength: Int, maxMessageLines: Int) {
         try {
           pprinter(product).toString
         } catch {
-          case err: IllegalArgumentException => ThrowableUtil.messageWithStacktrace(err)
+          case err: IllegalArgumentException => ErrorUtil.messageWithStacktrace(err)
         }
       case _: Any =>
         import com.digitalasset.canton.logging.pretty.Pretty.*

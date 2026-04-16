@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -36,7 +36,7 @@ case class TypedSignedProtocolMessageContent[+M <: SignedProtocolMessageContent]
 
   private def toProtoV30: v30.TypedSignedProtocolMessageContent =
     v30.TypedSignedProtocolMessageContent(
-      someSignedProtocolMessage = content.toProtoTypedSomeSignedProtocolMessageV30
+      someSignedProtocolMessage = content.toProtoTypedSomeSignedProtocolMessage
     )
 
   @VisibleForTesting
@@ -63,7 +63,7 @@ object TypedSignedProtocolMessageContent
     ] {
   override def name: String = "TypedSignedProtocolMessageContent"
 
-  override val versioningTable: VersioningTable = VersioningTable(
+  override def versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(
       ProtocolVersion.v34
     )(v30.TypedSignedProtocolMessageContent)(

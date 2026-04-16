@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -165,7 +165,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
           lookup <- store
             .findAfter(
               requestAfter = Some(
-                reassignment2.unassignmentTs -> reassignment2.sourcePsid
+                reassignment2.unassignmentTs -> reassignment2.sourcePSId
               ),
               10,
             )
@@ -219,7 +219,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
       val data = unassignmentData
       val assignmentData = AssignmentData(
         data.reassignmentId,
-        data.sourcePsid,
+        data.sourcePSId,
         data.contractsBatch,
       )
 
@@ -240,8 +240,6 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
             val newCid = ExampleContractFactory.buildContractId(77)
             (
               ExampleContractFactory.modify(reassign.contract, contractId = Some(newCid)),
-              reassign.sourceValidationPackageId,
-              reassign.targetValidationPackageId,
               reassign.counter,
             )
           })
@@ -285,7 +283,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
           modifiedUnassignmentData = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
             sourceMediator = mediator1,
             data.submitterMetadata.submitter,
-            data.sourcePsid,
+            data.sourcePSId,
             targetSynchronizer,
             contract,
           )
@@ -315,7 +313,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
           entry1 shouldBe Right(
             ReassignmentEntry(
               data.reassignmentId,
-              data.sourcePsid,
+              data.sourcePSId,
               NonEmpty.mk(Seq, contract),
               None,
               None,
@@ -359,7 +357,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
 
         val data = (1L until 13).flatMap { i =>
           val reassignmentData =
-            unassignmentDataFor(unassignmentData.sourcePsid, ofEpochSecond(i), contract)
+            unassignmentDataFor(unassignmentData.sourcePSId, ofEpochSecond(i), contract)
 
           val mod = 4
 
@@ -715,7 +713,7 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
         val unassignmentOffset = 20L
         val assignmentData = AssignmentData(
           unassignmentData.reassignmentId,
-          unassignmentData.sourcePsid,
+          unassignmentData.sourcePSId,
           unassignmentData.contractsBatch,
         )
 

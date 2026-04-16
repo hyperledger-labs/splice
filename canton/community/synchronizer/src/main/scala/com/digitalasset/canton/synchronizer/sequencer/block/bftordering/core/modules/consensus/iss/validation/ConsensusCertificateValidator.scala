@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation
@@ -41,18 +41,16 @@ class ConsensusCertificateValidator(strongQuorum: Int) {
     val prePrepare = consensusCertificate.prePrepare
     val blockNumber = prePrepare.message.blockMetadata.blockNumber
     val epochNumber = prePrepare.message.blockMetadata.epochNumber
-    val (messages, messageName, dontAllowHigherView) = consensusCertificate match {
+    val (messages, messageName) = consensusCertificate match {
       case prepareCertificate: PrepareCertificate =>
         (
           prepareCertificate.prepares: Seq[SignedMessage[ConsensusMessage.PbftNormalCaseMessage]],
           "prepare",
-          true,
         )
       case commitCertificate: CommitCertificate =>
         (
           commitCertificate.commits: Seq[SignedMessage[ConsensusMessage.PbftNormalCaseMessage]],
           "commit",
-          false,
         )
     }
 
@@ -85,7 +83,7 @@ class ConsensusCertificateValidator(strongQuorum: Int) {
           else
             currentViewNumber.fold(valid) { viewNumber =>
               val messagesViewNumber = byViewNumber.head1._1
-              if (messagesViewNumber >= viewNumber && dontAllowHigherView) {
+              if (messagesViewNumber >= viewNumber) {
                 invalid(
                   s"${messageName}s have view number $messagesViewNumber but it should be less than current view number $viewNumber"
                 )

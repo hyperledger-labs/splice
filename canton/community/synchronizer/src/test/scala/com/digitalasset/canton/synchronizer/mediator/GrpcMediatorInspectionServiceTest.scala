@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -18,16 +18,13 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.mediator.admin.v30
+import com.digitalasset.canton.mediator.admin.v30.VerdictsResponse
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.InformeeMessage
-import com.digitalasset.canton.synchronizer.mediator.Mediator.LsuSuccessorAfterUpgradeTime
 import com.digitalasset.canton.synchronizer.mediator.MediatorVerdict.MediatorApprove
 import com.digitalasset.canton.synchronizer.mediator.service.GrpcMediatorInspectionService
 import com.digitalasset.canton.synchronizer.mediator.store.InMemoryFinalizedResponseStore
-import com.digitalasset.canton.synchronizer.service.{
-  ManualFlowControlServerCallStreamObserver,
-  RecordStreamObserverItems,
-}
+import com.digitalasset.canton.synchronizer.service.RecordStreamObserverItems
 import com.digitalasset.canton.time.TimeAwaiter
 import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.tracing.TraceContext
@@ -38,7 +35,8 @@ import io.grpc.stub.ServerCallStreamObserver
 import org.apache.pekko.actor.ActorSystem
 import org.scalatest.wordspec.AsyncWordSpec
 
-import scala.concurrent.Future
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import scala.concurrent.{Future, Promise}
 import scala.util.Random
 
 class GrpcMediatorInspectionServiceTest
@@ -98,13 +96,8 @@ class GrpcMediatorInspectionServiceTest
 
     val scanService = new GrpcMediatorInspectionService(
       finalizedResponseStore,
-      () => timeAwaiter.getCurrentKnownTime(),
-      ts => tc => timeAwaiter.awaitKnownTimestamp(ts)(tc),
+      timeAwaiter,
       batchSize = PositiveInt.tryCreate(batchSize),
-      lsuSuccessorAfterUpgradeTime = new LsuSuccessorAfterUpgradeTime {
-        override def apply(at: CantonTimestamp)(implicit tc: TraceContext) =
-          FutureUnlessShutdown.pure(None)
-      },
       loggerFactory = loggerFactory,
     )
     implicit val cc: CloseContext = CloseContext(new FlagCloseable {
@@ -122,16 +115,63 @@ class GrpcMediatorInspectionServiceTest
         ],
         Future[Seq[v30.VerdictsResponse]],
     ) = {
-      val observer =
-        new ManualFlowControlServerCallStreamObserver[v30.VerdictsResponse](numExpected)
+
+      val promise = Promise[Seq[v30.VerdictsResponse]]()
+      val counter = new AtomicInteger(numExpected)
+      val observer = new ServerCallStreamObserver[v30.VerdictsResponse]
+        with RecordStreamObserverItems[v30.VerdictsResponse] {
+        @volatile var isCancelled_ = false
+        val onCancelHandlerRef = new AtomicReference[Option[Runnable]](None)
+        override def isCancelled: Boolean = isCancelled_
+        override def setOnCancelHandler(onCancelHandler: Runnable): Unit =
+          onCancelHandlerRef.set(Some(onCancelHandler))
+
+        override def setOnCloseHandler(onCloseHandler: Runnable): Unit = ()
+        override def setCompression(compression: String): Unit = ???
+        override def isReady: Boolean = ???
+
+        val onReadyHandlerRef = new AtomicReference[Option[Runnable]](None)
+        override def setOnReadyHandler(onReadyHandler: Runnable): Unit = {
+          onReadyHandlerRef.set(Some(onReadyHandler))
+          if (counter.get > 0) signalReady()
+        }
+
+        override def request(count: Int): Unit = ???
+        override def setMessageCompression(enable: Boolean): Unit = ???
+        override def disableAutoInboundFlowControl(): Unit = ()
+
+        override def onNext(value: VerdictsResponse): Unit = {
+          super.onNext(value)
+          val newCounter = counter.decrementAndGet()
+          if (newCounter == 0) {
+            promise.trySuccess(values)
+            cancel()
+          } else if (newCounter > 0) {
+            signalReady()
+          }
+        }
+
+        override def onError(t: Throwable): Unit = {
+          super.onError(t)
+          promise.tryFailure(t)
+        }
+
+        private def signalReady(): Unit = onReadyHandlerRef.get.foreach(_.run())
+
+        private def cancel(): Unit = {
+          isCancelled_ = true
+          onCancelHandlerRef.get.foreach(_.run())
+        }
+      }
       scanService.verdicts(
         v30.VerdictsRequest(
           mostRecentlyReceivedRecordTime = Some(fromRequestExclusive.toProtoTimestamp)
         ),
         observer,
       )
-      (observer, observer.promise.future)
+      (observer, promise.future)
     }
+
     def observeWatermark(watermark: CantonTimestamp): Unit = {
       logger.info(s"observing $watermark")
       latestKnownWatermark = watermark
@@ -164,7 +204,7 @@ class GrpcMediatorInspectionServiceTest
         _ <- FutureUnlessShutdown.outcomeF(future)
       } yield {
         val timestamps1 = observer.values
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
         timestamps1 should have size responses.size.toLong
         timestamps1 shouldBe sorted
@@ -201,7 +241,7 @@ class GrpcMediatorInspectionServiceTest
         // wait for the future to complete after numExpected verdicts have been emitted
         _ <- FutureUnlessShutdown.outcomeF(future1)
 
-        lastVerdict = observer1.values.last.payload.verdict.value
+        lastVerdict = observer1.values.last.verdict.value
         nextFromRequest = CantonTimestamp
           .fromProtoTimestamp(lastVerdict.recordTime.value)
           .value
@@ -214,13 +254,13 @@ class GrpcMediatorInspectionServiceTest
         _ <- FutureUnlessShutdown.outcomeF(future2)
       } yield {
         val timestamps1 = observer1.values
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
         timestamps1 should have size responses.size.toLong / 2
         timestamps1 shouldBe sorted
 
         val timestamps2 = observer2.values
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
         timestamps2 should have size responses.size.toLong - timestamps1.size.toLong
         timestamps2 shouldBe sorted
@@ -270,7 +310,7 @@ class GrpcMediatorInspectionServiceTest
         _ <- FutureUnlessShutdown.outcomeF(future)
       } yield {
         val receivedTimestamps = observer.values
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
 
         receivedTimestamps should contain theSameElementsInOrderAs responses
@@ -300,7 +340,7 @@ class GrpcMediatorInspectionServiceTest
         // wait for the future to complete after numExpected verdicts have been emitted
         verdicts1 <- FutureUnlessShutdown.outcomeF(future1)
 
-        lastVerdict = verdicts1.last.payload.verdict.value
+        lastVerdict = verdicts1.last.verdict.value
         nextFromRequest = CantonTimestamp
           .fromProtoTimestamp(lastVerdict.recordTime.value)
           .value
@@ -313,13 +353,13 @@ class GrpcMediatorInspectionServiceTest
         verdicts2 <- FutureUnlessShutdown.outcomeF(future2)
       } yield {
         val timestamps1 = verdicts1
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
         timestamps1 should have size 5
         timestamps1 shouldBe sorted
 
         val timestamps2 = verdicts2
-          .flatMap(_.payload.verdict)
+          .flatMap(_.verdict)
           .map(r => r.recordTime.value)
         timestamps2 should have size responses.size.toLong - timestamps1.size.toLong
         timestamps2 shouldBe sorted

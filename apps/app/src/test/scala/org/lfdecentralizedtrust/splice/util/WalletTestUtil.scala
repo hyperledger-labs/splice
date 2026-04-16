@@ -33,7 +33,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.scalatest.Assertion
 
@@ -1515,18 +1515,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     }
 
     cid
-  }
-
-  def alicesTapsWithPackageId(
-      packageId: String
-  )(implicit env: SpliceTestConsoleEnvironment): Assertion = {
-    val tapContractId = aliceValidatorWalletClient.tap(10)
-    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .of_party(Amulet.COMPANION)(dsoParty)
-      .filter(_.contractId == tapContractId.contractId)
-      .loneElement
-      .getTemplateId
-      .packageId shouldBe packageId
   }
 
 }

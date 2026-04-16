@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders
@@ -40,8 +40,6 @@ class SimpleLeaderSelectionPolicy[E <: Env[E]] extends LeaderSelectionPolicy[E] 
   ): Unit = ()
 
   override def firstBlockWeNeedToAdd: Option[BlockNumber] = None
-
-  override def currentEpoch: Option[EpochNumber] = None
 
   override def getHistoricState(
       epochNumber: EpochNumber

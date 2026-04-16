@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -14,11 +14,9 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.RichSequencerClientImpl
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.{Failure, Success}
 
 trait PostAggregationHandler {
@@ -27,12 +25,11 @@ trait PostAggregationHandler {
     */
   def handlerIsIdleF: Future[Unit]
 
-  def signalHandler(eventQueue: BlockingQueue[SequencedSerializedEvent])(implicit
-      traceContext: TraceContext
-  ): Unit
+  def signalHandler()(implicit traceContext: TraceContext): Unit
 }
 
-class PostAggregationHandlerImpl private[canton] (
+class PostAggregationHandlerImpl private[sequencing] (
+    sequencerAggregator: SequencerAggregator,
     addToFlushAndLogError: String => Future[?] => Unit,
     eventInboxSize: PositiveInt,
     eventBatchProcessor: RichSequencerClientImpl.EventBatchProcessor,
@@ -42,11 +39,15 @@ class PostAggregationHandlerImpl private[canton] (
     extends PostAggregationHandler
     with NamedLogging {
 
+  // TODO(i27260): This link should not be needed, and we should ideally create the aggregator after the
+  //  post-aggregation handler in `SequencerClient`, passing the latter as argument.
+  sequencerAggregator.setPostAggregationHandler(this)
+
   /** Completed iff the handler is idle. */
   private val handlerIdle: AtomicReference[Promise[Unit]] = new AtomicReference(
     Promise.successful(())
   )
-  private val handlerIdleLock = new Mutex()
+  private val handlerIdleLock: Object = new Object
 
   override def handlerIsIdleF: Future[Unit] = handlerIdle.get.future
 
@@ -71,19 +72,18 @@ class PostAggregationHandlerImpl private[canton] (
   //        futures have been added in the meantime as the synchronous flush future finished.
   //     c. I (rv) think that waiting on the `handlerIdle` is a unnecessary for shutdown as it does the
   //        same as the flush future. We only need it to ensure we don't start the sequential processing in parallel.
-  override def signalHandler(
-      eventQueue: BlockingQueue[SequencedSerializedEvent]
-  )(implicit traceContext: TraceContext): Unit =
+  override def signalHandler()(implicit traceContext: TraceContext): Unit =
     hasSynchronizeWithClosing
       .synchronizeWithClosingSync(functionFullName) {
         logger.debug("Application handler has been signalled")
-        val isIdle =
-          handlerIdleLock.exclusive {
+        val isIdle = blocking {
+          handlerIdleLock.synchronized {
             val oldPromise = handlerIdle.getAndUpdate(p => if (p.isCompleted) Promise() else p)
             oldPromise.isCompleted
           }
+        }
         if (isIdle) {
-          val handlingF = handleReceivedEventsUntilEmpty(eventQueue)
+          val handlingF = handleReceivedEventsUntilEmpty()
           addToFlushAndLogError("invoking the application handler")(
             handlingF.failOnShutdownToAbortException("sequencer client: flush and log errors")
           )
@@ -91,50 +91,47 @@ class PostAggregationHandlerImpl private[canton] (
       }
       .discard
 
-  private def handleReceivedEventsUntilEmpty(
-      eventQueue: BlockingQueue[SequencedSerializedEvent]
-  ): FutureUnlessShutdown[Unit] = {
-    def go(): FutureUnlessShutdown[Unit] = {
-      val inboxSize = eventInboxSize.unwrap
-      val javaEventList = new java.util.ArrayList[SequencedSerializedEvent](inboxSize)
-      if (eventQueue.drainTo(javaEventList, inboxSize) > 0) {
-        import scala.jdk.CollectionConverters.*
-        val handlerEvents = javaEventList.asScala.toSeq
+  private def handleReceivedEventsUntilEmpty(): FutureUnlessShutdown[Unit] = {
+    val inboxSize = eventInboxSize.unwrap
+    val javaEventList = new java.util.ArrayList[SequencedSerializedEvent](inboxSize)
+    if (sequencerAggregator.eventQueue.drainTo(javaEventList, inboxSize) > 0) {
+      import scala.jdk.CollectionConverters.*
+      val handlerEvents = javaEventList.asScala.toSeq
 
-        def stopHandler(): Unit =
-          handlerIdleLock.exclusive(handlerIdle.get().success(()).discard)
+      def stopHandler(): Unit = blocking {
+        handlerIdleLock.synchronized(handlerIdle.get().success(()).discard)
+      }
 
-        eventBatchProcessor
-          .process(handlerEvents)
-          .value
-          .transformWith {
-            case Success(UnlessShutdown.Outcome(Right(()))) => go()
-            case Success(UnlessShutdown.Outcome(Left(_))) | Failure(_) |
-                Success(UnlessShutdown.AbortedDueToShutdown) =>
-              // `eventBatchProcessor` has already propagated the error
-              stopHandler()
-              FutureUnlessShutdown.unit
+      eventBatchProcessor
+        .process(handlerEvents)
+        .value
+        .transformWith {
+          case Success(UnlessShutdown.Outcome(Right(()))) =>
+            handleReceivedEventsUntilEmpty()
+          case Success(UnlessShutdown.Outcome(Left(_))) | Failure(_) |
+              Success(UnlessShutdown.AbortedDueToShutdown) =>
+            // `eventBatchProcessor` has already propagated the error
+            stopHandler()
+            FutureUnlessShutdown.unit
+        }
+    } else {
+      val stillBusy = blocking {
+        handlerIdleLock.synchronized {
+          val idlePromise = handlerIdle.get()
+          if (sequencerAggregator.eventQueue.isEmpty) {
+            // signalHandler must not be executed here, because that would lead to lost signals.
+            idlePromise.success(())
           }
-      } else {
-        val stillBusy =
-          handlerIdleLock.exclusive {
-            val idlePromise = handlerIdle.get()
-            if (eventQueue.isEmpty) {
-              // signalHandler must not be executed here, because that would lead to lost signals.
-              idlePromise.success(())
-            }
-            // signalHandler must not be executed here, because that would lead to duplicate invocations.
-            !idlePromise.isCompleted
-          }
-
-        if (stillBusy) {
-          go()
-        } else {
-          FutureUnlessShutdown.unit
+          // signalHandler must not be executed here, because that would lead to duplicate invocations.
+          !idlePromise.isCompleted
         }
       }
-    }
 
-    go()
+      if (stillBusy) {
+        handleReceivedEventsUntilEmpty()
+      } else {
+        FutureUnlessShutdown.unit
+      }
+    }
   }
 }

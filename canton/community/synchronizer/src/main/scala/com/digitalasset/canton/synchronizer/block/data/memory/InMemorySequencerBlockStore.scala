@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.data.memory
@@ -15,9 +15,12 @@ import com.digitalasset.canton.synchronizer.block.data.{
   BlockInfo,
   SequencerBlockStore,
 }
-import com.digitalasset.canton.synchronizer.sequencer.SequencerInitialState
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.InMemorySequencerStore
+import com.digitalasset.canton.synchronizer.sequencer.{
+  InFlightAggregationUpdates,
+  SequencerInitialState,
+}
 import com.digitalasset.canton.synchronizer.sequencing.integrations.state.InMemorySequencerStateManagerStore
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -32,15 +35,15 @@ class InMemorySequencerBlockStore(
 ) extends SequencerBlockStore
     with NamedLogging {
 
+  private val sequencerStore = new InMemorySequencerStateManagerStore(loggerFactory)
   implicit override protected val executionContext: ExecutionContext =
     DirectExecutionContext(noTracingLogger)
-  override protected val stateManagerStore = new InMemorySequencerStateManagerStore(loggerFactory)
 
   /** Stores for each block height the timestamp of the last event and the last topology client
     * timestamp up to and including this block
     */
   private val blockToTimestampMap =
-    new TrieMap[Long, (CantonTimestamp, Option[CantonTimestamp], Option[CantonTimestamp])]
+    new TrieMap[Long, (CantonTimestamp, Option[CantonTimestamp])]
 
   override def setInitialState(
       initialSequencerState: SequencerInitialState,
@@ -49,13 +52,18 @@ class InMemorySequencerBlockStore(
     val initial = BlockEphemeralState.fromSequencerInitialState(initialSequencerState)
     updateBlockHeight(initial.latestBlock)
     for {
-      _ <- stateManagerStore.addInFlightAggregationUpdates(
+      _ <- sequencerStore.addInFlightAggregationUpdates(
         initial.inFlightAggregations.fmap(_.asUpdate)
       )
     } yield {
       ()
     }
   }
+
+  override def storeInflightAggregations(
+      inFlightAggregationUpdates: InFlightAggregationUpdates
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    sequencerStore.addInFlightAggregationUpdates(inFlightAggregationUpdates)
 
   override def finalizeBlockUpdates(blocks: Seq[BlockInfo])(implicit
       traceContext: TraceContext
@@ -66,19 +74,12 @@ class InMemorySequencerBlockStore(
 
   private def updateBlockHeight(block: BlockInfo): Unit =
     blockToTimestampMap
-      .put(
-        block.height,
-        (
-          block.lastTs,
-          block.latestSequencerEventTimestamp,
-          block.latestPendingTopologyTransactionTimestamp,
-        ),
-      )
+      .put(block.height, block.lastTs -> block.latestSequencerEventTimestamp)
       .discard
 
-  override def readHeadBlockInfo()(implicit
+  override def readHead(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[BlockInfo]] =
+  ): FutureUnlessShutdown[Option[BlockEphemeralState]] =
     for {
       watermarkO <- inMemorySequencerStore.safeWatermark
       blockInfoO = watermarkO match {
@@ -87,7 +88,18 @@ class InMemorySequencerBlockStore(
         case None =>
           None
       }
-    } yield blockInfoO
+      state <- blockInfoO match {
+        case None => FutureUnlessShutdown.pure(None)
+        case Some(blockInfo) =>
+          sequencerStore
+            .readInFlightAggregations(
+              blockInfo.lastTs,
+              maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
+            )
+            .map(inFlightAggregations => Some(BlockEphemeralState(blockInfo, inFlightAggregations)))
+      }
+
+    } yield state
 
   private def findBlockForCrashRecoveryForWatermark(
       beforeInclusive: CantonTimestamp
@@ -95,9 +107,8 @@ class InMemorySequencerBlockStore(
     .readOnlySnapshot()
     .toSeq
     .collect {
-      case (height, (latestEventTs, latestSequencerEventTsO, latestPendingTopologyTsO))
-          if latestEventTs <= beforeInclusive =>
-        BlockInfo(height, latestEventTs, latestSequencerEventTsO, latestPendingTopologyTsO)
+      case (height, (latestEventTs, latestSequencerEventTsO)) if latestEventTs <= beforeInclusive =>
+        BlockInfo(height, latestEventTs, latestSequencerEventTsO)
     }
     .maxByOption(_.height)
 
@@ -120,20 +131,22 @@ class InMemorySequencerBlockStore(
       .find(_._2._1 >= timestamp)
       .fold[EitherT[FutureUnlessShutdown, SequencerError, BlockEphemeralState]](
         EitherT.leftT(BlockNotFound.InvalidTimestamp(timestamp))
-      ) { case (blockHeight, (blockTimestamp, latestSequencerEventTs, latestTopologyTs)) =>
-        val block = BlockInfo(blockHeight, blockTimestamp, latestSequencerEventTs, latestTopologyTs)
+      ) { case (blockHeight, (blockTimestamp, latestSequencerEventTs)) =>
+        val block = BlockInfo(blockHeight, blockTimestamp, latestSequencerEventTs)
         EitherT
           .right(
-            readStateAtBlock(block, maxSequencingTimeBound)
+            sequencerStore
+              .readInFlightAggregations(blockTimestamp, maxSequencingTimeBound)
           )
+          .map(inFlightAggregations => BlockEphemeralState(block, inFlightAggregations))
       }
 
   override def prune(requestedTimestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[String] = {
-    stateManagerStore.pruneExpiredInFlightAggregations(requestedTimestamp).discard
+    sequencerStore.pruneExpiredInFlightAggregationsInternal(requestedTimestamp).discard
     val blocksToBeRemoved = blockToTimestampMap.collect {
-      case (height, (latestEventTs, _, _)) if latestEventTs < requestedTimestamp =>
+      case (height, (latestEventTs, _)) if latestEventTs < requestedTimestamp =>
         height
     }
     blockToTimestampMap.subtractAll(blocksToBeRemoved)

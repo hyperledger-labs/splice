@@ -32,8 +32,6 @@ import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
 import { CopyableIdentifier, CopyableUrl, MemberIdentifier, VoteStats } from '../beta';
-import { useQuery } from '@tanstack/react-query';
-import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 
 dayjs.extend(relativeTime);
 
@@ -195,7 +193,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           />
 
           <DetailItem
-            label="Vote Proposal Contract ID"
+            label="Contract ID"
             value={
               <CopyableIdentifier
                 value={contractId}
@@ -576,15 +574,10 @@ const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
       sx={{ display: 'contents' }}
     >
       <DetailItem
-        label="Provider Party ID"
-        value={
-          <CopyableIdentifier
-            value={provider}
-            size="large"
-            data-testid="proposal-details-feature-app-value"
-          />
-        }
+        label="Provider ID"
+        value={provider}
         labelId="proposal-details-feature-app-label"
+        valueId="proposal-details-feature-app-value"
       />
     </Box>
   );
@@ -595,37 +588,14 @@ interface UnfeatureAppSectionProps {
 }
 
 const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
-  const svAdminClient = useSvAdminClient();
-  const providerQuery = useQuery({
-    queryKey: ['featuredAppRightProvider', rightContractId],
-    queryFn: async () => {
-      const response = await svAdminClient.lookupFeaturedAppRightByContractId(rightContractId);
-      const contract = response.featured_app_right;
-      return (contract?.payload as { provider?: string } | undefined)?.provider ?? null;
-    },
-  });
-
   return (
     <Box
       id="proposal-details-unfeature-app-section"
       data-testid="proposal-details-unfeature-app-section"
       sx={{ display: 'contents' }}
     >
-      {providerQuery.data && (
-        <DetailItem
-          label="Provider Party ID"
-          value={
-            <CopyableIdentifier
-              value={providerQuery.data}
-              size="large"
-              data-testid="proposal-details-unfeature-provider-value"
-            />
-          }
-          labelId="proposal-details-unfeature-provider-label"
-        />
-      )}
       <DetailItem
-        label="Featured Application Contract ID"
+        label="Proposal ID"
         value={
           <CopyableIdentifier
             value={rightContractId}

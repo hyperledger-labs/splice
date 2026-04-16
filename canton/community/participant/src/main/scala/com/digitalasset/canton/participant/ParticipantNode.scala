@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -26,7 +26,6 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
-import com.digitalasset.canton.error.FatalError
 import com.digitalasset.canton.health.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -49,9 +48,9 @@ import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
 }
 import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, PruningProcessor}
-import com.digitalasset.canton.participant.replica.ParticipantReplicaManager
 import com.digitalasset.canton.participant.scheduler.ParticipantPruningScheduler
 import com.digitalasset.canton.participant.store.*
+import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.Active
 import com.digitalasset.canton.participant.store.memory.MutablePackageMetadataViewImpl
 import com.digitalasset.canton.participant.sync.*
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizer.SubmissionReady
@@ -60,7 +59,6 @@ import com.digitalasset.canton.participant.synchronizer.grpc.GrpcSynchronizerReg
 import com.digitalasset.canton.participant.topology.*
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.services.admin.PackageUpgradeValidator
-import com.digitalasset.canton.platform.store.LedgerApiContractStoreImpl
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.*
@@ -71,10 +69,10 @@ import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.time.admin.v30.SynchronizerTimeServiceGrpc
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.PsidLookup
+import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
-import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, SynchronizerStore}
+import com.digitalasset.canton.topology.store.{PartyMetadataStore, TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.HostingParticipant
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
@@ -98,8 +96,8 @@ class ParticipantNodeBootstrap(
       ParticipantNodeParameters,
       ParticipantMetrics,
     ],
-    replicaManager: ParticipantReplicaManager,
     engine: Engine,
+    cantonSyncServiceFactory: CantonSyncService.Factory[CantonSyncService],
     resourceManagementServiceFactory: Eval[ParticipantSettingsStore] => ResourceManagementService,
     replicationServiceFactory: Storage => ServerServiceDefinition,
     ledgerApiServerBootstrapUtils: LedgerApiServerBootstrapUtils,
@@ -118,6 +116,11 @@ class ParticipantNodeBootstrap(
 
   private val cantonSyncService = new SingleUseCell[CantonSyncService]
   private val mutablePackageMetadataView = new SingleUseCell[MutablePackageMetadataViewImpl]
+  private val packageDependencyResolver = new SingleUseCell[PackageDependencyResolver.Impl]
+  private val packageUpgradeValidator = new PackageUpgradeValidator(
+    arguments.parameterConfig.general.cachingConfigs.packageUpgradeCache,
+    loggerFactory,
+  )
   override def metrics: ParticipantMetrics = arguments.metrics
 
   override protected val adminTokenConfig: AdminTokenConfig =
@@ -128,28 +131,32 @@ class ParticipantNodeBootstrap(
       sys.error("mutablePackageMetadataView should be defined")
     )
 
+  private def tryGetPackageDependencyResolver(): PackageDependencyResolver.Impl =
+    packageDependencyResolver.getOrElse(
+      sys.error("packageDependencyResolver should be defined")
+    )
+
   override protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]] =
     cantonSyncService.get.toList
       .flatMap(_.syncPersistentStateManager.getAll.values)
       .map(_.topologyStore)
 
   override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] =
-    sequencedTopologyStores.flatMap(store =>
-      cantonSyncService.get.toList.flatMap(_.lookupTopologyManager(store.storeId.psid))
-    )
+    cantonSyncService.get.toList
+      .flatMap(_.syncPersistentStateManager.getAll.values)
+      .map(_.topologyManager)
 
   override protected def lookupTopologyClient(
-      psid: PhysicalSynchronizerId
+      storeId: TopologyStoreId
   ): Option[SynchronizerTopologyClient] =
-    cantonSyncService.get.flatMap(_.lookupTopologyClient(psid))
+    storeId match {
+      case SynchronizerStore(synchronizerId) =>
+        cantonSyncService.get.flatMap(_.lookupTopologyClient(synchronizerId))
+      case _ => None
+    }
 
-  override protected def lookupSynchronizerTimeTracker(
-      psid: PhysicalSynchronizerId
-  ): Option[SynchronizerTimeTracker] =
-    cantonSyncService.get.flatMap(_.lookupSynchronizerTimeTracker(psid).toOption)
-
-  override protected lazy val lookupActivePsid: PsidLookup =
-    synchronizerId => cantonSyncService.get.flatMap(_.activePsidForLsid(synchronizerId))
+  override protected lazy val lookupActivePSId: PSIdLookup =
+    synchronizerId => cantonSyncService.get.flatMap(_.activePSIdForLSId(synchronizerId))
 
   override protected def customNodeStages(
       storage: Storage,
@@ -186,10 +193,6 @@ class ParticipantNodeBootstrap(
       exitOnFatalFailures = parameters.exitOnFatalFailures,
       loggerFactory,
     )
-    val packageUpgradeValidator = new PackageUpgradeValidator(
-      arguments.parameterConfig.general.cachingConfigs.packageUpgradeCache,
-      loggerFactory,
-    )
 
     val packageMetadataView = new MutablePackageMetadataViewImpl(
       clock,
@@ -201,7 +204,26 @@ class ParticipantNodeBootstrap(
       arguments.futureSupervisor,
       exitOnFatalFailures = parameters.exitOnFatalFailures,
     )
+
     mutablePackageMetadataView.putIfAbsent(packageMetadataView).discard
+
+    val resolver = new PackageDependencyResolver.Impl(
+      participantId = ParticipantId(nodeId),
+      damlPackageStore = DamlPackageStore(
+        storage,
+        arguments.futureSupervisor,
+        arguments.parameterConfig,
+        exitOnFatalFailures = parameters.exitOnFatalFailures,
+        loggerFactory,
+      ),
+      timeouts = arguments.parameterConfig.processingTimeouts,
+      loggerFactory = loggerFactory,
+      fetchPackageParallelism = arguments.parameterConfig.general.batchingConfig.parallelism,
+      packageDependencyCacheConfig =
+        arguments.parameterConfig.general.cachingConfigs.packageDependencyCache,
+    )
+
+    packageDependencyResolver.putIfAbsent(resolver).discard
 
     def acsInspectionPerSynchronizer(): Map[SynchronizerId, AcsInspection] =
       cantonSyncService.get
@@ -221,8 +243,6 @@ class ParticipantNodeBootstrap(
       nodeId,
       clock,
       crypto,
-      parameters.batchingConfig.topologyCacheAggregator,
-      config.topology,
       authorizedStore,
       exitOnFatalFailures = parameters.exitOnFatalFailures,
       bootstrapStageCallback.timeouts,
@@ -245,7 +265,7 @@ class ParticipantNodeBootstrap(
           currentlyVettedPackages,
           nextPackageIds,
           packageMetadataView,
-          dryRunSnapshot.getOrElse(PackageMetadata()),
+          dryRunSnapshot,
           forceFlags,
           disableUpgradeValidation = parameters.disableUpgradeValidation,
         )
@@ -325,12 +345,10 @@ class ParticipantNodeBootstrap(
         storage,
         engine,
         topologyManager,
+        tryGetPackageDependencyResolver(),
       ).map { participantServices =>
         if (cantonSyncService.putIfAbsent(participantServices.cantonSyncService).nonEmpty) {
-          FatalError.exitOnFatalError(
-            "Canton sync service was already initialized, this should not happen",
-            logger,
-          )
+          sys.error("should not happen")
         }
         val node = new ParticipantNode(
           participantId,
@@ -357,17 +375,12 @@ class ParticipantNodeBootstrap(
       val packageOps = new PackageOpsImpl(
         participantId = participantId,
         stateManager = manager,
-        topologyLookup = new TopologyLookup(
-          clock = clock,
-          topologyConfig = config.topology,
-          timeouts = timeouts,
-          futureSupervisor = futureSupervisor,
-          topologyManagerO = psid => cantonSyncService.get.flatMap(_.lookupTopologyManager(psid)),
-          psidLookup = lookupActivePsid,
-          topologyClientO = psid => cantonSyncService.get.flatMap(_.lookupTopologyClient(psid)),
-          syncPersistentStateO = psid =>
-            cantonSyncService.get.flatMap(_.syncPersistentStateManager.get(psid)),
-          loggerFactory = loggerFactory,
+        topologyManagerLookup = new TopologyManagerLookup(
+          lookupByPsid = psid =>
+            cantonSyncService.get
+              .flatMap(_.syncPersistentStateManager.get(psid))
+              .map(_.topologyManager),
+          lookupActivePsidByLsid = lookupActivePSId,
         ),
         initialProtocolVersion = ProtocolVersion.latest,
         loggerFactory = ParticipantNodeBootstrap.this.loggerFactory,
@@ -386,6 +399,7 @@ class ParticipantNodeBootstrap(
         storage: Storage,
         engine: Engine,
         authorizedTopologyManager: AuthorizedTopologyManager,
+        packageDependencyResolver: PackageDependencyResolver.Impl,
     )(implicit executionSequencerFactory: ExecutionSequencerFactory): EitherT[
       FutureUnlessShutdown,
       String,
@@ -397,7 +411,6 @@ class ParticipantNodeBootstrap(
           ips,
           crypto,
           cryptoConfig,
-          Some(arguments.metrics.kmsMetrics),
           parameters.batchingConfig.parallelism,
           parameters.cachingConfigs.publicKeyConversionCache,
           timeouts,
@@ -463,9 +476,9 @@ class ParticipantNodeBootstrap(
           (staticSynchronizerParameters: StaticSynchronizerParameters) =>
             SynchronizerCrypto(crypto, staticSynchronizerParameters),
           clock,
+          mutablePackageMetadataView,
           persistentState.map(_.ledgerApiStore),
           persistentState.map(_.contractStore),
-          arguments.metrics,
           futureSupervisor,
           loggerFactory,
         )
@@ -474,8 +487,6 @@ class ParticipantNodeBootstrap(
           authorizedTopologyManager,
           participantId,
           syncPersistentStateManager,
-          topologyManagerLookup = psid =>
-            cantonSyncService.get.flatMap(_.lookupTopologyManager(psid)),
           config.topology,
           crypto,
           clock,
@@ -505,12 +516,7 @@ class ParticipantNodeBootstrap(
 
         commandProgressTracker =
           if (parameters.commandProgressTracking.enabled)
-            new CommandProgressTrackerImpl(
-              parameters.commandProgressTracking,
-              clock,
-              metrics.phase,
-              loggerFactory,
-            )
+            new CommandProgressTrackerImpl(parameters.commandProgressTracking, clock, loggerFactory)
           else CommandProgressTracker.NoOp
 
         connectedSynchronizersLookupContainer = new ConnectedSynchronizersLookupContainer
@@ -528,13 +534,7 @@ class ParticipantNodeBootstrap(
                 clock = clock,
                 commandProgressTracker = commandProgressTracker,
                 ledgerApiStore = persistentState.map(_.ledgerApiStore),
-                contractStore = persistentState.map(state =>
-                  LedgerApiContractStoreImpl(
-                    state.contractStore,
-                    loggerFactory,
-                    metrics.ledgerApiServer,
-                  )
-                ),
+                contractStore = persistentState.map(_.contractStore),
                 ledgerApiIndexerConfig = LedgerApiIndexerConfig(
                   storageConfig = config.storage,
                   processingTimeout = parameters.processingTimeouts,
@@ -551,7 +551,7 @@ class ParticipantNodeBootstrap(
                 postProcessor = inFlightSubmissionTracker
                   .processPublications(_)(_)
                   .failOnShutdownTo(
-                    // This will be thrown in the Indexer pekko-stream pipeline, and handled gracefully there
+                    // This will be throw in the Indexer pekko-stream pipeline, and handled gracefully there
                     new RuntimeException("Post processing aborted due to shutdown")
                   ),
                 sequentialPostProcessor = sequentialPostProcessor,
@@ -570,12 +570,21 @@ class ParticipantNodeBootstrap(
           }
         }
 
-        ephemeralState = ParticipantNodeEphemeralState(inFlightSubmissionTracker)
+        ephemeralState = ParticipantNodeEphemeralState(
+          ledgerApiIndexerContainer.asEval,
+          inFlightSubmissionTracker,
+          clock,
+          exitOnFatalFailures = parameters.exitOnFatalFailures,
+          timeouts = parameters.processingTimeouts,
+          futureSupervisor,
+          loggerFactory,
+        )
 
         packageService = PackageService(
           clock = clock,
           engine = engine,
           mutablePackageMetadataView = mutablePackageMetadataView,
+          packageDependencyResolver = packageDependencyResolver,
           enableStrictDarValidation = parameters.enableStrictDarValidation,
           loggerFactory = loggerFactory,
           metrics = arguments.metrics,
@@ -585,10 +594,26 @@ class ParticipantNodeBootstrap(
 
         sequencerInfoLoader = new SequencerInfoLoader(
           parameters.processingTimeouts,
-          config.sequencerClient.clientChannelParams(parameters.tracing.propagation),
+          parameters.tracing.propagation,
           ProtocolVersionCompatibility.supportedProtocols(parameters),
           parameters.protocolConfig.minimumProtocolVersion,
           parameters.protocolConfig.dontWarnOnDeprecatedPV,
+          loggerFactory,
+        )
+
+        partyMetadataStore =
+          PartyMetadataStore(storage, parameters.processingTimeouts, loggerFactory)
+
+        partyNotifier = new LedgerServerPartyNotifier(
+          participantId,
+          ephemeralState.participantEventPublisher,
+          partyMetadataStore,
+          clock,
+          arguments.futureSupervisor,
+          mustTrackSubmissionIds = true,
+          exitOnFatalFailures = parameters.exitOnFatalFailures,
+          parameters.batchingConfig.maxItemsInBatch,
+          parameters.processingTimeouts,
           loggerFactory,
         )
 
@@ -598,14 +623,17 @@ class ParticipantNodeBootstrap(
           topologyDispatcher,
           syncCryptoSignerWithSessionKeys,
           config.crypto,
+          config.topology,
           clock,
           parameters,
           synchronizerAliasManager,
           arguments.testingConfig,
           recordSequencerInteractions,
           replaySequencerConfig,
-          mutablePackageMetadataView,
+          packageDependencyResolver,
           arguments.metrics.connectedSynchronizerMetrics,
+          sequencerInfoLoader,
+          partyNotifier,
           futureSupervisor,
           loggerFactory,
         )
@@ -671,8 +699,21 @@ class ParticipantNodeBootstrap(
             )
             .mapK(FutureUnlessShutdown.outcomeK)
 
+        /*
+        Returns the topology manager corresponding to an active configuration. Restricting to active is fine since
+        the topology manager is used for party allocation which would fail for inactive configurations.
+         */
+        activeTopologyManagerGetter = (id: PhysicalSynchronizerId) =>
+          synchronizerConnectionConfigStore
+            .get(id)
+            .toOption
+            .filter(_.status == Active)
+            .flatMap(_.configuredPSId.toOption)
+            .flatMap(syncPersistentStateManager.get)
+            .map(_.topologyManager)
+
         // Sync Service
-        sync = CantonSyncService.create(
+        sync = cantonSyncServiceFactory.create(
           participantId,
           synchronizerRegistry,
           synchronizerConnectionConfigStore,
@@ -680,9 +721,10 @@ class ParticipantNodeBootstrap(
           persistentState,
           ephemeralState,
           syncPersistentStateManager,
-          replicaManager,
           packageService,
+          new PartyOps(activeTopologyManagerGetter, loggerFactory),
           topologyDispatcher,
+          partyNotifier,
           syncCryptoSignerWithSessionKeys,
           engine,
           commandProgressTracker,
@@ -692,7 +734,9 @@ class ParticipantNodeBootstrap(
           resourceManagementService,
           parameters,
           pruningProcessor,
+          schedulers,
           arguments.metrics,
+          exitOnFatalFailures = arguments.parameterConfig.exitOnFatalFailures,
           sequencerInfoLoader,
           arguments.futureSupervisor,
           loggerFactory,
@@ -702,18 +746,10 @@ class ParticipantNodeBootstrap(
           () => triggerDeclarativeChange(),
         )
 
-        _ <-
-          if (sync.isActive()) sync.finishLSUs() else EitherT.pure[FutureUnlessShutdown, String](())
-
-        _ = if (sync.isActive()) sync.attemptPendingHandshakesSuccessors()
-
         _ = {
           connectedSynchronizerHealth.set(sync.connectedSynchronizerHealth)
           connectedSynchronizerEphemeralHealth.set(sync.ephemeralHealth)
           connectedSynchronizerSequencerClientHealth.set(sync.sequencerClientHealth)
-          connectedSynchronizerSequencerConnectionPoolHealthRef.set(
-            sync.sequencerConnectionPoolHealth
-          )
           connectedSynchronizerAcsCommitmentProcessorHealth.set(sync.acsCommitmentProcessorHealth)
         }
 
@@ -736,7 +772,6 @@ class ParticipantNodeBootstrap(
                 participantId = participantId.toLf,
                 participantNodePersistentState = persistentState,
                 sync = sync,
-                pruningConfig = parameters.stores,
                 tracerProvider = tracerProvider,
               )
             ),
@@ -758,7 +793,6 @@ class ParticipantNodeBootstrap(
             clock,
             adminServerRegistry,
             adminTokenDispenser,
-            storage,
             futureSupervisor,
             loggerFactory,
             tracerProvider,
@@ -847,13 +881,28 @@ class ParticipantNodeBootstrap(
         addCloseable(syncPersistentStateManager)
         addCloseable(synchronizerRegistry)
         addCloseable(resourceManagementService)
+        addCloseable(partyMetadataStore)
         persistentState.map(addCloseable).discard
         addCloseable(packageService)
         addCloseable(indexedStringStore)
+        addCloseable(partyNotifier)
+        addCloseable(ephemeralState.participantEventPublisher)
         addCloseable(topologyDispatcher)
         addCloseable(schedulers)
         addCloseable(ledgerApiServerContainer.currentAutoCloseable())
+        // TODO(#25118) clean up cache metrics on shutdown wherever they are initialized
+        addCloseable(new AutoCloseable {
+          override def close(): Unit =
+            Seq(
+              metrics.ledgerApiServer.execution.cache.keyState.stateCache,
+              metrics.ledgerApiServer.execution.cache.contractState.stateCache,
+              metrics.ledgerApiServer.identityProviderConfigStore.verifierCache,
+              metrics.ledgerApiServer.identityProviderConfigStore.idpConfigCache,
+              metrics.ledgerApiServer.userManagement.cache,
+            ).foreach(_.closeAcquired())
+        })
         addCloseable(ledgerApiDependentServices)
+        addCloseable(packageDependencyResolver)
         addCloseable(mutablePackageMetadataView)
 
         // return values
@@ -876,13 +925,6 @@ class ParticipantNodeBootstrap(
   override protected def mkNodeHealthService(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService) = {
-    val constantSoftDependencies = Seq(
-      connectedSynchronizerHealth,
-      connectedSynchronizerEphemeralHealth,
-      connectedSynchronizerSequencerClientHealth,
-      connectedSynchronizerAcsCommitmentProcessorHealth,
-    )
-
     val readiness = DependenciesHealthService(
       "participant",
       logger,
@@ -890,9 +932,11 @@ class ParticipantNodeBootstrap(
       criticalDependencies = storage +: crypto.toList,
       // The sync service won't be reporting Ok until the node is initialized, but that shouldn't prevent traffic from
       // reaching the node
-      softDependencies = Eval.always(
-        constantSoftDependencies ++
-          connectedSynchronizerSequencerConnectionPoolHealthRef.get.apply()
+      Seq(
+        connectedSynchronizerHealth,
+        connectedSynchronizerEphemeralHealth,
+        connectedSynchronizerSequencerClientHealth,
+        connectedSynchronizerAcsCommitmentProcessorHealth,
       ),
     )
     val liveness = LivenessHealthService.alwaysAlive(logger, timeouts)
@@ -933,9 +977,6 @@ class ParticipantNodeBootstrap(
       SequencerClient.healthName,
       timeouts,
     )
-
-  private val connectedSynchronizerSequencerConnectionPoolHealthRef =
-    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
 
   private lazy val connectedSynchronizerAcsCommitmentProcessorHealth: MutableHealthComponent =
     MutableHealthComponent(

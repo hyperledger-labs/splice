@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -22,9 +22,9 @@ import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.CostEstimationHints
-import com.digitalasset.canton.topology.{PartyId as TopologyPartyId, Synchronizer}
+import com.digitalasset.canton.topology.{PartyId as TopologyPartyId, SynchronizerId}
 import com.digitalasset.canton.version.HashingSchemeVersion
-import com.digitalasset.canton.version.HashingSchemeVersion.{V2, V3}
+import com.digitalasset.canton.version.HashingSchemeVersion.V2
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag.*
 
@@ -70,18 +70,11 @@ class SubmitRequestValidator(
         // If not set, defaults to the default instance which enables estimation without hints
         req.estimateTrafficCost.getOrElse(CostEstimationHintsP.defaultInstance)
       )
-      hashingSchemeVersion <- req.hashingSchemeVersion match {
-        case Some(hashingSchemeVersionP) =>
-          validateHashingSchemeVersion(hashingSchemeVersionP).leftMap(_.asGrpcError)
-        case None =>
-          Right(HashingSchemeVersion.V2) // Default to V2 for backward compatibility if not set
-      }
     } yield InteractiveSubmissionService.PrepareRequest(
       validatedCommands,
       req.verboseHashing,
       maxRecordTime,
       costEstimationHints,
-      hashingSchemeVersion,
     )
 
   private def validatePartySignatures(
@@ -142,14 +135,12 @@ class SubmitRequestValidator(
       )
       partySignaturesP <- requirePresence(partySignaturesOP, "parties_signatures")
       partySignatures <- validatePartySignatures(partySignaturesP)
-      hashingSchemeVersion <- validateHashingSchemeVersion(hashingSchemeVersionP).leftMap(
-        _.asGrpcError
-      )
+      version <- validateHashingSchemeVersion(hashingSchemeVersionP).leftMap(_.asGrpcError)
       synchronizerIdString <- requirePresence(
         preparedTransactionP.flatMap(_.metadata.map(_.synchronizerId)),
         "synchronizer_id",
       )
-      synchronizer <- validateSynchronizer(synchronizerIdString).leftMap(_.asGrpcError)
+      synchronizerId <- validateSynchronizerId(synchronizerIdString).leftMap(_.asGrpcError)
       ledgerEffectiveTime <- commandsValidator.validateLedgerTime(
         currentLedgerTime,
         minLedgerTimeP.flatMap(_.time.minLedgerTimeAbs),
@@ -162,26 +153,27 @@ class SubmitRequestValidator(
         deduplicationPeriod,
         partySignatures,
         preparedTransaction,
-        hashingSchemeVersion,
+        version,
+        synchronizerId,
         ledgerEffectiveTime,
       )
     }
   }
 
-  private def validateSynchronizer(string: String)(implicit
+  private def validateSynchronizerId(string: String)(implicit
       errorLoggingContext: ErrorLoggingContext
-  ): Either[RpcError, Synchronizer] =
-    Synchronizer
-      .fromLogicalOrPhysicalString(string, "synchronizer_id")
+  ): Either[RpcError, SynchronizerId] =
+    SynchronizerId
+      .fromString(string)
       .leftMap(err =>
         RequestValidationErrors.InvalidField
-          .Reject("synchronizer_id", err.message)
+          .Reject("synchronizer_id", err)
       )
+
   private def validateHashingSchemeVersion(protoVersion: iss.HashingSchemeVersion)(implicit
       errorLoggingContext: ErrorLoggingContext
   ): Either[RpcError, HashingSchemeVersion] = protoVersion match {
     case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2 => Right(V2)
-    case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V3 => Right(V3)
     case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_UNSPECIFIED =>
       Left(
         RequestValidationErrors.InvalidField

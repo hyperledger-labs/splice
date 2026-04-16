@@ -83,8 +83,6 @@ function _infra_up() {
       _uses_pulumi_stack infra
 
       subcmd_pulumi infra up --yes --skip-preview
-      _uses_pulumi_stack observability
-      subcmd_pulumi observability up --yes --skip-preview
 }
 
 function _remove_pulumi_finalizers() {

@@ -29,12 +29,27 @@ export async function stackForSv(
 
 export const svsToDeploy = allSvNamesToDeploy;
 
-export function runSvProjectForSvs<T>(
-  svsToRunFor: string[],
+export function runSvProjectForAllSvs<T>(
   operation: string,
+  runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
   requiresExistingStack: boolean,
-  runForStack: (stack: automation.Stack, sv: string) => Promise<T>
-) {
+  // allow the ability to force run for the runbook in certain cases
+  // this also requires that the cluster is a dev cluster
+  // used to ensure down/refresh always takes care of the runbook as well
+  forceSvRunbook: boolean = false
+): { name: string; promise: Promise<T> }[] {
+  const isLsuDeployment =
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
+  // For now we're skipping in all cases. When stack config files are versioned for all clusters and we start using
+  // the sv project regularly we should not skip on the down operation.
+  if (!isLsuDeployment) {
+    console.log('Not an LSU deployment. Skipping sv stacks.');
+    return [];
+  }
+  const svsToRunFor = svsToDeploy.concat(
+    !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
+  );
+  console.log(`Running for svs ${JSON.stringify(svsToRunFor)}`);
   return svsToRunFor.map(sv => {
     console.error(`Adding operation for sv ${sv}`);
     return {
@@ -45,36 +60,4 @@ export function runSvProjectForSvs<T>(
       })(),
     };
   });
-}
-
-export function runSvProjectForAllSvs<T>(
-  operation: string,
-  runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
-  requiresExistingStack: boolean,
-  // allow the ability to force run for the runbook in certain cases
-  // this also requires that the cluster is a dev cluster
-  // used to ensure down/refresh always takes care of the runbook as well
-  forceSvRunbook: boolean = false
-): { name: string; promise: Promise<T> }[] {
-  const svsToRunFor = svsToDeploy.concat(
-    !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
-  );
-  console.log(`Running for svs ${JSON.stringify(svsToRunFor)}`);
-  return runSvProjectForSvs(svsToRunFor, operation, requiresExistingStack, runForStack);
-}
-
-export function runSvProjectForAllSvsIfLsu<T>(
-  operation: string,
-  runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
-  requiresExistingStack: boolean,
-  forceSvRunbook: boolean = false
-): { name: string; promise: Promise<T> }[] {
-  const isLsuDeployment =
-    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
-  if (!isLsuDeployment) {
-    console.log('Not an LSU deployment. Skipping sv stacks.');
-    return [];
-  } else {
-    return runSvProjectForAllSvs(operation, runForStack, requiresExistingStack, forceSvRunbook);
-  }
 }

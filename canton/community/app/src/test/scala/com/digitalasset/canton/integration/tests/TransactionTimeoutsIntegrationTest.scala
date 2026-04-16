@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -8,12 +8,14 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Security.SecurityTest.Property.Finality
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
 import com.digitalasset.base.error.utils.DecodedCantonError
-import com.digitalasset.canton.config
-import com.digitalasset.canton.config.TestSequencerClientFor
+import com.digitalasset.canton.config.{DbConfig, TestSequencerClientFor}
 import com.digitalasset.canton.error.{CantonBaseError, MediatorError}
 import com.digitalasset.canton.examples.java.cycle.Cycle
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseProgrammableSequencer}
+import com.digitalasset.canton.integration.plugins.{
+  UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
@@ -66,12 +68,7 @@ abstract class TransactionTimeoutsIntegrationTest
           Set(TestSequencerClientFor(this.getClass.getSimpleName, "mediator1", "synchronizer1"))
         )
       )
-      .addConfigTransforms(
-        ConfigTransforms.useStaticTime,
-        ConfigTransforms.updateAllSequencerConfigs_(
-          _.focus(_.timeTracker.observationLatency).replace(config.NonNegativeFiniteDuration.Zero)
-        ),
-      )
+      .addConfigTransforms(ConfigTransforms.useStaticTime)
       .withSetup { implicit env =>
         import env.*
 
@@ -144,17 +141,21 @@ abstract class TransactionTimeoutsIntegrationTest
         submissionRequest.sender match {
           case _: MediatorId =>
             env.environment.simClock.value.advance(Duration.ofSeconds(10))
-            SendDecision.Reject()
+            SendDecision.Reject
           case _: ParticipantId | _: SequencerId => SendDecision.Process
         }
     })
 
+    val usingPool = participant1.config.sequencerClient.useNewConnectionPool
     val completion = loggerFactory.assertLoggedWarningsAndErrorsSeq(
       attemptCreateAndWait(sequencer),
       LogEntry.assertLogSeq(
         Seq(
           (
-            _.errorMessage should (include("Request failed for server-sequencer1-0") and
+            _.errorMessage should (include(
+              if (usingPool) "Request failed for server-sequencer1-0"
+              else "Request failed for sequencer"
+            ) and
               include("Message rejected by send policy.")),
             "Mediator send attempts",
           )
@@ -178,12 +179,9 @@ abstract class TransactionTimeoutsIntegrationTest
     val sequencer = getProgrammableSequencer(sequencer1.name)
     val participant1Id = participant1.id
     val advanceClock = Promise[Unit]()
-    val simClock = env.environment.simClock.value
 
     // advance the clock such that the mediator will request a time proof when asked
-    simClock.advance(Duration.ofSeconds(5))
-    // make sure sequencer has caught up to the current sim clock time
-    sequencer1.underlying.value.sequencer.timeTracker.awaitTick(simClock.now).foreach(_.futureValue)
+    env.environment.simClock.value.advance(Duration.ofSeconds(5))
 
     sequencer.setPolicy_("drop participant response messages") { submissionRequest =>
       submissionRequest.sender match {
@@ -207,7 +205,8 @@ abstract class TransactionTimeoutsIntegrationTest
       // time of the confirmation request.
       mediator1.testing.fetch_synchronizer_time()
       // now advance the clock
-      simClock.advance(confirmationResponseTimeout.unwrap.plus(Duration.ofSeconds(1)))
+      env.environment.simClock.value
+        .advance(confirmationResponseTimeout.unwrap.plus(Duration.ofSeconds(1)))
     }
 
     val completion = loggerFactory.assertLogsUnorderedOptional(
@@ -229,7 +228,6 @@ abstract class TransactionTimeoutsIntegrationTest
     import env.*
 
     val confirmationResponseCount = new AtomicInteger()
-    val simClock = environment.simClock.value
 
     // Reject time proof requests from the mediator to ensure that the send tracker cannot observe
     // the timeout before the mediator receives the synchronous rejection for its send verdict.
@@ -261,15 +259,12 @@ abstract class TransactionTimeoutsIntegrationTest
           logger.info(s"Received confirmation response #$count")
           if (count == 1) {
             // Advance the clock so that the mediator's verdict will bounce at the sequencer
-            simClock.advance(
+            environment.simClock.value.advance(
               confirmationResponseTimeout.unwrap
                 .plus(mediatorReactionTimeout.unwrap)
                 // Advance by more so that the participant will request a time proof to trigger the timeout.
                 .plusSeconds(10)
             )
-            sequencer1.underlying.value.sequencer.timeTracker
-              .awaitTick(simClock.now)
-              .foreach(_.futureValue)
           }
         }
         DelayedSequencerClient.Immediate
@@ -309,7 +304,8 @@ abstract class TransactionTimeoutsIntegrationTest
   }
 }
 
-final class TransactionTimeoutsIntegrationTestPostgres extends TransactionTimeoutsIntegrationTest {
-  registerPlugin(new UseBftSequencer(loggerFactory))
+final class TransactionTimeoutsReferenceIntegrationTestPostgres
+    extends TransactionTimeoutsIntegrationTest {
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

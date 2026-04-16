@@ -35,7 +35,6 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -126,31 +125,9 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
-
-  def lookupFeaturedAppRightByContractId(contractId: String)(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
-
-  def listFeaturedAppRights()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
-
   def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]]
-
-  def lookupRollForwardLsu()(implicit
-      tc: TraceContext
-  ): Future[Option[HttpScanAppClient.RollForwardLsu]]
 
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,
@@ -294,11 +271,10 @@ trait ScanConnection
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
-      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])]
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
   def listUnclaimedDevelopmentFundCoupons()(implicit
       ec: ExecutionContext,
@@ -308,11 +284,6 @@ trait ScanConnection
       ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
     ]
   ]
-
-  def getActivePhysicalSynchronizerSerial()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[NonNegativeInt]
 
 }
 

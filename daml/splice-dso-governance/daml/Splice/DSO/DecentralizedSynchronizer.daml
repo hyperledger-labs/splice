@@ -65,21 +65,6 @@ data SynchronizerState
 -- ==========================
 
 -- | Config for a sequencer.
-data SequencerIdentityConfig = SequencerIdentityConfig with
-    sequencerId : Text
-      -- ^ The id of the sequencer.
-    availableAfter : Optional Time
-      -- ^ Any participant should subscribe this sequencer after this time.
-      -- ^ If not set the sequencer is not yet accessible
-  deriving (Eq, Show)
-
--- | Connection config for a sequencer.
-data SequencerConnectionConfig = SequencerConnectionConfig with
-    url : Text
-      -- ^ The public accessible url of the sequencer.
-  deriving (Eq, Show)
-
--- | Config for a sequencer.
 data SequencerConfig = SequencerConfig with
     migrationId : Int
       -- ^ The synchronizer migration id corresponding to this sequencer.
@@ -114,18 +99,8 @@ data ScanConfig = ScanConfig with
       -- ^ The publicly accessible URL of the Scan instance.
   deriving (Eq, Show)
 
-data PhysicalSynchronizerNodeConfig = PhysicalSynchronizerNodeConfig with
-
-    sequencer : Optional SequencerConnectionConfig
-      -- ^ The configuration of this sv's optional local sequencer.
-
-  deriving (Eq, Show)
-
 -- | A map from synchronizer-ids to the configuration of a sv's node for this synchronizer.
 type SynchronizerNodeConfigMap = Map.Map Text SynchronizerNodeConfig
-
--- | A map from physical synchronizer serial to the configuration of a sv's node for that physical synchronizer.
-type PhysicalSynchronizerNodeConfigMap = Map.Map Int PhysicalSynchronizerNodeConfig
 
 -- | The configuration of a sv's node for a particular synchronizer.
 data SynchronizerNodeConfig = SynchronizerNodeConfig with
@@ -145,12 +120,6 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
     legacySequencerConfig: Optional LegacySequencerConfig
       -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
 
-    sequencerIdentity : Optional SequencerIdentityConfig
-      -- ^ The configuration of this sv's optional local sequencer.
-
-    physicalSynchronizers: Optional PhysicalSynchronizerNodeConfigMap
-      -- ^ The synchronizer node configs for the currently running physical synchronizers.
-
   deriving (Eq, Show)
 
 noSynchronizerNodes : SynchronizerNodeConfigMap
@@ -165,7 +134,7 @@ data SynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with
 -----------------
 
 emptySynchronizerNodeConfig : SynchronizerNodeConfig
-emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None None None
+emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None
 
 
 -- helper functions
@@ -186,26 +155,15 @@ instance Patchable SynchronizerNodeConfig where
   patch new base current = SynchronizerNodeConfig with
     cometBft = patch new.cometBft base.cometBft current.cometBft
     sequencer = patch new.sequencer base.sequencer current.sequencer
-    sequencerIdentity = patch new.sequencerIdentity base.sequencerIdentity current.sequencerIdentity
     mediator = patch new.mediator base.mediator current.mediator
     scan = patch new.scan base.scan current.scan
     legacySequencerConfig = patch new.legacySequencerConfig base.legacySequencerConfig current.legacySequencerConfig
-    physicalSynchronizers = patch new.physicalSynchronizers base.physicalSynchronizers current.physicalSynchronizers
 
 instance Patchable SynchronizerConfig where
   patch new base current = SynchronizerConfig with
     state = patch new.state base.state current.state
     cometBftGenesisJson = patch new.cometBftGenesisJson base.cometBftGenesisJson current.cometBftGenesisJson
     acsCommitmentReconciliationInterval = patch new.acsCommitmentReconciliationInterval base.acsCommitmentReconciliationInterval current.acsCommitmentReconciliationInterval
-
-instance Patchable SequencerIdentityConfig where
-  patch new base current = SequencerIdentityConfig with
-    sequencerId = patch new.sequencerId base.sequencerId current.sequencerId
-    availableAfter = patch new.availableAfter base.availableAfter current.availableAfter
-
-instance Patchable SequencerConnectionConfig where
-  patch new base current = SequencerConnectionConfig with
-    url = patch new.url base.url current.url
 
 instance Patchable SequencerConfig where
   patch new base current = SequencerConfig with
@@ -227,10 +185,6 @@ instance Patchable ScanConfig where
 instance Patchable MediatorConfig where
   patch new base current = MediatorConfig with
     mediatorId = patch new.mediatorId base.mediatorId current.mediatorId
-
-instance Patchable PhysicalSynchronizerNodeConfig where
-  patch new base current = PhysicalSynchronizerNodeConfig with
-    sequencer = patch new.sequencer base.sequencer current.sequencer
 
 instance Patchable DsoDecentralizedSynchronizerConfig where
   patch new base current = DsoDecentralizedSynchronizerConfig with

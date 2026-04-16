@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -15,6 +15,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStoreTest, SequencerStore}
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{MediatorId, TestingIdentityFactory, TestingTopology}
@@ -35,6 +36,8 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
     loggerFactory,
     DynamicSynchronizerParameters.initialValues(testedProtocolVersion),
   ).forOwnerAndSynchronizer(owner = mediatorId, psid)
+
+  private val requestSigner = RequestSigner(crypto, testedProtocolVersion, loggerFactory)
 
   def createSequencerWithSnapshot(
       initialState: Option[SequencerInitialState]
@@ -64,8 +67,8 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
-      lsuSequencingBounds = None,
-      drSequencingTimeUpperBound = None,
+      sequencingTimeLowerBoundExclusive =
+        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
       clock,
       sequencerId,
       crypto,
@@ -94,18 +97,9 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       val testSequencerWrapper =
         TestDatabaseSequencerWrapper(sequencer.asInstanceOf[DatabaseSequencer])
 
-      val requestSigner = RequestSigner(crypto, loggerFactory)
-
       for {
         signedRequest <- valueOrFail(
-          requestSigner
-            .signRequest(
-              request,
-              HashPurpose.SubmissionRequestSignature,
-              crypto.currentSnapshotApproximation.futureValueUS,
-              None, // not needed for unit tests; session signing keys disabled
-            )
-            .failOnShutdown
+          requestSigner.signRequest(request, HashPurpose.SubmissionRequestSignature).failOnShutdown
         )(s"Sign request")
         _ <- valueOrFail(
           testSequencerWrapper.registerMemberInternal(sender, CantonTimestamp.Epoch).failOnShutdown
@@ -160,7 +154,6 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
               snapshot,
               latestSequencerEventTimestamp = None,
               initialTopologyEffectiveTimestamp = None,
-              latestPendingTopologyTransactionTimestamp = None,
             )
           )
         )
@@ -176,12 +169,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
         }
 
         signedRequest2 <- valueOrFail(
-          requestSigner.signRequest(
-            request2,
-            HashPurpose.SubmissionRequestSignature,
-            crypto.currentSnapshotApproximation.futureValueUS,
-            None, // not needed for unit tests; session signing keys disabled
-          )
+          requestSigner.signRequest(request2, HashPurpose.SubmissionRequestSignature)
         )(s"Sign request")
         _ <- {
           // need to advance clock so that the new event doesn't get the same timestamp as the previous one,

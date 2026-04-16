@@ -21,7 +21,7 @@ import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Keep
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider, SpliceMetrics}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
@@ -144,16 +144,6 @@ class UpdateHistoryBulkStorageTest
             .map(
               new CompactJsonScanHttpEncodings(identity, identity).httpToLapiUpdate
             ) should contain theSameElementsInOrderAs segmentUpdates
-          /* We hard-code the expected digests to enforce that the persisted data format does not change.
-             These values must not be modified unless there is a conscious decision to change the persisted format,
-             with a migration plan for how to apply it consistently across SVs. */
-          bucketConnection
-            .getChecksums(objectKeys.toSeq)
-            .futureValue
-            .map(_.checksum) should contain theSameElementsInOrderAs Seq(
-            "MM+DyxPP6UgpAaSCsm99j4ZAtYIK3TIrPmxFyodBrQQ=",
-            "2oWb5Um18xwnJTMkC4yilyrcsUADYoxtV7toJi29VsI=",
-          )
         }
       }
     }
@@ -612,7 +602,6 @@ class UpdateHistoryBulkStorageTest
         0L,
         BigDecimal(0.1),
         contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
-        version = DarResources.amulet_0_1_17,
       )
       val tx = mkCreateTx(
         1, // not used in updates v2

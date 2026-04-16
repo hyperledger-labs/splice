@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
 
-import com.digitalasset.canton.annotations.{NuckTest, RollbackTest}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -14,7 +13,6 @@ import com.digitalasset.canton.integration.plugins.UseLedgerApiTestTool.LAPITTVe
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.tests.ledgerapi.LedgerApiConformanceBase.excludedTests
 import com.digitalasset.canton.integration.tests.ledgerapi.SuppressionRules.ApiUserManagementServiceSuppressionRule
-import com.digitalasset.canton.integration.util.TestUtils
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -102,7 +100,6 @@ class LedgerApiConformanceMultiSynchronizerTest
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1_S1M1
-      .addConfigTransforms(ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag)
       .withSetup(setupLedgerApiConformanceEnvironment)
 
   // ensure ledger api conformance tests have less noisy neighbours
@@ -125,10 +122,9 @@ class LedgerApiConformanceMultiSynchronizerTest
       lfVersion = UseLedgerApiTestTool.LfVersion.Stable,
       version = LAPITTVersion.LocalJar,
     )
-  registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(ledgerApiTestToolPlugin)
   registerPlugin(
-    new UseBftSequencer(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
@@ -150,6 +146,46 @@ class LedgerApiConformanceMultiSynchronizerTest
   }
 }
 
+class LedgerApiConformanceWithTrafficControlTest
+    extends CommunityIntegrationTest
+    with IsolatedEnvironments {
+
+  override lazy val environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition.P1_S1M1
+      .withTrafficControl()
+      .withSetup(setupLedgerApiConformanceEnvironment(_))
+
+  // ensure ledger api conformance tests have less noisy neighbours
+  protected override def numPermits: PositiveInt = PositiveInt.tryCreate(2)
+
+  protected def setupLedgerApiConformanceEnvironment(implicit
+      env: TestConsoleEnvironment
+  ): Unit = {
+    import env.*
+    participants.all.synchronizers.connect_local(sequencer1, alias = daName)
+  }
+
+  protected val ledgerApiTestToolPlugin =
+    new UseLedgerApiTestTool(
+      loggerFactory,
+      connectedSynchronizersCount = 1,
+      lfVersion = UseLedgerApiTestTool.LfVersion.Stable,
+      version = LAPITTVersion.LocalJar,
+    )
+  registerPlugin(ledgerApiTestToolPlugin)
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+
+  "Ledger API test tool on a synchronizer with traffic control enabled" can {
+    "pass traffic control related conformance tests" in { implicit env =>
+      ledgerApiTestToolPlugin.runSuites(
+        suites = LedgerApiConformanceBase.trafficControlTests.mkString(","),
+        exclude = Nil,
+        concurrency = 2,
+      )
+    }
+  }
+}
+
 object LedgerApiConformanceBase {
   val multiSynchronizerTests = Seq(
     "CommandServiceIT:CSsubmitAndWaitPrescribedSynchronizerId",
@@ -160,7 +196,12 @@ object LedgerApiConformanceBase {
     "VettingIT:PVListVettedPackagesMultiSynchronizer",
     "VettingIT:PVListVettedPackagesPagination",
   )
+  val trafficControlTests = Seq(
+    "InteractiveSubmissionServiceIT:ISSPrepareSubmissionRequestBasic",
+    "InteractiveSubmissionServiceIT:ISSPrepareSubmissionRequestWithoutCostEstimation",
+  )
   val excludedTests = Seq(
+    "ClosedWorldIT", // Canton errors with "Some(Disputed: unable to parse party id 'unallocated': FailedSimpleStringConversion(LfError(Invalid unique identifier missing namespace unallocated)))"
     // Exclude tests which are run separately below
     "ParticipantPruningIT",
     "TLSOnePointThreeIT",
@@ -181,21 +222,16 @@ object LedgerApiConformanceBase {
   )
 }
 
-abstract class LedgerApiShardedConformanceBase(shard: Int)
-    extends SingleVersionLedgerApiConformanceBase {
+trait LedgerApiShardedConformanceBase extends SingleVersionLedgerApiConformanceBase {
 
   override def connectedSynchronizersCount = 1
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
       .withSetup(setupLedgerApiConformanceEnvironment)
-      .withTrafficControl(TestUtils.waitForTargetTimeOnSynchronizerNode(wallClock.now, logger))
 
-  protected val numShards: Int = 6
-  assert(shard < numShards)
-
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  protected val numShards: Int = 3
+  protected def shard: Int
 
   "Ledger Api Test Tool" can {
     s"pass semantic tests block $shard" in { implicit env =>
@@ -206,19 +242,6 @@ abstract class LedgerApiShardedConformanceBase(shard: Int)
     }
   }
 }
-
-@RollbackTest
-class LedgerApiShard0ConformanceTestPostgres extends LedgerApiShardedConformanceBase(0)
-@RollbackTest
-class LedgerApiShard1ConformanceTestPostgres extends LedgerApiShardedConformanceBase(1)
-@RollbackTest
-class LedgerApiShard2ConformanceTestPostgres extends LedgerApiShardedConformanceBase(2)
-@RollbackTest
-class LedgerApiShard3ConformanceTestPostgres extends LedgerApiShardedConformanceBase(3)
-@RollbackTest
-class LedgerApiShard4ConformanceTestPostgres extends LedgerApiShardedConformanceBase(4)
-@RollbackTest
-class LedgerApiShard5ConformanceTestPostgres extends LedgerApiShardedConformanceBase(5)
 
 // Conformance test that need a suppressing rule on canton side
 trait LedgerApiConformanceSuppressedLogs extends SingleVersionLedgerApiConformanceBase {
@@ -278,7 +301,40 @@ trait LedgerApiConformanceSuppressedLogs extends SingleVersionLedgerApiConforman
 
 class LedgerApiConformanceSuppressedLogsPostgres extends LedgerApiConformanceSuppressedLogs {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+}
+
+trait LedgerApiShard0ConformanceTest extends LedgerApiShardedConformanceBase {
+  override def shard: Int = 0
+}
+
+// not testing in-memory/H2, as we have observed flaky h2 persistence problems in the indexer
+
+class LedgerApiShard0ConformanceTestPostgres extends LedgerApiShard0ConformanceTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+}
+
+trait LedgerApiShard1ConformanceTest extends LedgerApiShardedConformanceBase {
+  override def shard: Int = 1
+}
+
+// not testing in-memory/H2, as we have observed flaky h2 persistence problems in the indexer
+
+class LedgerApiShard1ConformanceTestPostgres extends LedgerApiShard1ConformanceTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+}
+
+trait LedgerApiShard2ConformanceTest extends LedgerApiShardedConformanceBase {
+  override def shard: Int = 2
+}
+
+// not testing in-memory/H2, as we have observed flaky h2 persistence problems in the indexer
+
+class LedgerApiShard2ConformanceTestPostgres extends LedgerApiShard2ConformanceTest {
+  registerPlugin(new UsePostgres(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 trait LedgerApiExperimentalConformanceTest extends SingleVersionLedgerApiConformanceBase {
@@ -322,20 +378,6 @@ trait LedgerApiExperimentalConformanceTest extends SingleVersionLedgerApiConform
             "PrefetchContractKeysIT:CSprefetchContractKeysPrepareEndpointBasic",
             "PrefetchContractKeysIT:CSprefetchContractKeysPrepareWronglyTyped",
             "PrefetchContractKeysIT:CSprefetchContractPrepareKeysMany",
-            // TODO(#30398): Exclude tests that roll back effects on dev for now, should assert failure instead.
-            "EventsDescendantsIT:DescendantsRollbackCreate",
-            "EventsDescendantsIT:DescendantsRollbackExercise",
-            "ExceptionsIT:ExRollbackActiveExerciseConsuming",
-            "ExceptionsIT:ExRolledbackArchiveConsuming",
-            "ExceptionsIT:ExRolledbackArchiveNonConsuming",
-            "ExceptionsIT:ExRolledbackKeyCreation",
-            "ExceptionsIT:ExRollbackHidden",
-            "ExceptionsIT:ExRollbackProjectionNormalization",
-            "ExceptionsIT:ExRollbackProjectionNesting",
-            "ExceptionsIT:ExRollbackCreate",
-            // TODO(#30398): Exclude tests that fail because of the temporary inconsistency between the CSM used by
-            //    the engine, and the CSM used during view decomposition.
-            "ContractKeysIT:CKLocalLookupByKeyVisibility",
           ),
           concurrency = 4,
         )
@@ -345,12 +387,8 @@ trait LedgerApiExperimentalConformanceTest extends SingleVersionLedgerApiConform
 
 // not testing in-memory/H2, as we have observed flaky h2 persistence problems in the indexer
 
-@NuckTest
-@RollbackTest
 class LedgerApiExperimentalConformanceTest_Postgres extends LedgerApiExperimentalConformanceTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  // On registerPlugin(new UseBftSequencer(loggerFactory)) PrefetchContractKeysIT fails with
-  // ABORTED: SEQUENCER_BACKPRESSURE(2,54fe840c): The sequencer is overloaded.
   registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
@@ -393,7 +431,7 @@ trait LedgerApiParticipantPruningConformanceTest extends SingleVersionLedgerApiC
 class LedgerApiParticipantPruningConformanceTestPostgres
     extends LedgerApiParticipantPruningConformanceTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 trait LedgerApiOffsetCheckpointsConformanceTest extends SingleVersionLedgerApiConformanceBase {
@@ -405,7 +443,7 @@ trait LedgerApiOffsetCheckpointsConformanceTest extends SingleVersionLedgerApiCo
       .addConfigTransforms(
         updateAllParticipantConfigs_(
           _.focus(_.ledgerApi.indexService.offsetCheckpointCacheUpdateInterval)
-            .replace(config.NonNegativeFiniteDuration(java.time.Duration.ofMillis(3000)))
+            .replace(config.NonNegativeFiniteDuration(java.time.Duration.ofMillis(1000)))
             .focus(_.ledgerApi.indexService.idleStreamOffsetCheckpointTimeout)
             .replace(config.NonNegativeFiniteDuration(java.time.Duration.ofMillis(1000)))
         )
@@ -431,13 +469,13 @@ trait LedgerApiOffsetCheckpointsConformanceTest extends SingleVersionLedgerApiCo
 class LedgerApiOffsetCheckpointsConformanceTestPostgres
     extends LedgerApiOffsetCheckpointsConformanceTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 // simple class which can be used to test a single test in the Ledger API conformance suite
 class LedgerApiSingleTest extends SingleVersionLedgerApiConformanceBase {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 
   override def connectedSynchronizersCount = 1
 
@@ -448,7 +486,7 @@ class LedgerApiSingleTest extends SingleVersionLedgerApiConformanceBase {
   "Ledger Api Test Tool" can {
     "run a single test" in { implicit env =>
       ledgerApiTestToolPlugin.runSuites(
-        suites = "UserManagementServiceIT:TestExternalAllocationTimeGrantUserRights",
+        suites = "PartyManagementServiceIT:PMGenerateExternalPartyTopologyTransaction",
         exclude = Nil,
         concurrency = 1,
       )

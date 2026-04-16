@@ -163,23 +163,4 @@ object HttpSvAdminAppClient {
       SynchronizerNodeIdentities.fromHttp(response.identities)
     }
   }
-
-  case class CancelLogicalSynchronizerUpgrade()
-      extends BaseCommand[http.CancelLogicalSynchronizerUpgradeResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.CancelLogicalSynchronizerUpgradeResponse] =
-      client.cancelLogicalSynchronizerUpgrade(headers = headers)
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.CancelLogicalSynchronizerUpgradeResponse.OK =>
-      Right(())
-    }
-  }
 }

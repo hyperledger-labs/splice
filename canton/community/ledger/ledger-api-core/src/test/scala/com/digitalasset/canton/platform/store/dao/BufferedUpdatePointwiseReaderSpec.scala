@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -128,7 +128,7 @@ class BufferedUpdatePointwiseReaderSpec extends AsyncFlatSpec with MockitoSugar 
       effectiveAt = Timestamp.Epoch,
       offset = offset,
       events = Vector(null),
-      completionStreamResponseO = None,
+      completionStreamResponse = None,
       synchronizerId = someSynchronizerId.toProtoPrimitive,
       recordTime = Timestamp.Epoch,
       externalTransactionHash = None,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -8,7 +8,6 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.packageName
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, LfPartyId}
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.value.Value.{ValueText, ValueUnit}
 import org.scalatest.wordspec.AsyncWordSpec
@@ -31,31 +30,12 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
 
     val instance0Template = ExampleContractFactory.templateId
     val key00: LfGlobalKey =
-      LfGlobalKey
-        .build(
-          instance0Template,
-          packageName,
-          ValueUnit,
-          crypto.Hash.hashPrivateKey("dummy-key-hash-1"),
-        )
-        .value
+      LfGlobalKey.build(instance0Template, ValueUnit, packageName).value
     val key1: LfGlobalKey =
-      LfGlobalKey
-        .build(
-          instance0Template,
-          packageName,
-          ValueText("abc"),
-          crypto.Hash.hashPrivateKey("dummy-key-hash-2"),
-        )
-        .value
+      LfGlobalKey.build(instance0Template, ValueText("abc"), packageName).value
     val forbiddenKey: LfGlobalKey =
       LfGlobalKey
-        .build(
-          instance0Template,
-          packageName,
-          ValueText("forbiddenKey"),
-          crypto.Hash.hashPrivateKey("dummy-key-hash-3"),
-        )
+        .build(instance0Template, ValueText("forbiddenKey"), packageName)
         .value
     val alice = LfPartyId.assertFromString("alice")
     val bob = LfPartyId.assertFromString("bob")
@@ -86,7 +66,7 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
 
     val extendedStore = new ExtendedContractLookup(
       overwrites,
-      Map(key00 -> Vector(coid00), key1 -> Vector.empty),
+      Map(key00 -> Some(coid00), key1 -> None),
     )
 
     "not make up contracts" in {

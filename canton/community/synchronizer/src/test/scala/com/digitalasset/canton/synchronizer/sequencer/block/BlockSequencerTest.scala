@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -37,6 +37,7 @@ import com.digitalasset.canton.synchronizer.block.update.{
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.InMemorySequencerStore
 import com.digitalasset.canton.synchronizer.sequencer.{BlockSequencerConfig, SequencerIntegration}
@@ -51,8 +52,8 @@ import com.digitalasset.canton.topology.processing.{
   TopologyTransactionTestFactory,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
+import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
-import com.digitalasset.canton.topology.store.{NoPackageDependencies, ValidatedTopologyTransaction}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.apache.pekko.NotUsed
@@ -120,7 +121,7 @@ class BlockSequencerTest
       mock[Clock],
       defaultStaticSynchronizerParameters,
       topologyStore,
-      NoPackageDependencies,
+      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       topologyConfig = TopologyConfig(),
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
@@ -130,6 +131,7 @@ class BlockSequencerTest
       SequencedTime(CantonTimestamp.Epoch),
       EffectiveTime(CantonTimestamp.Epoch),
       ApproximateTime(CantonTimestamp.Epoch),
+      potentialTopologyChange = true,
     )
     private val cryptoApi = SynchronizerCryptoClient.create(
       member = sequencer1,
@@ -154,7 +156,6 @@ class BlockSequencerTest
       sequencer1,
       blockSequencerMode = true,
       loggerFactory,
-      timeouts = timeouts,
       sequencerMetrics = sequencerMetrics,
     )
     private val storage = new MemoryStorage(loggerFactory, timeouts)
@@ -165,7 +166,6 @@ class BlockSequencerTest
           sequencer1,
           blockSequencerMode = true,
           loggerFactory,
-          timeouts = timeouts,
           sequencerMetrics = sequencerMetrics,
         ),
         loggerFactory,
@@ -180,7 +180,6 @@ class BlockSequencerTest
         store,
         dbSequencerStore = fakeDbSequencerStore,
         BlockSequencerConfig(),
-        producePostOrderingTopologyTicks = false,
         balanceStore,
         storage,
         FutureSupervisor.Noop,
@@ -188,8 +187,8 @@ class BlockSequencerTest
         clock = new SimClock(loggerFactory = loggerFactory),
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
-        lsuSequencingBounds = None,
-        drSequencingTimeUpperBound = None,
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
@@ -197,7 +196,6 @@ class BlockSequencerTest
           ApiLoggingConfig.defaultMaxMessageLines,
         ),
         metrics = SequencerMetrics.noop(this.getClass.getName),
-        batchingConfig = BatchingConfig(),
         loggerFactory = loggerFactory,
         exitOnFatalFailures = true,
         runtimeReady = FutureUnlessShutdown.unit,
@@ -219,7 +217,7 @@ class BlockSequencerTest
 
     override def subscribe()(implicit
         traceContext: TraceContext
-    ): Source[Traced[RawLedgerBlock], KillSwitch] =
+    ): Source[RawLedgerBlock, KillSwitch] =
       Source
         .fromIterator { () =>
           LazyList
@@ -228,14 +226,7 @@ class BlockSequencerTest
             .map { i =>
               if (n == i + 1)
                 completed.success(())
-              Traced(
-                RawLedgerBlock(
-                  blockHeight = i.toLong,
-                  baseSequencingTimeMicrosFromEpoch =
-                    CantonTimestamp.Epoch.toMicros, // Not relevant for the test
-                  Seq.empty,
-                )
-              )
+              RawLedgerBlock(i.toLong, Seq.empty)
             }
             .iterator
         }
@@ -269,8 +260,8 @@ class BlockSequencerTest
   class FakeBlockSequencerStateManager extends BlockSequencerStateManagerBase {
     override def processBlock(
         bug: BlockUpdateGenerator
-    ): Flow[Traced[BlockEvents], Traced[OrderedBlockUpdate], NotUsed] =
-      Flow[Traced[BlockEvents]].mapConcat(_ => Seq.empty)
+    ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed] =
+      Flow[BlockEvents].mapConcat(_ => Seq.empty)
 
     override def applyBlockUpdate(
         dbSequencerIntegration: SequencerIntegration

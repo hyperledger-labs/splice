@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -14,7 +14,6 @@ import com.digitalasset.canton.ledger.api.validation.FieldValidator.{
   validateOptional,
 }
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.{
-  disclosedContractsConflictingPayloads,
   invalidArgument,
   invalidField,
 }
@@ -57,22 +56,25 @@ object ValidateDisclosedContracts extends ValidateDisclosedContracts {
       disclosedContracts: Seq[LfFatContractInst]
   )(implicit
       errorLoggingContext: ErrorLoggingContext
-  ): Either[StatusRuntimeException, Unit] = {
-    val contractConflictingPayloads = disclosedContracts
-      .groupBy(_.contractId.coid)
-      .flatMap { case (id, contracts) =>
-        val duplicateContracts = contracts.distinct
-        if (duplicateContracts.sizeIs > 1)
-          Some(
-            (id, duplicateContracts.size.toLong, duplicateContracts.mkString(", "))
-          )
-        else None
-      }
-      .toList
-
-    if (contractConflictingPayloads.isEmpty) Right(())
-    else Left(disclosedContractsConflictingPayloads(contractConflictingPayloads))
-  }
+  ): Either[StatusRuntimeException, Unit] =
+    for {
+      _ <- disclosedContracts
+        .map(_.contractId)
+        .groupBy(identity)
+        .collectFirst {
+          case (contractId, occurrences) if occurrences.sizeIs > 1 => contractId.coid
+        }
+        .map(id => invalidArgument(s"Disclosed contracts contain duplicate contract id ($id)"))
+        .toLeft(())
+      _ <- disclosedContracts
+        .flatMap(_.contractKeyWithMaintainers)
+        .groupBy(identity)
+        .collectFirst {
+          case (key, occurrences) if occurrences.sizeIs > 1 => key
+        }
+        .map(key => invalidArgument(s"Disclosed contracts contain duplicate contract key ($key)"))
+        .toLeft(())
+    } yield ()
 
   private def validateContracts(
       disclosedContracts: Seq[ProtoDisclosedContract]

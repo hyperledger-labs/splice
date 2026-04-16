@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules
@@ -89,6 +89,8 @@ class PruningModuleTest extends AnyWordSpec with BftSequencerBaseTest {
       )(traceContext)
     ).thenReturn(() => AvailabilityStore.NumberOfRecords(10L))
 
+    when(outputStore.getLastConsecutiveBlock(traceContext)).thenReturn(() => Some(latestBlock))
+
     createPruningModule[ProgrammableUnitTestEnv](
       epochStore = epochStore,
       outputStore = outputStore,
@@ -135,9 +137,7 @@ class PruningModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           mock[OutputMetadataStore[ProgrammableUnitTestEnv]]
         val module = createPruningModule[ProgrammableUnitTestEnv](outputStore = outputStore)
 
-        when(outputStore.getLastBlockInLatestCompletedEpoch(traceContext)).thenReturn(() =>
-          Some(latestBlock)
-        )
+        when(outputStore.getLastConsecutiveBlock(traceContext)).thenReturn(() => Some(latestBlock))
 
         module.receiveInternal(
           Pruning.KickstartPruning(retentionPeriod, minNumberOfBlocksToKeep, None)
@@ -288,9 +288,7 @@ class PruningModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           availabilityStore = availabilityStore,
         )
 
-        when(outputStore.getLastBlockInLatestCompletedEpoch(traceContext)).thenReturn(() =>
-          Some(latestBlock)
-        )
+        when(outputStore.getLastConsecutiveBlock(traceContext)).thenReturn(() => Some(latestBlock))
 
         val requestPromise = Promise[String]()
 
@@ -364,9 +362,7 @@ class PruningModuleTest extends AnyWordSpec with BftSequencerBaseTest {
 
         val lowerBound = OutputMetadataStore.LowerBound(EpochNumber(5L), BlockNumber(50L))
         when(outputStore.getLowerBound()(traceContext)).thenReturn(() => Some(lowerBound))
-        when(outputStore.getLastBlockInLatestCompletedEpoch(traceContext)).thenReturn(() =>
-          Some(latestBlock)
-        )
+        when(outputStore.getLastConsecutiveBlock(traceContext)).thenReturn(() => Some(latestBlock))
 
         val requestPromise = Promise[BftPruningStatus]()
         module.receiveInternal(Pruning.PruningStatusRequest(requestPromise))

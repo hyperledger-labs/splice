@@ -142,7 +142,7 @@ function buildPackageConfigChanges(
     },
     {
       fieldName: 'packageConfigWallet',
-      label: 'Daml model version: wallet',
+      label: 'Daml model vVersion: wallet',
       currentValue: before?.wallet || '',
       newValue: after?.wallet || '',
     },

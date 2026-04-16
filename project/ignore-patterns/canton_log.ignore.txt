@@ -167,29 +167,4 @@ java.lang.IllegalStateException: cannot enqueue after timer shutdown
 # Sometimes we deliberately break sequencer connections in tests
 Connection has failed validation
 
-# During the LSU at upgrade time submissions time-out
-Submission timed out at
-
-# SV that joins late as part of the LSU test
-Missing successor information for the following sequencers.*sv4
-
-# We don't use the onboarding flag clearance atm.
-Skipping insertion of pending onboarding flag clearance operation as no party ID was provided
-
-# LSU SV4 migrates late
-SEQ::sv4.*Sequencer can't take requests because it is behind on processing events
-Sequencer can't take requests because it is behind on processing events.*sequencer=>sv4StandaloneSequencer
-Now retrying operation 'request current time.*participant=sv4Participant.*global-domain.*-2
-
-# Triggered by roll-forward LSU test
-No sequencer successor was found
-P2P connectivity is not ready
-Missing successor information for the following sequencers.*participant=aliceParticipant
-
-# LSU: submissions on the old physical synchronizer after the upgrade time has passed are rejected
-Request failed for server-DefaultSequencer-0.\n  GrpcRequestRefusedByServer: FAILED_PRECONDITION/SEQUENCER_SUBMISSION_AFTER_UPGRADE_TIME
-
-# TODO(DACH-NY/cn-test-failures#7920) Remove once Canton is fixed
-loadVettedPackages.*mismatch between reference and current state.*Map\(\)
-
 # Make sure to have a trailing newline

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -7,10 +7,15 @@ import cats.implicits.catsSyntaxOptionId
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
-import com.daml.tls.TlsServerConfig
+import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.auth.AsyncForwardingListener
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{AdminServerConfig, ApiLoggingConfig, CantonConfig}
+import com.digitalasset.canton.config.{
+  AdminServerConfig,
+  ApiLoggingConfig,
+  CantonConfig,
+  TlsServerConfig,
+}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
@@ -19,7 +24,6 @@ import com.digitalasset.canton.metrics.ActiveRequestsMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.tracing.TracingConfig.{BatchSpanProcessor, Exporter}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
-import com.digitalasset.canton.util.Mutex
 import com.google.common.io.BaseEncoding
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, Contexts, Metadata, ServerCall, ServerCallHandler, ServerInterceptor}
@@ -32,8 +36,8 @@ import io.opentelemetry.proto.trace.v1.Span
 import monocle.macros.syntax.lens.*
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, blocking}
 import scala.jdk.CollectionConverters.ListHasAsScala
 
 final case class OtlpSpan(traceId: String, spanId: String, parentSpanId: String, name: String)
@@ -44,25 +48,22 @@ class OtlpGrpcServer(protected val loggerFactory: NamedLoggerFactory)
 
   logger.info("Created Otlp Server")(TraceContext.empty)
   private val traceSpans: ListBuffer[Span] = ListBuffer[Span]()
-  private val lock = new Mutex()
 
-  def getSpans: Seq[OtlpSpan] = (lock
-    .exclusive(traceSpans.toSeq))
-    .map(span =>
-      OtlpSpan(
-        traceId = BaseEncoding.base16().lowerCase().encode(span.getTraceId.toByteArray),
-        spanId = BaseEncoding.base16().lowerCase().encode(span.getSpanId.toByteArray),
-        parentSpanId = BaseEncoding.base16().lowerCase().encode(span.getParentSpanId.toByteArray),
-        name = span.getName,
-      )
+  def getSpans: Seq[OtlpSpan] = blocking(synchronized(traceSpans.toSeq)).map(span =>
+    OtlpSpan(
+      traceId = BaseEncoding.base16().lowerCase().encode(span.getTraceId.toByteArray),
+      spanId = BaseEncoding.base16().lowerCase().encode(span.getSpanId.toByteArray),
+      parentSpanId = BaseEncoding.base16().lowerCase().encode(span.getParentSpanId.toByteArray),
+      name = span.getName,
     )
+  )
 
   override def `export`(
       request: ExportTraceServiceRequest,
       responseObserver: StreamObserver[ExportTraceServiceResponse],
   ): Unit = {
-    (
-      lock.exclusive(
+    blocking(
+      synchronized(
         traceSpans.addAll(
           request.getResourceSpansList.asScala
             .flatMap(_.getInstrumentationLibrarySpansList.asScala)
@@ -141,16 +142,18 @@ class UseOtlp(
 
     val serverBuilder = CantonServerBuilder
       .forConfig(
-        config = serverConfig,
-        executor = executionContext,
-        loggerFactory = loggerFactory,
+        serverConfig,
+        None,
+        executionContext,
+        loggerFactory,
         apiLoggingConfig = ApiLoggingConfig(messagePayloads = false),
-        tracing = TracingConfig(),
-        grpcMetrics = (
+        TracingConfig(),
+        (
           new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
           new ActiveRequestsMetrics(NoOpMetricsFactory, "test")(MetricsContext.Empty),
         ),
-        additionalInterceptors = Seq(new HeaderPrinter(loggerFactory)),
+        NoOpTelemetry,
+        Seq(new HeaderPrinter(loggerFactory)),
       )
       .addService(otlpServer.bindService)
     val server = serverBuilder.build.start()

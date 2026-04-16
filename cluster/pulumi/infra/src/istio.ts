@@ -9,6 +9,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
 import { mergeWith } from 'lodash';
 
 import {
@@ -99,33 +100,6 @@ function configureIstiod(
       // taken from https://github.com/istio/istio/issues/37682
       accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
       accessLogEncoding: 'JSON',
-      // Changing istio access log default format to include trace_id:
-      // - envoy access log configuration: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#config-access-log
-      // - w3c docs for trace context: https://www.w3.org/TR/trace-context/#header-name
-      accessLogFormat: JSON.stringify({
-        trace_id: '%REQ(traceparent)%',
-        authority: '%REQ(:AUTHORITY)%',
-        bytes_received: '%BYTES_RECEIVED%',
-        bytes_sent: '%BYTES_SENT%',
-        downstream_local_address: '%DOWNSTREAM_LOCAL_ADDRESS%',
-        downstream_remote_address: '%DOWNSTREAM_REMOTE_ADDRESS%',
-        duration: '%DURATION%',
-        method: '%REQ(:METHOD)%',
-        path: '%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%',
-        protocol: '%PROTOCOL%',
-        request_id: '%REQ(X-REQUEST-ID)%',
-        requested_server_name: '%REQUESTED_SERVER_NAME%',
-        response_code: '%RESPONSE_CODE%',
-        response_code_details: '%RESPONSE_CODE_DETAILS%',
-        response_flags: '%RESPONSE_FLAGS%',
-        start_time: '%START_TIME%',
-        upstream_cluster: '%UPSTREAM_CLUSTER%',
-        upstream_host: '%UPSTREAM_HOST%',
-        upstream_local_address: '%UPSTREAM_LOCAL_ADDRESS%',
-        upstream_service_time: '%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%',
-        user_agent: '%REQ(USER-AGENT)%',
-        x_forwarded_for: '%REQ(X-FORWARDED-FOR)%',
-      }),
       // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
       enablePrometheusMerge: false,
       defaultConfig: {
@@ -821,4 +795,110 @@ export function configureIstio(
     httpServiceName: 'istio-ingress',
     istioResource: gwSvc,
   };
+}
+
+export function istioMonitoring(
+  ingressNs: ExactNamespace,
+  dependsOn: pulumi.Resource[] = []
+): pulumi.Resource[] {
+  const svc = new ServiceMonitor(
+    'istiod-service-monitor',
+    {
+      istio: 'pilot',
+    },
+    'http-monitoring',
+    ingressNs.ns.metadata.name,
+    { dependsOn }
+  );
+
+  const sidecar = new PodMonitor(
+    `istio-sidecar-monitor`,
+    ingressNs.ns.metadata.name,
+    {
+      matchLabels: {
+        'security.istio.io/tlsMode': 'istio',
+      },
+      // specify the namespaces to monitor, to scrape only the istio-proxy sidecars used for our apps
+      namespaces: Array.from({ length: 16 }, (_, i) => `sv-${i + 1}`).concat([
+        'sv',
+        'splitwell',
+        'validator1',
+        'validator',
+      ]),
+      //https://github.com/istio/istio/blob/master/samples/addons/extras/prometheus-operator.yaml#L16
+      podMetricsEndpoints: [
+        {
+          port: 'http-envoy-prom',
+          path: '/stats/prometheus',
+          // keep only istio metrics, drop envoy metrics
+          metricRelabelings: [
+            {
+              sourceLabels: ['__name__'],
+              regex: 'istio_.*',
+              action: 'keep',
+            },
+            // drop instance label, we have the pod name
+            {
+              action: 'labeldrop',
+              regex: 'instance',
+            },
+          ],
+          relabelings: [
+            {
+              action: 'keep',
+              sourceLabels: ['__meta_kubernetes_pod_container_name'],
+              regex: 'istio-proxy',
+            },
+            {
+              action: 'replace',
+              regex: '(\\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})',
+              replacement: '[$2]:$1',
+              sourceLabels: [
+                '__meta_kubernetes_pod_annotation_prometheus_io_port',
+                '__meta_kubernetes_pod_ip',
+              ],
+              targetLabel: '__address__',
+            },
+            {
+              action: 'replace',
+              regex: '(\\d+);((([0-9]+?)(\\.|$)){4})',
+              replacement: '$2:$1',
+              sourceLabels: [
+                '__meta_kubernetes_pod_annotation_prometheus_io_port',
+                '__meta_kubernetes_pod_ip',
+              ],
+              targetLabel: '__address__',
+            },
+            {
+              action: 'labeldrop',
+              regex: '__meta_kubernetes_pod_label_(.+)',
+            },
+            {
+              sourceLabels: ['__meta_kubernetes_namespace'],
+              action: 'replace',
+              targetLabel: 'namespace',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      dependsOn,
+    }
+  );
+  const gateway = new PodMonitor(
+    `istio-gateway-monitor`,
+    ingressNs.ns.metadata.name,
+    {
+      matchLabels: {
+        istio: 'ingress',
+      },
+      podMetricsEndpoints: [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+      namespaces: [ingressNs.ns.metadata.name],
+    },
+    {
+      dependsOn,
+    }
+  );
+  return [svc, sidecar, gateway];
 }

@@ -157,39 +157,6 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListSvBftSequencersResponse"
 
-  /v0/roll-forward-lsu:
-    get:
-      tags: [internal, scan]
-      x-jvm-package: scan
-      operationId: "getRollForwardLsu"
-      description: |
-        Retrieve information on a roll-forward LSU
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetRollForwardLsuResponse"
-
-  /v0/active-synchronizer-serial:
-    get:
-      tags: [internal, scan]
-      x-jvm-package: scan
-      operationId: "getActivePhysicalSynchronizerSerial"
-      description: |
-        Get the current physical synchronizer serial as reported by the SV participant.
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetActivePhysicalSynchronizerSerialResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
@@ -477,44 +444,6 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v2/updates/hash/{hash}:
-    get:
-      tags: [external, scan]
-      x-jvm-package: scan
-      operationId: "getUpdateByHash"
-      description: |
-        Returns the update associated with the given hash of the prepared transaction.
-
-        This endpoint is not always BFT safe.
-        For transactions committed before a scan instance started indexing hashes, the instance will return a 404 error.
-        For transactions committed around the time different scans started indexing hashes,
-        some scan instances might return a 404 error while others return the matching update.
-
-        This is in contrast to the `v2/updates` and `v2/updates/{update_id}` endpoints, which are guaranteed to be always BFT safe.
-      parameters:
-        - name: "hash"
-          in: "path"
-          required: true
-          schema:
-            type: string
-        - name: "daml_value_encoding"
-          in: "query"
-          schema:
-            $ref: "#/components/schemas/DamlValueEncoding"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UpdateHistoryItemV2WithHash"
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
   /v0/state/acs/snapshot-timestamp:
     get:
       tags: [external, scan]
@@ -595,12 +524,11 @@ paths:
 
   /v0/state/acs:
     post:
-      deprecated: true
-      tags: [ deprecated ]
+      tags: [external, scan]
       x-jvm-package: scan
       operationId: "getAcsSnapshotAt"
       description: |
-        Deprecated. Please use /v1/state/acs instead. Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
       requestBody:
         required: true
         content:
@@ -614,37 +542,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcsResponse"
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
-  /v1/state/acs:
-    post:
-      tags: [ external, scan ]
-      x-jvm-package: scan
-      operationId: "getAcsSnapshotAtV1"
-      description: |
-        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
-        Unlike /v0/state/acs, every contract is identified by an (optional) update_id
-        (as opposed to the event ID in /v0/state/acs, which was not BFT-safe).
-        The update_id is the ID of the update in which the contract was created, and can be used to correlate with updates returned by /v2/updates.
-        For contracts created in an earlier migration ID, the update_id will be absent.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/AcsRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AcsResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -677,36 +574,9 @@ paths:
 
   /v0/holdings/state:
     post:
-      tags: [deprecated]
-      x-jvm-package: scan
-      operationId: "getHoldingsStateAt"
-      description: |
-        Deprecated. Please use /v1/holdings/state instead. Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/HoldingsStateRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AcsResponse"
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
-  /v1/holdings/state:
-    post:
       tags: [external, scan]
       x-jvm-package: scan
-      operationId: "getHoldingsStateAtV1"
+      operationId: "getHoldingsStateAt"
       description: |
         Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
       requestBody:
@@ -721,7 +591,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcsResponseV1"
+                $ref: "#/components/schemas/AcsResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -935,49 +805,6 @@ paths:
         return it; `featured_app_right` will be empty otherwise.
       parameters:
         - name: "provider_party_id"
-          in: "path"
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-
-  /v0/featured-apps/by-provider/{provider_party_id}:
-    get:
-      tags: [internal, scan]
-      x-jvm-package: scan
-      operationId: "listFeaturedAppRightsByProvider"
-      description: |
-        List all `FeaturedAppRight` contracts for the given provider.
-      parameters:
-        - name: "provider_party_id"
-          in: "path"
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
-
-  /v0/featured-apps/by-contract-id/{contract_id}:
-    get:
-      tags: [internal, scan]
-      x-jvm-package: scan
-      operationId: "lookupFeaturedAppRightByContractId"
-      description: |
-        Look up a `FeaturedAppRight` contract by its contract ID.
-        Returns `featured_app_right` if found, empty otherwise.
-      parameters:
-        - name: "contract_id"
           in: "path"
           required: true
           schema:
@@ -2189,11 +2016,11 @@ components:
             $ref: "#/components/schemas/SynchronizerBftSequencer"
     SynchronizerBftSequencer:
       type: object
-      required: ["serialId", "id", "p2pUrl"]
+      required: ["migrationId", "id", "p2pUrl"]
       properties:
-        serialId:
+        migrationId:
           description: |
-            The synchronizer serial corresponding to this sequencer.
+            The synchronizer migration id corresponding to this sequencer.
           type: integer
           format: int64
         id:
@@ -2229,13 +2056,6 @@ components:
         migrationId:
           description: |
             The synchronizer migration id corresponding to this sequencer.
-            Set to -1 if serial is set.
-          type: integer
-          format: int64
-        synchronizerSerial:
-          description: |
-            The synchronizer serial corresponding to this sequencer.
-            One of migrationId or serialId will be set.
           type: integer
           format: int64
         id:
@@ -2252,36 +2072,6 @@ components:
             Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
-    GetRollForwardLsuResponse:
-      type: object
-      properties:
-        rollForwardLsu:
-          description: "Info on a roll-forward LSU"
-          "$ref": "#/components/schemas/RollForwardLsu"
-    RollForwardLsu:
-      type: object
-      required:
-        - upgradeTime
-        - currentPhysicalSynchronizerId
-        - successorPhysicalSynchronizerId
-      properties:
-        upgradeTime:
-          description: The time at which to upgrade
-          type: string
-          format: date-time
-        currentPhysicalSynchronizerId:
-          type: string
-        successorPhysicalSynchronizerId:
-          type: string
-    GetActivePhysicalSynchronizerSerialResponse:
-      type: object
-      required: ["serial"]
-      properties:
-        serial:
-          description: |
-            The current physical synchronizer serial as reported by the SV participant.
-          type: integer
-          format: int64
     ListDsoScansResponse:
       type: object
       required: ["scans"]
@@ -2497,13 +2287,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
-    UpdateHistoryItemV2WithHash:
-      type: object
-      description: |
-        An individual item in the update history. May be a transaction or a contract reassignment.
-      oneOf:
-        - $ref: "#/components/schemas/UpdateHistoryTransactionV2WithHash"
-        - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItemV2:
       type: object
       description: |
@@ -2695,12 +2478,10 @@ components:
             $ref: "#/components/schemas/TreeEvent"
         external_transaction_hash:
           description: |
-            For an externally signed transaction, contains the external transaction hash
+            For transaction externally signed, contains the external transaction hash
             signed by the external party. Can be used to correlate an external submission with a committed transaction.
-            This field is conditionally omitted from JSON when null (see OmitNullString).
           type: string
-          x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
-    BaseUpdateHistoryTransaction:
+    UpdateHistoryTransactionV2:
       type: object
       required:
         - update_id
@@ -2758,31 +2539,11 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
-    UpdateHistoryTransactionV2:
-      allOf:
-        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
-        - type: object
-          properties:
-            external_transaction_hash:
-              description: |
-                For an externally signed transaction, contains the external transaction hash
-                signed by the external party. Can be used to correlate an external submission with a committed transaction.
-                This field is conditionally omitted from JSON when null (see OmitNullString).
-              type: string
-              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
-    UpdateHistoryTransactionV2WithHash:
-      allOf:
-        - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
-        - type: object
-          required:
-            - external_transaction_hash
-          properties:
-            external_transaction_hash:
-              description: |
-                For an externally signed transaction, contains the external transaction hash
-                signed by the external party. Can be used to correlate an external submission with a committed transaction.
-              type: string
-              x-scala-type: org.lfdecentralizedtrust.splice.http.OmitNullString
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
     TreeEvent:
       type: object
       description: |
@@ -2814,56 +2575,6 @@ components:
           description: |
             The ID of this particular event. Equal to the key of this element of
             the containing `events_by_id` if this is part of a `TreeEvent`.
-          type: string
-        contract_id:
-          description: |
-            The ID of the created contract.
-          type: string
-        template_id:
-          description: |
-            The template of the created contract.
-          type: string
-        package_name:
-          description: |
-            The package name of the created contract.
-          type: string
-        create_arguments:
-          description: |
-            The arguments that have been used to create the contract, in the
-            form of JSON representation of a Daml record.
-          type: object
-        created_at:
-          description: |
-            Ledger effective time of the transaction that created the contract.
-          type: string
-          format: date-time
-        signatories:
-          description: |
-            Signatories to the contract, in the form of party IDs.
-          type: array
-          items:
-            type: string
-        observers:
-          description: |
-            Observers to the contract, in the form of party IDs.
-          type: array
-          items:
-            type: string
-    ActiveContract:
-      type: object
-      required:
-        - contract_id
-        - template_id
-        - package_name
-        - create_arguments
-        - created_at
-        - signatories
-        - observers
-      properties:
-        created_in_update_id:
-          description: |
-            The id of the update in which this contract was created.
-            Optional and will be absent for contracts created in prior migration IDs.
           type: string
         contract_id:
           description: |
@@ -3163,36 +2874,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreatedEvent"
-        next_page_token:
-          type: integer
-          format: int64
-          description: |
-            When requesting the next page of results, pass this as `after`
-            to the `AcsRequest` or `HoldingsStateRequest`.
-            Will be absent when there are no more pages.
-
-    AcsResponseV1:
-      type: object
-      required:
-        - record_time
-        - migration_id
-        - created_events
-      properties:
-        record_time:
-          description: The same `record_time` as in the request.
-          type: string
-          format: date-time
-        migration_id:
-          description: The same `migration_id` as in the request.
-          type: integer
-          format: int64
-        created_events:
-          description: |
-            Up to `page_size` contracts in the ACS.
-            `create_arguments` are always encoded as `compact_json`.
-          type: array
-          items:
-            $ref: "#/components/schemas/ActiveContract"
         next_page_token:
           type: integer
           format: int64
@@ -4471,3 +4152,4 @@ components:
           description: |
             The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
+

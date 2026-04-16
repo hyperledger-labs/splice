@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
@@ -6,10 +6,11 @@ package com.digitalasset.canton.integration.tests.upgrading
 import com.daml.ledger.api.v2.value.Identifier.toJavaProto
 import com.daml.ledger.javaapi.data.DisclosedContract
 import com.digitalasset.canton.admin.api.client.data.TemplateId.fromJavaIdentifier
+import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.damltests.upgrade.v1.java as v1
 import com.digitalasset.canton.damltests.upgrade.v1.java.upgrade.Quote
 import com.digitalasset.canton.damltests.upgrade.v2.java as v2
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -303,8 +304,7 @@ sealed abstract class UpgradePackageAvailabilityIntegrationTest
 
 }
 
-final class BftOrderingUpgradePackageAvailabilityIntegrationTestPostgres
+final class ReferenceUpgradePackageAvailabilityIntegrationTestPostgres
     extends UpgradePackageAvailabilityIntegrationTest {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[Postgres](loggerFactory))
 }

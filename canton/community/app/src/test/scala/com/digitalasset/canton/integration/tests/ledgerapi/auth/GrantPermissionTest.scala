@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.auth
@@ -34,7 +34,7 @@ trait GrantPermissionTest {
   }
 
   private def grantPermissionCallWithIdpUser(
-      rights: Vector[ums.Right],
+      rights: Vector[ums.Right.Kind],
       identityProviderId: String,
       tokenIssuer: Option[String],
       secret: Option[String] = None,
@@ -43,7 +43,7 @@ trait GrantPermissionTest {
       userId = UUID.randomUUID().toString,
       identityProviderId = identityProviderId,
       tokenIssuer = tokenIssuer,
-      rights = rights,
+      rights = rights.map(ums.Right(_)),
       secret = secret,
     ).flatMap { case (_, context) =>
       serviceCallWithGrantPermission(context, adminPermission)

@@ -14,7 +14,7 @@ $(dir)/.build: $(dir)/package.json $(dir)/package-lock.json
 
 .PHONY: $(dir)/clean
 $(dir)/clean:
-	cd $(@D) && rm -rf node_modules .build
+	cd $(@D) && rm -rfv node_modules .build
 
 .PHONY: $(dir)/format
 $(dir)/format: $(dir)/.build
@@ -24,7 +24,7 @@ $(dir)/format: $(dir)/.build
 $(dir)/unit-test: $(dir)/.build
 	cd $(@D) && npm run test
 
-pulumi_projects ::= operator deployment gcp infra observability canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell sv
+pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell sv
 
 .PHONY: $(dir)/test $(dir)/update-expected
 $(dir)/test: $(dir)/unit-test $(foreach project,$(pulumi_projects),$(dir)/$(project)/test) $(deployment_dir)/check-resolved-config

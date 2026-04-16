@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -34,20 +34,13 @@ import com.digitalasset.canton.platform.apiserver.services.admin.PackageUpgradeV
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{DefaultTestIdentities, SynchronizerId}
 import com.digitalasset.canton.util.{BinaryFileUtil, MonadUtil}
-import com.digitalasset.canton.{
-  BaseTest,
-  HasActorSystem,
-  HasExecutionContext,
-  HasExecutorService,
-  LfPackageId,
-}
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext, LfPackageId}
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.archive.testing.Encode
 import com.digitalasset.daml.lf.archive.{DamlLf, Dar as LfDar, DarParser, DarWriter}
 import com.digitalasset.daml.lf.data.Bytes
-import com.digitalasset.daml.lf.engine.EngineLoggingConfig
-import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
+import com.digitalasset.daml.lf.language.{Ast, LanguageMajorVersion, LanguageVersion}
 import com.digitalasset.daml.lf.testing.parser.Implicits.SyntaxHelper
 import com.digitalasset.daml.lf.testing.parser.ParserParameters
 import com.google.protobuf.ByteString
@@ -56,7 +49,6 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import java.io.File
 import java.nio.file.{Files, Paths}
-import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.Future
 import scala.util.Using
 
@@ -101,8 +93,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     extends AsyncWordSpec
     with BaseTest
     with HasActorSystem
-    with HasExecutionContext
-    with HasExecutorService {
+    with HasExecutionContext {
 
   private val examplePackages: List[Archive] = readCantonExamples()
   private val adminWorkflowPackages: List[Archive] = readPingAdminWorkflow()
@@ -113,11 +104,25 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
   protected class Env(now: CantonTimestamp) {
     val packageStore = new InMemoryDamlPackageStore(loggerFactory)
     private val processingTimeouts = ProcessingTimeout()
+    val packageDependencyResolver =
+      new PackageDependencyResolver.Impl(
+        participantId,
+        packageStore,
+        processingTimeouts,
+        loggerFactory,
+      )
+    private val engine =
+      DAMLe.newEngine(
+        enableLfDev = false,
+        enableLfBeta = false,
+        enableStackTraces = false,
+        paranoidMode = true,
+      )
+
     val clock = new SimClock(start = now, loggerFactory = loggerFactory)
-    implicit val scheduler: ScheduledExecutorService = scheduledExecutor()
     val mutablePackageMetadataView = new MutablePackageMetadataViewImpl(
       clock,
-      packageStore,
+      packageDependencyResolver.damlPackageStore,
       new PackageUpgradeValidator(CachingConfigs.defaultPackageUpgradeCache, loggerFactory),
       loggerFactory,
       PackageMetadataViewConfig(),
@@ -126,21 +131,11 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
       exitOnFatalFailures = false,
     )
     mutablePackageMetadataView.refreshState.futureValueUS
-    private val engine =
-      DAMLe.newEngine(
-        enableLfDev = false,
-        enableLfBeta = false,
-        enableStackTraces = false,
-        paranoidMode = true,
-        submissionPhaseLogging = EngineLoggingConfig(),
-        validationPhaseLogging = EngineLoggingConfig(),
-        loggerFactory = loggerFactory,
-      )
-
     val sut: PackageService = PackageService(
       clock = clock,
       engine = engine,
       mutablePackageMetadataView = mutablePackageMetadataView,
+      packageDependencyResolver = packageDependencyResolver,
       enableStrictDarValidation = enableStrictDarValidation,
       loggerFactory = loggerFactory,
       metrics = ParticipantTestMetrics,
@@ -165,7 +160,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     examplePackages.map(DamlPackageStore.readPackageId).toSet
 
   protected def mainPkg(
-      lfVersion: LanguageVersion = LanguageVersion.latestStableLfVersion
+      lfVersion: LanguageVersion = LanguageVersion.defaultOrLatestStable(LanguageMajorVersion.V2)
   ): Archive =
     createLfArchiveForLf(lfVersion) { implicit parserParameters =>
       p"""
@@ -176,7 +171,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     }
 
   protected def extraPkg(
-      lfVersion: LanguageVersion = LanguageVersion.latestStableLfVersion
+      lfVersion: LanguageVersion = LanguageVersion.defaultOrLatestStable(LanguageMajorVersion.V2)
   ): Archive =
     createLfArchiveForLf(lfVersion) { implicit parserParameters =>
       p"""
@@ -187,7 +182,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     }
 
   protected def missingPkg(
-      lfVersion: LanguageVersion = LanguageVersion.latestStableLfVersion
+      lfVersion: LanguageVersion = LanguageVersion.defaultOrLatestStable(LanguageMajorVersion.V2)
   ): Archive =
     createLfArchiveForLf(lfVersion) { implicit parserParameters =>
       p"""
@@ -373,12 +368,15 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
             expectedMainPackageId = None,
           )
           .valueOrFail("appending dar")
+        deps <- packageDependencyResolver.packageDependencies(mainPackageId).value
       } yield {
         // test for explict dependencies
-        val loaded = mutablePackageMetadataView.getSnapshot
-          .allDependenciesRecursively(Set(mainPackageId))
-        // all direct dependencies should be part of this
-        (dependencyIds -- loaded) shouldBe empty
+        deps match {
+          case Left((value, _)) => fail(value)
+          case Right(loaded) =>
+            // all direct dependencies should be part of this
+            (dependencyIds -- loaded) shouldBe empty
+        }
       }).unwrap.map(_.failOnShutdown)
     }
 
@@ -478,7 +476,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     "requested by PackageService.removeDar" should {
       "reject the request with an error" in withEnv(
         rejectOnMissingDar(
-          _.removeDar(unknownDarId, connectedSynchronizers = Set.empty),
+          _.removeDar(unknownDarId, psids = Set.empty),
           unknownDarId,
           "DAR archive removal",
         )
@@ -544,7 +542,7 @@ abstract class BasePackageServiceTest(enableStrictDarValidation: Boolean)
     }
 
   private def createLfArchive(defn: ParserParameters[?] => Ast.Package): Archive = {
-    val lfVersion = LanguageVersion.latestStableLfVersion
+    val lfVersion = LanguageVersion.defaultOrLatestStable(LanguageMajorVersion.V2)
     createLfArchiveForLf(lfVersion)(defn)
   }
 

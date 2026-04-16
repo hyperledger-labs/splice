@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -6,12 +6,7 @@ package com.digitalasset.canton.synchronizer.sequencer
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.sequencing.protocol.{
-  SequencerDeliverError,
-  SequencerErrors,
-  SignedContent,
-  SubmissionRequest,
-}
+import com.digitalasset.canton.sequencing.protocol.{SignedContent, SubmissionRequest}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -25,10 +20,7 @@ object SendDecision {
   case object Process extends SendDecision
 
   /** Immediately reject the [[SubmissionRequest]] and return a [[protocol.SendAsyncError]] */
-  final case class Reject(
-      error: SequencerDeliverError =
-        SequencerErrors.InternalTesting("Message rejected by send policy.")
-  ) extends SendDecision
+  case object Reject extends SendDecision
 
   /** Drop the submission request but provide a successful [[protocol.SendAsyncError]] emulating the
     * send getting lost

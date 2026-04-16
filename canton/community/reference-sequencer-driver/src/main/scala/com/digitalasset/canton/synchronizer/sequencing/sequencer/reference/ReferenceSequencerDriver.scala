@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.sequencer.reference
@@ -41,7 +41,7 @@ import com.digitalasset.canton.synchronizer.sequencing.sequencer.reference.store
 }
 import com.digitalasset.canton.time.TimeProvider
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.PekkoUtil
+import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
 import com.digitalasset.canton.{RichGeneratedMessage, config}
 import com.google.protobuf.ByteString
 import io.grpc.ServerServiceDefinition
@@ -68,29 +68,17 @@ class ReferenceSequencerDriver(
     with NamedLogging
     with FlagCloseableAsync {
 
-  private lazy val ((sendQueue, tickKillSwitch), done) = {
+  private lazy val (sendQueue, done) = {
     implicit val errorLoggingCtx: ErrorLoggingContext = errorLoggingContext(TraceContext.empty)
-
-    val tickSource =
-      (config.emptyBlockIntervalMillis match {
-        case Some(interval) =>
-          Source.tick(
-            interval.millis,
-            interval.millis,
-            TimestampedRequest.Tick,
-          )
-        case None =>
-          Source.empty[Traced[TimestampedRequest]]
-      }).viaMat(KillSwitches.single)(Keep.right)
 
     PekkoUtil.runSupervised(
       Source
-        .queue[Traced[TimestampedRequest]](bufferSize = config.bufferSize)
-        .mergeMat(tickSource)(Keep.both)
+        .queue[Traced[TimestampedRequest]](bufferSize = 100)
         .groupedWithin(n = config.maxBlockSize, d = config.maxBlockCutMillis.millis)
         .map { requests =>
           implicit val traceContext: TraceContext =
             TraceContext.ofBatch("reference-driver-requests-batch")(requests)(logger)
+          logger.debug("Storing batch of requests")
           traceContext -> batchRequests(
             sequencerId,
             timeProvider.nowInMicrosecondsSinceEpoch,
@@ -99,7 +87,7 @@ class ReferenceSequencerDriver(
             traceContext,
           )
         }
-        .mapAsync(parallelism = config.writeParallelism) { case (tc, req) =>
+        .map { case (tc, req) =>
           implicit val traceContext: TraceContext = tc
           store
             .insertRequest(
@@ -110,7 +98,6 @@ class ReferenceSequencerDriver(
                 s"Stored batch of requests"
               )
             )
-            .unwrap
         }
         .toMat(Sink.ignore)(Keep.both),
       errorLogMessagePrefix = "Fatally failed to handle state changes",
@@ -155,7 +142,6 @@ class ReferenceSequencerDriver(
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*
     Seq[AsyncOrSyncCloseable](
-      SyncCloseable("tickKillSwitch", tickKillSwitch.shutdown()),
       SyncCloseable("sendQueue", sendQueue.complete()),
       AsyncCloseable("done", done, timeouts.closing),
       SyncCloseable("store", store.close()),
@@ -180,7 +166,8 @@ class ReferenceSequencerDriver(
       tag: String,
       body: ByteString,
   )(implicit
-      traceContext: TraceContext
+      errorLoggingContext: ErrorLoggingContext,
+      traceContext: TraceContext,
   ): Unit = {
     val microsecondsSinceEpoch = timeProvider.nowInMicrosecondsSinceEpoch
     sendQueue
@@ -192,8 +179,11 @@ class ReferenceSequencerDriver(
           s"enqueued reference sequencer store request with tag $tag and sequencing time (ms since epoch) $microsecondsSinceEpoch"
         )
       case QueueOfferResult.Dropped =>
-        logger.warn(
-          s"Silently dropped send to reference store with tag $tag and sequencing time (ms since epoch) $microsecondsSinceEpoch due to send queue being overloaded"
+        // This should not happen
+        ErrorUtil.internalError(
+          new IllegalStateException(
+            s"dropped reference store request with tag $tag and sequencing time (ms since epoch) $microsecondsSinceEpoch"
+          )
         )
       case _: QueueCompletionResult =>
         logger.debug(
@@ -210,28 +200,18 @@ object ReferenceSequencerDriver {
     *   storage configuration for requests storage
     * @param pollInterval
     *   how often to poll for new blocks in blocks subscription
-    * @param emptyBlockIntervalMillis
-    *   if defined, the driver will emit empty blocks at least every emptyBlockIntervalMillis should
-    *   there be no incoming requests
     */
   final case class Config[StorageConfigT <: StorageConfig](
       storage: StorageConfigT,
       pollInterval: config.NonNegativeFiniteDuration =
         config.NonNegativeFiniteDuration.ofMillis(100),
       logQueryCost: Option[QueryCostMonitoringConfig] = None,
-      bufferSize: Int = 5000,
       maxBlockSize: Int = 500,
       maxBlockCutMillis: Int = 1,
       maxQueryBlockCount: Int = 100,
-      writeParallelism: Int = 1,
-      emptyBlockIntervalMillis: Option[Int] = Some(500),
   )
 
   final case class TimestampedRequest(tag: String, body: ByteString, microsecondsSinceEpoch: Long)
-  private object TimestampedRequest {
-    val Tick: Traced[TimestampedRequest] =
-      Traced(TimestampedRequest("tick", ByteString.EMPTY, 0L))(TraceContext.empty)
-  }
 
   private def batchRequests(
       sequencerId: String,
@@ -245,7 +225,7 @@ object ReferenceSequencerDriver {
       TracedBatchedBlockOrderingRequests
         .of(
           batchTraceparent,
-          requests.filterNot(_ == TimestampedRequest.Tick).map { case traced @ Traced(request) =>
+          requests.map { case traced @ Traced(request) =>
             val requestTraceparent =
               traced.traceContext.asW3CTraceContext.map(_.parent).getOrElse("")
             TracedBlockOrderingRequest(

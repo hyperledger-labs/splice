@@ -1,10 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.version
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.{UseH2, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -20,7 +21,7 @@ class FailingMinimumHandshakeIntegrationTestH2
     extends CommunityIntegrationTest
     with SharedEnvironment {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   private lazy val participantVersion = Some(
     ParticipantProtocolVersion(TestProtocolVersions.UnreleasedValidPV)

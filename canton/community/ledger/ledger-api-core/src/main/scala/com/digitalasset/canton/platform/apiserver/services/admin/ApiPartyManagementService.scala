@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
@@ -31,15 +31,12 @@ import com.daml.logging.LoggingContext
 import com.daml.nonempty.NonEmpty
 import com.daml.platform.v1.page_tokens.ListPartiesPageTokenPayload
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.auth.AuthorizationChecksErrors
-import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.v30.{SigningKeyScheme, SigningKeyUsage}
-import com.digitalasset.canton.crypto.{Signature, SigningKeysWithThreshold, SigningPublicKey, v30}
+import com.digitalasset.canton.crypto.{Signature, SigningPublicKey, v30}
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
-import com.digitalasset.canton.ledger.api.validation.FieldValidator.{requireParty, *}
-import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArgument
+import com.digitalasset.canton.ledger.api.validation.FieldValidator.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
 import com.digitalasset.canton.ledger.api.validation.{CryptoValidator, ValidationErrors}
 import com.digitalasset.canton.ledger.api.{
@@ -90,6 +87,7 @@ import com.digitalasset.canton.platform.apiserver.update.PartyRecordUpdateMapper
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.PositiveTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
@@ -179,70 +177,50 @@ private[apiserver] final class ApiPartyManagementService private (
       }
     }
 
-  private def parsePartyFilter(
-      unsafeString: String
-  )(implicit traceContext: TraceContext): Either[StatusRuntimeException, Option[String185]] = if (
-    unsafeString.isEmpty
-  )
-    Either.right(None)
-  else
-    (for {
-      validated <- Ref.Party.fromString(unsafeString)
-      limited <- String185.create(validated)
-    } yield Some(limited)).leftMap(err =>
-      RequestValidationErrors.InvalidField.Reject("filterString", err).asGrpcError
-    )
-
   override def listKnownParties(
       request: ListKnownPartiesRequest
   ): Future[ListKnownPartiesResponse] = {
     implicit val loggingContext =
       LoggingContextWithTrace(loggerFactory, telemetry)
-    val ListKnownPartiesRequest(pageToken, pageSize, identityProviderId, filterString) = request
+
     logger.info("Listing known parties.")
     withValidation(
       for {
-        fromExcl <- decodePartyFromPageToken(pageToken)
+        fromExcl <- decodePartyFromPageToken(request.pageToken)
         _ <- Either.cond(
-          pageSize >= 0,
-          pageSize,
+          request.pageSize >= 0,
+          request.pageSize,
           RequestValidationErrors.InvalidArgument
             .Reject("Page size must be non-negative")
             .asGrpcError,
         )
         _ <- Either.cond(
-          pageSize <= maxPartiesPageSize.value,
-          pageSize,
+          request.pageSize <= maxPartiesPageSize.value,
+          request.pageSize,
           RequestValidationErrors.InvalidArgument
             .Reject(s"Page size must not exceed the server's maximum of $maxPartiesPageSize")
             .asGrpcError,
         )
         identityProviderId <- optionalIdentityProviderId(
-          identityProviderId,
+          request.identityProviderId,
           "identity_provider_id",
         )
-        pageSizeOrDefault =
-          if (pageSize == 0) maxPartiesPageSize.value
-          else pageSize
-        filterStringParsed <- parsePartyFilter(filterString)
+        pageSize =
+          if (request.pageSize == 0) maxPartiesPageSize.value
+          else request.pageSize
       } yield {
-        (fromExcl, pageSizeOrDefault, identityProviderId, filterStringParsed)
+        (fromExcl, pageSize, identityProviderId)
       }
-    ) { case (fromExcl, pageSizeOrDefault, identityProviderId, filterStringParsed) =>
+    ) { case (fromExcl, pageSize, identityProviderId) =>
       for {
-        partyDetailsSeq <- partyManagementService.listKnownParties(
-          fromExcl,
-          filterStringParsed,
-          pageSizeOrDefault,
-        )
+        partyDetailsSeq <- partyManagementService.listKnownParties(fromExcl, pageSize)
         partyRecords <- fetchPartyRecords(partyDetailsSeq)
       } yield {
         val protoDetails = partyDetailsSeq
           .zip(partyRecords)
           .map(blindAndConvertToProto(identityProviderId))
         val lastParty =
-          if (partyDetailsSeq.sizeIs < pageSizeOrDefault) None
-          else partyDetailsSeq.lastOption.map(_.party)
+          if (partyDetailsSeq.sizeIs < pageSize) None else partyDetailsSeq.lastOption.map(_.party)
         ListKnownPartiesResponse(protoDetails, encodeNextPageToken(lastParty))
       }
     }
@@ -267,7 +245,7 @@ private[apiserver] final class ApiPartyManagementService private (
       CommonErrors.RequestAlreadyInFlight
         .Reject(
           requestId = key.submissionId,
-          details = s"Party ${key.partyId} is in the process of being allocated on this node.",
+          details = s"Party ${key.party} is in the process of being allocated on this node.",
         )
         .asGrpcError
   }
@@ -304,12 +282,12 @@ private[apiserver] final class ApiPartyManagementService private (
           )
           _ <- requireEmptyString(
             metadata.resourceVersion,
-            "local_metadata.resource_version",
+            "party_details.local_metadata.resource_version",
           )
           annotations <- verifyMetadataAnnotations(
             metadata.annotations,
             allowEmptyValues = false,
-            "local_metadata.annotations",
+            "party_details.local_metadata.annotations",
           )
           identityProviderId <- optionalIdentityProviderId(
             request.identityProviderId,
@@ -317,14 +295,11 @@ private[apiserver] final class ApiPartyManagementService private (
           )
           synchronizerIdO <- optionalSynchronizerId(request.synchronizerId, "synchronizer_id")
           userId <- optionalUserId(request.userId, "user_id")
-          partyName = partyIdHintO.getOrElse(generatePartyName)
-          partyId <- UniqueIdentifier
-            .create(partyName, syncService.participantId.namespace)
-            .map(PartyId(_))
-            .leftMap(err => invalidArgument(s"Invalid party ID: $err"))
-        } yield (partyId, annotations, identityProviderId, synchronizerIdO, userId)
-      } { case (partyId, annotations, identityProviderId, synchronizerIdO, userId) =>
-        val trackerKey = submissionIdGenerator(partyId.toLf, AuthorizationLevel.Submission)
+
+        } yield (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId)
+      } { case (partyIdHintO, annotations, identityProviderId, synchronizerIdO, userId) =>
+        val partyName = partyIdHintO.getOrElse(generatePartyName)
+        val trackerKey = submissionIdGenerator(partyName, AuthorizationLevel.Submission)
         withEnrichedLoggingContext(logging.submissionId(trackerKey.submissionId)) {
           implicit loggingContext =>
             pendingPartyAllocations.withUser(userId) { outstandingCalls =>
@@ -336,10 +311,6 @@ private[apiserver] final class ApiPartyManagementService private (
                   outstandingCalls,
                   authenticatedUserContextF,
                 )
-                _ <- verifyPartyIsNonExistentOrInIdp(
-                  identityProviderId,
-                  partyId.toLf,
-                )
                 allocated <- partyAllocationTracker
                   .track(
                     trackerKey,
@@ -347,7 +318,7 @@ private[apiserver] final class ApiPartyManagementService private (
                   ) { _ =>
                     for {
                       result <- syncService.allocateParty(
-                        partyId,
+                        partyName,
                         trackerKey.submissionId,
                         synchronizerIdO,
                         externalPartyOnboardingDetails = None,
@@ -356,6 +327,10 @@ private[apiserver] final class ApiPartyManagementService private (
                     } yield ()
                   }
                   .transform(alreadyExistsError(trackerKey.submissionId, loggingContext))
+                _ <- verifyPartyIsNonExistentOrInIdp(
+                  identityProviderId,
+                  allocated.partyDetails.party,
+                )
                 existingPartyRecord <- partyRecordStore.getPartyRecordO(
                   allocated.partyDetails.party
                 )
@@ -461,122 +436,129 @@ private[apiserver] final class ApiPartyManagementService private (
   override def updatePartyDetails(
       request: UpdatePartyDetailsRequest
   ): Future[UpdatePartyDetailsResponse] = {
-    implicit val loggingContext: LoggingContextWithTrace =
-      LoggingContextWithTrace(loggerFactory, telemetry)
-    implicit val errorLoggingContext: ErrorLoggingContext =
-      ErrorLoggingContext(logger, loggingContext)
-    withValidation {
-      for {
-        partyDetails <- requirePresence(
-          request.partyDetails,
-          "party_details",
-        )
-        party <- requireParty(partyDetails.party)
-        metadata = partyDetails.localMetadata.getOrElse(
-          ProtoObjectMeta(
-            resourceVersion = "",
-            annotations = Map.empty,
+    val submissionId = submissionIdGenerator(
+      request.partyDetails.fold("")(_.party),
+      AuthorizationLevel.Submission,
+    ).submissionId
+    withEnrichedLoggingContext(telemetry)(
+      logging.submissionId(submissionId)
+    ) { implicit loggingContext =>
+      implicit val errorLoggingContext: ErrorLoggingContext =
+        ErrorLoggingContext(logger, loggingContext)
+      withValidation {
+        for {
+          partyDetails <- requirePresence(
+            request.partyDetails,
+            "party_details",
           )
-        )
-        resourceVersionNumberO <- optionalString(metadata.resourceVersion)(
-          requireResourceVersion(
-            _,
-            "party_details.local_metadata",
+          party <- requireParty(partyDetails.party)
+          metadata = partyDetails.localMetadata.getOrElse(
+            ProtoObjectMeta(
+              resourceVersion = "",
+              annotations = Map.empty,
+            )
           )
-        )
-        annotations <- verifyMetadataAnnotations(
-          metadata.annotations,
-          allowEmptyValues = true,
-          "party_details.local_metadata.annotations",
-        )
-        updateMask <- requirePresence(
-          request.updateMask,
-          "update_mask",
-        )
-        identityProviderId <- optionalIdentityProviderId(
-          partyDetails.identityProviderId,
-          "identity_provider_id",
-        )
-        partyRecord = PartyDetails(
-          party = party,
-          isLocal = partyDetails.isLocal,
-          metadata = ObjectMeta(
-            resourceVersionO = resourceVersionNumberO,
-            annotations = annotations,
-          ),
-          identityProviderId = identityProviderId,
-        )
-      } yield (partyRecord, updateMask)
-    } { case (partyRecord, updateMask) =>
-      for {
-        _ <- identityProviderExistsOrError(partyRecord.identityProviderId)
-        _ = logger.info(
-          s"Updating party: ${request.getPartyDetails.party}, ${loggingContext.serializeFiltered("submissionId")}."
-        )
-        partyDetailsUpdate: PartyDetailsUpdate <- handleUpdatePathResult(
-          party = partyRecord.party,
-          PartyRecordUpdateMapper.toUpdate(
-            apiObject = partyRecord,
-            updateMask = updateMask,
-          ),
-        )
-        fetchedPartyDetailsO <- partyManagementService
-          .getParties(parties = Seq(partyRecord.party))
-          .map(_.headOption)
-        fetchedPartyDetails <- fetchedPartyDetailsO match {
-          case Some(partyDetails) => Future.successful(partyDetails)
-          case None =>
-            Future.failed(
-              PartyManagementServiceErrors.PartyNotFound
-                .Reject(
-                  operation = "updating a party record",
-                  party = partyRecord.party,
-                )
-                .asGrpcError
+          resourceVersionNumberO <- optionalString(metadata.resourceVersion)(
+            requireResourceVersion(
+              _,
+              "party_details.local_metadata",
             )
-        }
-        partyRecordUpdate: PartyRecordUpdate <- {
-          if (partyDetailsUpdate.isLocalUpdate.exists(_ != fetchedPartyDetails.isLocal)) {
-            Future.failed(
-              PartyManagementServiceErrors.InvalidUpdatePartyDetailsRequest
-                .Reject(
-                  party = partyRecord.party,
-                  reason = s"Update request attempted to modify not-modifiable 'is_local' attribute",
-                )
-                .asGrpcError
-            )
-          } else {
-            // NOTE: In the current implementation (as of 2022.10.13) a no-op update request
-            // will still cause an update of the resourceVersion's value.
-            Future.successful(
-              PartyRecordUpdate(
-                party = partyDetailsUpdate.party,
-                metadataUpdate = partyDetailsUpdate.metadataUpdate,
-                identityProviderId = partyRecord.identityProviderId,
+          )
+          annotations <- verifyMetadataAnnotations(
+            metadata.annotations,
+            allowEmptyValues = true,
+            "party_details.local_metadata.annotations",
+          )
+          updateMask <- requirePresence(
+            request.updateMask,
+            "update_mask",
+          )
+          identityProviderId <- optionalIdentityProviderId(
+            partyDetails.identityProviderId,
+            "identity_provider_id",
+          )
+          partyRecord = PartyDetails(
+            party = party,
+            isLocal = partyDetails.isLocal,
+            metadata = ObjectMeta(
+              resourceVersionO = resourceVersionNumberO,
+              annotations = annotations,
+            ),
+            identityProviderId = identityProviderId,
+          )
+        } yield (partyRecord, updateMask)
+      } { case (partyRecord, updateMask) =>
+        for {
+          _ <- identityProviderExistsOrError(partyRecord.identityProviderId)
+          _ = logger.info(
+            s"Updating party: ${request.getPartyDetails.party}, ${loggingContext.serializeFiltered("submissionId")}."
+          )
+          partyDetailsUpdate: PartyDetailsUpdate <- handleUpdatePathResult(
+            party = partyRecord.party,
+            PartyRecordUpdateMapper.toUpdate(
+              apiObject = partyRecord,
+              updateMask = updateMask,
+            ),
+          )
+          fetchedPartyDetailsO <- partyManagementService
+            .getParties(parties = Seq(partyRecord.party))
+            .map(_.headOption)
+          fetchedPartyDetails <- fetchedPartyDetailsO match {
+            case Some(partyDetails) => Future.successful(partyDetails)
+            case None =>
+              Future.failed(
+                PartyManagementServiceErrors.PartyNotFound
+                  .Reject(
+                    operation = "updating a party record",
+                    party = partyRecord.party,
+                  )
+                  .asGrpcError
               )
-            )
           }
-        }
-        _ <- verifyPartyIsNonExistentOrInIdp(
-          partyRecordUpdate.identityProviderId,
-          partyRecordUpdate.party,
-        )
-        updatedPartyRecordResult <- partyRecordStore.updatePartyRecord(
-          partyRecordUpdate = partyRecordUpdate,
-          ledgerPartyIsLocal = fetchedPartyDetailsO.exists(_.isLocal),
-        )
-        updatedPartyRecord: PartyRecord <- handlePartyRecordStoreResult(
-          "updating a participant party record"
-        )(updatedPartyRecordResult)
-      } yield UpdatePartyDetailsResponse(
-        Some(
-          toProtoPartyDetails(
-            partyDetails = fetchedPartyDetails,
-            metadataO = Some(updatedPartyRecord.metadata),
-            identityProviderId = Some(updatedPartyRecord.identityProviderId),
+          partyRecordUpdate: PartyRecordUpdate <- {
+            if (partyDetailsUpdate.isLocalUpdate.exists(_ != fetchedPartyDetails.isLocal)) {
+              Future.failed(
+                PartyManagementServiceErrors.InvalidUpdatePartyDetailsRequest
+                  .Reject(
+                    party = partyRecord.party,
+                    reason =
+                      s"Update request attempted to modify not-modifiable 'is_local' attribute",
+                  )
+                  .asGrpcError
+              )
+            } else {
+              // NOTE: In the current implementation (as of 2022.10.13) a no-op update request
+              // will still cause an update of the resourceVersion's value.
+              Future.successful(
+                PartyRecordUpdate(
+                  party = partyDetailsUpdate.party,
+                  metadataUpdate = partyDetailsUpdate.metadataUpdate,
+                  identityProviderId = partyRecord.identityProviderId,
+                )
+              )
+            }
+          }
+          _ <- verifyPartyIsNonExistentOrInIdp(
+            partyRecordUpdate.identityProviderId,
+            partyRecordUpdate.party,
+          )
+          updatedPartyRecordResult <- partyRecordStore.updatePartyRecord(
+            partyRecordUpdate = partyRecordUpdate,
+            ledgerPartyIsLocal = fetchedPartyDetailsO.exists(_.isLocal),
+          )
+          updatedPartyRecord: PartyRecord <- handlePartyRecordStoreResult(
+            "updating a participant party record"
+          )(updatedPartyRecordResult)
+        } yield UpdatePartyDetailsResponse(
+          Some(
+            toProtoPartyDetails(
+              partyDetails = fetchedPartyDetails,
+              metadataO = Some(updatedPartyRecord.metadata),
+              identityProviderId = Some(updatedPartyRecord.identityProviderId),
+            )
           )
         )
-      )
+      }
     }
   }
 
@@ -837,13 +819,6 @@ private[apiserver] final class ApiPartyManagementService private (
     implicit val errorLoggingContext: ErrorLoggingContext =
       ErrorLoggingContext(logger, loggingContext.toPropertiesMap, loggingContext.traceContext)
     import com.digitalasset.canton.config.NonNegativeFiniteDuration
-    // Retrieving the authenticated user context from the thread-local context
-    val authenticatedUserContextF: Future[AuthenticatedUserContext] =
-      resolveAuthenticatedUserContext
-
-    // The default value (empty) should default to true (pre-existing behavior)
-    // So this is only false if explicitly set to false
-    val waitForAllocation = !request.waitForAllocation.contains(false)
 
     withValidation {
       for {
@@ -853,8 +828,7 @@ private[apiserver] final class ApiPartyManagementService private (
             requirePhysicalSynchronizerId(request.synchronizer, "synchronizer").map(_.logical)
           )
         protocolVersion <- syncService
-          .physicalSynchronizerIdForSynchronizerId(synchronizerId)
-          .map(_.protocolVersion)
+          .protocolVersionForSynchronizerId(synchronizerId)
           .toRight(
             ValidationErrors.invalidArgument(
               s"This node is not connected to the requested synchronizer $synchronizerId."
@@ -875,103 +849,66 @@ private[apiserver] final class ApiPartyManagementService private (
         _ = logger.debug(
           s"External party allocation input transactions:\n ${signedTransactionsNE.map(_._1).mkString("\n")}"
         )
-        identityProviderId <- optionalIdentityProviderId(
-          request.identityProviderId,
-          "identity_provider_id",
-        )
-        userId <- optionalUserId(request.userId, "user_id")
         cantonParticipantId = this.syncService.participantId
         externalPartyDetails <- ExternalPartyOnboardingDetails
           .create(signedTransactionsNE, parsedMultiSignatures, protocolVersion, cantonParticipantId)
           .leftMap(ValidationErrors.invalidArgument(_))
-      } yield (synchronizerId, externalPartyDetails, identityProviderId, userId)
-    } { case (synchronizerId, externalPartyOnboardingDetails, identityProviderId, userId) =>
-      if (externalPartyOnboardingDetails.signedPartyToKeyMappingTransaction.isDefined) {
-        logger.info(
-          "PartyToKeyMapping has been deprecated. Please use PartyToParticipant directly to configure" +
-            " the party's protocol signing keys and threshold instead."
-        )
-      }
-
+        partyName <- requireParty(externalPartyDetails.partyHint)
+      } yield (partyName, synchronizerId, externalPartyDetails)
+    } { case (partyName, synchronizerId, externalPartyOnboardingDetails) =>
       val hostingParticipantsString = externalPartyOnboardingDetails.hostingParticipants
         .map { case HostingParticipant(participantId, permission, _onboarding) =>
           s"$participantId -> $permission"
         }
         .mkString("[", ", ", "]")
-      val signingKeysString =
-        externalPartyOnboardingDetails.optionallySignedPartyToParticipant.mapping.partySigningKeysWithThreshold
-          .map { case SigningKeysWithThreshold(keys, threshold) =>
-            s" and ${keys.size} signing keys with threshold ${threshold.value}"
-          }
-          .getOrElse("")
+      val signingKeysString = externalPartyOnboardingDetails.signedPartyToKeyMappingTransaction
+        .map { p2k =>
+          s" and ${p2k.mapping.signingKeys.size} signing keys with threshold ${p2k.mapping.threshold.value}"
+        }
+        .getOrElse("")
       logger.info(
         s"Allocating external party ${externalPartyOnboardingDetails.partyId.toProtoPrimitive} on" +
           s" $hostingParticipantsString with confirmation threshold ${externalPartyOnboardingDetails.confirmationThreshold.value}" + signingKeysString
       )
       val trackerKey =
         submissionIdGenerator(
-          externalPartyOnboardingDetails.partyId.toLf,
+          partyName,
           authorizationLevel =
             if (externalPartyOnboardingDetails.isConfirming) AuthorizationLevel.Confirmation
             else Observation,
         )
       withEnrichedLoggingContext(telemetry)(logging.submissionId(trackerKey.submissionId)) {
         implicit loggingContext =>
-          pendingPartyAllocations.withUser(userId) { outstandingCalls =>
-            def allocateFn = for {
-              result <- syncService.allocateParty(
-                externalPartyOnboardingDetails.partyId,
-                trackerKey.submissionId,
-                Some(synchronizerId),
-                Some(externalPartyOnboardingDetails),
-              )
-              _ <- checkSubmissionResult(result)
-            } yield ()
+          def allocateFn = for {
+            result <- syncService.allocateParty(
+              partyName,
+              trackerKey.submissionId,
+              Some(synchronizerId),
+              Some(externalPartyOnboardingDetails),
+            )
+            _ <- checkSubmissionResult(result)
+          } yield ()
 
-            for {
-              _ <- identityProviderExistsOrError(identityProviderId)
-              userInfo <- getUserIfUserSpecified(userId, identityProviderId)
-              _ <- checkUserLimitsIfUserSpecified(
-                userInfo.map(_.rights),
-                outstandingCalls,
-                authenticatedUserContextF,
-              )
-              _ <- verifyPartyIsNonExistentOrInIdp(
-                identityProviderId,
-                externalPartyOnboardingDetails.partyId.toLf,
-              )
-              // Only track the party if we expect it to be fully authorized (and it hasn't explicitly been disabled in the request)
-              // Otherwise the party won't be fully onboarded here so this would time out
-              allocated <-
-                (if (externalPartyOnboardingDetails.fullyAllocatesParty && waitForAllocation) {
-                   partyAllocationTracker
-                     .track(
-                       trackerKey,
-                       NonNegativeFiniteDuration(managementServiceTimeout),
-                     )(_ => allocateFn)
-                     .map(_.partyDetails.party)
-                 } else {
-                   allocateFn
-                     .map(_ => externalPartyOnboardingDetails.partyId.toLf)
-                     .failOnShutdownTo(
-                       CommonErrors.ServiceNotRunning.Reject("PartyManagementService").asGrpcError
-                     )
-                 }).transform(alreadyExistsError(trackerKey.submissionId, loggingContext))
-              existingPartyRecord <- partyRecordStore.getPartyRecordO(
-                allocated
-              )
-              _ <- updateOrCreatePartyRecord(
-                existingPartyRecord,
-                allocated,
-                identityProviderId,
-                Map.empty,
-              )
-              _ <- updateUserInfoIfUserSpecified(
-                allocated,
-                userInfo.map(_.user),
-              )
-            } yield AllocateExternalPartyResponse(allocated)
-          }
+          // Only track the party if we expect it to be fully authorized
+          // Otherwise the party won't be fully onboarded here so this would time out
+          val partyIdF =
+            if (externalPartyOnboardingDetails.fullyAllocatesParty) {
+              partyAllocationTracker
+                .track(
+                  trackerKey,
+                  NonNegativeFiniteDuration(managementServiceTimeout),
+                )(_ => allocateFn)
+                .map(_.partyDetails.party)
+            } else {
+              allocateFn
+                .map(_ => externalPartyOnboardingDetails.partyId.toProtoPrimitive)
+                .failOnShutdownTo(
+                  CommonErrors.ServiceNotRunning.Reject("PartyManagementService").asGrpcError
+                )
+            }
+          partyIdF
+            .map(AllocateExternalPartyResponse.apply)
+            .transform(alreadyExistsError(trackerKey.submissionId, loggingContext))
       }
     }
   }
@@ -1018,15 +955,15 @@ private[apiserver] final class ApiPartyManagementService private (
         .fromProtoV30(publicKeyT)
         .leftMap(_.message)
       namespace = Namespace(pubKey.fingerprint)
-      protocolVersion <- UniqueIdentifier
+      synchronizerIdWithVersion <- UniqueIdentifier
         .fromProtoPrimitive_(synchronizerIdP)
         .map(SynchronizerId(_))
         .leftMap(_.message)
         .flatMap(synchronizerId =>
           syncService
-            .physicalSynchronizerIdForSynchronizerId(synchronizerId)
-            .map(_.protocolVersion)
+            .protocolVersionForSynchronizerId(synchronizerId)
             .toRight(s"Unknown or not connected synchronizer $synchronizerId")
+            .map((synchronizerId, _))
         )
       _ <- Either.cond(partyHint.nonEmpty, (), "Party hint is empty")
       _ <- UniqueIdentifier.verifyValidString(partyHint).leftMap(x => "party_hint: " + x)
@@ -1071,6 +1008,12 @@ private[apiserver] final class ApiPartyManagementService private (
         if (confirmationThreshold == 0) availableConfirmers
         else confirmationThreshold
       party = PartyId(uid)
+      nsd <- NamespaceDelegation.create(namespace, pubKey, CanSignAllMappings)
+      p2k <- PartyToKeyMapping.create(
+        party,
+        threshold = PositiveInt.one,
+        signingKeys = NonEmpty.mk(Seq, pubKey),
+      )
       p2p <- PartyToParticipant.create(
         party,
         threshold = PositiveInt.tryCreate(threshold),
@@ -1083,17 +1026,12 @@ private[apiserver] final class ApiPartyManagementService private (
         ) ++ observingPids.map(uid =>
           HostingParticipant(ParticipantId(uid), ParticipantPermission.Observation)
         )),
-        partySigningKeysWithThreshold = Some(
-          SigningKeysWithThreshold.tryCreate(
-            keys = NonEmpty.mk(Seq, pubKey),
-            threshold = PositiveInt.one,
-          )
-        ),
       )
     } yield {
+      val (_synchronizerId, protocolVersion) = synchronizerIdWithVersion
       val transactions =
         NonEmpty
-          .mk(List, p2p)
+          .mk(List, nsd, p2k, p2p)
           .map(mapping =>
             TopologyTransaction(
               op = TopologyChangeOp.Replace,
@@ -1241,7 +1179,7 @@ private[apiserver] object ApiPartyManagementService {
 
   trait CreateSubmissionId {
     def apply(
-        partyId: LfPartyId,
+        partyIdHint: String,
         authorizationLevel: AuthorizationLevel,
     ): PartyAllocation.TrackerKey
   }
@@ -1251,11 +1189,11 @@ private[apiserver] object ApiPartyManagementService {
 
     def forParticipant(participantId: Ref.ParticipantId) = new CreateSubmissionId() {
       override def apply(
-          partyId: LfPartyId,
+          partyIdHint: String,
           authorizationLevel: AuthorizationLevel,
       ): PartyAllocation.TrackerKey =
         PartyAllocation.TrackerKey(
-          partyId,
+          partyIdHint,
           participantId,
           AuthorizationEvent.Added(authorizationLevel),
         )

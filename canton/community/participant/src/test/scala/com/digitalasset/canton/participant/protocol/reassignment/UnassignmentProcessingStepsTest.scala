@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -8,8 +8,11 @@ import cats.data.EitherT
 import cats.implicits.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.config.{DefaultProcessingTimeouts, SessionEncryptionKeyCacheConfig}
+import com.digitalasset.canton.config.{
+  CachingConfigs,
+  DefaultProcessingTimeouts,
+  SessionEncryptionKeyCacheConfig,
+}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{
   Signature,
@@ -22,11 +25,9 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.UnassignmentViewType
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{DefaultPromiseUnlessShutdownFactory, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.{LedgerApiIndexer, LedgerApiStore}
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
@@ -35,12 +36,7 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDe
   mkActivenessResult,
   mkActivenessSet,
 }
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentDataHelpers.TestValidator
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.{
-  ContractValidationError,
-  MultiSynchronizerIsNotEnabled,
-}
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentProcessingSteps.PendingUnassignment
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentProcessorError.*
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidationError.PackageIdUnknownOrUnvetted
@@ -72,7 +68,6 @@ import com.digitalasset.canton.participant.store.{
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
@@ -96,7 +91,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.{ContractValidator, ReassignmentTag, ResourceUtil}
+import com.digitalasset.canton.util.{ContractValidator, ResourceUtil}
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{
   BaseTest,
@@ -112,9 +107,6 @@ import com.digitalasset.canton.{
 }
 import com.google.rpc.status.Status
 import io.grpc.Status.Code.FAILED_PRECONDITION
-import monocle.macros.syntax.lens.*
-import org.scalatest
-import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -182,7 +174,7 @@ final class UnassignmentProcessingStepsTest
   private lazy val logicalPersistentState =
     new InMemoryLogicalSyncPersistentState(
       IndexedSynchronizer.tryCreate(sourceSynchronizer.unwrap, 1),
-      ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
+      enableAdditionalConsistencyChecks = true,
       indexedStringStore = indexedStringStore,
       contractStore = contractStore,
       acsCounterParticipantConfigStore = mock[AcsCounterParticipantConfigStore],
@@ -190,9 +182,15 @@ final class UnassignmentProcessingStepsTest
       loggerFactory,
     )
   private lazy val physicalSyncPersistentState = new InMemoryPhysicalSyncPersistentState(
+    submittingParticipant,
+    clock,
     SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters),
     IndexedPhysicalSynchronizer.tryCreate(sourceSynchronizer.unwrap, 1),
     defaultStaticSynchronizerParameters,
+    parameters = ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
+    packageMetadataView = mock[PackageMetadataView],
+    Eval.now(mock[LedgerApiStore]),
+    logicalPersistentState,
     loggerFactory,
     timeouts,
     futureSupervisor,
@@ -207,7 +205,6 @@ final class UnassignmentProcessingStepsTest
       mock[RecordOrderPublisher],
       mock[SynchronizerTimeTracker],
       mock[InFlightSubmissionSynchronizerTracker],
-      mock[OnboardingClearanceScheduler],
       persistentState,
       ledgerApiIndexer,
       contractStore,
@@ -229,8 +226,6 @@ final class UnassignmentProcessingStepsTest
     reassigningParticipants = Set(submittingParticipant),
     ContractsReassignmentBatch(
       contract,
-      sourceValidationPackageId,
-      targetValidationPackageId,
       initialReassignmentCounter,
     ),
     sourceSynchronizer,
@@ -247,28 +242,23 @@ final class UnassignmentProcessingStepsTest
     TestingTopology(synchronizers)
       .withReversedTopology(topology)
       .withPackages(packages)
-      .enableMultiSynchronizer(topology.keys.toSeq*)
       .build(loggerFactory)
-
-  private val defaultTopologyPackageIds = Seq(
-    sourceValidationPackageId.unwrap,
-    targetValidationPackageId.unwrap,
-    ExampleContractFactory.packageId,
-  )
 
   private def createTestingTopologySnapshot(
       topology: Map[ParticipantId, Map[LfPartyId, ParticipantPermission]],
       packagesOverride: Option[Map[ParticipantId, Seq[LfPackageId]]] = None,
   ): TopologySnapshot = {
 
-    val defaultPackages = topology.keys.map(_ -> defaultTopologyPackageIds).toMap
+    val defaultPackages = topology.keys
+      .map(_ -> Seq(ExampleTransactionFactory.packageId))
+      .toMap
 
     val packages = packagesOverride.getOrElse(defaultPackages)
     createTestingIdentityFactory(topology, packages).topologySnapshot()
   }
 
   private def createCryptoFactory(
-      packages: Seq[LfPackageId] = defaultTopologyPackageIds
+      packages: Seq[LfPackageId] = Seq(ExampleTransactionFactory.packageId)
   ) = {
     val topology = Map(
       submittingParticipant -> Map(
@@ -293,7 +283,7 @@ final class UnassignmentProcessingStepsTest
       .forOwnerAndSynchronizer(submittingParticipant, sourceSynchronizer.unwrap)
 
   private lazy val cryptoClient = createCryptoClient()
-  private lazy val cryptoSnapshot = cryptoClient.currentSnapshotApproximation.futureValueUS
+  private lazy val cryptoSnapshot = cryptoClient.currentSnapshotApproximation
 
   private lazy val seedGenerator = new SeedGenerator(crypto.pureCrypto)
 
@@ -303,12 +293,12 @@ final class UnassignmentProcessingStepsTest
       targetTimestampForwardTolerance: FiniteDuration = 30.seconds,
   ) =
     TestReassignmentCoordination(
-      synchronizers = Set(Target(sourceSynchronizer.unwrap), targetSynchronizer),
-      timeProofTimestamp = approximateTimestamp,
-      snapshotOverride = Some(cryptoSnapshot),
-      awaitTimestampOverride = Some(None),
-      loggerFactory = loggerFactory,
-      packages = Seq(ExampleContractFactory.packageId),
+      Set(Target(sourceSynchronizer.unwrap), targetSynchronizer),
+      approximateTimestamp,
+      Some(cryptoSnapshot),
+      Some(None),
+      loggerFactory,
+      Seq(ExampleTransactionFactory.packageId),
       targetTimestampForwardTolerance = targetTimestampForwardTolerance,
     )(directExecutionContext)
 
@@ -318,7 +308,6 @@ final class UnassignmentProcessingStepsTest
   private def createUnassignmentProcessingSteps(
       reassignmentCoordination: ReassignmentCoordination = coordination,
       cryptoClient: SynchronizerCryptoClient = cryptoClient,
-      contractValidator: ContractValidator = ContractValidator.AllowAll,
   ) =
     new UnassignmentProcessingSteps(
       sourceSynchronizer,
@@ -327,8 +316,7 @@ final class UnassignmentProcessingStepsTest
       cryptoClient,
       seedGenerator,
       Source(defaultStaticSynchronizerParameters),
-      contractValidator,
-      clock,
+      ContractValidator.AllowAll,
       Source(testedProtocolVersion),
       loggerFactory,
     )(executorService)
@@ -357,13 +345,6 @@ final class UnassignmentProcessingStepsTest
   )
   private lazy val contractId = contract.contractId
 
-  private lazy val sourceValidationPackageId = Source(
-    LfPackageId.assertFromString("source-rep-pkg-id")
-  )
-  private lazy val targetValidationPackageId = Target(
-    LfPackageId.assertFromString("target-rep-pkg-id")
-  )
-
   private val reassignmentId = ReassignmentId.tryCreate("00")
 
   private def mkParsedRequest(
@@ -385,7 +366,6 @@ final class UnassignmentProcessingStepsTest
     cryptoSnapshot,
     cryptoSnapshot.ipsSnapshot.findDynamicSynchronizerParameters().futureValueUS.value,
     reassignmentId,
-    NonNegativeLong.tryCreate(789),
   )
 
   "UnassignmentRequest.validated" should {
@@ -400,7 +380,6 @@ final class UnassignmentProcessingStepsTest
     def mkUnassignmentResult(
         sourceTopologySnapshot: TopologySnapshot,
         targetTopologySnapshot: TopologySnapshot,
-        contractValidator: ContractValidator = ContractValidator.AllowAll,
         stakeholdersOverride: Option[Stakeholders] = None,
     ): Either[ReassignmentValidationError, UnassignmentRequestValidated] = {
       val updatedContract = stakeholdersOverride.fold(contract)(stakeholders =>
@@ -414,7 +393,6 @@ final class UnassignmentProcessingStepsTest
         sourceTopologySnapshot,
         targetTopologySnapshot,
         updatedContract,
-        contractValidator: ContractValidator,
       )
     }
 
@@ -422,18 +400,14 @@ final class UnassignmentProcessingStepsTest
         sourceTopologySnapshot: TopologySnapshot,
         targetTopologySnapshot: TopologySnapshot,
         updatedContract: ContractInstance,
-        contractValidator: ContractValidator = ContractValidator.AllowAll,
     ): Either[ReassignmentValidationError, UnassignmentRequestValidated] =
       UnassignmentRequest
         .validated(
           submittingParticipant,
           ContractsReassignmentBatch(
             updatedContract,
-            sourceValidationPackageId,
-            targetValidationPackageId,
             initialReassignmentCounter,
           ),
-          contractValidator,
           submitterMetadata(submitter),
           sourceSynchronizer,
           sourceMediator,
@@ -456,38 +430,6 @@ final class UnassignmentProcessingStepsTest
         submitter,
         stakeholders.all,
       )
-    }
-
-    def testInvalidRepresentativeContract(invalidPackageId: LfPackageId): scalatest.Assertion = {
-      val expected = "invalid-contract"
-
-      val contractValidator =
-        new ReassignmentDataHelpers.TestValidator(
-          Map(
-            (contract.contractId, invalidPackageId) -> expected
-          )
-        )
-
-      inside(
-        mkUnassignmentResult(
-          testingTopology,
-          testingTopology,
-          contractValidator = contractValidator,
-        ).left.value
-      ) { case actual: ContractValidationError =>
-        actual.reassignmentRef shouldBe ReassignmentRef(contract.contractId)
-        actual.contractId shouldBe contract.contractId
-        actual.representativePackageId shouldBe invalidPackageId
-        actual.reason should include(expected)
-      }
-    }
-
-    "fail if contract does not authenticate against source validation package" in {
-      testInvalidRepresentativeContract(sourceValidationPackageId.unwrap)
-    }
-
-    "fail if contract does not authenticate against target validation package" in {
-      testInvalidRepresentativeContract(targetValidationPackageId.unwrap)
     }
 
     "fail if submitting party is not hosted on participant" in {
@@ -550,35 +492,20 @@ final class UnassignmentProcessingStepsTest
       result.left.value shouldBe expectedError
     }
 
-    def testPackageVettingFailure(
-        participantId: ParticipantId,
-        missingPackageId: ReassignmentTag[LfPackageId],
-        expectedSychronizerId: PhysicalSynchronizerId,
-    ): Assertion = {
-
-      val packagesOverride =
-        Seq(submittingParticipant, participant1)
-          .map(_ -> Seq(sourceValidationPackageId, targetValidationPackageId).map(_.unwrap))
-          .toMap
-
-      val modifiedPackageOverride =
-        packagesOverride.map {
-          case (k, v) if k == participantId => (k, v.filterNot(_ == missingPackageId.unwrap))
-          case other => other
-        }
-
-      val (sourcePackagesOverride, targetPackagesOverride) = missingPackageId match {
-        case Source(_) => (modifiedPackageOverride, packagesOverride)
-        case Target(_) => (packagesOverride, modifiedPackageOverride)
-      }
-
+    // TODO(i13201) This should ideally be covered in integration tests as well
+    "fail if the package for the contract being reassigned is unvetted on the target synchronizer" in {
       val sourceSynchronizerTopology =
         createTestingTopologySnapshot(
           Map(
             submittingParticipant -> Map(submitter -> Submission),
             participant1 -> Map(party1 -> Submission),
           ),
-          packagesOverride = Some(sourcePackagesOverride),
+          // The package is known on the source synchronizer
+          packagesOverride = Some(
+            Seq(submittingParticipant, participant1)
+              .map(_ -> Seq(ExampleTransactionFactory.packageId))
+              .toMap
+          ),
         )
 
       val targetSynchronizerTopology =
@@ -587,7 +514,7 @@ final class UnassignmentProcessingStepsTest
             submittingParticipant -> Map(submitter -> Submission),
             participant1 -> Map(party1 -> Submission),
           ),
-          packagesOverride = Some(targetPackagesOverride),
+          packagesOverride = Some(Map.empty), // The package is not known on the target synchronizer
         )
 
       val stakeholders =
@@ -598,35 +525,59 @@ final class UnassignmentProcessingStepsTest
         stakeholdersOverride = Some(stakeholders),
       )
 
-      val expected = PackageIdUnknownOrUnvetted(
+      val expectedError = PackageIdUnknownOrUnvetted(
         Set(contractId),
-        unknownTo = List(PackageUnknownTo(missingPackageId.unwrap, participantId)),
-        expectedSychronizerId,
+        unknownTo = List(
+          PackageUnknownTo(ExampleTransactionFactory.packageId, participant1),
+          PackageUnknownTo(ExampleTransactionFactory.packageId, submittingParticipant),
+        ),
       )
 
-      result.left.value shouldBe expected
+      result.left.value shouldBe expectedError
     }
 
-    // TODO(i13201) This should ideally be covered in integration tests as well
-    "fail vetting if source validation packages are not vetted on source synchronizer" in {
-      forEvery(List(submittingParticipant, participant1)) { participantId =>
-        testPackageVettingFailure(
-          participantId,
-          sourceValidationPackageId,
-          sourceSynchronizer.unwrap,
-        )
-      }
-    }
+    "fail if the package for the contract being reassigned is unvetted on one non-reassigning participant connected to the target synchronizer" in {
+      val sourceSynchronizerTopology =
+        createTestingIdentityFactory(
+          topology = Map(
+            submittingParticipant -> Map(submitter -> Submission),
+            participant1 -> Map(party1 -> Submission),
+          ),
+          // On the source synchronizer, the package is vetted on all participants
+          packages = Seq(submittingParticipant, participant1)
+            .map(_ -> Seq(ExampleTransactionFactory.packageId))
+            .toMap,
+        ).topologySnapshot()
 
-    // TODO(i13201) This should ideally be covered in integration tests as well
-    "fail vetting if target validation packages are not vetted in target synchronizer" in {
-      forEvery(List(submittingParticipant, participant1)) { participantId =>
-        testPackageVettingFailure(
-          participantId,
-          targetValidationPackageId,
-          targetSynchronizer.unwrap,
+      val targetSynchronizerTopology =
+        createTestingIdentityFactory(
+          topology = Map(
+            submittingParticipant -> Map(submitter -> Submission),
+            participant1 -> Map(party1 -> Submission),
+          ),
+          // On the target synchronizer, the package is not vetted on `participant1`
+          packages = Map(submittingParticipant -> Seq(ExampleTransactionFactory.packageId)),
+        ).topologySnapshot()
+
+      // `party1` is a stakeholder hosted on `participant1`, but it has not vetted `templateId.packageId` on the target synchronizer
+      val stakeholders =
+        Stakeholders.tryCreate(Set(submitter, party1, adminSubmitter, admin1), Set(submitter))
+
+      val result =
+        mkUnassignmentResult(
+          sourceTopologySnapshot = sourceSynchronizerTopology,
+          targetTopologySnapshot = targetSynchronizerTopology,
+          stakeholdersOverride = Some(stakeholders),
         )
-      }
+
+      val expectedError = PackageIdUnknownOrUnvetted(
+        Set(contractId),
+        unknownTo = List(
+          PackageUnknownTo(ExampleTransactionFactory.packageId, participant1)
+        ),
+      )
+
+      result.left.value shouldBe expectedError
     }
 
     "pick the active confirming admin party" in {
@@ -646,8 +597,6 @@ final class UnassignmentProcessingStepsTest
             reassigningParticipants = Set(submittingParticipant, participant1),
             contracts = ContractsReassignmentBatch(
               contract,
-              sourceValidationPackageId,
-              targetValidationPackageId,
               initialReassignmentCounter,
             ),
             sourceSynchronizer = sourceSynchronizer,
@@ -688,8 +637,6 @@ final class UnassignmentProcessingStepsTest
               Set(submittingParticipant, participant1, participant3, participant4),
             contracts = ContractsReassignmentBatch(
               contract,
-              sourceValidationPackageId,
-              targetValidationPackageId,
               initialReassignmentCounter,
             ),
             sourceSynchronizer = sourceSynchronizer,
@@ -719,8 +666,6 @@ final class UnassignmentProcessingStepsTest
           reassigningParticipants = Set(submittingParticipant, participant1),
           contracts = ContractsReassignmentBatch(
             updatedContract,
-            sourceValidationPackageId,
-            targetValidationPackageId,
             initialReassignmentCounter,
           ),
           sourceSynchronizer = sourceSynchronizer,
@@ -743,8 +688,6 @@ final class UnassignmentProcessingStepsTest
           submitterMetadata = submitterMetadata(party1),
           Seq(contractId),
           targetSynchronizer,
-          overrideSourceValidationPkgIds = Map.empty,
-          overrideTargetValidationPkgIds = Map.empty,
         )
 
       for {
@@ -762,7 +705,6 @@ final class UnassignmentProcessingStepsTest
               sourceMediator,
               state,
               cryptoSnapshot,
-              _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
             )
             .valueOrFail("prepare submission failed")
       } yield succeed
@@ -775,8 +717,6 @@ final class UnassignmentProcessingStepsTest
         submitterMetadata = submitterMetadata(party1),
         Seq(contract.contractId),
         Target(sourceSynchronizer.unwrap),
-        overrideSourceValidationPkgIds = Map.empty,
-        overrideTargetValidationPkgIds = Map.empty,
       )
 
       for {
@@ -787,76 +727,12 @@ final class UnassignmentProcessingStepsTest
             sourceMediator,
             state,
             cryptoSnapshot,
-            _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
           )
         )("prepare submission succeeded unexpectedly")
       } yield {
         submissionResult shouldBe a[TargetSynchronizerIsSourceSynchronizer]
       }
     }
-
-    def checkContractsValidateAgainstValidationPackage(
-        invalidPackageId: ReassignmentTag[LfPackageId]
-    ): Future[scalatest.Assertion] = {
-      val state = mkState
-      val submissionParam =
-        UnassignmentProcessingSteps.SubmissionParam(
-          submitterMetadata = submitterMetadata(party1),
-          Seq(contractId),
-          targetSynchronizer,
-          overrideSourceValidationPkgIds = invalidPackageId match {
-            case Source(rpId) => Map(contractId -> rpId)
-            case Target(_) => Map.empty
-          },
-          overrideTargetValidationPkgIds = invalidPackageId match {
-            case Source(_) => Map.empty
-            case Target(rpId) => Map(contractId -> rpId)
-          },
-        )
-
-      val contractValidator =
-        new TestValidator(Map((contractId, invalidPackageId.unwrap) -> "Invalid, as expected"))
-
-      val unassignmentProcessingSteps =
-        createUnassignmentProcessingSteps(contractValidator = contractValidator)
-
-      for {
-        _ <- state.contractStore.storeContract(contract)
-        _ <- persistentState.activeContractStore
-          .markContractsCreated(
-            Seq(contractId -> initialReassignmentCounter),
-            TimeOfChange(targetTs.unwrap),
-          )
-          .value
-        submissionResult <- leftOrFail(
-          unassignmentProcessingSteps
-            .createSubmission(
-              submissionParam,
-              sourceMediator,
-              state,
-              cryptoSnapshot,
-              _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
-            )
-        )("prepare submission succeeded unexpectedly")
-      } yield {
-        inside(submissionResult) { case SubmissionValidationError(message) =>
-          message should include regex s"contract authentication failure.*${contract.contractId.coid}.*${invalidPackageId.unwrap}"
-        }
-      }
-    }
-
-    "check that the contracts validate against the source validation package" in {
-      checkContractsValidateAgainstValidationPackage(
-        sourceValidationPackageId
-      )
-    }
-
-    "check that the contracts validate against the target validation package" in {
-      checkContractsValidateAgainstValidationPackage(
-        targetValidationPackageId
-      )
-    }
-
   }
 
   "receive request" should {
@@ -864,7 +740,7 @@ final class UnassignmentProcessingStepsTest
     "succeed without errors" in {
       ResourceUtil.withResourceM(
         new SessionKeyStoreWithInMemoryCache(
-          SessionEncryptionKeyCacheConfig(),
+          CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
           timeouts,
           loggerFactory,
         )
@@ -912,8 +788,6 @@ final class UnassignmentProcessingStepsTest
         reassigningParticipants = Set(submittingParticipant),
         ContractsReassignmentBatch(
           contract,
-          sourceValidationPackageId,
-          targetValidationPackageId,
           ReassignmentCounter(1),
         ),
         sourceSynchronizer,
@@ -929,11 +803,7 @@ final class UnassignmentProcessingStepsTest
         .futureValue
 
       val signature = cryptoSnapshot
-        .sign(
-          fullUnassignmentTree.rootHash.unwrap,
-          SigningKeyUsage.ProtocolOnly,
-          None, // not needed for unit tests; session signing keys disabled
-        )
+        .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
         .value
         .onShutdown(fail("unexpected shutdown during a test"))
         .futureValue
@@ -958,7 +828,6 @@ final class UnassignmentProcessingStepsTest
             loggerFactory,
           ),
           DummyTickRequest,
-          PublishUpdateViaRecordOrderPublisher.noop,
         )
         .value
         .onShutdown(fail("unexpected shutdown during a test"))
@@ -977,7 +846,7 @@ final class UnassignmentProcessingStepsTest
     "prevent the contract being reassigned is not vetted on the target synchronizer" in {
       val unassignmentProcessingStepsWithoutPackages = {
         val f = createCryptoFactory(packages = Seq.empty)
-        val s = createCryptoClient(f).currentSnapshotApproximation.futureValueUS
+        val s = createCryptoClient(f).currentSnapshotApproximation
         val c = createReassignmentCoordination(s)
         createUnassignmentProcessingSteps(c)
       }
@@ -1050,7 +919,6 @@ final class UnassignmentProcessingStepsTest
       .trySignAndCreate(
         reassignmentResult,
         cryptoSnapshot,
-        None,
       )
       .futureValueUS
 
@@ -1089,7 +957,6 @@ final class UnassignmentProcessingStepsTest
         participantSignatureVerificationResult = None,
         contractAuthenticationResultF = EitherT.right(FutureUnlessShutdown.unit),
         submitterCheckResult = None,
-        multiSynchronizerFeatureFlagCheckResult = None,
       ),
       reassigningParticipantValidationResult = ReassigningParticipantValidationResult(errors = Nil),
     )
@@ -1104,8 +971,6 @@ final class UnassignmentProcessingStepsTest
       abortEngine = _ => (),
       engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
       DummyTickRequest,
-      PublishUpdateViaRecordOrderPublisher.noop,
-      trafficCost = NonNegativeLong.tryCreate(123L),
     )
 
     "succeed without errors" in {
@@ -1150,28 +1015,6 @@ final class UnassignmentProcessingStepsTest
         )
       } yield succeed
     }
-
-    "don't commit when multi-synchronizer is not enabled" in {
-      val failingUnassignmentValidation = pendingUnassignment
-        .focus(
-          _.unassignmentValidationResult.commonValidationResult.multiSynchronizerFeatureFlagCheckResult
-        )
-        .replace(
-          Some(MultiSynchronizerIsNotEnabled(Set(submittingParticipant), sourceSynchronizer.unwrap))
-        )
-
-      for {
-        result <- unassignmentProcessingSteps
-          .getCommitSetAndContractsToBeStoredAndEventFactory(
-            NoOpeningErrors(signedContent),
-            reassignmentResult.verdict,
-            failingUnassignmentValidation,
-            state.pendingUnassignmentSubmissions,
-            crypto.pureCrypto,
-          )
-          .failOnShutdown
-      } yield result.commitSet.nonEmpty shouldBe false
-    }
   }
 
   "verify the submitting participant signature" should {
@@ -1180,11 +1023,7 @@ final class UnassignmentProcessingStepsTest
     "succeed when the signature is correct" in {
       for {
         signature <- cryptoSnapshot
-          .sign(
-            fullUnassignmentTree.rootHash.unwrap,
-            SigningKeyUsage.ProtocolOnly,
-            None, // not needed for unit tests; session signing keys disabled
-          )
+          .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
           .failOnShutdown
 
         parsed = mkParsedRequest(
@@ -1218,11 +1057,7 @@ final class UnassignmentProcessingStepsTest
     "fail when the signature is incorrect" in {
       for {
         signature <- cryptoSnapshot
-          .sign(
-            TestHash.digest("wrong signature"),
-            SigningKeyUsage.ProtocolOnly,
-            None, // not needed for unit tests; session signing keys disabled
-          )
+          .sign(TestHash.digest("wrong signature"), SigningKeyUsage.ProtocolOnly)
           .valueOrFailShutdown("signing failed")
 
         parsed = mkParsedRequest(
@@ -1270,7 +1105,6 @@ final class UnassignmentProcessingStepsTest
           tree,
           (viewKey, viewKeyMap),
           cryptoSnapshot,
-          None,
           testedProtocolVersion,
         )(
           implicitly[TraceContext],

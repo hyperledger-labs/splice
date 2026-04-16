@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.handlers
@@ -8,10 +8,10 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.Envelope
 import com.digitalasset.canton.sequencing.{
-  ApplicationHandler,
   BoxedEnvelope,
-  GenericHandlerResult,
-  OrdinaryEnvelopeBox,
+  HandlerResult,
+  OrdinaryApplicationHandler,
+  PossiblyIgnoredApplicationHandler,
   PossiblyIgnoredEnvelopeBox,
   SubscriptionStart,
 }
@@ -30,10 +30,10 @@ import com.digitalasset.canton.tracing.TraceContext
   * cannot tick any of the trackers, including the
   * [[com.digitalasset.canton.topology.processing.TopologyTransactionProcessor]].
   */
-class DiscardIgnoredEvents[Env <: Envelope[?], +A](
-    handler: ApplicationHandler[OrdinaryEnvelopeBox, Env, A],
+class DiscardIgnoredEvents[Env <: Envelope[?]](
+    handler: OrdinaryApplicationHandler[Env],
     override protected val loggerFactory: NamedLoggerFactory,
-) extends ApplicationHandler[PossiblyIgnoredEnvelopeBox, Env, A]
+) extends PossiblyIgnoredApplicationHandler[Env]
     with NamedLogging {
 
   override def name: String = handler.name
@@ -47,7 +47,7 @@ class DiscardIgnoredEvents[Env <: Envelope[?], +A](
 
   override def apply(
       tracedEvents: BoxedEnvelope[PossiblyIgnoredEnvelopeBox, Env]
-  ): GenericHandlerResult[A] = {
+  ): HandlerResult = {
     val filtered = tracedEvents.mapWithTraceContext { implicit batchTraceContext => events =>
       val classified = events.map {
         case e: OrdinarySequencedEvent[Env] => Right(e)
@@ -69,8 +69,7 @@ class DiscardIgnoredEvents[Env <: Envelope[?], +A](
 }
 
 object DiscardIgnoredEvents {
-  def apply[Env <: Envelope[?], A](loggerFactory: NamedLoggerFactory)(
-      handler: ApplicationHandler[OrdinaryEnvelopeBox, Env, A]
-  ): ApplicationHandler[PossiblyIgnoredEnvelopeBox, Env, A] =
-    new DiscardIgnoredEvents[Env, A](handler, loggerFactory)
+  def apply[Env <: Envelope[?]](loggerFactory: NamedLoggerFactory)(
+      handler: OrdinaryApplicationHandler[Env]
+  ): PossiblyIgnoredApplicationHandler[Env] = new DiscardIgnoredEvents[Env](handler, loggerFactory)
 }

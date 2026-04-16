@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Signature, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
@@ -258,9 +257,7 @@ class DefaultVerdictSenderTest
         identityFactory.forOwnerAndSynchronizer(mediatorId, psid)
       }
 
-    private val sequencerClientSend: TestSequencerClientSend = new TestSequencerClientSend(
-      wallClock
-    )
+    private val sequencerClientSend: TestSequencerClientSend = new TestSequencerClientSend
 
     def interceptedMessages: Seq[(Batch[DefaultOpenEnvelope], Option[AggregationRule])] =
       sequencerClientSend.requestsQueue.asScala.map { request =>
@@ -271,7 +268,6 @@ class DefaultVerdictSenderTest
       sequencerClientSend,
       synchronizerSyncCryptoApi,
       mediatorId,
-      BatchingConfig(),
       loggerFactory,
     )
 

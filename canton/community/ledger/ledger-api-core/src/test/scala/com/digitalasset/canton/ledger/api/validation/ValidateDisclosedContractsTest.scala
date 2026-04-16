@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -20,7 +20,6 @@ import com.digitalasset.canton.ledger.api.validation.ValidateDisclosedContractsT
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.{DefaultDamlValues, LfValue}
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value as Lf
@@ -216,32 +215,36 @@ class ValidateDisclosedContractsTest
     )
   }
 
-  it should "succeed on duplicate contract ids with same payload" in {
+  it should "fail validation on duplicate contract ids" in {
     val commandsWithDuplicateDisclosedContracts =
       ProtoCommands.defaultInstance.copy(disclosedContracts =
         scala.Seq(
           api.protoDisclosedContract,
           api.protoDisclosedContract,
-        )
-      )
-    underTest.validateCommands(commandsWithDuplicateDisclosedContracts) shouldBe Right(
-      lf.expectedDuplicateDisclosedContracts
-    )
-  }
-
-  it should "fail validation on duplicate contract ids with different payloads" in {
-    val commandsWithDuplicateDisclosedContracts =
-      ProtoCommands.defaultInstance.copy(disclosedContracts =
-        scala.Seq(
-          api.protoDisclosedContract,
-          api.protoConflictingDisclosedContractDuplicate,
         )
       )
     requestMustFailWith(
       request = underTest.validateCommands(commandsWithDuplicateDisclosedContracts),
       code = Status.Code.INVALID_ARGUMENT,
       description =
-        s"An error occurred. Please contact the operator and inquire about the request <no-correlation-id> with tid <no-tid>",
+        s"INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Disclosed contracts contain duplicate contract id (${api.contractId})",
+      metadata = Map.empty,
+    )
+  }
+
+  it should "fail validation on duplicate contract keys" in {
+    val commandsWithDuplicateDisclosedContracts =
+      ProtoCommands.defaultInstance.copy(disclosedContracts =
+        scala.Seq(
+          api.protoDisclosedContract,
+          api.dupKeyProtoDisclosedContract,
+        )
+      )
+    requestMustFailWith(
+      request = underTest.validateCommands(commandsWithDuplicateDisclosedContracts),
+      code = Status.Code.INVALID_ARGUMENT,
+      description =
+        s"INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Disclosed contracts contain duplicate contract key (${lf.keyWithMaintainers})",
       metadata = Map.empty,
     )
   }
@@ -269,24 +272,11 @@ object ValidateDisclosedContractsTest {
     val signatories: Set[Ref.Party] = Set(alice, bob)
     val keyMaintainers: Set[Ref.Party] = Set(bob)
     val createdAtSeconds = 1337L
-    val createdAtSeconds2 = 1338L
     val protoDisclosedContract: ProtoDisclosedContract = ProtoDisclosedContract(
       templateId = Some(templateId),
       contractId = contractId,
       createdEventBlob = TransactionCoder
         .encodeFatContractInstance(lf.fatContractInstance)
-        .fold(
-          err =>
-            throw new RuntimeException(s"Cannot serialize createdEventBlob: ${err.errorMessage}"),
-          identity,
-        ),
-      synchronizerId = "",
-    )
-    val protoConflictingDisclosedContractDuplicate: ProtoDisclosedContract = ProtoDisclosedContract(
-      templateId = Some(templateId),
-      contractId = contractId,
-      createdEventBlob = TransactionCoder
-        .encodeFatContractInstance(lf.fatContractInstance2)
         .fold(
           err =>
             throw new RuntimeException(s"Cannot serialize createdEventBlob: ${err.errorMessage}"),
@@ -336,7 +326,6 @@ object ValidateDisclosedContractsTest {
           None -> LfValue.ValueText("some key"),
         ),
       ),
-      crypto.Hash.hashPrivateKey("dummy-key-hash"),
       api.keyMaintainers,
       api.packageName,
     )
@@ -361,13 +350,6 @@ object ValidateDisclosedContractsTest {
       authenticationData = lf.authenticationDataBytes,
     )
 
-    def fatContractInstance2: LfFatContractInst = FatContractInstance.fromCreateNode(
-      create = createNode,
-      createTime =
-        CreationTime.CreatedAt(Time.Timestamp.assertFromLong(api.createdAtSeconds2 * 1000000L)),
-      authenticationData = lf.authenticationDataBytes,
-    )
-
     def dupKeyFatContractInstance: LfFatContractInst = FatContractInstance.fromCreateNode(
       create = dupKeyCreateNode,
       createTime = fatContractInstance.createdAt,
@@ -376,11 +358,6 @@ object ValidateDisclosedContractsTest {
 
     val expectedDisclosedContracts: ImmArray[DisclosedContract] = ImmArray(
       DisclosedContract(fatContractInstance, None)
-    )
-
-    val expectedDuplicateDisclosedContracts: ImmArray[DisclosedContract] = ImmArray(
-      DisclosedContract(fatContractInstance, None),
-      DisclosedContract(fatContractInstance, None),
     )
 
   }

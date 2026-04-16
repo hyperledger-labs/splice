@@ -60,6 +60,6 @@ To do so, set the following through the ``additionalEnvVars`` on your participan
 .. code-block:: yaml
 
     additionalEnvVars:
-        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMMITMENTS
+        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
           value: |
             canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"

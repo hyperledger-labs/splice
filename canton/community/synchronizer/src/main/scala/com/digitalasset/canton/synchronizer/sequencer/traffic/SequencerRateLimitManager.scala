@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.traffic
@@ -15,12 +15,8 @@ import com.digitalasset.canton.sequencing.protocol.{SubmissionRequest, TrafficSt
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.EventCostDetails
 import com.digitalasset.canton.sequencing.traffic.TrafficConsumedManager.NotEnoughTraffic
 import com.digitalasset.canton.sequencing.traffic.{TrafficPurchased, TrafficReceipt}
+import com.digitalasset.canton.synchronizer.sequencing.traffic.SequencerTrafficControlSubscriber
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficConsumedStore
-import com.digitalasset.canton.synchronizer.sequencing.traffic.{
-  SequencerTrafficControlSubscriber,
-  TrafficPurchasedManager,
-}
-import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -31,8 +27,6 @@ import scala.concurrent.ExecutionContext
 trait SequencerRateLimitManager extends AutoCloseable {
 
   def trafficConsumedStore: TrafficConsumedStore
-
-  private[synchronizer] def trafficPurchasedManager: TrafficPurchasedManager
 
   /** Create a traffic state for a new member at the given timestamp. Its base traffic remainder
     * will be equal to the max burst window configured at that point in time.
@@ -96,13 +90,12 @@ trait SequencerRateLimitManager extends AutoCloseable {
     * by this method in the order T1 -> T2. However, if T1 and T2 have been processed in the correct
     * order, it is then ok to call the method with T1 again, which will result in the same output as
     * when it was first called.
-    * @param latestSequencerEventTimestamp
+    * @param lastSequencerEventTimestamp
     *   timestamp of the last event addressed to the sequencer.
     */
   def validateRequestAndConsumeTraffic(
       request: SubmissionRequest,
       sequencingTime: CantonTimestamp,
-      sequencingTopologySnapshot: TopologySnapshot,
       submissionTimestamp: Option[CantonTimestamp],
       latestSequencerEventTimestamp: Option[CantonTimestamp],
       warnIfApproximate: Boolean,

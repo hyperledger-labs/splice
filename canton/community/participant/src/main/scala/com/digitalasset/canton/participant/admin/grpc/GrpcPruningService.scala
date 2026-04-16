@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.grpc
@@ -26,7 +26,6 @@ import com.digitalasset.canton.participant.scheduler.{
 }
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants
-import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
@@ -62,20 +61,7 @@ class GrpcPruningService(
                     .asGrpcError
                 )
             )
-          safeToPruneCommitmentState <- EitherT.fromEither[Future](
-            request.counterParticipantsCommitmentsState
-              .traverse(SafeToPruneCommitmentState.fromProtoV30)
-              .leftMap(deserializationErr =>
-                InvalidArgument
-                  .Reject(
-                    s"The counter_participants_commitments_state field (${request.counterParticipantsCommitmentsState}) is invalid: $deserializationErr"
-                  )
-                  .asGrpcError
-              )
-          )
-          _ <- CantonGrpcUtil.mapErrNewETUS(
-            sync.pruneInternally(ledgerSyncOffset, safeToPruneCommitmentState)
-          )
+          _ <- CantonGrpcUtil.mapErrNewETUS(sync.pruneInternally(ledgerSyncOffset))
         } yield PruneResponse()
       }
     }
@@ -84,9 +70,7 @@ class GrpcPruningService(
       request: GetSafePruningOffsetRequest
   ): Future[GetSafePruningOffsetResponse] = TraceContextGrpc.withGrpcTraceContext {
     implicit traceContext =>
-      val validatedRequestE: ParsingResult[
-        (CantonTimestamp, Offset, Option[SafeToPruneCommitmentState])
-      ] = for {
+      val validatedRequestE: ParsingResult[(CantonTimestamp, Offset)] = for {
         beforeOrAt <-
           ProtoConverter.parseRequired(
             CantonTimestamp.fromProtoTimestamp,
@@ -97,10 +81,7 @@ class GrpcPruningService(
         ledgerEndOffset <- Offset
           .fromLong(request.ledgerEnd)
           .leftMap(err => ProtoDeserializationError.ValueConversionError("ledger_end", err))
-
-        safeToPruneCommitmentState <- request.counterParticipantsCommitmentsState
-          .traverse(SafeToPruneCommitmentState.fromProtoV30)
-      } yield (beforeOrAt, ledgerEndOffset, safeToPruneCommitmentState)
+      } yield (beforeOrAt, ledgerEndOffset)
 
       val res = for {
         validatedRequest <- EitherT.fromEither[FutureUnlessShutdown](
@@ -111,10 +92,10 @@ class GrpcPruningService(
           )
         )
 
-        (beforeOrAt, ledgerEndOffset, safeToPruneCommitmentState) = validatedRequest
+        (beforeOrAt, ledgerEndOffset) = validatedRequest
 
         safeOffsetO <- sync.pruningProcessor
-          .safeToPrune(beforeOrAt, ledgerEndOffset, safeToPruneCommitmentState)
+          .safeToPrune(beforeOrAt, ledgerEndOffset)
           .leftFlatMap[Option[Offset], StatusRuntimeException] {
             case e @ Pruning.LedgerPruningNothingToPrune =>
               // Let the user know that no internal canton data exists prior to the specified

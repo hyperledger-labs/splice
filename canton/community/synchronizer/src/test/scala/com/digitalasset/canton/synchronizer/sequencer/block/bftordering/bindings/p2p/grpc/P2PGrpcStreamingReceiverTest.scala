@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc
@@ -23,7 +23,7 @@ import scala.concurrent.ExecutionContext
 class P2PGrpcStreamingReceiverTest extends AnyWordSpec with BftSequencerBaseTest {
 
   // Direct execution context is crucial for the tests to verify entire code paths.
-  implicit private val executionContext: ExecutionContext = DirectExecutionContext(noTracingLogger)
+  implicit private val executionContext: ExecutionContext = DirectExecutionContext(logger)
 
   "P2PGrpcStreamingReceiver" should {
     "throw an exception if received gRPC message before authentication was completed" in {

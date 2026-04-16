@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -16,7 +16,7 @@ import com.digitalasset.canton.util.{ErrorUtil, ResourceUtil}
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutionContext,
-  TestPredicateFiltersFixtureAnyWordSpec,
+  ProtocolVersionChecksFixtureAnyWordSpec,
 }
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.scalatest.Outcome
@@ -24,11 +24,11 @@ import org.scalatest.wordspec.FixtureAnyWordSpec
 
 import java.util.concurrent.atomic.AtomicReference
 
-final class SequencedEventMonotonicityCheckerTest
+class SequencedEventMonotonicityCheckerTest
     extends FixtureAnyWordSpec
     with BaseTest
     with HasExecutionContext
-    with TestPredicateFiltersFixtureAnyWordSpec {
+    with ProtocolVersionChecksFixtureAnyWordSpec {
   import SequencedEventMonotonicityCheckerTest.*
 
   override protected type FixtureParam = SequencedEventTestFixture
@@ -57,8 +57,8 @@ final class SequencedEventMonotonicityCheckerTest
       val checkedHandler = checker.handler(handler)
       val (batch1, batch2) = bobEvents.splitAt(2)
 
-      checkedHandler(Traced(batch1)).futureValueUS.unwrap.futureValueUS.future.futureValueUS
-      checkedHandler(Traced(batch2)).futureValueUS.unwrap.futureValueUS.future.futureValueUS
+      checkedHandler(Traced(batch1)).futureValueUS.unwrap.futureValueUS
+      checkedHandler(Traced(batch2)).futureValueUS.unwrap.futureValueUS
       handler.invocations.get.flatMap(_.value) shouldBe bobEvents
     }
 
@@ -83,9 +83,9 @@ final class SequencedEventMonotonicityCheckerTest
       val handler = mkHandler()
       val checkedHandler = checker.handler(handler)
 
-      checkedHandler(Traced(Seq(event1))).futureValueUS.unwrap.futureValueUS.future.futureValueUS
+      checkedHandler(Traced(Seq(event1))).futureValueUS.unwrap.futureValueUS
       loggerFactory.assertThrowsAndLogs[MonotonicityFailureException](
-        checkedHandler(Traced(Seq(event2))).futureValueUS.unwrap.futureValueUS.future.futureValueUS,
+        checkedHandler(Traced(Seq(event2))).futureValueUS.unwrap.futureValueUS,
         _.errorMessage should include(ErrorUtil.internalErrorMessage),
       )
     }
@@ -144,7 +144,7 @@ final class SequencedEventMonotonicityCheckerTest
 
 object SequencedEventMonotonicityCheckerTest {
   class CapturingApplicationHandler()
-      extends UnthrottledApplicationHandler[SequencedEnvelopeBox, ClosedEnvelope] {
+      extends ApplicationHandler[SequencedEnvelopeBox, ClosedEnvelope] {
     val invocations =
       new AtomicReference[Seq[BoxedEnvelope[SequencedEnvelopeBox, ClosedEnvelope]]](Seq.empty)
 

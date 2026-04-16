@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -25,7 +25,6 @@ object CantonNodeParameters {
     def loggingConfig: LoggingConfig
     def enableAdditionalConsistencyChecks: Boolean
     def enablePreviewFeatures: Boolean
-    def enableTestingFeatures: Boolean
     def processingTimeouts: ProcessingTimeout
     def sequencerClient: SequencerClientConfig
     def cachingConfigs: CachingConfigs
@@ -44,7 +43,6 @@ object CantonNodeParameters {
         override val loggingConfig: LoggingConfig,
         override val enableAdditionalConsistencyChecks: Boolean,
         override val enablePreviewFeatures: Boolean,
-        override val enableTestingFeatures: Boolean,
         override val processingTimeouts: ProcessingTimeout,
         override val sequencerClient: SequencerClientConfig,
         override val cachingConfigs: CachingConfigs,
@@ -82,7 +80,6 @@ trait HasGeneralCantonNodeParameters extends CantonNodeParameters.General {
   override def enableAdditionalConsistencyChecks: Boolean =
     general.enableAdditionalConsistencyChecks
   override def enablePreviewFeatures: Boolean = general.enablePreviewFeatures
-  override def enableTestingFeatures: Boolean = general.enableTestingFeatures
   override def processingTimeouts: ProcessingTimeout = general.processingTimeouts
   override def sequencerClient: SequencerClientConfig = general.sequencerClient
   override def cachingConfigs: CachingConfigs = general.cachingConfigs

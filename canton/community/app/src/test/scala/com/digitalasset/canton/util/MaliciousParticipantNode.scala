@@ -1,16 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
 
 import cats.data.EitherT
+import cats.syntax.functor.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{ProcessingTimeout, SessionEncryptionKeyCacheConfig}
+import com.digitalasset.canton.config.{CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.console.LocalParticipantReference
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{
   CryptoPureApi,
   Salt,
@@ -22,8 +22,6 @@ import com.digitalasset.canton.data.ViewType.{AssignmentViewType, UnassignmentVi
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.TestSubmissionService
 import com.digitalasset.canton.integration.util.TestSubmissionService.CommandsWithMetadata
-import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdown,
@@ -42,7 +40,6 @@ import com.digitalasset.canton.participant.protocol.submission.{
 }
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{SendResult, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.SessionKeyStoreWithInMemoryCache
@@ -56,16 +53,8 @@ import com.digitalasset.canton.topology.transaction.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{
-  BaseTest,
-  FutureHelpers,
-  LedgerCommandId,
-  LfPartyId,
-  WorkflowId,
-  checked,
-}
+import com.digitalasset.canton.{BaseTest, LedgerCommandId, LfPartyId, WorkflowId, checked}
 import com.digitalasset.daml.lf.data.Ref.UserId
-import com.digitalasset.daml.lf.transaction.SubmittedTransaction
 import com.digitalasset.daml.lf.transaction.test.TestIdFactory
 import org.scalatest.EitherValues.*
 import org.scalatest.OptionValues.*
@@ -82,7 +71,7 @@ class MaliciousParticipantNode(
     contractOfId: TransactionTreeFactory.ContractInstanceOfId,
     confirmationRequestFactory: TransactionConfirmationRequestFactory,
     sequencerClient: SequencerClient,
-    defaultPsid: PhysicalSynchronizerId,
+    defaultPSId: PhysicalSynchronizerId,
     defaultMediatorGroup: MediatorGroupRecipient,
     pureCrypto: CryptoPureApi,
     defaultCryptoSnapshot: () => SynchronizerSnapshotSyncCryptoApi,
@@ -101,8 +90,6 @@ class MaliciousParticipantNode(
 
   private def sendRequestBatchToSequencer(
       batch: Batch[DefaultOpenEnvelope],
-      approximateTimestampForSigning: CantonTimestamp,
-      maxSequencingTime: CantonTimestamp,
       topologyTimestamp: Option[CantonTimestamp] = None,
   )(implicit
       traceContext: TraceContext
@@ -113,11 +100,7 @@ class MaliciousParticipantNode(
       _ <- sequencerClient
         .send(
           batch,
-          timestamps = SendRequestTimestamps(
-            topologyTimestamp = topologyTimestamp,
-            approximateTimestampForSigning = approximateTimestampForSigning,
-            maxSequencingTime = maxSequencingTime,
-          ),
+          topologyTimestamp = topologyTimestamp,
           callback = {
             case UnlessShutdown.Outcome(success: SendResult.Success) =>
               promise.outcome_(Right(success))
@@ -148,29 +131,16 @@ class MaliciousParticipantNode(
     val rootHash = fullTree.rootHash
     val stakeholders = fullTree.stakeholders
 
-    val now = sequencerClient.clock.now
-    val maxSequencingTime = sequencerClient.generateMaxSequencingTime(now)
-    val signingTimestampOverrides = Some(
-      SigningTimestampOverrides(
-        approximateTimestamp = now,
-        validityPeriodEnd = Some(maxSequencingTime),
-      )
-    )
-
     ResourceUtil.withResourceM(
       new SessionKeyStoreWithInMemoryCache(
-        SessionEncryptionKeyCacheConfig(),
+        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
         timeouts,
         loggerFactory,
       )
     ) { sessionKeyStore =>
       for {
         submittingParticipantSignature <- cryptoSnapshot
-          .sign(
-            rootHash.unwrap,
-            SigningKeyUsage.ProtocolOnly,
-            signingTimestampOverrides,
-          )
+          .sign(rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
           .leftMap(_.toString)
         mediatorMessage = fullTree.mediatorMessage(
           submittingParticipantSignature,
@@ -206,7 +176,6 @@ class MaliciousParticipantNode(
             fullTree,
             (viewKey, viewKeyMap),
             cryptoSnapshot,
-            signingTimestampOverrides,
             sourceProtocolVersion.unwrap,
           )
           .leftMap(_.toString)
@@ -234,7 +203,7 @@ class MaliciousParticipantNode(
           rootHashMessage -> rootHashRecipients,
         )
         batch = Batch.of(sourceProtocolVersion.unwrap, messages*)
-        _ <- sendRequestBatchToSequencer(batch, now, maxSequencingTime)
+        _ <- sendRequestBatchToSequencer(batch)
       } yield ()
     }
   }
@@ -255,8 +224,8 @@ class MaliciousParticipantNode(
     logger.info(
       s"Malicious participant $participantId submitting assignment request for $reassignmentId"
     )
-    val sourceSynchronizer = reassignmentData.sourcePsid
-    val targetSynchronizer = reassignmentData.targetPsid
+    val sourceSynchronizer = reassignmentData.sourcePSId
+    val targetSynchronizer = reassignmentData.targetPSId
 
     val stakeholders = reassignmentData.contractsBatch.stakeholders
 
@@ -291,7 +260,7 @@ class MaliciousParticipantNode(
 
     ResourceUtil.withResourceM(
       new SessionKeyStoreWithInMemoryCache(
-        SessionEncryptionKeyCacheConfig(),
+        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
         timeouts,
         loggerFactory,
       )
@@ -311,21 +280,8 @@ class MaliciousParticipantNode(
         )
 
         rootHash = fullTree.rootHash
-        now = sequencerClient.clock.now
-        maxSequencingTime = sequencerClient.generateMaxSequencingTime(now)
-        signingTimestampOverrides = Some(
-          SigningTimestampOverrides(
-            approximateTimestamp = now,
-            validityPeriodEnd = Some(maxSequencingTime),
-          )
-        )
-
         submittingParticipantSignature <- cryptoSnapshot
-          .sign(
-            rootHash.unwrap,
-            SigningKeyUsage.ProtocolOnly,
-            signingTimestampOverrides,
-          )
+          .sign(rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
           .leftMap(_.toString)
         mediatorMessage = fullTree.mediatorMessage(
           submittingParticipantSignature,
@@ -361,7 +317,6 @@ class MaliciousParticipantNode(
             fullTree,
             (viewKey, viewKeyMap),
             cryptoSnapshot,
-            signingTimestampOverrides,
             targetProtocolVersion.unwrap,
           )
           .leftMap(_.toString)
@@ -389,14 +344,14 @@ class MaliciousParticipantNode(
           rootHashMessage -> rootHashRecipients,
         )
         batch = Batch.of(targetProtocolVersion.unwrap, messages*)
-        _ <- sendRequestBatchToSequencer(batch, now, maxSequencingTime)
+        _ <- sendRequestBatchToSequencer(batch)
       } yield ()
     }
   }
 
   def submitTopologyTransactionRequest[Op <: TopologyChangeOp, M <: TopologyMapping](
       signedTopologyTransaction: SignedTopologyTransaction[Op, M],
-      psid: PhysicalSynchronizerId = defaultPsid,
+      psid: PhysicalSynchronizerId = defaultPSId,
       protocolVersion: ProtocolVersion = defaultProtocolVersion,
       topologyTimestamp: Option[CantonTimestamp] = None,
       recipients: Recipients = Recipients.cc(AllMembersOfSynchronizer),
@@ -411,23 +366,15 @@ class MaliciousParticipantNode(
       psid,
       List(signedTopologyTransaction),
     )
-
-    // It's safe to use these timestamps for signing the request because batch signatures are either empty
-    // or generated with the long-term key, and no specific max sequencing time is defined, so the default can be used.
-    val now = sequencerClient.clock.now
-    val maxSequencingTime = sequencerClient.generateMaxSequencingTime(now)
-
     sendRequestBatchToSequencer(
       Batch.of(protocolVersion, broadcast -> recipients),
-      approximateTimestampForSigning = now,
-      maxSequencingTime = maxSequencingTime,
-      topologyTimestamp = topologyTimestamp,
+      topologyTimestamp,
     )
   }
 
   def submitTopologyTransactionBroadcasts(
       topologyBroadcasts: Seq[TopologyTransactionsBroadcast],
-      psid: PhysicalSynchronizerId = defaultPsid,
+      psid: PhysicalSynchronizerId = defaultPSId,
       protocolVersion: ProtocolVersion = defaultProtocolVersion,
       topologyTimestamp: Option[CantonTimestamp] = None,
       recipients: Recipients = Recipients.cc(AllMembersOfSynchronizer),
@@ -438,21 +385,14 @@ class MaliciousParticipantNode(
       s"Malicious participant $participantId submitting topology transaction broadcasts ${topologyBroadcasts
           .map(_.transactions)} to $psid"
     )
-    // It's safe to use these timestamps for signing the batch of `TopologyTransactionsBroadcast`
-    // because they match the timestamps and max sequencing typically applied in production.
-    val now = sequencerClient.clock.now
-    val maxSequencingTime = sequencerClient.generateMaxSequencingTime(now)
     sendRequestBatchToSequencer(
       Batch.of(protocolVersion, topologyBroadcasts.map(_ -> recipients)*),
-      approximateTimestampForSigning = now,
-      maxSequencingTime = maxSequencingTime,
-      topologyTimestamp = topologyTimestamp,
+      topologyTimestamp,
     )
   }
 
   def submitCommand(
       command: CommandsWithMetadata,
-      transactionInterceptor: SubmittedTransaction => SubmittedTransaction = identity,
       transactionTreeInterceptor: GenTransactionTree => GenTransactionTree = identity,
       confirmationRequestInterceptor: TransactionConfirmationRequest => TransactionConfirmationRequest =
         identity,
@@ -461,13 +401,12 @@ class MaliciousParticipantNode(
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi = defaultCryptoSnapshot(),
       maxDeduplicationDuration: Duration = Duration.ofDays(7),
       protocolVersion: ProtocolVersion = defaultProtocolVersion,
-      submitterInfoInterceptor: SubmitterInfo => SubmitterInfo = identity,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, SendResult.Success] =
     ResourceUtil.withResourceM(
       new SessionKeyStoreWithInMemoryCache(
-        SessionEncryptionKeyCacheConfig(),
+        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
         timeouts,
         loggerFactory,
       )
@@ -477,8 +416,7 @@ class MaliciousParticipantNode(
           .interpret(command)
           .leftMap(err => s"Unable to create transaction: $err")
           .mapK(FutureUnlessShutdown.outcomeK)
-        (_submittedTransaction, metadata) = transactionAndMetadata
-        submittedTransaction = transactionInterceptor(_submittedTransaction)
+        (submittedTransaction, metadata) = transactionAndMetadata
         transactionMeta = command.transactionMeta(submittedTransaction, metadata)
         transactionMetadata = TransactionMetadata
           .fromTransactionMeta(
@@ -494,27 +432,18 @@ class MaliciousParticipantNode(
           WellFormedTransaction.WithoutSuffixes,
         )
 
-        now = sequencerClient.clock.now
-        maxSequencingTime = sequencerClient.generateMaxSequencingTime(now)
-        signingTimestampOverrides = Some(
-          SigningTimestampOverrides(
-            approximateTimestamp = now,
-            validityPeriodEnd = Some(maxSequencingTime),
-          )
-        )
-
         transactionTree <- transactionTreeFactory
           .createTransactionTree(
             wfTransaction,
-            submitterInfoInterceptor(command.submitterInfo(maxDeduplicationDuration)),
+            command.submitterInfo(maxDeduplicationDuration),
             command.workflowIdO.map(WorkflowId(_)),
             mediator,
-            command.transactionSeed,
-            command.transactionUuid,
+            seedGenerator.generateSaltSeed(),
+            seedGenerator.generateUuid(),
             cryptoSnapshot.ipsSnapshot,
             contractOfId,
             metadata.globalKeyMapping,
-            maxSequencingTime,
+            sequencerClient.generateMaxSequencingTime,
             validatePackageVettings = false,
           )
           .leftMap(err => s"Unable to create transaction tree: $err")
@@ -525,7 +454,6 @@ class MaliciousParticipantNode(
           .createConfirmationRequest(
             modifiedTransactionTree,
             cryptoSnapshot,
-            signingTimestampOverrides,
             sessionKeyStore,
             protocolVersion,
           )
@@ -535,12 +463,12 @@ class MaliciousParticipantNode(
         batch <- EitherT
           .right(modifiedConfirmationRequest.asBatch(cryptoSnapshot.ipsSnapshot))
         modifiedBatch = batch.map(envelopeInterceptor)
-        sendResult <- sendRequestBatchToSequencer(modifiedBatch, now, maxSequencingTime)
+        sendResult <- sendRequestBatchToSequencer(modifiedBatch)
       } yield sendResult
     }
 }
 
-object MaliciousParticipantNode extends FutureHelpers {
+object MaliciousParticipantNode {
   def apply(
       participant: LocalParticipantReference,
       synchronizerId: PhysicalSynchronizerId,
@@ -579,7 +507,6 @@ object MaliciousParticipantNode extends FutureHelpers {
     def currentCryptoSnapshot(): SynchronizerSnapshotSyncCryptoApi = sync.syncCrypto
       .tryForSynchronizer(synchronizerId, BaseTest.defaultStaticSynchronizerParameters)
       .currentSnapshotApproximation
-      .futureValueUS
 
     new MaliciousParticipantNode(
       participant.id,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -7,7 +7,6 @@ import cats.Monad
 import cats.data.StateT
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.{LfInterfaceId, LfPackageId}
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.Ref.QualifiedName
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
 import com.digitalasset.daml.lf.language.LanguageVersion
@@ -22,7 +21,7 @@ object LfTransactionBuilder {
   type LfAction = (LfNodeId, Map[LfNodeId, LfActionNode])
 
   // Helper methods for Daml-LF types
-  val defaultLanguageVersion: LanguageVersion = LanguageVersion.defaultLfVersion
+  val defaultLanguageVersion: LanguageVersion = LanguageVersion.default
   val defaultSerializationVersion: LfSerializationVersion =
     LfSerializationVersion.V1
 //    LfSerializationVersion.assign(LfLanguageVersion.AllV2.min)
@@ -35,9 +34,8 @@ object LfTransactionBuilder {
 
   val defaultGlobalKey: LfGlobalKey = LfGlobalKey.assertBuild(
     defaultTemplateId,
-    defaultPackageName,
     Value.ValueUnit,
-    crypto.Hash.hashPrivateKey("default-global-key"),
+    defaultPackageName,
   )
 
   def allocateNodeId[M[_]](implicit monadInstance: Monad[M]): StateT[M, NodeIdState, LfNodeId] =

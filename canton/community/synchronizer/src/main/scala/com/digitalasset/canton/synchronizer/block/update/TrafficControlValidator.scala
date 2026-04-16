@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.update
@@ -22,7 +22,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SubmissionOutcome,
 }
 import com.digitalasset.canton.topology.SequencerId
-import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 
@@ -49,7 +48,6 @@ private[update] class TrafficControlValidator(
       orderingSequencerId: SequencerId,
       sequencingTimestamp: CantonTimestamp,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
-      sequencingTopologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
@@ -73,7 +71,6 @@ private[update] class TrafficControlValidator(
             signedSubmissionRequest,
             orderingSequencerId,
             sequencingTimestamp,
-            sequencingTopologySnapshot,
             latestSequencerEventTimestamp,
             // TODO(#18401) set warnIfApproximate to true and check that we don't get warnings
             // This used to be the following code:
@@ -136,7 +133,6 @@ private[update] class TrafficControlValidator(
       signedSubmissionRequest: SignedSubmissionRequest,
       orderingSequencerId: SequencerId,
       sequencingTimestamp: CantonTimestamp,
-      sequencingTopologySnapshot: TopologySnapshot,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
       warnIfApproximate: Boolean,
   )(implicit
@@ -148,7 +144,6 @@ private[update] class TrafficControlValidator(
       .validateRequestAndConsumeTraffic(
         submissionRequest,
         sequencingTimestamp,
-        sequencingTopologySnapshot,
         submissionTimestamp = signedSubmissionRequest.timestampOfSigningKey,
         latestSequencerEventTimestamp = latestSequencerEventTimestamp,
         warnIfApproximate = warnIfApproximate,

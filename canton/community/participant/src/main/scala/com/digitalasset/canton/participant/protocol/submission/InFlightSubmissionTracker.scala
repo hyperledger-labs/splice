@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -36,11 +36,11 @@ import com.digitalasset.canton.sequencing.protocol.{DeliverError, MessageId}
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{MonadUtil, Mutex}
+import com.digitalasset.canton.util.MonadUtil
 
 import java.util.UUID
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, blocking}
 
 /** Tracker for in-flight submissions backed by the
   * [[com.digitalasset.canton.participant.store.InFlightSubmissionStore]].
@@ -299,35 +299,27 @@ class InFlightSubmissionSynchronizerTracker(
       changeIdHash: ChangeIdHash,
       messageId: MessageId,
       newTrackingData: SubmissionTrackingData,
-      maxSequencingTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    // This timeout has relevance only for crash recovery (will be used there to publish the rejection).
-    // We try to approximate it as precision is not paramount (this approximation is likely too low, resulting in an immediate delivery on crash recovery).
-    // In theory, we could pipe the realized immediate-synchronizer time back to the persistence, but then we would need to wait for persisting before letting
-    // the synchronizer go, which would have the undesirable effect of submission errors are slowing down the synchronizer.
-    // Please note: as this data is also used in a heuristic for journal garbage collection, we must use here realistic values.
-
-    // first approximation is by synchronizer-time-tracker
-    val tsLatestObserved = timeTracker.latestTime
-      .getOrElse(
-        // if no synchronizer-time yet, then approximating with the initial time of the synchronizer
-        recordOrderPublisher.initTimestamp
-      )
-
-    // cap the timeout by the max sequencing time so that the timeout field can move only backwards.
-    val newTsUnsequenced = if (tsLatestObserved > maxSequencingTime) {
-      logger.info(
-        s"Capping submission error $newTrackingData (change ID hash $changeIdHash, message Id $messageId on $synchronizerId) observed around $tsLatestObserved beyond max sequencing time $maxSequencingTime."
-      )
-      maxSequencingTime
-    } else tsLatestObserved
-
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     store.value
       .updateUnsequenced(
         changeIdHash,
         synchronizerId,
         messageId,
-        UnsequencedSubmission(newTsUnsequenced, newTrackingData),
+        UnsequencedSubmission(
+          // This timeout has relevance only for crash recovery (will be used there to publish the rejection).
+          // We try to approximate it as precision is not paramount (this approximation is likely too low, resulting in an immediate delivery on crash recovery).
+          // In theory we could pipe the realized immediate-synchronizer time back to the persistence, but then we would need to wait for persisting before letting
+          // the synchronizer go, which would have the undesirable effect of submission errors are slowing down the synchronizer.
+          // Please note: as this data is also used in a heuristic for journal garbage collection, we must use here realistic values.
+
+          // first approximation is by synchronizer-time-tracker
+          timeTracker.latestTime
+            .getOrElse(
+              // if no synchronizer-time yet, then approximating with the initial time of the synchronizer
+              recordOrderPublisher.initTimestamp
+            ),
+          newTrackingData,
+        ),
       )
       .map { _ =>
         unsequencedSubmissionMap.changeIfExists(
@@ -340,7 +332,6 @@ class InFlightSubmissionSynchronizerTracker(
           )
           .discard
       }
-  }
 
   /** Updates the unsequenced submission corresponding to the
     * [[com.digitalasset.canton.sequencing.protocol.DeliverError]], if any, using
@@ -364,7 +355,6 @@ class InFlightSubmissionSynchronizerTracker(
         newTrackingData <- unsequenced.trackingData.updateOnNotSequenced(
           deliverError.timestamp,
           deliverError.reason,
-          deliverError.trafficCost,
         )
       } yield (inFlight.changeIdHash, newTrackingData, inFlight.submissionTraceContext)
 
@@ -457,7 +447,6 @@ object InFlightSubmissionTracker {
       override val loggerFactory: NamedLoggerFactory,
   ) extends NamedLogging {
 
-    private val lock = new Mutex()
     private val mutableUnsequencedMap: mutable.Map[MessageId, Entry[T]] =
       mutable.Map()
     private val rootHashMap: mutable.Map[RootHash, MessageId] =
@@ -467,8 +456,8 @@ object InFlightSubmissionTracker {
     def changeIfExists(
         key: MessageId,
         trackingData: T,
-    ): Unit = (
-      lock.exclusive(
+    ): Unit = blocking(
+      synchronized(
         mutableUnsequencedMap
           .updateWith(key) {
             case Some(entry) =>
@@ -484,8 +473,8 @@ object InFlightSubmissionTracker {
     def addRootHashIfNotSpecifiedYet(
         key: MessageId,
         rootHash: RootHash,
-    ): Unit = (
-      lock.exclusive(
+    ): Unit = blocking(
+      synchronized(
         mutableUnsequencedMap
           .updateWith(key) {
             case Some(entry @ Entry(_, _, _, None, _)) =>
@@ -506,7 +495,7 @@ object InFlightSubmissionTracker {
         rootHash: Option[RootHash],
     )(implicit traceContext: TraceContext): Option[SynchronizerTimeTracker.TickRequestCell] = {
       val messageId = MessageId.fromUuid(messageUuid)
-      (lock.exclusive {
+      blocking(synchronized {
         Option.when(!mutableUnsequencedMap.contains(MessageId.fromUuid(messageUuid))) {
           val entry = Entry(
             trackingData,
@@ -531,8 +520,8 @@ object InFlightSubmissionTracker {
     // This is needed as corresponding scheduled tasks are not getting removed, but rather those task will do nothing on perform()
     // if an earlier task already emitted the corresponding event.
     def pull(key: MessageId): Option[Entry[T]] =
-      (
-        lock.exclusive(
+      blocking(
+        synchronized(
           mutableUnsequencedMap
             .remove(key)
             .map { result =>
@@ -545,8 +534,8 @@ object InFlightSubmissionTracker {
       )
 
     def pullByHash(rootHash: RootHash): Unit =
-      (
-        lock.exclusive(
+      blocking(
+        synchronized(
           rootHashMap
             .get(rootHash)
             .foreach(pull)

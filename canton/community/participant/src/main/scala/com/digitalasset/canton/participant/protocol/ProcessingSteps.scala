@@ -1,23 +1,21 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.{HashOps, Signature, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, ViewType}
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.{AcsChangeFactory, SequencedEventUpdate}
+import com.digitalasset.canton.ledger.participant.state.{AcsChangeFactory, SequencedUpdate}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
-  DecryptedViews,
   InternalContractIds,
   ParsedRequest,
   WrapsProcessorError,
@@ -40,7 +38,6 @@ import com.digitalasset.canton.participant.protocol.validation.PendingTransactio
 import com.digitalasset.canton.participant.store.ReassignmentLookup
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.{ConfirmationRequestSessionKeyStore, SessionKeyStore}
@@ -53,7 +50,7 @@ import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LedgerSubmissionId, RequestCounter, SequencerCounter, checked}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Interface for processing steps that are specific to request types (transaction / reassignment).
   * The [[ProtocolProcessor]] wires up these steps with the necessary synchronization and state
@@ -162,22 +159,15 @@ trait ProcessingSteps[
     *   Read-only access to the [[com.digitalasset.canton.participant.sync.SyncEphemeralState]]
     * @param recentSnapshot
     *   A recent snapshot of the topology state to be used for submission
-    * @param generateMaxSequencingTime
-    *   Function to generate the max sequencing time, based on a given start timestamp.
     */
   def createSubmission(
       submissionParam: SubmissionParam,
       mediator: MediatorGroupRecipient,
       ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      generateMaxSequencingTime: CantonTimestamp => CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[
-    FutureUnlessShutdown,
-    SubmissionError,
-    (Submission, PendingSubmissionData),
-  ]
+  ): EitherT[FutureUnlessShutdown, SubmissionError, (Submission, PendingSubmissionData)]
 
   def embedNoMediatorError(error: NoMediatorError): SubmissionError
 
@@ -187,17 +177,12 @@ trait ProcessingSteps[
 
   sealed trait Submission {
 
-    /** Timestamp used for signing the request (i.e., to select the correct session signing key).
-      * Since this trait models submission requests, the topology is not fixed, so we use an
-      * approximate timestamp to better reflect the current time. Typically, the local clock is
-      * suitable.
+    /** Optional timestamp for the max sequencing time of the event.
+      *
+      * If possible, set it to the upper limit when the event could be successfully processed. If
+      * [[scala.None]], then the sequencer client default will be used.
       */
-    def approximateTimestampForSigning: CantonTimestamp
-
-    /** Timestamp representing the maximum sequencing time for this event. Should be set to the
-      * latest time the event can be processed successfully.
-      */
-    def maxSequencingTime: CantonTimestamp
+    def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp]
   }
 
   /** Submission to be sent off without tracking the in-flight submission and without deduplication.
@@ -269,7 +254,6 @@ trait ProcessingSteps[
       */
     def prepareBatch(
         actualDeduplicationOffset: DeduplicationPeriod.DeduplicationOffset,
-        approximateTimestampForSigning: CantonTimestamp,
         maxSequencingTime: CantonTimestamp,
         sessionKeyStore: SessionKeyStore,
     ): EitherT[FutureUnlessShutdown, SubmissionTrackingData, PreparedBatch]
@@ -375,7 +359,31 @@ trait ProcessingSteps[
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, RequestError, DecryptedViews[DecryptedView]]
+  ): EitherT[FutureUnlessShutdown, RequestError, DecryptedViews]
+
+  /** Phase 3, step 1a:
+    *
+    * @param views
+    *   The successfully decrypted views and their signatures. Signatures are only present for
+    *   top-level views (where the submitter metadata is not blinded)
+    * @param decryptionErrors
+    *   The decryption errors while trying to decrypt the views
+    */
+  case class DecryptedViews(
+      views: Seq[(WithRecipients[DecryptedView], Option[Signature])],
+      decryptionErrors: Seq[EncryptedViewMessageError],
+  )
+
+  object DecryptedViews {
+    def apply(
+        all: Seq[
+          Either[EncryptedViewMessageError, (WithRecipients[DecryptedView], Option[Signature])]
+        ]
+    ): DecryptedViews = {
+      val (errors, views) = all.separate
+      DecryptedViews(views, errors)
+    }
+  }
 
   /** Phase 3, step 1b
     *
@@ -433,7 +441,6 @@ trait ProcessingSteps[
       mediator: MediatorGroupRecipient,
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       synchronizerParameters: DynamicSynchronizerParametersWithValidity,
-      trafficCost: NonNegativeLong,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ParsedRequestType]
 
   /** Phase 3, step 2 (some good views) */
@@ -457,8 +464,6 @@ trait ProcessingSteps[
     * @param freshOwnTimelyTx
     *   The resolved status from
     *   [[com.digitalasset.canton.participant.protocol.SubmissionTracker.register]]
-    * @param trafficCost
-    *   Traffic cost of the associated confirmation request
     *
     * @return
     *   The optional rejection event to be published in the event log, and the optional submission
@@ -471,10 +476,9 @@ trait ProcessingSteps[
       rootHash: RootHash,
       freshOwnTimelyTx: Boolean,
       error: TransactionError,
-      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
-  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId])
+  ): (Option[SequencedUpdate], Option[PendingSubmissionId])
 
   /** Phase 3, step 2 (rejected submission, e.g. chosen mediator is inactive, invalid recipients)
     *
@@ -494,6 +498,10 @@ trait ProcessingSteps[
       traceContext: TraceContext
   ): Unit
 
+  def authenticateInputContracts(parsedRequest: ParsedRequestType)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, RequestError, Unit]
+
   /** Phase 3, step 3: Yields the pending data and confirmation responses for the case that at least
     * one payload is well-formed.
     *
@@ -512,7 +520,6 @@ trait ProcessingSteps[
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
-      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, RequestError, StorePendingDataAndSendResponseAndCreateTimeout]
@@ -552,7 +559,7 @@ trait ProcessingSteps[
     */
   def createRejectionEvent(rejectionArgs: RejectionArgs)(implicit
       traceContext: TraceContext
-  ): Either[ResultError, Option[SequencedEventUpdate]]
+  ): Either[ResultError, Option[SequencedUpdate]]
 
   // Phase 7: Result processing
 
@@ -596,7 +603,7 @@ trait ProcessingSteps[
   case class CommitAndStoreContractsAndPublishEvent(
       commitSet: Option[FutureUnlessShutdown[CommitSet]],
       contractsToBeStored: Seq[ContractInstance],
-      maybeEvent: Option[AcsChangeFactory => InternalContractIds => SequencedEventUpdate],
+      maybeEvent: Option[AcsChangeFactory => InternalContractIds => SequencedUpdate],
   )
 
   /** Phase 7, step 4:
@@ -747,10 +754,6 @@ object ProcessingSteps {
     def synchronizerParameters: DynamicSynchronizerParametersWithValidity
     def rootHash: RootHash
 
-    /** Traffic cost incurred by this participant for sequencing the request
-      */
-    def trafficCost: NonNegativeLong
-
     def decisionTime: CantonTimestamp = synchronizerParameters
       .decisionTimeFor(requestTimestamp)
       .valueOr(err => throw new IllegalStateException(err))
@@ -773,10 +776,7 @@ object ProcessingSteps {
 
     def rootHashO: Option[RootHash]
 
-    /** Returns the handle that takes the event to be published to the record order publisher. Must
-      * be defined iff this is not a clean replay.
-      */
-    def publishUpdateO: Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]]
+    def isCleanReplay: Boolean
 
     def cancelDecisionTimeTickRequest(): Unit
   }
@@ -800,6 +800,7 @@ object ProcessingSteps {
   final case class Wrapped[+A <: PendingRequestData](unwrap: A) extends ReplayDataOr[A] {
     override def requestCounter: RequestCounter = unwrap.requestCounter
     override def requestSequencerCounter: SequencerCounter = unwrap.requestSequencerCounter
+    override def isCleanReplay: Boolean = false
     override def mediator: MediatorGroupRecipient = unwrap.mediator
 
     override def locallyRejectedF: FutureUnlessShutdown[Boolean] = unwrap.locallyRejectedF
@@ -812,10 +813,6 @@ object ProcessingSteps {
     override def toOption: Option[A] = Some(unwrap)
 
     override def cancelDecisionTimeTickRequest(): Unit = unwrap.cancelDecisionTimeTickRequest()
-
-    override def publishUpdateO
-        : Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]] =
-      unwrap.publishUpdateO
   }
 
   /** Minimal implementation of [[PendingRequestData]] to be used in case of a clean replay. */
@@ -827,39 +824,16 @@ object ProcessingSteps {
       override val abortEngine: String => Unit,
       override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
   ) extends ReplayDataOr[Nothing] {
+    override def isCleanReplay: Boolean = true
+
     override def rootHashO: Option[RootHash] = None
 
     override def toOption: Option[Nothing] = None
 
     override def cancelDecisionTimeTickRequest(): Unit = ()
-
-    override def publishUpdateO
-        : Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]] = None
   }
 
+  // TODO(#27996) remove this type when internal contract ids are no longer fetched from ProtocolProcessor
   type InternalContractIds = Map[LfContractId, Long]
 
-  /** Phase 3, step 1a:
-    *
-    * @param views
-    *   The successfully decrypted views and their signatures. Signatures are only present for
-    *   top-level views (where the submitter metadata is not blinded)
-    * @param decryptionErrors
-    *   The decryption errors while trying to decrypt the views
-    */
-  final case class DecryptedViews[V](
-      views: Seq[(WithRecipients[V], Option[Signature])],
-      decryptionErrors: Seq[EncryptedViewMessageError],
-  )
-
-  object DecryptedViews {
-    def apply[V](
-        all: Seq[
-          Either[EncryptedViewMessageError, (WithRecipients[V], Option[Signature])]
-        ]
-    ): DecryptedViews[V] = {
-      val (errors, views) = all.separate
-      DecryptedViews(views, errors)
-    }
-  }
 }

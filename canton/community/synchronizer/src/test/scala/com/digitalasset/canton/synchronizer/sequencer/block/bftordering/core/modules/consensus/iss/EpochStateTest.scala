@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -53,7 +53,7 @@ class EpochStateTest extends AsyncWordSpec with BftSequencerBaseTest {
     "return the last block's completed commit messages" when {
       "created with the last block already completed" in {
         val epochInfo =
-          EpochInfo.forTesting(
+          EpochInfo.mk(
             number = EpochNumber.First,
             startBlockNumber = BlockNumber.First,
             length = 7,
@@ -89,7 +89,7 @@ class EpochStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
     "complete epoch once all blocks are stored" in {
       val epochInfo =
-        EpochInfo.forTesting(
+        EpochInfo.mk(
           number = EpochNumber.First,
           startBlockNumber = BlockNumber.First,
           length = 7,

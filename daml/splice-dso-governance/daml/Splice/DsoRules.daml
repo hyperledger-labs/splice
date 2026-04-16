@@ -457,7 +457,6 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
-    nextScheduledLogicalSynchronizerUpgrade: Optional LogicalSynchronizerUpgradeSchedule
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
@@ -471,20 +470,6 @@ data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     migrationId : Int
       -- ^ The incremental integer ID of the migration.
   deriving (Eq, Show)
-
-data LogicalSynchronizerUpgradeSchedule = LogicalSynchronizerUpgradeSchedule
-  with
-    topologyFreezeTime : Time
-      -- ^ The time at which topology transactions will be frozen. Note that this time is used by the automation
-      -- to initiate the topology transactions for freezing. The actual freeze time is the effective time of the topology transaction.
-    upgradeTime : Time
-      -- ^ The time at which the upgrade to the new physical synchronizer will happen.
-    newPhysicalSynchronizerSerial : Int
-      -- ^ The serial of the new physical synchronizer. Usually just the serial of the old physical synchronizer + 1.
-    newPhysicalSynchronizerProtocolVersion : Text
-      -- ^ The protocol version of the new physical synchronizer
-  deriving (Show, Eq)
-
 
 data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
@@ -1956,7 +1941,6 @@ instance Patchable DsoRulesConfig where
     maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
-    nextScheduledLogicalSynchronizerUpgrade = patch new.nextScheduledLogicalSynchronizerUpgrade base.nextScheduledLogicalSynchronizerUpgrade current.nextScheduledLogicalSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
 
 instance Patchable SynchronizerUpgradeSchedule where
@@ -1966,10 +1950,3 @@ instance Patchable SynchronizerUpgradeSchedule where
 
 instance HasCheckedFetch BootstrapExternalPartyConfigStateInstruction ForDso where
   contractGroupId BootstrapExternalPartyConfigStateInstruction{..} = ForDso with dso
-
-instance Patchable LogicalSynchronizerUpgradeSchedule where
-  patch new base current = LogicalSynchronizerUpgradeSchedule with
-        topologyFreezeTime = patch new.topologyFreezeTime base.topologyFreezeTime current.topologyFreezeTime
-        upgradeTime = patch new.upgradeTime base.upgradeTime current.upgradeTime
-        newPhysicalSynchronizerSerial = patch new.newPhysicalSynchronizerSerial base.newPhysicalSynchronizerSerial current.newPhysicalSynchronizerSerial
-        newPhysicalSynchronizerProtocolVersion = patch new.newPhysicalSynchronizerProtocolVersion base.newPhysicalSynchronizerProtocolVersion current.newPhysicalSynchronizerProtocolVersion

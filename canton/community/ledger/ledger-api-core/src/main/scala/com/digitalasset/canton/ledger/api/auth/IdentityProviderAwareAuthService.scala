@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth
@@ -17,7 +17,7 @@ import com.digitalasset.canton.auth.{AuthService, ClaimSet, JwtVerifierLoader}
 import com.digitalasset.canton.ledger.api.IdentityProviderId
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.parser
+import spray.json.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -117,22 +117,14 @@ class IdentityProviderAwareAuthService(
 
   private def parseAuthServicePayload(jwtPayload: String): AuthServiceJWTPayload = {
     import AuthServiceJWTCodec.JsonImplicits.*
-    parser
-      .decode(jwtPayload)
-      .fold(
-        err => throw new RuntimeException("Failed to decode JWT JSON payload", err),
-        identity,
-      )
+    JsonParser(jwtPayload).convertTo[AuthServiceJWTPayload]
   }
 
-  private[this] def parseAudienceBasedPayload(jwtPayload: String): AuthServiceJWTPayload = {
+  private[this] def parseAudienceBasedPayload(
+      jwtPayload: String
+  ): AuthServiceJWTPayload = {
     import AuthServiceJWTCodec.AudienceBasedTokenJsonImplicits.*
-    parser
-      .decode(jwtPayload)
-      .fold(
-        err => throw new RuntimeException("Failed to decode JWT JSON payload", err),
-        identity,
-      )
+    JsonParser(jwtPayload).convertTo[AuthServiceJWTPayload]
   }
 
   private def toAuthenticatedUser(payload: StandardJWTPayload, id: IdentityProviderId.Id) =

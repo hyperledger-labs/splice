@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -127,7 +127,7 @@ class SequencedEventValidatorTest
           cmd: => FutureUnlessShutdown[SequencedEventValidationError[E]]
       ): SequencedEventValidationError[E] =
         loggerFactory
-          .assertLogs(cmd, _.shouldBeCantonErrorCode(SequencerSubscriptionError.ForkHappened))
+          .assertLogs(cmd, _.shouldBeCantonErrorCode(ResilientSequencerSubscription.ForkHappened))
           .failOnShutdown
           .futureValue
 
@@ -596,8 +596,8 @@ class SequencedEventValidatorTest
         ),
         // We get two log messages here: one from the validator that creates the error
         // and one from the test case that creates the error again for the comparison
-        _.errorMessage should include(SequencerSubscriptionError.ForkHappened.id),
-        _.errorMessage should include(SequencerSubscriptionError.ForkHappened.id),
+        _.errorMessage should include(ResilientSequencerSubscription.ForkHappened.id),
+        _.errorMessage should include(ResilientSequencerSubscription.ForkHappened.id),
       )
     }
 

@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/pulumi';
-import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { refreshOperation, refreshStack } from './pulumiOperations';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 const abortController = new PulumiAbortController();
 
@@ -16,8 +16,6 @@ export async function runStacksRefresh(): Promise<void> {
   operations.push(refreshOperation(validator1, abortController));
   const infra = await stack('infra', 'infra', true, {});
   operations.push(refreshOperation(infra, abortController));
-  const observability = await stack('observability', 'observability', true, {});
-  operations.push(refreshOperation(observability, abortController));
   const splitwell = await stack('splitwell', 'splitwell', true, {});
   operations.push(refreshOperation(splitwell, abortController));
   const multiValidatorStack = await stack('multi-validator', 'multi-validator', true, {});
@@ -47,8 +45,8 @@ export async function runStacksRefresh(): Promise<void> {
         return refreshStack(stack, abortController);
       },
       false,
-      true
-    )
+      true,
+    ),
   );
   await awaitAllOrThrowAllExceptions(operations);
 }

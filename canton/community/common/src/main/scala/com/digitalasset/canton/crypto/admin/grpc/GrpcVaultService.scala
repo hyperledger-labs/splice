@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.admin.grpc
@@ -274,10 +274,7 @@ class GrpcVaultService(
       case kmsCrypto: KmsPrivateCrypto =>
         Right(kmsCrypto)
       case _ =>
-        Left(
-          GrpcVaultServiceError.RegisterKmsKeyInternalError
-            .Failure("The private crypto API in use is not backed by a KMS")
-        )
+        Left(GrpcVaultServiceError.NoEncryptedPrivateKeyStoreError.Failure())
     }
 
   private def registerKmsKey[A <: PublicKey](

@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
 
 import cats.data.EitherT
 import cats.syntax.option.*
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveDouble, PositiveInt}
@@ -31,7 +30,6 @@ import com.digitalasset.canton.synchronizer.sequencer.Sequencer
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerParameters
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.service.{
-  ManualFlowControlServerCallStreamObserver,
   RecordStreamObserverItems,
   StreamComplete,
   StreamError,
@@ -51,7 +49,7 @@ import com.digitalasset.canton.topology.store.{
   TopologyStateForInitializationService,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, MaxBytesToDecompress, MonadUtil, PekkoUtil}
+import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.{ProtocolVersion, VersionedMessage}
 import com.digitalasset.canton.{
   BaseTest,
@@ -91,9 +89,6 @@ class GrpcSequencerServiceTest
 
   private lazy val participant = DefaultTestIdentities.participant1
 
-  implicit val executionSequencerFactory: ExecutionSequencerFactory =
-    PekkoUtil.createExecutionSequencerFactory(loggerFactory.threadName, noTracingLogger)
-
   class Environment(member: Member) extends Matchers {
     val sequencer: Sequencer = mock[Sequencer]
     when(sequencer.sendAsyncSigned(any[SignedContent[SubmissionRequest]])(anyTraceContext))
@@ -104,11 +99,6 @@ class GrpcSequencerServiceTest
       TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(member)
     val subscriptionPool: SubscriptionPool[Subscription] =
       mock[SubscriptionPool[GrpcManagedSubscription[?]]]
-    val checkMemberActive: (Member, TraceContext) => FutureUnlessShutdown[Boolean] =
-      mock[(Member, TraceContext) => FutureUnlessShutdown[Boolean]]
-
-    when(checkMemberActive(any[Member], any[TraceContext]))
-      .thenReturn(FutureUnlessShutdown.pure(true))
 
     private val confirmationRequestsMaxRate = NonNegativeInt.tryCreate(5)
     private val maxRequestSize = NonNegativeInt.tryCreate(1000)
@@ -116,7 +106,7 @@ class GrpcSequencerServiceTest
     private val topologyClient = mock[SynchronizerTopologyClient]
     private val mockTopologySnapshot = mock[TopologySnapshot]
     when(topologyClient.currentSnapshotApproximation(any[TraceContext]))
-      .thenReturn(FutureUnlessShutdown.pure(mockTopologySnapshot))
+      .thenReturn(mockTopologySnapshot)
     when(
       mockTopologySnapshot.findDynamicSynchronizerParametersOrDefault(
         any[ProtocolVersion],
@@ -145,7 +135,6 @@ class GrpcSequencerServiceTest
       override def maxConfirmationRequestsBurstFactor: PositiveDouble =
         PositiveDouble.tryCreate(1e-6)
       override def processingTimeouts: ProcessingTimeout = timeouts
-      override def maxSubscriptionsPerMember: PositiveInt = PositiveInt.three
     }
 
     val maxItemsInTopologyBatch = 5
@@ -191,7 +180,6 @@ class GrpcSequencerServiceTest
         new AuthenticationCheck.MatchesAuthenticatedMember {
           override def lookupCurrentMember(): Option[Member] = member.some
         },
-        checkMemberActive,
         subscriptionPool,
         sequencerSubscriptionFactory,
         synchronizerParamLookup,
@@ -242,8 +230,7 @@ class GrpcSequencerServiceTest
     mkSubmissionRequest(
       Batch(
         List(
-          ClosedUncompressedEnvelope
-            .create(content, Recipients.cc(recipient), Seq.empty, testedProtocolVersion)
+          ClosedEnvelope.create(content, Recipients.cc(recipient), Seq.empty, testedProtocolVersion)
         ),
         testedProtocolVersion,
       ),
@@ -258,7 +245,7 @@ class GrpcSequencerServiceTest
     mkSubmissionRequest(
       Batch(
         List(
-          ClosedUncompressedEnvelope.create(
+          ClosedEnvelope.create(
             content,
             Recipients.cc(recipientPar, recipientMed),
             Seq.empty,
@@ -342,18 +329,7 @@ class GrpcSequencerServiceTest
     "reject envelopes with empty content" in { implicit env =>
       val request = defaultRequest
         .focus(_.batch.envelopes)
-        .modify(_.map {
-          case closedEnvelope: ClosedEnvelope =>
-            if (testedProtocolVersion >= ProtocolVersion.v35) {
-              closedEnvelope.toClosedCompressedEnvelope
-                .copy(bytes = ByteString.empty)(maxBytesToDecompress =
-                  MaxBytesToDecompress.HardcodedDefault
-                )
-            } else {
-              closedEnvelope.toClosedUncompressedEnvelopeUnsafe.copy(bytes = ByteString.empty)
-            }
-          case other => other // Won't happen, but is required for the match to be exhaustive
-        })
+        .modify(_.map(_.focus(_.bytes).replace(ByteString.EMPTY)))
 
       loggerFactory.assertLogs(
         sendAndCheckError(request) { case ex: StatusRuntimeException =>
@@ -388,30 +364,15 @@ class GrpcSequencerServiceTest
 
     "reject large messages" in { implicit env =>
       val bigEnvelope =
-        ClosedUncompressedEnvelope.create(
+        ClosedEnvelope.create(
           ByteString.copyFromUtf8(scala.util.Random.nextString(5000)),
           Recipients.cc(participant),
           Seq.empty,
           testedProtocolVersion,
         )
+      val request = defaultRequest.focus(_.batch.envelopes).replace(List(bigEnvelope))
 
-      val request =
-        defaultRequest
-          .focus(_.batch.envelopes)
-          .replace(
-            List(
-              bigEnvelope.copy(
-                recipients = Recipients.cc(participant)
-              )
-            )
-          )
-
-      val alarmMsg =
-        if (testedProtocolVersion >= ProtocolVersion.v35)
-          "Batch contains envelope with max bytes exceeded. The limit is 1000 bytes."
-        else
-          s"Max bytes to decompress is exceeded. The limit is 1000 bytes."
-
+      val alarmMsg = s"Max bytes to decompress is exceeded. The limit is 1000 bytes."
       loggerFactory.assertLogs(
         sendAndCheckError(request) { case ex: StatusRuntimeException =>
           ex.getMessage should include(alarmMsg)
@@ -486,13 +447,13 @@ class GrpcSequencerServiceTest
     ): FixtureParam => Future[Assertion] = { _ =>
       val differentEnvelopes = Batch.fromClosed(
         testedProtocolVersion,
-        ClosedUncompressedEnvelope.create(
+        ClosedEnvelope.create(
           ByteString.copyFromUtf8("message to first mediator"),
           Recipients(NonEmpty.mk(Seq, mediator1)),
           Seq.empty,
           testedProtocolVersion,
         ),
-        ClosedUncompressedEnvelope.create(
+        ClosedEnvelope.create(
           ByteString.copyFromUtf8("message to second mediator"),
           Recipients(NonEmpty.mk(Seq, mediator2)),
           Seq.empty,
@@ -501,7 +462,7 @@ class GrpcSequencerServiceTest
       )
       val sameEnvelope = Batch.fromClosed(
         testedProtocolVersion,
-        ClosedUncompressedEnvelope.create(
+        ClosedEnvelope.create(
           ByteString.copyFromUtf8("message to two mediators and the participant"),
           Recipients(
             NonEmpty(
@@ -619,7 +580,7 @@ class GrpcSequencerServiceTest
     }
   }
 
-  "subscribe" should {
+  "versionedSubscribe" should {
     "return error if called with observer not capable of observing server calls" in { env =>
       val observer = new MockStreamObserver[v30.SubscriptionResponse]()
       loggerFactory.suppressWarningsAndErrors {
@@ -640,7 +601,7 @@ class GrpcSequencerServiceTest
     }
 
     "return error if request cannot be deserialized" in { env =>
-      val observer = new ManualFlowControlServerCallStreamObserver[v30.SubscriptionResponse](0)
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       env.service.subscribe(
         v30.SubscriptionRequest(
           member = "",
@@ -658,7 +619,7 @@ class GrpcSequencerServiceTest
     }
 
     "return error if pool registration fails" in { env =>
-      val observer = new ManualFlowControlServerCallStreamObserver[v30.SubscriptionResponse](0)
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
         SubscriptionRequest(
           participant,
@@ -686,7 +647,7 @@ class GrpcSequencerServiceTest
     }
 
     "return error if sending request with member that is not authenticated" in { env =>
-      val observer = new ManualFlowControlServerCallStreamObserver[v30.SubscriptionResponse](0)
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
         SubscriptionRequest(
           ParticipantId("Wrong participant"),
@@ -708,14 +669,13 @@ class GrpcSequencerServiceTest
     "close subscription if canceled before fully created" in { env =>
       val observer = mock[MockServerStreamObserver[v30.SubscriptionResponse]]
       val cancelHandler = new AtomicReference[Option[Runnable]](None)
-      val grpcObserverHandle = mock[GrpcObserverHandle[v30.SubscriptionResponse]]
       val subscriptionClosed = new AtomicBoolean(false)
 
       // Subscription augmented to let us know when it is closed.
       val subscription =
         new GrpcManagedSubscription(
           _ => ???,
-          grpcObserverHandle,
+          observer,
           participant,
           None,
           timeouts,
@@ -767,58 +727,6 @@ class GrpcSequencerServiceTest
 
       // The point of this test: Make sure the subscription is closed.
       eventually()(subscriptionClosed.get() shouldBe true)
-    }
-
-    "return error and close subscription if member is revoked during creation" in { env =>
-      val observer = mock[MockServerStreamObserver[v30.SubscriptionResponse]]
-      val grpcObserverHandle = mock[GrpcObserverHandle[v30.SubscriptionResponse]]
-      val subscriptionClosed = new AtomicBoolean(false)
-
-      val subscription =
-        new GrpcManagedSubscription(
-          _ => ???,
-          grpcObserverHandle,
-          participant,
-          None,
-          timeouts,
-          loggerFactory,
-          _ => ???,
-        ) {
-          override def onClosed(): Unit = {
-            super.onClosed()
-            subscriptionClosed.set(true)
-          }
-        }
-
-      Mockito
-        .when(
-          env.subscriptionPool.create(
-            ArgumentMatchers.any[() => FutureUnlessShutdown[Subscription]](),
-            ArgumentMatchers.any[Member](),
-          )(anyTraceContext)
-        )
-        .thenReturn {
-          EitherT.rightT(subscription)
-        }
-
-      // switch the active status of the member to false
-      Mockito
-        .when(env.checkMemberActive(ArgumentMatchers.eq(participant), anyTraceContext))
-        .thenReturn(FutureUnlessShutdown.pure(false))
-
-      val requestP =
-        SubscriptionRequest(participant, timestamp = None, testedProtocolVersion).toProtoV30
-
-      // trigger .create (returns subscription) and checkMemberActive (returns false)
-      env.service.subscribe(requestP, observer)
-      eventually() {
-        // the subscription should have been closed because the member was deactivated
-        subscriptionClosed.get() shouldBe true
-        verify(observer).onError(argThat { (ex: Throwable) =>
-          ex.asInstanceOf[StatusException].getStatus.getCode == PERMISSION_DENIED
-        })
-        succeed
-      }
     }
   }
 
@@ -883,11 +791,7 @@ class GrpcSequencerServiceTest
 
   "downloadTopologyStateForInit" should {
     "stream batches of topology transactions" in { env =>
-      val observer =
-        new ManualFlowControlServerCallStreamObserver[v30.DownloadTopologyStateForInitResponse](
-          3 + // responses
-            1 // stream complete
-        )
+      val observer = new MockServerStreamObserver[v30.DownloadTopologyStateForInitResponse]()
       env.service.downloadTopologyStateForInit(
         TopologyStateForInitRequest(participant, testedProtocolVersion).toProtoV30,
         observer,

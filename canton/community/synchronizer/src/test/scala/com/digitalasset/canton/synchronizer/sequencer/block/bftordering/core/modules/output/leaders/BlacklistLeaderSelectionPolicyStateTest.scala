@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders
@@ -23,10 +23,9 @@ class BlacklistLeaderSelectionPolicyStateTest extends AnyWordSpec with BaseTest 
   private val n1 = n(1)
   private val n2 = n(2)
   private val n3 = n(3)
-  private val orderingTopology = OrderingTopology.forTesting(
-    Set(n0, n1, n2, n3),
-    epochLength = EpochLength(10),
-  )
+  private val orderingTopology = OrderingTopology.forTesting(Set(n0, n1, n2, n3))
+
+  private val epochLength = EpochLength(10)
 
   private val blockToLeaderAll: Map[BlockNumber, BftNodeId] = Map(
     BlockNumber(0L) -> n0,
@@ -58,127 +57,109 @@ class BlacklistLeaderSelectionPolicyStateTest extends AnyWordSpec with BaseTest 
   "BlacklistLeaderSelectionPolicyState" should {
     "a clean node" should {
       "stay clean if not punished" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(initState(), orderingTopology)
-          .update(
-            orderingTopology,
-            config,
-            blockToLeaderAll,
-            Set.empty,
-          )
-          .state shouldBe stateNextEpoch()
+        initState().update(
+          orderingTopology,
+          config,
+          epochLength,
+          blockToLeaderAll,
+          Set.empty,
+        ) shouldBe stateNextEpoch()
       }
 
       "be blacklisted if punished" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(initState(), orderingTopology)
-          .update(
-            orderingTopology,
-            config,
-            blockToLeaderAll,
-            Set(n0),
-          )
-          .state shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(1, 1))
+        initState().update(
+          orderingTopology,
+          config,
+          epochLength,
+          blockToLeaderAll,
+          Set(n0),
+        ) shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(1, 1))
       }
     }
 
     "a blacklisted node" should {
       "stay blacklisted if still time" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(
-          initState(
-            n0 -> BlacklistStatus.Blacklisted(1, 1)
-          ),
-          orderingTopology,
+        initState(
+          n0 -> BlacklistStatus.Blacklisted(1, 1)
         ).update(
           orderingTopology,
           config,
+          epochLength,
           blockToLeaderAllWithoutN0,
           Set.empty,
-        ).state shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(1, 0))
+        ) shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(1, 0))
       }
 
       "go on trial if waited long enough" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(
-          initState(
-            n0 -> BlacklistStatus.Blacklisted(1, 0)
-          ),
-          orderingTopology,
+        initState(
+          n0 -> BlacklistStatus.Blacklisted(1, 0)
         ).update(
           orderingTopology,
           config,
+          epochLength,
           blockToLeaderAllWithoutN0,
           Set.empty,
-        ).state shouldBe stateNextEpoch(n0 -> BlacklistStatus.OnTrial(1))
+        ) shouldBe stateNextEpoch(n0 -> BlacklistStatus.OnTrial(1))
       }
     }
 
     "a node on trial" should {
       "become clean if succeed" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(
-          initState(
-            n0 -> BlacklistStatus.OnTrial(1)
-          ),
-          orderingTopology,
+        initState(
+          n0 -> BlacklistStatus.OnTrial(1)
         ).update(
           orderingTopology,
           config,
+          epochLength,
           blockToLeaderAll,
           Set.empty,
-        ).state shouldBe stateNextEpoch()
+        ) shouldBe stateNextEpoch()
       }
 
       "become blacklisted if punished" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(
-          initState(
-            n0 -> BlacklistStatus.OnTrial(1)
-          ),
-          orderingTopology,
+        initState(
+          n0 -> BlacklistStatus.OnTrial(1)
         ).update(
           orderingTopology,
           config,
+          epochLength,
           blockToLeaderAll,
           Set(n0),
-        ).state shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(2, 2))
+        ) shouldBe stateNextEpoch(n0 -> BlacklistStatus.Blacklisted(2, 2))
       }
 
       "stay on trial if did not participate" in {
-        BlacklistLeaderSelectionPolicyStateWithTopology(
-          initState(
-            n0 -> BlacklistStatus.OnTrial(1)
-          ),
-          orderingTopology,
+        initState(
+          n0 -> BlacklistStatus.OnTrial(1)
         ).update(
           orderingTopology,
           config,
+          epochLength,
           blockToLeaderAllWithoutN0,
           Set.empty,
-        ).state shouldBe stateNextEpoch(n0 -> BlacklistStatus.OnTrial(1))
+        ) shouldBe stateNextEpoch(n0 -> BlacklistStatus.OnTrial(1))
       }
     }
 
     "should only select clean and nodes on trial" in {
-      BlacklistLeaderSelectionPolicyStateWithTopology(
-        initState(n1 -> BlacklistStatus.OnTrial(1), n2 -> BlacklistStatus.Blacklisted(1, 1)),
-        orderingTopology,
-      ).computeLeaders(config) shouldBe Seq(n0, n1, n3)
+      initState(n1 -> BlacklistStatus.OnTrial(1), n2 -> BlacklistStatus.Blacklisted(1, 1))
+        .selectLeaders(orderingTopology, config) shouldBe Set(n0, n1, n3)
     }
 
     "should only drop up to f nodes" in {
-      BlacklistLeaderSelectionPolicyStateWithTopology(
-        initState(n1 -> BlacklistStatus.Blacklisted(2, 2), n2 -> BlacklistStatus.Blacklisted(1, 1)),
-        orderingTopology,
-      )
-        .computeLeaders(config) shouldBe Seq(n0, n2, n3)
+      initState(n1 -> BlacklistStatus.Blacklisted(2, 2), n2 -> BlacklistStatus.Blacklisted(1, 1))
+        .selectLeaders(orderingTopology, config) shouldBe Set(n0, n2, n3)
     }
 
     "should not drop any if config says so" in {
-      BlacklistLeaderSelectionPolicyStateWithTopology(
-        initState(n1 -> BlacklistStatus.Blacklisted(2, 1), n2 -> BlacklistStatus.Blacklisted(1, 1)),
-        orderingTopology,
-      ).computeLeaders(
-        Blacklisting(
-          howLongToBlackList = DefaultHowLongToBlackList,
-          howManyCanWeBlacklist = NoBlacklisting,
-        )
-      ) shouldBe Seq(n0, n1, n2, n3)
+      initState(n1 -> BlacklistStatus.Blacklisted(2, 1), n2 -> BlacklistStatus.Blacklisted(1, 1))
+        .selectLeaders(
+          orderingTopology,
+          Blacklisting(
+            howLongToBlackList = DefaultHowLongToBlackList,
+            howManyCanWeBlacklist = NoBlacklisting,
+          ),
+        ) shouldBe Set(n0, n1, n2, n3)
     }
   }
 }

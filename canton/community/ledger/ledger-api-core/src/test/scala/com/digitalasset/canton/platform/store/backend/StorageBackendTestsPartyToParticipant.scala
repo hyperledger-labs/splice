@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -22,10 +22,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.Sequen
   IdRange,
   Ids,
 }
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.{
-  PaginationFromTo,
-  PaginationInput,
-}
+import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.PaginationInput
 import com.digitalasset.canton.protocol.UpdateId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Ref
@@ -56,8 +53,8 @@ private[backend] trait StorageBackendTestsPartyToParticipant
   private val multipleDtos = Vector(
     dtoPartyToParticipant(offset(1), 1L),
     dtoPartyToParticipant(offset(2), 2L, someParty2),
-    dtoPartyToParticipant(offset(3), 3L, someParty, otherParticipantId),
-    dtoPartyToParticipant(offset(4), 4L, someParty, someParticipantId, Revoked),
+    dtoPartyToParticipant(offset(3), 3L, someParty, otherParticipantId.toString),
+    dtoPartyToParticipant(offset(4), 4L, someParty, someParticipantId.toString, Revoked),
   )
 
   private val authorizationEvents: Vector[AuthorizationEvent] = Vector(
@@ -89,48 +86,40 @@ private[backend] trait StorageBackendTestsPartyToParticipant
         .authorizationEvent(dbDto.participant_authorization_event, dbDto.participant_permission),
       recordTime = Timestamp.assertFromLong(dbDto.record_time),
       synchronizerId = dbDto.synchronizer_id.toProtoPrimitive,
-      traceContext = dbDto.trace_context,
+      traceContext = Some(dbDto.trace_context),
     )
 
   private def sanitize: RawParticipantAuthorization => RawParticipantAuthorization =
-    _.copy(traceContext = Array.emptyByteArray)
+    _.copy(traceContext = None)
 
   it should "return correct index for a single party to participant mapping" in {
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(singleDto, _))
     val eventsForAll = executeSql(
-      backend.event
-        .fetchTopologyPartyEventIds(
-          party = None
+      backend.event.fetchTopologyPartyEventIds(
+        party = None
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 10L,
+          limit = 10,
         )
-        .fetchPage(_)(
-          PaginationInput(
-            PaginationFromTo.ascending(
-              startExclusive = 0L,
-              endInclusive = 10L,
-            ),
-            limit = 10,
-          )
-        )
-    ).ids
+      )
+    )
     executeSql(
       updateLedgerEnd(offset(1), ledgerEndSequentialId = 1L)
     )
     val eventsForSomeParty = executeSql(
-      backend.event
-        .fetchTopologyPartyEventIds(
-          party = Some(someParty)
+      backend.event.fetchTopologyPartyEventIds(
+        party = Some(someParty)
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 10L,
+          limit = 10,
         )
-        .fetchPage(_)(
-          PaginationInput(
-            PaginationFromTo.ascending(
-              startExclusive = 0L,
-              endInclusive = 10L,
-            ),
-            limit = 10,
-          )
-        )
-    ).ids
+      )
+    )
 
     eventsForAll should not be empty
     eventsForSomeParty should not be empty
@@ -140,38 +129,30 @@ private[backend] trait StorageBackendTestsPartyToParticipant
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(multipleDtos, _))
     val eventsForAll = executeSql(
-      backend.event
-        .fetchTopologyPartyEventIds(
-          party = None
+      backend.event.fetchTopologyPartyEventIds(
+        party = None
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 10L,
+          limit = 10,
         )
-        .fetchPage(_)(
-          PaginationInput(
-            PaginationFromTo.ascending(
-              startExclusive = 0L,
-              endInclusive = 10L,
-            ),
-            limit = 10,
-          )
-        )
-    ).ids
+      )
+    )
     executeSql(
       updateLedgerEnd(offset(4), ledgerEndSequentialId = 4L)
     )
     val eventsForSomeParty = executeSql(
-      backend.event
-        .fetchTopologyPartyEventIds(
-          party = Some(someParty)
+      backend.event.fetchTopologyPartyEventIds(
+        party = Some(someParty)
+      )(_)(
+        PaginationInput(
+          startExclusive = 0L,
+          endInclusive = 10L,
+          limit = 10,
         )
-        .fetchPage(_)(
-          PaginationInput(
-            PaginationFromTo.ascending(
-              startExclusive = 0L,
-              endInclusive = 10L,
-            ),
-            limit = 10,
-          )
-        )
-    ).ids
+      )
+    )
 
     eventsForAll should contain theSameElementsAs Vector(1L, 2L, 3L, 4L)
     eventsForSomeParty should contain theSameElementsAs Vector(1L, 3L, 4L)

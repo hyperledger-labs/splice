@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -17,7 +17,13 @@ import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  NamedLogging,
+  TracedLogger,
+}
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
@@ -31,7 +37,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMapping,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, SingleUseCell}
+import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, ErrorUtil, SingleUseCell}
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -414,6 +420,7 @@ class SynchronizerOutboxDynamicObserver(val loggerFactory: NamedLoggerFactory)
 class SynchronizerOutboxFactory(
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
+    synchronizerTopologyManager: SynchronizerTopologyManager,
     crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     timeouts: ProcessingTimeout,
@@ -421,11 +428,12 @@ class SynchronizerOutboxFactory(
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
+  private val psid: PhysicalSynchronizerId = synchronizerTopologyManager.psid
+
   private val authorizedObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
   private val synchronizerObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
 
   def create(
-      synchronizerTopologyManager: SynchronizerTopologyManager,
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
@@ -435,7 +443,6 @@ class SynchronizerOutboxFactory(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): SynchronizerOutboxHandle = {
-    val psid: PhysicalSynchronizerId = synchronizerTopologyManager.psid
     val handle = new SequencerBasedRegisterTopologyTransactionHandle(
       sequencerClient,
       memberId,
@@ -523,6 +530,60 @@ class SynchronizerOutboxFactory(
       override protected def logger: TracedLogger = SynchronizerOutboxFactory.this.logger
     }
   }
+}
+
+class SynchronizerOutboxFactorySingleCreate(
+    memberId: Member,
+    authorizedTopologyManager: AuthorizedTopologyManager,
+    synchronizerTopologyManager: SynchronizerTopologyManager,
+    crypto: SynchronizerCrypto,
+    topologyConfig: TopologyConfig,
+    override val timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
+    loggerFactory: NamedLoggerFactory,
+) extends SynchronizerOutboxFactory(
+      memberId,
+      authorizedTopologyManager,
+      synchronizerTopologyManager,
+      crypto,
+      topologyConfig,
+      timeouts,
+      futureSupervisor,
+      loggerFactory,
+    )
+    with FlagCloseable {
+  val outboxRef = new SingleUseCell[SynchronizerOutboxHandle]
+
+  def createOnlyOnce(
+      targetTopologyClient: SynchronizerTopologyClientWithInit,
+      sequencerClient: SequencerClient,
+      timeTracker: SynchronizerTimeTracker,
+      clock: Clock,
+      synchronizerLoggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): SynchronizerOutboxHandle = {
+    outboxRef.get.foreach { _ =>
+      ErrorUtil.invalidState(s"SynchronizerOutbox was already created. This is a bug.")(
+        ErrorLoggingContext(
+          synchronizerLoggerFactory.getTracedLogger(getClass),
+          LoggingContextWithTrace(synchronizerLoggerFactory),
+        )
+      )
+    }
+
+    create(
+      targetTopologyClient,
+      sequencerClient,
+      timeTracker,
+      clock,
+      synchronizerLoggerFactory,
+    ).tap(outbox => outboxRef.putIfAbsent(outbox).discard)
+  }
+
+  override protected def onClosed(): Unit =
+    LifeCycle.close(outboxRef.get.toList*)(logger)
 }
 
 final case class PendingTransactions(

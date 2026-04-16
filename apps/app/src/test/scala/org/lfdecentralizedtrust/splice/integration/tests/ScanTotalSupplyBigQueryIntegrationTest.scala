@@ -89,7 +89,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
   private val aliceValidatorMintedAmount = BigDecimal("26051.7503805176")
   private val lockedAmount = BigDecimal("5000")
-  private val burnedAmount = BigDecimal("0")
+  private val burnedAmount = BigDecimal("60010")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
   private val amuletHolders = 5

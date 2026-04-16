@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -51,15 +51,10 @@ object TracingConfig {
   sealed trait Exporter
   object Exporter {
     case object Disabled extends Exporter
-
-    /** Zipkin exporter is deprecated from opentelemetry, with removal planned for mid-2026. See
-      * https://opentelemetry.io/blog/2025/deprecating-zipkin-exporters/ for more details.
-      */
-    @deprecated("Use OTLP exporter instead.", since = "3.5.0")
     final case class Zipkin(address: String = "localhost", port: Int = 9411) extends Exporter
     final case class Otlp(
         address: String = "localhost",
-        port: Int = 4317,
+        port: Int = 4318,
         trustCollectionPath: Option[String] = None,
         additionalHeaders: Map[String, String] = Map.empty,
         timeout: Option[FiniteDuration] = None,

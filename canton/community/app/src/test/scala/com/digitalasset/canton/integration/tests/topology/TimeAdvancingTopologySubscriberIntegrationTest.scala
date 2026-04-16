@@ -1,20 +1,20 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
 
-import com.digitalasset.canton.admin.api.client.data.{
-  SequencerConnections,
-  SynchronizerConnectionConfig,
-}
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.{SynchronizerTimeTrackerConfig, TestSequencerClientFor}
+import com.digitalasset.canton.config.{
+  DbConfig,
+  SynchronizerTimeTrackerConfig,
+  TestSequencerClientFor,
+}
 import com.digitalasset.canton.console.{ParticipantReference, SequencerReference}
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -22,7 +22,7 @@ import com.digitalasset.canton.integration.{
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.sequencing.SequencedSerializedEvent
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.client.DelayedSequencerClient
 import com.digitalasset.canton.sequencing.client.DelayedSequencerClient.{
   DelaySequencerClient,
@@ -35,6 +35,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   SequencedEvent,
   TimeProof,
 }
+import com.digitalasset.canton.sequencing.{SequencedSerializedEvent, SequencerConnections}
 import com.digitalasset.canton.synchronizer.sequencer.time.TimeAdvancingTopologySubscriber.TimeAdvanceBroadcastMessageIdPrefix
 import com.digitalasset.canton.synchronizer.sequencer.{HasProgrammableSequencer, SendDecision}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -66,10 +67,6 @@ trait TimeAdvancingTopologySubscriberIntegrationTest
         ),
         ConfigTransforms.updateAllMediatorConfigs_(
           _.focus(_.timeTracker.observationLatency).replace(observationLatency.toConfig)
-        ),
-        ConfigTransforms.updateAllSequencerConfigs_(
-          _.focus(_.parameters.producePostOrderingTopologyTicks)
-            .replace(false)
         ),
       )
       // Do not use a static time because this test requires a non-zero topology change delay
@@ -136,14 +133,11 @@ trait TimeAdvancingTopologySubscriberIntegrationTest
         )
         .value
       p1SequencerClientInterceptor.setDelayPolicy(new SequencedEventDelayPolicy {
-        private def isBroadcastEvent(event: SequencedEvent[ClosedEnvelope]): Boolean =
-          event match {
-            case deliver: Deliver[ClosedEnvelope] =>
-              deliver.envelopes.exists(
-                _.recipients.allRecipients.contains(AllMembersOfSynchronizer)
-              )
-            case _ => false
-          }
+        private def isBroadcastEvent(event: SequencedEvent[ClosedEnvelope]): Boolean = event match {
+          case deliver: Deliver[ClosedEnvelope] =>
+            deliver.envelopes.exists(_.recipients.allRecipients.contains(AllMembersOfSynchronizer))
+          case _ => false
+        }
 
         override def apply(event: SequencedSerializedEvent): DelaySequencerClient = {
           if (isBroadcastEvent(event.underlying.value.content))
@@ -164,18 +158,17 @@ trait TimeAdvancingTopologySubscriberIntegrationTest
       timeProofRequestCounter.get() shouldBe 0
 
       val broadcasts = broadcastsObservedByP1.get().map(_.underlying.value.content)
-      // We expect at least two broadcasts: One for the topology transaction and one for the aggregated notification message
-      // If the sequencing of the notification message is slow, we may see more of them.
-      broadcasts.size shouldBe >=(2)
+      // We expect two broadcasts: One for the topology transaction and one for the aggregated notification message
+      broadcasts should have size 2
 
       progSeqs.foreach(_.resetPolicy())
     }
   }
 }
 
-class TimeAdvancingTopologySubscriberBftOrderingIntegrationTestPostgres
+class TimeAdvancingTopologySubscriberReferenceIntegrationTestPostgres
     extends TimeAdvancingTopologySubscriberIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

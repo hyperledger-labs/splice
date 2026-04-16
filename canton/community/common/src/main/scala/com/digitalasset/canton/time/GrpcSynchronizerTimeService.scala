@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -24,8 +24,8 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param lookupTimeTracker
   *   Lookup the time tracker
   * @tparam SId
-  *   Participant nodes can serve requests for Lsid and Psid but synchronizer nodes only serve
-  *   requests for Psid.
+  *   Participant nodes can serve requests for LSId and PSId but synchronizer nodes only serve
+  *   requests for PSId.
   */
 private[time] class GrpcSynchronizerTimeService(
     lookupTimeTracker: Option[Synchronizer] => Either[String, SynchronizerTimeTracker],
@@ -159,10 +159,10 @@ object GrpcSynchronizerTimeService {
   ): GrpcSynchronizerTimeService =
     new GrpcSynchronizerTimeService(
       // allow none or the actual synchronizerId to return the time tracker
-      requestPsidO =>
+      requestPSIdO =>
         for {
           _ <- Either.cond(
-            requestPsidO.forall(_.isCompatibleWith(psid)),
+            requestPSIdO.forall(_.isCompatibleWith(psid)),
             (),
             "Provided synchronizer id does not match running synchronizer",
           )

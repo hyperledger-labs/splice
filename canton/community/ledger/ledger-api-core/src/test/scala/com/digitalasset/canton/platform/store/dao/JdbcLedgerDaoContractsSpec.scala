@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -12,7 +12,6 @@ import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReade
   KeyUnassigned,
 }
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.transaction.{GlobalKey, GlobalKeyWithMaintainers}
 import com.digitalasset.daml.lf.value.Value.{ContractId, ValueText}
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -68,7 +67,7 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
 
   it should "present the contract state at a specific event sequential id" in {
     for {
-      (_, tx) <- store(singleCreate(create(signatories = Set(alice))))
+      (_, tx) <- store(singleCreate(create(_, signatories = Set(alice))))
       contractId = nonTransient(tx).loneElement
       _ <- store(singleNonConsumingExercise(contractId))
       Some(ledgerEndAtCreate) <- ledgerDao.lookupLedgerEnd()
@@ -94,7 +93,6 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
     val key = GlobalKeyWithMaintainers.assertBuild(
       someTemplateId,
       aTextValue,
-      crypto.Hash.hashPrivateKey("dummy-key-hash"),
       Set(alice, bob),
       somePackageName,
     )
@@ -136,7 +134,6 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
       val key = GlobalKeyWithMaintainers.assertBuild(
         someTemplateId,
         aTextValue,
-        crypto.Hash.hashPrivateKey(string),
         Set(alice),
         somePackageName,
       )
@@ -164,7 +161,8 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
         .lookupKeyStatesFromDb(keys, eventSeqId)
         .flatMap(resultsWithInternalContractIds =>
           contractStore
-            .lookupBatchedContractIdsNonReadThrough(resultsWithInternalContractIds.values)
+            .lookupBatchedNonCachedContractIds(resultsWithInternalContractIds.values)
+            .failOnShutdown
             .map(internalToContractIds =>
               keys.map { key =>
                 key -> resultsWithInternalContractIds

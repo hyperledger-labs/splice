@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p
@@ -776,7 +776,7 @@ class P2PNetworkOutModuleTest extends AnyWordSpec with BftSequencerBaseTest {
       output,
       pruning,
     )
-    val module =
+    val outputModule =
       new P2PNetworkOutModule[ProgrammableUnitTestEnv, FakeP2PNetworkManager](
         selfNode,
         isGenesis,
@@ -787,7 +787,7 @@ class P2PNetworkOutModuleTest extends AnyWordSpec with BftSequencerBaseTest {
         P2PNetworkOutModuleTest.this.loggerFactory,
         P2PNetworkOutModuleTest.this.timeouts,
       )(MetricsContext.Empty)
-    (module, module.p2pNetworkManager)
+    (outputModule, outputModule.p2pNetworkManager)
   }
 
   private def connect(

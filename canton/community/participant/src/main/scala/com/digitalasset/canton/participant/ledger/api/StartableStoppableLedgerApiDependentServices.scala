@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
@@ -21,21 +21,18 @@ import com.digitalasset.canton.participant.admin.grpc.{
   GrpcPartyManagementService,
   GrpcPingService,
 }
-import com.digitalasset.canton.participant.admin.party.PartyReplicator
+import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow
 import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PackageService}
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.participant.sync.CantonSyncService
-import com.digitalasset.canton.participant.topology.TopologyLookup
-import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.Mutex
 import io.grpc.ServerServiceDefinition
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, blocking}
 
 /** Holds and manages the lifecycle of all Canton services that use the Ledger API and hence depend
   * on the Ledger API server to be up.
@@ -56,7 +53,6 @@ class StartableStoppableLedgerApiDependentServices(
     clock: Clock,
     registry: CantonMutableHandlerRegistry,
     adminTokenDispenser: CantonAdminTokenDispenser,
-    storage: Storage,
     futureSupervisor: FutureSupervisor,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -72,14 +68,11 @@ class StartableStoppableLedgerApiDependentServices(
   private type ApiInfoServiceGrpc = ServerServiceDefinition
   private type PartyManagementGrpc = ServerServiceDefinition
 
-  private val lock = new Mutex()
-
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile private var servicesRef =
     Option.empty[
       (
           AdminWorkflowServices,
-          Option[PartyReplicator],
           PackageServiceGrpc,
           PingServiceGrpc,
           ApiInfoServiceGrpc,
@@ -91,140 +84,118 @@ class StartableStoppableLedgerApiDependentServices(
   if (syncService.isActive()) start()(TraceContext.empty)
 
   def start()(implicit traceContext: TraceContext): Unit =
-    lock.exclusive {
-      servicesRef match {
-        case Some(_servicesStarted) =>
-          logger.info(
-            "Attempt to start Ledger API-dependent Canton services, but they are already started. Ignoring."
-          )
-        case None =>
-          logger.debug("Starting Ledger API-dependent canton services")
+    blocking {
+      synchronized {
+        servicesRef match {
+          case Some(_servicesStarted) =>
+            logger.info(
+              "Attempt to start Ledger API-dependent Canton services, but they are already started. Ignoring."
+            )
+          case None =>
+            logger.debug("Starting Ledger API-dependent canton services")
 
-          val partyReplicatorO =
-            config.parameters.alphaOnlinePartyReplicationSupport.map(
-              new PartyReplicator(
-                participantId,
+            val adminWorkflowServices =
+              new AdminWorkflowServices(
+                config,
+                parameters,
+                packageService,
                 syncService,
-                clock,
-                _,
-                config.parameters.batching,
-                storage,
+                participantId,
+                adminTokenDispenser,
                 futureSupervisor,
-                parameters.exitOnFatalFailures,
-                parameters.processingTimeouts,
                 loggerFactory,
-              )
-            )
-
-          val adminWorkflowServices =
-            new AdminWorkflowServices(
-              config,
-              parameters,
-              packageService,
-              syncService,
-              partyReplicatorO,
-              participantId,
-              adminTokenDispenser,
-              futureSupervisor,
-              loggerFactory,
-              clock,
-              tracerProvider,
-            )
-
-          val (packageServiceGrpc, _) = registry.addService(
-            PackageServiceGrpc
-              .bindService(
-                new GrpcPackageService(
-                  packageService,
-                  syncService.synchronizeVettingOnSynchronizer,
-                  () => syncService.readySynchronizers.values.map(_._1).toSet,
-                  loggerFactory,
-                ),
-                ec,
-              )
-          )
-
-          val (pingServiceGrpc, _) = registry
-            .addService(
-              PingServiceGrpc.bindService(
-                new GrpcPingService(adminWorkflowServices.ping, loggerFactory),
-                ec,
-              )
-            )
-
-          val (apiInfoServiceGrpc, _) =
-            registry
-              .addService(
-                ApiInfoServiceGrpc.bindService(
-                  new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
-                  ec,
-                )
+                clock,
+                tracerProvider,
               )
 
-          val topologyLookup = new TopologyLookup(
-            clock = clock,
-            topologyConfig = config.topology,
-            timeouts = parameters.processingTimeouts,
-            futureSupervisor = futureSupervisor,
-            topologyManagerO = syncService.lookupTopologyManager,
-            psidLookup = syncService.activePsidForLsid(_),
-            topologyClientO = syncService.lookupTopologyClient,
-            syncPersistentStateO = psid => syncService.syncPersistentStateManager.get(psid),
-            loggerFactory = loggerFactory,
-          )
-
-          val (partyManagementGrpc, _) =
-            registry
-              .addService(
-                PartyManagementServiceGrpc.bindService(
-                  new GrpcPartyManagementService(
-                    participantId,
-                    partyReplicatorO,
-                    syncService,
-                    topologyLookup,
-                    parameters,
+            val (packageServiceGrpc, _) = registry.addService(
+              PackageServiceGrpc
+                .bindService(
+                  new GrpcPackageService(
+                    packageService,
+                    syncService.synchronizeVettingOnSynchronizer,
+                    () => syncService.readySynchronizers.values.map(_._1).toSet,
                     loggerFactory,
                   ),
                   ec,
                 )
+            )
+
+            val (pingServiceGrpc, _) = registry
+              .addService(
+                PingServiceGrpc.bindService(
+                  new GrpcPingService(adminWorkflowServices.ping, loggerFactory),
+                  ec,
+                )
               )
 
-          servicesRef = Some(
-            (
-              adminWorkflowServices,
-              partyReplicatorO,
-              packageServiceGrpc,
-              pingServiceGrpc,
-              apiInfoServiceGrpc,
-              partyManagementGrpc,
+            val (apiInfoServiceGrpc, _) =
+              registry
+                .addService(
+                  ApiInfoServiceGrpc.bindService(
+                    new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
+                    ec,
+                  )
+                )
+
+            val (partyManagementGrpc, _) = {
+              // Party replication coordinator is available through a feature flag only!
+              val partyReplicationAdminWorkflowO: Option[PartyReplicationAdminWorkflow] =
+                adminWorkflowServices.partyManagementO.map {
+                  case (_, partyReplicationAdminWorkflow) => partyReplicationAdminWorkflow
+                }
+              registry
+                .addService(
+                  PartyManagementServiceGrpc.bindService(
+                    new GrpcPartyManagementService(
+                      participantId,
+                      partyReplicationAdminWorkflowO,
+                      parameters.processingTimeouts,
+                      syncService,
+                      parameters,
+                      loggerFactory,
+                    ),
+                    ec,
+                  )
+                )
+            }
+
+            servicesRef = Some(
+              (
+                adminWorkflowServices,
+                packageServiceGrpc,
+                pingServiceGrpc,
+                apiInfoServiceGrpc,
+                partyManagementGrpc,
+              )
             )
-          )
+        }
       }
     }
 
   override def close(): Unit =
-    lock.exclusive {
-      servicesRef match {
-        case Some(
-              (
-                adminWorkflowServices,
-                partyReplicatorO,
-                packageServiceGrpc,
-                pingGrpcService,
-                apiInfoServiceGrpc,
-                partyManagementGrpc,
-              )
-            ) =>
-          logger.debug("Stopping Ledger API-dependent Canton services")(TraceContext.empty)
-          servicesRef = None
-          registry.removeServiceU(pingGrpcService)
-          registry.removeServiceU(packageServiceGrpc)
-          registry.removeServiceU(apiInfoServiceGrpc)
-          registry.removeServiceU(partyManagementGrpc)
-          adminWorkflowServices.close()
-          partyReplicatorO.foreach(_.close())
-        case None =>
-          logger.debug("Ledger API-dependent Canton services already stopped")(TraceContext.empty)
+    blocking {
+      synchronized {
+        servicesRef match {
+          case Some(
+                (
+                  adminWorkflowServices,
+                  packageServiceGrpc,
+                  pingGrpcService,
+                  apiInfoServiceGrpc,
+                  partyManagementGrpc,
+                )
+              ) =>
+            logger.debug("Stopping Ledger API-dependent Canton services")(TraceContext.empty)
+            servicesRef = None
+            registry.removeServiceU(pingGrpcService)
+            registry.removeServiceU(packageServiceGrpc)
+            registry.removeServiceU(apiInfoServiceGrpc)
+            registry.removeServiceU(partyManagementGrpc)
+            adminWorkflowServices.close()
+          case None =>
+            logger.debug("Ledger API-dependent Canton services already stopped")(TraceContext.empty)
+        }
       }
     }
 }

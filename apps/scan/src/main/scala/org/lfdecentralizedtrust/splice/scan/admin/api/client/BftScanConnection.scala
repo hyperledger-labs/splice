@@ -61,7 +61,6 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
@@ -247,12 +246,6 @@ class BftScanConnection(
     bftCall(_.listDsoSequencers())
   }
 
-  override def lookupRollForwardLsu()(implicit
-      tc: TraceContext
-  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
-    bftCall(_.lookupRollForwardLsu())
-  }
-
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
@@ -272,30 +265,6 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
-  }
-
-  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    bftCall(_.listFeaturedAppRightsByProvider(providerPartyId))
-  }
-
-  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    bftCall(_.lookupFeaturedAppRightByContractId(contractId))
-  }
-
-  override def listFeaturedAppRights()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    bftCall(_.listFeaturedAppRights())
   }
 
   override def getMigrationSchedule()(implicit
@@ -430,11 +399,10 @@ class BftScanConnection(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
-      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])] = bftCall(
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = bftCall(
     _.listVoteRequestResults(
       actionName,
       accepted,
@@ -442,7 +410,6 @@ class BftScanConnection(
       effectiveFrom,
       effectiveTo,
       limit,
-      pageToken,
     )
   )
 
@@ -724,11 +691,6 @@ class BftScanConnection(
   ): Future[Seq[
     ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
   ]] = bftCall(_.listUnclaimedDevelopmentFundCoupons())
-
-  override def getActivePhysicalSynchronizerSerial()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[NonNegativeInt] = bftCall(_.getActivePhysicalSynchronizerSerial())
 }
 trait HasUrl {
   def url: Uri

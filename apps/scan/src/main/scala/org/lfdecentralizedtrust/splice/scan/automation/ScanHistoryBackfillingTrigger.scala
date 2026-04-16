@@ -202,7 +202,7 @@ class ScanHistoryBackfillingTrigger(
   private def initializeBackfilling()(implicit
       traceContext: TraceContext
   ): Future[TaskOutcome] = blocking {
-    mutex.exclusive {
+    synchronized {
       val batchSize = 100
       for {
         updates <- updateHistory.getUpdatesWithoutImportUpdates(
@@ -224,7 +224,7 @@ class ScanHistoryBackfillingTrigger(
 
   private def getOrCreateScanConnection()(implicit tc: TraceContext): Future[BftScanConnection] =
     blocking {
-      mutex.exclusive {
+      synchronized {
         connectionVar match {
           case Some(connection) =>
             Future.successful(connection)
@@ -254,7 +254,7 @@ class ScanHistoryBackfillingTrigger(
   private def getOrCreateBackfilling(
       connection: BackfillingScanConnection
   ): ScanHistoryBackfilling = blocking {
-    mutex.exclusive {
+    synchronized {
       backfillingVar match {
         case Some(backfilling) =>
           backfilling

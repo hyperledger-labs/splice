@@ -64,7 +64,7 @@ copy_dir "cluster/deployment"
 copy_dir "cluster/configs"
 copy_dir "cluster/stacks/scratchnets"
 copy_dir "openapi-templates"
-copy_dir "cluster/pulumi/observability/grafana-dashboards"
+copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
 copy_dir "load-tester"
 

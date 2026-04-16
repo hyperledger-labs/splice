@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.submission
@@ -28,8 +28,8 @@ class NoSubmitterPackageIntegrationTest
         ppn.dars.upload(CantonTestsPath, synchronizerId = daId)
         cpn.dars.upload(CantonTestsPath, synchronizerId = daId)
 
-        bobE = ppn.parties.testing.external.enable("Bob")
-        aliceE = cpn.parties.testing.external.enable("Alice")
+        bobE = ppn.parties.external.enable("Bob")
+        aliceE = cpn.parties.external.enable("Alice")
       }
       .addConfigTransform(ConfigTransforms.enableInteractiveSubmissionTransforms)
 
@@ -45,7 +45,6 @@ class NoSubmitterPackageIntegrationTest
             .commands()
             .loneElement
         ),
-        hashingSchemeVersion = testedApiHashingSchemeVersion,
       )
 
     "fail if the executing participant does not have the package loaded" in {

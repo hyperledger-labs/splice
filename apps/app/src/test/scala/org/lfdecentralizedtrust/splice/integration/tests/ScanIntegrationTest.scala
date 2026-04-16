@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
@@ -17,8 +16,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAutomationConfig,
   ConfigurableApp,
+  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   TransactionHistoryRequest,
@@ -40,7 +39,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
-import scala.concurrent.{blocking, Future}
+import scala.concurrent.{Future, blocking}
 import scala.util.{Success, Try}
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
@@ -65,15 +64,12 @@ class ScanIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(config =>
           config.copy(
-            synchronizerNodes = config.synchronizerNodes.copy(
-              current = config.synchronizerNodes.current.copy(
-                bftSequencerConfig = Some(BftSequencerConfig("http://testUrl:8081"))
-              ),
-              legacy = Some(
-                config.synchronizerNodes.current.copy(
-                  bftSequencerConfig = Some(BftSequencerConfig("http://legacyUrl:8082"))
-                )
-              ),
+            bftSequencers = Seq(
+              BftSequencerConfig(
+                config.domainMigrationId,
+                config.sequencerAdminClient,
+                "http://testUrl:8081",
+              )
             ),
             parameters = config.parameters.copy(
               customTimeouts = config.parameters.customTimeouts.map {
@@ -130,9 +126,6 @@ class ScanIntegrationTest
         scan.amuletRules should be(amuletRules.toHttp)
         scan.dsoRules should be(dsoRules.toHttp)
         scan.svNodeStates should be(svNodeStates.map(_._2.toHttp))
-    }
-    clue("Returns physical synchronizer id") {
-      sv1ScanBackend.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.zero
     }
     // sanity checks
     scan.dsoRules.contract.contractId should be(
@@ -695,13 +688,10 @@ class ScanIntegrationTest
 
   "return bft sequencers" in { implicit env =>
     val bftSequencers = sv1ScanBackend.listBftSequencers()
-    bftSequencers should have size 2
-    val expectedSequencerId =
-      sv1Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
-    val currentSequencer = bftSequencers.find(_.url == "http://testUrl:8081").value
-    currentSequencer.id shouldBe expectedSequencerId
-    val legacySequencer = bftSequencers.find(_.url == "http://legacyUrl:8082").value
-    legacySequencer.id shouldBe expectedSequencerId
+    val sequencer = bftSequencers.loneElement
+    sequencer.url should be("http://testUrl:8081")
+    sequencer.migrationId should be(0)
+    sequencer.id shouldBe sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
   }
 
   "respect rate limit" in { implicit env =>

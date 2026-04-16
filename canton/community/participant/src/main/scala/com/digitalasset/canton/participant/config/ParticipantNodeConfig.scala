@@ -1,14 +1,14 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.config
 
 import cats.syntax.option.*
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.DeprecatedConfigUtils.DeprecatedFieldsFor
 import com.digitalasset.canton.config.RequireTypes.*
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{ReplicationConfig, *}
 import com.digitalasset.canton.http.JsonApiConfig
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
@@ -31,13 +31,13 @@ import com.digitalasset.canton.platform.config.{
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
-import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.PrunableByTimeParameters
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
+import java.nio.file.Path
 import scala.concurrent.duration.DurationInt
 
 /** Base for all participant configs - both local and remote */
@@ -89,13 +89,14 @@ final case class ParticipantNodeConfig(
     override val parameters: ParticipantNodeParameterConfig = ParticipantNodeParameterConfig(),
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig(),
     replication: Option[ReplicationConfig] = None,
-    features: ParticipantFeaturesConfig = ParticipantFeaturesConfig(),
+    features: ParticipantFeaturesConfig = ParticipantFeaturesConfig.default,
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig(),
     override val topology: TopologyConfig = TopologyConfig(),
     alphaDynamic: DeclarativeParticipantConfig = DeclarativeParticipantConfig(),
 ) extends LocalNodeConfig
     with BaseParticipantConfig
-    with ConfigDefaults[Option[DefaultPorts], ParticipantNodeConfig] {
+    with ConfigDefaults[Option[DefaultPorts], ParticipantNodeConfig]
+    with UniformCantonConfigValidation {
   override def nodeTypeName: String = "participant"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -106,42 +107,38 @@ final case class ParticipantNodeConfig(
     RemoteParticipantConfig(adminApi.clientConfig, ledgerApi.clientConfig)
 
   override def withDefaults(
-      ports: Option[DefaultPorts]
+      ports: Option[DefaultPorts],
+      edition: CantonEdition,
   ): ParticipantNodeConfig =
-    ports
-      .fold(this)(ports =>
-        this
-          .focus(_.ledgerApi.internalPort)
-          .modify(ports.ledgerApiPort.setDefaultPort)
-          .focus(_.adminApi.internalPort)
-          .modify(ports.participantAdminApiPort.setDefaultPort)
-          .focus(_.httpLedgerApi.internalPort)
-          .modify(ports.jsonLedgerApiPort.setDefaultPort)
-      )
-      .focus(_.replication)
-      .modify(ReplicationConfig.withDefaultO(storage, _))
+    ports.fold(this)(ports =>
+      this
+        .focus(_.ledgerApi.internalPort)
+        .modify(ports.ledgerApiPort.setDefaultPort)
+        .focus(_.adminApi.internalPort)
+        .modify(ports.participantAdminApiPort.setDefaultPort)
+        .focus(_.replication)
+        .modify(ReplicationConfig.withDefaultO(storage, _, edition))
+        .focus(_.httpLedgerApi.internalPort)
+        .modify(ports.jsonLedgerApiPort.setDefaultPort)
+    )
+
 }
 
 object ParticipantNodeConfig {
+  implicit val localParticipantConfigCantonConfigValidator
+      : CantonConfigValidator[ParticipantNodeConfig] =
+    CantonConfigValidatorDerivation[ParticipantNodeConfig]
+
   trait ParticipantNodeConfigDeprecationsImplicits {
     implicit def deprecatedParticipantNodeConfig[X <: ParticipantNodeConfig]
         : DeprecatedFieldsFor[X] = new DeprecatedFieldsFor[ParticipantNodeConfig] {
       override def movedFields: List[DeprecatedConfigUtils.MovedConfigPath] = List(
-        DeprecatedConfigUtils.MovedConfigPath(
-          "http-ledger-api.server",
-          since = "3.4.0",
-          to = Seq("http-ledger-api"),
-        ),
-        DeprecatedConfigUtils.MovedConfigPath(
-          "features.profileDir",
-          since = "3.5.0",
-          to = Seq("parameters.engine"),
-        ),
-        DeprecatedConfigUtils.MovedConfigPath(
-          "features.snapshotDir",
-          since = "3.5.0",
-          to = Seq("parameters.engine"),
-        ),
+        DeprecatedConfigUtils.MovedConfigPath("http-ledger-api.server", "http-ledger-api")
+      )
+
+      override def deprecatePath: List[DeprecatedConfigUtils.DeprecatedConfigPath[?]] = List(
+        DeprecatedConfigUtils
+          .DeprecatedConfigPath[Boolean]("http-ledger-api.server", "3.4.0")
       )
     }
   }
@@ -149,8 +146,29 @@ object ParticipantNodeConfig {
   object DeprecatedImplicits extends ParticipantNodeConfigDeprecationsImplicits
 }
 
-/** Participant features configuration */
-final case class ParticipantFeaturesConfig()
+/** Participant features configuration
+  *
+  * @param profileDir
+  *   path to the directory used for Daml profiling
+  * @param snapshotDir
+  *   path to the directory used for saving transaction tree snapshots
+  */
+final case class ParticipantFeaturesConfig(
+    profileDir: Option[Path] = None,
+    snapshotDir: Option[Path] = None,
+) extends PredicatedCantonConfigValidation {
+  override protected def allowThisInCommunity: Boolean =
+    // DAMLe profiling is an enterprise-only supported feature
+    profileDir.isEmpty
+}
+
+object ParticipantFeaturesConfig {
+  val default: ParticipantFeaturesConfig = ParticipantFeaturesConfig()
+
+  implicit val participantFeaturesConfigCantonConfigValidator
+      : CantonConfigValidator[ParticipantFeaturesConfig] =
+    CantonConfigValidatorDerivation[ParticipantFeaturesConfig]
+}
 
 /** Configuration to connect the console to a participant running remotely.
   *
@@ -165,9 +183,15 @@ final case class RemoteParticipantConfig(
     adminApi: FullClientConfig,
     ledgerApi: FullClientConfig,
     token: Option[String] = None,
-) extends BaseParticipantConfig {
+) extends BaseParticipantConfig
+    with UniformCantonConfigValidation {
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi
+}
+object RemoteParticipantConfig {
+  implicit val remoteParticipantConfigCantonConfigValidator
+      : CantonConfigValidator[RemoteParticipantConfig] =
+    CantonConfigValidatorDerivation[RemoteParticipantConfig]
 }
 
 /** Canton configuration case class to pass-through configuration options to the ledger api server
@@ -229,8 +253,6 @@ final case class LedgerApiServerConfig(
     ),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     maxInboundMetadataSize: NonNegativeInt = ServerConfig.defaultMaxInboundMetadataSize,
-    maxConcurrentStreamsPerConnection: NonNegativeInt =
-      ServerConfig.defaultMaxConcurrentStreamsPerConnection,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
     databaseConnectionTimeout: config.NonNegativeFiniteDuration =
@@ -268,6 +290,11 @@ final case class LedgerApiServerConfig(
 
 object LedgerApiServerConfig {
 
+  implicit val ledgerApiServerConfigCantonConfigValidator
+      : CantonConfigValidator[LedgerApiServerConfig] =
+    // Do not recurse into the LAPI config as there are no enterprise server features in there
+    CantonConfigValidator.validateAll
+
   private val DefaultManagementServiceTimeout: config.NonNegativeFiniteDuration =
     config.NonNegativeFiniteDuration.ofMinutes(2L)
   private val DefaultDatabaseConnectionTimeout: config.NonNegativeFiniteDuration =
@@ -285,8 +312,11 @@ object LedgerApiServerConfig {
 }
 
 /** Optional ledger api time service configuration for demo and testing only */
-sealed trait TestingTimeServiceConfig
+sealed trait TestingTimeServiceConfig extends UniformCantonConfigValidation
 object TestingTimeServiceConfig {
+  implicit val testingTimeServiceConfigCanontConfigValidator
+      : CantonConfigValidator[TestingTimeServiceConfig] =
+    CantonConfigValidatorDerivation[TestingTimeServiceConfig]
 
   /** A variant of [[TestingTimeServiceConfig]] with the ability to read and monotonically advance
     * ledger time
@@ -340,7 +370,7 @@ object TestingTimeServiceConfig {
   *   are logged as warning instead.
   * @param packageMetadataView
   *   Initialization parameters for the package metadata in-memory store.
-  * @param automaticallyPerformLsu
+  * @param automaticallyPerformLogicalSynchronizerUpgrade
   *   Whether the participant automatically performs a handshake with the upgraded synchronizer
   *   after receiving enough sequencer connections, and whether the participants automatically
   *   connects to the synchronizer after the upgrade time.
@@ -352,10 +382,6 @@ object TestingTimeServiceConfig {
   * @param doNotAwaitOnCheckingIncomingCommitments
   *   Enable fully asynchronous checking of incoming commitments. This may result in some incoming
   *   commitments not being checked in case of crashes or HA failovers.
-  * @param commitmentAsynchronousInitialization
-  *   Enables asynchronous initialization of the ACS commitment processor. This speeds up
-  *   reconnection to a synchronizer at the expense of potentially increased memory and resource
-  *   consumption while the initialization is running in the background.
   * @param commitmentCheckpointInterval
   *   Checkpoint interval for commitments. Smaller intervals lead to less resource-intensive crash
   *   recovery, at the cost of more frequent DB writing of checkpoints. Regardless of this
@@ -371,17 +397,6 @@ object TestingTimeServiceConfig {
   *   commitment computation is slow. If set, the participant triggers catch-up if it's behind in
   *   processing incoming commitments, and it's behind in processing ACS changes, regardless of
   *   whether its commitment computation is slow or not.
-  * @param autoSyncProtocolFeatureFlags
-  *   When true (default), protocol feature flags will be automatically updated when the node
-  *   connects to a synchronizer.
-  * @param alphaMultiSynchronizerSupport
-  *   Determines whether ACS imports use Create/Archive or Assign/Unassign events. Only enable if
-  *   your Ledger API consumers can process (un)assign events and require non-zero reassignment
-  *   counters.
-  *   - false (Default): Uses Create/Archive; resets reassignment counters to zero.
-  *   - true: Uses Assign/Unassign; preserves existing reassignment counters.
-  * @param commitAfterFailedActivenessCheck
-  *   For internal testing only. Do not enable this in production.
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -391,6 +406,9 @@ final case class ParticipantNodeParameterConfig(
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
       ParticipantProtocolVersion(ProtocolVersion.v34)
+    ),
+    initialProtocolVersion: ParticipantProtocolVersion = ParticipantProtocolVersion(
+      ProtocolVersion.latest
     ),
     alphaVersionSupport: Boolean = false,
     betaVersionSupport: Boolean = false,
@@ -407,23 +425,25 @@ final case class ParticipantNodeParameterConfig(
     watchdog: Option[WatchdogConfig] = None,
     packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
     commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
-    alphaOnlinePartyReplicationSupport: Option[AlphaOnlinePartyReplicationConfig] = None,
+    unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig] = None,
     // TODO(#25344): check whether this should be removed
-    automaticallyPerformLsu: Boolean = true,
+    automaticallyPerformLogicalSynchronizerUpgrade: Boolean = true,
     activationFrequencyForWarnAboutConsistencyChecks: Long = 1000,
     reassignmentsConfig: ReassignmentsConfig = ReassignmentsConfig(),
     doNotAwaitOnCheckingIncomingCommitments: Boolean = false,
-    commitmentAsynchronousInitialization: Boolean = false,
     commitmentCheckpointInterval: config.PositiveDurationSeconds =
       config.PositiveDurationSeconds.ofMinutes(1),
     commitmentMismatchDebugging: Boolean = false,
     commitmentProcessorNrAcsChangesBehindToTriggerCatchUp: Option[PositiveInt] = None,
-    commitmentReduceParallelism: NonNegativeInt = NonNegativeInt.one,
-    commitmentUseDbSnapshotForParticipantLookup: Boolean = false,
-    autoSyncProtocolFeatureFlags: Boolean = true,
-    alphaMultiSynchronizerSupport: Boolean = false,
-    commitAfterFailedActivenessCheck: Boolean = false,
 ) extends LocalNodeParametersConfig
+    with UniformCantonConfigValidation
+
+object ParticipantNodeParameterConfig {
+  import CantonConfigValidatorInstances.*
+  implicit val participantNodeParameterConfigCantonConfigValidator
+      : CantonConfigValidator[ParticipantNodeParameterConfig] =
+    CantonConfigValidatorDerivation[ParticipantNodeParameterConfig]
+}
 
 /** Parameters for the participant node's stores
   *
@@ -435,8 +455,12 @@ final case class ParticipantStoreConfig(
     pruningMetricUpdateInterval: Option[config.PositiveDurationSeconds] =
       config.PositiveDurationSeconds.ofHours(1L).some,
     journalPruning: JournalPruningConfig = JournalPruningConfig(),
-    safeToPruneCommitmentState: Option[SafeToPruneCommitmentState] = None,
-)
+) extends UniformCantonConfigValidation
+object ParticipantStoreConfig {
+  implicit val participantStoreConfigCantonConfigValidator
+      : CantonConfigValidator[ParticipantStoreConfig] =
+    CantonConfigValidatorDerivation[ParticipantStoreConfig]
+}
 
 /** Control background journal pruning
   *
@@ -466,7 +490,7 @@ final case class JournalPruningConfig(
     maxBuckets: PositiveInt = JournalPruningConfig.DefaultMaxBuckets,
     maxItemsExpectedToPrunePerBatch: PositiveInt =
       JournalPruningConfig.DefaultMaxItemsExpectedToPrunePerBatch,
-) {
+) extends UniformCantonConfigValidation {
   def toInternal: PrunableByTimeParameters =
     PrunableByTimeParameters(
       targetBatchSize,
@@ -477,6 +501,11 @@ final case class JournalPruningConfig(
 }
 
 object JournalPruningConfig {
+  implicit val journalPruningConfigCantonConfigValidator
+      : CantonConfigValidator[JournalPruningConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[JournalPruningConfig]
+  }
 
   private val DefaultTargetBatchSize = PositiveInt.tryCreate(5000)
   private val DefaultInitialInterval = config.NonNegativeFiniteDuration.ofSeconds(5)
@@ -502,6 +531,12 @@ final case class LedgerApiServerParametersConfig(
     contractLoader: ContractLoaderConfig = ContractLoaderConfig(),
 )
 
+object LedgerApiServerParametersConfig {
+  implicit val ledgerApiServerParametersConfigCanontConfigValidator
+      : CantonConfigValidator[LedgerApiServerParametersConfig] =
+    CantonConfigValidator.validateAll // There are no enterprise server features in here
+}
+
 /** Parameters to control batch loading during phase 1 / interpretation
   *
   * @param maxQueueSize
@@ -524,15 +559,12 @@ object ContractLoaderConfig {
   private val defaultMaxParallelism: PositiveInt = PositiveInt.tryCreate(5)
 }
 
-/** Parameters for the Online Party Replication (OnPR) alpha preview feature
+/** Parameters for the Online Party Replication (OPR) preview feature (unsafe for production)
   */
-final case class AlphaOnlinePartyReplicationConfig(
-    testInterceptor: Option[AlphaOnlinePartyReplicationConfig.TestInterceptor] = None,
-    unsafeSequencerChannelSupport: Boolean = false,
-    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false,
-)
-
-object AlphaOnlinePartyReplicationConfig {
+final case class UnsafeOnlinePartyReplicationConfig(
+    testInterceptor: Option[UnsafeOnlinePartyReplicationConfig.TestInterceptor] = None
+) extends UniformCantonConfigValidation
+object UnsafeOnlinePartyReplicationConfig {
 
   /** The PartyReplicator supports adding a test interceptor for manipulating behavior during tests.
     * This is used for delaying and/or dropping messages to verify the behavior in abnormal
@@ -541,4 +573,10 @@ object AlphaOnlinePartyReplicationConfig {
     */
   type TestInterceptor = () => PartyReplicationTestInterceptor
 
+  implicit val unsafeOnlinePartyReplicationConfigCantonConfigValidator
+      : CantonConfigValidator[UnsafeOnlinePartyReplicationConfig] = {
+    implicit val testingInterceptorCantonConfigValidator: CantonConfigValidator[TestInterceptor] =
+      CantonConfigValidator.validateAll
+    CantonConfigValidatorDerivation[UnsafeOnlinePartyReplicationConfig]
+  }
 }

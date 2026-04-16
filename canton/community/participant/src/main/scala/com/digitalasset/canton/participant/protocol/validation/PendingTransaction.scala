@@ -1,24 +1,18 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
 
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.PendingRequestData
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 
-/** Storing metadata of pending transactions required for emitting transactions on the sync API.
-  * @param trafficCost
-  *   Traffic cost of the associated confirmation request
-  */
+/** Storing metadata of pending transactions required for emitting transactions on the sync API. */
 final case class PendingTransaction(
     freshOwnTimelyTx: Boolean,
     requestTime: CantonTimestamp,
@@ -30,8 +24,6 @@ final case class PendingTransaction(
     override val abortEngine: String => Unit,
     override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
     decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
-    publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
-    trafficCost: NonNegativeLong,
 ) extends PendingRequestData {
 
   val requestId: RequestId = RequestId(requestTime)
@@ -40,8 +32,7 @@ final case class PendingTransaction(
     transactionValidationResult.updateId.toRootHash
   )
 
-  override def publishUpdateO: Option[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]] =
-    Some(publishUpdate)
+  override def isCleanReplay: Boolean = false
 
   override def cancelDecisionTimeTickRequest(): Unit = decisionTimeTickRequest.cancel()
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -61,11 +61,6 @@ package object logging {
       offset: Option[Offset]
   ): LoggingEntry =
     "endInclusive" -> offset
-
-  private[services] def descendingOrder(
-      descendingOrder: Boolean
-  ): LoggingEntry =
-    "descendingOrder" -> descendingOrder
 
   private[services] def offset(offset: Long): LoggingEntry =
     "offset" -> offset.toString

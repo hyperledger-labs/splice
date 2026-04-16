@@ -19,7 +19,7 @@ usage() {
 
 check_grafana_dashboards() {
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  dashboard_dir="$script_dir/../cluster/pulumi/observability/grafana-dashboards"
+  dashboard_dir="$script_dir/../cluster/pulumi/infra/grafana-dashboards"
 
   if [[ $# -gt 0 ]]; then
     dashboard_files=("$@")

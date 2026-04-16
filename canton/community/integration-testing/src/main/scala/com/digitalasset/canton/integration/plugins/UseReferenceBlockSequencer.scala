@@ -1,11 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
 
 import cats.syntax.parallel.*
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.Threading
@@ -59,7 +57,6 @@ class UseReferenceBlockSequencer[StorageConfigT <: StorageConfig](
     Threading.newExecutionContext(
       loggerFactory.threadName + s"-$driverSingleWordName-sequencer-plugin-execution-context",
       noTracingLogger,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -242,78 +239,43 @@ class UseReferenceBlockSequencer[StorageConfigT <: StorageConfig](
             .failOnShutdownToAbortException("recreateDatabases")
         )
       case _ =>
-        warnNoPlugin(functionFullName)
+        logger.underlying.warn(
+          s"`$functionFullName` was called on a test without UsePostgres plugin, which is not supported!"
+        )
+        Future.unit
     }
 
   def dumpDatabases(tempDirectory: TempDirectory, forceLocal: Boolean = false): Future[Unit] =
-    dumpDatabases(dbNames, tempDirectory, forceLocal)
-
-  private def dumpDatabases(
-      names: Seq[String],
-      tempDirectory: TempDirectory,
-      forceLocal: Boolean,
-  ): Future[Unit] =
     pgPlugin match {
       case Some(postgresPlugin) =>
         val pgDumpRestore = PostgresDumpRestore(postgresPlugin, forceLocal)
-        names.parTraverse_(db => pgDumpRestore.saveDump(db, dumpTempFile(tempDirectory, db)))
+        dbNames.forgetNE.parTraverse_(db =>
+          pgDumpRestore.saveDump(db, dumpTempFile(tempDirectory, db))
+        )
       case _ =>
-        warnNoPlugin(functionFullName)
+        logger.underlying.warn(
+          s"`$functionFullName` was called on a test without UsePostgres plugin, which is not supported!"
+        )
+        Future.unit
     }
 
-  def dumpAllDatabases(
-      config: CantonConfig,
-      tempDirectory: TempDirectory,
-      forceLocal: Boolean = false,
-  ): Future[Unit] =
-    forAllDatabaseDumps(functionFullName, config)(dumpDatabases(_, tempDirectory, forceLocal))
-
   def restoreDatabases(tempDirectory: TempDirectory, forceLocal: Boolean = false): Future[Unit] =
-    restoreDatabases(dbNames, tempDirectory, forceLocal)
-
-  private def restoreDatabases(
-      names: Seq[String],
-      tempDirectory: TempDirectory,
-      forceLocal: Boolean,
-  ): Future[Unit] =
     pgPlugin match {
       case Some(postgresPlugin) =>
         val pgDumpRestore = PostgresDumpRestore(postgresPlugin, forceLocal)
-        names.parTraverse_(db =>
+        dbNames.forgetNE.parTraverse_(db =>
           pgDumpRestore.restoreDump(db, dumpTempFile(tempDirectory, db).path)
         )
       case _ =>
-        warnNoPlugin(functionFullName)
-    }
-
-  def restoreAllDatabases(
-      config: CantonConfig,
-      tempDirectory: TempDirectory,
-      forceLocal: Boolean = false,
-  ): Future[Unit] =
-    forAllDatabaseDumps(functionFullName, config)(restoreDatabases(_, tempDirectory, forceLocal))
-
-  private def forAllDatabaseDumps(functionName: String, config: CantonConfig)(
-      op: Seq[String] => Future[Unit]
-  ): Future[Unit] =
-    pgPlugin match {
-      case Some(postgresPlugin) =>
-        val nodeDatabases =
-          config.nodeNamesInStartupOrder.map(name => name.unwrap)
-        op(dbNames.forgetNE ++ nodeDatabases)
-      case _ =>
-        warnNoPlugin(functionName)
+        logger.underlying.warn(
+          s"`$functionFullName` was called on a test without UsePostgres plugin, which is not supported!"
+        )
+        Future.unit
     }
 
   private def dumpTempFile(tempDirectory: TempDirectory, dbName: String): TempFile =
     tempDirectory.toTempFile(s"pg-dump-$dbName.tar")
 
-  private def warnNoPlugin(functionName: String): Future[Unit] = {
-    logger.underlying.warn(
-      s"`$functionName` was called on a test without UsePostgres plugin, which is not supported!"
-    )
-    Future.unit
-  }
 }
 
 object UseReferenceBlockSequencer {

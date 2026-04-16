@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.data.EitherT
 import cats.syntax.alternative.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
@@ -14,7 +13,7 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{Checked, EitherTUtil, ErrorUtil}
+import com.digitalasset.canton.util.{Checked, ErrorUtil}
 
 import scala.concurrent.ExecutionContext
 
@@ -109,28 +108,24 @@ object RootHashMessageRecipients extends HasLoggerName {
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, String, Unit] = {
+  ): FutureUnlessShutdown[WrongMembers] = {
     val participants = rootHashMessagesRecipients.collect {
       case MemberRecipient(p: ParticipantId) => p
     }
     for {
-      allInformeeParticipants <- EitherT.right(
-        topologySnapshot
-          .activeParticipantsOfParties(request.allInformees.toList)
-          .map(_.values.toSet.flatten)
-      )
-      participantsSet = participants.toSet
-      missingInformeeParticipants = allInformeeParticipants diff participantsSet
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        missingInformeeParticipants.isEmpty,
-        show"Missing root hash message for informee participants: $missingInformeeParticipants",
-      )
-      superfluousMembers = participantsSet diff allInformeeParticipants
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        superfluousMembers.isEmpty,
-        show"Superfluous root hash message for members: $superfluousMembers",
-      )
-
-    } yield ()
+      allInformeeParticipants <- topologySnapshot
+        .activeParticipantsOfParties(request.allInformees.toList)
+        .map(_.values.toSet.flatten)
+    } yield {
+      val participantsSet = participants.toSet
+      val missingInformeeParticipants = allInformeeParticipants diff participantsSet
+      val superfluousMembers = participantsSet diff allInformeeParticipants
+      WrongMembers(missingInformeeParticipants, superfluousMembers)
+    }
   }
+
+  final case class WrongMembers(
+      missingInformeeParticipants: Set[ParticipantId],
+      superfluousMembers: Set[ParticipantId],
+  )
 }

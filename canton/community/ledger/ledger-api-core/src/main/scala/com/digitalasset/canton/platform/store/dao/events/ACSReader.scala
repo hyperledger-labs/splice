@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -14,21 +14,13 @@ import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
 import com.daml.tracing
 import com.daml.tracing.{SpanAttribute, Spans}
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.api.AcsContinuationToken.Checksum
-import com.digitalasset.canton.ledger.api.{
-  AcsContinuationToken,
-  AcsContinuationTokenActive,
-  AcsContinuationTokenIncomplete,
-}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig
-import com.digitalasset.canton.platform.store.LedgerApiContractStore
-import com.digitalasset.canton.platform.store.ScalaPbStreamingOptimizations.ScalaPbMessageWithPrecomputedSerializedSize
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
@@ -39,13 +31,6 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawUnassignEvent,
 }
 import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesAcsDelta
-import com.digitalasset.canton.platform.store.cache.AchsStateCache
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.{
-  IdFilterPageQuery,
-  IdPageBounds,
-  PaginationFromTo,
-  PaginationInput,
-}
 import com.digitalasset.canton.platform.store.dao.events.UpdateReader.endSpanOnTermination
 import com.digitalasset.canton.platform.store.dao.{
   DbDispatcher,
@@ -65,11 +50,10 @@ import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.FullIdentifier
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.stream.{Attributes, OverflowStrategy}
 
-import java.sql.Connection
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 import scala.util.chaining.*
 
@@ -91,8 +75,7 @@ class ACSReader(
     queryValidRange: QueryValidRange,
     eventStorageBackend: EventStorageBackend,
     lfValueTranslation: LfValueTranslation,
-    contractStore: LedgerApiContractStore,
-    achsStateCache: AchsStateCache,
+    contractStore: ContractStore,
     incompleteOffsets: (
         Offset,
         Option[Set[Ref.Party]],
@@ -112,8 +95,6 @@ class ACSReader(
       filteringConstraints: TemplatePartiesFilter,
       activeAt: (Offset, Long),
       eventProjectionProperties: EventProjectionProperties,
-      continuationToken: Option[AcsContinuationToken],
-      checksum: Checksum,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -130,8 +111,6 @@ class ACSReader(
       filteringConstraints,
       activeAt,
       eventProjectionProperties,
-      continuationToken,
-      checksum,
     )
       .watchTermination()(endSpanOnTermination(span))
   }
@@ -140,8 +119,6 @@ class ACSReader(
       filter: TemplatePartiesFilter,
       activeAt: (Offset, Long),
       eventProjectionProperties: EventProjectionProperties,
-      continuationToken: Option[AcsContinuationToken],
-      checksum: Checksum,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -175,105 +152,13 @@ class ACSReader(
       loggerFactory = loggerFactory,
     )
 
-    def achsIsValid: Boolean = activeAtEventSeqId >= achsStateCache.get().validAt
-
-    def fetchAchsIdFilterPageQuery(
-        filter: DecomposedFilter
-    ): IdFilterPageQuery = {
-      val achsQuery: IdFilterPageQuery =
-        eventStorageBackend.updateStreamingQueries.fetchAchsIds(
-          stakeholderO = filter.party,
-          templateIdO = filter.templateId,
-          activeAtEventSeqId = activeAtEventSeqId,
-        )
-
-      new ACSReader.AchsValidatingIdFilterPageQuery(
-        achsQuery = achsQuery,
-        achsIsValid = () => achsIsValid,
-        getLastPopulated = () => achsStateCache.get().lastPointers.lastPopulated,
-      )
-    }
-
-    def fetchActiveIds(initialFromIdExclusive: Long)(
-        filter: DecomposedFilter
-    ): Source[Long, NotUsed] =
-      if (achsStateCache.get().lastPointers.lastPopulated == 0 || !achsIsValid)
-        fetchActiveIdsFromFilterTables(
-          achsLastInput = None,
-          initialFromIdExclusive = initialFromIdExclusive,
-        )(filter)
-      else {
-        val achsLastInputPromise = Promise[Option[PaginationInput]]()
-        paginatingAsyncStream
-          .streamIdPagesFromSeekPaginationWithIdFilter(
-            idStreamName = s"ActiveContractIds $filter",
-            idPageSizing = idQueryPageSizing,
-            initialFromIdExclusive = initialFromIdExclusive,
-            initialEndInclusive = activeAtEventSeqId,
-            descendingOrder = false,
-          )(fetchAchsIdFilterPageQuery(filter))(
-            executeFetchBounds = f =>
-              activeIdQueriesLimiter.execute(
-                globalIdQueriesLimiter.execute(
-                  dispatcher.executeSql(metrics.index.db.getAchsIdRanges)(f)
-                )
-              ),
-            idFilterQueryParallelism = config.idFilterQueryParallelism,
-            executeFetchPage = f =>
-              activeIdQueriesLimiter.execute(
-                globalIdQueriesLimiter.execute(
-                  dispatcher.executeSql(
-                    metrics.index.db.getAchsFilteredIds
-                  )(f)
-                )
-              ),
-          )
-          .takeWhile(_ => achsIsValid)
-          .statefulMap(() => Option.empty[PaginationInput])(
-            f = { case (_previousInput, (input, ids)) =>
-              (Some(input), (input, ids))
-            },
-            onComplete = state => {
-              achsLastInputPromise
-                .trySuccess(state)
-                .discard
-              None
-            },
-          )
-          .buffer(config.maxPagesPerIdPagesBuffer, OverflowStrategy.backpressure)
-          .mapConcat(_._2)
-          .concat(
-            Source.futureSource(
-              achsLastInputPromise.future.map(achsLastInput =>
-                fetchActiveIdsFromFilterTables(
-                  achsLastInput = achsLastInput,
-                  initialFromIdExclusive = initialFromIdExclusive,
-                )(filter)
-              )(executionContext)
-            )
-          )
-      }
-
-    def fetchActiveIdsFromFilterTables(
-        achsLastInput: Option[PaginationInput],
-        initialFromIdExclusive: Long,
-    )(
-        filter: DecomposedFilter
-    ): Source[Long, NotUsed] =
+    def fetchActiveIds(filter: DecomposedFilter): Source[Long, NotUsed] =
       paginatingAsyncStream.streamIdsFromSeekPaginationWithIdFilter(
         idStreamName = s"ActiveContractIds $filter",
-        idPageSizing = achsLastInput
-          .map(lastInput =>
-            idQueryPageSizing.copy(
-              minPageSize = lastInput.limit
-            )
-          )
-          .getOrElse(idQueryPageSizing),
+        idPageSizing = idQueryPageSizing,
         idPageBufferSize = config.maxPagesPerIdPagesBuffer,
-        initialFromIdExclusive =
-          achsLastInput.map(_.fromTo.toInclusive).getOrElse(initialFromIdExclusive),
+        initialFromIdExclusive = 0L,
         initialEndInclusive = activeAtEventSeqId,
-        descendingOrder = false,
       )(
         eventStorageBackend.updateStreamingQueries.fetchActiveIds(
           stakeholderO = filter.party,
@@ -281,14 +166,14 @@ class ACSReader(
           activeAtEventSeqId = activeAtEventSeqId,
         )
       )(
-        executeFetchBounds = f =>
+        executeLastIdQuery = f =>
           activeIdQueriesLimiter.execute(
             globalIdQueriesLimiter.execute(
               dispatcher.executeSql(metrics.index.db.getActiveContractIdRanges)(f)
             )
           ),
         idFilterQueryParallelism = config.idFilterQueryParallelism,
-        executeFetchPage = f =>
+        executeIdFilterQuery = f =>
           activeIdQueriesLimiter.execute(
             globalIdQueriesLimiter.execute(
               dispatcher.executeSql(
@@ -303,9 +188,10 @@ class ACSReader(
     )(payloads: Vector[T]): Future[Vector[(T, Option[FatContract])]] =
       for {
         contractsM <- contractStore
-          .lookupBatchedNonReadThrough(
+          .lookupBatchedNonCached(
             payloads.map(internalContractId)
           )
+          .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
       } yield payloads.map { payload =>
         payload -> contractsM
           .get(internalContractId(payload))
@@ -368,10 +254,9 @@ class ACSReader(
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
         dispatcher.executeSql(metrics.index.db.getAssingIdsForOffsets) { connection =>
-          // all activations for an incomplete offset should be assignments
           val ids =
             eventStorageBackend
-              .lookupActivationSequentialIdByOffset(offsets.map(_.unwrap))(connection)
+              .lookupAssignSequentialIdByOffset(offsets.map(_.unwrap))(connection)
           logger.debug(
             s"Assign Ids for offsets returned #${ids.size} (from ${offsets.size}) ${ids.lastOption
                 .map(last => s"until $last")
@@ -386,10 +271,9 @@ class ACSReader(
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
         dispatcher.executeSql(metrics.index.db.getUnassingIdsForOffsets) { connection =>
-          // all deactivations for an incomplete offset should be assignments
           val ids =
             eventStorageBackend
-              .lookupDeactivationSequentialIdByOffset(offsets.map(_.unwrap))(connection)
+              .lookupUnassignSequentialIdByOffset(offsets.map(_.unwrap))(connection)
           logger.debug(
             s"Unassign Ids for offsets returned #${ids.size} (from ${offsets.size}) ${ids.lastOption
                 .map(last => s"until $last")
@@ -526,9 +410,9 @@ class ACSReader(
     val inputBufferSize =
       Utils.largestSmallerOrEqualPowerOfTwo(config.maxParallelPayloadCreateQueries)
 
-    def activeContractsStream(startSequentialIdExclusive: Long) = decomposedFilters
-      .map(fetchActiveIds(startSequentialIdExclusive))
-      .pipe(EventIdsUtils.sortAndDeduplicateIds(descendingOrder = false))
+    decomposedFilters
+      .map(fetchActiveIds)
+      .pipe(EventIdsUtils.sortAndDeduplicateIds)
       .batchN(
         maxBatchSize = config.maxPayloadsPerPayloadsPage,
         maxBatchCount = config.maxParallelPayloadCreateQueries + 1,
@@ -537,85 +421,70 @@ class ACSReader(
       .mapAsync(config.maxParallelPayloadCreateQueries)(fetchActivePayloads)
       .mapConcat(identity)
       .mapAsync(config.contractProcessingParallelism)(
-        toApiResponseActiveContract(eventProjectionProperties, checksum)
+        toApiResponseActiveContract(eventProjectionProperties)
       )
+      .concatLazy(
+        // compute incomplete reassignments
+        Source.lazyFutureSource(() =>
+          incompleteOffsets(
+            activeAtOffset,
+            filter.allFilterParties,
+            loggingContext.traceContext,
+          ).map { offsets =>
+            def incompleteOffsetPages: () => Iterator[Vector[Offset]] =
+              () => offsets.sliding(config.maxIncompletePageSize, config.maxIncompletePageSize)
 
-    val activeContracts = continuationToken match {
-      case Some(AcsContinuationTokenIncomplete(_, _, _)) => Source.empty
-      case Some(AcsContinuationTokenActive(_, startSequentialIdExclusive)) =>
-        activeContractsStream(startSequentialIdExclusive)
-      case _ => activeContractsStream(0L)
-    }
-    val incompleteReassignments = Source.lazyFutureSource(() =>
-      incompleteOffsets(
-        activeAtOffset,
-        filter.allFilterParties,
-        loggingContext.traceContext,
-      ).map { allOffsets =>
-        val (sequentialIdLimit, offsetLimit) = continuationToken match {
-          case Some(AcsContinuationTokenIncomplete(_, sequentialId, offset)) =>
-            (sequentialId, Offset.tryFromLong(offset))
-          case _ => (0L, Offset.firstOffset)
-        }
-        val offsets = allOffsets.filter(_ >= offsetLimit)
-        def incompleteOffsetPages: () => Iterator[Vector[Offset]] =
-          () => offsets.sliding(config.maxIncompletePageSize, config.maxIncompletePageSize)
+            val incompleteAssigned: Source[(Long, GetActiveContractsResponse), NotUsed] =
+              Source
+                .fromIterator(incompleteOffsetPages)
+                .mapAsync(config.maxParallelActiveIdQueries)(
+                  fetchAssignIdsForOffsets
+                )
+                .mapConcat(identity)
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchAssignPayloads
+                )
+                .mapConcat(_.filter(assignMeetsConstraints))
+                .mapAsync(config.contractProcessingParallelism)(
+                  toApiResponseIncompleteAssigned(eventProjectionProperties)
+                )
 
-        val incompleteAssigned: Source[(Long, GetActiveContractsResponse), NotUsed] =
-          Source
-            .fromIterator(incompleteOffsetPages)
-            .mapAsync(config.maxParallelActiveIdQueries)(
-              fetchAssignIdsForOffsets
-            )
-            .mapConcat(identity)
-            .dropWhile(_ <= sequentialIdLimit)
-            .grouped(config.maxIncompletePageSize)
-            .mapAsync(config.maxParallelPayloadCreateQueries)(
-              fetchAssignPayloads
-            )
-            .mapConcat(_.filter(assignMeetsConstraints))
-            .mapAsync(config.contractProcessingParallelism)(
-              toApiResponseIncompleteAssigned(eventProjectionProperties, checksum)
-            )
+            val incompleteUnassigned: Source[(Long, GetActiveContractsResponse), NotUsed] =
+              Source
+                .fromIterator(incompleteOffsetPages)
+                .mapAsync(config.maxParallelActiveIdQueries)(
+                  fetchUnassignIdsForOffsets
+                )
+                .mapConcat(identity)
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchUnassignPayloads
+                )
+                .mapConcat(_.filter(unassignMeetsConstraints))
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchActivationEventsForUnassignedBatch
+                )
+                .mapConcat(identity)
+                .mapAsync(config.contractProcessingParallelism)(
+                  toApiResponseIncompleteUnassigned(eventProjectionProperties)
+                )
 
-        val incompleteUnassigned: Source[(Long, GetActiveContractsResponse), NotUsed] =
-          Source
-            .fromIterator(incompleteOffsetPages)
-            .mapAsync(config.maxParallelActiveIdQueries)(
-              fetchUnassignIdsForOffsets
+            incompleteAssigned
+              .mergeSorted(incompleteUnassigned)(Ordering.by(_._1))
+              .map(_._2)
+          }.onShutdown {
+            Source.failed(
+              AbortedDueToShutdown.Error().asGrpcError
             )
-            .mapConcat(identity)
-            .dropWhile(_ <= sequentialIdLimit)
-            .grouped(config.maxIncompletePageSize)
-            .mapAsync(config.maxParallelPayloadCreateQueries)(
-              fetchUnassignPayloads
-            )
-            .mapConcat(_.filter(unassignMeetsConstraints))
-            .grouped(config.maxIncompletePageSize)
-            .mapAsync(config.maxParallelPayloadCreateQueries)(
-              fetchActivationEventsForUnassignedBatch
-            )
-            .mapConcat(identity)
-            .mapAsync(config.contractProcessingParallelism)(
-              toApiResponseIncompleteUnassigned(eventProjectionProperties, checksum)
-            )
-
-        incompleteAssigned
-          .mergeSorted(incompleteUnassigned)(Ordering.by(_._1))
-          .map(_._2)
-      }.onShutdown {
-        Source.failed(
-          AbortedDueToShutdown.Error().asGrpcError
+          }
         )
-      }
-    )
-
-    activeContracts.concatLazy(incompleteReassignments)
+      )
   }
 
   private def toApiResponseActiveContract(
-      eventProjectionProperties: EventProjectionProperties,
-      checksum: Checksum,
+      eventProjectionProperties: EventProjectionProperties
   )(
       rawActiveContract: RawFatActiveContract
   )(implicit lc: LoggingContextWithTrace): Future[GetActiveContractsResponse] =
@@ -644,18 +513,13 @@ class ACSReader(
                     rawActiveContract.fatCreatedEventProperties.thinCreatedEventProperties.reassignmentCounter,
                 )
               ),
-              streamContinuationToken =
-                AcsContinuationTokenActive(checksum, rawActiveContract.eventSeqId).encode,
-            ).withPrecomputedSerializedSize()
+            )
           )
       ),
       timer = dbMetrics.getActiveContracts.translationTimer,
     )
 
-  private def toApiResponseIncompleteAssigned(
-      eventProjectionProperties: EventProjectionProperties,
-      checksum: Checksum,
-  )(
+  private def toApiResponseIncompleteAssigned(eventProjectionProperties: EventProjectionProperties)(
       rawFatAssign: RawFatAssignEvent
   )(implicit lc: LoggingContextWithTrace): Future[(Long, GetActiveContractsResponse)] =
     Timed.future(
@@ -674,27 +538,21 @@ class ACSReader(
           )
           .map(createdEvent =>
             rawFatAssign.reassignmentProperties.commonEventProperties.offset -> GetActiveContractsResponse(
-              workflowId = rawFatAssign.reassignmentProperties.commonEventProperties.workflowId
-                .getOrElse(""),
+              workflowId =
+                rawFatAssign.reassignmentProperties.commonEventProperties.workflowId.getOrElse(""),
               contractEntry = GetActiveContractsResponse.ContractEntry.IncompleteAssigned(
                 IncompleteAssigned(
                   Some(UpdateReader.toAssignedEvent(rawFatAssign, createdEvent))
                 )
               ),
-              streamContinuationToken = AcsContinuationTokenIncomplete(
-                checksum,
-                rawFatAssign.eventSeqId,
-                rawFatAssign.offset,
-              ).encode,
-            ).withPrecomputedSerializedSize()
+            )
           )
       ),
       timer = dbMetrics.getActiveContracts.translationTimer,
     )
 
   private def toApiResponseIncompleteUnassigned(
-      eventProjectionProperties: EventProjectionProperties,
-      checksum: Checksum,
+      eventProjectionProperties: EventProjectionProperties
   )(
       rawUnassignEventWithActive: (RawUnassignEvent, RawFatActiveContract)
   )(implicit lc: LoggingContextWithTrace): Future[(Long, GetActiveContractsResponse)] = {
@@ -724,12 +582,7 @@ class ACSReader(
                 ),
               )
             ),
-            streamContinuationToken = AcsContinuationTokenIncomplete(
-              checksum,
-              rawUnassignEvent.eventSeqId,
-              rawUnassignEvent.offset,
-            ).encode,
-          ).withPrecomputedSerializedSize()
+          )
         ),
       timer = dbMetrics.getActiveContracts.translationTimer,
     )
@@ -738,56 +591,6 @@ class ACSReader(
 }
 
 object ACSReader {
-
-  /** A wrapper around an ACHS `IdFilterPageQuery` that guards each call with validity checks and
-    * pins the upper bound to `lastPopulated`.
-    *
-    *   - `fetchPageBounds` returns `None` when `achsIsValid` is false (completing the stream). When
-    *     valid, it adjusts the input's `toInclusive` to `lastPopulated`, and on the last page, also
-    *     adjusts the returned bounds' `toInclusive` to `lastPopulated` so that the filter table
-    *     continuation starts from the correct position.
-    *   - `fetchPage` returns an empty vector when `achsIsValid` is false, otherwise delegates to
-    *     the underlying query.
-    *
-    * @param achsQuery
-    *   the underlying ACHS `IdFilterPageQuery` to delegate to
-    * @param achsIsValid
-    *   returns whether the ACHS cache is still valid for the requested `activeAtEventSeqId`
-    * @param getLastPopulated
-    *   returns the current `lastPopulated` event sequential id from the ACHS cache
-    */
-  private[store] class AchsValidatingIdFilterPageQuery(
-      achsQuery: IdFilterPageQuery,
-      achsIsValid: () => Boolean,
-      getLastPopulated: () => Long,
-  ) extends IdFilterPageQuery {
-    override def fetchPageBounds(connection: Connection)(
-        input: PaginationInput
-    ): Option[IdPageBounds] =
-      if (!achsIsValid()) None // this completes the stream
-      else {
-        val lastPopulated = getLastPopulated()
-        val adjustedInput = input.copy(
-          fromTo = input.fromTo.copy(
-            // pin the upper bound to the moving target of last populated - as soon we were able to catch up, the stream completes
-            toInclusive = lastPopulated
-          )
-        )
-        achsQuery.fetchPageBounds(connection)(adjustedInput).map { bounds =>
-          if (bounds.lastPage) {
-            // on last page, pin toInclusive to lastPopulated so filter table continuation starts from here
-            bounds.copy(fromTo = bounds.fromTo.copy(toInclusive = lastPopulated))
-          } else bounds
-        }
-      }
-
-    override def fetchPage(connection: Connection)(
-        fromTo: PaginationFromTo
-    ): Vector[Long] =
-      // the takeWhile anyway will filter this out later so does not make sense to do the query
-      if (!achsIsValid()) Vector.empty
-      else achsQuery.fetchPage(connection)(fromTo)
-  }
 
   def acsBeforePruningErrorReason(
       acsOffset: Offset,

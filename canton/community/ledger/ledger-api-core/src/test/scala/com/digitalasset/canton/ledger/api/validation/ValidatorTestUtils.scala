@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -46,8 +46,8 @@ trait ValidatorTestUtils extends Matchers with Inside with OptionValues with Eit
   protected val refTemplateId2 = Ref.Identifier(packageId2, templateQualifiedName)
 
   private val expectedTemplates = Set(
-    Ref.NameTypeConRef(
-      Ref.PackageRef.Name(packageName),
+    Ref.TypeConRef(
+      Ref.PackageRef.Id(Ref.PackageId.assertFromString(packageId)),
       Ref.QualifiedName(
         Ref.DottedName.assertFromString(includedModule),
         Ref.DottedName.assertFromString(includedTemplate),
@@ -57,7 +57,7 @@ trait ValidatorTestUtils extends Matchers with Inside with OptionValues with Eit
 
   protected def hasExpectedFilters(
       req: update.GetUpdatesRequest,
-      expectedTemplates: Set[Ref.NameTypeConRef] = expectedTemplates,
+      expectedTemplates: Set[Ref.TypeConRef] = expectedTemplates,
   ): Assertion = {
     val filtersByParty = req.updateFormat.includeTransactions.value.eventFormat.filtersByParty
     filtersByParty should have size 1
@@ -69,8 +69,8 @@ trait ValidatorTestUtils extends Matchers with Inside with OptionValues with Eit
             expectedTemplates.map(TemplateFilter(_, includeCreatedEventBlob = false)),
           interfaceFilters = Set(
             InterfaceFilter(
-              interfaceTypeRef = Ref.NameTypeConRef(
-                Ref.PackageRef.Name(packageName),
+              interfaceTypeRef = Ref.TypeConRef(
+                Ref.PackageRef.assertFromString(packageId),
                 Ref.QualifiedName(
                   Ref.DottedName.assertFromString(includedModule),
                   Ref.DottedName.assertFromString(includedTemplate),

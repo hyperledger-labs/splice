@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -43,7 +43,6 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcFUSExtended
-import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.OptionUtil
 import io.grpc.ServerServiceDefinition
@@ -60,7 +59,6 @@ class ApiInteractiveSubmissionService(
     currentUtcTime: () => Instant,
     maxDeduplicationDuration: Duration,
     submissionIdGenerator: SubmissionIdGenerator,
-    tracker: CommandProgressTracker,
     metrics: LedgerApiServerMetrics,
     telemetry: Telemetry,
     val loggerFactory: NamedLoggerFactory,
@@ -131,17 +129,6 @@ class ApiInteractiveSubmissionService(
         loggingContextWithTrace,
         OptionUtil.emptyStringAsNone(request.submissionId),
       )
-    submitterInfo match {
-      case Some(value) =>
-        val _ = tracker.registerCommand(
-          value.commandId,
-          OptionUtil.emptyStringAsNone(request.submissionId),
-          request.userId,
-          Seq.empty, // needs change in the API to support extracting root nodes here
-          actAs = value.actAs.toSet,
-        )(loggingContextWithTrace.traceContext)
-      case _ =>
-    }
     validator
       .validateExecute(
         request,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -53,8 +53,8 @@ class InMemoryReassignmentStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] = {
     ErrorUtil.requireArgument(
-      unassignmentData.targetPsid.map(_.logical) == synchronizer,
-      s"Synchronizer $synchronizer: Reassignment store cannot store reassignment for synchronizer ${unassignmentData.targetPsid
+      unassignmentData.targetPSId.map(_.logical) == synchronizer,
+      s"Synchronizer $synchronizer: Reassignment store cannot store reassignment for synchronizer ${unassignmentData.targetPSId
           .map(_.logical)}",
     )
 
@@ -277,7 +277,7 @@ class InMemoryReassignmentStore(
         requestAfter.forall { case (ts, sourceSynchronizerID) =>
           (
             entry.unassignmentTs,
-            entry.unassignmentData.map(_.sourcePsid.map(_.logical)),
+            entry.unassignmentData.map(_.sourcePSId.map(_.logical)),
           ) > (ts, Some(sourceSynchronizerID))
         }
 
@@ -285,7 +285,7 @@ class InMemoryReassignmentStore(
       .to(LazyList)
       .filter(filter)
       .flatMap(_.unassignmentData)
-      .sortBy(t => (t.unassignmentTs, t.sourcePsid.unwrap))
+      .sortBy(t => (t.unassignmentTs, t.sourcePSId.unwrap))
       .take(limit)
   }
 
@@ -380,7 +380,7 @@ class InMemoryReassignmentStore(
               .map(_.contractsBatch.contractIds)
               .exists(contractIds.contains) &&
             sourceSynchronizer.forall(source =>
-              entry.unassignmentData.exists(_.sourcePsid == source)
+              entry.unassignmentData.exists(_.sourcePSId == source)
             ) &&
             unassignmentTs.forall(
               _ == entry.unassignmentTs

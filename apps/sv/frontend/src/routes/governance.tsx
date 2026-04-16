@@ -27,7 +27,6 @@ import {
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
 import { Link as RouterLink } from 'react-router';
 import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
-import { useInfiniteVoteRequestResults } from '../hooks';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -40,6 +39,8 @@ function getAction(action: ActionRequiringConfirmation): string {
   }
 }
 
+const QUERY_LIMIT = 50;
+
 export const Governance: React.FC = () => {
   const svConfig = useSvConfig();
   const amuletName = svConfig.spliceInstanceNames.amuletName;
@@ -47,7 +48,17 @@ export const Governance: React.FC = () => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
   const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
-  const voteResultsInfiniteQuery = useInfiniteVoteRequestResults();
+  const voteResultsWithAcceptedQuery = (accepted: boolean) =>
+    votesHooks.useListVoteRequestResult(
+      QUERY_LIMIT,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      accepted
+    );
+  const acceptedResultsQuery = voteResultsWithAcceptedQuery(true);
+  const notAcceptedResultsQuery = voteResultsWithAcceptedQuery(false);
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
@@ -55,53 +66,18 @@ export const Governance: React.FC = () => {
   const votesQuery = votesHooks.useListVotes(voteRequestIds);
 
   const svPartyId = dsoInfosQuery.data?.svPartyId;
-  const votingThreshold = dsoInfosQuery.data?.votingThreshold;
   const alreadyVotedRequestIds: Set<ContractId<VoteRequest>> = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
       : new Set();
   }, [votesQuery.data, svPartyId]);
 
-  const voteHistory = useMemo(() => {
-    const pages = voteResultsInfiniteQuery.data?.pages;
-    if (!pages || !svPartyId || votingThreshold === undefined) return [];
-
-    const allVoteResults = pages.flatMap(page => page.results);
-
-    return allVoteResults
-      .filter(
-        vr =>
-          (vr.outcome.tag === 'VRO_Accepted' &&
-            dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())) ||
-          vr.outcome.tag === 'VRO_Expired' ||
-          vr.outcome.tag === 'VRO_Rejected'
-      )
-      .map(vr => {
-        const votes = vr.request.votes.entriesArray().map(e => e[1]);
-
-        return {
-          contractId: vr.request.trackingCid,
-          actionName:
-            actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
-          description: vr.request.reason.body,
-          votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
-          voteTakesEffect:
-            (vr.outcome.tag === 'VRO_Accepted' &&
-              dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
-            dayjs(vr.completedAt).format(dateTimeFormatISO),
-          yourVote: computeYourVote(votes, svPartyId),
-          status: getVoteResultStatus(vr.outcome),
-          voteStats: computeVoteStats(votes),
-          acceptanceThreshold: votingThreshold,
-        } as ProposalListingData;
-      });
-  }, [voteResultsInfiniteQuery.data?.pages, amuletName, svPartyId, votingThreshold]);
-
   if (
     dsoInfosQuery.isPending ||
     listVoteRequestsQuery.isPending ||
     votesQuery.isPending ||
-    voteResultsInfiniteQuery.isPending
+    acceptedResultsQuery.isPending ||
+    notAcceptedResultsQuery.isPending
   ) {
     return <Loading />;
   }
@@ -110,12 +86,14 @@ export const Governance: React.FC = () => {
     dsoInfosQuery.isError ||
     listVoteRequestsQuery.isError ||
     votesQuery.isError ||
-    voteResultsInfiniteQuery.isError
+    acceptedResultsQuery.isError ||
+    notAcceptedResultsQuery.isError
   ) {
     return <ErrorStateSection />;
   }
 
   const voteRequests = listVoteRequestsQuery.data;
+  const votingThreshold = dsoInfosQuery.data.votingThreshold;
 
   const actionRequiredRequests = voteRequests
     .filter(v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
@@ -150,9 +128,38 @@ export const Governance: React.FC = () => {
         yourVote: computeYourVote(votes, svPartyId),
         status: 'In Progress',
         voteStats: computeVoteStats(votes),
-        acceptanceThreshold: dsoInfosQuery.data.votingThreshold,
+        acceptanceThreshold: votingThreshold,
       } as ProposalListingData;
     });
+
+  const acceptedRequests = acceptedResultsQuery.data.filter(
+    vr => vr.outcome.tag === 'VRO_Accepted' && dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())
+  );
+
+  const notAcceptedRequests = notAcceptedResultsQuery.data.filter(
+    vr => vr.outcome.tag === 'VRO_Expired' || vr.outcome.tag === 'VRO_Rejected'
+  );
+
+  const allRequests = [...acceptedRequests, ...notAcceptedRequests];
+
+  const voteHistory = allRequests.map(vr => {
+    const votes = vr.request.votes.entriesArray().map(e => e[1]);
+
+    return {
+      contractId: vr.request.trackingCid,
+      actionName: actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
+      description: vr.request.reason.body,
+      votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+      voteTakesEffect:
+        (vr.outcome.tag === 'VRO_Accepted' &&
+          dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
+        dayjs(vr.completedAt).format(dateTimeFormatISO),
+      yourVote: computeYourVote(votes, svPartyId),
+      status: getVoteResultStatus(vr.outcome),
+      voteStats: computeVoteStats(votes),
+      acceptanceThreshold: votingThreshold,
+    } as ProposalListingData;
+  });
 
   return (
     <Box sx={{ p: 4 }}>
@@ -173,8 +180,7 @@ export const Governance: React.FC = () => {
 
       {actionRequiredRequests.length === 0 &&
       inflightRequests.length === 0 &&
-      voteHistory.length === 0 &&
-      !voteResultsInfiniteQuery.hasNextPage ? (
+      voteHistory.length === 0 ? (
         <EmptyStateSection />
       ) : (
         <>
@@ -197,10 +203,7 @@ export const Governance: React.FC = () => {
             uniqueId="vote-history"
             showStatus
             showVoteStats
-            fetchNextPage={voteResultsInfiniteQuery.fetchNextPage}
-            hasNextPage={voteResultsInfiniteQuery.hasNextPage}
-            isFetchingNextPage={voteResultsInfiniteQuery.isFetchingNextPage}
-            pageCount={voteResultsInfiniteQuery.data?.pages.length}
+            sortOrder="effectiveAtDesc"
           />
         </>
       )}

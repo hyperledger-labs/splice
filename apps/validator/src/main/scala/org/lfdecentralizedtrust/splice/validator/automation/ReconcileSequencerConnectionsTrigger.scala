@@ -3,23 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnection,
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
-import io.grpc.{Status, StatusRuntimeException}
-import io.grpc.Status.Code
-import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingTrigger,
   TriggerContext,
@@ -29,6 +12,23 @@ import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SequencerConnectionPoolDelays,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import io.grpc.Status.Code
+import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -66,7 +66,6 @@ class ReconcileSequencerConnectionsTrigger(
                   ex.getStatus.getDescription.contains("Time tracker for domain") =>
               None
           }
-      psid <- participantAdminConnection.getPhysicalSynchronizerId(decentralizedSynchronizer)
       _ <- maybeDomainTime match {
         case Some(domainTime) =>
           val maxDomainTime = initialSynchronizerTimeO match {
@@ -82,8 +81,7 @@ class ReconcileSequencerConnectionsTrigger(
           }
           for {
             (sequencerConnections, _) <- domainConnector.getSequencerConnectionsFromScan(
-              Left(maxDomainTime),
-              psid.serial,
+              Left(maxDomainTime)
             )
             _ <- MonadUtil.sequentialTraverse_(sequencerConnections.toList) {
               case (alias, connections) =>

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -16,6 +16,7 @@ import com.digitalasset.canton.data.{
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.SignedMessageContentCast
 import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
@@ -30,10 +31,9 @@ import com.digitalasset.canton.version.{
   VersionedProtoCodec,
   VersioningCompanionMemoization,
 }
-import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.scalaland.chimney.dsl.*
-import slick.jdbc.{GetResult, GetTupleResult}
+import slick.jdbc.{GetResult, GetTupleResult, SetParameter}
 
 import scala.math.Ordering.Implicits.*
 
@@ -150,7 +150,7 @@ abstract sealed case class AcsCommitment private (
   override protected[this] def toByteStringUnmemoized: ByteString =
     super[HasProtocolVersionedWrapper].toByteString
 
-  override protected[messages] def toProtoTypedSomeSignedProtocolMessageV30
+  override protected[messages] def toProtoTypedSomeSignedProtocolMessage
       : v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage =
     v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage.AcsCommitment(
       getCryptographicEvidence
@@ -182,6 +182,11 @@ object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
   )
 
   type CommitmentType = ByteString
+  implicit val getResultCommitmentType: GetResult[CommitmentType] =
+    DbStorage.Implicits.getResultByteString
+  implicit val setCommitmentType: SetParameter[CommitmentType] =
+    DbStorage.Implicits.setParameterByteString
+
   type HashedCommitmentType = Hash
 
   def hashedCommitmentTypeToProto(commitment: HashedCommitmentType): ByteString =
@@ -191,26 +196,6 @@ object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
   ): Either[DeserializationError, HashedCommitmentType] = Hash.fromByteString(bytes)
   def hashCommitment(commitment: CommitmentType): HashedCommitmentType =
     Hash.digest(HashPurpose.HashedAcsCommitment, commitment, HashAlgorithm.Sha256)
-
-  @VisibleForTesting
-  def create(
-      synchronizerId: PhysicalSynchronizerId,
-      sender: ParticipantId,
-      counterParticipant: ParticipantId,
-      period: CommitmentPeriod,
-      commitment: HashedCommitmentType,
-      protocolVersion: ProtocolVersion,
-  ): AcsCommitment =
-    new AcsCommitment(
-      synchronizerId,
-      sender,
-      counterParticipant,
-      period,
-      commitment,
-    )(
-      protocolVersionRepresentativeFor(protocolVersion),
-      None,
-    ) {}
 
   def create(
       synchronizerId: PhysicalSynchronizerId,

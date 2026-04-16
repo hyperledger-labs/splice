@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.health
 
-import cats.Eval
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -30,7 +29,7 @@ final class DependenciesHealthService(
     override protected val logger: TracedLogger,
     override protected val timeouts: ProcessingTimeout,
     private val criticalDependencies: Seq[HealthQuasiComponent],
-    private val softDependencies: Eval[Seq[HealthQuasiComponent]],
+    private val softDependencies: Seq[HealthQuasiComponent],
 ) extends HealthService {
 
   alterDependencies(
@@ -49,7 +48,7 @@ final class DependenciesHealthService(
   override protected def initialHealthState: ServingStatus =
     if (criticalDependencies.isEmpty) ServingStatus.SERVING else ServingStatus.NOT_SERVING
 
-  def dependencies: Seq[HealthQuasiComponent] = criticalDependencies ++ softDependencies.value
+  def dependencies: Seq[HealthQuasiComponent] = criticalDependencies ++ softDependencies
 }
 
 object DependenciesHealthService {
@@ -58,7 +57,7 @@ object DependenciesHealthService {
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       criticalDependencies: Seq[HealthQuasiComponent] = Seq.empty,
-      softDependencies: Eval[Seq[HealthQuasiComponent]] = Eval.now(Seq.empty),
+      softDependencies: Seq[HealthQuasiComponent] = Seq.empty,
   ): DependenciesHealthService =
     new DependenciesHealthService(name, logger, timeouts, criticalDependencies, softDependencies)
 

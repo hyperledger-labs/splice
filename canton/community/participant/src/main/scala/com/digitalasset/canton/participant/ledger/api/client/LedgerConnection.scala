@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api.client
@@ -60,9 +60,7 @@ object LedgerConnection {
       .executor(ec)
       .intercept(
         TraceContextGrpc.clientInterceptor(
-          Some(
-            GrpcTelemetry.builder(tracerProvider.openTelemetry).build().createClientInterceptor()
-          )
+          Some(GrpcTelemetry.builder(tracerProvider.openTelemetry).build().newClientInterceptor())
         )
       )
     LedgerClient.withoutToken(builder.build(), clientConfig, loggerFactory)

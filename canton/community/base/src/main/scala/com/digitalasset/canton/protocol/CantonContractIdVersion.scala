@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -97,6 +97,7 @@ object CantonContractIdVersion {
       AuthenticatedContractIdVersionV12,
     )
 
+  // TODO(#27612) where possible convert tests using this to iterate over allV1
   lazy val maxV1: CantonContractIdV1Version = AuthenticatedContractIdVersionV12
 
   lazy val all: Seq[CantonContractIdVersion] = allV1 :+ CantonContractIdV2Version0

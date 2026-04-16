@@ -1,17 +1,17 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.http.json.v2.ApiDocsGenerator
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
 
 final class OpenApiTests
     extends AbstractHttpServiceIntegrationTestFuns
     with HttpServiceUserFixture.UserToken {
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
   private val apiDocsGenerator = new ApiDocsGenerator(loggerFactory)
   private val expectedOpenApiServices = Seq(
     "commands",
@@ -27,12 +27,6 @@ final class OpenApiTests
     "authenticated-user",
     "users",
     "version",
-    "contracts",
-  )
-
-  private val expectedRootOpenApiServices = Seq(
-    "livez",
-    "readyz",
   )
 
   private val expectedAsyncApiServices = Seq(
@@ -46,7 +40,7 @@ final class OpenApiTests
     val staticDocs = apiDocsGenerator.createStaticDocs(protoInfo)
 
     "should be consistent with live docs" in httpTestFixture { fixture =>
-      /** We generate documentation "statically" without starting an http server. However, when the
+      /** We generate documentation "statically" without starting an http server However, when the
         * server is running the documentation is generated from actually running endpoints This test
         * checks that both of them are matching
         * @see
@@ -83,19 +77,9 @@ final class OpenApiTests
       val yaml = io.circe.yaml.parser.parse(staticDocs.openApi)
       val openapiServices =
         (yaml.value \\ "paths").head.asObject.value.keys
-          .filter(_.split("/").length >= 3)
           .map(_.split("/").drop(2).head)
           .toSet
-
-      val openApiRootServices =
-        (yaml.value \\ "paths").head.asObject.value.keys
-          .filter(_.split("/").length < 3)
-          .map { path =>
-            path.split("/").drop(1).head
-          }
-          .toSet
       openapiServices should contain theSameElementsAs expectedOpenApiServices
-      openApiRootServices should contain theSameElementsAs expectedRootOpenApiServices
     }
 
     "contains expected async services " in { _ =>

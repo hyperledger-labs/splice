@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
@@ -152,7 +152,6 @@ class GrpcSequencerAuthenticationService(
       case MemberAuthentication.NoKeysWithCorrectUsageRegistered(_, _) => maliciousOrFaulty()
       case MemberAuthentication.FailedToSign(_, _) => maliciousOrFaulty()
       case MemberAuthentication.MissingNonce(_) => maliciousOrFaulty()
-      case MemberAuthentication.ExpiredNonce(_, _, _, _) => maliciousOrFaulty()
       case MemberAuthentication.InvalidSignature(_) => maliciousOrFaulty()
       case MemberAuthentication.MissingToken(_) => maliciousOrFaulty()
       case MemberAuthentication.TokenVerificationException(_) => maliciousOrFaulty()
@@ -194,7 +193,7 @@ class GrpcSequencerAuthenticationService(
       }
       logoutResult <- authenticationService.invalidateMemberWithToken(providedToken)
       _ <- logoutResult match {
-        case Right(()) => FutureUnlessShutdown.unit
+        case Right(()) => FutureUnlessShutdown.pure(())
         case Left(err @ LogoutTokenDoesNotExist) =>
           FutureUnlessShutdown.failed(
             Status.FAILED_PRECONDITION

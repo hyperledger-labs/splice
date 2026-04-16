@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer
@@ -7,6 +7,7 @@ import com.daml.ledger.resources.ResourceOwner
 import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.index.InMemoryStateUpdater
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
@@ -21,11 +22,11 @@ import com.digitalasset.canton.platform.store.DbSupport.{
   DataSourceProperties,
   ParticipantDataSourceConfig,
 }
+import com.digitalasset.canton.platform.store.DbType
 import com.digitalasset.canton.platform.store.backend.StorageBackendFactory
 import com.digitalasset.canton.platform.store.backend.h2.H2StorageBackendFactory
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.platform.store.dao.events.{CompressionStrategy, LfValueTranslation}
-import com.digitalasset.canton.platform.store.{DbType, LedgerApiContractStore}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
@@ -47,12 +48,12 @@ object JdbcIndexer {
       loggerFactory: NamedLoggerFactory,
       dataSourceProperties: DataSourceProperties,
       highAvailability: HaConfig,
-      indexServiceDbDispatcher: Option[DbDispatcher],
+      indexSericeDbDispatcher: Option[DbDispatcher],
       clock: Clock,
       reassignmentOffsetPersistence: ReassignmentOffsetPersistence,
       postProcessor: (Vector[PostPublishData], TraceContext) => Future[Unit],
       sequentialPostProcessor: Update => Unit,
-      contractStore: LedgerApiContractStore,
+      contractStore: ContractStore,
   )(implicit materializer: Materializer) {
 
     def initialized()(implicit traceContext: TraceContext): ResourceOwner[Indexer] = {
@@ -72,17 +73,12 @@ object JdbcIndexer {
       val stringInterningStorageBackend = factory.createStringInterningStorageBackend
       val completionStorageBackend =
         factory.createCompletionStorageBackend(inMemoryState.stringInterningView, loggerFactory)
-      val eventStorageBackend = factory.createEventStorageBackend(
-        inMemoryState.ledgerEndCache,
-        inMemoryState.stringInterningView,
-        loggerFactory,
-      )
       val dbConfig = dataSourceProperties
       // in case H2 backend, we share a single connection between indexer and index service
       // to prevent H2 synchronization bug to materialize
       // the ingestion parallelism is also limited to 1 in this case
       val (ingestionParallelism, indexerDbDispatcherOverride) =
-        if (factory == H2StorageBackendFactory) 1 -> indexServiceDbDispatcher
+        if (factory == H2StorageBackendFactory) 1 -> indexSericeDbDispatcher
         else config.ingestionParallelism.unwrap -> None
       ParallelIndexerFactory(
         inputMappingParallelism = config.inputMappingParallelism.unwrap,
@@ -107,7 +103,6 @@ object JdbcIndexer {
           parameterStorageBackend = parameterStorageBackend,
           ingestionStorageBackend = ingestionStorageBackend,
           contractStorageBackend = contractStorageBackend,
-          eventStorageBackend = eventStorageBackend,
           participantId = participantId,
           translation = new LfValueTranslation(
             metrics = metrics,
@@ -127,14 +122,9 @@ object JdbcIndexer {
           dbPrepareParallelism = config.dbPrepareParallelism.unwrap,
           batchingParallelism = config.batchingParallelism.unwrap,
           ingestionParallelism = ingestionParallelism,
-          useWeightedBatching = config.useWeightedBatching,
           submissionBatchSize = config.submissionBatchSize,
-          submissionBatchInsertionSize = config.submissionBatchInsertionSize,
           maxTailerBatchSize = config.maxTailerBatchSize,
           postProcessingParallelism = config.postProcessingParallelism,
-          achsPopulationParallelism = config.achsPopulationParallelism.unwrap,
-          achsRemovalParallelism = config.achsRemovalParallelism.unwrap,
-          achsAggregationThreshold = config.achsAggregationThreshold,
           maxOutputBatchedBufferSize = config.maxOutputBatchedBufferSize,
           metrics = metrics,
           inMemoryStateUpdaterFlow = apiUpdaterFlow,
@@ -146,9 +136,7 @@ object JdbcIndexer {
           disableMonotonicityChecks = config.disableMonotonicityChecks,
           tracer = tracer,
           loggerFactory = loggerFactory,
-          executionContext = executionContext,
         ),
-        achsConfigO = config.achsConfig,
         mat = materializer,
         executionContext = executionContext,
         initializeInMemoryState = inMemoryState.initializeTo,

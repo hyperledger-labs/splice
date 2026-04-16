@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -6,20 +6,18 @@ package com.digitalasset.canton.lifecycle
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.*
-import com.digitalasset.canton.lifecycle.PromiseUnlessShutdownFactory.DefaultLogAfterDuration
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import org.slf4j.event.Level
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
 /** Adds the [[java.lang.AutoCloseable.close]] method to the interface of [[PerformUnlessClosing]].
   * The component's custom shutdown behaviour should override the `onClosed` method.
@@ -118,11 +116,6 @@ trait HasCloseContext extends PromiseUnlessShutdownFactory { self: FlagCloseable
   implicit val closeContext: CloseContext = CloseContext(self)
 }
 
-object PromiseUnlessShutdownFactory {
-  val DefaultLogAfterDuration: NonNegativeFiniteDuration =
-    NonNegativeFiniteDuration.tryOfSeconds(10)
-}
-
 trait PromiseUnlessShutdownFactory { self: HasCloseContext =>
   protected def logger: TracedLogger
 
@@ -136,7 +129,7 @@ trait PromiseUnlessShutdownFactory { self: HasCloseContext =>
   def mkPromise[A](
       description: String,
       futureSupervisor: FutureSupervisor,
-      logAfter: Duration = DefaultLogAfterDuration.toScala,
+      logAfter: Duration = 10.seconds,
       logLevel: Level = Level.DEBUG,
   )(implicit elc: ErrorLoggingContext): PromiseUnlessShutdown[A] =
     PromiseUnlessShutdown

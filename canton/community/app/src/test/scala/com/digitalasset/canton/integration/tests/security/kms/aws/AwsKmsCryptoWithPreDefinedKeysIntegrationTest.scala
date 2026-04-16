@@ -1,10 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security.kms.aws
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.EnvironmentDefinition.allNodeNames
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.EnvironmentSetupPlugin
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.security.CryptoIntegrationTest
 import com.digitalasset.canton.integration.tests.security.kms.KmsCryptoWithPreDefinedKeysIntegrationTest
 
@@ -24,8 +26,8 @@ class AwsKmsCryptoWithPreDefinedKeysReferenceIntegrationTestAllNodes
 
   setupPlugins(
     withAutoInit = false,
-    storagePlugin = Some(new UsePostgres(loggerFactory)),
-    sequencerPlugin = new UseBftSequencer(loggerFactory),
+    storagePlugin = Option.empty[EnvironmentSetupPlugin],
+    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
   )
 }
 
@@ -55,8 +57,8 @@ class AwsKmsCryptoWithPreDefinedCrossAccountKeysReferenceIntegrationTest
 
   setupPlugins(
     withAutoInit = false,
-    storagePlugin = Some(new UsePostgres(loggerFactory)),
-    sequencerPlugin = new UseBftSequencer(loggerFactory),
+    storagePlugin = Option.empty[EnvironmentSetupPlugin],
+    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
   )
 }
 
@@ -73,6 +75,6 @@ class AwsKmsCryptoWithPreDefinedKeysReferenceIntegrationTestPostgres
   setupPlugins(
     withAutoInit = false,
     storagePlugin = Some(new UsePostgres(loggerFactory)),
-    sequencerPlugin = new UseBftSequencer(loggerFactory),
+    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
   )
 }

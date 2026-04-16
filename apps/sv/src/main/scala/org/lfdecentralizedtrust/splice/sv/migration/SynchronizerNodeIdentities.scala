@@ -73,7 +73,7 @@ object SynchronizerNodeIdentities {
 
   def getSynchronizerNodeIdentities(
       participantAdminConnection: ParticipantAdminConnection,
-      node: LocalSynchronizerNode,
+      synchronizerNode: LocalSynchronizerNode,
       dsoStore: SvDsoStore,
       synchronizerAlias: SynchronizerAlias,
       loggerFactory: NamedLoggerFactory,
@@ -88,8 +88,8 @@ object SynchronizerNodeIdentities {
     for {
       synchronizerId <- dsoStore.getDsoRules().map(_.domain)
       participant <- getNodeIdentitiesDump(participantAdminConnection)
-      sequencer <- getNodeIdentitiesDump(node.sequencerAdminConnection)
-      mediator <- getNodeIdentitiesDump(node.mediatorAdminConnection)
+      sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection)
+      mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection)
     } yield SynchronizerNodeIdentities(
       dsoStore.key.svParty,
       dsoStore.key.dsoParty,

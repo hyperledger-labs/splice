@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.apiserver.TimedIndexService
 import com.digitalasset.canton.platform.config.IndexServiceConfig
@@ -37,11 +38,7 @@ import com.digitalasset.canton.platform.store.dao.{
   LedgerReadDao,
 }
 import com.digitalasset.canton.platform.store.interning.StringInterning
-import com.digitalasset.canton.platform.store.{
-  DbSupport,
-  LedgerApiContractStore,
-  PruningOffsetService,
-}
+import com.digitalasset.canton.platform.store.{DbSupport, PruningOffsetService}
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
@@ -70,7 +67,7 @@ final class IndexServiceOwner(
     lfValueTranslation: LfValueTranslation,
     queryExecutionContext: ExecutionContextExecutorService,
     commandExecutionContext: ExecutionContextExecutorService,
-    participantContractStore: LedgerApiContractStore,
+    participantContractStore: ContractStore,
     pruningOffsetService: PruningOffsetService,
 ) extends ResourceOwner[IndexService]
     with NamedLogging {
@@ -80,7 +77,6 @@ final class IndexServiceOwner(
   def acquire()(implicit context: ResourceContext): Resource[IndexService] = {
     val ledgerDao = createLedgerReadDao(
       ledgerEndCache = inMemoryState.ledgerEndCache,
-      achsStateCache = inMemoryState.achsStateCache,
       stringInterning = inMemoryState.stringInterningView,
       contractLoader = contractLoader,
       lfValueTranslation = lfValueTranslation,
@@ -97,7 +93,6 @@ final class IndexServiceOwner(
         contractStateCaches = inMemoryState.contractStateCaches,
         loggerFactory = loggerFactory,
         contractStore = participantContractStore,
-        ledgerEndCache = inMemoryState.ledgerEndCache,
       )(commandExecutionContext)
 
       bufferedTransactionsReader = BufferedUpdateReader(
@@ -199,7 +194,6 @@ final class IndexServiceOwner(
 
   private def createLedgerReadDao(
       ledgerEndCache: LedgerEndCache,
-      achsStateCache: AchsStateCache,
       stringInterning: StringInterning,
       contractLoader: ContractLoader,
       pruningOffsetService: PruningOffsetService,
@@ -207,16 +201,14 @@ final class IndexServiceOwner(
       queryExecutionContext: ExecutionContextExecutorService,
       commandExecutionContext: ExecutionContextExecutorService,
   ): LedgerReadDao =
-    new JdbcLedgerDao(
-      dbDispatcher = dbSupport.dbDispatcher,
+    JdbcLedgerDao.read(
+      dbSupport = dbSupport,
       queryExecutionContext = queryExecutionContext,
       commandExecutionContext = commandExecutionContext,
       metrics = metrics,
-      readStorageBackend = dbSupport.storageBackendFactory
-        .readStorageBackend(ledgerEndCache, stringInterning, loggerFactory),
-      parameterStorageBackend =
-        dbSupport.storageBackendFactory.createParameterStorageBackend(stringInterning),
+      participantId = participantId,
       ledgerEndCache = ledgerEndCache,
+      stringInterning = stringInterning,
       completionsPageSize = config.completionsPageSize,
       activeContractsServiceStreamsConfig = config.activeContractsServiceStreams,
       updatesStreamsConfig = config.updatesStreams,
@@ -229,7 +221,6 @@ final class IndexServiceOwner(
       lfValueTranslation = lfValueTranslation,
       pruningOffsetService = pruningOffsetService,
       contractStore = participantContractStore,
-      achsStateCache = achsStateCache,
     )(queryExecutionContext)
 
   private object InMemoryStateNotInitialized extends NoStackTrace

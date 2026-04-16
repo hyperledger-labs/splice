@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release
@@ -14,9 +14,11 @@ trait ReleaseArtifactIntegrationTestUtils extends FixtureAnyWordSpec with BaseTe
 
   override protected def withFixture(test: OneArgTest): Outcome = test(new BufferedProcessLogger)
 
+  protected def isEnterprise: Boolean
+
   override type FixtureParam = BufferedProcessLogger
 
-  protected lazy val packageName = "community"
+  protected lazy val packageName = if (isEnterprise) "enterprise" else "community"
   protected lazy val cantonDir = s"$packageName/app/target/release/canton"
   protected lazy val repositoryRootFromCantonDir = "../../../../.."
   protected lazy val cantonBin = s"$cantonDir/bin/canton"
@@ -35,12 +37,12 @@ trait ReleaseArtifactIntegrationTestUtils extends FixtureAnyWordSpec with BaseTe
       shouldNotContain: Seq[String] = Seq(),
       shouldSucceed: Boolean = true,
   ): Unit = {
-    // Filter out false positives in help message
+    // Filter out false positives in help message for last-errors option
     val filters = List(
       jsonTtyWarning,
       ttyWarning,
-      "log-access-errors",
-      "access error",
+      "last_errors",
+      "last-errors",
       // slow ExecutionContextMonitor warnings
       "WARN  c.d.c.c.ExecutionContextMonitor - Execution context",
     )

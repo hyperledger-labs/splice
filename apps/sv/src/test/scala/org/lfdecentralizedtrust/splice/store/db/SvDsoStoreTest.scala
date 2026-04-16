@@ -452,87 +452,6 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       }
     }
 
-    "listExpiredAmuletAllocations" should {
-
-      "return expired allocations and respect ignored parties" in {
-        val now = Instant.parse("2025-01-01T12:00:00.000000Z")
-        val past = now.minusSeconds(3600)
-        val future = now.plusSeconds(3600)
-        val amount = new java.math.BigDecimal("10.0").setScale(10)
-
-        val expiredCid = amuletAllocation(
-          sender = userParty(1),
-          receiver = userParty(3),
-          executor = userParty(4),
-          amount = amount,
-          requestedAt = past.minusSeconds(3600),
-          allocateBefore = past.minusSeconds(1800),
-          settleBefore = past,
-        )
-
-        val activeCid = amuletAllocation(
-          sender = userParty(1),
-          receiver = userParty(2),
-          executor = userParty(4),
-          amount = amount,
-          requestedAt = now,
-          allocateBefore = now.plusSeconds(1800),
-          settleBefore = future,
-        )
-
-        val ignoredCid = amuletAllocation(
-          sender = userParty(2),
-          receiver = userParty(1),
-          executor = userParty(4),
-          amount = amount,
-          requestedAt = past.minusSeconds(3600),
-          allocateBefore = past.minusSeconds(1800),
-          settleBefore = past,
-        )
-
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
-          _ <- MonadUtil.sequentialTraverse(Seq(expiredCid, activeCid, ignoredCid))(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-
-          resultAll <- store.listExpiredAmuletAllocations(Set.empty)(
-            CantonTimestamp.assertFromInstant(now),
-            PageLimit.tryCreate(100),
-          )(traceContext)
-
-          resultFiltered <- store.listExpiredAmuletAllocations(Set(userParty(2)))(
-            CantonTimestamp.assertFromInstant(now),
-            PageLimit.tryCreate(100),
-          )(traceContext)
-
-          resultFilteredTwoParties <- store.listExpiredAmuletAllocations(
-            Set(userParty(2), userParty(3))
-          )(
-            CantonTimestamp.assertFromInstant(now),
-            PageLimit.tryCreate(100),
-          )(traceContext)
-
-        } yield {
-          val allContracts = resultAll.map(_.contract)
-          allContracts should contain(expiredCid)
-          allContracts should contain(ignoredCid)
-          allContracts should not contain activeCid
-
-          val filteredContracts = resultFiltered.map(_.contract)
-          filteredContracts should contain(expiredCid)
-          filteredContracts should not contain ignoredCid
-          filteredContracts should not contain activeCid
-
-          val filteredTwoPartiesContracts = resultFilteredTwoParties.map(_.contract)
-          filteredTwoPartiesContracts should not contain expiredCid
-          filteredTwoPartiesContracts should not contain ignoredCid
-          filteredTwoPartiesContracts should not contain activeCid
-        }
-      }
-    }
-
     "listExpiredAmuletTransferInstructions" should {
 
       "return expired instructions and respect ignored parties" in {
@@ -1696,7 +1615,6 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         ),
         Optional.empty(),
         Optional.empty(), // voteCooldownTime`
-        Optional.empty(), // nextScheduledLogicalSynchronizerUpgrade`
       ),
       Collections.emptyMap(),
       true,

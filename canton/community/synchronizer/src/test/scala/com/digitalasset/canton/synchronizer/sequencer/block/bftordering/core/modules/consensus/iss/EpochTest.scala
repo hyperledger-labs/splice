@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -31,7 +31,7 @@ class EpochTest extends AsyncWordSpec with BftSequencerBaseTest {
       val membership = Membership.forTesting(myId)
       val epoch =
         Epoch(
-          EpochInfo.forTesting(
+          EpochInfo.mk(
             number = EpochNumber.First,
             startBlockNumber = BlockNumber.First,
             length = 4,
@@ -47,7 +47,7 @@ class EpochTest extends AsyncWordSpec with BftSequencerBaseTest {
 
     "support an uneven distribution with multiple leaders" in {
       val epoch = Epoch(
-        EpochInfo.forTesting(
+        EpochInfo.mk(
           number = EpochNumber.First,
           startBlockNumber = BlockNumber.First,
           length = 11,
@@ -71,7 +71,7 @@ class EpochTest extends AsyncWordSpec with BftSequencerBaseTest {
       val leaderWithoutSegment = sortedLeaders(3)
       val membership = Membership.forTesting(leaderWithoutSegment, sortedLeaders.init.toSet)
       val epoch = Epoch(
-        EpochInfo.forTesting(
+        EpochInfo.mk(
           number = EpochNumber.First,
           startBlockNumber = BlockNumber.First,
           length = 3L, // epoch length can accommodate all but the last leader

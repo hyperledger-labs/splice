@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.examples.bftordering
@@ -58,10 +58,6 @@ class BftSequencerInvalidAuthenticationConfigIntegrationTest
         (
           LogEntryOptionality.Optional,
           _.warningMessage should include("Token refresh aborted due to shutdown"),
-        ),
-        (
-          LogEntryOptionality.OptionalMany,
-          _.warningMessage should include("Token refresh failed"),
         ),
         (
           LogEntryOptionality.OptionalMany,

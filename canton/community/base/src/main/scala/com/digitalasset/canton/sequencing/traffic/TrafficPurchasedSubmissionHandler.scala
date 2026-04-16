@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.traffic
@@ -9,8 +9,7 @@ import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
+import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -20,7 +19,6 @@ import com.digitalasset.canton.protocol.messages.{
   SignedProtocolMessage,
 }
 import com.digitalasset.canton.sequencing.TrafficControlParameters
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
@@ -45,6 +43,10 @@ class TrafficPurchasedSubmissionHandler(
   /** Send a signed traffic purchased entry request.
     * @param member
     *   recipient of the new balance
+    * @param psid
+    *   synchronizerId of the synchronizer where the top up is being sent to
+    * @param protocolVersion
+    *   protocol version used
     * @param serial
     *   monotonically increasing serial number for the request
     * @param totalTrafficPurchased
@@ -65,12 +67,12 @@ class TrafficPurchasedSubmissionHandler(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit] = {
-    val now = clock.now
+    val topology: SynchronizerSnapshotSyncCryptoApi = cryptoApi.currentSnapshotApproximation
+    val snapshot = topology.ipsSnapshot
 
     val protocolVersion: ProtocolVersion = cryptoApi.psid.protocolVersion
 
     def send(
-        approximateTimestampForSigning: CantonTimestamp,
         maxSequencingTimes: NonEmpty[Seq[CantonTimestamp]],
         batch: Batch[OpenEnvelope[SignedProtocolMessage[SetTrafficPurchasedMessage]]],
         aggregationRule: AggregationRule,
@@ -83,13 +85,11 @@ class TrafficPurchasedSubmissionHandler(
           logger.debug(
             s"Submitting traffic purchased entry request for $member with balance ${totalTrafficPurchased.value}, serial ${serial.value} and max sequencing time $maxSequencingTime"
           )
-          // in this particular case we must decouple the current timestamp we
           sendRequest(
             sequencerClient,
             synchronizerTimeTracker,
             batch,
             aggregationRule,
-            approximateTimestampForSigning,
             maxSequencingTime,
           ).value
         }
@@ -110,8 +110,6 @@ class TrafficPurchasedSubmissionHandler(
     }
 
     for {
-      topology <- EitherT.liftF(cryptoApi.currentSnapshotApproximation)
-      snapshot = topology.ipsSnapshot
       trafficParams <- EitherT
         .fromOptionF(
           snapshot.trafficControlParameters(protocolVersion),
@@ -142,36 +140,26 @@ class TrafficPurchasedSubmissionHandler(
         protocolVersion,
       )
       setTrafficPurchasedMessage: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
-        member,
-        serial,
-        totalTrafficPurchased,
-        cryptoApi.psid,
+        member = member,
+        serial = serial,
+        totalTrafficPurchased = totalTrafficPurchased,
+        psid = cryptoApi.psid,
       )
-      maxSequencingTimes = computeMaxSequencingTimes(trafficParams, now)
-      // Depending on the window size and the current timestamp, we may need to sign and send two traffic
-      // purchase messages. Each has its own max sequencing time, but we use the maximum of these times
-      // for signing (i.e., to select the appropriate session signing key).
       signedTrafficPurchasedMessage <- EitherT
         .liftF(
           SignedProtocolMessage.trySignAndCreate(
             setTrafficPurchasedMessage,
             topology,
-            Some(
-              SigningTimestampOverrides(
-                approximateTimestamp = now,
-                validityPeriodEnd = maxSequencingTimes.maxOption,
-              )
-            ),
           )
         )
       batch = Batch.of(
         protocolVersion = protocolVersion,
-        // This recipient tree structure allows the recipient of the top-up to verify that the sequencers were also addressed
+        // This recipient tree structure allows the recipient of the top up to verify that the sequencers were also addressed
         signedTrafficPurchasedMessage -> Recipients(
           NonEmpty.mk(
             Seq,
             RecipientsTree.ofMembers(
-              NonEmpty.mk(Set, member), // Root of recipient tree: recipient of the top-up
+              NonEmpty.mk(Set, member), // Root of recipient tree: recipient of the top up
               Seq(
                 RecipientsTree.recipientsLeaf( // Leaf of the tree: sequencers of synchronizer group
                   NonEmpty.mk(
@@ -184,7 +172,8 @@ class TrafficPurchasedSubmissionHandler(
           )
         ),
       )
-      _ <- send(now, maxSequencingTimes, batch, aggregationRule)
+      maxSequencingTimes = computeMaxSequencingTimes(trafficParams)
+      _ <- send(maxSequencingTimes, batch, aggregationRule)
     } yield ()
   }
 
@@ -193,7 +182,6 @@ class TrafficPurchasedSubmissionHandler(
       synchronizerTimeTracker: SynchronizerTimeTracker,
       batch: Batch[DefaultOpenEnvelope],
       aggregationRule: AggregationRule,
-      approximateTimestampForSigning: CantonTimestamp,
       maxSequencingTime: CantonTimestamp,
   )(implicit
       ec: ExecutionContext,
@@ -206,11 +194,7 @@ class TrafficPurchasedSubmissionHandler(
         .send(
           batch,
           aggregationRule = Some(aggregationRule),
-          timestamps = SendRequestTimestamps(
-            topologyTimestamp = None,
-            approximateTimestampForSigning = approximateTimestampForSigning,
-            maxSequencingTime = maxSequencingTime,
-          ),
+          maxSequencingTime = maxSequencingTime,
           callback = callback,
         )
         .leftMap(err =>
@@ -254,10 +238,10 @@ class TrafficPurchasedSubmissionHandler(
   }
 
   private def computeMaxSequencingTimes(
-      trafficParams: TrafficControlParameters,
-      now: CantonTimestamp,
+      trafficParams: TrafficControlParameters
   ): NonEmpty[Seq[CantonTimestamp]] = {
     val timeWindowSize = trafficParams.setBalanceRequestSubmissionWindowSize
+    val now = clock.now
     val windowUpperBound = CantonTimestamp.ofEpochMilli(
       timeWindowSize.duration
         .multipliedBy(

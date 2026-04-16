@@ -1,10 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.cache
 
 import cats.data.NonEmptyVector
-import com.daml.testing.utils.PekkoBeforeAndAfterAll
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.ledger.participant.state.index.ContractStateStatus
 import com.digitalasset.canton.ledger.participant.state.index.ContractStateStatus.{
@@ -16,8 +16,8 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTr
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
+import com.digitalasset.canton.participant.store.{ContractStore, PersistedContractInstance}
 import com.digitalasset.canton.platform.*
-import com.digitalasset.canton.platform.store.backend.ContractStorageBackend
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStoreRaceTests.{
   IndexViewContractsReader,
   assert_sync_vs_async_race_contract,
@@ -29,13 +29,7 @@ import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractSt
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader.*
-import com.digitalasset.canton.platform.store.{LedgerApiContractStore, LedgerApiContractStoreImpl}
-import com.digitalasset.canton.protocol.{
-  ContractInstance,
-  ExampleContractFactory,
-  ExampleTransactionFactory,
-}
-import com.digitalasset.daml.lf.crypto
+import com.digitalasset.canton.protocol.{ExampleContractFactory, ExampleTransactionFactory}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.transaction.GlobalKey
 import com.digitalasset.daml.lf.value.Value
@@ -65,15 +59,10 @@ class MutableCacheBackedContractStoreRaceTests
   it should "preserve causal monotonicity under contention for key state" in {
     val workload = generateWorkload(keysCount = 10L, contractsCount = 1000L)
     val indexViewContractsReader = IndexViewContractsReader()(unboundedExecutionContext)
-    val inMemoryContractStore = new InMemoryContractStore(
+    val participantContractStore = new InMemoryContractStore(
       timeouts = timeouts,
       loggerFactory = loggerFactory,
     )(unboundedExecutionContext)
-    val participantContractStore = LedgerApiContractStoreImpl(
-      inMemoryContractStore,
-      loggerFactory,
-      LedgerApiServerMetrics.ForTesting,
-    )
     val contractStore =
       buildContractStore(
         indexViewContractsReader,
@@ -97,15 +86,10 @@ class MutableCacheBackedContractStoreRaceTests
   it should "preserve causal monotonicity under contention for contract state" in {
     val workload = generateWorkload(keysCount = 10L, contractsCount = 1000L)
     val indexViewContractsReader = IndexViewContractsReader()(unboundedExecutionContext)
-    val inMemoryContractStore = new InMemoryContractStore(
+    val participantContractStore = new InMemoryContractStore(
       timeouts = timeouts,
       loggerFactory = loggerFactory,
     )(unboundedExecutionContext)
-    val participantContractStore = LedgerApiContractStoreImpl(
-      inMemoryContractStore,
-      loggerFactory,
-      LedgerApiServerMetrics.ForTesting,
-    )
     val contractStore =
       buildContractStore(
         indexViewContractsReader,
@@ -133,7 +117,7 @@ private object MutableCacheBackedContractStoreRaceTests {
 
   private def test(
       indexViewContractsReader: IndexViewContractsReader,
-      participantContractStore: LedgerApiContractStoreImpl,
+      participantContractStore: ContractStore,
       workload: Seq[Long => SimplifiedContractStateEvent],
       unboundedExecutionContext: ExecutionContext,
   )(
@@ -281,9 +265,8 @@ private object MutableCacheBackedContractStoreRaceTests {
     val keys = (0L until keysCount).map { keyIdx =>
       keyIdx -> Key.assertBuild(
         Identifier.assertFromString("pkgId:module:entity"),
-        Ref.PackageName.assertFromString("pkg-name"),
         ValueInt64(keyIdx),
-        crypto.Hash.hashPrivateKey(keyIdx.toString),
+        Ref.PackageName.assertFromString("pkg-name"),
       )
     }.toMap
 
@@ -375,7 +358,7 @@ private object MutableCacheBackedContractStoreRaceTests {
       indexViewContractsReader: IndexViewContractsReader,
       ec: ExecutionContext,
       loggerFactory: NamedLoggerFactory,
-      participantContractStore: LedgerApiContractStore,
+      participantContractStore: ContractStore,
   ) = {
     val metrics = LedgerApiServerMetrics.ForTesting
     new MutableCacheBackedContractStore(
@@ -388,7 +371,6 @@ private object MutableCacheBackedContractStoreRaceTests {
         loggerFactory = loggerFactory,
       )(ec),
       contractStore = participantContractStore,
-      ledgerEndCache = MutableLedgerEndCache(),
       loggerFactory = loggerFactory,
     )(ec)
   }
@@ -501,29 +483,16 @@ private object MutableCacheBackedContractStoreRaceTests {
     override def lookupKeyStatesFromDb(keys: Seq[Key], notEarlierThanEventSeqId: Long)(implicit
         loggingContext: LoggingContextWithTrace
     ): Future[Map[Key, Long]] = ??? // not used in this test
-
-    override def lookupNonUniqueKey(
-        key: Key,
-        validAtEventSeqId: CreatedAt,
-        nextPageToken: Option[CreatedAt],
-        limit: Int,
-    )(implicit
-        loggingContext: LoggingContextWithTrace
-    ): Future[ContractStorageBackend.KeysPageResult] =
-      ??? // not used in this test
   }
 
-  def update(contractStore: LedgerApiContractStoreImpl, event: SimplifiedContractStateEvent)(
-      implicit ec: ExecutionContext
+  def update(contractStore: ContractStore, event: SimplifiedContractStateEvent)(implicit
+      ec: ExecutionContext
   ): Future[Unit] =
     if (event.created) {
-      val contract =
-        ContractInstance
-          .create(event.contract)
-          .getOrElse(fail(s"Failed creating contract ${event.contract.contractId}"))
-      contractStore.participantContractStore
-        .storeContracts(Seq(contract))
-        .failOnShutdownToAbortException("update")
+      val contract = PersistedContractInstance(event.contract)
+      contractStore
+        .storeContracts(Seq(contract.asContractInstance))
         .map(_ => ())
+        .failOnShutdownToAbortException("test")
     } else Future.unit
 }

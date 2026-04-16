@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data
@@ -85,12 +85,11 @@ trait OutputMetadataStore[E <: Env[E]] extends AutoCloseable {
   protected final def getLastInEpochActionName(epochNumber: EpochNumber): String =
     s"get last output block metadata in epoch $epochNumber"
 
-  def getLastBlockInLatestCompletedEpoch(implicit
+  def getLastConsecutiveBlock(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[Option[OutputBlockMetadata]]
 
-  protected final val lastBlockInLatestCompletedEpochName: String =
-    "get last block in latest completed epoch"
+  protected final val lastConsecutiveActionName: String = "get last consecutive block metadata"
 
   @VisibleForTesting
   private[data] def loadNumberOfRecords(implicit

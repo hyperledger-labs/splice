@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http
 
 import io.grpc.health.v1.health.HealthCheckResponse
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import sttp.model.StatusCode
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -45,11 +44,11 @@ object HealthService {
       (checks.map(check(_)) ++ Seq(s"readyz check ${if (ok) "passed" else "failed"}", ""))
         .mkString("\n")
 
-    def getStatusCode: StatusCode =
-      if (ok) StatusCode.apply(StatusCodes.OK.intValue)
-      else StatusCode.apply(StatusCodes.ServiceUnavailable.intValue)
-
-    def getResponseBody: String = render()
+    def toHttpResponse: HttpResponse =
+      HttpResponse(
+        status = if (ok) StatusCodes.OK else StatusCodes.ServiceUnavailable,
+        entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, render()),
+      )
   }
   type GetHealthCheckResponse = () => Future[HealthCheckResponse]
 }

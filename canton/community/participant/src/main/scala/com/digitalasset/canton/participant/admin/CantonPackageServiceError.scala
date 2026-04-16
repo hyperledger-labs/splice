@@ -1,9 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{
   ContextualizedDamlError,
   ErrorCategory,
@@ -20,7 +19,7 @@ import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.admin.PackageService.DarDescription
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -124,35 +123,13 @@ object CantonPackageServiceError extends PackageServiceErrorGroup {
         )
 
     @Resolution(
-      s"""To cleanly remove the package, you must first revoke authorization for the packages on the referenced synchronizers."""
+      s"""To cleanly remove the package, you must first revoke authorization for the package."""
     )
-    class PackagesVetted(
-        synchronizersByPackageId: NonEmpty[Seq[(PackageId, NonEmpty[Set[PhysicalSynchronizerId]])]]
-    )(implicit
+    class PackageVetted(pkg: PackageId)(implicit
         val loggingContext: ErrorLoggingContext
-    ) extends PackageRemovalError(
-          if (synchronizersByPackageId.sizeIs == 1) {
-            val (packageId, psids) = synchronizersByPackageId.head1
-            show"Package $packageId is currently vetted on the following synchronizers: ${psids.toSeq.sorted}"
-          } else {
-            show"""Several packages are currently vetted on some synchronizers:
-              |${synchronizersByPackageId
-                .sortBy { case (packageId, _) => packageId }
-                .map { case (packageId, psids) => show"\t$packageId: ${psids.toSeq.sorted}" }
-                .mkString("\n")}""".stripMargin
-          }
-        )
+    ) extends PackageRemovalError(s"Package $pkg is currently vetted and available to use.")
 
-    object PackagesVetted {
-      def apply(pkg: PackageId, psid: PhysicalSynchronizerId)(implicit
-          loggingContext: ErrorLoggingContext
-      ) = new PackagesVetted(NonEmpty(Seq, pkg -> NonEmpty(Set, psid)))
-
-      def apply(pkg: PackageId, psids: NonEmpty[Set[PhysicalSynchronizerId]])(implicit
-          loggingContext: ErrorLoggingContext
-      ) = new PackagesVetted(NonEmpty(Seq, pkg -> psids))
-    }
-
+    import com.digitalasset.canton.util.ShowUtil.*
     @Resolution(
       s"""The DAR cannot be removed because a package in the DAR is in-use and is not found in any other DAR."""
     )

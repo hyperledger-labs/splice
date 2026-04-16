@@ -19,7 +19,7 @@
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   },
   "devDependencies": {
-    "@types/sinon": "^21.0.1",
+    "@types/sinon": "^21.0.0",
     "sinon": "^21.0.3"
   }
 }

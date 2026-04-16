@@ -40,7 +40,6 @@ import {
   getNamespaceConfig,
   standardStorageClassName,
   pvcSuffix,
-  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -60,15 +59,11 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 
-const validatorVersion: CnChartVersion = validatorConfig.version
-  ? CnChartVersion.parse(validatorConfig.version)
-  : activeVersion;
-
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
-    validatorVersion.type === 'local'
+    activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${validatorVersion.version}`
+      : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
 
   const xns = exactNamespace(validatorConfig.namespace, true);
@@ -122,7 +117,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSvIngress: false,
     },
-    validatorVersion,
+    activeVersion,
     { dependsOn: ingressImagePullDeps.concat([validator]) }
   );
 }
@@ -175,16 +170,15 @@ async function installValidator(
     'postgres-secrets',
     postgresValues,
     true,
-    supportsValidatorRunbookReset,
-    validatorVersion
+    supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
     validatorConfig,
-    DecentralizedSynchronizerUpgradeConfig.activeMigrationId,
+    DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
     false, // We don't currently support non-auth for validator-runbook
-    validatorVersion,
+    activeVersion,
     postgres,
     {
       dependsOn: imagePullDeps.concat([postgres]),
@@ -209,7 +203,7 @@ async function installValidator(
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.activeMigrationId.toString(),
+        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
         TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
@@ -310,7 +304,7 @@ async function installValidator(
     'validator',
     'splice-validator',
     validatorValuesWithMaybeTopups,
-    validatorVersion,
+    activeVersion,
     { dependsOn: dependsOn }
   );
   if (validatorConfig?.partyAllocator.enable) {

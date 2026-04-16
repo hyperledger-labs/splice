@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
@@ -11,7 +11,6 @@ import com.digitalasset.canton.integration.tests.SynchronizerRouterIntegrationTe
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
-  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
@@ -34,9 +33,8 @@ class AutomaticReassignmentBatchingIntegrationTest
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 
   override def environmentDefinition: EnvironmentDefinition = EnvironmentDefinition.P1_S1M1_S1M1
-    .addConfigTransforms(
-      ProgrammableSequencer.configOverride(this.getClass.toString, loggerFactory),
-      ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
+    .addConfigTransform(
+      ProgrammableSequencer.configOverride(this.getClass.toString, loggerFactory)
     )
     .withSetup { implicit env =>
       import env.*
@@ -44,7 +42,6 @@ class AutomaticReassignmentBatchingIntegrationTest
       participant1.synchronizers.connect_local(sequencer2, alias = acmeName)
       participant1.dars.upload(CantonTestsPath, synchronizerId = daId)
       participant1.dars.upload(CantonTestsPath, synchronizerId = acmeId)
-
     }
 
   "automatic reassignment" should {

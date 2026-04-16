@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
 
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.damltests.appupgrade.v1.java.appupgrade.{
   AppInstall as AppInstall_V1,
@@ -11,14 +12,13 @@ import com.digitalasset.canton.damltests.appupgrade.v1.java.appupgrade.{
 }
 import com.digitalasset.canton.damltests.token
 import com.digitalasset.canton.error.TransactionRoutingError.ConfigurationErrors.InvalidPrescribedSynchronizerId
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
@@ -29,8 +29,7 @@ import scala.util.chaining.scalaUtilChainingOps
 abstract class SimpleTopologyAwarePackageSelectionIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 
   @volatile var v2Hash: String = _
   @volatile var appInstallRequest: AppInstallRequest.Contract = _
@@ -97,22 +96,6 @@ abstract class SimpleTopologyAwarePackageSelectionIntegrationTest
             appInstallRequest.id.exerciseAppInstall_Accept().commands().asScala.toSeq,
           )
         }
-      }
-    }
-
-    "tapsMaxPasses is zero or negative " should {
-      "fail" in { _ =>
-        def testTapsMaxPasses(value: Int) =
-          assertThrowsAndLogsCommandFailures(
-            providerParticipant.ledger_api.javaapi.commands.submit(
-              Seq(provider),
-              appInstallRequest.id.exerciseAppInstall_Accept().commands().asScala.toSeq,
-              tapsMaxPasses = Some(value),
-            ),
-            _.shouldBeCantonErrorCode(RequestValidationErrors.InvalidArgument),
-          )
-        testTapsMaxPasses(0)
-        testTapsMaxPasses(-1)
       }
     }
 

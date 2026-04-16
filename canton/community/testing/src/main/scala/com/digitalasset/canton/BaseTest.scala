@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -7,30 +7,23 @@ import cats.Functor
 import cats.data.{EitherT, OptionT}
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import com.daml.ledger.api.v2.interactive.interactive_submission_service.HashingSchemeVersion as ApiHashingSchemeVersion
-import com.daml.metrics.OpenTelemetryOnDemandMetricsReader
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor, Threading}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger, SuppressionRule}
-import com.digitalasset.canton.protocol.{
-  DynamicSynchronizerParameters,
-  StaticSynchronizerParameters,
-}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, WallClock}
-import com.digitalasset.canton.topology.{PartyKind, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
+import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{CheckedT, MaxBytesToDecompress}
 import com.digitalasset.canton.version.{
-  HashingSchemeVersion,
   ProtocolVersion,
   ProtocolVersionValidation,
   ReleaseProtocolVersion,
@@ -43,14 +36,13 @@ import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
 import org.scalacheck.Test
 import org.scalactic.source.Position
 import org.scalactic.{Prettifier, source}
+import org.scalatest.*
 import org.scalatest.concurrent.{Eventually, PatienceConfiguration, ScalaFutures}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.matchers.should.Matchers.*
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.scalatest.{Assertion, *}
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
 import org.slf4j.event.Level
@@ -59,7 +51,6 @@ import org.typelevel.discipline.Laws
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
-import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -81,9 +72,6 @@ trait TestEssentials
     with ArgumentMatchersSugar
     with NamedLogging {
 
-  protected def defaultMaxBytesToDecompress: MaxBytesToDecompress =
-    BaseTest.defaultMaxBytesToDecompress
-
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
   protected lazy val testedProtocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion
@@ -93,15 +81,6 @@ trait TestEssentials
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
     BaseTest.defaultStaticSynchronizerParameters
-
-  protected implicit lazy val testedHashingSchemeVersion: HashingSchemeVersion =
-    HashingSchemeVersion.getHashingSchemeVersionsForProtocolVersion(testedProtocolVersion).last1
-
-  protected lazy val testedApiHashingSchemeVersion: ApiHashingSchemeVersion =
-    testedHashingSchemeVersion.toLedgerApiProto
-
-  protected implicit lazy val partiesKind: PartyKind =
-    BaseTest.testedPartiesKind(testedHashingSchemeVersion)
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext: TraceContext = TraceContext.empty
@@ -138,18 +117,6 @@ trait TestEssentials
     * deal with imports.
     */
   lazy val directExecutionContext: ExecutionContext = DirectExecutionContext(noTracingLogger)
-
-  implicit def enrichSuppressingLogger(
-      loggerFactory: SuppressingLogger
-  ): BaseTest.EnrichedSuppressingLogger =
-    new BaseTest.EnrichedSuppressingLogger(loggerFactory)
-}
-
-trait TimestampHelpers { self: EitherValues =>
-  implicit def protoTimestampToCantonTimestamp(
-      proto: com.google.protobuf.timestamp.Timestamp
-  ): CantonTimestamp =
-    CantonTimestamp.fromProtoTimestamp(proto).value
 }
 
 trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
@@ -290,9 +257,6 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
         pos: Position
     ): Either[E, A] =
       eitherT.value.futureValueUS(timeout)(pos)
-
-    def succeedOnFutureCompleteOrShutdown(implicit pos: Position): Unit =
-      eitherT.value.succeedOnFutureCompleteOrShutdown(pos)
   }
 
   implicit class CheckedTFutureUnlessShutdownSyntax[A, N, R](
@@ -316,19 +280,11 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
     def failOnShutdown(clue: String)(implicit ec: ExecutionContext, pos: Position): Future[A] =
       fut.onShutdown(fail(s"Shutdown during $clue"))
     def failOnShutdown(implicit ec: ExecutionContext, pos: Position): Future[A] =
-      fut.onShutdown(fail("Unexpected shutdown"))
+      fut.onShutdown(fail(s"Unexpected shutdown"))
     def futureValueUS(implicit pos: Position): A =
       futureValueUS(PatienceConfiguration.Timeout(defaultPatience.timeout))(pos)
     def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
       fut.unwrap.futureValue(timeout).onShutdown(fail("Unexpected shutdown"))
-    def succeedOnFutureCompleteOrShutdown(implicit pos: Position): Unit =
-      fut.succeedOnFutureCompleteOrShutdown(PatienceConfiguration.Timeout(defaultPatience.timeout))(
-        pos
-      )
-    def succeedOnFutureCompleteOrShutdown(timeout: PatienceConfiguration.Timeout)(implicit
-        pos: Position
-    ): Unit =
-      fut.unwrap.futureValue(timeout).map(_ => ()).onShutdown(())
   }
 
   implicit class UnlessShutdownSyntax[A](us: UnlessShutdown[A]) {
@@ -353,7 +309,6 @@ trait BaseTest
     with OptionValues
     with TryValues
     with AppendedClues
-    with TimestampHelpers
     with FutureHelpers { self =>
 
   /** A metrics factory constructed from an OpenTelemetryOnDemandMetricsReader which allows to make
@@ -408,7 +363,7 @@ trait BaseTest
     logger.debug(s"Running clue: $message")
     Try(expr) match {
       case Success(value) =>
-        value.thereafter {
+        value.onComplete {
           case Success(_) =>
             logger.debug(s"Finished clue: $message")
           case Failure(ex) =>
@@ -434,7 +389,7 @@ trait BaseTest
     logger.debug(s"Running clue: $message")
     Try(expr) match {
       case Success(value) =>
-        value.thereafter {
+        value.onComplete {
           case Success(_) =>
             logger.debug(s"Finished clue: $message")
           case Failure(ex) =>
@@ -518,8 +473,10 @@ trait BaseTest
 
   lazy val CantonExamplesPath: String = BaseTest.CantonExamplesPath
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
-  lazy val CantonTestsLF23Path: String = BaseTest.CantonTestsLF23Path
+  lazy val CantonTestsDevPath: String = BaseTest.CantonTestsDevPath
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
+  lazy val DamlTestFilesPath: String = BaseTest.DamlTestFilesPath
+  lazy val DamlTestLfDevFilesPath: String = BaseTest.DamlTestLfDevFilesPath
   // TODO(#25385): Consider deduplicating the upgrade test DARs below
   lazy val FooV1Path: String = BaseTest.FooV1Path
   lazy val FooV2Path: String = BaseTest.FooV2Path
@@ -535,15 +492,10 @@ trait BaseTest
   lazy val VettingMainCompatPath: String = BaseTest.VettingMainCompatPath
   lazy val VettingMainIncompatPath: String = BaseTest.VettingMainIncompatPath
   lazy val VettingMainSubstitutionPath: String = BaseTest.VettingMainSubstitutionPath
-  lazy val ModelTestsPath: String = BaseTest.ModelTestsPath
-  lazy val SubViewsIfaceV1Path: String = BaseTest.SubViewsIfaceV1Path
-  lazy val SubViewsAssetV1Path: String = BaseTest.SubViewsAssetV1Path
-  lazy val SubViewsAssetV2Path: String = BaseTest.SubViewsAssetV2Path
-  lazy val SubViewsMainV1Path: String = BaseTest.SubViewsMainV1Path
 
   implicit class RichSynchronizerId(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
+      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
   }
 
   implicit def toSynchronizerId(id: PhysicalSynchronizerId): SynchronizerId = id.logical
@@ -556,7 +508,7 @@ object BaseTest {
 
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
+      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
   }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
@@ -659,30 +611,7 @@ object BaseTest {
       serial = NonNegativeInt.zero,
     )
 
-  lazy val defaultMaxBytesToDecompress: MaxBytesToDecompress = MaxBytesToDecompress(
-    // TODO(i29003): Define our own param for this.
-    DynamicSynchronizerParameters.defaultMaxRequestSize.value
-  )
-
-  sealed trait UnsupportedExternalPartyTest
-  object UnsupportedExternalPartyTest {
-    // TODO(i27461): Support multi party submissions for external parties
-    case object MultiPartySubmission extends UnsupportedExternalPartyTest
-    // TODO(i29530): Support multi root node submissions for external parties
-    case object MultiRootNodeSubmission extends UnsupportedExternalPartyTest
-    // TODO(i30278): Either support command tracking for external parties or drop it entirely
-    case object CommandTracking extends UnsupportedExternalPartyTest
-    // TODO(i30256): Synchronizer routing for external parties
-    case object MultiSynchronizerParties extends UnsupportedExternalPartyTest
-  }
-
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
-
-  def testedPartiesKind(hashingSchemeVersion: HashingSchemeVersion): PartyKind = sys.env
-    .get("CANTON_TEST_EXTERNAL_PARTIES")
-    .filter(_ == "true")
-    .map[PartyKind](_ => PartyKind.External(hashingSchemeVersion))
-    .getOrElse[PartyKind](PartyKind.Local)
 
   lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
     ProtocolVersionValidation(testedProtocolVersion)
@@ -692,16 +621,19 @@ object BaseTest {
   )
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-1.0.0.dar")
-  lazy val CantonTestsLF23Path: String = getResourcePath("CantonTestsLF23-1.0.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-1.0.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-1.0.0.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.4.0.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.4.0.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.4.0.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.4.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.4.0.dar")
+  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.4.0.dar")
+  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.4.0.dar")
   // TODO(#25385): Deduplicate these upgrading test DARs
   lazy val FooV1Path: String = getResourcePath("foo-0.0.1.dar")
   lazy val FooV2Path: String = getResourcePath("foo-0.0.2.dar")
   lazy val FooV3Path: String = getResourcePath("foo-0.0.3.dar")
-  lazy val UpgradeTestsPath: String = getResourcePath("UpgradeTests-1.0.0.dar")
+  lazy val UpgradeTestsPath: String = getResourcePath("UpgradeTests-3.4.0.dar")
   lazy val UpgradeTestsCompatPath: String = getResourcePath("UpgradeTests-4.0.0.dar")
   lazy val UpgradeTestsIncompatPath: String = getResourcePath("UpgradeTests-5.0.0.dar")
   lazy val VettingDepPath: String = getResourcePath("VettingDep-1.0.0.dar")
@@ -712,109 +644,11 @@ object BaseTest {
   lazy val VettingMainCompatPath: String = getResourcePath("VettingMain-2.0.0.dar")
   lazy val VettingMainIncompatPath: String = getResourcePath("VettingMain-3.0.0.dar")
   lazy val VettingMainSubstitutionPath: String = getResourcePath("VettingMain-4.0.0.dar")
-  lazy val ModelTestsPath: String = getResourcePath("model-tests-1.0.0.dar")
-  lazy val SubViewsIfaceV1Path: String = getResourcePath("sub-views-iface-1.0.0.dar")
-  lazy val SubViewsAssetV1Path: String = getResourcePath("sub-views-asset-1.0.0.dar")
-  lazy val SubViewsAssetV2Path: String = getResourcePath("sub-views-asset-2.0.0.dar")
-  lazy val SubViewsMainV1Path: String = getResourcePath("sub-views-main-1.0.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))
       .map(_.getPath)
       .getOrElse(throw new IllegalArgumentException(s"Cannot find resource $name"))
-
-  implicit final class EnrichedSuppressingLogger(private val loggerFactory: SuppressingLogger)
-      extends AnyVal {
-    def assertInternalErrorAsync[T <: Throwable](
-        within: => Future[?],
-        assertion: T => Assertion,
-    )(implicit c: ClassTag[T], pos: source.Position): Future[Assertion] =
-      loggerFactory.assertLogs(
-        within.transform {
-          case Success(_) =>
-            fail(s"An exception of type $c was expected, but no exception was thrown.")
-          case Failure(c(t)) => Success(assertion(t))
-          case Failure(t) => fail(s"Exception has wrong type. Expected type: $c.", t)
-        }(loggerFactory.directExecutionContext),
-        loggerFactory.checkLogsInternalError(assertion),
-      )
-
-    def assertInternalErrorAsyncUS[T <: Throwable](
-        within: => FutureUnlessShutdown[?],
-        assertion: T => Assertion,
-    )(implicit
-        c: ClassTag[T],
-        ec: ExecutionContext,
-        pos: source.Position,
-    ): FutureUnlessShutdown[Unit] =
-      for {
-        _ <- loggerFactory.assertLogs(
-          within.transform {
-            case Success(x) =>
-              fail(s"An exception of type $c was expected, but instead a value was returned: $x")
-            case Failure(c(t)) => Success(UnlessShutdown.Outcome(assertion(t)))
-            case Failure(t) => fail(s"Exception has wrong type. Expected type: $c.", t)
-          }(loggerFactory.directExecutionContext),
-          loggerFactory.checkLogsInternalError(assertion),
-        )
-      } yield ()
-
-    /** Asserts that the sequence of logged warnings/errors will eventually meet a given assertion.
-      * Use this if the expected sequence of logged warnings/errors is non-deterministic and the
-      * log-message assertion might not immediately succeed when it is called (e.g. because the
-      * messages might be logged with a delay). The SuppressingLogger only starts suppressing and
-      * capturing logs when this method is called, If some logs that we want to capture might fire
-      * before the start or after the end of the suppression. Please use method
-      * `assertEventuallyLogsSeq` instead to provide those action in `within` parameter. On success,
-      * the method will delete all logged messages. So this method is not idempotent.
-      *
-      * On failure of the log-message assertion, it will be retried until it eventually succeeds or
-      * a timeout occurs. On timeout without success, the method will not delete any logged message
-      */
-    def assertEventuallyLogsSeq_(
-        rule: SuppressionRule
-    )(
-        assertion: Seq[LogEntry] => Assertion,
-        timeUntilSuccess: FiniteDuration = 20.seconds,
-        maxPollInterval: FiniteDuration = 5.seconds,
-    ): Unit = assertEventuallyLogsSeq(rule)((), assertion, timeUntilSuccess, maxPollInterval)
-
-    /** Asserts that the sequence of logged warnings/errors will eventually meet a given assertion.
-      * Use this if the expected sequence of logged warnings/errors is non-deterministic and the
-      * log-message assertion might not immediately succeed when it is called (e.g. because the
-      * messages might be logged with a delay).
-      *
-      * On success, the method will delete all logged messages. So this method is not idempotent.
-      *
-      * On failure of the log-message assertion, it will be retried until it eventually succeeds or
-      * a timeout occurs. On timeout without success, the method will not delete any logged message
-      *
-      * This method will automatically use asynchronous suppression if `A` is `Future[_]`.
-      *
-      * @throws java.lang.IllegalArgumentException
-      *   if `A` is `EitherT` or `OptionT`, because the method cannot detect whether asynchronous
-      *   suppression is needed in this case. Use `EitherT.value` or `OptionT`.value to work around
-      *   this.
-      */
-    def assertEventuallyLogsSeq[A](
-        rule: SuppressionRule
-    )(
-        within: => A,
-        assertion: Seq[LogEntry] => Assertion,
-        timeUntilSuccess: FiniteDuration = 20.seconds,
-        maxPollInterval: FiniteDuration = 5.seconds,
-    ): A =
-      loggerFactory.suppress(rule) {
-        loggerFactory.runWithCleanup(
-          within,
-          (_: A) =>
-            BaseTest.eventually(timeUntilSuccess, maxPollInterval)(
-              loggerFactory.checkLogsAssertion(assertion)
-            ),
-          () => (),
-        )
-      }
-  }
 
 }
 

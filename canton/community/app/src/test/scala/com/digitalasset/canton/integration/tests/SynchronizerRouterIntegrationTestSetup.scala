@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -19,7 +19,6 @@ import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.integration.util.{AcsInspection, EntitySyntax}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
-  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
   TestConsoleEnvironment,
@@ -28,7 +27,7 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{Party, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.scalatest.LoneElement.convertToCollectionLoneElementWrapper
 
 import java.util.{List as JList, Optional}
@@ -48,9 +47,6 @@ trait SynchronizerRouterIntegrationTestSetup
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .P4_S1M1_S1M1_S1M1()
-      .addConfigTransforms(
-        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag
-      )
       .withSetup { implicit env =>
         import env.*
 
@@ -65,6 +61,7 @@ trait SynchronizerRouterIntegrationTestSetup
               )
           )
         }
+        assignPartyIdReferences()
       }
 
   protected val darPath: String = CantonTestsPath
@@ -75,13 +72,13 @@ trait SynchronizerRouterIntegrationTestSetup
   protected val allSynchronizers: List[SynchronizerAlias] =
     List(synchronizer1, synchronizer2, synchronizer3)
 
-  protected var party1Id: Party = _
-  protected var party1aId: Party = _
-  protected var party1bId: Party = _
-  protected var party1cId: Party = _
-  protected var party2Id: Party = _
-  protected var party3Id: Party = _
-  protected var party4Id: Party = _
+  protected var party1Id: PartyId = _
+  protected var party1aId: PartyId = _
+  protected var party1bId: PartyId = _
+  protected var party1cId: PartyId = _
+  protected var party2Id: PartyId = _
+  protected var party3Id: PartyId = _
+  protected var party4Id: PartyId = _
 
   protected def defaultTopology(implicit
       env: TestConsoleEnvironment
@@ -141,8 +138,7 @@ trait SynchronizerRouterIntegrationTestSetup
           permission = ParticipantPermission.Submission,
         )
         // allocate parties on synchronizers where they aren't allocated yet
-        val partiesMap = allocateParties(participant, synchronizerAlias)
-        assignPartyIdReferences(partiesMap)
+        allocateParties(participant, synchronizerAlias)
         updateVetting(participant, synchronizerAlias)
       }
     }
@@ -160,41 +156,35 @@ trait SynchronizerRouterIntegrationTestSetup
   private def allocateParties(
       participant: ParticipantReference,
       synchronizerAlias: SynchronizerAlias,
-  )(implicit env: TestConsoleEnvironment): Map[String, Party] = {
+  )(implicit env: TestConsoleEnvironment): Unit = {
     import env.*
-    val synchronizerId = initializedSynchronizers(synchronizerAlias).synchronizerId
-    def partyExistsOnThisSynchronizer(party: String) = participant.parties.testing
-      .list(synchronizerIds = Set(synchronizerId))
-      .exists(_.party.uid.identifier.str == party)
-    def partyOnAnySynchronizer(party: String) =
-      participant.parties.testing
-        .list()
-        .find(_.party.uid.identifier.str == party)
-        .map(_.partyResult)
     participantsToParties
       .getOrElse(participant, Set.empty)
-      .filter(party => !partyExistsOnThisSynchronizer(party))
-      .map { party =>
-        val allocatedParty = partyOnAnySynchronizer(party) match {
-          case Some(existingParty) =>
-            participant.parties.testing.also_enable(existingParty, synchronizer = synchronizerAlias)
-            existingParty
-          case None =>
-            participant.parties.testing.enable(party, synchronizer = synchronizerAlias)
-        }
-        party -> allocatedParty
+      .filter(party =>
+        participant.parties
+          .hosted(
+            party,
+            synchronizerIds = Set(initializedSynchronizers(synchronizerAlias).synchronizerId),
+          )
+          .isEmpty
+      )
+      .foreach { party =>
+        participant.parties.enable(party, synchronizer = synchronizerAlias)
+
       }
-      .toMap
   }
 
-  private def assignPartyIdReferences(partiesMap: Map[String, Party]): Unit = {
-    partiesMap.get("party1").foreach(party1Id = _)
-    partiesMap.get("party1a").foreach(party1aId = _)
-    partiesMap.get("party1b").foreach(party1bId = _)
-    partiesMap.get("party1c").foreach(party1cId = _)
-    partiesMap.get("party2").foreach(party2Id = _)
-    partiesMap.get("party3").foreach(party3Id = _)
-    partiesMap.get("party4").foreach(party4Id = _)
+  private def assignPartyIdReferences()(implicit env: TestConsoleEnvironment): Unit = {
+    import env.*
+    // first wait for all participants to be initialized, so that we can properly fetch the ID to get the namespace.
+    participants.all.foreach(_.health.wait_for_initialized())
+    party1Id = PartyId.tryCreate("party1", p("participant1").namespace)
+    party1aId = PartyId.tryCreate("party1a", p("participant1").namespace)
+    party1bId = PartyId.tryCreate("party1b", p("participant1").namespace)
+    party1cId = PartyId.tryCreate("party1c", p("participant1").namespace)
+    party2Id = PartyId.tryCreate("party2", p("participant2").namespace)
+    party3Id = PartyId.tryCreate("party3", p("participant3").namespace)
+    party4Id = PartyId.tryCreate("party4", p("participant4").namespace)
   }
 
   protected def synchronizeTopologyState()(implicit env: TestConsoleEnvironment): Unit = {
@@ -207,7 +197,7 @@ trait SynchronizerRouterIntegrationTestSetup
   }
 
   protected def createInject(
-      owner: Party,
+      owner: PartyId,
       synchronizerId: Option[SynchronizerId],
       participant: LocalParticipantReference,
   ): Inject.Contract =
@@ -221,8 +211,8 @@ trait SynchronizerRouterIntegrationTestSetup
 
   protected def exerciseInForm(
       participant: ParticipantReference,
-      owner: Party,
-      submitter: Party,
+      owner: PartyId,
+      submitter: PartyId,
       contract: Inject.Contract,
       targetSynchronizer: Option[SynchronizerId] = None,
   ): Inject.Contract = {
@@ -236,7 +226,7 @@ trait SynchronizerRouterIntegrationTestSetup
   }
 
   protected def createDummy(
-      owner: Party,
+      owner: PartyId,
       synchronizerId: Option[SynchronizerId],
       participant: LocalParticipantReference,
   ): Dummy.Contract = {
@@ -245,7 +235,7 @@ trait SynchronizerRouterIntegrationTestSetup
   }
 
   protected def exerciseDummies(
-      submitters: Iterable[Party],
+      submitters: Iterable[PartyId],
       dummies: Iterable[Dummy.Contract],
       participant: ParticipantReference,
       targetSynchronizer: Option[SynchronizerId] = None,
@@ -274,7 +264,7 @@ private[tests] object SynchronizerRouterIntegrationTestSetup {
       TC <: Contract[ID, ?],
   ](
       companion: ContractCompanion[TC, ID, ?],
-      owner: Party,
+      owner: PartyId,
       synchronizerId: Option[SynchronizerId],
       participant: ParticipantReference,
       commands: JList[Command],
@@ -307,7 +297,7 @@ private[tests] object SynchronizerRouterIntegrationTestSetup {
 
   def createAggregate(
       participant: ParticipantReference,
-      submitter: Party,
+      submitter: PartyId,
       singles: Seq[Single.ContractId],
       synchronizerId: Option[SynchronizerId],
       additionalParty: Option[PartyId] = None,
@@ -328,7 +318,7 @@ private[tests] object SynchronizerRouterIntegrationTestSetup {
 
   def exerciseCountAll(
       participant: ParticipantReference,
-      submitter: Party,
+      submitter: PartyId,
       contract: Aggregate.Contract,
       targetSynchronizer: Option[SynchronizerId] = None,
       optTimeout: Option[NonNegativeDuration] = Some(
@@ -347,7 +337,7 @@ private[tests] object SynchronizerRouterIntegrationTestSetup {
 
   def exerciseCountPublicAll(
       participant: ParticipantReference,
-      submitter: Party,
+      submitter: PartyId,
       contract: Aggregate.Contract,
       targetSynchronizer: Option[SynchronizerId] = None,
       optTimeout: Option[NonNegativeDuration] = Some(
@@ -367,7 +357,7 @@ private[tests] object SynchronizerRouterIntegrationTestSetup {
   }
 
   def createSingle(
-      owner: Party,
+      owner: PartyId,
       synchronizerId: Option[SynchronizerId],
       participant: LocalParticipantReference,
       coordinator: PartyId,

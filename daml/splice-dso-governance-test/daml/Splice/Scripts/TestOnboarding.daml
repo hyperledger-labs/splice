@@ -232,10 +232,6 @@ testSvOnboarding = do
         url = "sequencer.address:1234"
         availableAfter = Some now
 
-  let sequencerIdentityConfig = Some SequencerIdentityConfig with
-        sequencerId = "sequencer-id"
-        availableAfter = Some now
-
   let mediatorConfig = Some MediatorConfig with
         mediatorId = "mediator-id"
 
@@ -245,11 +241,9 @@ testSvOnboarding = do
   let newNodeConfig = SynchronizerNodeConfig with
         cometBft = cometBftConfig
         sequencer = sequencerConfig
-        sequencerIdentity = sequencerIdentityConfig
         mediator = mediatorConfig
         scan = scanConfig
         legacySequencerConfig = None
-        physicalSynchronizers = None
 
   setSynchronizerNodeConfig app svX dsoRules.config.decentralizedSynchronizer.lastSynchronizerId newNodeConfig
 

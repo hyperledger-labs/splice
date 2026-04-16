@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block
@@ -27,7 +27,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficConsumedStore
 import com.digitalasset.canton.topology.{DefaultTestIdentities, Member}
-import com.digitalasset.canton.version.HasTestCloseContext
+import com.digitalasset.canton.version.{HasTestCloseContext, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.wordspec.FixtureAsyncWordSpecLike
 import org.scalatest.{Assertion, FutureOutcome}
@@ -149,7 +149,7 @@ class BlockSequencerStateAsyncWriterTest
       AggregationRule(
         eligibleMembers = NonEmpty.mk(Seq, member): NonEmpty[Seq[Member]],
         threshold = PositiveInt.one,
-        protocolVersion = testedProtocolVersion,
+        protocolVersion = ProtocolVersion.latest,
       ),
     )
   private lazy val agg1 = InFlightAggregationUpdate(
@@ -162,8 +162,7 @@ class BlockSequencerStateAsyncWriterTest
     Chain.one(sender2),
   )
 
-  private lazy val block1 =
-    BlockInfo(10L, CantonTimestamp.Epoch, Some(CantonTimestamp.Epoch), Some(CantonTimestamp.Epoch))
+  private lazy val block1 = BlockInfo(10L, CantonTimestamp.Epoch, Some(CantonTimestamp.Epoch))
   private def unwrap(t: EitherT[FutureUnlessShutdown, String, Assertion]): Future[Assertion] =
     t.failOnShutdown.value.map(_.valueOrFail("EitherT returned left"))
 
@@ -191,7 +190,7 @@ class BlockSequencerStateAsyncWriterTest
           // check that writes have started
           trafficConsumed.get().written shouldBe Seq(Seq(tc1))
         }
-        _ <- EitherT.right(writer.finalizeBlockUpdate(block1))
+        _ <- EitherT.right(writer.finalizeBlockUpate(block1))
         _ = {
           // check that block update is not written yet (because aggregation write is in progress)
           blockInfos.get().written shouldBe empty

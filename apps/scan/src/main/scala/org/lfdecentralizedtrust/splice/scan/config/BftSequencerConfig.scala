@@ -3,6 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
+import com.digitalasset.canton.config.FullClientConfig
+
 case class BftSequencerConfig(
-    p2pUrl: String
+    migrationId: Long,
+    sequencerAdminClient: FullClientConfig,
+    p2pUrl: String,
 )

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security
@@ -14,10 +14,7 @@ import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
-  AssignedWrapper,
-  ReassignmentWrapper,
   TransactionWrapper,
-  UnassignedWrapper,
   UpdateWrapper,
 }
 import com.digitalasset.canton.console.{
@@ -29,7 +26,7 @@ import com.digitalasset.canton.console.{
   SequencerReference,
 }
 import com.digitalasset.canton.crypto.{HashOps, SyncCryptoApi, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
+import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.integration.tests.security.SecurityTestHelpers.{
   MessageTransform,
@@ -193,7 +190,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
           blocking {
             requestsB.synchronized {
               val allProtocolMessages = message.batch.envelopes.map(
-                _.toOpenEnvelope(hashOps, testedProtocolVersion)
+                _.openEnvelope(hashOps, testedProtocolVersion)
                   .valueOrFail("open envelopes")
                   .protocolMessage
               )
@@ -469,7 +466,6 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
   def signedTransformOf[A <: SignedProtocolMessageContent](
       transform: MessageTransform[A],
       useCurrentSnapshot: Boolean = false,
-      approximateTimestampForSigning: Option[CantonTimestamp] = None,
   )(implicit
       executionContext: ExecutionContext
   ): SignedMessageTransform[A] =
@@ -479,9 +475,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
       (transform(updateSignatureUsing(syncCrypto, useCurrentSnapshot), _))
         .andThen(_.focus(_.sender).replace(sender))
         // TODO(i16512): See if we should pass `useCurrentSnapshot` to sign the submission request
-        .andThen(signModifiedSubmissionRequest(_, syncCrypto, approximateTimestampForSigning))(
-          submissionRequest
-        )
+        .andThen(signModifiedSubmissionRequest(_, syncCrypto))(submissionRequest)
     }
 
   /** Convenience method to create a [[SignedMessageTransform]] from a [[MessageTransform]] signing
@@ -494,7 +488,6 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
       transform: MessageTransform[A],
       senderRef: LocalInstanceReference,
       useCurrentSnapshot: Boolean = false,
-      approximateTimestampForSigning: Option[CantonTimestamp] = None,
   )(implicit
       executionContext: ExecutionContext
   ): SignedMessageTransform[A] =
@@ -504,9 +497,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
       (transform(updateSignatureUsing(syncCrypto, useCurrentSnapshot), _))
         .andThen(_.focus(_.sender).replace(sender))
         // TODO(i16512): See if we should pass `useCurrentSnapshot` to sign the submission request
-        .andThen(signModifiedSubmissionRequest(_, syncCrypto, approximateTimestampForSigning))(
-          submissionRequest
-        )
+        .andThen(signModifiedSubmissionRequest(_, syncCrypto))(submissionRequest)
     }
 
   private def senderAndCryptoFromRef(
@@ -529,7 +520,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
       useCurrentSnapshot: Boolean,
   ): A => Option[SyncCryptoApi] =
     message => {
-      if (useCurrentSnapshot) Some(syncCrypto.currentSnapshotApproximation.futureValueUS)
+      if (useCurrentSnapshot) Some(syncCrypto.currentSnapshotApproximation)
       else
         Some(
           message.signingTimestamp
@@ -568,7 +559,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
     val trackedParties = extraTrackedParties ++ participants.map(_.id.adminParty)
 
     // Subscribe to transaction trees & completions for all participants
-    val (completionsF, updatesF) = (for (participant <- participants) yield {
+    val (completionsF, transactionsF) = (for (participant <- participants) yield {
       val completionObserver =
         new CollectUntilObserver[Completion](_.commandId == finishCommandId)
       val completionCloseable = participant.ledger_api.completions
@@ -583,7 +574,6 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
       val transactionObserver =
         new CollectUntilObserver[UpdateWrapper]({
           case TransactionWrapper(tt) => tt.commandId == finishCommandId
-          case rw: ReassignmentWrapper => rw.reassignment.commandId == finishCommandId
           case _ => false
         })
       val updateFormat = getUpdateFormat(
@@ -601,10 +591,13 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
         )
       transactionObserver.result.onComplete(_ => transactionCloseable.close())
       submissionFailedP.future.onComplete(_ => transactionCloseable.close())
+      val transactions = transactionObserver.result.map(_.collect {
+        case TransactionWrapper(transaction) => transaction
+      })
 
       (
         participant -> completionObserver.result,
-        participant -> transactionObserver.result,
+        participant -> transactions,
       )
     }).separate
 
@@ -625,7 +618,7 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
         )
         .futureValue
 
-      (result, new TrackingResult(completionsF.toMap, updatesF.toMap))
+      (result, new TrackingResult(completionsF.toMap, transactionsF.toMap))
     } catch {
       case NonFatal(ex) =>
         submissionFailedP.trySuccess(())
@@ -651,17 +644,8 @@ trait SecurityTestHelpers extends SecurityTestLensUtils {
 
   class TrackingResult(
       completions: Map[ParticipantReference, Future[Seq[Completion]]],
-      updates: Map[ParticipantReference, Future[Seq[UpdateWrapper]]],
-  )(implicit executionContext: ExecutionContext) {
-
-    def transactions: Map[ParticipantReference, Future[Seq[Transaction]]] =
-      updates.map { case (p, uf) => p -> uf.map(_.collect { case TransactionWrapper(tt) => tt }) }
-
-    def unassignments: Map[ParticipantReference, Future[Seq[UnassignedWrapper]]] =
-      updates.map { case (p, uf) => p -> uf.map(_.collect { case uw: UnassignedWrapper => uw }) }
-
-    def assignments: Map[ParticipantReference, Future[Seq[AssignedWrapper]]] =
-      updates.map { case (p, uf) => p -> uf.map(_.collect { case aw: AssignedWrapper => aw }) }
+      transactions: Map[ParticipantReference, Future[Seq[Transaction]]],
+  ) {
 
     def assertStatusOk(participant: ParticipantReference): Assertion =
       assertExactlyOneCompletion(participant).status.value.code shouldBe Code.OK.value()

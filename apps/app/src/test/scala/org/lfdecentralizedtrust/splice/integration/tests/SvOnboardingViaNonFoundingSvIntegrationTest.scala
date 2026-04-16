@@ -1,14 +1,14 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  bumpUrl,
   IsTheCantonSequencerBFTEnabled,
+  bumpUrl,
 }
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -140,10 +140,10 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               }
             endpoints.toSet shouldBe Set(
               LocalSynchronizerNode.toEndpoint(
-                sv1Backend.config.localSynchronizerNodes.current.sequencer.internalApi
+                sv1Backend.config.localSynchronizerNode.value.sequencer.internalApi
               ),
               LocalSynchronizerNode.toEndpoint(
-                sv2Backend.config.localSynchronizerNodes.current.sequencer.internalApi
+                sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
               ),
             )
             sv2Backend.participantClient.synchronizers.is_connected(
@@ -223,7 +223,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .item
               .allSequencers
               .toIndexedSeq should have size 1 withClue "sole sequencers"
-            sv2Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection
+            sv2Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
               .getSequencerOrderingTopology()
               .futureValue
               .sequencerIds should have size 1 withClue "sole sequencerId"

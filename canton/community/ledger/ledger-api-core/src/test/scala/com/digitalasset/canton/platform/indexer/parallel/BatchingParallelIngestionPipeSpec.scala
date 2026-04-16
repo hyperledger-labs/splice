@@ -1,12 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
 
-import com.daml.testing.utils.PekkoBeforeAndAfterAll
-import com.digitalasset.canton.annotations.UnstableTest
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.util.BatchN
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import org.scalatest.OptionValues
@@ -19,7 +17,6 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.chaining.*
 
-@UnstableTest // TODO(#19208)
 class BatchingParallelIngestionPipeSpec
     extends AsyncFlatSpec
     with Matchers
@@ -29,17 +26,9 @@ class BatchingParallelIngestionPipeSpec
   // AsyncFlatSpec is with serial execution context
   private implicit val ec: ExecutionContext = system.dispatcher
 
-  private val input = Iterator.continually(util.Random.nextInt()).take(1000).toList
-  // 1000 items must be separated into 10 iterations of 2 parallel batches, so each batch should hold 50 items
-  // to hold 50 items with the given weight fn we need a capacity of ~280,  rounding it to 300
-  private val MaxBatchSize = 300
+  private val input = Iterator.continually(util.Random.nextInt()).take(100).toList
+  private val MaxBatchSize = 5
   private val MaxTailerBatchSize = 4
-
-  def weightFn(i: Int): Long = i match {
-    case n if n % 10 == 0 => 20
-    case n if n % 3 == 0 => 10
-    case _ => 1
-  }
 
   it should "end the stream successfully in a happy path case" in {
     runPipe().map { case (ingested, ingestedTail, err) =>
@@ -47,7 +36,7 @@ class BatchingParallelIngestionPipeSpec
       ingested.sortBy(_._1) shouldBe input.map(_.toString).zipWithIndex.map { case (s, i) =>
         (i + 1, s)
       }
-      ingestedTail.last shouldBe 1000
+      ingestedTail.last shouldBe 100
     }
   }
 
@@ -83,46 +72,43 @@ class BatchingParallelIngestionPipeSpec
     }
   }
 
-  it should "hold the stream if a single ingestion takes too long and timeouts" in {
+  it should "hold the stream if a single ingestion takes too long" in {
     val ingestedTailAcc = new AtomicInteger(0)
     runPipe(
       inputMapperHook = () => Threading.sleep(1L),
       ingesterHook = batch => {
-        // due to timing issues it can be that other than full batches are formed, so we check if the batch contains 201
-        val max = batch.map(_._1).max
-        if (max < 201) {
-          ingestedTailAcc.accumulateAndGet(max, _ max _)
+        // due to timing issues it can be that other than full batches are formed, so we check if the batch contains 21
+        if (batch.max < 21) {
+          ingestedTailAcc.accumulateAndGet(batch.max, _ max _)
         }
-        if (batch.map(_._1).contains(201)) Threading.sleep(1000)
+        if (batch.contains(21)) Threading.sleep(1000)
       },
       timeout = FiniteDuration(100, "milliseconds"),
     ).map { case (ingested, ingestedTail, err) =>
       err.value.getMessage shouldBe "timed out"
-      // worst case: 200 elements will be ingested before 201
-      // + 300 elements in the batch that does not contain it and is back-pressured by the batch containing 201
-      ingested.size should be <= 500
-      ingestedTail.last should be < 201
+      // 25 is the ideal case: due to timing issues it can be that other than full batches are formed, so either having < 20 before and < 5 after is possible
+      ingested.size should be <= 25
+      ingestedTail.last should be < 21
       ingestedTail.last shouldBe ingestedTailAcc.get()
     }
   }
 
   it should "form max-sized batches when back-pressured by downstream" in {
-    val batchWeights = ArrayBuffer.empty[Long]
+    val batchSizes = ArrayBuffer.empty[Int]
     runPipe(
       // Back-pressure to ensure formation of max batch sizes (of size 5)
       inputMapperHook = () => Threading.sleep(1),
       ingesterHook = batch => {
-        blocking(batchWeights.synchronized {
-          batchWeights.addOne(batch.map(p => weightFn(p._2.toInt)).sum)
+        blocking(batchSizes.synchronized {
+          batchSizes.addOne(batch.size)
         })
         ()
       },
       inputSource = Source(Iterator.continually(util.Random.nextInt()).take(1000).toList),
     ).map { case (_, _, err) =>
-      // The first and last batches can be much smaller than `MaxBatchWeight`
-      // so we drop 2 and assert the average batch weight instead of the weight of individual batches
-      val measurementBatchWeights = batchWeights.drop(2)
-      measurementBatchWeights.sum.toDouble / measurementBatchWeights.size should be > (MaxBatchSize.toDouble * 0.7)
+      // The first and last batches can be smaller than `MaxBatchSize`
+      // so we assert the average batch size instead of the sizes of individual batches
+      batchSizes.sum.toDouble / batchSizes.size should be > (MaxBatchSize.toDouble * 0.8)
       err shouldBe empty
     }
   }
@@ -134,9 +120,8 @@ class BatchingParallelIngestionPipeSpec
         ()
       },
       inputSource = Source(input).take(10).map(_.tap(_ => Threading.sleep(10L))).async,
-    ).map { case (ingested, _, err) =>
+    ).map { case (_, _, err) =>
       err shouldBe empty
-      ingested.size shouldBe 10
     }
   }
 
@@ -146,15 +131,14 @@ class BatchingParallelIngestionPipeSpec
     runPipe(
       ingestTailHook = { batchOfBatches =>
         // Slow ingest tail
-        Threading.sleep(20L)
+        Threading.sleep(10L)
         batchSizes.addOne(batchOfBatches.size)
       },
       inputSource = Source(input).take(100).async,
     ).map { case (_, _, err) =>
       // The first and last batches can be smaller than `MaxTailerBatchSize`
-      // so we drop one and assert the average batch size instead of the sizes of individual batches
-      val measurementBatchSizes = batchSizes.drop(1)
-      measurementBatchSizes.sum.toDouble / measurementBatchSizes.size should be > (MaxTailerBatchSize.toDouble * 0.7)
+      // so we assert the average batch size instead of the sizes of individual batches
+      batchSizes.sum.toDouble / batchSizes.size should be > (MaxTailerBatchSize.toDouble * 0.7)
       err shouldBe empty
     }
   }
@@ -183,7 +167,7 @@ class BatchingParallelIngestionPipeSpec
       inputMapperHook: () => Unit = () => (),
       seqMapperHook: () => Unit = () => (),
       batcherHook: () => Unit = () => (),
-      ingesterHook: List[(Int, String)] => Unit = _ => (),
+      ingesterHook: List[Int] => Unit = _ => (),
       ingestTailHook: Vector[List[(Int, String)]] => Unit = _ => (),
       timeout: FiniteDuration = FiniteDuration(10, "seconds"),
       inputSource: Source[Int, NotUsed] = Source(input),
@@ -193,7 +177,7 @@ class BatchingParallelIngestionPipeSpec
     var ingestedTail: Vector[Int] = Vector.empty
     val indexingFlow =
       BatchingParallelIngestionPipe[Int, List[(Int, Int)], List[(Int, String)]](
-        batchingFlow = BatchN.weighted(MaxBatchSize.toLong, 2)(weightFn),
+        submissionBatchSize = MaxBatchSize.toLong,
         inputMappingParallelism = 2,
         inputMapper = ins =>
           Future {
@@ -221,7 +205,7 @@ class BatchingParallelIngestionPipeSpec
         ingestingParallelism = 2,
         ingester = dbBatch =>
           Future {
-            ingesterHook(dbBatch)
+            ingesterHook(dbBatch.map(_._1))
             blocking(semaphore.synchronized {
               ingested = ingested ++ dbBatch
             })
@@ -251,5 +235,4 @@ class BatchingParallelIngestionPipeSpec
       blocking(semaphore.synchronized((ingested, ingestedTail, Some(t))))
     }
   }
-
 }

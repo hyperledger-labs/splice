@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -10,12 +10,8 @@ import scala.annotation.tailrec
 
 object EventIdsUtils {
 
-  def sortAndDeduplicateIds(
-      descendingOrder: Boolean
-  )(ids: Vector[Source[Long, NotUsed]]): Source[Long, NotUsed] = {
-    implicit val ord: Ordering[Long] = if (descendingOrder) Ordering.Long.reverse else Ordering.Long
+  def sortAndDeduplicateIds(ids: Vector[Source[Long, NotUsed]]): Source[Long, NotUsed] =
     mergeSort(ids).statefulMapConcat(statefulDeduplicate)
-  }
 
   @tailrec
   protected[events] def mergeSort[T: Ordering](

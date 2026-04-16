@@ -103,7 +103,6 @@ class BaseLedgerConnection(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
         eventFormat = Some(eventFormat),
-        streamContinuationToken = None,
       )
     )
     activeContractsRequest

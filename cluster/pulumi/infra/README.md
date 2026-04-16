@@ -3,7 +3,9 @@
 Manages common setup expected by Splice deployments that is scoped to a single cluster, including
 
 - IAM (auth0)
+- monitoring and alerting (Grafana, Prometheus)
 - ingress (Istio)
+- GCP log-based alerting
 - DNS entries
 
 The long-term goal is to split this into smaller projects;

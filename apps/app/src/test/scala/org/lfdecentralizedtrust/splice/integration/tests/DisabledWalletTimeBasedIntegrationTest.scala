@@ -57,7 +57,7 @@ class DisabledWalletTimeBasedIntegrationTest
         sv1WalletClient.list() should be(1),
         log =>
           log.message should include(
-            "The requested resource could not be found"
+            "Command failed, message: The requested resource could not be found."
           ),
       )
     }

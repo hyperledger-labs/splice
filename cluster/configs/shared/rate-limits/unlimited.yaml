@@ -65,15 +65,7 @@ rateLimits:
     name: state
     type: unlimited
 
-  /api/scan/v1/state:
-    name: state
-    type: unlimited
-
   /api/scan/v0/holdings:
-    name: holdings
-    type: unlimited
-
-  /api/scan/v1/holdings:
     name: holdings
     type: unlimited
 
@@ -195,14 +187,6 @@ rateLimits:
 
   /api/scan/v0/history/bulk/updates:
     name: listBulkUpdateHistoryObjects
-    type: unlimited
-
-  /api/scan/v0/active-synchronizer-serial:
-    name: activeSynchronizerSerial
-    type: unlimited
-
-  /api/scan/v0/roll-forward-lsu:
-    name: rollForwardLsu
     type: unlimited
 
   # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",

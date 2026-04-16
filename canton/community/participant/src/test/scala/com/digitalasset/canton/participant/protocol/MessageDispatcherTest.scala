@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
+import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
@@ -19,7 +20,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.ledger.participant.state.{SequencedEventUpdate, SequencedUpdate}
+import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.PrettyUtil
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
@@ -36,7 +37,6 @@ import com.digitalasset.canton.participant.protocol.submission.{
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedView.CompressedView
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
@@ -52,6 +52,7 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.{TrafficControlProcessor, TrafficReceipt}
 import com.digitalasset.canton.sequencing.{
+  AsyncResult,
   HandlerResult,
   PossiblyIgnoredProtocolEvent,
   RawProtocolEvent,
@@ -103,8 +104,8 @@ trait MessageDispatcherTest {
   case class Fixture(
       messageDispatcher: MessageDispatcher,
       requestTracker: RequestTracker,
-      testProcessor: RequestProcessor[TestViewType, SequencedEventUpdate],
-      otherTestProcessor: RequestProcessor[OtherTestViewType, SequencedEventUpdate],
+      testProcessor: RequestProcessor[TestViewType],
+      otherTestProcessor: RequestProcessor[OtherTestViewType],
       topologyProcessor: ParticipantTopologyProcessor,
       trafficProcessor: TrafficControlProcessor,
       acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
@@ -140,17 +141,13 @@ trait MessageDispatcherTest {
     ): Fixture = {
       val requestTracker = mock[RequestTracker]
 
-      def mockMethods[VT <: ViewType](
-          processor: RequestProcessor[VT, SequencedEventUpdate]
-      ): Unit = {
+      def mockMethods[VT <: ViewType](processor: RequestProcessor[VT]): Unit = {
         when(
           processor.processRequest(
             any[CantonTimestamp],
             any[RequestCounter],
             any[SequencerCounter],
             any[RequestAndRootHashMessage[OpenEnvelope[EncryptedViewMessage[VT]]]],
-            any[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]],
-            any[NonNegativeLong],
           )(anyTraceContext)
         )
           .thenReturn(processingRequestHandlerF)
@@ -163,10 +160,10 @@ trait MessageDispatcherTest {
           .thenReturn(processingResultHandlerF)
       }
 
-      val testViewProcessor = mock[RequestProcessor[TestViewType, SequencedEventUpdate]]
+      val testViewProcessor = mock[RequestProcessor[TestViewType]]
       mockMethods(testViewProcessor)
 
-      val otherTestViewProcessor = mock[RequestProcessor[OtherTestViewType, SequencedEventUpdate]]
+      val otherTestViewProcessor = mock[RequestProcessor[OtherTestViewType]]
       mockMethods(otherTestViewProcessor)
 
       val identityProcessor = mock[ParticipantTopologyProcessor]
@@ -206,15 +203,20 @@ trait MessageDispatcherTest {
           any[SequencedUpdate],
           any[SequencerCounter],
           any[Option[RequestCounter]],
-        )(any[TraceContext])
-      ).thenAnswer(UnlessShutdown.unit)
+        )(
+          any[TraceContext]
+        )
+      )
+        .thenAnswer(FutureUnlessShutdown.unit)
       when(
         recordOrderPublisher.scheduleEmptyAcsChangePublication(
           any[SequencerCounter],
           any[CantonTimestamp],
-        )(any[TraceContext])
-      ).thenAnswer(UnlessShutdown.unit)
-      when(recordOrderPublisher.backpressure()).thenAnswer(FutureUnlessShutdown.unit)
+        )(
+          any[TraceContext]
+        )
+      )
+        .thenAnswer(UnlessShutdown.unit)
 
       val badRootHashMessagesRequestProcessor = mock[BadRootHashMessagesRequestProcessor]
       when(
@@ -242,9 +244,9 @@ trait MessageDispatcherTest {
         .thenReturn(FutureUnlessShutdown.unit)
 
       val protocolProcessors = new RequestProcessors {
-        override protected def getInternal[P[_]](
-            viewType: ViewType { type Processor[Event] = P[Event] }
-        ): Option[P[SequencedEventUpdate]] = viewType match {
+        override protected def getInternal[P](
+            viewType: ViewType { type Processor = P }
+        ): Option[P] = viewType match {
           case TestViewType => Some(testViewProcessor)
           case OtherTestViewType => Some(otherTestViewProcessor)
           case _ => None
@@ -318,7 +320,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       None,
       ViewHash(TestHash.digest(9000)),
-      viewEncryptionKeyRandomness = sessionKeyMapTest,
+      sessionKeys = sessionKeyMapTest,
       encryptedTestView,
       psid,
       SymmetricKeyScheme.Aes128Gcm,
@@ -330,7 +332,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       submittingParticipantSignature = None,
       viewHash = ViewHash(TestHash.digest(9001)),
-      viewEncryptionKeyRandomness = sessionKeyMapTest,
+      sessionKeys = sessionKeyMapTest,
       encryptedView = encryptedOtherTestView,
       synchronizerId = psid,
       viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
@@ -379,7 +381,7 @@ trait MessageDispatcherTest {
       ) => MessageDispatcher
   ) = {
 
-    type AnyProcessor = RequestProcessor[? <: ViewType, SequencedEventUpdate]
+    type AnyProcessor = RequestProcessor[? <: ViewType]
     type ProcessorOfFixture = Fixture => AnyProcessor
 
     def mk(
@@ -425,23 +427,12 @@ trait MessageDispatcherTest {
         dummySignature,
       )
 
-    val setTrafficPurchasedMsg = SignedProtocolMessage.from(
-      SetTrafficPurchasedMessage(
-        participantId,
-        PositiveInt.one,
-        NonNegativeLong.tryCreate(1000),
-        psid,
-      ),
-      dummySignature,
-    )
-
     def checkTickTopologyProcessor(
         sut: Fixture,
         sc: SequencerCounter = SequencerCounter(0),
         ts: CantonTimestamp = CantonTimestamp.Epoch,
     ): Assertion = {
-      // For topology transactions, the topology processor may be ticked multiple times
-      verify(sut.topologyProcessor, atLeastOnce).apply(
+      verify(sut.topologyProcessor).apply(
         isEq(sc),
         isEq(SequencedTime(ts)),
         any[Option[CantonTimestamp]],
@@ -500,7 +491,7 @@ trait MessageDispatcherTest {
     }
 
     def checkProcessRequest[VT <: ViewType](
-        processor: RequestProcessor[VT, SequencedEventUpdate],
+        processor: RequestProcessor[VT],
         ts: CantonTimestamp,
         rc: RequestCounter,
         sc: SequencerCounter,
@@ -510,22 +501,16 @@ trait MessageDispatcherTest {
         isEq(rc),
         isEq(sc),
         any[RequestAndRootHashMessage[OpenEnvelope[EncryptedViewMessage[VT]]]],
-        any[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]],
-        any[NonNegativeLong],
       )(anyTraceContext)
       succeed
     }
 
-    def checkNotProcessRequest[VT <: ViewType](
-        processor: RequestProcessor[VT, SequencedEventUpdate]
-    ): Assertion = {
+    def checkNotProcessRequest[VT <: ViewType](processor: RequestProcessor[VT]): Assertion = {
       verify(processor, never).processRequest(
         any[CantonTimestamp],
         any[RequestCounter],
         any[SequencerCounter],
         any[RequestAndRootHashMessage[OpenEnvelope[EncryptedViewMessage[VT]]]],
-        any[PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate]],
-        any[NonNegativeLong],
       )(anyTraceContext)
       succeed
     }
@@ -582,6 +567,16 @@ trait MessageDispatcherTest {
       }
 
       "call the topology processor before calling the traffic control processor" in {
+        val setTrafficPurchasedMsg = SignedProtocolMessage.from(
+          SetTrafficPurchasedMessage(
+            participantId,
+            PositiveInt.one,
+            NonNegativeLong.tryCreate(1000),
+            psid,
+          ),
+          dummySignature,
+        )
+
         val sut = mk()
         val sc = SequencerCounter(1)
         val ts = CantonTimestamp.Epoch
@@ -614,8 +609,73 @@ trait MessageDispatcherTest {
       }
     }
 
+    List(
+      DisabledTransferTestData(
+        "in",
+        TransferInViewType,
+        EncryptedView(TransferInViewType)(
+          Encrypted.fromByteString[CompressedView[FullTransferInTree]](ByteString.EMPTY).value
+        ),
+      ),
+      DisabledTransferTestData(
+        "out",
+        TransferOutViewType,
+        EncryptedView(TransferOutViewType)(
+          Encrypted.fromByteString[CompressedView[FullTransferOutTree]](ByteString.EMPTY).value
+        ),
+      ),
+    ).foreach { case DisabledTransferTestData(inOut, viewType, transferView) =>
+      s"transfer $inOut requests" should {
+        "not be let through if UCK is enabled" in {
+          val sut = mk(initRc = RequestCounter(-12), uck = Some(true))
+          val encryptedTransferViewMessage =
+            EncryptedViewMessageV0(
+              None,
+              ViewHash(TestHash.digest(9002)),
+              Map.empty,
+              transferView,
+              domainId,
+            )
+          val rootHashMessage =
+            RootHashMessage(
+              rootHash(1),
+              domainId,
+              testedProtocolVersion,
+              viewType,
+              SerializedRootHashMessagePayload.empty,
+            )
+          val event = mkDeliver(
+            Batch.of[ProtocolMessage](
+              testedProtocolVersion,
+              encryptedTransferViewMessage -> Recipients.cc(participantId),
+              rootHashMessage -> Recipients.cc(participantId, mediatorId),
+            ),
+            SequencerCounter(11),
+            CantonTimestamp.ofEpochSecond(11),
+          )
+
+          val error = loggerFactory
+            .assertLogs(
+              sut.messageDispatcher.handleAll(signAndTrace(event)).failed,
+              loggerFactory.checkLogsInternalError[IllegalArgumentException](
+                _.getMessage should include(
+                  "Domain transfers are not supported with unique contract keys"
+                )
+              ),
+              _.errorMessage should include("event processing failed."),
+            )
+            .futureValue
+
+          error shouldBe a[IllegalArgumentException]
+          error.getMessage should include(
+            "Domain transfers are not supported with unique contract keys"
+          )
+        }
+      }
+    }
+
     "topology transactions" should {
-      "be passed to the transaction processor" in {
+      "be passed to the identity processor" in {
         val sut = mk()
         val sc = SequencerCounter(1)
         val ts = CantonTimestamp.ofEpochSecond(1)
@@ -723,7 +783,7 @@ trait MessageDispatcherTest {
         EncryptedViewMessage(
           None,
           ViewHash(TestHash.digest(9002)),
-          viewEncryptionKeyRandomness = sessionKeyMapTest,
+          sessionKeys = sessionKeyMapTest,
           encryptedUnknownTestView,
           psid,
           SymmetricKeyScheme.Aes128Gcm,
@@ -800,7 +860,6 @@ trait MessageDispatcherTest {
       error.getMessage should include(show"No processor for view type $UnknownTestViewType")
 
     }
-
     "ignore protocol messages for foreign synchronizers" in {
       val sut = mk()
       val sc = SequencerCounter(1)
@@ -817,7 +876,7 @@ trait MessageDispatcherTest {
 
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         handle(sut, sc, event) {
-          verify(sut.topologyProcessor, atLeastOnce).apply(
+          verify(sut.topologyProcessor).apply(
             isEq(sc),
             isEq(SequencedTime(ts)),
             isEq(None),
@@ -1194,10 +1253,10 @@ trait MessageDispatcherTest {
               checkTicks(sut)
             },
             _.warningMessage should include(
-              show"Received unexpected ${RequestKind(TestViewType, FutureUnlessShutdown.failed(new Exception), () => ???)} for $requestId"
+              show"Received unexpected ${RequestKind(TestViewType, () => FutureUnlessShutdown.pure(AsyncResult.immediate))} for $requestId"
             ),
             _.warningMessage should include(
-              show"Received unexpected ${RequestKind(OtherTestViewType, FutureUnlessShutdown.failed(new Exception), () => ???)} for $requestId"
+              show"Received unexpected ${RequestKind(OtherTestViewType, () => FutureUnlessShutdown.pure(AsyncResult.immediate))} for $requestId"
             ),
           )
           .futureValue
@@ -1215,12 +1274,6 @@ trait MessageDispatcherTest {
           testedProtocolVersion,
           MalformedMediatorConfirmationRequestResult -> Recipients.cc(participantId),
         )
-        val consumedCost = NonNegativeLong.tryCreate(12453)
-        val trafficReceipt = TrafficReceipt(
-          consumedCost = consumedCost,
-          extraTrafficConsumed = NonNegativeLong.zero,
-          baseTrafficRemainder = NonNegativeLong.zero,
-        )
         val deliver1 = SequencerCounter(0) ->
           mkDeliver(dummyBatch, CantonTimestamp.Epoch, messageId1.some)
         val deliver2 = SequencerCounter(1) -> mkDeliver(
@@ -1236,7 +1289,7 @@ trait MessageDispatcherTest {
           psid,
           messageId3,
           SequencerErrors.SubmissionRequestRefused("invalid batch"),
-          Some(trafficReceipt),
+          Option.empty[TrafficReceipt],
         )
 
         val sequencedEvents = Seq(deliver1, deliver2, deliver3, deliverError4).map {
@@ -1310,83 +1363,6 @@ trait MessageDispatcherTest {
           ),
         )
 
-      }
-    }
-
-    "multiple strands of envelopes" should {
-      "be processed correctly and tick all trackers" in {
-        val sut = mk()
-
-        val viewType = encryptedTestViewMessage.viewType
-        val rootHashMessage = RootHashMessage(
-          rootHash(1),
-          psid,
-          viewType,
-          testTopologyTimestamp,
-          SerializedRootHashMessagePayload.empty,
-        )
-
-        val envelopes = Seq[(ProtocolMessage, Recipients)](
-          idTx -> Recipients.cc(TopologyBroadcastAddress.recipient),
-          commitment -> Recipients.cc(participantId),
-          MalformedMediatorConfirmationRequestResult -> Recipients.cc(participantId),
-          testMediatorResult -> Recipients.cc(participantId),
-          setTrafficPurchasedMsg -> Recipients.cc(participantId),
-          encryptedTestViewMessage -> Recipients.cc(participantId),
-          rootHashMessage -> Recipients.cc(MemberRecipient(participantId), mediatorGroup),
-        )
-
-        def allSubsequences[A](xs: Seq[A]): Seq[Seq[A]] =
-          NonEmpty.from(xs) match {
-            case None => Seq(Seq.empty)
-            case Some(xsNE) =>
-              val tailSubsequences = allSubsequences(xsNE.tail1)
-              tailSubsequences ++ tailSubsequences.map(xsNE.head1 +: _)
-          }
-
-        val allEnvelopeSubsets = allSubsequences(envelopes).zipWithIndex.map { case (batch, idx) =>
-          val sc = SequencerCounter(idx.toLong)
-          val ts = CantonTimestamp.ofEpochSecond(idx.toLong)
-          val event = mkDeliver(Batch.of[ProtocolMessage](testedProtocolVersion, batch*), ts)
-          val signed = signEvent(event)
-          NoOpeningErrors(OrdinarySequencedEvent(sc, signed)(traceContext))
-        }
-
-        loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          for {
-            asyncF <- sut.messageDispatcher.handleAll(Traced(allEnvelopeSubsets))
-            _ <- asyncF.unwrap
-          } yield {
-            forAll(allEnvelopeSubsets.indices.toSeq) { idx =>
-              val sc = SequencerCounter(idx.toLong)
-              val ts = CantonTimestamp.ofEpochSecond(idx.toLong)
-              checkTicks(sut, sc, ts)
-            }
-          },
-          LogEntry.assertLogSeq(
-            Seq(
-              (
-                _.warningMessage should include("Received no encrypted view message of type"),
-                "missing view message",
-              ),
-              (
-                _.warningMessage should include("No valid root hash message in batch "),
-                "missing root hash message",
-              ),
-              (
-                _.warningMessage should include(show"Received unexpected $viewType for "),
-                "unexpected view message",
-              ),
-              (
-                _.warningMessage should include(
-                  "Invalid batch containing both a request and topology transaction"
-                ),
-                "mixed request and topology",
-              ),
-            ),
-            Seq.empty,
-          ),
-        )
       }
     }
   }

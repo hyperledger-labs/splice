@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi
@@ -17,13 +17,13 @@ import com.daml.ledger.javaapi.data.Command
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.admin.api.client.data.ParticipantSynchronizerLimits
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
+import com.digitalasset.canton.config.{DbConfig, NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.damltests.java.test
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.examples.java.paint.OfferToPaintHouseByOwner
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransform,
@@ -273,12 +273,12 @@ trait LedgerApiParticipantPruningTest
       val (participant, offsetToPruneUpTo) = (participant2, pruningOffset)
       // user-manual-entry-begin: ManualPruneParticipantNodeInternalPrune
       // The prune() method prunes more comprehensively and should be used in most cases.
-      participant.pruning.prune_internally(offsetToPruneUpTo, None)
+      participant.pruning.prune_internally(offsetToPruneUpTo)
       // user-manual-entry-end: ManualPruneParticipantNodeInternalPrune
       logger.info(s"pruned internally at $pruningOffset")
 
       // Pruning internally with lower offset should succeed and be a no-op.
-      participant2.pruning.prune_internally(offsetInMiddleOfPrunedHistory, None)
+      participant2.pruning.prune_internally(offsetInMiddleOfPrunedHistory)
 
       // Starting after the last pruned event should be fine:
       participant2.ledger_api.updates
@@ -320,7 +320,7 @@ trait LedgerApiParticipantPruningTest
         val endBeforePrune = participant2.ledger_api.state.end()
         loggerFactory.assertLogs(
           a[CommandFailure] shouldBe thrownBy {
-            participant2.pruning.prune_internally(endBeforePrune, None)
+            participant2.pruning.prune_internally(endBeforePrune)
 
             // should not get here - if we do, check that the end has since moved:
             val endAfterPrune = participant2.ledger_api.state.end(): @unchecked
@@ -343,7 +343,7 @@ trait LedgerApiParticipantPruningTest
       val pruneUpTo = -12345678L
       loggerFactory.assertLogs(
         a[CommandFailure] shouldBe thrownBy {
-          participant2.pruning.prune_internally(pruneUpTo, None)
+          participant2.pruning.prune_internally(pruneUpTo)
         },
         logEntry => {
           logEntry.commandFailureMessage should include(
@@ -504,11 +504,10 @@ trait LedgerApiParticipantPruningTest
 }
 
 class LedgerApiParticipantPruningTestDefault extends LedgerApiParticipantPruningTest {
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }
 
 //class LedgerApiParticipantPruningTestPostgres extends LedgerApiParticipantPruningTest {
 //  registerPlugin(new UsePostgres(loggerFactory))
-//  registerPlugin(new UseBftSequencer(loggerFactory))
+//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 //}

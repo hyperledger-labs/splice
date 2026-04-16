@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -31,8 +31,8 @@ private[backend] trait StorageBackendTestsCompletions
     TraceContext.withNewTraceContext("test") { aTraceContext =>
       val party = someParty
       val userId = someUserId
-      val emptyTraceContext = SerializableTraceContext(TraceContext.empty).toSerializedDamlProto
-      val serializableTraceContext = SerializableTraceContext(aTraceContext).toSerializedDamlProto
+      val emptyTraceContext = SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
+      val serializableTraceContext = SerializableTraceContext(aTraceContext).toDamlProto.toByteArray
 
       val dtos = Vector(
         dtoCompletion(offset(1), submitters = Set(party)),
@@ -83,11 +83,11 @@ private[backend] trait StorageBackendTestsCompletions
       completions0to9 should have length 3
 
       completions0to9.head.completionResponse.completion.map(_.traceContext) shouldBe Some(
-        SerializableTraceContext(testTraceContext).toDamlProto
+        Some(SerializableTraceContext(testTraceContext).toDamlProto)
       )
       completions0to9(1).completionResponse.completion.map(_.traceContext) shouldBe Some(None)
       completions0to9(2).completionResponse.completion.map(_.traceContext) shouldBe Some(
-        SerializableTraceContext(aTraceContext).toDamlProto
+        Some(SerializableTraceContext(aTraceContext).toDamlProto)
       )
     }
   }
@@ -365,7 +365,7 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(2),
         submitters = Set(someParty),
         commandId = commandId,
-        userId = Ref.UserId.assertFromString("userid1"),
+        userId = "userid1",
         submissionId = Some(submissionId),
         synchronizerId = synchronizerId,
         messageUuid = Some(messageUuid.toString),
@@ -376,7 +376,7 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(5),
         submitters = Set(someParty),
         commandId = commandId,
-        userId = Ref.UserId.assertFromString("userid1"),
+        userId = "userid1",
         submissionId = Some(submissionId),
         synchronizerId = synchronizerId,
         messageUuid = Some(messageUuid.toString),
@@ -387,7 +387,7 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(9),
         submitters = Set(someParty),
         commandId = commandId,
-        userId = Ref.UserId.assertFromString("userid1"),
+        userId = "userid1",
         submissionId = Some(submissionId),
         synchronizerId = synchronizerId,
         recordTime = recordTime,

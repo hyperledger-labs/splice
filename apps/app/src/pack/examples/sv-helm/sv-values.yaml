@@ -18,6 +18,12 @@ auth:
   # jwks:
   #   connectionTimeout: "10 seconds"
   #   readTimeout: "10 seconds"
+cometBFT:
+  enabled: true
+  connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
+  # Uncomment if you will be using KMS for the SV participant.
+  # You will need to provide the key via the `splice-app-sv-cometbft-governance-key` secret.
+  # externalGovernanceKey: true
 
 # MIGRATION_START
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
@@ -38,35 +44,28 @@ participantAddress: "participant-MIGRATION_ID"
 # Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
 #DOCS_PRUNING_START
-synchronizers:
-  current:
-    sequencerPruningConfig:
-      # Enable or disable sequencer pruning
-      enabled: true
-      # The pruning interval is the time between two consecutive prunings.
-      pruningInterval: "1 hour"
-      # The retention period is the time for which the sequencer will retain the data.
-      retentionPeriod: "30 days"
-  #DOCS_PRUNING_END
-    sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
-    mediatorAddress: "global-domain-MIGRATION_ID-mediator"
-    sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
-    sequencerAvailabilityDelay: "60 seconds"
-    enableBftSequencer: false
-    cometBFT:
-      enabled: true
-      connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
-    # Uncomment if you will be using KMS for the SV participant.
-    # You will need to provide the key via the `splice-app-sv-cometbft-governance-key` secret.
-    # externalGovernanceKey: true
-    # Enable this to skip initialization of the sequencer and mediator node.
-    # This needs to be false when a node is first created but can be set to true afterwards.
-    # Setting it to true allows the SV app to start without the sequencer being up
-    # which can be useful, e.g., when a database migration blocks the sequencer from starting
-    # until it completes.
-    # Note that you must set it (temporarily) to false if you reset your mediator or sequencer
-    # or change the sequencer or mediator config, e.g., the sequencer url.
-    # This has no effect when `migrating: true`.
+domain:
+  sequencerPruningConfig:
+    # Enable or disable sequencer pruning
+    enabled: true
+    # The pruning interval is the time between two consecutive prunings.
+    pruningInterval: "1 hour"
+    # The retention period is the time for which the sequencer will retain the data.
+    retentionPeriod: "30 days"
+#DOCS_PRUNING_END
+  sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
+  mediatorAddress: "global-domain-MIGRATION_ID-mediator"
+  sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
+  sequencerAvailabilityDelay: "60 seconds"
+  enableBftSequencer: false
+  # Enable this to skip initialization of the sequencer and mediator node.
+  # This needs to be false when a node is first created but can be set to true afterwards.
+  # Setting it to true allows the SV app to start without the sequencer being up
+  # which can be useful, e.g., when a database migration blocks the sequencer from starting
+  # until it completes.
+  # Note that you must set it (temporarily) to false if you reset your mediator or sequencer
+  # or change the sequencer or mediator config, e.g., the sequencer url.
+  # This has no effect when `migrating: true`.
   skipInitialization: false
 
 # Please make the ``scan`` service `publicUrl` accessible for other validators to read from, and set the URL below to your Scan service.

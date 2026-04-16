@@ -17,7 +17,7 @@ export async function retry<T>(
       await new Promise(resolve => setTimeout(resolve, delayMs));
       return await retry(name, Math.min(delayMs * 2 - 1, maxRetryDelayMs), retries - 1, action);
     } else {
-      return Promise.reject(new Error(`Exhausted retries. Last error: ${e}.`));
+      return Promise.reject(`Exhausted retries. Last error: ${e}.`);
     }
   }
 }

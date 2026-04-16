@@ -1,8 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
 
+import cats.syntax.either.*
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
@@ -51,7 +52,7 @@ class ApplicationHandlerPekko[F[+_], Context](
       asyncParallelism: PositiveInt
   )(implicit traceContext: TraceContext, closeContext: CloseContext): Flow[
     F[BoxedEnvelope[PossiblyIgnoredEnvelopeBox, ClosedEnvelope]],
-    F[UnlessShutdown[Either[ApplicationHandlerError, UnthrottledAsync]]],
+    F[UnlessShutdown[Either[ApplicationHandlerError, Unit]]],
     NotUsed,
   ] =
     Flow[F[BoxedEnvelope[PossiblyIgnoredEnvelopeBox, ClosedEnvelope]]].contextualize
@@ -68,7 +69,7 @@ class ApplicationHandlerPekko[F[+_], Context](
               errorOrSyncResult match {
                 case Right(Some(syncResult)) =>
                   processAsyncResult(syncResult, killSwitchOfContext(context))
-                case Right(None) => FutureUnlessShutdown.pure(Right(UnthrottledAsync.immediate))
+                case Right(None) => FutureUnlessShutdown.pure(Either.unit)
                 case Left(error) => FutureUnlessShutdown.pure(Left(error))
               }
             case AbortedDueToShutdown => FutureUnlessShutdown.abortedDueToShutdown
@@ -112,15 +113,13 @@ class ApplicationHandlerPekko[F[+_], Context](
       val firstEvent = batch.head1
       val firstTimestamp = firstEvent.timestamp
 
-      import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.TimerOnShutdownSyntax
-
       metrics.handler.numEvents.inc(batch.size.toLong)(MetricsContext.Empty)
       logger.debug(s"Passing ${batch.size} events to the application handler ${handler.name}.")
       // Measure only the synchronous part of the application handler so that we see how much the application handler
       // contributes to the sequential processing bottleneck.
       val syncResultFF = FutureUnlessShutdown.fromTry(
         Try(
-          Timed.futureUS(metrics.handler.applicationHandle, handler(Traced(batch)))
+          Timed.future(metrics.handler.applicationHandle, handler(Traced(batch)))
         )
       )
 
@@ -144,7 +143,7 @@ class ApplicationHandlerPekko[F[+_], Context](
       killSwitch: KillSwitch,
   )(implicit
       closeContext: CloseContext
-  ): FutureUnlessShutdown[Either[ApplicationHandlerError, UnthrottledAsync]] = {
+  ): FutureUnlessShutdown[Either[ApplicationHandlerError, Unit]] = {
     val EventBatchSynchronousResult(firstTimestamp, lastTimestamp, asyncResult) = syncResult
     implicit val batchTraceContext: TraceContext = syncResult.traceContext
     asyncResult.unwrap.transformIntoSuccess {
@@ -199,6 +198,6 @@ object ApplicationHandlerPekko {
   private final case class EventBatchSynchronousResult(
       firstTimestamp: CantonTimestamp,
       lastTimestamp: CantonTimestamp,
-      asyncResult: AsyncResult[UnthrottledAsync],
+      asyncResult: AsyncResult[Unit],
   )(implicit val traceContext: TraceContext)
 }

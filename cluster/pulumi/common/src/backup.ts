@@ -17,14 +17,12 @@ export async function bootstrapDataBucketSpec(
   return await bootstrapBucket(projectId, bucketName, gcpSecretName);
 }
 
-function openGcpBucket(bucket: GcpBucket): pulumi.Output<Bucket> {
-  return bucket.jsonCredentials.apply(jsonCredentials => {
-    const storage = new Storage({
-      projectId: bucket.projectId,
-      credentials: JSON.parse(jsonCredentials),
-    });
-    return storage.bucket(bucket.bucketName);
+function openGcpBucket(bucket: GcpBucket): Bucket {
+  const storage: Storage = new Storage({
+    projectId: bucket.projectId,
+    credentials: JSON.parse(bucket.jsonCredentials),
   });
+  return storage.bucket(bucket.bucketName);
 }
 
 async function fetchBucketFile(bucket: Bucket, file: File): Promise<string> {
@@ -109,8 +107,13 @@ export async function fetchAndInstallParticipantBootstrapDump(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
 ): Promise<k8s.core.v1.Secret> {
-  const content = openGcpBucket(config.bucket).apply(bucket =>
-    getLatestParticipantIdentitiesDump(bucket, xns, config.cluster, config.start, config.end)
+  const bucket = openGcpBucket(config.bucket);
+  const content = await getLatestParticipantIdentitiesDump(
+    bucket,
+    xns,
+    config.cluster,
+    config.start,
+    config.end
   );
   return installParticipantIdentitiesSecret(xns, participantBootstrapDumpSecretName, content);
 }

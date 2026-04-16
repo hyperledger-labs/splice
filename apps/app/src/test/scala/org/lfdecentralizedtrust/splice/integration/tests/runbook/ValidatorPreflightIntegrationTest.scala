@@ -1,16 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
+import org.lfdecentralizedtrust.splice.util.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.console.ValidatorAppClientReference
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebElement
 
@@ -95,10 +94,10 @@ abstract class ValidatorPreflightIntegrationTestBase
     limitValidatorUsers()
   }
 
-  protected lazy val validatorClient: ValidatorAppClientReference = {
+  protected def validatorClient(suppressErrors: Boolean = true): ValidatorAppClientReference = {
     val env = provideEnvironment("NotUsed")
     // retry on e.g. network errors and rate limits
-    val token = eventuallySucceeds(suppressErrors = false) {
+    val token = eventuallySucceeds(suppressErrors = suppressErrors) {
       Auth0Util.getAuth0ClientCredential(
         validatorAuth0Secret,
         validatorAuth0Audience,
@@ -113,7 +112,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     // We skip offboarding users on non-auth0 validators. We don't use those on any long-running clusters,
     // where number of users becomes an issue.
     if (isAuth0) {
-      val users = eventuallySucceeds()(validatorClient.listUsers())
+      val users = eventuallySucceeds()(validatorClient(suppressErrors = false).listUsers())
       val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
       val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
       if (users.length > offboardThreshold) {
@@ -126,7 +125,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           .foreach { user =>
             {
               logger.debug(s"Offboarding user: ${user}")
-              eventuallySucceeds()(validatorClient.offboardUser(user))
+              eventuallySucceeds()(validatorClient(suppressErrors = false).offboardUser(user))
             }
           }
       } else {
@@ -266,7 +265,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       val charlieUser = auth0Users.get("charlie").value
       clue("Onboard charlie manually to share a party with Bob") {
         eventuallySucceeds()(
-          validatorClient.onboardUser(
+          validatorClient().onboardUser(
             charlieUser.id,
             Some(PartyId.tryFromProtoPrimitive(bobPartyId)),
           )
@@ -445,7 +444,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   "can dump participant identities of validator" in { _ =>
     if (isAuth0) {
       eventuallySucceeds() {
-        validatorClient.dumpParticipantIdentities()
+        validatorClient(suppressErrors = false).dumpParticipantIdentities()
       }
     }
   }
@@ -458,32 +457,20 @@ abstract class ValidatorPreflightIntegrationTestBase
           case Seq(DomainSequencers(_, connections)) => connections
         }
         connections should not be empty withClue "sequencer connections"
-
-        def isAvailable(connection: HttpScanAppClient.DsoSequencer) = {
-          // added 60s grace period for the polling trigger interval 30s + other latency
-          env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
-        }
-
-        val availableConnections = if (connections.forall(_.serial.isEmpty)) {
-          val latestMigrationId = connections.map(_.migrationId).max
-          connections.filter(connection =>
-            connection.migrationId == latestMigrationId &&
-              connection.url != "" &&
-              isAvailable(connection)
-          )
-        } else {
-          connections.filter(connection =>
-            connection.serial.contains(migrationId) &&
-              isAvailable(connection)
-          )
-        }
+        val latestMigrationId = connections.map(_.migrationId).max
+        val availableConnections = connections.filter(connection =>
+          connection.migrationId == latestMigrationId &&
+            connection.url != "" &&
+            // added 60s grace period for the polling trigger interval 30s + other latency
+            env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
+        )
         val (expectedSequencerConnections, _) =
           Endpoint
             .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
             .value
 
         val domainConnectionConfig =
-          eventuallySucceeds()(validatorClient.decentralizedSynchronizerConnectionConfig())
+          eventuallySucceeds()(validatorClient().decentralizedSynchronizerConnectionConfig())
         val connectedEndpointSet =
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
 
@@ -630,22 +617,12 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
       eventually(2.minutes) {
         val dsoInfo = sv.getDsoInfo()
         val nodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
-        val synchronizerNodeConfig =
-          nodeState.state.synchronizerNodes.asScala.values.headOption.value
-        val svSequencerUrl = synchronizerNodeConfig.physicalSynchronizers.toScala
-          .flatMap(_.asScala.get(migrationId).flatMap(_.sequencer.map(_.url).toScala))
-          .getOrElse(
-            synchronizerNodeConfig.sequencer.toScala.value.url
-          )
+        val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
         val (svSequencerEndpoint, _) = Endpoint
-          .fromUris(
-            NonEmpty.from(Seq(new URI(svSequencerUrl))).value
-          )
+          .fromUris(NonEmpty.from(Seq(new URI(domainConfig.sequencer.toScala.value.url))).value)
           .value
         val domainConnectionConfig =
-          eventuallySucceeds()(
-            validatorClient.decentralizedSynchronizerConnectionConfig()
-          )
+          eventuallySucceeds()(validatorClient().decentralizedSynchronizerConnectionConfig())
         val connectedEndpointSet =
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
         connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)

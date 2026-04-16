@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -19,8 +19,6 @@ sealed trait SendAsyncError extends PrettyPrinting {
 
   /** The Sequencer is overloaded and declined to handle the request */
   def isOverload: Boolean
-
-  def isMaxSequencingTimeTooFar: Boolean
 
   /** The max sequencing time has elapsed and the request was refused */
   def hasMaxSequencingTimeElapsed: Boolean
@@ -48,14 +46,6 @@ object SendAsyncError {
         }
       case _ => false
     }
-
-    override def isMaxSequencingTimeTooFar: Boolean = error match {
-      case _: GrpcRequestRefusedByServer =>
-        error.decodedCantonError.exists { decoded =>
-          decoded.code.id == SequencerErrors.MaxSequencingTimeTooFar.id
-        }
-      case _ => false
-    }
   }
 
   /** Implementation of [[SendAsyncError]]s for direct transports */
@@ -64,8 +54,5 @@ object SendAsyncError {
 
     override def hasMaxSequencingTimeElapsed: Boolean =
       message.contains(ExceededMaxSequencingTime.id)
-
-    // Only used for amplification, but direct sequencer transport doesn't use amplification
-    override def isMaxSequencingTimeTooFar: Boolean = false
   }
 }

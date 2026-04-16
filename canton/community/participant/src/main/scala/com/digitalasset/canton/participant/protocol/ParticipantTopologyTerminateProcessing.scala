@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
-import cats.implicits.toTraverseOps
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   LogicalUpgradeTime,
@@ -14,30 +13,19 @@ import com.digitalasset.canton.data.{
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
-  Added,
-  Onboarding,
-}
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing.EventInfo
-import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation
-import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation.PendingOnboardingClearanceStore
-import com.digitalasset.canton.participant.synchronizer.PendingHandshakeWithLsuSuccessor
-import com.digitalasset.canton.participant.synchronizer.PendingHandshakeWithLsuSuccessor.PendingHandshakesWithSuccessorsStore
+import com.digitalasset.canton.participant.sync.LogicalSynchronizerUpgradeCallback
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStore.EffectiveStateChange
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.TopologyMapping
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, MonadUtil}
+import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.{SequencerCounter, topology}
-import org.slf4j.event.Level
 
 import scala.concurrent.ExecutionContext
 
@@ -46,8 +34,7 @@ object ParticipantTopologyTerminateProcessing {
   /** Event with indication of whether the participant needs to initiate party replication */
   private final case class EventInfo(
       event: Update.TopologyTransactionEffective,
-      onboardingLocallyHostedParty: Boolean,
-      clearingOnboardingLocallyHostedParty: Boolean,
+      requireLocalPartyReplication: Boolean,
   )
 }
 
@@ -58,14 +45,7 @@ class ParticipantTopologyTerminateProcessing(
     participantId: ParticipantId,
     pauseSynchronizerIndexingDuringPartyReplication: Boolean,
     synchronizerPredecessor: Option[SynchronizerPredecessor],
-    pendingHandshakesWithSuccessorsStore: PendingHandshakesWithSuccessorsStore,
-    pendingOnboardingClearanceStore: PendingOnboardingClearanceStore,
-    onboardingClearanceScheduler: OnboardingClearanceScheduler,
-    retrieveAndStoreMissingSequencerIds: TraceContext => EitherT[
-      FutureUnlessShutdown,
-      String,
-      Unit,
-    ],
+    lsuCallback: LogicalSynchronizerUpgradeCallback,
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends topology.processing.TerminateProcessing
     with NamedLogging {
@@ -101,9 +81,6 @@ class ParticipantTopologyTerminateProcessing(
             s"Invalid: findEffectiveStateChanges with onlyAtEffective = true should return only one EffectiveStateChange for effective time $effectiveTime, only the first one is taken into consideration."
           )
         events = effectiveStateChanges.headOption.flatMap(getNewEvents)
-
-        _ <- events.traverse(processPartyHostingEvents)
-
         _ <- FutureUnlessShutdown.lift(
           events
             .map(scheduleEvent(effectiveTime, sequencedTime, sc, _))
@@ -120,169 +97,24 @@ class ParticipantTopologyTerminateProcessing(
     }
   }
 
-  /** Processes party authorization events for the local participant to manage the onboarding (flag)
-    * clearance lifecycle.
-    *
-    * When a party is onboarded, it records a pending operation and schedules a clearance task. When
-    * the party is finally added (onboarding flag cleared), it removes the pending operation from
-    * the store.
-    */
-  private def processPartyHostingEvents(eventInfo: EventInfo)(implicit
-      traceContext: TraceContext,
-      executionContext: ExecutionContext,
-  ): FutureUnlessShutdown[Unit] = {
-    if (eventInfo.onboardingLocallyHostedParty || eventInfo.clearingOnboardingLocallyHostedParty) {
-      MonadUtil.sequentialTraverse_[FutureUnlessShutdown, TopologyEvent, Unit](
-        eventInfo.event.events
-      ) {
-        // Onboarding: Persist the clearance intent and trigger the scheduler
-        case PartyToParticipantAuthorization(lfParty, participant, Onboarding(_permission))
-            if participant == participantId.toLf =>
-          val effectiveAt = EffectiveTime(eventInfo.event.effectiveTime)
-
-          PartyId
-            .fromLfParty(lfParty)
-            .fold(
-              err => {
-                logger.error(
-                  s"Failed to parse PartyId from $lfParty during 'Onboarding' event. Reason: $err"
-                )
-                FutureUnlessShutdown.unit
-              },
-              partyId => {
-                logger.info(
-                  s"Party $partyId is onboarding on the local participant."
-                )
-
-                pendingOnboardingClearanceStore
-                  .get(
-                    psid.logical,
-                    OnboardingClearanceOperation.operationKey(partyId),
-                    OnboardingClearanceOperation.operationName,
-                  )
-                  .value
-                  .flatMap {
-                    case None =>
-                      // If no record is found, do nothing (no DB insertion, no clearance request)
-                      logger.info(
-                        s"No pending onboarding clearance operation found for party $partyId. Skipping clearance request."
-                      )
-                      FutureUnlessShutdown.unit
-
-                    // Record's existence guards against prematurely scheduling of an onboarding flag clearance
-                    case Some(record) =>
-                      // If a record is found, update it only if onboardingEffectiveAt is undefined
-                      // (the record was persisted as part of the offline party ACS import)
-                      val persistOperationFus =
-                        if (record.operation.onboardingEffectiveAt.isDefined) {
-                          logger.warn(
-                            s"Unexpected: An effective PTP mapping with set onboarding flag (validFrom=${record.operation.onboardingEffectiveAt}) " +
-                              s"together with a pending onboarding clearance operation record for party $partyId."
-                          )
-                          FutureUnlessShutdown.unit // Already tracked with the effective time
-                        } else {
-                          val operation =
-                            OnboardingClearanceOperation(Some(effectiveAt))(
-                              OnboardingClearanceOperation
-                                .protocolVersionRepresentativeFor(store.protocolVersion)
-                            )
-                          pendingOnboardingClearanceStore
-                            .updateOperation(
-                              operation,
-                              psid.logical,
-                              OnboardingClearanceOperation.operationName,
-                              OnboardingClearanceOperation.operationKey(partyId),
-                            )
-                        }
-
-                      // After ensuring the update is persisted (if it was needed), request clearance
-                      persistOperationFus.flatMap { _ =>
-                        val onboardingEffectiveAt =
-                          record.operation.onboardingEffectiveAt.getOrElse(effectiveAt)
-
-                        onboardingClearanceScheduler
-                          .requestClearance(
-                            partyId,
-                            onboardingEffectiveAt,
-                            maxInitialRetries = NonNegativeInt.one,
-                          )
-                          .fold(
-                            error =>
-                              logger.warn(
-                                s"Failed to request onboarding clearance for party $partyId: $error. " +
-                                  "Please recover by manually calling the clear party onboarding flag endpoint."
-                              ),
-                            _ => (), // Successfully requested the onboarding flag clearance
-                          )
-                      }
-                  }
-              },
-            )
-
-        // Added: The onboarding flag has been successfully cleared
-        case PartyToParticipantAuthorization(lfParty, participant, Added(_permission))
-            if participant == participantId.toLf =>
-          PartyId
-            .fromLfParty(lfParty)
-            .fold(
-              err => {
-                logger.error(
-                  s"Failed to parse PartyId from $lfParty during 'Added' event. Reason: $err"
-                )
-                FutureUnlessShutdown.unit
-              },
-              partyId => {
-                logger.info(
-                  s"Party $partyId was successfully added to the local participant. Removing pending onboarding clearance operation."
-                )
-                pendingOnboardingClearanceStore.delete(
-                  psid.logical,
-                  OnboardingClearanceOperation.operationKey(partyId),
-                  OnboardingClearanceOperation.operationName,
-                )
-              },
-            )
-
-        case _ =>
-          // Ignore other events (Revoked, ChangedTo, or events for other parties/participants)
-          FutureUnlessShutdown.unit
-      }
-    } else {
-      // When neither onboardingLocallyHostedParty nor clearingOnboardingLocallyHostedParty is true
-      FutureUnlessShutdown.unit
-    }
-  }
-
   override def notifyUpgradeAnnouncement(
       successor: SynchronizerSuccessor
-  )(implicit traceContext: TraceContext, executionContext: ExecutionContext): Unit = {
+  )(implicit traceContext: TraceContext): Unit = {
     logger.info(
       s"Node is notified about the upgrade of $psid to ${successor.psid} scheduled at ${successor.upgradeTime}"
     )
 
+    lsuCallback.registerCallback(successor)
     recordOrderPublisher.setSuccessor(Some(successor))
-
-    EitherTUtil.doNotAwaitUS(
-      retrieveAndStoreMissingSequencerIds(traceContext),
-      s"retrieve and store missing sequencer ids for $psid",
-      failLevel = Level.WARN,
-    )
   }
 
-  override def notifyUpgradeCancellation()(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = {
+  override def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit = {
     logger.info(
       s"Node is notified about the cancellation of upgrade"
     )
 
+    lsuCallback.unregisterCallback()
     recordOrderPublisher.setSuccessor(None)
-
-    pendingHandshakesWithSuccessorsStore.delete(
-      psid,
-      PendingHandshakeWithLsuSuccessor.operationKey,
-      PendingHandshakeWithLsuSuccessor.operationName,
-    )
   }
 
   private def scheduleEvent(
@@ -300,7 +132,7 @@ class ParticipantTopologyTerminateProcessing(
       )
       _ <- EitherT(
         if (
-          pauseSynchronizerIndexingDuringPartyReplication && eventInfo.onboardingLocallyHostedParty
+          pauseSynchronizerIndexingDuringPartyReplication && eventInfo.requireLocalPartyReplication
         )
           recordOrderPublisher.scheduleEventBuffering(effectiveTime.value)
         else
@@ -467,22 +299,15 @@ class ParticipantTopologyTerminateProcessing(
       oldRelevantState = effectiveStateChange.before.signedTransactions,
       currentRelevantState = effectiveStateChange.after.signedTransactions,
       localParticipantId = participantId,
-    ).map {
-      case TopologyTransactionDiff(
-            events,
-            updateId,
-            onboardingLocalParty,
-            clearingOnboardingLocalParty,
-          ) =>
-        EventInfo(
-          Update.TopologyTransactionEffective(
-            updateId = updateId,
-            events = events,
-            synchronizerId = psid.logical,
-            effectiveTime = effectiveStateChange.effectiveTime.value,
-          ),
-          onboardingLocallyHostedParty = onboardingLocalParty,
-          clearingOnboardingLocallyHostedParty = clearingOnboardingLocalParty,
-        )
+    ).map { case TopologyTransactionDiff(events, updateId, requiresLocalPartyReplication) =>
+      EventInfo(
+        Update.TopologyTransactionEffective(
+          updateId = updateId,
+          events = events,
+          synchronizerId = psid.logical,
+          effectiveTime = effectiveStateChange.effectiveTime.value,
+        ),
+        requiresLocalPartyReplication,
+      )
     }
 }

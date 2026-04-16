@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -6,8 +6,6 @@ package com.digitalasset.canton.synchronizer.sequencer
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
-import com.daml.metrics.api.testing.InMemoryMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -18,9 +16,8 @@ import com.digitalasset.canton.logging.SuppressionRule.FullSuppression
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.sequencing.protocol.ProtocolObjectTestUtils.assertSequencedEventEquals
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
-import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
+import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.SynchronizerSequencingTestUtils.*
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
@@ -52,8 +49,8 @@ import org.scalatest.wordspec.FixtureAsyncWordSpec
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable.SortedSet
-import scala.concurrent.Promise
 import scala.concurrent.duration.*
+import scala.concurrent.{Future, Promise}
 
 class SequencerReaderTest
     extends FixtureAsyncWordSpec
@@ -111,7 +108,9 @@ class SequencerReaderTest
 
     override protected def logger: TracedLogger = SequencerReaderTest.this.logger
 
-    override def notifyOfLocalWrite(notification: WriteNotification): Unit = ()
+    override def notifyOfLocalWrite(notification: WriteNotification)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = Future.unit
   }
 
   class Env extends FlagCloseableAsync {
@@ -121,22 +120,12 @@ class SequencerReaderTest
       new AtomicBoolean(true) // should the latest timestamp be added to the signaller when stored
     val actorSystem: ActorSystem = ActorSystem(classOf[SequencerReaderTest].getSimpleName)
     implicit val materializer: Materializer = Materializer(actorSystem)
-
-    val metricsFactory = new InMemoryMetricsFactory
-    val sequencerMetrics: SequencerMetrics = {
-      val (_, metrics) = HistogramInventory.create(implicit inventory =>
-        new SequencerMetrics(new SequencerHistograms(MetricName.Daml), metricsFactory)
-      )
-      metrics
-    }
-
     val store = new InMemorySequencerStore(
       protocolVersion = testedProtocolVersion,
       sequencerMember = topologyClientMember,
       blockSequencerMode = true,
       loggerFactory = loggerFactory,
-      timeouts = timeouts,
-      sequencerMetrics = sequencerMetrics,
+      sequencerMetrics = SequencerMetrics.noop("sequencer-reader-test"),
     )
     val instanceIndex: Int = 0
     // create a spy so we can add verifications on how many times methods were called
@@ -153,26 +142,11 @@ class SequencerReaderTest
       cryptoD,
       eventSignaller,
       topologyClientMember,
-      lsuSequencingBounds = None,
-      sequencerMetrics,
       timeouts,
       loggerFactory,
     )
     val defaultTimeout: FiniteDuration = 20.seconds
     implicit val closeContext: CloseContext = CloseContext(reader)
-
-    /** Helper to read the subscriptionLastTimestamp metric value by member */
-    def subscriptionLastTimestampMetric(member: Member = alice): Long = {
-      val metricName =
-        MetricName.Daml :+ "sequencer" :+ "public-api" :+ "subscription-last-timestamp"
-      val metricsContext = MetricsContext("subscriber" -> member.toProtoPrimitive)
-
-      metricsFactory.metrics.gauges
-        .get(metricName)
-        .flatMap(_.get(metricsContext))
-        .map(_.getValue.asInstanceOf[Long])
-        .getOrElse(0L)
-    }
 
     def ts(epochSeconds: Int): CantonTimestamp = CantonTimestamp.ofEpochSecond(epochSeconds.toLong)
 
@@ -213,7 +187,9 @@ class SequencerReaderTest
       )
 
       val source = Source
-        .future(subscribeF)
+        .future(
+          subscribeF
+        )
         .flatMapConcat(identity)
         .map {
           case Right(event) => event
@@ -489,7 +465,7 @@ class SequencerReaderTest
             logs =>
               forAtLeast(1, logs)(
                 _.message should include(
-                  s"latest topology client timestamp = Some(${ts(2)})"
+                  s"latest topology client timestamp = Some(${ts(1)})"
                 )
               ),
           )
@@ -644,7 +620,7 @@ class SequencerReaderTest
           import env.*
 
           val expectedMessage =
-            "Subscription for PAR::alice::default would require reading data from the beginning, but this sequencer cannot serve timestamps at or before 1970-01-01T00:00:10Z or at or before the member's registration timestamp 1970-01-01T00:00:00Z."
+            "Subscription for PAR::alice::default would require reading data from the beginning, but this sequencer cannot serve timestamps at or before 1970-01-01T00:00:10Z or below the member's registration timestamp 1970-01-01T00:00:00Z."
 
           for {
             _ <- store.registerMember(topologyClientMember, ts0).failOnShutdown
@@ -677,7 +653,7 @@ class SequencerReaderTest
         import env.*
 
         val expectedMessage =
-          "Subscription for PAR::alice::default would require reading data from 1970-01-01T00:00:10Z (inclusive), but this sequencer cannot serve timestamps at or before 1970-01-01T00:00:10Z or at or before the member's registration timestamp 1970-01-01T00:00:00Z."
+          "Subscription for PAR::alice::default would require reading data from 1970-01-01T00:00:10Z (inclusive), but this sequencer cannot serve timestamps at or before 1970-01-01T00:00:10Z or below the member's registration timestamp 1970-01-01T00:00:00Z."
 
         for {
           _ <- store.registerMember(topologyClientMember, ts0).failOnShutdown
@@ -755,7 +731,7 @@ class SequencerReaderTest
           )
           batch = Batch.fromClosed(
             testedProtocolVersion,
-            ClosedUncompressedEnvelope.create(
+            ClosedEnvelope.create(
               ByteString.copyFromUtf8("test envelope"),
               Recipients.cc(alice, bob),
               Seq.empty,
@@ -810,7 +786,6 @@ class SequencerReaderTest
                       _traceContext,
                       _trafficReceiptO,
                     ),
-                    _,
                   ),
                 ),
                 _idx,
@@ -828,7 +803,6 @@ class SequencerReaderTest
 
       "read by the sender into deliver errors" in { env =>
         import env.*
-
         setup(env).flatMap {
           case (topologyTimestampTolerance, batch, delivers, previousTimestamps) =>
             for {
@@ -870,11 +844,7 @@ class SequencerReaderTest
                         ),
                         Option.empty[TrafficReceipt],
                       )
-                  assertSequencedEventEquals(
-                    actual = delivered.signedEvent.content,
-                    expected = expectedSequencedEvent,
-                    testedProtocolVersion = testedProtocolVersion,
-                  )
+                  delivered.signedEvent.content shouldBe expectedSequencedEvent
               }
             }
         }
@@ -921,113 +891,10 @@ class SequencerReaderTest
                         None,
                         Option.empty[TrafficReceipt],
                       )
-
-                  assertSequencedEventEquals(
-                    actual = delivered.signedEvent.content,
-                    expected = expectedSequencedEvent,
-                    testedProtocolVersion = testedProtocolVersion,
-                  )
+                  delivered.signedEvent.content shouldBe expectedSequencedEvent
               }
             }
         }
-      }
-    }
-
-    "report separate subscriptionLastTimestamp metric per subscriber" in { env =>
-      import env.*
-
-      for {
-        _ <- store.registerMember(topologyClientMember, ts0).failOnShutdown
-        registeredAlice <- store.registerMember(alice, ts0).failOnShutdown
-        registeredBob <- store.registerMember(bob, ts0).failOnShutdown
-
-        // Generate 5 events for Alice starting at ts0+1s
-        aliceEvents = (1L to 5L)
-          .map(ts0.plusSeconds)
-          .map(
-            Sequenced(
-              _,
-              mockDeliverStoreEvent(
-                sender = registeredAlice.memberId,
-                traceContext = traceContext,
-              )(),
-            )
-          )
-        _ <- storeAndWatermark(aliceEvents)
-
-        // Generate 3 events for Bob starting at ts0+10s
-        bobEvents = (10L to 12L)
-          .map(ts0.plusSeconds)
-          .map(
-            Sequenced(
-              _,
-              mockDeliverStoreEvent(
-                sender = registeredBob.memberId,
-                traceContext = traceContext,
-              )(),
-            )
-          )
-        _ <- storeAndWatermark(bobEvents)
-
-        // Initial metric values should be 0 for both subscribers
-        _ = subscriptionLastTimestampMetric(alice) shouldBe 0L
-        _ = subscriptionLastTimestampMetric(bob) shouldBe 0L
-
-        // Start reading events for Alice
-        aliceQueue = readWithQueue(alice, timestampInclusive = None)
-        _ <- MonadUtil.sequentialTraverse((1 to 3).toList) { idx =>
-          for {
-            eventO <- pullFromQueue(aliceQueue)
-          } yield {
-            eventO.value.timestamp shouldBe ts0.plusSeconds(idx.toLong)
-            // Alice's metric should be updated (at least to this event, possibly more due to async buffering)
-            subscriptionLastTimestampMetric(alice) should be >= ts0.plusSeconds(idx.toLong).toMicros
-            // Bob's metric should still be 0
-            subscriptionLastTimestampMetric(bob) shouldBe 0L
-          }
-        }
-
-        // Start reading events for Bob
-        bobQueue = readWithQueue(bob, timestampInclusive = None)
-        _ <- MonadUtil.sequentialTraverse((10 to 11).toList) { idx =>
-          for {
-            eventO <- pullFromQueue(bobQueue)
-          } yield {
-            eventO.value.timestamp shouldBe ts0.plusSeconds(idx.toLong)
-            // Bob's metric should be updated
-            subscriptionLastTimestampMetric(bob) should be >= ts0.plusSeconds(idx.toLong).toMicros
-            // Alice's metric may have consumed all events due to async buffering
-            subscriptionLastTimestampMetric(alice) should be >= ts0.plusSeconds(3L).toMicros
-          }
-        }
-
-        // Read the remaining 2 events for Alice (stream may have already buffered them)
-        _ <- MonadUtil.sequentialTraverse((4 to 5).toList) { idx =>
-          for {
-            eventO <- pullFromQueue(aliceQueue)
-          } yield {
-            eventO.value.timestamp shouldBe ts0.plusSeconds(idx.toLong)
-          }
-        }
-
-        // Read the last event for Bob
-        bobLastEvent <- pullFromQueue(bobQueue)
-        _ = bobLastEvent.value.timestamp shouldBe ts0.plusSeconds(12L)
-
-        _ = aliceQueue.cancel()
-        _ = bobQueue.cancel()
-      } yield {
-        // Final verification - each subscriber should have independent metric values
-        // This verifies that the TrieMap pattern creates separate gauges per subscriber
-        val aliceFinal = subscriptionLastTimestampMetric(alice)
-        val bobFinal = subscriptionLastTimestampMetric(bob)
-
-        // Each subscriber should have consumed all their events
-        aliceFinal shouldBe ts0.plusSeconds(5L).toMicros
-        bobFinal shouldBe ts0.plusSeconds(12L).toMicros
-
-        // Verify they are truly independent (different values)
-        aliceFinal should not equal bobFinal
       }
     }
   }

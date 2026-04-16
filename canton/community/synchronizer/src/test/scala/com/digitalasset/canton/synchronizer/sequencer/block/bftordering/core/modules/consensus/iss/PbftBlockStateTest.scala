@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -34,7 +34,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
@@ -134,7 +133,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       val processResults = blockState.advance()
       val prepare = createPrepare(myId)
       processResults should contain theSameElementsInOrderAs List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
         SignPbftMessage(prepare.message),
       )
 
@@ -144,19 +143,19 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
       blockState.confirmPrePrepareStored()
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(prepare, None, traceContext),
+        SendPbftMessage(prepare, None),
         SignPbftMessage(createCommit(myId).message),
       )
 
       assertNoLogs(blockState.processMessage(createCommit(myId))) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(createCommit(myId), Some(StorePrepares(Seq(prepare))), traceContext)
+        SendPbftMessage(createCommit(myId), Some(StorePrepares(Seq(prepare))))
       )
 
       blockState.confirmPreparesStored()
       blockState.advance() shouldBe empty
       blockState.commitCertificate should contain(
-        Traced(CommitCertificate(prePrepare, Seq(createCommit(myId))))
+        CommitCertificate(prePrepare, Seq(createCommit(myId)))
       )
     }
 
@@ -172,13 +171,13 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
         assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
         val prePrepareResult = blockState.advance()
         prePrepareResult should contain theSameElementsInOrderAs List(
-          SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+          SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
           SignPbftMessage(createPrepare(myId).message),
         )
         blockState.confirmPrePrepareStored()
         assertNoLogs(blockState.processMessage(createPrepare(myId))) shouldBe true
         blockState.advance() should contain theSameElementsInOrderAs List(
-          SendPbftMessage(createPrepare(myId), store = None, traceContext)
+          SendPbftMessage(createPrepare(myId), store = None)
         )
 
         val myPrepare = createPrepare(myId)
@@ -204,7 +203,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
         val prepareResult = blockState.advance()
         inside(prepareResult) {
-          case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)), _)) =>
+          case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)))) =>
             commit shouldBe createCommit(myId, ppHash)
             preparesToBeStored should contain theSameElementsAs (nodePrepares.take(
               membership.orderingTopology.strongQuorum - 1
@@ -228,7 +227,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
         // Advance should reach threshold; block is complete
         blockState.advance() shouldBe empty
-        inside(blockState.commitCertificate.map(_.value)) { case Some(commitCertificate) =>
+        inside(blockState.commitCertificate) { case Some(commitCertificate) =>
           commitCertificate.prePrepare shouldBe prePrepare
           commitCertificate.commits should contain theSameElementsAs
             (nodeCommits.take(membership.orderingTopology.strongQuorum - 1) + myCommit)
@@ -262,7 +261,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
         )
         assertNoLogs(blockState.processMessage(myPrepare)) shouldBe true
         blockState.advance() should contain theSameElementsInOrderAs List(
-          SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)), traceContext)
+          SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)))
         )
 
         // Receive all but one needed Prepare to make progress, and ensure advance() is empty;
@@ -286,7 +285,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
         assertNoLogs(blockState.processMessage(myCommit)) shouldBe true
         inside(blockState.advance()) {
-          case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)), _)) =>
+          case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)))) =>
             commit shouldBe myCommit
             val expectedPrepares =
               (myPrepare +: nodePrepares).take(membership.orderingTopology.strongQuorum)
@@ -310,7 +309,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
         // Advance should reach threshold; block is complete
         blockState.advance() shouldBe empty
-        inside(blockState.commitCertificate.map(_.value)) { case Some(commitCertificate) =>
+        inside(blockState.commitCertificate) { case Some(commitCertificate) =>
           commitCertificate.prePrepare shouldBe pp
           commitCertificate.commits should contain theSameElementsAs
             (nodeCommits.take(membership.orderingTopology.strongQuorum - 1) :+ myCommit)
@@ -325,13 +324,13 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // PrePrepare from leader (self)
       assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
         SignPbftMessage(createPrepare(myId).message),
       )
       blockState.confirmPrePrepareStored()
       assertNoLogs(blockState.processMessage(createPrepare(myId))) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(createPrepare(myId), store = None, traceContext)
+        SendPbftMessage(createPrepare(myId), store = None)
       )
 
       // Prepare with BAD hash (won't count)
@@ -350,7 +349,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
       assertNoLogs(blockState.processMessage(createCommit(myId))) shouldBe true
       inside(blockState.advance()) {
-        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)), _)) =>
+        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToBeStored)))) =>
           commit shouldBe createCommit(myId)
           preparesToBeStored should contain theSameElementsAs List(
             createPrepare(
@@ -378,11 +377,9 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       suppressProblemLogs(blockState.advance()) shouldBe empty
 
       blockState.commitCertificate should contain(
-        Traced(
-          CommitCertificate(
-            prePrepare,
-            Seq(createCommit(otherId2), createCommit(otherId3), createCommit(myId)),
-          )
+        CommitCertificate(
+          prePrepare,
+          Seq(createCommit(otherId2), createCommit(otherId3), createCommit(myId)),
         )
       )
       blockState.isBlockComplete shouldBe true
@@ -422,13 +419,13 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // As a leader, the PrePrepare must always come first
       assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
         SignPbftMessage(myPrepare.message),
       )
       assertNoLogs(blockState.processMessage(myPrepare)) shouldBe true
       blockState.confirmPrePrepareStored()
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(myPrepare, store = None, traceContext)
+        SendPbftMessage(myPrepare, store = None)
       )
 
       // Receive some commits first, but not enough yet to complete the block
@@ -449,7 +446,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
       assertNoLogs(blockState.processMessage(myCommit)) shouldBe true
       inside(blockState.advance()) {
-        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToStore)), _)) =>
+        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToStore)))) =>
           commit shouldBe myCommit
           val expectedPreparesToStore = otherIds.take(2).map(createPrepare(_)) :+ myPrepare
           preparesToStore should contain theSameElementsAs expectedPreparesToStore
@@ -459,11 +456,9 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       blockState.confirmPreparesStored()
       blockState.advance() shouldBe empty
       blockState.commitCertificate should contain(
-        Traced(
-          CommitCertificate(
-            prePrepare,
-            Seq(createCommit(otherId1), createCommit(otherId2), myCommit),
-          )
+        CommitCertificate(
+          prePrepare,
+          Seq(createCommit(otherId1), createCommit(otherId2), myCommit),
         )
       )
     }
@@ -484,7 +479,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       )
       assertNoLogs(blockState.processMessage(myPrepare)) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)), traceContext)
+        SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)))
       )
       blockState.confirmPrePrepareStored()
 
@@ -505,7 +500,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       )
       assertNoLogs(blockState.processMessage(myCommit)) shouldBe true
       inside(blockState.advance()) {
-        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToStore)), _)) =>
+        case List(SendPbftMessage(commit, Some(StorePrepares(preparesToStore)))) =>
           commit shouldBe myCommit
           val expectedPreparesToStore =
             Seq(myPrepare, createPrepare(otherId2, hash), createPrepare(otherIds.head, hash))
@@ -517,15 +512,13 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
       blockState.advance() shouldBe empty
       blockState.commitCertificate should contain(
-        Traced(
-          CommitCertificate(
-            pp,
-            Seq(
-              createCommit(otherId1, hash),
-              createCommit(otherId2, hash),
-              myCommit,
-            ),
-          )
+        CommitCertificate(
+          pp,
+          Seq(
+            createCommit(otherId1, hash),
+            createCommit(otherId2, hash),
+            myCommit,
+          ),
         )
       )
     }
@@ -537,14 +530,14 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // As a leader, the PrePrepare must always come first
       assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
       blockState.advance() shouldBe List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
         SignPbftMessage(myPrepare.message),
       )
       blockState.confirmPrePrepareStored()
 
       assertNoLogs(blockState.processMessage(myPrepare)) shouldBe true
       blockState.advance() shouldBe List(
-        SendPbftMessage(myPrepare, store = None, traceContext)
+        SendPbftMessage(myPrepare, store = None)
       )
 
       // Receive commits from all but the last node, which should not complete the block
@@ -558,11 +551,9 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
         assertNoLogs(blockState.processMessage(createCommit(node))) shouldBe true
         blockState.advance() shouldBe empty
         blockState.commitCertificate should contain(
-          Traced(
-            CommitCertificate(
-              prePrepare,
-              Seq(createCommit(otherId1), createCommit(otherId2), createCommit(otherId3)),
-            )
+          CommitCertificate(
+            prePrepare,
+            Seq(createCommit(otherId1), createCommit(otherId2), createCommit(otherId3)),
           )
         )
       }
@@ -591,7 +582,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
       assertNoLogs(blockState.processMessage(myPrepare)) shouldBe true
       blockState.advance() should contain theSameElementsInOrderAs List(
-        SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)), traceContext)
+        SendPbftMessage(myPrepare, store = Some(StorePrePrepare(pp)))
       )
 
       // Receive commits from all but the last node, which should not complete the block
@@ -605,15 +596,13 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
         assertNoLogs(blockState.processMessage(createCommit(node, hash))) shouldBe true
         blockState.advance() shouldBe empty
         blockState.commitCertificate should contain(
-          Traced(
-            CommitCertificate(
-              pp,
-              Seq(
-                createCommit(otherId1, hash),
-                createCommit(otherId2, hash),
-                createCommit(otherId3, hash),
-              ),
-            )
+          CommitCertificate(
+            pp,
+            Seq(
+              createCommit(otherId1, hash),
+              createCommit(otherId2, hash),
+              createCommit(otherId3, hash),
+            ),
           )
         )
       }
@@ -669,9 +658,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       blockState.processMessage(myCommit)
       blockState.advance()
       blockState.commitCertificate shouldBe Some(
-        Traced(
-          CommitCertificate(prePrepare, Seq(commit1, commit2, myCommit))
-        )
+        CommitCertificate(prePrepare, Seq(commit1, commit2, myCommit))
       )
     }
 
@@ -682,7 +669,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // Process the local PrePrepare
       assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
       blockState.advance() shouldBe List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext),
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare))),
         SignPbftMessage(myPrepare.message),
       )
 
@@ -693,7 +680,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // After confirming the PrePrepare is stored, the send action triggers
       blockState.confirmPrePrepareStored()
       blockState.advance() shouldBe List(
-        SendPbftMessage(myPrepare, store = None, traceContext)
+        SendPbftMessage(myPrepare, store = None)
       )
     }
 
@@ -713,7 +700,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // After confirming the PrePrepare is stored, the send action triggers
       blockState.confirmPrePrepareStored()
       blockState.advance() shouldBe List(
-        SendPbftMessage(myPrepare, store = None, traceContext)
+        SendPbftMessage(myPrepare, store = None)
       )
     }
 
@@ -731,14 +718,14 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       // since we are using the recovered (pre-existing) prepare
       assertNoLogs(blockState.processMessage(prePrepare)) shouldBe true
       assertNoLogs(blockState.advance()) shouldBe List(
-        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)), traceContext)
+        SendPbftMessage(prePrepare, store = Some(StorePrePrepare(prePrepare)))
       )
       blockState.confirmPrePrepareStored()
 
       val processResults = assertNoLogs(blockState.advance())
       inside(processResults) {
         case Seq(
-              SendPbftMessage(SignedMessage(p, _), _, _)
+              SendPbftMessage(SignedMessage(p, _), _)
             ) =>
           // if a new prepare had been created, its memoized bytes should be different,
           // but that didn't happen, so we know the rehydrated prepare was picked

@@ -18,14 +18,28 @@ on:
         description: 'The GitHub username of a reviewer to request a review from (currently supports only one reviewer)'
         required: false
         type: string
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: 'A commit SHA to backport (either commit_sha or pr_number must be provided)'
+        required: false
+        type: string
+      pr_number:
+        description: 'A merged PR to backport (either commit_sha or pr_number must be provided)'
+        required: false
+        type: number
+      base_branch:
+        description: 'The branch to backport to'
+        required: true
+        type: string
+      reviewer:
+        description: 'The GitHub username of a reviewer to request a review from (currently supports only one reviewer)'
+        required: false
+        type: string
 
 jobs:
-  backport:
-    uses: hyperledger-labs/splice-shared-gha/.github/workflows/backport.yml@a78684a826be866b199ae7a05471a7fad2c9c76c
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
-      pr_number: ${{ fromJSON(inputs.pr_number) }}
-      base_branch: ${{ inputs.base_branch }}
-      reviewer: ${{ inputs.reviewer }}
-    secrets:
-      strong_token: ${{ secrets.GH_CREATE_PRS_TOKEN }}
+  dummy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dummy step
+        run: echo 'Hello, world!'

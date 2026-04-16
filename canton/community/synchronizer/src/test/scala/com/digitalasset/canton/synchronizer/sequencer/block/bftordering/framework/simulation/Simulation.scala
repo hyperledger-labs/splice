@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
@@ -13,11 +13,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl.Send
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.RetransmissionsMessage
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
-  ConsensusSegment,
-  P2PNetworkOut,
-}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.FutureSimulator.FutureSimulatorState
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.P2PNetworkOut
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.{
   MachineInitializer,
   SimulationEnv,
@@ -26,6 +22,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SimulationP2PNetworkManager,
   TraceContextGenerator,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.RunningFuture
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.onboarding.OnboardingManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.onboarding.OnboardingManager.ReasonForProvide.{
   ProvideForInit,
@@ -68,10 +65,7 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
     clock: SimClock,
     traceContextGenerator: TraceContextGenerator,
     loggerFactory: NamedLoggerFactory,
-)(
-    val agenda: Agenda = new Agenda(clock, loggerFactory),
-    futureSimulatorState: FutureSimulatorState = FutureSimulatorState.create(),
-) {
+)(val agenda: Agenda = new Agenda(clock, loggerFactory)) {
 
   val simulationStageStart: CantonTimestamp = clock.now
 
@@ -97,12 +91,6 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
       // TODO(#22807): Currently, only initial nodes are subjects to crashes.
       nodes = topology.activeSequencersToMachines.view.keySet.toSet,
       agenda,
-    )
-  private val futureSimulator =
-    new FutureSimulator(
-      agenda,
-      simSettings.futureSettings,
-      futureSimulatorState,
     )
 
   // the init functions might have already sent messages that we need to add to the agenda
@@ -139,7 +127,7 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
       case NodeCollector.SendNetworkEvent(to, msg) =>
         network.scheduleNetworkEvent(from = node, to, msg)
       case NodeCollector.AddFuture(to, future, errorMessage, traceContext) =>
-        futureSimulator.scheduleFuture(node, to, future, errorMessage, traceContext)
+        local.scheduleFuture(node, to, clock.now, future, errorMessage, traceContext)
       case NodeCollector.CancelTick(tickCounter) =>
         agenda.removeInternalTick(node, tickCounter)
       case NodeCollector.OpenConnection(
@@ -214,17 +202,26 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
   private def executeFuture[FutureT, MessageT](
       node: BftNodeId,
       name: ModuleName,
-      valueFromFuture: Try[FutureT],
+      future: RunningFuture[FutureT],
       fun: Try[FutureT] => Option[MessageT],
       traceContext: TraceContext,
   ): Unit =
-    fun(valueFromFuture).foreach { msg =>
-      local.scheduleEvent(
-        node,
-        name,
-        EventOriginator.FromFuture,
-        ModuleControl.Send(msg, traceContext, MetricsContext.Empty),
-      )
+    future.resolveAllBelow(clock.now) match {
+      case RunningFuture.Scheduled(nextTime, newFuture) =>
+        agenda.addOne(
+          RunFuture(node, name, newFuture, fun, traceContext),
+          nextTime,
+          ScheduledCommand.DefaultPriority,
+        )
+      case RunningFuture.Resolved(valueFromFuture) =>
+        fun(valueFromFuture).foreach { msg =>
+          local.scheduleEvent(
+            node,
+            name,
+            EventOriginator.FromFuture,
+            ModuleControl.Send(msg, traceContext, MetricsContext.Empty),
+          )
+        }
     }
 
   private def executeClientTick[M](node: BftNodeId, msg: M, traceContext: TraceContext): Unit = {
@@ -311,9 +308,6 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
           case Send(RetransmissionsMessage.StatusRequest(_), _, _, _, _) =>
             // We don't care about status requests after the module is gone
             None
-          case Send(ConsensusSegment.ConsensusMessage.CancelEpoch(_), _, _, _, _) =>
-            // We don't care about epoch cancellations after the segment module is gone
-            None
           case _ if machine.isCrashed =>
             // machine is crashed don't send message
             None
@@ -340,9 +334,7 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
       clock.advanceTo(whatToDo.at, logAdvancementAtInfo = false)(TraceContext.empty)
       local.tick(clock.now)
       network.tick()
-      if (simSettings.shouldRecordHistory) {
-        val _ = currentHistory.addOne(whatToDo.command)
-      }
+      val _ = currentHistory.addOne(whatToDo.command)
 
       logger.trace(s"Simulation will run ${whatToDo.command}")(TraceContext.empty)
 
@@ -357,14 +349,10 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
           )
         case InternalTick(machineName, to, _, msg) =>
           executeEvent(machineName, ModuleAddress.ViaName(to), msg)
-        case RunFuture(node, runningFuture) =>
-          logger.trace(
-            s"Future ${runningFuture.futureId} for $node completed: ${runningFuture.future.debugName}"
-          )(TraceContext.empty)
-          futureSimulator.runFuture(node, runningFuture)
-          verifier.aFutureHappened(node)
-        case RunFutureContinuation(node, name, valueFromFuture, fun, traceContext) =>
-          executeFuture(node, name, valueFromFuture, fun, traceContext)
+        case RunFuture(machine, to, toRun, fun, traceContext) =>
+          logger.trace(s"Future ${toRun.name} for $machine:$to completed")(TraceContext.empty)
+          executeFuture(machine, to, toRun, fun, traceContext)
+          verifier.aFutureHappened(machine)
         case ReceiveNetworkMessage(machineName, msg) =>
           local.scheduleEvent(
             machineName,
@@ -403,7 +391,6 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
           logger.info(s"Restarting '$node' at ${whatToDo.at}")(TraceContext.empty)
           restartNode(node)
         case MakeSystemHealthy =>
-          logger.info("Healing system")(TraceContext.empty)
           local.makeHealthy()
           network.makeHealthy()
           topology.activeNodes.foreach { node =>
@@ -447,7 +434,7 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
         clock,
         traceContextGenerator,
         loggerFactory,
-      )(agenda, futureSimulator.snapshotState)
+      )(agenda)
     newSim
   }
 }

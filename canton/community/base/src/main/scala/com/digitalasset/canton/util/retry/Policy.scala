@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
@@ -11,7 +11,7 @@ import com.digitalasset.canton.lifecycle.{
   HasSynchronizeWithClosing,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryWithDelay.{RetryOutcome, RetryTermination}
@@ -66,8 +66,7 @@ object PolicyEffect {
   */
 abstract class Policy(logger: TracedLogger) {
 
-  protected val directExecutionContext: DirectExecutionContext =
-    DirectExecutionContext(NamedLogging.loggerWithoutTracing(logger))
+  protected val directExecutionContext: DirectExecutionContext = DirectExecutionContext(logger)
 
   def apply[F[_], T](task: => F[T], retryOk: ExceptionRetryPolicy)(implicit
       success: Success[T],
@@ -217,9 +216,6 @@ abstract class RetryWithDelay(
               val errorKind = retryable.logAndDetermineErrorKind(outcome, logger, lastErrorKind)
               val retriesOfErrorKind =
                 if (lastErrorKind.contains(errorKind)) retriesOfLastErrorKind else 0
-              logger.trace(
-                s"Determined kind $errorKind with $retriesOfErrorKind retries (max ${errorKind.maxRetries}) for outcome $outcome of '$operationName'; "
-              )
               if (
                 errorKind.maxRetries == Int.MaxValue || retriesOfErrorKind < errorKind.maxRetries
               ) {

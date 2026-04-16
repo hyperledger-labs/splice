@@ -20,7 +20,7 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Sink
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider, SpliceMetrics}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -126,29 +126,12 @@ class AcsSnapshotBulkStorageTest
         val allContractsFromS3 = objectKeys.flatMap(
           readUncompressAndDecode(
             bucketConnection,
-            io.circe.parser.decode[httpApi.ActiveContract],
+            io.circe.parser.decode[httpApi.CreatedEvent],
           )
         )
-        allContracts.map(c =>
-          new CompactJsonScanHttpEncodings(identity, identity)
-            .javaToHttpActiveContract(c.eventId, c.event)
-        ) should contain theSameElementsInOrderAs allContractsFromS3
-
-        /* We hard-code the expected digests to enforce that the persisted data format does not change.
-           These values must not be modified unless there is a conscious decision to change the persisted format,
-           with a migration plan for how to apply it consistently across SVs. */
-        bucketConnection
-          .getChecksums(objectKeys.toSeq)
-          .futureValue
-          .map(_.checksum) should contain theSameElementsInOrderAs Seq(
-          "ViKwAawccbUGu7VOF9K+w1fwXOJL82x8KtlPR8fE5QQ=",
-          "0JsYpCrjL3Iesxvba4mq6JazsAq3iIAKWPjViQhQDd0=",
-          "uGbENvaUVHMbZ5aVwR0iezkR1tpO0plZPXs79Rg2Kx0=",
-          "ecGsxj9T8BgMPgaguPcKJK9tomTEPuSv216vqvGrtVE=",
-          "CVECMUsWmg4hN0gdI2mOhXPZabJjxYNft/J0e3Yo/JU=",
-          "EGexqBExmi9b6H+kjsD+4aizbR6pBP3qQ6LXmMfiXMY=",
-          "ciCi6myO535U0y+eeZS90agy4QwBueeWGAZnnbr2zvM=",
-        )
+        allContractsFromS3.map(
+          new CompactJsonScanHttpEncodings(identity, identity).httpToJavaCreatedEvent
+        ) should contain theSameElementsInOrderAs allContracts.map(_.event)
       }
     }
 
@@ -327,7 +310,6 @@ class AcsSnapshotBulkStorageTest
                       0L,
                       BigDecimal(0.1),
                       contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
-                      version = DarResources.amulet_0_1_17, // ensure packageid determinism
                     )
                     SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
                   }),

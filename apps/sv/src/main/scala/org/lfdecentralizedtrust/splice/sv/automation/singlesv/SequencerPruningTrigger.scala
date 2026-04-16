@@ -87,7 +87,8 @@ class SequencerPruningTrigger(
             if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>
           for {
             rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
-            dsoRulesActiveSequencerConfig = rulesAndState.lookupActiveSequencerIdConfigFor(
+            // TODO(#998): check whether are passing the right domain-id to make this work with soft-domain migration
+            dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
               rulesAndState.dsoRules.domain,
               clock.now.toInstant,
               migrationId,

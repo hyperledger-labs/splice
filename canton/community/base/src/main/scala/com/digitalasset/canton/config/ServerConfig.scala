@@ -1,20 +1,31 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.nonempty.NonEmpty
-import com.daml.tls.{TlsClientConfig, TlsClientConfigOnlyTrustFile, TlsServerConfig}
+import com.daml.tls.{OcspProperties, ProtocolDisabler, TlsInfo, TlsVersion}
+import com.daml.tracing.Telemetry
 import com.digitalasset.canton.SequencerAlias
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.networking.grpc.{CantonServerBuilder, ClientChannelParams}
+import com.digitalasset.canton.networking.grpc.{
+  CantonCommunityServerInterceptors,
+  CantonServerBuilder,
+  CantonServerInterceptors,
+}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TracingConfig
-import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
+import io.grpc.ServerInterceptor
+import io.grpc.netty.shaded.io.netty.handler.ssl.{ClientAuth, SslContext}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
 import scala.math.Ordering.Implicits.infixOrderingOps
@@ -32,7 +43,15 @@ final case class ActiveRequestLimitsConfig(
     active: Map[String, NonNegativeInt] = Map.empty,
     warnOnUndefinedLimits: Boolean = false,
     throttleLoggingRatePerSecond: NonNegativeInt = NonNegativeInt.tryCreate(10),
-)
+) extends UniformCantonConfigValidation
+
+object ActiveRequestLimitsConfig {
+  implicit val activeRequestLimitsConfigCantonConfigValidator
+      : CantonConfigValidator[ActiveRequestLimitsConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[ActiveRequestLimitsConfig]
+  }
+}
 
 /** Configuration for hosting a server api */
 trait ServerConfig extends Product with Serializable {
@@ -95,8 +114,6 @@ trait ServerConfig extends Product with Serializable {
   /** maximum inbound message size in bytes on the ledger api and the admin api */
   def maxInboundMessageSize: NonNegativeInt
 
-  def maxConcurrentStreamsPerConnection: NonNegativeInt
-
   /** maximum expiration time accepted for tokens */
   def maxTokenLifetime: NonNegativeDuration
 
@@ -105,12 +122,43 @@ trait ServerConfig extends Product with Serializable {
 
   /** configure limits for open streams per service */
   def limits: Option[ActiveRequestLimitsConfig]
+
+  /** Use the configuration to instantiate the interceptors for this server */
+  def instantiateServerInterceptors(
+      api: String,
+      tracingConfig: TracingConfig,
+      apiLoggingConfig: ApiLoggingConfig,
+      loggerFactory: NamedLoggerFactory,
+      grpcMetrics: GrpcServerMetricsX,
+      authServices: Seq[AuthServiceConfig],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
+      jwtTimestampLeeway: Option[JwtTimestampLeeway],
+      adminTokenConfig: AdminTokenConfig,
+      jwksCacheConfig: JwksCacheConfig,
+      telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
+      requestLimits: Option[ActiveRequestLimitsConfig],
+  ): CantonServerInterceptors = new CantonCommunityServerInterceptors(
+    api,
+    tracingConfig,
+    apiLoggingConfig,
+    loggerFactory,
+    grpcMetrics,
+    authServices,
+    adminTokenDispenser,
+    jwtTimestampLeeway,
+    adminTokenConfig,
+    jwksCacheConfig,
+    telemetry,
+    additionalInterceptors,
+    requestLimits,
+  )
+
 }
 
 object ServerConfig {
   val defaultMaxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(10 * 1024 * 1024)
   val defaultMaxInboundMetadataSize: NonNegativeInt = NonNegativeInt.tryCreate(8 * 1024)
-  val defaultMaxConcurrentStreamsPerConnection: NonNegativeInt = NonNegativeInt.tryCreate(500)
 }
 
 /** A variant of [[ServerConfig]] that by default listens to connections only on the loopback
@@ -125,26 +173,20 @@ final case class AdminServerConfig(
       BasicKeepAliveServerConfig()
     ),
     override val maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
-    override val maxConcurrentStreamsPerConnection: NonNegativeInt =
-      ServerConfig.defaultMaxConcurrentStreamsPerConnection,
     override val authServices: Seq[AuthServiceConfig] = Seq.empty,
     override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig(),
     override val maxTokenLifetime: NonNegativeDuration = NonNegativeDuration(5.minutes),
     override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
     override val limits: Option[ActiveRequestLimitsConfig] = None,
-) extends ServerConfig {
+) extends ServerConfig
+    with UniformCantonConfigValidation {
   override val name: String = "admin"
   def clientConfig: FullClientConfig =
     FullClientConfig(
       address,
       port,
       tls = tls.map(_.clientConfig),
-      channel = ClientChannelParams(
-        maxInboundMessageSize = maxInboundMessageSize,
-        keepAliveClient = keepAliveServer.map(_.clientConfigFor),
-        flowControlWindow = ClientChannelParams.DefaultFlowControlWindow,
-        traceContextPropagation = TracingConfig.Propagation.Enabled,
-      ),
+      keepAliveClient = keepAliveServer.map(_.clientConfigFor),
     )
 
   override def sslContext: Option[SslContext] = tls.map(CantonServerBuilder.sslContext(_))
@@ -153,6 +195,11 @@ final case class AdminServerConfig(
 }
 object AdminServerConfig {
   val defaultAddress: String = "127.0.0.1"
+
+  implicit val adminServerConfigCantonConfigValidator: CantonConfigValidator[AdminServerConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[AdminServerConfig]
+  }
 }
 
 /** GRPC keep alive server configuration. */
@@ -195,6 +242,13 @@ final case class BasicKeepAliveServerConfig(
     permitKeepAliveTime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(20),
     permitKeepAliveWithoutCalls: Boolean = false,
 ) extends KeepAliveServerConfig
+    with UniformCantonConfigValidation
+
+object BasicKeepAliveServerConfig {
+  implicit val basicKeepAliveServerConfigCantonConfigValidator
+      : CantonConfigValidator[BasicKeepAliveServerConfig] =
+    CantonConfigValidatorDerivation[BasicKeepAliveServerConfig]
+}
 
 final case class LedgerApiKeepAliveServerConfig(
     time: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
@@ -219,27 +273,24 @@ final case class LedgerApiKeepAliveServerConfig(
   * [[https://man7.org/linux/man-pages/man7/tcp.7.html]]). 15s gives a larger margin to detect a
   * faulty connection earlier and retry a submission on another sequencer via amplification, thereby
   * avoiding a request failure.
-  * @param keepAliveWithoutCalls
-  *   Enables sending of keep alive even when there are no RPCs on the channel (default to false).
-  *   This increases network resource consumption for idle connections and requires the server to
-  *   enable permitKeepAliveWithoutCalls. Prefer using [[idleTimeout]].
-  * @param idleTimeout
-  *   If there are no RPCs during this duration, the channel will close all connections and switch
-  *   to Idle state (default is 30 min)
   */
 final case class KeepAliveClientConfig(
     time: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(40),
     timeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(15),
-    keepAliveWithoutCalls: Boolean = false,
-    idleTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(30),
-)
+) extends UniformCantonConfigValidation
+
+object KeepAliveClientConfig {
+  implicit val keepAliveClientConfigCantonConfigValidator
+      : CantonConfigValidator[KeepAliveClientConfig] =
+    CantonConfigValidatorDerivation[KeepAliveClientConfig]
+}
 
 /** Base trait for Grpc transport client configuration classes, abstracts access to the configs */
 trait ClientConfig {
   def address: String
   def port: Port
   def tlsConfig: Option[TlsClientConfig]
-  def channel: ClientChannelParams
+  def keepAliveClient: Option[KeepAliveClientConfig]
   def endpointAsString: String = address + ":" + port.unwrap
 }
 
@@ -255,10 +306,17 @@ final case class FullClientConfig(
     override val address: String = "127.0.0.1",
     override val port: Port,
     override val tls: Option[TlsClientConfig] = None,
-    override val channel: ClientChannelParams = ClientChannelParams.Default,
+    override val keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
 ) extends ClientConfig
-    with TlsField[TlsClientConfig] {
+    with TlsField[TlsClientConfig]
+    with UniformCantonConfigValidation {
   override def tlsConfig: Option[TlsClientConfig] = tls
+}
+object FullClientConfig {
+  implicit val clientConfigCantonConfigValidator: CantonConfigValidator[FullClientConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[FullClientConfig]
+  }
 }
 
 /** A client configuration for a public server configuration, the class is aimed to be used in
@@ -268,24 +326,335 @@ final case class SequencerApiClientConfig(
     override val address: String,
     override val port: Port,
     override val tls: Option[TlsClientConfigOnlyTrustFile] = None,
-    override val channel: ClientChannelParams = ClientChannelParams.Default,
 ) extends ClientConfig
-    with TlsField[TlsClientConfigOnlyTrustFile] {
+    with TlsField[TlsClientConfigOnlyTrustFile]
+    with UniformCantonConfigValidation {
+
+  override def keepAliveClient: Option[KeepAliveClientConfig] = None
 
   override def tlsConfig: Option[TlsClientConfig] = tls.map(_.toTlsClientConfig)
 
   def asSequencerConnection(
-      sequencerAlias: SequencerAlias,
-      sequencerId: Option[SequencerId],
+      sequencerAlias: SequencerAlias = SequencerAlias.Default,
+      sequencerId: Option[SequencerId] = None,
   ): GrpcSequencerConnection = {
     val endpoint = Endpoint(address, port)
     GrpcSequencerConnection(
-      NonEmpty(Set, endpoint),
+      NonEmpty(Seq, endpoint),
       tls.exists(_.enabled),
       tls.flatMap(_.trustCollectionFile).map(_.pemBytes),
       sequencerAlias,
       sequencerId = sequencerId,
     )
+  }
+}
+
+object SequencerApiClientConfig {
+  implicit val sequencerApiClientConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerApiClientConfig] =
+    CantonConfigValidator.validateAll
+}
+
+sealed trait BaseTlsArguments {
+  def certChainFile: PemFileOrString
+  def privateKeyFile: PemFile
+  def minimumServerProtocolVersion: Option[String]
+  def ciphers: Option[Seq[String]]
+
+  def protocols: Option[Seq[String]] =
+    minimumServerProtocolVersion.map { minVersion =>
+      val knownTlsVersions =
+        Seq(
+          TlsVersion.V1.version,
+          TlsVersion.V1_1.version,
+          TlsVersion.V1_2.version,
+          TlsVersion.V1_3.version,
+        )
+      knownTlsVersions
+        .find(_ == minVersion)
+        .fold[Seq[String]](
+          throw new IllegalArgumentException(s"Unknown TLS protocol version $minVersion")
+        )(versionFound => knownTlsVersions.filter(_ >= versionFound))
+    }
+}
+
+/** A wrapper for TLS related server parameters supporting mutual authentication.
+  *
+  * Certificates and keys must be provided in the PEM format. It is recommended to create them with
+  * OpenSSL. Other formats (such as GPG) may also work, but have not been tested.
+  *
+  * @param certChainFile
+  *   a file containing a certificate chain, containing the certificate chain from the server to the
+  *   root CA. The certificate chain is used to authenticate the server. The order of certificates
+  *   in the chain matters, i.e., it must start with the server certificate and end with the root
+  *   certificate.
+  * @param privateKeyFile
+  *   a file containing the server's private key. The key must not use a password.
+  * @param trustCollectionFile
+  *   a file containing certificates of all nodes the server trusts. Used for client authentication.
+  *   It depends on the enclosing configuration whether client authentication is mandatory, optional
+  *   or unsupported. If client authentication is enabled and this parameter is absent, the
+  *   certificates in the JVM trust store will be used instead.
+  * @param clientAuth
+  *   indicates whether server requires, requests, or does not request auth from clients. Normally
+  *   the ledger api server requires client auth under TLS, but using this setting this requirement
+  *   can be loosened. See
+  *   https://github.com/digital-asset/daml/commit/edd73384c427d9afe63bae9d03baa2a26f7b7f54
+  * @param minimumServerProtocolVersion
+  *   minimum supported TLS protocol. Set None (or null in config file) to default to JVM settings.
+  * @param ciphers
+  *   supported ciphers. Set to None (or null in config file) to default to JVM settings.
+  * @param enableCertRevocationChecking
+  *   whether to enable certificate revocation checking per
+  *   https://tersesystems.com/blog/2014/03/22/fixing-certificate-revocation/
+  */
+// Information in this ScalaDoc comment has been taken from https://grpc.io/docs/guides/auth/.
+final case class TlsServerConfig(
+    certChainFile: PemFileOrString,
+    privateKeyFile: PemFile,
+    trustCollectionFile: Option[PemFileOrString] = None,
+    clientAuth: ServerAuthRequirementConfig = ServerAuthRequirementConfig.Optional,
+    minimumServerProtocolVersion: Option[String] = Some(
+      TlsServerConfig.defaultMinimumServerProtocol
+    ),
+    ciphers: Option[Seq[String]] = TlsServerConfig.defaultCiphers,
+    enableCertRevocationChecking: Boolean = false,
+) extends BaseTlsArguments
+    with UniformCantonConfigValidation {
+  lazy val clientConfig: TlsClientConfig = {
+    val clientCert = clientAuth match {
+      case ServerAuthRequirementConfig.Require(cert) => Some(cert)
+      case _ => None
+    }
+    TlsClientConfig(trustCollectionFile = Some(certChainFile), clientCert = clientCert)
+  }
+
+  /** This is a side-effecting method. It modifies JVM TLS properties according to the TLS
+    * configuration.
+    */
+  def setJvmTlsProperties(): Unit = {
+    if (enableCertRevocationChecking) OcspProperties.enableOcsp()
+    ProtocolDisabler.disableSSLv2Hello()
+  }
+
+  override def protocols: Option[Seq[String]] = {
+    val disallowedTlsVersions =
+      Seq(
+        TlsVersion.V1.version,
+        TlsVersion.V1_1.version,
+      )
+    minimumServerProtocolVersion match {
+      case Some(minVersion) if disallowedTlsVersions.contains(minVersion) =>
+        throw new IllegalArgumentException(s"Unsupported TLS version: $minVersion")
+      case _ =>
+        super.protocols
+    }
+  }
+
+}
+
+object TlsServerConfig {
+  implicit val tlsServerConfigCantonConfigValidator: CantonConfigValidator[TlsServerConfig] =
+    CantonConfigValidatorDerivation[TlsServerConfig]
+
+  // default OWASP strong cipher set with broad compatibility (B list)
+  // https://cheatsheetseries.owasp.org/cheatsheets/TLS_Cipher_String_Cheat_Sheet.html
+  lazy val defaultCiphers = {
+    val candidates = Seq(
+      "TLS_AES_256_GCM_SHA384",
+      "TLS_CHACHA20_POLY1305_SHA256",
+      "TLS_AES_128_GCM_SHA256",
+      "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+      "TLS_DHE_RSA_WITH_AES_256_CBC_SHA256",
+      "TLS_DHE_RSA_WITH_AES_128_CBC_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384",
+      "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
+    )
+    val logger = LoggerFactory.getLogger(TlsServerConfig.getClass)
+    val filtered = candidates.filter { x =>
+      io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
+        .availableOpenSslCipherSuites()
+        .contains(x) ||
+      io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.availableJavaCipherSuites().contains(x)
+    }
+    if (filtered.isEmpty) {
+      val len = io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
+        .availableOpenSslCipherSuites()
+        .size() + io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
+        .availableJavaCipherSuites()
+        .size()
+      logger.warn(
+        s"All of Canton's default TLS ciphers are unsupported by your JVM (netty reports $len ciphers). Defaulting to JVM settings."
+      )
+      if (!io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.isAvailable) {
+        logger.info(
+          "Netty OpenSSL is not available because of an issue",
+          io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.unavailabilityCause(),
+        )
+      }
+      None
+    } else {
+      logger.debug(
+        s"Using ${filtered.length} out of ${candidates.length} Canton's default TLS ciphers"
+      )
+      Some(filtered)
+    }
+  }
+
+  val defaultMinimumServerProtocol = "TLSv1.2"
+
+  /** Netty incorrectly hardcodes the report that the SSLv2Hello protocol is enabled. There is no
+    * way to stop it from doing it, so we just filter the netty's erroneous claim. We also make sure
+    * that the SSLv2Hello protocol is knocked out completely at the JSSE level through the
+    * ProtocolDisabler
+    */
+  private def filterSSLv2Hello(protocols: Seq[String]): Seq[String] =
+    protocols.filter(_ != ProtocolDisabler.sslV2Protocol)
+
+  def logTlsProtocolsAndCipherSuites(
+      sslContext: SslContext,
+      isServer: Boolean,
+  ): Unit = {
+    val (who, provider, logger) =
+      if (isServer)
+        (
+          "Server",
+          SslContext.defaultServerProvider(),
+          LoggerFactory.getLogger(TlsServerConfig.getClass),
+        )
+      else
+        (
+          "Client",
+          SslContext.defaultClientProvider(),
+          LoggerFactory.getLogger(TlsClientConfig.getClass),
+        )
+
+    val tlsInfo = TlsInfo.fromSslContext(sslContext)
+    logger.info(s"$who TLS - enabled via $provider")
+    logger.debug(
+      s"$who TLS - supported protocols: ${filterSSLv2Hello(tlsInfo.supportedProtocols).mkString(", ")}."
+    )
+    logger.info(
+      s"$who TLS - enabled protocols: ${filterSSLv2Hello(tlsInfo.enabledProtocols).mkString(", ")}."
+    )
+    logger.debug(
+      s"$who TLS $who - supported cipher suites: ${tlsInfo.supportedCipherSuites.mkString(", ")}."
+    )
+    logger.info(s"$who TLS - enabled cipher suites: ${tlsInfo.enabledCipherSuites.mkString(", ")}.")
+  }
+
+}
+
+/** A wrapper for TLS server parameters supporting only server side authentication
+  *
+  * Same parameters as the more complete `TlsServerConfig`
+  */
+final case class TlsBaseServerConfig(
+    certChainFile: PemFileOrString,
+    privateKeyFile: PemFile,
+    minimumServerProtocolVersion: Option[String] = Some(
+      TlsServerConfig.defaultMinimumServerProtocol
+    ),
+    ciphers: Option[Seq[String]] = TlsServerConfig.defaultCiphers,
+) extends BaseTlsArguments
+    with UniformCantonConfigValidation
+object TlsBaseServerConfig {
+  implicit val tlsBaseServerConfigCantonConfigValidator
+      : CantonConfigValidator[TlsBaseServerConfig] =
+    CantonConfigValidatorDerivation[TlsBaseServerConfig]
+}
+
+/** A wrapper for TLS related client configurations
+  *
+  * @param trustCollectionFile
+  *   a file containing certificates of all nodes the client trusts. If none is specified, defaults
+  *   to the JVM trust store
+  * @param clientCert
+  *   the client certificate
+  * @param enabled
+  *   allows enabling TLS without `trustCollectionFile` or `clientCert`
+  */
+final case class TlsClientConfig(
+    trustCollectionFile: Option[PemFileOrString],
+    clientCert: Option[TlsClientCertificate],
+    enabled: Boolean = true,
+) extends UniformCantonConfigValidation {
+  def withoutClientCert: TlsClientConfigOnlyTrustFile =
+    TlsClientConfigOnlyTrustFile(
+      trustCollectionFile = trustCollectionFile,
+      enabled = enabled,
+    )
+}
+object TlsClientConfig {
+  implicit val tlsClientConfigCantonConfigValidator: CantonConfigValidator[TlsClientConfig] =
+    CantonConfigValidatorDerivation[TlsClientConfig]
+}
+
+/** A wrapper for TLS related client configurations without client auth support (currently public
+  * sequencer api)
+  *
+  * @param trustCollectionFile
+  *   a file containing certificates of all nodes the client trusts. If none is specified, defaults
+  *   to the JVM trust store
+  * @param enabled
+  *   allows enabling TLS without `trustCollectionFile`
+  */
+final case class TlsClientConfigOnlyTrustFile(
+    trustCollectionFile: Option[PemFileOrString],
+    enabled: Boolean = true,
+) {
+  def toTlsClientConfig: TlsClientConfig = TlsClientConfig(
+    trustCollectionFile = trustCollectionFile,
+    clientCert = None,
+    enabled = enabled,
+  )
+}
+
+object TlsClientConfigOnlyTrustFile {
+  implicit val tlsClientConfigOnlyTrustFileCantonConfigValidator
+      : CantonConfigValidator[TlsClientConfigOnlyTrustFile] = CantonConfigValidator.validateAll
+}
+
+/**
+  */
+final case class TlsClientCertificate(certChainFile: PemFileOrString, privateKeyFile: PemFile)
+    extends UniformCantonConfigValidation
+object TlsClientCertificate {
+  implicit val tlsClientCertificateCantonConfigValidator
+      : CantonConfigValidator[TlsClientCertificate] =
+    CantonConfigValidatorDerivation[TlsClientCertificate]
+}
+
+/** Configuration on whether server requires auth, requests auth, or no auth */
+sealed trait ServerAuthRequirementConfig extends UniformCantonConfigValidation {
+  def clientAuth: ClientAuth
+}
+object ServerAuthRequirementConfig {
+
+  implicit val serverAuthRequirementConfigCantonConfigValidator
+      : CantonConfigValidator[ServerAuthRequirementConfig] =
+    CantonConfigValidatorDerivation[ServerAuthRequirementConfig]
+
+  /** A variant of [[ServerAuthRequirementConfig]] by which the server requires auth from clients */
+  final case class Require(adminClient: TlsClientCertificate) extends ServerAuthRequirementConfig {
+    val clientAuth = ClientAuth.REQUIRE
+  }
+
+  /** A variant of [[ServerAuthRequirementConfig]] by which the server merely requests auth from
+    * clients
+    */
+  case object Optional extends ServerAuthRequirementConfig {
+    val clientAuth = ClientAuth.OPTIONAL
+  }
+
+  /** A variant of [[ServerAuthRequirementConfig]] by which the server does not even request auth
+    * from clients
+    */
+  case object None extends ServerAuthRequirementConfig {
+    val clientAuth = ClientAuth.NONE
   }
 }
 
@@ -296,9 +665,11 @@ final case class JwksCacheConfig(
     cacheExpiration: NonNegativeFiniteDuration = JwksCacheConfig.DefaultCacheExpiration,
     connectionTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultConnectionTimeout,
     readTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultReadTimeout,
-)
+) extends UniformCantonConfigValidation
 
 object JwksCacheConfig {
+  implicit val basicJwksCacheConfigCantonConfigValidator: CantonConfigValidator[JwksCacheConfig] =
+    CantonConfigValidatorDerivation[JwksCacheConfig]
   private val DefaultCacheMaxSize: Long = 1000
   private val DefaultCacheExpiration: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMinutes(5)
@@ -323,7 +694,7 @@ final case class AdminTokenConfig(
     adminTokenDuration: PositiveFiniteDuration = AdminTokenConfig.DefaultAdminTokenDuration,
     actAsAnyPartyClaim: Boolean = false,
     adminClaim: Boolean = false,
-) {
+) extends UniformCantonConfigValidation {
 
   def merge(other: AdminTokenConfig): AdminTokenConfig =
     AdminTokenConfig(
@@ -335,6 +706,9 @@ final case class AdminTokenConfig(
 }
 
 object AdminTokenConfig {
+
+  implicit val adminTokenConfigCantonConfigValidator: CantonConfigValidator[AdminTokenConfig] =
+    CantonConfigValidatorDerivation[AdminTokenConfig]
 
   val DefaultAdminTokenDuration: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5)
 }

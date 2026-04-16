@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -43,7 +43,6 @@ class ThrottleFilterEvaluator extends EvaluatorFilter[ILoggingEvent] {
 
     @throws[NullPointerException]
     @throws[EvaluationException]
-    @SuppressWarnings(Array("com.digitalasset.canton.ConcurrentMapSize"))
     override def evaluate(event: ILoggingEvent): Boolean = {
       val now = Instant.now.toEpochMilli
 

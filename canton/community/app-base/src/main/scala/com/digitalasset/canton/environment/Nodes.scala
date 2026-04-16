@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -31,11 +31,10 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.{SequencerNode, SequencerNodeBootstrap}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.Thereafter.syntax.*
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 /** Group of CantonNodes of the same type (mediators, participants, sequencers). */
 trait Nodes[+Node <: CantonNode, +NodeBootstrap <: CantonNodeBootstrap[Node]]
@@ -129,7 +128,6 @@ class ManagedNodes[
     with HasCloseContext
     with FlagCloseableAsync {
 
-  private val lock = new Mutex()
   private val nodes = TrieMap[InstanceName, ManagedNodeStage[NodeBootstrap]]()
   override def names(): Seq[InstanceName] = configs.keys.toSeq
 
@@ -263,8 +261,8 @@ class ManagedNodes[
       params = parametersFor(name)
     } yield (config, params)
 
-  override def migrateDatabase(name: InstanceName): Either[StartupError, Unit] = (
-    lock.exclusive {
+  override def migrateDatabase(name: InstanceName): Either[StartupError, Unit] = blocking(
+    synchronized {
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP
@@ -273,8 +271,8 @@ class ManagedNodes[
     }
   )
 
-  override def repairDatabaseMigration(name: InstanceName): Either[StartupError, Unit] = (
-    lock.exclusive {
+  override def repairDatabaseMigration(name: InstanceName): Either[StartupError, Unit] = blocking(
+    synchronized {
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP
@@ -463,8 +461,6 @@ class SequencerNodes(
     timeouts: ProcessingTimeout,
     configs: => Map[String, SequencerNodeConfig],
     parameters: String => SequencerNodeParameters,
-    runnerFactory: String => GrpcAdminCommandRunner,
-    enableAlphaStateViaConfig: Boolean,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends ManagedNodes[
@@ -479,10 +475,6 @@ class SequencerNodes(
       parameters,
       startUpGroup = 0,
       loggerFactory,
-      Option.when(enableAlphaStateViaConfig)(
-        DeclarativeApiManager
-          .forSequencers(runnerFactory, timeouts.dynamicStateConsistencyTimeout, loggerFactory)
-      ),
     )
 
 class MediatorNodes(

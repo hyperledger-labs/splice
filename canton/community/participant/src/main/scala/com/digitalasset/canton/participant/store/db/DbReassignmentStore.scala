@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -164,8 +164,8 @@ class DbReassignmentStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] = {
     ErrorUtil.requireArgument(
-      unassignmentData.targetPsid.map(_.logical) == targetSynchronizerId,
-      s"Synchronizer $targetSynchronizerId: Reassignment store cannot store reassignment for synchronizer ${unassignmentData.targetPsid
+      unassignmentData.targetPSId.map(_.logical) == targetSynchronizerId,
+      s"Synchronizer $targetSynchronizerId: Reassignment store cannot store reassignment for synchronizer ${unassignmentData.targetPSId
           .map(_.logical)}",
     )
 
@@ -203,7 +203,7 @@ class DbReassignmentStore(
 
     for {
       indexedSourceSynchronizer <- indexedSynchronizerET(
-        unassignmentData.sourcePsid.map(_.logical)
+        unassignmentData.sourcePSId.map(_.logical)
       )
       _ <- EitherT.right(
         storage.update(

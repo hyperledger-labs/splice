@@ -1,13 +1,12 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.networking.grpc.ClientChannelParams
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
-import com.digitalasset.canton.tracing.TracingConfig.Propagation
 
 /** Client configured options for how to connect to a sequencer
   *
@@ -42,8 +41,7 @@ import com.digitalasset.canton.tracing.TracingConfig.Propagation
   *   know what you are doing, you shouldn't touch this setting.
   * @param overrideMaxRequestSize
   *   overrides the maxRequestSize configured in the dynamic synchronizer parameters. If
-  *   overrideMaxRequestSize is set, modifying the maxRequestSize won't have any effect. This is
-  *   only used for testing.
+  *   overrideMaxRequestSize, is set, modifying the maxRequestSize won't have any effect.
   * @param maximumInFlightEventBatches
   *   The maximum number of event batches that the system will process concurrently. Setting the
   *   `maximumInFlightEventBatches` parameter limits the number of event batches that the system
@@ -69,10 +67,6 @@ import com.digitalasset.canton.tracing.TracingConfig.Propagation
   *     immediately continue to the next step of amplification.
   *   - Scheduling of the next amplification takes into account the time taken by the transport to
   *     provide a response.
-  * @param channelMaxInboundMessageSize
-  *   max inbound request size for the grpc channel to the sequencer.
-  * @param channelFlowControlWindow
-  *   flow control window for the grpc channel to the sequencer.
   */
 final case class SequencerClientConfig(
     eventInboxSize: PositiveInt = PositiveInt.tryCreate(100),
@@ -82,16 +76,8 @@ final case class SequencerClientConfig(
     maxConnectionRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     handshakeRetryAttempts: NonNegativeInt = NonNegativeInt.tryCreate(50),
     handshakeRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
-    // The `defaultMaxSequencingTimeOffset` defines the default window added to `now`
-    // to compute the maximum sequencing time, used for example in confirmation requests.
-    // If it exceeds or equals what a session signing key can cover
-    // (i.e., `keyValidityDuration` - `cutOffDuration`), we fall back to
-    // signing with the long-term key. This does not break correctness, but may require extra
-    // KMS calls, impacting performance. The closer this parameter is to `keyValidityDuration`,
-    // the fewer opportunities we have to reuse a session signing key, as it leaves a smaller
-    // margin in the future for the validity period of a newly created session signing key.
     defaultMaxSequencingTimeOffset: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(2),
+      NonNegativeFiniteDuration.ofMinutes(5),
     acknowledgementInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
     keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
     authToken: AuthenticationTokenManagerConfig = AuthenticationTokenManagerConfig(),
@@ -100,17 +86,13 @@ final case class SequencerClientConfig(
     maximumInFlightEventBatches: PositiveInt = PositiveInt.tryCreate(20),
     useNewConnectionPool: Boolean = true,
     timeReadingsRetention: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5),
-    enableAmplificationImprovements: Boolean = true,
-    amplifyOnMaxSequencingTimeTooFar: Boolean = true,
-    channelMaxInboundMessageSize: NonNegativeInt = ClientChannelParams.DefaultMaxInboundMessageSize,
-    channelFlowControlWindow: PositiveInt = ClientChannelParams.DefaultFlowControlWindow,
-) {
+    enableAmplificationImprovements: Boolean = false,
+) extends UniformCantonConfigValidation
 
-  def clientChannelParams(tracePropagation: Propagation): ClientChannelParams = ClientChannelParams(
-    maxInboundMessageSize = channelMaxInboundMessageSize,
-    keepAliveClient = keepAliveClient,
-    flowControlWindow = channelFlowControlWindow,
-    traceContextPropagation = tracePropagation,
-  )
-
+object SequencerClientConfig {
+  implicit val sequencerClientConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerClientConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[SequencerClientConfig]
+  }
 }

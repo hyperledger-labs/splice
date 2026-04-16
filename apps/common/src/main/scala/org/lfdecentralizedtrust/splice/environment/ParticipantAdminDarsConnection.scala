@@ -130,7 +130,6 @@ trait ParticipantAdminDarsConnection {
     }
   }
 
-  // TODO(DACH-NY/splice#4803): unvet dependencies
   def unvetDars(
       synchronizerId: SynchronizerId,
       dars: Seq[DarResource],

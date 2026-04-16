@@ -939,51 +939,6 @@ class DbSvDsoStore(
     listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION, filterClause)
   }
 
-  override def listExpiredAmuletAllocations(
-      ignoredParties: Set[PartyId]
-  ): ListExpiredContracts[
-    splice.amuletallocation.AmuletAllocation.ContractId,
-    splice.amuletallocation.AmuletAllocation,
-  ] = (now, limit) =>
-    implicit tc => {
-      val _ = tc
-      val filterClause = if (ignoredParties.nonEmpty) {
-        (sql" and " ++ notInClause(
-          "create_arguments->'allocation'->'transferLeg'->>'sender'",
-          ignoredParties,
-        ) ++ sql" and " ++ notInClause(
-          "create_arguments->'allocation'->'transferLeg'->>'receiver'",
-          ignoredParties,
-        )).toActionBuilder
-      } else {
-        sql""
-      }
-
-      waitUntilAcsIngested {
-        for {
-          synchronizerId <- getDsoRules().map(_.domain)
-          rows <- storage.query(
-            selectFromAcsTableWithState(
-              DsoTables.acsTableName,
-              acsStoreId,
-              domainMigrationId,
-              splice.amuletallocation.AmuletAllocation.COMPANION,
-              additionalWhere = (sql"""
-                and assigned_domain = $synchronizerId
-                and acs.contract_expires_at < ${now}
-              """ ++ filterClause).toActionBuilder,
-              orderLimit = sql"""limit ${sqlLimit(limit)}""",
-            ),
-            "listExpiredAmuletAllocations",
-          )
-        } yield rows.map(
-          assignedContractFromRow(
-            splice.amuletallocation.AmuletAllocation.COMPANION
-          )(_)
-        )
-      }
-    }
-
   override def listExpiredAmuletTransferInstructions(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[

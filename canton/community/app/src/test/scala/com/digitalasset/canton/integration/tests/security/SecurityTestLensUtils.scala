@@ -1,33 +1,21 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security
 
-import cats.instances.list.*
-import cats.syntax.either.*
-import com.daml.nonempty.NonEmptyUtil.instances.*
-import com.daml.nonempty.catsinstances.*
-import com.daml.nonempty.{NonEmpty, NonEmptyF}
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
-import com.digitalasset.canton.crypto.{CryptoPureApi, HashOps, SyncCryptoApi}
+import com.digitalasset.canton.crypto.{CryptoPureApi, SyncCryptoApi}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.MerkleTree.VersionedMerkleTree
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.{
-  Batch,
   ClosedEnvelope,
-  MediatorGroupRecipient,
   OpenEnvelope,
-  Recipient,
   Recipients,
-  RecipientsTree,
   SubmissionRequest,
 }
-import com.digitalasset.canton.util.SetsUtil.instances.*
-import com.digitalasset.canton.version.ProtocolVersion
-import monocle.function.Each
-import monocle.macros.{GenLens, GenPrism}
+import monocle.macros.GenLens
 import monocle.{Lens, Traversal}
 import org.scalactic.source.Position
 
@@ -44,16 +32,9 @@ trait SecurityTestLensUtils {
     * [[SignedProtocolMessage]] is not of type `M`, the traversal may still succeed due to erasure;
     * however, downstream code will likely fail with a [[java.lang.ClassCastException]] in that
     * case.
-    *
-    * @param signingTimestampOverrides
-    *   Optional overrides for the signing timestamps, allowing the use of an approximate timestamp
-    *   and an optional validity end to aid in selecting a session signing key. Currently, this
-    *   method is only used for `ConfirmationResponses` and `ConfirmationResultMessage`, which are
-    *   not signed with an approximate timestamp, and therefore the overrides default to `None`.
     */
   def traverseMessages[M <: SignedProtocolMessageContent](
-      updateSignatureWith: M => Option[SyncCryptoApi],
-      signingTimestampOverrides: Option[SigningTimestampOverrides] = None,
+      updateSignatureWith: M => Option[SyncCryptoApi]
   )(implicit
       executionContext: ExecutionContext
   ): Traversal[SubmissionRequest, M] =
@@ -66,11 +47,7 @@ trait SecurityTestLensUtils {
           updateSignatureWith(newMessage) match {
             case Some(snapshot) =>
               val newSig = SignedProtocolMessage
-                .mkSignature(
-                  newTypedMessage,
-                  snapshot,
-                  signingTimestampOverrides,
-                )
+                .mkSignature(newTypedMessage, snapshot)
                 .failOnShutdown
                 .futureValue
               signedMessage.copy(typedMessage = newTypedMessage, signatures = NonEmpty(Seq, newSig))
@@ -88,7 +65,7 @@ trait SecurityTestLensUtils {
       : Traversal[SubmissionRequest, SignedProtocolMessage[M]] =
     GenLens[SubmissionRequest](_.batch.envelopes)
       .andThen(Traversal.fromTraverse[List, ClosedEnvelope])
-      .andThen(tryDefaultOpenEnvelope(pureCrypto, testedProtocolVersion))
+      .andThen(ClosedEnvelope.tryDefaultOpenEnvelope(pureCrypto, testedProtocolVersion))
       .andThen(
         Lens[DefaultOpenEnvelope, SignedProtocolMessage[M]](
           _.protocolMessage.asInstanceOf[SignedProtocolMessage[M]]
@@ -119,7 +96,7 @@ trait SecurityTestLensUtils {
   def firstViewCommonData: Lens[GenTransactionTree, ViewCommonData] =
     GenTransactionTree.rootViewsUnsafe
       .andThen(firstElement[TransactionView])
-      .andThen(TransactionView.Optics.viewCommonDataUnsafe)
+      .andThen(TransactionView.viewCommonDataUnsafe)
       .andThen(MerkleTree.tryUnwrap[ViewCommonData])
 
   def allViewRecipients: Traversal[TransactionConfirmationRequest, Recipients] =
@@ -131,27 +108,4 @@ trait SecurityTestLensUtils {
           Recipients,
         ]
       )
-
-  private def tryDefaultOpenEnvelope(
-      hashOps: HashOps,
-      protocolVersion: ProtocolVersion,
-  ): Lens[ClosedEnvelope, DefaultOpenEnvelope] =
-    Lens[ClosedEnvelope, DefaultOpenEnvelope](
-      _.toOpenEnvelope(hashOps, protocolVersion).valueOr(err =>
-        throw new IllegalArgumentException(s"Failed to open envelope: $err")
-      )
-    )(newOpenEnvelope => _ => newOpenEnvelope.toClosedUncompressedEnvelope)
-
-  def submissionRequestRecipients: Traversal[SubmissionRequest, Recipients] =
-    GenLens[SubmissionRequest](_.batch)
-      .andThen(GenLens[Batch[ClosedEnvelope]](_.envelopes))
-      .andThen(Traversal.fromTraverse[List, ClosedEnvelope])
-      .andThen(ClosedEnvelope.recipientsLens)
-
-  def mediatorGroupRecipient: Traversal[Recipients, MediatorGroupRecipient] =
-    GenLens[Recipients](_.trees).toNEF
-      .andThen(Traversal.fromTraverse[NonEmptyF[Seq, *], RecipientsTree])
-      .andThen(GenLens[RecipientsTree](_.recipientGroup))
-      .andThen(Each.each[NonEmpty[Set[Recipient]], Recipient])
-      .andThen(GenPrism[Recipient, MediatorGroupRecipient])
 }

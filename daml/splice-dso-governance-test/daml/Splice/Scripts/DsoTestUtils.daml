@@ -87,7 +87,6 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
         voteCooldownTime = None -- use default value of 1 minute
-        nextScheduledLogicalSynchronizerUpgrade = None
   let amuletConfig = fromOptional defaultAmuletConfig optAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
@@ -111,15 +110,11 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
                   sequencerId = "sequencer-id"
                   url = "sequencer.address:1234"
                   availableAfter = Some now
-                sequencerIdentity = Some SequencerIdentityConfig with
-                  sequencerId = "sequencer-id"
-                  availableAfter = Some now
                 mediator = Some MediatorConfig with
                   mediatorId = "mediator-id"
                 scan = Some ScanConfig with
                   publicUrl = "https://sv1.example.com"
                 legacySequencerConfig = None
-                physicalSynchronizers = None
         )]
       amuletConfig
       amuletPrice

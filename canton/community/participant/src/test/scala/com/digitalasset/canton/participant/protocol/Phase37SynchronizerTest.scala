@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -13,7 +13,6 @@ import com.digitalasset.canton.participant.protocol.TestProcessingSteps.{
   TestPendingRequestData,
   TestPendingRequestDataType,
 }
-import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
@@ -43,7 +42,6 @@ class Phase37SynchronizerTest extends AnyWordSpec with BaseTest with HasExecutio
         locallyRejectedF = FutureUnlessShutdown.pure(false),
         abortEngine = _ => (),
         engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
-        PublishUpdateViaRecordOrderPublisher.noop,
       )
     )
 

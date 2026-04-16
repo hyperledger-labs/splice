@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer
@@ -24,6 +24,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.shortType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
+  EpochLength,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
@@ -85,6 +86,7 @@ import scala.util.{Failure, Random, Success}
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 final class StateTransferBehavior[E <: Env[E]](
+    private val epochLength: EpochLength, // Currently fixed for all epochs
     private val initialState: InitialState[E],
     stateTransferType: StateTransferType,
     catchupDetector: CatchupDetector,
@@ -125,6 +127,7 @@ final class StateTransferBehavior[E <: Env[E]](
     new StateTransferManager(
       thisNode,
       dependencies,
+      epochLength,
       epochStore,
       random,
       metrics,
@@ -146,7 +149,7 @@ final class StateTransferBehavior[E <: Env[E]](
     None
 
   override def ready(self: ModuleRef[Consensus.Message[E]]): Unit =
-    self.asyncSendNoTrace(Consensus.Init.KickOff)
+    self.asyncSendNoTrace(Consensus.Init)
 
   override protected def receiveInternal(
       message: Consensus.Message[E]
@@ -154,13 +157,11 @@ final class StateTransferBehavior[E <: Env[E]](
     lazy val messageType = shortType(message)
 
     message match {
-      case _: Consensus.Init =>
+      case Consensus.Init =>
         val epochNumber = initialState.epochState.epoch.info.number
         // Note that for onboarding, segments are created but not started
-        context.withNewTraceContext { implicit traceContext =>
-          logger.info(s"$messageType: cancelling segment modules for epoch $epochNumber")
-          initialState.epochState.notifyEpochCancellationToSegments(epochNumber)
-        }
+        logger.info(s"$messageType: cancelling segment modules for epoch $epochNumber")
+        initialState.epochState.notifyEpochCancellationToSegments(epochNumber)
 
       case Consensus.SegmentCancelledEpoch =>
         cancelledSegments += 1
@@ -209,7 +210,7 @@ final class StateTransferBehavior[E <: Env[E]](
 
           val newEpochInfo =
             currentEpochInfo.next(
-              newEpochTopologyMessage.membership.orderingTopology.epochLength,
+              epochLength,
               newEpochTopologyMessage.membership.orderingTopology.activationTime,
             )
           storeEpochs(
@@ -328,7 +329,6 @@ final class StateTransferBehavior[E <: Env[E]](
         stateTransferMessage,
         activeTopologyInfo,
         latestCompletedEpoch,
-        epochState.epoch.info,
       )(abort)
 
     handleStateTransferMessageResult(result, messageType)
@@ -374,7 +374,7 @@ final class StateTransferBehavior[E <: Env[E]](
   ): Unit =
     dependencies.availability.asyncSend(
       Availability.Consensus.UpdateTopologyDuringStateTransfer(
-        newEpochTopology.membership,
+        newEpochTopology.membership.orderingTopology,
         // TODO(#25220) If the onboarding/starting epoch (`e_start`) is always immediately before the one where
         //  the node is active in the topology, the below distinction could go away.
         DelegationCryptoProvider(
@@ -460,6 +460,7 @@ final class StateTransferBehavior[E <: Env[E]](
         sequencerSnapshotAdditionalInfo = None,
       )
     val consensusBehavior = new IssConsensusModule[E](
+      epochLength,
       consensusInitialState,
       epochStore,
       clock,
@@ -554,6 +555,7 @@ object StateTransferBehavior {
       behavior: StateTransferBehavior[?]
   ): Option[
     (
+        EpochLength,
         EpochNumber,
         Option[EpochNumber],
         OrderingTopologyInfo[?],
@@ -563,6 +565,7 @@ object StateTransferBehavior {
   ] =
     Some(
       (
+        behavior.epochLength,
         behavior.initialState.stateTransferStartEpoch,
         behavior.initialState.minimumStateTransferEndEpoch,
         behavior.activeTopologyInfo,

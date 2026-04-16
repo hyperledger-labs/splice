@@ -1,18 +1,20 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
 
-import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.topology.cache.TopologyStateLookupByNamespace
-import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
-import com.digitalasset.canton.topology.store.TopologyTransactions
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.PositiveStoredTopologyTransactions
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransactions,
+  TopologyStore,
+  TopologyStoreId,
+}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.TopologyMapping.ReferencedAuthorizations
 import com.digitalasset.canton.topology.transaction.TopologyMapping.RequiredAuth.RequiredNamespaces
@@ -52,8 +54,9 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
       Option[DecentralizedNamespaceAuthorizationGraph],
     ]()
 
-  protected def lookup: TopologyStateLookupByNamespace
-  protected def synchronizerId: Option[PhysicalSynchronizerId] = lookup.synchronizerId
+  protected def store: TopologyStore[TopologyStoreId]
+  protected lazy val synchronizerId: Option[PhysicalSynchronizerId] =
+    TopologyStoreId.select[TopologyStoreId.SynchronizerStore](store).map(_.storeId.psid)
 
   protected def requiredAuthFor(
       toValidate: TopologyTransaction[TopologyChangeOp, TopologyMapping],
@@ -82,11 +85,6 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
   protected def pureCrypto: PureCrypto
 
   implicit protected def executionContext: ExecutionContext
-
-  final def evict(): Unit =
-    if (namespaceCache.sizeIs > 2000) {
-      reset()
-    }
 
   final def reset(): Unit = {
     namespaceCache.clear()
@@ -144,13 +142,12 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
 
     def extract[T <: TopologyMapping: ClassTag](
-        transactions: Seq[GenericStoredTopologyTransaction]
+        transactions: PositiveStoredTopologyTransactions
     ): Seq[SignedTopologyTransaction[TopologyChangeOp.Replace, T]] =
-      TopologyTransactions
-        .collectLatestByUniqueKey(
-          transactions
-            .mapFilter(_.selectOp[TopologyChangeOp.Replace].mapFilter(_.selectMapping[T]))
-        )
+      transactions
+        .collectOfMapping[T]
+        .collectLatestByUniqueKey
+        .result
         .map(_.transaction)
 
     // only load the ones we don't already hold in memory
@@ -167,19 +164,18 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
         (if (storeIsEmpty) None
          else
            NonEmpty
-             .from((decentralizedNamespacesToLoad ++ namespacesToLoad).toSeq)
+             .from(decentralizedNamespacesToLoad ++ namespacesToLoad)
              .map(dnsOrNs =>
-               lookup
-                 .lookupForNamespaces(
-                   EffectiveTime(asOfExclusive),
-                   asOfInclusive = false,
-                   ns = dnsOrNs,
-                   transactionTypes = codes.toSet,
-                   op = TopologyChangeOp.Replace,
-                 )
-                 .map(_.flatMap { case (_, v) => v }.toSeq)
+               store.findPositiveTransactions(
+                 asOfExclusive,
+                 asOfInclusive = false,
+                 isProposal = false,
+                 types = codes,
+                 filterUid = None,
+                 filterNamespace = Some(dnsOrNs.toSeq),
+               )
              ))
-          .getOrElse(FutureUnlessShutdown.pure(Seq.empty))
+          .getOrElse(FutureUnlessShutdown.pure(StoredTopologyTransactions.empty))
       decentralizedNamespaceDefinitions = extract[DecentralizedNamespaceDefinition](
         storedDecentralizedAndOrdinaryNamespaces
       ).filter(x => decentralizedNamespacesToLoad.contains(x.mapping.namespace))
@@ -202,21 +198,18 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
         (if (storeIsEmpty) None
          else
            NonEmpty
-             .from(remainingNamespacesToLoad.toSeq)
+             .from(remainingNamespacesToLoad)
              .map { ns =>
-               lookup
-                 .lookupForNamespaces(
-                   EffectiveTime(asOfExclusive),
-                   asOfInclusive = false,
-                   ns = ns,
-                   transactionTypes = Set(
-                     TopologyMapping.Code.NamespaceDelegation
-                   ),
-                   op = TopologyChangeOp.Replace,
-                 )
-                 .map(_.flatMap { case (_, v) => v }.toSeq)
+               store.findPositiveTransactions(
+                 asOfExclusive,
+                 asOfInclusive = false,
+                 isProposal = false,
+                 types = Seq(NamespaceDelegation.code),
+                 filterUid = None,
+                 filterNamespace = Some(ns.toSeq),
+               )
              })
-          .getOrElse(FutureUnlessShutdown.pure(Seq.empty))
+          .getOrElse(FutureUnlessShutdown.pure(StoredTopologyTransactions.empty))
       remainingNamespaceDelegations = extract[NamespaceDelegation](
         storedRemainingNamespaceDelegations
       )

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -12,7 +12,6 @@ import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInpu
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsCantonError,
-  OneOfSchemaExtension,
   stringDecoderForEnum,
   stringEncoderForEnum,
   stringSchemaForEnum,
@@ -20,7 +19,6 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
 import com.digitalasset.canton.ledger.client.services.admin.PackageManagementClient
 import com.digitalasset.canton.ledger.client.services.pkg.PackageClient
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
@@ -49,11 +47,9 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 import JsPackageCodecs.*
 
-@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsPackageService(
     packageClient: PackageClient,
     packageManagementClient: PackageManagementClient,
-    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -89,14 +85,6 @@ class JsPackageService(
         status,
       ),
       withServerLogic(
-        JsPackageService.listVettedPackagesEndpoint_deprecated,
-        listVettedPackages,
-      ),
-      withServerLogic(
-        JsPackageService.updateVettedPackagesEndpoint_deprecated,
-        updateVettedPackages,
-      ),
-      withServerLogic(
         JsPackageService.listVettedPackagesEndpoint,
         listVettedPackages,
       ),
@@ -105,27 +93,25 @@ class JsPackageService(
         updateVettedPackages,
       ),
     )
-
   private def list(
       caller: CallerContext
   ): TracedInput[Unit] => Future[Either[JsCantonError, package_service.ListPackagesResponse]] = {
-    _ =>
-      packageClient.listPackages(caller.token())(caller.traceContext()).resultToRight
+    req =>
+      packageClient.listPackages(caller.token())(req.traceContext).resultToRight
   }
 
   private def status(
       @unused caller: CallerContext
   ): TracedInput[String] => Future[
     Either[JsCantonError, package_service.GetPackageStatusResponse]
-  ] = req =>
-    packageClient.getPackageStatus(req.in, caller.token())(caller.traceContext()).resultToRight
+  ] = req => packageClient.getPackageStatus(req.in, caller.token())(req.traceContext).resultToRight
 
   private def listVettedPackages(
       @unused caller: CallerContext
   ): TracedInput[package_service.ListVettedPackagesRequest] => Future[
     Either[JsCantonError, package_service.ListVettedPackagesResponse]
   ] = req =>
-    packageClient.listVettedPackages(req.in, caller.token())(caller.traceContext()).resultToRight
+    packageClient.listVettedPackages(req.in, caller.token())(req.traceContext).resultToRight
 
   private def updateVettedPackages(
       @unused caller: CallerContext
@@ -133,12 +119,12 @@ class JsPackageService(
     Either[JsCantonError, package_management_service.UpdateVettedPackagesResponse]
   ] = req =>
     packageManagementClient
-      .updateVettedPackages(req.in, caller.token())(caller.traceContext())
+      .updateVettedPackages(req.in, caller.token())(req.traceContext)
       .resultToRight
 
   private def validateDar(caller: CallerContext) = {
     (tracedInput: TracedInput[(Source[util.ByteString, Any], Option[String])]) =>
-      implicit val traceContext: TraceContext = caller.traceContext()
+      implicit val traceContext: TraceContext = tracedInput.traceContext
       val (bytesSource, synchronizerIdO) = tracedInput.in
       val inputStream = bytesSource.runWith(StreamConverters.asInputStream())(materializer)
       val bs = protobuf.ByteString.readFrom(inputStream)
@@ -153,7 +139,7 @@ class JsPackageService(
 
   private def upload(caller: CallerContext) = {
     (tracedInput: TracedInput[(Source[util.ByteString, Any], Option[Boolean], Option[String])]) =>
-      implicit val traceContext: TraceContext = caller.traceContext()
+      implicit val traceContext: TraceContext = tracedInput.traceContext
       val (bytesSource, vetAllPackagesO, synchronizerIdO) = tracedInput.in
       val inputStream = bytesSource.runWith(StreamConverters.asInputStream())(materializer)
       val bs = protobuf.ByteString.readFrom(inputStream)
@@ -172,7 +158,7 @@ class JsPackageService(
 
   private def getPackage(caller: CallerContext) = { (tracedInput: TracedInput[String]) =>
     packageClient
-      .getPackage(tracedInput.in, caller.token())(caller.traceContext())
+      .getPackage(tracedInput.in, caller.token())(tracedInput.traceContext)
       .map(response =>
         (
           Source.fromIterator(() =>
@@ -201,18 +187,17 @@ object JsPackageService extends DocumentationEndpoints {
       .in(streamBinaryBody(PekkoStreams)(CodecFormat.OctetStream()).toEndpointIO)
       .in(sttp.tapir.stringToPath("validate"))
       .in(query[Option[String]]("synchronizerId"))
-      .protoRef(package_management_service.PackageManagementServiceGrpc.METHOD_VALIDATE_DAR_FILE)
+      .description(
+        "Validates a DAR for upgrade-compatibility against the current vetting state on the target synchronizer"
+      )
 
   val uploadDar = uploadDarEndpoint(dars).description("Upload a DAR to the participant node")
 
   private val uploadDarOld =
     uploadDarEndpoint(packages)
-      .description(s"""
-                 |Behaves the same as /dars. This endpoint will be deprecated and removed in a future release.
-                 |${createProtoRef(
-          package_management_service.PackageManagementServiceGrpc.METHOD_UPLOAD_DAR_FILE
-        )}
-                """.stripMargin.trim)
+      .description(
+        "Upload a DAR to the participant node. Behaves the same as /dars. This endpoint will be deprecated and removed in a future release."
+      )
 
   private def uploadDarEndpoint(
       endpointDef: Endpoint[CallerContext, Unit, (StatusCode, JsCantonError), Unit, Any]
@@ -222,12 +207,11 @@ object JsPackageService extends DocumentationEndpoints {
       .in(query[Option[Boolean]]("vetAllPackages"))
       .in(query[Option[String]]("synchronizerId"))
       .out(jsonBody[UploadDarFileResponse])
-      .protoRef(package_management_service.PackageManagementServiceGrpc.METHOD_UPLOAD_DAR_FILE)
 
   val listPackagesEndpoint =
     packages.get
       .out(jsonBody[package_service.ListPackagesResponse])
-      .protoRef(package_service.PackageServiceGrpc.METHOD_LIST_PACKAGES)
+      .description("List all packages uploaded on the participant node")
 
   val downloadPackageEndpoint =
     packages.get
@@ -236,60 +220,26 @@ object JsPackageService extends DocumentationEndpoints {
       .out(
         sttp.tapir.header[String]("Canton-Package-Hash")
       ) // Non standard header used for hash output
-      .protoRef(package_service.PackageServiceGrpc.METHOD_GET_PACKAGE)
+      .description("Download the package for the requested package-id")
 
   val packageStatusEndpoint =
     packages.get
       .in(path[String](packageIdPath))
       .in(sttp.tapir.stringToPath("status"))
       .out(jsonBody[package_service.GetPackageStatusResponse])
-      .protoRef(package_service.PackageServiceGrpc.METHOD_GET_PACKAGE_STATUS)
+      .description("Get package status")
 
-  private val listVettedPackagesEndpoint_deprecated =
+  val listVettedPackagesEndpoint =
     packageVetting.get
       .in(jsonBody[package_service.ListVettedPackagesRequest])
       .out(jsonBody[package_service.ListVettedPackagesResponse])
-      .protoRef(
-        package_service.PackageServiceGrpc.METHOD_LIST_VETTED_PACKAGES
-      )
-      .deprecated()
-      .description(
-        """Lists which participant node vetted what packages on which synchronizer.
-        |This endpoint (GET /package-vetting) is deprecated and will be removed in a future release. Please use POST /package-vetting/list instead.""".stripMargin
-      )
+      .description("List vetted packages")
 
-  private val updateVettedPackagesEndpoint_deprecated =
+  val updateVettedPackagesEndpoint =
     packageVetting.post
       .in(jsonBody[package_management_service.UpdateVettedPackagesRequest])
       .out(jsonBody[package_management_service.UpdateVettedPackagesResponse])
-      .protoRef(
-        package_management_service.PackageManagementServiceGrpc.METHOD_UPDATE_VETTED_PACKAGES
-      )
-      .deprecated()
-      .description(
-        """Update the vetted packages of this participant
-        |This endpoint (POST /package-vetting) is deprecated and will be removed in a future release. Please use POST /package-vetting/update instead.""".stripMargin
-      )
-
-  val listVettedPackagesEndpoint =
-    packageVetting
-      .in(sttp.tapir.stringToPath("list"))
-      .post
-      .in(jsonBody[package_service.ListVettedPackagesRequest])
-      .out(jsonBody[package_service.ListVettedPackagesResponse])
-      .protoRef(
-        package_service.PackageServiceGrpc.METHOD_LIST_VETTED_PACKAGES
-      )
-
-  val updateVettedPackagesEndpoint =
-    packageVetting
-      .in(sttp.tapir.stringToPath("update"))
-      .post
-      .in(jsonBody[package_management_service.UpdateVettedPackagesRequest])
-      .out(jsonBody[package_management_service.UpdateVettedPackagesResponse])
-      .protoRef(
-        package_management_service.PackageManagementServiceGrpc.METHOD_UPDATE_VETTED_PACKAGES
-      )
+      .description("Update vetted packages")
 
   override def documentation: Seq[AnyEndpoint] =
     Seq(
@@ -299,8 +249,6 @@ object JsPackageService extends DocumentationEndpoints {
       listPackagesEndpoint,
       downloadPackageEndpoint,
       packageStatusEndpoint,
-      listVettedPackagesEndpoint_deprecated,
-      updateVettedPackagesEndpoint_deprecated,
       listVettedPackagesEndpoint,
       updateVettedPackagesEndpoint,
     )
@@ -333,7 +281,7 @@ object JsPackageCodecs {
     deriveConfiguredCodec
   implicit val vettedPackagesChangeOperationSchema
       : Schema[package_management_service.VettedPackagesChange.Operation] =
-    Schema.oneOfWrapped[package_management_service.VettedPackagesChange.Operation].oneOfExtension()
+    Schema.oneOfWrapped
 
   implicit val topologySerial: Codec[package_reference.PriorTopologySerial] =
     deriveRelaxedCodec

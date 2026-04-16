@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -12,13 +12,8 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{
-  BatchingConfig,
-  CachingConfigs,
-  CryptoConfig,
-  SessionEncryptionKeyCacheConfig,
-  SharedCantonConfig,
-}
+import com.digitalasset.canton.config.{CachingConfigs, SharedCantonConfig, CryptoConfig}
+import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleEnvironmentTestHelpers,
@@ -26,11 +21,10 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
 }
-import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext}
 import org.apache.pekko.actor.ActorSystem
@@ -62,20 +56,17 @@ trait TestEnvironment[C <: SharedCantonConfig[C]]
   private lazy val cryptoET: EitherT[FutureUnlessShutdown, String, Crypto] = Crypto
     .create(
       CryptoConfig(),
-      CachingConfigs.defaultKmsMetadataCache,
-      SessionEncryptionKeyCacheConfig(),
+      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
       CachingConfigs.defaultPublicKeyConversionCache,
       storage,
-      Option.empty[ReplicaManager],
+      CryptoPrivateStoreFactory.withoutKms(),
       testedReleaseProtocolVersion,
       FutureSupervisor.Noop,
       environment.clock,
       executionContext,
       environmentTimeouts,
-      BatchingConfig(),
       loggerFactory,
       NoReportingTracerProvider,
-      environment.executorServiceMetrics,
     )(executionContext, TraceContext.empty)
 
   private lazy val crypto: Crypto =

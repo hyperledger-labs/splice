@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.handlers
@@ -11,9 +11,9 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing.protocol.ClosedEnvelope
 import com.digitalasset.canton.sequencing.{
+  ApplicationHandler,
   OrdinaryApplicationHandler,
   OrdinaryEnvelopeBox,
-  UnthrottledApplicationHandler,
 }
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.version.ProtocolVersion
@@ -31,20 +31,19 @@ object EnvelopeOpener {
       handler: OrdinaryApplicationHandler[DefaultOpenEnvelope]
   )(implicit
       logger: ErrorLoggingContext
-  ): UnthrottledApplicationHandler[OrdinaryEnvelopeBox, ClosedEnvelope] = handler.replace {
-    tracedEvents =>
-      val openedEvents = tracedEvents.map { closedEvents =>
-        closedEvents.map { event =>
-          val openedEvent = OrdinarySequencedEvent.openEnvelopes(event)(protocolVersion, hashOps)
-          openedEvent.openingErrors.foreach { error =>
-            EnvelopeOpenerError.EnvelopeOpenerDeserializationError
-              .Error(error, protocolVersion)
-              .report()
-          }
-          openedEvent.event
+  ): ApplicationHandler[OrdinaryEnvelopeBox, ClosedEnvelope] = handler.replace { tracedEvents =>
+    val openedEvents = tracedEvents.map { closedEvents =>
+      closedEvents.map { event =>
+        val openedEvent = OrdinarySequencedEvent.openEnvelopes(event)(protocolVersion, hashOps)
+        openedEvent.openingErrors.foreach { error =>
+          EnvelopeOpenerError.EnvelopeOpenerDeserializationError
+            .Error(error, protocolVersion)
+            .report()
         }
+        openedEvent.event
       }
-      handler(openedEvents)
+    }
+    handler(openedEvents)
   }
 }
 

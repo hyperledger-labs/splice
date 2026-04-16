@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -26,6 +26,7 @@ import io.grpc.{ServerServiceDefinition, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 private[apiserver] final class ApiTimeService(
     backend: TimeServiceBackend,
@@ -70,7 +71,7 @@ private[apiserver] final class ApiTimeService(
       expectedTime <- requirePresence(request.currentTime, "current_time")
         .map(toInstant)
       requestedTime <- requirePresence(request.newTime, "new_time").map(toInstant)
-      _ <-
+      _ <- {
         if (!requestedTime.isBefore(expectedTime))
           Either.unit
         else
@@ -79,17 +80,24 @@ private[apiserver] final class ApiTimeService(
               s"new_time [$requestedTime] is before current_time [$expectedTime]. Setting time backwards is not allowed."
             )
           )
+      }
     } yield (expectedTime, requestedTime)
-
-    val result = validatedInput match {
-      case Left(err) => Future.failed(err)
+    val result: Future[Either[StatusRuntimeException, Empty]] = validatedInput match {
+      case Left(err) => Future.successful(Left(err))
       case Right((expectedTime, requestedTime)) =>
-        updateTime(expectedTime, requestedTime).flatMap(resultET =>
-          Future.fromTry(resultET.map(_ => Empty()).toTry)
-        )
+        updateTime(expectedTime, requestedTime) map (_.map { _ =>
+          Empty()
+        })
     }
 
-    result.thereafter(logger.logErrorsOnCall)
+    result
+      .thereafter(logger.logErrorsOnCall)
+      .transform(_.flatMap {
+        case Left(error) =>
+          logger.warn(s"Failed to set time for request $request: ${error.getMessage}")
+          Failure(error)
+        case Right(r) => Success(r)
+      })
   }
 
   override def bindService(): ServerServiceDefinition =

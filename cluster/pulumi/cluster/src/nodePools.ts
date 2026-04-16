@@ -87,7 +87,7 @@ function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?
       machineType: config.nodeType,
       bootDisk: {
         diskType: 'hyperdisk-balanced',
-        sizeGb: config.bootDiskSizeGb || 100,
+        sizeGb: 100,
       },
       taints: [
         {

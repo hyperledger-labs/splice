@@ -8,8 +8,6 @@ import {
   HELM_MAX_HISTORY_SIZE,
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
-  K8sResourceSchema,
-  SingleK8sResourceSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/dockerConfig';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -22,6 +20,17 @@ import yaml from 'js-yaml';
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
 import { createCloudSQLInstanceForPerformanceTests, PerformanceTestDb } from './performanceTests';
+
+type ResourcesSpec = {
+  requests?: {
+    cpu?: string;
+    memory?: string;
+  };
+  limits?: {
+    cpu?: string;
+    memory?: string;
+  };
+};
 
 const localnetHostAliases = [
   {
@@ -39,25 +48,6 @@ const localnetHostAliases = [
   },
 ];
 
-function singleResourcesSpecFromConfig(resources: SingleK8sResourceSchema) {
-  return resources
-    ? {
-        cpu: resources.cpu,
-        memory: resources.memory,
-        'ephemeral-storage': resources.ephemeralStorage,
-      }
-    : undefined;
-}
-
-function resourcesSpecFromConfig(resources: K8sResourceSchema) {
-  return resources
-    ? {
-        limits: singleResourcesSpecFromConfig(resources.limits),
-        requests: singleResourcesSpecFromConfig(resources.requests),
-      }
-    : undefined;
-}
-
 function installDockerRunnerScaleSet(
   name: string,
   runnersNamespace: Namespace,
@@ -65,7 +55,7 @@ function installDockerRunnerScaleSet(
   cachePvc: PersistentVolumeClaim,
   configMap: ConfigMap,
   dockerConfigSecret: Secret,
-  resources: K8sResourceSchema,
+  resources: ResourcesSpec,
   serviceAccountName: string,
   dependsOn: Resource[]
 ): k8s.helm.v3.Release {
@@ -116,13 +106,8 @@ function installDockerRunnerScaleSet(
                     name: 'RUNNER_WAIT_FOR_DOCKER_IN_SECONDS',
                     value: '120',
                   },
-                  // May help shutting down runners https://github.com/actions/runner/pull/2233
-                  {
-                    name: 'RUNNER_MANUALLY_TRAP_SIG',
-                    value: 'true',
-                  },
                 ],
-                resources: resourcesSpecFromConfig(resources),
+                resources,
                 // required to mount the nix store inside the container from the NFS
                 securityContext: {
                   privileged: true,
@@ -325,7 +310,7 @@ function installK8sRunnerScaleSet(
   name: string,
   tokenSecret: Secret,
   cachePvcName: string,
-  resources: K8sResourceSchema,
+  resources: ResourcesSpec,
   serviceAccountName: string,
   dependsOn: Resource[],
   performanceTestsDb: PerformanceTestDb
@@ -379,9 +364,8 @@ function installK8sRunnerScaleSet(
                     // using the limits as the requests values.
                     cpu: '1m',
                     memory: '1m',
-                    'ephemeral-storage': '1',
                   },
-                  limits: resources ? singleResourcesSpecFromConfig(resources.limits) : undefined,
+                  limits: resources?.limits,
                 },
                 ports: [
                   {
@@ -495,11 +479,10 @@ function installK8sRunnerScaleSet(
                   // See note above on resource requests and limits on why we set the requests
                   // on the runner pod.
                   requests: resources
-                    ? singleResourcesSpecFromConfig(resources.requests)
+                    ? resources.requests
                     : {
                         cpu: '0.1',
                         memory: '2Gi',
-                        'ephemeral-storage': '1Gi',
                       },
                 },
               },

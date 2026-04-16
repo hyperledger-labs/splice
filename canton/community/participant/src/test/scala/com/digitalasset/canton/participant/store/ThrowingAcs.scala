@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
 
 import com.digitalasset.canton.ReassignmentCounter
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
@@ -141,18 +140,10 @@ class ThrowingAcs[T <: Throwable](mk: String => T)(override implicit val ec: Exe
   ): FutureUnlessShutdown[Int] =
     FutureUnlessShutdown.failed(mk(s"contractCount at $timestamp"))
 
-  override def changesBetween(
-      fromExclusive: TimeOfChange,
-      toInclusive: TimeOfChange,
-      maxResultSize: PositiveInt,
-  )(implicit
+  override def changesBetween(fromExclusive: TimeOfChange, toInclusive: TimeOfChange)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[(LazyList[(TimeOfChange, ActiveContractIdsChange)], Int)] =
-    FutureUnlessShutdown.failed(
-      mk(
-        s"changesBetween for $fromExclusive, $toInclusive, limit $maxResultSize"
-      )
-    )
+  ): FutureUnlessShutdown[LazyList[(TimeOfChange, ActiveContractIdsChange)]] =
+    FutureUnlessShutdown.failed(mk(s"changesBetween for $fromExclusive, $toInclusive"))
 
   override def packageUsage(pkg: PackageId, contractStore: ContractStore)(implicit
       traceContext: TraceContext

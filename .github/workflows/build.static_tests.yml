@@ -37,7 +37,7 @@ jobs:
       - name: Setup Nix
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          cache_version: 8
+          cache_version: 7
           test_name: canton_consistency
           target: 'static_tests'
 
@@ -72,7 +72,7 @@ jobs:
             fi
             echo "Success: Docker digests match the version."
   static_tests:
-    runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-medium' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
     timeout-minutes: 35
     container:
       image: ${{ inputs.self_hosted && 'us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12' || '' }}
@@ -90,7 +90,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          cache_version: 8
+          cache_version: 7
           test_name: static_tests
           target: 'static_tests'
 

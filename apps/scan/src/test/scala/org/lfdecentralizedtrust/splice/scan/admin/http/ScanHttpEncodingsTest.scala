@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members.CreatedEvent as HttpCreatedEvent
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members.{
@@ -294,7 +293,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           rightChildId2 -> mkCreate(rightChildId2),
         ),
         externalTransactionHash =
-          Some(OmitNullString("4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7")),
+          Some("4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"),
       )
     )
 
@@ -682,7 +681,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           externalTransactionHashThresholdTime = Some(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
-        value.externalTransactionHash shouldBe Some(OmitNullString(extTxnHashHexString))
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
       }
     }
 
@@ -697,7 +696,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           externalTransactionHashThresholdTime = Some(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
-        value.externalTransactionHash shouldBe Some(OmitNullString(extTxnHashHexString))
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
       }
     }
 

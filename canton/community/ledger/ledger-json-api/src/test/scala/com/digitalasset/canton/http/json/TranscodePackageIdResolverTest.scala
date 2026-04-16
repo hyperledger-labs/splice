@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json
@@ -18,7 +18,7 @@ import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.{
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.platform.PackagePreferenceBackend
-import com.digitalasset.canton.platform.PackagePreferenceBackend.SupportedPackagesFilter
+import com.digitalasset.canton.platform.PackagePreferenceBackend.PackageFilterRestriction
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.store.packagemeta.PackageMetadata.{
   LocalPackagePreference,
@@ -66,7 +66,7 @@ class TranscodePackageIdResolverTest extends AsyncWordSpec with BaseTest with Ha
                   exerciseByKeyPkgRef.packageName -> Set(submittingParty),
                 )
               ),
-              packageFilter = SupportedPackagesFilter(
+              packageFilter = PackageFilterRestriction(
                 Map.empty,
                 "Commands.packageIdSelectionPreferences",
               ),
@@ -128,7 +128,7 @@ class TranscodePackageIdResolverTest extends AsyncWordSpec with BaseTest with Ha
               packageVettingRequirements = PackageVettingRequirements(
                 Map(createPkgRef.packageName -> Set(submittingParty))
               ),
-              packageFilter = SupportedPackagesFilter(
+              packageFilter = PackageFilterRestriction(
                 Map.empty,
                 "Commands.packageIdSelectionPreferences",
               ),
@@ -165,7 +165,7 @@ class TranscodePackageIdResolverTest extends AsyncWordSpec with BaseTest with Ha
               packageVettingRequirements = PackageVettingRequirements(
                 Map(createPkgRef.packageName -> Set(submittingParty))
               ),
-              packageFilter = SupportedPackagesFilter(
+              packageFilter = PackageFilterRestriction(
                 Map(createPkgRef.packageName -> Set(upgradeCreatePkgRef.pkgId)),
                 "Commands.packageIdSelectionPreferences",
               ),
@@ -191,7 +191,7 @@ class TranscodePackageIdResolverTest extends AsyncWordSpec with BaseTest with Ha
               packageVettingRequirements = PackageVettingRequirements(
                 Map(createPkgRef.packageName -> Set(submittingParty))
               ),
-              packageFilter = SupportedPackagesFilter(
+              packageFilter = PackageFilterRestriction(
                 Map(createPkgRef.packageName -> Set(upgradeCreatePkgRef.pkgId)),
                 "Commands.packageIdSelectionPreferences",
               ),

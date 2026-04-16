@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.data
@@ -11,12 +11,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.transaction.*
 
-final case class ListPartiesResult(
-    partyResult: Party,
-    participants: Seq[ParticipantSynchronizers],
-) {
-  def party: PartyId = partyResult.partyId
-}
+final case class ListPartiesResult(party: PartyId, participants: Seq[ParticipantSynchronizers])
 
 object ListPartiesResult {
   final case class SynchronizerPermission(

@@ -194,7 +194,6 @@ class BftScanConnectionTest
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           jtime(n),
           ByteString.EMPTY,
-          0L,
         )
       ),
       synchronizerId = synchronizerId,

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission.routing
@@ -21,7 +21,6 @@ import com.digitalasset.canton.protocol.{LfContractId, StaticSynchronizerParamet
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.client.TopologySnapshotLoader
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 
 import scala.concurrent.ExecutionContext
 
@@ -33,27 +32,19 @@ object RoutingSynchronizerStateFactory {
       connectedSynchronizers: ConnectedSynchronizersLookup,
       syncCryptoPureApiLookup: SyncCryptoPureApiLookup,
   )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): FutureUnlessShutdown[RoutingSynchronizerStateImpl] = {
+      traceContext: TraceContext
+  ): RoutingSynchronizerStateImpl = {
     val connectedSynchronizersSnapshot = connectedSynchronizers.snapshot.toMap
 
     // Ensure we have a constant snapshot for the lifetime of this object.
-    val topologySnapshotsUS = MonadUtil
-      .sequentialTraverse(connectedSynchronizersSnapshot.toList) {
-        case (psid, connectedSynchronizer) =>
-          connectedSynchronizer.topologyClient.currentSnapshotApproximation.map { snapshot =>
-            (psid, snapshot)
-          }
-      }
-      .map(_.toMap)
+    val topologySnapshots = connectedSynchronizersSnapshot.view.mapValues {
+      _.topologyClient.currentSnapshotApproximation
+    }.toMap
 
-    topologySnapshotsUS.map(topologySnapshots =>
-      new RoutingSynchronizerStateImpl(
-        connectedSynchronizers = connectedSynchronizersSnapshot,
-        topologySnapshots = topologySnapshots,
-        syncCryptoPureApiLookup = syncCryptoPureApiLookup,
-      )
+    new RoutingSynchronizerStateImpl(
+      connectedSynchronizers = connectedSynchronizersSnapshot,
+      topologySnapshots = topologySnapshots,
+      syncCryptoPureApiLookup = syncCryptoPureApiLookup,
     )
   }
 }
@@ -65,11 +56,11 @@ class RoutingSynchronizerStateImpl private[routing] (
 ) extends RoutingSynchronizerState {
 
   override def getTopologySnapshotFor(
-      psid: PhysicalSynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   ): Either[UnableToQueryTopologySnapshot.Failed, TopologySnapshotLoader] =
     topologySnapshots
-      .get(psid)
-      .toRight(UnableToQueryTopologySnapshot.Failed(psid))
+      .get(synchronizerId)
+      .toRight(UnableToQueryTopologySnapshot.Failed(synchronizerId))
 
   override def getSynchronizersOfContracts(coids: Seq[LfContractId])(implicit
       ec: ExecutionContext,

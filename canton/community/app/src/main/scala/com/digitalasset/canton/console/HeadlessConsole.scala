@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -18,7 +18,7 @@ import com.digitalasset.canton.console.HeadlessConsole.{
 }
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.ThrowableUtil
+import com.digitalasset.canton.util.ErrorUtil
 import os.PathConvertible.*
 
 import java.io.File
@@ -108,7 +108,7 @@ object HeadlessConsole extends NoTracing {
   final case class RuntimeError(message: String, cause: Throwable) extends HeadlessConsoleError {
     override def toString: String = {
       val messageWithSeparator = if (message.isEmpty) "" else message + " "
-      val exceptionInfo = ThrowableUtil.messageWithStacktrace(cause)
+      val exceptionInfo = ErrorUtil.messageWithStacktrace(cause)
       messageWithSeparator + exceptionInfo
     }
   }

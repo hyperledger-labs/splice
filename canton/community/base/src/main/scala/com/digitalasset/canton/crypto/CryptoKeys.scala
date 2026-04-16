@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -15,7 +15,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.{
 }
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.ToDbPrimitive
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
@@ -59,8 +58,8 @@ object Fingerprint {
   implicit val fingerprintOrder: Order[Fingerprint] =
     Order.by[Fingerprint, String](_.unwrap)
 
-  implicit val fingerprintToDbPrimitive: ToDbPrimitive[Fingerprint, String68] =
-    ToDbPrimitive(_.toLengthLimitedString)
+  implicit val setParameterFingerprint: SetParameter[Fingerprint] = (f, pp) =>
+    pp >> f.toLengthLimitedString
   implicit val getResultFingerprint: GetResult[Fingerprint] = GetResult { r =>
     Fingerprint
       .fromProtoPrimitive(r.nextString())
@@ -204,8 +203,6 @@ trait PublicKey extends CryptoKeyPairKey {
   def purpose: KeyPurpose
 
   def isSigning: Boolean = purpose == KeyPurpose.Signing
-
-  def isEncryption: Boolean = purpose == KeyPurpose.Encryption
 
   def asSigningKey: Option[SigningPublicKey] = this match {
     case k: SigningPublicKey => Some(k)

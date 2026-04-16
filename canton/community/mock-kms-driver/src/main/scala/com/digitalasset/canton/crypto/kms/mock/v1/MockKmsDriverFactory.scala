@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.mock.v1
@@ -12,7 +12,6 @@ import com.digitalasset.canton.config.{
   CryptoConfig,
   CryptoProvider,
   ProcessingTimeout,
-  SessionEncryptionKeyCacheConfig,
 }
 import com.digitalasset.canton.crypto.kms.driver.api.v1.KmsDriverFactory
 import com.digitalasset.canton.crypto.kms.driver.v1.KmsDriverSpecsConverter
@@ -99,14 +98,14 @@ class MockKmsDriverFactory extends KmsDriverFactory {
         .create(
           cryptoConfig,
           cryptoSchemes,
-          SessionEncryptionKeyCacheConfig(),
+          CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
           CachingConfigs.defaultPublicKeyConversionCache,
           cryptoPrivateStore,
           cryptoPublicStore,
           timeouts,
           namedLoggerFactory,
         )
-      // The Mock KMS driver supports all schemes supported by JCE
+
       supportedSigningKeySpecs = convertSpec(
         CryptoProvider.Jce.signingKeys.supported,
         KmsDriverSpecsConverter.convertToDriverSigningKeySpec,

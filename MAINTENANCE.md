@@ -22,9 +22,6 @@
 
 ## Bumping Daml Compiler version
 
-Before bumping a compiler version, make sure that all API packages are excluded from
-compilation. These are conventionally named `splice-api-*`. See [Maintaining Daml Interfaces](DEVELOPMENT.md#maintaining-daml-interfaces).
-
 1. Update the `version` in `nix/daml-compiler-sources.json` to the new daml compiler version.
    The compiler version is then used in two places:
    1. To build all daml packages using `sbt damlBuild`
@@ -42,7 +39,7 @@ Initial setup:
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
 2. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`. This can be added to your private env vars.
 
-Current Canton commit: `c2c5d1fc2420600ca85c3a08b87ccc9efa182862`
+Current Canton commit: `50ef182732c8285cf1bdaeeceac8943b6784e304`
 
 1. Checkout the **current Canton commit listed above** in the Canton open source repo from above, so we can diff our current fork against this checkout.
 2. Change to your checkout of the Splice repo and execute the following steps:

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework
@@ -30,10 +30,6 @@ object PureFun {
 
   final case class Const[A](v: A) extends PureFun[Unit, A] {
     override def apply(v1: Unit): A = v
-  }
-
-  final case class Append(ys: String) extends PureFun[String, String] {
-    override def apply(xs: String): String = xs ++ ys
   }
 
   object Seq {

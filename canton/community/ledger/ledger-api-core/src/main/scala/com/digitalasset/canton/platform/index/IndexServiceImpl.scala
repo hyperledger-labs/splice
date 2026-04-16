@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
@@ -13,13 +13,10 @@ import com.digitalasset.base.error.DamlErrorWithDefiniteAnswer
 import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.health.HealthStatus
-import com.digitalasset.canton.ledger.api.AcsContinuationToken.Checksum
+import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
-  AcsContinuationToken,
   CumulativeFilter,
   EventFormat,
   TraceIdentifiers,
@@ -62,7 +59,14 @@ import com.digitalasset.canton.platform.{
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.store.packagemeta.PackageMetadata.PackageResolution
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{FullIdentifier, Identifier, NameTypeConRef, PackageId}
+import com.digitalasset.daml.lf.data.Ref.{
+  FullIdentifier,
+  Identifier,
+  NameTypeConRef,
+  PackageId,
+  PackageRef,
+  TypeConRef,
+}
 import com.digitalasset.daml.lf.transaction.GlobalKey
 import com.google.rpc.Status
 import io.grpc.StatusRuntimeException
@@ -71,7 +75,6 @@ import org.apache.pekko.stream.scaladsl.{Flow, Source}
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success, Try}
 
 private[index] class IndexServiceImpl(
@@ -115,7 +118,6 @@ private[index] class IndexServiceImpl(
       startExclusive: Option[Offset],
       endInclusive: Option[Offset],
       updateFormat: UpdateFormat,
-      descendingOrder: Boolean,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdatesResponse, NotUsed] = {
     val interfaceViewPackageUpgrade = createViewUpgradeMemoized
     val contextualizedErrorLogger = ErrorLoggingContext(logger, loggingContext)
@@ -150,7 +152,6 @@ private[index] class IndexServiceImpl(
                         startInclusive = startInclusive,
                         endInclusive = endInclusive,
                         internalUpdateFormat = internalUpdateFormat,
-                        descendingOrder = descendingOrder,
                       )
                   }
                   .via(
@@ -165,7 +166,6 @@ private[index] class IndexServiceImpl(
           // when a tailing stream is requested add checkpoint messages
           .via(
             checkpointFlow(
-              startExclusive = startExclusive,
               cond = isTailingStream,
               fetchOffsetCheckpoint = fetchOffsetCheckpoint,
               responseFromCheckpoint = updatesResponse,
@@ -190,7 +190,6 @@ private[index] class IndexServiceImpl(
   //  and applied exactly after an element that has the same or greater offset
   // if the condition is not true the original elements are streamed and the range decorators are ignored
   private def checkpointFlow[T](
-      startExclusive: Option[Offset],
       cond: Boolean,
       fetchOffsetCheckpoint: () => Option[OffsetCheckpoint],
       responseFromCheckpoint: OffsetCheckpoint => T,
@@ -204,18 +203,7 @@ private[index] class IndexServiceImpl(
           idleStreamOffsetCheckpointTimeout.underlying,
           () => (Offset.MaxValue, Timeout), // the offset for timeout is ignored
         )
-        // send the first timeout almost immediately to fetch the initial checkpoint without waiting
-        .mergePreferred(
-          Source.single((Offset.MaxValue, Timeout)).delay(500.millis),
-          preferred = false,
-        )
-        .via(
-          injectCheckpoints(
-            fetchOffsetCheckpoint = fetchOffsetCheckpoint,
-            responseFromCheckpoint = responseFromCheckpoint,
-            startExclusive = startExclusive,
-          )
-        )
+        .via(injectCheckpoints(fetchOffsetCheckpoint, responseFromCheckpoint))
         .map(_._2)
     } else
       Flow[(Offset, Carrier[T])].collect { case (_offset, Element(elem)) =>
@@ -252,7 +240,6 @@ private[index] class IndexServiceImpl(
           )
           .via(
             checkpointFlow(
-              startExclusive = startExclusive,
               cond = true,
               fetchOffsetCheckpoint = fetchOffsetCheckpoint,
               responseFromCheckpoint = completionsResponse,
@@ -265,8 +252,6 @@ private[index] class IndexServiceImpl(
   override def getActiveContracts(
       eventFormat: EventFormat,
       activeAt: Option[Offset],
-      continuationToken: Option[AcsContinuationToken],
-      checksum: Checksum,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -296,8 +281,6 @@ private[index] class IndexServiceImpl(
                 activeAt = activeAt,
                 filter = templateFilter,
                 eventProjectionProperties = eventProjectionProperties,
-                continuationToken = continuationToken,
-                checksum = checksum,
               )
           }
         activeContractsSource
@@ -386,18 +369,17 @@ private[index] class IndexServiceImpl(
 
   override def listKnownParties(
       fromExcl: Option[Party],
-      filterString: Option[String185],
       maxResults: Int,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[List[IndexerPartyDetails]] =
-    ledgerDao.listKnownParties(fromExcl, filterString, maxResults)
+    ledgerDao.listKnownParties(fromExcl, maxResults)
 
   override def prune(
       previousPruneUpToInclusive: Option[Offset],
       previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpToInclusive: Offset,
-      incompleteReassignmentOffsets: Vector[Offset],
+      incompletReassignmentOffsets: Vector[Offset],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Unit] = {
@@ -406,11 +388,11 @@ private[index] class IndexServiceImpl(
       previousPruneUpToInclusive = previousPruneUpToInclusive,
       previousIncompleteReassignmentOffsets = previousIncompleteReassignmentOffsets,
       pruneUpToInclusive = pruneUpToInclusive,
-      incompleteReassignmentOffsets = incompleteReassignmentOffsets,
+      incompletReassignmentOffsets = incompletReassignmentOffsets,
     )
   }
 
-  override def indexDbPrunedUpto(implicit
+  override def indexDbPrunedUpTo(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[Offset]] =
     ledgerDao.indexDbPrunedUpTo
@@ -480,9 +462,7 @@ private[index] class IndexServiceImpl(
     val memoizedSelection =
       TrieMap.empty[(Identifier, Ref.PackageName), Future[Either[Status, Ref.PackageId]]]
     val contextualizedErrorLogger = ErrorLoggingContext(logger, loggingContextWithTrace)
-    implicit val directExecutionContext: DirectExecutionContext = DirectExecutionContext(
-      noTracingLogger
-    )
+    implicit val directExecutionContext: DirectExecutionContext = DirectExecutionContext(logger)
 
     def handlePreferredPackageVersionError(
         computeUpgradeResult: Try[Either[String, Ref.PackageId]],
@@ -571,14 +551,6 @@ private[index] class IndexServiceImpl(
         }
     }
   }
-
-  override def lookupNonUniqueContractKey(
-      readers: Set[Party],
-      key: Key,
-      pageToken: Option[Long],
-      limit: Int,
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ContractKeyPage] =
-    contractStore.lookupNonUniqueContractKey(readers, key, pageToken, limit)
 }
 
 object IndexServiceImpl {
@@ -610,26 +582,33 @@ object IndexServiceImpl {
       contextualizedErrorLogger: ErrorLoggingContext
   ): Either[DamlErrorWithDefiniteAnswer, Unit] = {
     val unknownPackageNames = Set.newBuilder[Ref.PackageName]
+    val unknownTemplateIds = Set.newBuilder[Identifier]
+    val unknownInterfaceIds = Set.newBuilder[Identifier]
     val packageNamesWithNoTemplatesForQualifiedNameBuilder =
       Set.newBuilder[(Ref.PackageName, Ref.QualifiedName)]
     val packageNamesWithNoInterfacesForQualifiedNameBuilder =
       Set.newBuilder[(Ref.PackageName, Ref.QualifiedName)]
 
-    def checkNameTypeConRef(
+    def checkTypeConRef(
         knownIds: Set[Identifier],
-        handleUnknownIdForPkgName: ((Ref.PackageName, Ref.QualifiedName)) => Unit,
-        handleUnknownPkgName: Ref.PackageName => Unit,
-    )(nameTypeConRef: NameTypeConRef): Unit = {
-      val packageName = nameTypeConRef.pkg.name
-      metadata.packageNameMap.get(packageName) match {
-        case Some(PackageResolution(_, allPackageIdsForName))
-            if !allPackageIdsForName.view
-              .map(Ref.Identifier(_, nameTypeConRef.qualifiedName))
-              .exists(knownIds) =>
-          handleUnknownIdForPkgName(packageName -> nameTypeConRef.qualifiedName)
-        case None => handleUnknownPkgName(packageName)
-        case _ => ()
-      }
+        handleUnknownIdForPkgName: (((Ref.PackageName, Ref.QualifiedName)) => Unit),
+        handleUnknownId: (Identifier => Unit),
+        handleUnknownPkgName: (Ref.PackageName => Unit),
+    )(typeConRef: TypeConRef): Unit = typeConRef match {
+      case TypeConRef(PackageRef.Name(packageName), qualifiedName) =>
+        metadata.packageNameMap.get(packageName) match {
+          case Some(PackageResolution(_, allPackageIdsForName))
+              if !allPackageIdsForName.view
+                .map(Ref.Identifier(_, qualifiedName))
+                .exists(knownIds) =>
+            handleUnknownIdForPkgName(packageName -> qualifiedName)
+          case None => handleUnknownPkgName(packageName)
+          case _ => ()
+        }
+
+      case TypeConRef(PackageRef.Id(packageId), qName) =>
+        val id = Identifier(packageId, qName)
+        if (!knownIds.contains(id)) handleUnknownId(id)
     }
 
     val cumulativeFilters = apiEventFormat.filtersByParty.iterator.map(
@@ -641,24 +620,28 @@ object IndexServiceImpl {
         templateFilters.iterator
           .map(_.templateTypeRef)
           .foreach(
-            checkNameTypeConRef(
+            checkTypeConRef(
               metadata.templates,
-              packageNamesWithNoTemplatesForQualifiedNameBuilder += _,
-              unknownPackageNames += _,
+              (packageNamesWithNoTemplatesForQualifiedNameBuilder += _),
+              (unknownTemplateIds += _),
+              (unknownPackageNames += _),
             )
           )
         interfaceFilters.iterator
           .map(_.interfaceTypeRef)
           .foreach(
-            checkNameTypeConRef(
+            checkTypeConRef(
               metadata.interfaces,
-              packageNamesWithNoInterfacesForQualifiedNameBuilder += _,
-              unknownPackageNames += _,
+              (packageNamesWithNoInterfacesForQualifiedNameBuilder += _),
+              (unknownInterfaceIds += _),
+              (unknownPackageNames += _),
             )
           )
     }
 
     val packageNames = unknownPackageNames.result()
+    val templateIds = unknownTemplateIds.result()
+    val interfaceIds = unknownInterfaceIds.result()
     val packageNamesWithNoTemplatesForQualifiedName =
       packageNamesWithNoTemplatesForQualifiedNameBuilder.result()
     val packageNamesWithNoInterfacesForQualifiedName =
@@ -683,6 +666,14 @@ object IndexServiceImpl {
         RequestValidationErrors.NotFound.NoInterfaceForPackageNameAndQualifiedName.Reject(
           packageNamesWithNoInterfacesForQualifiedName
         ),
+      )
+      _ <- Either.cond(
+        templateIds.isEmpty && interfaceIds.isEmpty,
+        (),
+        RequestValidationErrors.NotFound.TemplateOrInterfaceIdsNotFound
+          .Reject(unknownTemplatesOrInterfaces =
+            (templateIds.view.map(Left(_)) ++ interfaceIds.view.map(Right(_))).toSeq
+          ),
       )
     } yield ()
   }
@@ -842,7 +833,7 @@ object IndexServiceImpl {
           )
         metadata
           .resolveTypeConRef(
-            Ref.NameTypeConRef(
+            Ref.TypeConRef(
               Ref.PackageRef.Name(packageName),
               originalInterfaceImplementation.qualifiedName,
             )
@@ -946,7 +937,6 @@ object IndexServiceImpl {
   def injectCheckpoints[T](
       fetchOffsetCheckpoint: () => Option[OffsetCheckpoint],
       responseFromCheckpoint: OffsetCheckpoint => T,
-      startExclusive: Option[Offset],
   ): Flow[(Offset, Carrier[T]), (Offset, T), NotUsed] =
     Flow[(Offset, Carrier[T])]
       .statefulMap[
@@ -1004,12 +994,9 @@ object IndexServiceImpl {
               val relevantCheckpointO = fetchOffsetCheckpoint().collect {
                 case c: OffsetCheckpoint
                     if lastStreamedCheckpointO.fold(true)(_.offset < c.offset) &&
-                      // check that we are not in the middle of a range or no elements have been processed (either
-                      // because we are polling elements at ledger end or because Timeout arrived before any other element)
+                      // check that we are not in the middle of a range
                       processedElemO
-                        .fold(startExclusive == Option(c.offset))(e =>
-                          e._2.isRangeEnd && e._1 == c.offset
-                        ) =>
+                        .fold(false)(e => e._2.isRangeEnd && e._1 == c.offset) =>
                   c
               }
               val response =

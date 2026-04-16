@@ -3,24 +3,19 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
-import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnection}
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
-import com.digitalasset.canton.topology.{
-  ForceFlag,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-  UniqueIdentifier,
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -28,78 +23,70 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.Code.{
   NamespaceDelegation,
   OwnerToKeyMapping,
 }
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
+import org.lfdecentralizedtrust.splice.config.PruningConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
   * Note that this is optional. An SV app can run without a dedicated domain node.
   * TODO(DACH-NY/canton-network-node#5195) Consider making this mandatory.
   */
-class LocalSynchronizerNode(
+final class LocalSynchronizerNode(
     participantAdminConnection: ParticipantAdminConnection,
     override val sequencerAdminConnection: SequencerAdminConnection,
     override val mediatorAdminConnection: MediatorAdminConnection,
+    val staticDomainParameters: StaticSynchronizerParameters,
+    val sequencerInternalConfig: ClientConfig,
+    override val sequencerExternalPublicUrl: String,
+    override val sequencerAvailabilityDelay: Duration,
+    val sequencerPruningConfig: Option[SequencerPruningConfig],
+    override val mediatorSequencerAmplification: SubmissionRequestAmplification,
+    val mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
-    val config: SvSynchronizerNodeConfig,
-    override val cometbftNode: Option[CometBftNode],
+    mediatorPruningConfig: Option[PruningConfig],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
-) extends SvSynchronizerNode(
+) extends SynchronizerNode(
       sequencerAdminConnection,
       mediatorAdminConnection,
-      config.sequencer.externalPublicApiUrl,
-      config.sequencer.sequencerAvailabilityDelay.asJava,
+      sequencerExternalPublicUrl,
+      sequencerAvailabilityDelay,
       sequencerConfig,
-      config.mediator.sequencerRequestAmplification,
-      config.mediator.sequencerConnectionPoolDelays,
-      cometbftNode,
+      mediatorSequencerAmplification,
     )
     with RetryProvider.Has
     with FlagCloseable
     with NamedLogging {
 
-  val internalSequencerConnection: GrpcSequencerConnection =
-    LocalSynchronizerNode.toSequencerConnection(config.sequencer.internalApi)
-
-  val sequencerInternalConfig: com.digitalasset.canton.config.ClientConfig =
-    config.sequencer.internalApi
-
-  val sequencerPruningConfig
-      : Option[org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig] =
-    config.sequencer.pruning
-
-  def staticSynchronizerParameters(serial: NonNegativeInt): StaticSynchronizerParameters = {
-    SynchronizerParametersConfig()
-      .toStaticSynchronizerParameters(
-        CryptoConfig(provider = CryptoProvider.Jce),
-        config.protocolVersion,
-        config.serial
-          .getOrElse(serial),
-      )
-      .valueOr(err => throw new IllegalArgumentException(s"Invalid domain parameters config: $err"))
-      .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal)
-  }
+  val sequencerConnection: GrpcSequencerConnection =
+    LocalSynchronizerNode.toSequencerConnection(sequencerInternalConfig)
 
   private def containsIdentityTransactions(
       uid: UniqueIdentifier,
@@ -309,9 +296,9 @@ class LocalSynchronizerNode(
           case NodeStatus.NotInitialized(_, _) =>
             mediatorAdminConnection.initialize(
               synchronizerId,
-              internalSequencerConnection,
-              mediatorSequencerAmplification.toInternal,
-              mediatorSequencerConnectionPoolDelays.toInternal,
+              sequencerConnection,
+              mediatorSequencerAmplification,
+              mediatorSequencerConnectionPoolDelays,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -400,8 +387,7 @@ class LocalSynchronizerNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnection: => Future[SvConnection],
-      preInit: () => Future[Unit],
+      svConnection: => Future[SvConnection]
   )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] =
     retryProvider
       .getValueWithRetries(
@@ -414,8 +400,7 @@ class LocalSynchronizerNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_, _)) =>
           logger.info("Onboarding sequencer")
-          svConnection
-            .flatMap(svConnection => preInit().flatMap(_ => onboardLocalSequencer(svConnection)))
+          svConnection.flatMap(onboardLocalSequencer(_))
         case Right(NodeStatus.Success(s)) =>
           logger.info("Sequencer is already onboarded")
           Future.successful(s.synchronizerId)
@@ -502,7 +487,7 @@ class LocalSynchronizerNode(
       } yield connections match {
         case Seq(connection) =>
           if (
-            sequencerConnections.submissionRequestAmplification == mediatorSequencerAmplification.toInternal
+            sequencerConnections.submissionRequestAmplification == mediatorSequencerAmplification
           ) {
             Right(())
           } else {
@@ -518,15 +503,15 @@ class LocalSynchronizerNode(
       (sequencerConnection: SequencerConnection) =>
         mediatorAdminConnection.setSequencerConnection(
           sequencerConnection,
-          mediatorSequencerAmplification.toInternal,
-          mediatorSequencerConnectionPoolDelays.toInternal,
+          mediatorSequencerAmplification,
+          mediatorSequencerConnectionPoolDelays,
         ),
       logger,
     )
 
   def ensureMediatorPruningSchedule()(implicit tc: TraceContext): Future[Unit] =
     mediatorAdminConnection.ensurePruningSchedule(
-      config.mediator.pruning
+      mediatorPruningConfig
     )
 
   override protected def onClosed(): Unit = {
@@ -540,8 +525,8 @@ object LocalSynchronizerNode {
 
   // TODO(DACH-NY/canton-network-node#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
-  private def toEndpoints(config: ClientConfig): NonEmpty[Set[Endpoint]] =
-    NonEmpty.mk(Set, toEndpoint(config))
+  private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
+    NonEmpty.mk(Seq, toEndpoint(config))
 
   private def toSequencerConnection(
       config: ClientConfig,

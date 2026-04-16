@@ -1,10 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.sequencing.client.transports.replay.ReplayClient
+import com.digitalasset.canton.sequencing.client.transports.replay.ReplayingSendsSequencerClientTransport
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -51,24 +51,26 @@ object ReplayAction {
   case object SequencerEvents extends ReplayAction
 
   /** Replay sends that were made to the sequencer. Tests can control the
-    * [[transports.replay.ReplayClient]] once constructed by waiting for the `replayClient` future
-    * to be completed with the `ReplayClient` instance.
+    * [[transports.replay.ReplayingSendsSequencerClientTransport]] once constructed by waiting for
+    * the `transport` future to be completed with the transport instance.
     */
   final case class SequencerSends(
       override protected val loggerFactory: NamedLoggerFactory,
       sendTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.tryOfSeconds(20),
-      private val replayClientP: Promise[ReplayClient] = Promise[ReplayClient](),
+      private val transportP: Promise[ReplayingSendsSequencerClientTransport] =
+        Promise[ReplayingSendsSequencerClientTransport](),
       usePekko: Boolean = false,
   ) extends ReplayAction
       with NamedLogging {
 
-    private[client] def publishReplayClient(
-        replayClient: ReplayClient
+    /** Used by the transport to notify a test that the transport is ready */
+    private[client] def publishTransport(
+        transport: ReplayingSendsSequencerClientTransport
     ): Unit =
-      if (replayClientP.trySuccess(replayClient)) {
-        logger.info("Publishing replay client")(TraceContext.empty)
+      if (transportP.trySuccess(transport)) {
+        logger.info("Publishing transport")(TraceContext.empty)
       }
 
-    val replayClient: Future[ReplayClient] = replayClientP.future
+    val transport: Future[ReplayingSendsSequencerClientTransport] = transportP.future
   }
 }

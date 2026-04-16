@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -10,8 +10,13 @@ import com.daml.metrics.api.opentelemetry.{
 }
 import com.daml.metrics.api.{MetricQualification, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.{HistogramDefinition, MetricsFilterConfig}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  NonNegativeFiniteDuration,
+  UniformCantonConfigValidation,
+}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
@@ -23,8 +28,8 @@ import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.metrics.Meter
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
-import io.opentelemetry.instrumentation.runtimetelemetry.RuntimeTelemetry
-import io.opentelemetry.instrumentation.runtimetelemetry.internal.Experimental
+import io.opentelemetry.instrumentation.runtimemetrics.java8.*
+import io.opentelemetry.instrumentation.runtimemetrics.java8.internal.ExperimentalBufferPools
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder
 import io.opentelemetry.sdk.metrics.`export`.{MetricExporter, MetricReader, PeriodicMetricReader}
 import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
@@ -32,7 +37,6 @@ import org.slf4j.helpers.NOPLogger
 
 import java.io.File
 import java.util.concurrent.ScheduledExecutorService
-import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
 
 /** Configure metric instrumentiation
@@ -40,7 +44,7 @@ import scala.collection.concurrent.TrieMap
   * @param reporters
   *   which reports should be used to report metric output
   * @param jvmMetrics
-  *   JVM metrics report configuration
+  *   if true, then JvmMetrics will be reported
   * @param histograms
   *   customized histogram definitions
   * @param qualifiers
@@ -58,7 +62,7 @@ final case class MetricsConfig(
       MetricQualification.Saturation,
       MetricQualification.Traffic,
     ),
-) {
+) extends UniformCantonConfigValidation {
 
   // if empty, no filter, otherwise, the union of all filters
   val globalFilters: Seq[MetricsFilterConfig] =
@@ -70,56 +74,34 @@ final case class MetricsConfig(
 }
 
 object MetricsConfig {
+  implicit val metricsConfigCantonConfigValidator: CantonConfigValidator[MetricsConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[MetricsConfig]
+  }
 
   /** Control and enable jvm metrics */
-  @nowarn("cat=deprecation")
   final case class JvmMetrics(
       enabled: Boolean = false,
-      experimental: Boolean = false,
-      // Since OTel instrumentation 2.26.0, individual JVM metric classes were unified into
-      // RuntimeTelemetry. All standard metrics (classes, cpu, memory, threads, gc) are always
-      // registered. Experimental metrics (e.g. buffer pools) are controlled via the
-      // experimental flag. See https://github.com/open-telemetry/opentelemetry-java-instrumentation/pull/16087 for details.s
-      @deprecated(
-        "Per-metric granularity no longer supported. All standard JVM metrics are always enabled.",
-        since = "3.5.0",
-      )
       classes: Boolean = true,
-      @deprecated(
-        "Per-metric granularity no longer supported. All standard JVM metrics are always enabled.",
-        since = "3.5.0",
-      )
       cpu: Boolean = true,
-      @deprecated(
-        "Per-metric granularity no longer supported. All standard JVM metrics are always enabled.",
-        since = "3.5.0",
-      )
       memoryPools: Boolean = true,
-      @deprecated(
-        "Per-metric granularity no longer supported. All standard JVM metrics are always enabled.",
-        since = "3.5.0",
-      )
       threads: Boolean = true,
-      @deprecated(
-        "Per-metric granularity no longer supported. All standard JVM metrics are always enabled.",
-        since = "3.5.0",
-      )
       gc: Boolean = true,
-      @deprecated(
-        "Per-metric granularity no longer supported. Use 'experimental' instead.",
-        since = "3.5.0",
-      )
       buffers: Boolean = true,
-  )
+  ) extends UniformCantonConfigValidation
 
   object JvmMetrics {
+    implicit val jvmMetricsCanontConfigValidator: CantonConfigValidator[JvmMetrics] =
+      CantonConfigValidatorDerivation[JvmMetrics]
 
     def setup(config: JvmMetrics, openTelemetry: OpenTelemetry): Unit =
       if (config.enabled) {
-        val builder = RuntimeTelemetry.builder(openTelemetry)
-        if (config.experimental || (config.buffers: @nowarn("cat=deprecation")))
-          Experimental.setEmitExperimentalMetrics(builder, true)
-        builder.build().discard
+        if (config.classes) Classes.registerObservers(openTelemetry).discard
+        if (config.cpu) Cpu.registerObservers(openTelemetry).discard
+        if (config.memoryPools) MemoryPools.registerObservers(openTelemetry).discard
+        if (config.threads) Threads.registerObservers(openTelemetry).discard
+        if (config.gc) GarbageCollector.registerObservers(openTelemetry).discard
+        if (config.buffers) ExperimentalBufferPools.registerObservers(openTelemetry).discard
       }
   }
 
@@ -132,11 +114,18 @@ sealed trait MetricsReporterConfig {
 
 object MetricsReporterConfig {
 
+  implicit val metricsReporterConfigCantonConfigValidator
+      : CantonConfigValidator[MetricsReporterConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[MetricsReporterConfig]
+  }
+
   final case class Prometheus(
       address: String = "localhost",
       port: Port = Port.tryCreate(9464),
       filters: Seq[MetricsFilterConfig] = Seq.empty,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
   /** CSV metrics reporter configuration
     *
@@ -158,6 +147,7 @@ object MetricsReporterConfig {
       contextKeys: Set[String] = Set("node", "synchronizer"),
       filters: Seq[MetricsFilterConfig] = Seq.empty,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
   /** Log metrics reporter configuration
     *
@@ -173,6 +163,7 @@ object MetricsReporterConfig {
       filters: Seq[MetricsFilterConfig] = Seq.empty,
       logAsInfo: Boolean = true,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
 }
 final case class MetricsRegistry(

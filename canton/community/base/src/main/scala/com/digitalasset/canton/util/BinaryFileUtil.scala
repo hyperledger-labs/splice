@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -45,7 +45,7 @@ object BinaryFileUtil {
           Left(s"No such file [$inputFile].")
         else
           Left(
-            s"File exists but cannot be read [$inputFile]. ${ThrowableUtil.messageWithStacktrace(e)}"
+            s"File exists but cannot be read [$inputFile]. ${ErrorUtil.messageWithStacktrace(e)}"
           )
     } finally {
       bis.foreach(_.close())

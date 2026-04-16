@@ -1,10 +1,8 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
 
-import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.logging.{LogEntry, SuppressingLogger}
@@ -27,11 +25,7 @@ class ExecutionContextMonitorTest extends AnyWordSpec with BaseTest {
       )
 
     val ecName = loggerFactory.threadName + "test-my-ec"
-    implicit val ec = Threading.newExecutionContext(
-      ecName,
-      noTracingLogger,
-      new ExecutorServiceMetrics(NoOpMetricsFactory),
-    )
+    implicit val ec = Threading.newExecutionContext(ecName, noTracingLogger)
     val monitor =
       new ExecutionContextMonitor(
         loggerFactory,

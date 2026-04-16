@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -37,15 +37,11 @@ object UsableSynchronizers {
   /** Split the synchronizers in two categories:
     *   - Synchronizers that cannot be used
     *   - synchronizer that can be used
-    * @param hashingSchemeVersion:
-    *   For externally signed transactions, the version of the algorithm used to hash the
-    *   transaction
     */
   def check(
       synchronizers: List[(PhysicalSynchronizerId, TopologySnapshot)],
       transaction: LfVersionedTransaction,
       ledgerTime: CantonTimestamp,
-      hashingSchemeVersion: Option[HashingSchemeVersion],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -58,7 +54,8 @@ object UsableSynchronizers {
             snapshot,
             transaction,
             ledgerTime,
-            hashingSchemeVersion,
+            // TODO(i20688): use ISV to select synchronizer
+            Option.empty[HashingSchemeVersion],
           )
           .map(_ => synchronizerId)
           .value
@@ -177,7 +174,7 @@ object UsableSynchronizers {
       tc: TraceContext
   ): FutureUnlessShutdown[UnknownOrUnvettedPackages] = {
     val (participantId, required) = participantIdAndRequiredPackages
-    snapshot.loadUnvettedPackagesOrDependencies(participantId, required, ledgerTime)
+    snapshot.findUnvettedPackagesOrDependencies(participantId, required, ledgerTime)
   }
 
   private def resolveParticipants(

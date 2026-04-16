@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.continuity
@@ -21,7 +21,6 @@ import com.digitalasset.canton.integration.plugins.UseLedgerApiTestTool.{
 import com.digitalasset.canton.integration.tests.ledgerapi.LedgerApiConformanceBase
 import com.digitalasset.canton.integration.tests.ledgerapi.LedgerApiConformanceBase.excludedTests
 import com.digitalasset.canton.integration.tests.ledgerapi.SuppressionRules.ApiUserManagementServiceSuppressionRule
-import com.digitalasset.canton.integration.util.TestUtils
 import com.digitalasset.canton.integration.{
   ConfigTransforms,
   EnvironmentDefinition,
@@ -86,7 +85,6 @@ trait ProtocolContinuityConformanceTest
     EnvironmentDefinition.P1S1M1_Manual
       .addConfigTransforms(ConfigTransforms.clearMinimumProtocolVersion*)
       .addConfigTransforms(ConfigTransforms.dontWarnOnDeprecatedPV*)
-      .withTrafficControl(TestUtils.waitForTargetTimeOnSynchronizerNode(wallClock.now, logger))
 
   protected def testedReleases: List[TestedRelease]
   override lazy val ledgerApiTestToolVersions: List[String] =
@@ -181,7 +179,6 @@ trait ProtocolContinuityConformanceTestParticipant extends ProtocolContinuityCon
     EnvironmentDefinition
       .buildBaseEnvironmentDefinition(1, 1, 1)
       .withManualStart
-      .withTrafficControl(TestUtils.waitForTargetTimeOnSynchronizerNode(wallClock.now, logger))
 
   registerPlugin(external)
 

@@ -1,15 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.jsonapi
 
 import better.files.File
 import com.daml.ledger.api.v2.package_service.ListPackagesResponse
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.http.json.v2.JsPackageCodecs.*
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.AllTemplatesResponse
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.allTemplatesResponseCodec
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.tests.jsonapi.AbstractHttpServiceIntegrationTestFuns.HttpServiceTestFixtureData
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentDefinition}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -19,10 +20,11 @@ import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.typesig.reader.DamlLfArchiveReader
 import com.google.protobuf
 import com.google.protobuf.ByteString
-import io.circe.parser.{decode, parse}
+import io.circe.parser.decode
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, StatusCode, StatusCodes, Uri}
 import org.scalatest.Assertion
+import spray.json.*
 
 import java.nio.file.Files
 import scala.concurrent.Future
@@ -55,11 +57,10 @@ class JsonDamlDefinitionsServiceTest
       )
     )
 
-  registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   "Daml definitions service" should {
-    "output the definitions of the reference DAR" onlyRunWithOrGreaterThan (ProtocolVersion.v35) in httpTestFixture {
+    "output the definitions of the reference DAR" onlyRunWithOrGreaterThan (ProtocolVersion.dev) in httpTestFixture {
       fixture =>
         val darContent: ByteString =
           protobuf.ByteString.copyFrom(Files.readAllBytes(File(ReferenceTestDar).path))
@@ -79,7 +80,7 @@ class JsonDamlDefinitionsServiceTest
                 .getRequestString(Uri.Path(s"/v2/definitions/packages/$packageId"), headers)
                 .map { case (code, packageSigResult) =>
                   code should be(StatusCodes.OK)
-                  val prettyResult = prettySortedJsonString(packageSigResult)
+                  val prettyResult = packageSigResult.parseJson.sortedPrint
                   File(s"$RootTestResources/$packageId/package-signature.json")
                     .createFileIfNotExists()
                     .overwrite(prettyResult)
@@ -107,7 +108,7 @@ class JsonDamlDefinitionsServiceTest
 
                   val templateIdPath =
                     s"$RootTestResources/$packageId/${windowsSafeTemplateId(templateId.toString())}.json"
-                  val prettyResult = prettySortedJsonString(templateDefResult)
+                  val prettyResult = templateDefResult.parseJson.sortedPrint
                   File(templateIdPath)
                     .createFileIfNotExists()
                     .overwrite(prettyResult)
@@ -120,7 +121,7 @@ class JsonDamlDefinitionsServiceTest
     }
 
     // TODO(#27652): re-enable after using DARs generated with SBT or non-dev dars
-    "validate the definitions in the golden DAR against the golden files" onlyRunWithOrGreaterThan ProtocolVersion.v35 ignore httpTestFixture {
+    "validate the definitions in the golden DAR against the golden files" onlyRunWithOrGreaterThan ProtocolVersion.dev ignore httpTestFixture {
       fixture =>
         val darContent: ByteString =
           protobuf.ByteString.copyFrom(Files.readAllBytes(File(GoldenTestDar).path))
@@ -135,11 +136,11 @@ class JsonDamlDefinitionsServiceTest
             code should be(StatusCodes.OK)
 
             val expected =
-              prettySortedJsonString(
-                File(s"$RootTestResources/$pkgId/$goldenFile.json").contentAsString
-              )
+              File(
+                s"$RootTestResources/$pkgId/$goldenFile.json"
+              ).contentAsString.parseJson.sortedPrint
 
-            val prettyResult = prettySortedJsonString(result)
+            val prettyResult = result.parseJson.sortedPrint
             prettyResult shouldBe expected
           }
 
@@ -220,10 +221,4 @@ class JsonDamlDefinitionsServiceTest
 
   private def windowsSafeTemplateId(templateId: String): String =
     templateId.replaceAll("\\:", "_")
-
-  private def prettySortedJsonString(s: String): String =
-    parse(s) match {
-      case Left(err) => throw new RuntimeException(s"Failed to parse JSON", err)
-      case Right(j) => j.spaces2SortKeys
-    }
 }

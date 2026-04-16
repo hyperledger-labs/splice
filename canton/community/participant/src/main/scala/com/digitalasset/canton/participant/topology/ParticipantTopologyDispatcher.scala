@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.topology
@@ -61,7 +61,6 @@ class ParticipantTopologyDispatcher(
     val manager: AuthorizedTopologyManager,
     participantId: ParticipantId,
     state: SyncPersistentStateManager,
-    topologyManagerLookup: PhysicalSynchronizerId => Option[SynchronizerTopologyManager],
     topologyConfig: TopologyConfig,
     crypto: Crypto,
     clock: Clock,
@@ -100,7 +99,8 @@ class ParticipantTopologyDispatcher(
   )(implicit traceContext: TraceContext): Unit =
     synchronizers.remove(synchronizerId) match {
       case Some(outboxes) =>
-        LifeCycle.close(outboxes*)(logger)
+        disconnectOutboxes(synchronizerId)
+        outboxes.foreach(_.close())
       case None =>
         logger.debug(s"Topology pusher already disconnected from $synchronizerId")
     }
@@ -137,7 +137,7 @@ class ParticipantTopologyDispatcher(
       )
 
   private def managerQueueSize: Int =
-    manager.queueSize + synchronizers.keys.flatMap(topologyManagerLookup).map(_.queueSize).sum
+    manager.queueSize + state.getAll.values.map(_.topologyManager.queueSize).sum
 
   // connect to manager
   manager.addObserver(new TopologyManagerObserver {
@@ -158,13 +158,12 @@ class ParticipantTopologyDispatcher(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] = {
     val logicalSynchronizerId = synchronizerId.logical
-    val requiredFeatureFlagsForPV =
-      ParticipantProtocolFeatureFlags.requiredFeatureFlagsByPV.getOrElse(
-        synchronizerId.protocolVersion,
-        Set.empty,
-      )
+    val featureFlagsForPV = ParticipantProtocolFeatureFlags.supportedFeatureFlagsByPV.getOrElse(
+      synchronizerId.protocolVersion,
+      Set.empty,
+    )
 
-    def alreadyTrustedInStore(
+    def alreadyTrustedInStoreWithSupportedFeatures(
         store: TopologyStore[?]
     ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Boolean] =
       EitherT.right(
@@ -179,7 +178,13 @@ class ParticipantTopologyDispatcher(
               filterNamespace = None,
             )
             .map(_.toTopologyState.exists {
-              case SynchronizerTrustCertificate(`participantId`, `logicalSynchronizerId`, _) => true
+              // If certificate is missing feature flags, re-issue the trust certificate with it
+              case SynchronizerTrustCertificate(
+                    `participantId`,
+                    `logicalSynchronizerId`,
+                    featureFlags,
+                  ) =>
+                featureFlagsForPV.diff(featureFlags.toSet).isEmpty
               case _ => false
             })
         )
@@ -189,7 +194,7 @@ class ParticipantTopologyDispatcher(
         state: SyncPersistentState
     ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] =
       MonadUtil.unlessM(
-        alreadyTrustedInStore(manager.store)
+        alreadyTrustedInStoreWithSupportedFeatures(manager.store)
       ) {
         synchronizeWithClosing(functionFullName) {
           manager
@@ -198,7 +203,7 @@ class ParticipantTopologyDispatcher(
               SynchronizerTrustCertificate(
                 participantId,
                 logicalSynchronizerId,
-                requiredFeatureFlagsForPV.toSeq,
+                featureFlagsForPV.toSeq,
               ),
               serial = None,
               signingKeys = Seq.empty,
@@ -217,7 +222,7 @@ class ParticipantTopologyDispatcher(
     // check if cert already exists in the synchronizer store
     getState(synchronizerId).flatMap(state =>
       MonadUtil.unlessM(
-        alreadyTrustedInStore(state.topologyStore)
+        alreadyTrustedInStoreWithSupportedFeatures(state.topologyStore)
       )(
         trustSynchronizer(state)
       )
@@ -271,71 +276,67 @@ class ParticipantTopologyDispatcher(
       override def synchronizerConnected()(implicit
           traceContext: TraceContext
       ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] =
-        for {
-          state <- getState(sequencerClient.psid)
-          topologyManager <- EitherT.fromOption[FutureUnlessShutdown](
-            topologyManagerLookup(sequencerClient.psid),
-            SynchronizerRegistryError.SynchronizerRegistryInternalError.InvalidState(
-              s"Cannot find topology manager for ${sequencerClient.psid} even thought the participant is connected to the synchronizer."
-            ): SynchronizerRegistryError,
-          )
-          queueBasedSynchronizerOutbox = new QueueBasedSynchronizerOutbox(
-            synchronizerAlias = synchronizerAlias,
-            memberId = participantId,
-            handle = handle,
-            targetClient = client,
-            synchronizerOutboxQueue = topologyManager.outboxQueue,
-            targetStore = state.topologyStore,
-            timeouts = timeouts,
-            loggerFactory = synchronizerLoggerFactory,
-            crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
-            topologyConfig = topologyConfig,
-          )
-
-          // The store-based outbox is hooked up automatically by way of being added
-          // to the synchronizers map. The topology manager for the authorized store
-          // dynamically looks up all registered store-based outboxes and notifies them of
-          // new transactions.
-          storeBasedSynchronizerOutbox = new StoreBasedSynchronizerOutbox(
-            synchronizerAlias = synchronizerAlias,
-            memberId = participantId,
-            handle = handle,
-            targetClient = client,
-            authorizedStore = manager.store,
-            targetStore = state.topologyStore,
-            timeouts = timeouts,
-            loggerFactory = loggerFactory,
-            crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
-            topologyConfig = topologyConfig,
-            futureSupervisor = futureSupervisor,
-          )
-          psid = client.psid
-          _ = ErrorUtil.requireState(
-            !synchronizers.contains(psid),
-            s"topology pusher for $psid already exists",
-          )
-          outboxes = NonEmpty(Seq, queueBasedSynchronizerOutbox, storeBasedSynchronizerOutbox)
-          _ = synchronizers += psid -> outboxes
-
-          // attach the queue-based outbox to the SynchronizerTopologyManager.
-          _ = topologyManager.addObserver(new TopologyManagerObserver {
-            override def addedNewTransactions(
-                timestamp: CantonTimestamp,
-                transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-            )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-              queueBasedSynchronizerOutbox.newTransactionsAdded(
-                timestamp,
-                transactions.size,
-              )
-          })
-
-          _ <- outboxes.forgetNE.parTraverse_(
-            _.startup().leftMap(
-              SynchronizerRegistryError.InitialOnboardingError.Error(_): SynchronizerRegistryError
+        getState(sequencerClient.psid)
+          .flatMap { state =>
+            val queueBasedSynchronizerOutbox = new QueueBasedSynchronizerOutbox(
+              synchronizerAlias = synchronizerAlias,
+              memberId = participantId,
+              handle = handle,
+              targetClient = client,
+              synchronizerOutboxQueue = state.synchronizerOutboxQueue,
+              targetStore = state.topologyStore,
+              timeouts = timeouts,
+              loggerFactory = synchronizerLoggerFactory,
+              crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
+              topologyConfig = topologyConfig,
             )
-          )
-        } yield ()
+
+            val storeBasedSynchronizerOutbox = new StoreBasedSynchronizerOutbox(
+              synchronizerAlias = synchronizerAlias,
+              memberId = participantId,
+              handle = handle,
+              targetClient = client,
+              authorizedStore = manager.store,
+              targetStore = state.topologyStore,
+              timeouts = timeouts,
+              loggerFactory = loggerFactory,
+              crypto = SynchronizerCrypto(crypto, state.staticSynchronizerParameters),
+              topologyConfig = topologyConfig,
+              futureSupervisor = futureSupervisor,
+            )
+            val psid = client.psid
+            ErrorUtil.requireState(
+              !synchronizers.contains(psid),
+              s"topology pusher for $psid already exists",
+            )
+            val outboxes = NonEmpty(Seq, queueBasedSynchronizerOutbox, storeBasedSynchronizerOutbox)
+            synchronizers += psid -> outboxes
+
+            state.topologyManager.addObserver(new TopologyManagerObserver {
+              override def addedNewTransactions(
+                  timestamp: CantonTimestamp,
+                  transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
+              )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+                queueBasedSynchronizerOutbox.newTransactionsAdded(
+                  timestamp,
+                  transactions.size,
+                )
+            })
+
+            outboxes.forgetNE.parTraverse_(
+              _.startup().leftMap(
+                SynchronizerRegistryError.InitialOnboardingError.Error(_): SynchronizerRegistryError
+              )
+            )
+          }
     }
+  }
+
+  private def disconnectOutboxes(synchronizerId: PhysicalSynchronizerId)(implicit
+      traceContext: TraceContext
+  ): Unit = {
+    logger.debug("Clearing synchronizer topology manager observers")
+    state.get(synchronizerId).foreach(_.topologyManager.clearObservers())
   }
 }
 
@@ -408,6 +409,7 @@ private class SynchronizerOnboardingOutbox(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectClient.Error, Unit] =
     sequencerConnectClient.registerOnboardingTopologyTransactions(
+      synchronizerAlias,
       participantId,
       transactions,
     )

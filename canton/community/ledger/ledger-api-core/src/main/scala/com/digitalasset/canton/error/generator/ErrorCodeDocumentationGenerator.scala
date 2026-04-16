@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator
@@ -45,10 +45,9 @@ object ErrorCodeDocumentationGenerator {
   private val DefaultPackagePrefixes: Array[String] = Array("com.daml")
 
   def getErrorCodeItems(
-      searchPackagePrefixes: Array[String] = DefaultPackagePrefixes,
-      excludePackagePrefixes: Array[String] = Array.empty,
+      searchPackagePrefixes: Array[String] = DefaultPackagePrefixes
   ): Seq[ErrorCodeDocItem] = {
-    val errorCodes = findInstancesOf[ErrorCode](searchPackagePrefixes, excludePackagePrefixes)
+    val errorCodes = findInstancesOf[ErrorCode](searchPackagePrefixes)
     errorCodes.view.map(_.id).groupBy(identity).foreach {
       case (code, occurrences) if occurrences.sizeIs > 1 =>
         sys.error(
@@ -77,10 +76,9 @@ object ErrorCodeDocumentationGenerator {
   }
 
   def getErrorGroupItems(
-      searchPackagePrefixes: Array[String] = DefaultPackagePrefixes,
-      excludePackagePrefixes: Array[String] = Array.empty,
+      searchPackagePrefixes: Array[String] = DefaultPackagePrefixes
   ): Seq[ErrorGroupDocItem] = {
-    val errorGroups = findInstancesOf[ErrorGroup](searchPackagePrefixes, excludePackagePrefixes)
+    val errorGroups = findInstancesOf[ErrorGroup](searchPackagePrefixes)
     errorGroups.view.map(_.errorClass).groupBy(identity).foreach {
       case (group, occurrences) if occurrences.sizeIs > 1 =>
         sys.error(
@@ -198,18 +196,11 @@ object ErrorCodeDocumentationGenerator {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def findInstancesOf[T: ru.TypeTag](
-      packagePrefixes: Array[String],
-      excludePackagePrefixes: Array[String],
-  ): Seq[T] =
+  private def findInstancesOf[T: ru.TypeTag](packagePrefixes: Array[String]): Seq[T] =
     new Reflections(packagePrefixes)
       .getSubTypesOf(runtimeMirror.runtimeClass(ru.typeOf[T]))
       .asScala
       .view
-      .filterNot { clazz =>
-        val className = clazz.getName
-        excludePackagePrefixes.exists(prefix => className.startsWith(prefix))
-      }
       .filter(_.getDeclaredFields.exists(_.getName == "MODULE$"))
       .map(clazz => clazz.getDeclaredField("MODULE$").get(clazz).asInstanceOf[T])
       .toSeq

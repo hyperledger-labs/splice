@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto
@@ -43,20 +43,7 @@ class CantonCryptoProvider(
   ): PekkoFutureUnlessShutdown[Either[SyncCryptoError, Signature]] =
     PekkoFutureUnlessShutdown(
       "sign",
-      () =>
-        timeCrypto(
-          metrics,
-          cryptoApi
-            .sign(
-              hash,
-              BftOrderingSigningKeyUsage,
-              // It is fine to not specify any timestamps here because all signatures in the orderer are checked
-              // against the topology snapshot at the start of the epoch.
-              None,
-            )
-            .value,
-          operationId,
-        ),
+      () => timeCrypto(metrics, cryptoApi.sign(hash, BftOrderingSigningKeyUsage).value, operationId),
     )
 
   override def signMessage[MessageT <: ProtocolVersionedMemoizedEvidence & MessageFrom](
@@ -81,7 +68,7 @@ class CantonCryptoProvider(
           signature <-
             timeCrypto(
               metrics,
-              cryptoApi.sign(hash, BftOrderingSigningKeyUsage, None).value,
+              cryptoApi.sign(hash, BftOrderingSigningKeyUsage).value,
               operationId = s"sign-$authenticatedMessageType",
             )
         } yield signature.map(SignedMessage(message, _)),

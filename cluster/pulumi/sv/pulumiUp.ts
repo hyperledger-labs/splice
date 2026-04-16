@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { awaitAllOrThrowAllExceptions, PulumiAbortController } from '../pulumi';
-import { pulumiOptsForSv, runSvProjectForAllSvs, runSvProjectForAllSvsIfLsu } from './pulumi';
+import { pulumiOptsForSv, runSvProjectForAllSvs } from './pulumi';
 
 const abortController = new PulumiAbortController();
 
 awaitAllOrThrowAllExceptions(
-  runSvProjectForAllSvsIfLsu(
+  runSvProjectForAllSvs(
     'up',
     async (stack, sv) => {
       console.log(`Updating stack for ${sv}`);

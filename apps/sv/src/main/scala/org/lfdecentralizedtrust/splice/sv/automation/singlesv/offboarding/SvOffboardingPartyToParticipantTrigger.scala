@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,13 +27,12 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 class SvOffboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    val participantAdminConnection: ParticipantAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[ParticipantId]
-    with SyncConnectionStalenessCheck {
+) extends PollingParallelTaskExecutionTrigger[ParticipantId] {
 
   private val dsoParty: PartyId = dsoStore.key.dsoParty
 
@@ -90,9 +88,8 @@ class SvOffboardingPartyToParticipantProposalTrigger(
           dsoParty,
           topologySnapshot = TopologySnapshot.Sequenced,
         )
-      notConnected <- isNotConnectedToSync()
     } yield {
-      !currentHostingParticipants.mapping.participantIds.contains(task) || notConnected
+      !currentHostingParticipants.mapping.participantIds.contains(task)
     }
   }
 }

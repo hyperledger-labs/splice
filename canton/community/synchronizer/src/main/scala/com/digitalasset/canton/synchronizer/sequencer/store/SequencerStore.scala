@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.store
@@ -16,15 +16,10 @@ import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{
-  CloseContext,
-  FlagCloseable,
-  FutureUnlessShutdown,
-  HasCloseContext,
-}
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage, ToDbPrimitive}
+import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.sequencing.protocol.{Batch, ClosedEnvelope, MessageId}
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -38,8 +33,8 @@ import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{BytesUnit, ErrorUtil, MaxBytesToDecompress, MonadUtil, retry}
-import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
+import com.digitalasset.canton.util.{BytesUnit, ErrorUtil, MonadUtil, retry}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ProtoDeserializationError, checked}
 import com.github.blemale.scaffeine.Scaffeine
 import com.google.common.annotations.VisibleForTesting
@@ -100,9 +95,10 @@ final case class PayloadId(private val id: CantonTimestamp)
 }
 
 object PayloadId {
-  implicit val payloadIdToDbPrimitive: ToDbPrimitive[PayloadId, CantonTimestamp] = ToDbPrimitive(
-    _.unwrap
-  )
+  implicit def payloadIdSetParameter(implicit
+      tsSetParameter: SetParameter[CantonTimestamp]
+  ): SetParameter[PayloadId] =
+    (payloadId, pp) => tsSetParameter(payloadId.unwrap, pp)
   implicit def payloadIdGetResult(implicit
       tsGetResult: GetResult[CantonTimestamp]
   ): GetResult[PayloadId] =
@@ -125,17 +121,10 @@ final case class BytesPayload(id: PayloadId, content: ByteString) extends Payloa
       protocolVersion: ProtocolVersion,
       member: Member,
   ): Batch[ClosedEnvelope] = {
-    val fullBatch = decodeBatch(protocolVersion)
-    Batch.trimForMember(fullBatch, member)
-  }
-
-  def decodeBatch(
-      protocolVersion: ProtocolVersion
-  ): Batch[ClosedEnvelope] = {
-    val noLimitFromStore = MaxBytesToDecompress.MaxValueUnsafe
-    Batch
-      .fromByteString(ProtocolVersionValidation.PV(protocolVersion), noLimitFromStore, content)
+    val fullBatch = Batch
+      .fromByteString(protocolVersion, content)
       .valueOr(err => throw new DbDeserializationException(err.toString))
+    Batch.trimForMember(fullBatch, member)
   }
 }
 
@@ -147,7 +136,7 @@ sealed trait StoreEvent[+PayloadReference] extends HasTraceContext {
   val sender: SequencerMemberId
 
   /** Who gets notified of the event once it is successfully sequenced */
-  def notifies: NonEmpty[Set[SequencerMemberId]]
+  val notifies: WriteNotification
 
   /** Description of the event to be used in logs */
   val description: String
@@ -181,7 +170,7 @@ final case class ReceiptStoreEvent(
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[Nothing] {
-  override def notifies: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
+  override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
 
   override val description: String = show"receipt[message-id:$messageId]"
 
@@ -209,7 +198,7 @@ final case class DeliverStoreEvent[P](
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[P] {
-  override def notifies: NonEmpty[Set[SequencerMemberId]] = members
+  override lazy val notifies: WriteNotification = WriteNotification.Members(members)
 
   override val description: String = show"deliver[message-id:$messageId]"
 
@@ -256,7 +245,7 @@ final case class DeliverErrorStoreEvent(
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[Nothing] {
-  override def notifies: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
+  override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
   override val description: String = show"deliver-error[message-id:$messageId]"
   override val members: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
   override def map[P](f: Nothing => P): StoreEvent[P] = this
@@ -343,16 +332,9 @@ object Presequenced {
 /** Wrapper to assign a timestamp to a event. Useful to structure this way as events are only
   * timestamped right before they are persisted (this is effectively the "sequencing" step). Before
   * this point the sequencer component is free to reorder incoming events.
-  *
-  * @param fromStore
-  *   flag to indicate whether the data item has been read from store (or whether it is coming from
-  *   the in memory ring buffer. used to optimize payload caching strategy).
   */
-final case class Sequenced[+P](
-    timestamp: CantonTimestamp,
-    event: StoreEvent[P],
-    fromStore: Boolean = false,
-) extends HasTraceContext {
+final case class Sequenced[+P](timestamp: CantonTimestamp, event: StoreEvent[P])
+    extends HasTraceContext {
   override def traceContext: TraceContext = event.traceContext
 
   def map[A](fn: P => A): Sequenced[A] = copy(event = event.map(fn))
@@ -429,7 +411,7 @@ private[canton] final case class SequencerStoreRecordCounts(
   )
 }
 
-sealed trait ReadEvents {
+trait ReadEvents {
   def nextTimestamp: Option[CantonTimestamp]
   def events: Seq[Sequenced[IdOrPayload]]
 }
@@ -452,20 +434,12 @@ trait SequencerMemberValidator {
   def isMemberRegisteredAt(member: Member, time: CantonTimestamp)(implicit
       tc: TraceContext
   ): FutureUnlessShutdown[Boolean]
-
-  def areMembersRegisteredAt(members: Seq[Member], time: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): FutureUnlessShutdown[Map[Member, Boolean]]
 }
 
 /** Persistence for the Sequencer. Writers are expected to create a [[SequencerWriterStore]] which
   * may delegate to this underlying store through an appropriately managed storage instance.
   */
-trait SequencerStore
-    extends SequencerMemberValidator
-    with NamedLogging
-    with AutoCloseable
-    with HasCloseContext { self: FlagCloseable =>
+trait SequencerStore extends SequencerMemberValidator with NamedLogging with AutoCloseable {
 
   protected implicit val executionContext: ExecutionContext
 
@@ -487,8 +461,6 @@ trait SequencerStore
   protected def sequencerMember: Member
 
   protected def batchingConfig: BatchingConfig
-
-  protected def timeouts: ProcessingTimeout
 
   protected def sequencerMetrics: SequencerMetrics
 
@@ -559,22 +531,6 @@ trait SequencerStore
         registered
       }
 
-  override def areMembersRegisteredAt(members: Seq[Member], time: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): FutureUnlessShutdown[Map[Member, Boolean]] =
-    lookupMembers(members).map(
-      _.view
-        .mapValues(_.exists(_.registeredFrom <= time))
-        .toMap
-    )
-
-  /** Lists all known sequencer members. This method is uncached, so don't use this method in
-    * performance sensitive contexts like events processing.
-    */
-  def allRegisteredMembers(registeredAtBeforeInclusive: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Set[Member]]
-
   /** Save a series of payloads to the store. Is up to the caller to determine a reasonable batch
     * size and no batching is done within the store.
     * @param payloads
@@ -605,16 +561,12 @@ trait SequencerStore
   lazy val eventsBufferEnabled: Boolean = bufferedEventsMaxMemory.toLong > 0L
 
   protected val eventsBuffer =
-    new EventsBuffer(
-      bufferedEventsMaxMemory,
-      loggerFactory,
-      sequencerMetrics,
-    )
+    new EventsBuffer(bufferedEventsMaxMemory, loggerFactory, sequencerMetrics.eventBuffer)
 
   /** In case of single instance sequencer we can use in-memory fanout buffer for events */
   final def bufferEvents(
       events: NonEmpty[Seq[Sequenced[IdOrPayload]]]
-  )(implicit traceContext: TraceContext): Unit =
+  ): Unit =
     if (eventsBufferEnabled) eventsBuffer.bufferEvents(events)
 
   final def resetAndPreloadBuffer()(implicit
@@ -697,7 +649,6 @@ trait SequencerStore
     */
   protected def readEventsInternal(
       memberId: SequencerMemberId,
-      memberRegisteredFrom: CantonTimestamp,
       fromExclusiveO: Option[CantonTimestamp],
       limit: Int,
   )(implicit
@@ -707,16 +658,6 @@ trait SequencerStore
   def readPayloads(
       payloadIds: Seq[IdOrPayload],
       member: Member,
-      recentEvents: Boolean,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]]
-
-  /** Read payloads from their ID. IMPORTANTLY, payloads not in the cache are retrieved from the DB
-    * but are NOT added to the cache.
-    */
-  def readPayloadsByIdWithoutCacheLoading(
-      payloadIds: Seq[IdOrPayload]
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]]
@@ -756,7 +697,6 @@ trait SequencerStore
   def readEvents(
       memberId: SequencerMemberId,
       member: Member,
-      memberRegisteredFrom: CantonTimestamp,
       fromExclusiveO: Option[CantonTimestamp],
       limit: Int,
   )(implicit
@@ -803,7 +743,7 @@ trait SequencerStore
               // Note that if fromExclusive > cache.lastOption.timestamp, we keep the watermark unchanged
               // not to move it backwards and potentially read events twice
               FutureUnlessShutdown.pure(
-                SafeWatermark(cache.lastOption.map(_.timestamp).max(Some(fromExclusive)))
+                SafeWatermark(cache.lastOption.map(_.timestamp) max Some(fromExclusive))
               )
             }
           case _ =>
@@ -813,7 +753,7 @@ trait SequencerStore
             sequencerMetrics.eventBuffer.missCount.inc()
             // If the buffer does not start earlier than the `fromExclusive` timestamp,
             // we cannot serve the request with the buffer only, we need to fallback to read from the database
-            readEventsInternal(memberId, memberRegisteredFrom, fromExclusiveO, limit)
+            readEventsInternal(memberId, fromExclusiveO, limit)
         }
       case None =>
         logger.debug(
@@ -821,7 +761,7 @@ trait SequencerStore
         )
         sequencerMetrics.eventBuffer.missCount.inc()
         // In case we start from the beginning of events, we cannot determine if we can rely on the buffer
-        readEventsInternal(memberId, memberRegisteredFrom, fromExclusiveO, limit)
+        readEventsInternal(memberId, fromExclusiveO, limit)
     }
   }
 
@@ -1119,7 +1059,6 @@ object SequencerStore {
           sequencerMember,
           blockSequencerMode = blockSequencerMode,
           loggerFactory,
-          timeouts,
           sequencerMetrics = sequencerMetrics,
         )
       case dbStorage: DbStorage =>

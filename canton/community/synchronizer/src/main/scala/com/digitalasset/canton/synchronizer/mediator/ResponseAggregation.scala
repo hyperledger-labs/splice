@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -6,11 +6,9 @@ package com.digitalasset.canton.synchronizer.mediator
 import cats.Show.Shown
 import cats.data.OptionT
 import cats.syntax.either.*
-import com.daml.metrics.api.MetricHandle.Meter
-import com.daml.metrics.api.MetricsContext
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.{
   CantonTimestamp,
@@ -20,7 +18,7 @@ import com.digitalasset.canton.data.{
 }
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.error.MediatorError.ParticipantEquivocation
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdown}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.*
@@ -62,8 +60,6 @@ final case class ResponseAggregation[VKEY](
     decisionTime: CantonTimestamp,
     override val version: CantonTimestamp,
     state: Either[MediatorVerdict, Map[VKEY, ViewState]],
-    @VisibleForTesting
-    finalizedPromise: PromiseUnlessShutdown[Unit],
 )(
     val requestTraceContext: TraceContext,
     val participantResponseDeadlineTick: Option[SynchronizerTimeTracker.TickRequest],
@@ -74,18 +70,6 @@ final case class ResponseAggregation[VKEY](
   override type VKey = VKEY
 
   override def isFinalized: Boolean = state.isLeft
-
-  /** Future that completes when the response aggregation is completed and the sequencer counter
-    * corresponding to the request can safely be marked as clean (does not need to be replayed
-    * during crash recovery)
-    */
-  def finalizedFuture: FutureUnlessShutdown[Unit] = finalizedPromise.futureUS
-
-  /** Fulfill the finalizedPromise, indicating the request has been fully processed such that its
-    * associated sequencer counter can be marked clean.
-    */
-  def completeFinalizedPromise(): Unit =
-    finalizedPromise.outcome_(())
 
   def asFinalized(protocolVersion: ProtocolVersion): Option[FinalizedResponse] =
     state.swap.toOption.map { verdict =>
@@ -116,7 +100,6 @@ final case class ResponseAggregation[VKEY](
       rootHash: RootHash,
       sender: ParticipantId,
       topologySnapshot: TopologySnapshot,
-      batchingConfig: BatchingConfig,
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
@@ -137,7 +120,6 @@ final case class ResponseAggregation[VKEY](
         localVerdict,
         topologySnapshot,
         confirmingParties,
-        batchingConfig,
       )
 
       // This comes last so that the validation also runs for responses to finalized requests. Benefits:
@@ -350,15 +332,7 @@ final case class ResponseAggregation[VKEY](
       version: CantonTimestamp = version,
       state: Either[MediatorVerdict, Map[VKEY, ViewState]] = state,
   ): ResponseAggregation[VKEY] =
-    ResponseAggregation(
-      requestId,
-      request,
-      responseTimeout,
-      decisionTime,
-      version,
-      state,
-      finalizedPromise,
-    )(
+    ResponseAggregation(requestId, request, responseTimeout, decisionTime, version, state)(
       requestTraceContext,
       participantResponseDeadlineTick,
     )
@@ -367,7 +341,6 @@ final case class ResponseAggregation[VKEY](
     copy(version = version)
 
   def timeout(
-      timeoutNonResponsiveParticipantsMeter: Meter
   )(implicit loggingContext: NamedLoggingContext): ResponseAggregation[VKEY] = state match {
     case Right(statesOfView) =>
       val unresponsiveParties = statesOfView
@@ -378,29 +351,6 @@ final case class ResponseAggregation[VKEY](
         }
         // Sort and deduplicate the parties so that multiple mediator replicas generate the same rejection reason
         .to(SortedSet)
-
-      // Track non-responsive participants for each party that didn't reach threshold
-      // Deduplicate (party, participant) pairs across all views to avoid counting the same
-      // participant multiple times when it's unresponsive for the same party in multiple views
-      val markedPairs = scala.collection.mutable.Set.empty[(LfPartyId, ParticipantId)]
-
-      statesOfView.foreach { case (_, viewState) =>
-        viewState.consortiumVoting.foreach { case (party, votingState) =>
-          if (!votingState.isApproved && !votingState.isRejected) {
-            votingState.nonResponsiveParticipants.foreach { participant =>
-              val pair = (party, participant)
-              if (markedPairs.add(pair)) {
-                implicit val metricsContext: MetricsContext = MetricsContext(
-                  "party" -> party.toString,
-                  "participant" -> participant.toLf,
-                )
-                timeoutNonResponsiveParticipantsMeter.mark()(metricsContext)
-              }
-            }
-          }
-        }
-      }
-
       copy(
         // Immediate successor because the timeout triggers only once we've observed a message after the timeout.
         version = responseTimeout.immediateSuccessor,
@@ -434,16 +384,13 @@ object ResponseAggregation {
   /** Invariant: approvals, rejections, and abstains are pairwise disjoint. */
   final case class ConsortiumVotingState private (
       threshold: PositiveInt,
-      hostingParticipants: Set[ParticipantId],
+      hostingParticipantsCount: PositiveInt,
       approvals: Set[ParticipantId],
       rejections: List[(ParticipantId, LocalReject)],
       abstains: Set[ParticipantId],
   ) extends PrettyPrinting {
 
     private val rejectedParticipants = rejections.map(_._1).toSet
-
-    def hostingParticipantsCount: PositiveInt =
-      PositiveInt.create(hostingParticipants.size).getOrElse(PositiveInt.one)
 
     def responsesOf(participant: ParticipantId): Option[VoteKind] =
       if (approvals.contains(participant)) Some(VoteKind.Approve)
@@ -474,13 +421,14 @@ object ResponseAggregation {
     private def isThresholdIsReachable: Boolean =
       rejections.size + abstains.size + threshold.value <= hostingParticipantsCount.value
 
-    def nonResponsiveParticipants: Set[ParticipantId] =
-      hostingParticipants -- approvals -- rejectedParticipants -- abstains
-
     override protected def pretty: Pretty[ConsortiumVotingState] =
       prettyOfClass(
         param("consortium-threshold", _.threshold, _.threshold.value > 1),
-        paramIfNonEmpty("hosting participants", _.hostingParticipants),
+        param(
+          "number-of-hosting-participants",
+          _.hostingParticipantsCount,
+          _.hostingParticipantsCount.value > 1,
+        ),
         paramIfNonEmpty("approved by participants", _.approvals),
         paramIfNonEmpty("rejected by participants", _.rejections),
         paramIfNonEmpty("abstains by participants", _.abstains),
@@ -490,11 +438,11 @@ object ResponseAggregation {
   object ConsortiumVotingState {
     def initialValue(
         threshold: PositiveInt,
-        hostingParticipants: Set[ParticipantId],
+        numberOfHostingParticipants: PositiveInt,
     ): ConsortiumVotingState =
       ConsortiumVotingState(
         threshold,
-        hostingParticipants,
+        numberOfHostingParticipants,
         approvals = Set.empty,
         rejections = Nil,
         abstains = Set.empty,
@@ -503,14 +451,14 @@ object ResponseAggregation {
     @VisibleForTesting
     def withDefaultValues(
         threshold: PositiveInt = PositiveInt.one,
-        hostingParticipants: Set[ParticipantId] = Set.empty,
+        numberOfHostingParticipants: Option[PositiveInt] = None,
         approvals: Set[ParticipantId] = Set.empty,
         rejections: List[(ParticipantId, LocalReject)] = Nil,
         abstains: Set[ParticipantId] = Set.empty,
     ): ConsortiumVotingState =
       ConsortiumVotingState(
         threshold,
-        hostingParticipants,
+        numberOfHostingParticipants.getOrElse(threshold),
         approvals = approvals,
         rejections = rejections,
         abstains = abstains,
@@ -565,9 +513,7 @@ object ResponseAggregation {
       responseTimeout: CantonTimestamp,
       decisionTime: CantonTimestamp,
       topologySnapshot: TopologySnapshot,
-      batchingConfig: BatchingConfig,
       participantResponseDeadlineTick: Option[SynchronizerTimeTracker.TickRequest],
-      finalizePromise: PromiseUnlessShutdown[Unit],
   )(implicit
       requestTraceContext: TraceContext,
       ec: ExecutionContext,
@@ -576,7 +522,6 @@ object ResponseAggregation {
       initialState <- mkInitialState(
         request.informeesAndConfirmationParamsByViewPosition,
         topologySnapshot,
-        batchingConfig,
       )
     } yield {
       ResponseAggregation[ViewPosition](
@@ -586,19 +531,15 @@ object ResponseAggregation {
         decisionTime,
         requestId.unwrap,
         Right(initialState),
-        finalizePromise,
       )(requestTraceContext, participantResponseDeadlineTick)
     }
 
   private def mkInitialState[K](
       informeesAndConfirmationParamsByViewPosition: Map[K, ViewConfirmationParameters],
       topologySnapshot: TopologySnapshot,
-      batchingConfig: BatchingConfig,
   )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Map[K, ViewState]] =
-    MonadUtil
-      .parTraverseWithLimit(batchingConfig.parallelism)(
-        informeesAndConfirmationParamsByViewPosition.toSeq
-      ) {
+    informeesAndConfirmationParamsByViewPosition.toSeq
+      .parTraverse {
         case (viewKey, viewConfirmationParameters @ ViewConfirmationParameters(_, quorumsState)) =>
           for {
             confirmersPartyInfo <- topologySnapshot.activeParticipantsOfPartiesWithInfo(
@@ -606,12 +547,14 @@ object ResponseAggregation {
             )
           } yield {
             val consortiumVotingState = confirmersPartyInfo.map { case (party, info) =>
-              val hostingParticipantsWithConfirmation = info.participants.collect {
-                case (participantId, attributes) if attributes.canConfirm => participantId
-              }.toSet
+              val hostingParticipantWithConfirmationPermissionCount = info.participants.count {
+                case (_, attributes) => attributes.canConfirm
+              }
               party -> ConsortiumVotingState.initialValue(
                 info.threshold,
-                hostingParticipantsWithConfirmation,
+                PositiveInt
+                  .create(hostingParticipantWithConfirmationPermissionCount)
+                  .getOrElse(PositiveInt.one),
               )
             }
             viewKey -> ViewState(

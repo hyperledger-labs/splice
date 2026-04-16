@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json
 
 import com.digitalasset.canton.http.json.ResponseFormats
-import io.circe.Json
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.apache.pekko.stream.Materializer
@@ -18,6 +17,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scalaz.syntax.show.*
 import scalaz.{Show, \/}
+import spray.json.*
 
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -39,13 +39,15 @@ class ResponseFormatsTest
     Gen.listOf(errorOrJsNumber),
     Gen.option(Gen.nonEmptyListOf(Gen.identifier)),
   ) { (input, warnings) =>
-    val jsValWarnings: Option[Json] = warnings.map(ws => Json.arr(ws.map(w => Json.fromString(w))*))
-    val (failures, successes): (Vector[Json], Vector[Json]) =
-      input.toVector.partitionMap(_.leftMap(e => Json.fromString(e.shows)).toEither)
+    import spray.json.DefaultJsonProtocol.*
+
+    val jsValWarnings: Option[JsValue] = warnings.map(_.toJson)
+    val (failures, successes): (Vector[JsString], Vector[JsValue]) =
+      input.toVector.partitionMap(_.leftMap(e => JsString(e.shows)).toEither)
 
     val (wantResponse, wantStatus) = expectedResult(failures, successes, jsValWarnings)
 
-    val jsValSource = Source[DummyError \/ Json](input)
+    val jsValSource = Source[DummyError \/ JsValue](input)
 
     val resultF: Future[Assertion] = ResponseFormats
       .resultJsObject(jsValSource, jsValWarnings)
@@ -54,19 +56,19 @@ class ResponseFormatsTest
       }
       .map { case (bytes, statusCode) =>
         statusCode shouldBe wantStatus
-        bytes.utf8String shouldBe wantResponse.noSpaces
+        JsonParser(bytes.utf8String) shouldBe wantResponse
       }
 
     Await.result(resultF, 10.seconds)
   }
 
   private def expectedResult(
-      failures: Vector[Json],
-      successes: Vector[Json],
-      warnings: Option[Json],
-  ): (Json, StatusCode) = {
+      failures: Vector[JsValue],
+      successes: Vector[JsValue],
+      warnings: Option[JsValue],
+  ): (JsObject, StatusCode) = {
 
-    val map1: Map[String, Json] = warnings match {
+    val map1: Map[String, JsValue] = warnings match {
       case Some(x) => Map("warnings" -> x)
       case None => Map.empty
     }
@@ -74,25 +76,26 @@ class ResponseFormatsTest
     val (map2, status) =
       if (failures.isEmpty)
         (
-          Map[String, Json]("result" -> Json.fromValues(successes), "status" -> Json.fromInt(200)),
+          Map[String, JsValue]("result" -> JsArray(successes), "status" -> JsNumber("200")),
           StatusCodes.OK,
         )
       else
         (
-          Map[String, Json]("errors" -> Json.fromValues(failures), "status" -> Json.fromInt(500)),
+          Map[String, JsValue]("errors" -> JsArray(failures), "status" -> JsNumber("500")),
           StatusCodes.InternalServerError: StatusCode,
         )
-    (Json.fromFields(map1 ++ map2), status)
+
+    (JsObject(map1 ++ map2), status)
   }
 
-  private lazy val errorOrJsNumber: Gen[DummyError \/ Json] = Gen.frequency(
+  private lazy val errorOrJsNumber: Gen[DummyError \/ JsValue] = Gen.frequency(
     1 -> dummyErrorGen.map(\/.left),
     5 -> jsNumberGen.map(\/.right),
   )
 
   private lazy val dummyErrorGen: Gen[DummyError] = Gen.identifier.map(DummyError.apply)
 
-  private lazy val jsNumberGen: Gen[Json] = Gen.posNum[Long].map(Json.fromLong)
+  private lazy val jsNumberGen: Gen[JsNumber] = Gen.posNum[Long].map(JsNumber.apply)
 }
 
 final case class DummyError(message: String)

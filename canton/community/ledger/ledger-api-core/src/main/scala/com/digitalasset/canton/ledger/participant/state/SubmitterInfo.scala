@@ -1,11 +1,10 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.logging.entries.{LoggingValue, ToLoggingValue}
 import com.digitalasset.canton.LfTimestamp
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo.ExternallySignedSubmission
@@ -38,6 +37,14 @@ import java.util.UUID
   * @param submissionId
   *   An identifier for the submission that allows an application to correlate completions to its
   *   submissions.
+  * @param transactionUUID
+  *   Optionally explicitly chosen TransactionUUID. This is set in externally signed transactions
+  *   where the external party has included the transactionUUID in the signature. It acts as a
+  *   replay protection mechanism by allowing the mediator to deduplicate requests.
+  * @param mediatorGroup
+  *   Optionally explicitly chosen mediator group. This is set in externally signed transactions
+  *   where the external party has included the mediator group in the signature.
+  *
   * @param externallySignedSubmission
   *   If this is provided then the authorization for all acting parties will be provided by the
   *   enclosed signatures.
@@ -55,14 +62,13 @@ final case class SubmitterInfo(
   /** The ID for the ledger change */
   val changeId: ChangeId = ChangeId(userId, commandId, actAs.toSet)
 
-  def toCompletionInfo(paidTrafficCost: NonNegativeLong): CompletionInfo =
+  def toCompletionInfo: CompletionInfo =
     CompletionInfo(
       actAs,
       userId,
       commandId,
       Some(deduplicationPeriod),
       submissionId,
-      paidTrafficCost,
     )
 
 }
@@ -77,14 +83,14 @@ object SubmitterInfo {
           signatures,
           transactionUUID,
           mediatorGroup,
-          maxRecordTime,
+          maxRecordTimeO,
         ) =>
       LoggingValue.Nested.fromEntries(
         "version" -> version.index,
         "signatures" -> signatures.keys.map(_.toProtoPrimitive),
         "transactionUUID" -> transactionUUID.toString,
         "mediatorGroup" -> mediatorGroup.toString,
-        "maxRecordTime" -> maxRecordTime,
+        "maxRecordTimeO" -> maxRecordTimeO,
       )
   }
   implicit val `SubmitterInfo to LoggingValue`: ToLoggingValue[SubmitterInfo] = {
@@ -113,7 +119,7 @@ object SubmitterInfo {
       signatures: Map[PartyId, Seq[Signature]],
       transactionUUID: UUID,
       mediatorGroup: MediatorGroupIndex,
-      maxRecordTime: Option[LfTimestamp],
+      maxRecordTimeO: Option[LfTimestamp],
   )
 
 }

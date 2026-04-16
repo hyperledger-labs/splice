@@ -1,19 +1,20 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.logging
 
 import cats.syntax.functor.*
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.IntegrationTestUtilities.grabCounts
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
-import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.networking.grpc.ApiRequestLogger
 import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PingService}
 import com.digitalasset.canton.participant.protocol.TransactionProcessor
 import com.digitalasset.canton.participant.sync.CantonSyncService
@@ -159,6 +160,5 @@ abstract class TraceContextIntegrationTest extends CommunityIntegrationTest with
 class GrpcTraceContextIntegrationTestPostgres extends TraceContextIntegrationTest {
   // run with postgres to ensure writing to persistent stores is working correctly
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseBftSequencer(loggerFactory))
-
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

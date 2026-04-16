@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -19,7 +19,7 @@ import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.ledger.api.{CumulativeFilter, InterfaceFilter, TemplateFilter}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.NameTypeConRef
+import com.digitalasset.daml.lf.data.Ref.TypeConRef
 import io.grpc.Status.Code.*
 import org.mockito.MockitoSugar
 import org.scalatest.wordspec.AnyWordSpec
@@ -30,8 +30,7 @@ class UpdateServiceRequestValidatorTest
     with MockitoSugar {
   private implicit val noLogging: ErrorLoggingContext = NoLogging
 
-  private val templateId =
-    Identifier(Ref.PackageRef.Name(packageName).toString, includedModule, includedTemplate)
+  private val templateId = Identifier(packageId, includedModule, includedTemplate)
 
   private def getFiltersByParty(templateIdsForParty: Seq[Identifier]): Map[String, Filters] =
     Map(
@@ -52,7 +51,7 @@ class UpdateServiceRequestValidatorTest
                     ProtoInterfaceFilter(
                       interfaceId = Some(
                         Identifier(
-                          packageNameRefEncoded,
+                          packageId,
                           moduleName = includedModule,
                           entityName = includedTemplate,
                         )
@@ -101,14 +100,15 @@ class UpdateServiceRequestValidatorTest
           includeTopologyEvents = None,
         )
       ),
-      descendingOrder = false,
     )
 
   private val txReq = updatesReqBuilder(Some(Seq(templateId)))
-  private val txReqWithId = updatesReqBuilder(Some(Seq(templateId.copy(packageId = packageId))))
   private val reassignmentsReq = updatesReqBuilder(
     transactionTemplateIdsO = None,
     reassignmentsTemplateIdsO = Some(Seq(templateId)),
+  )
+  private val txReqWithPackageNameScoping = updatesReqBuilder(
+    Some(Seq(templateId.copy(packageId = Ref.PackageRef.Name(packageName).toString)))
   )
 
   private val txByOffsetReq =
@@ -390,16 +390,6 @@ class UpdateServiceRequestValidatorTest
         )
       }
 
-      "return the correct error when package id is used in filters" in {
-        requestMustFailWith(
-          request = UpdateServiceRequestValidator.validate(txReqWithId, ledgerEnd),
-          code = INVALID_ARGUMENT,
-          description =
-            "INVALID_FIELD(8,0): The submitted command has a field with invalid value: Invalid field packageId: Received an identifier with package ID packageId, but expected a package name.",
-          metadata = Map.empty,
-        )
-      }
-
       "tolerate missing end" in {
         inside(
           UpdateServiceRequestValidator.validate(
@@ -409,7 +399,6 @@ class UpdateServiceRequestValidatorTest
         ) { case Right(req) =>
           req.startExclusive shouldEqual None
           req.endInclusive shouldEqual None
-          req.descendingOrder shouldEqual false
           val filtersByParty =
             req.updateFormat.includeTransactions.map(_.eventFormat.filtersByParty).value
           filtersByParty should have size 1
@@ -477,6 +466,30 @@ class UpdateServiceRequestValidatorTest
         }
       }
 
+      "allow package-name scoped templates" in {
+        inside(
+          UpdateServiceRequestValidator.validate(txReqWithPackageNameScoping, ledgerEnd)
+        ) { case Right(req) =>
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
+          hasExpectedFilters(
+            req,
+            expectedTemplates =
+              Set(Ref.TypeConRef(Ref.PackageRef.Name(packageName), templateQualifiedName)),
+          )
+          req.updateFormat.includeTransactions.value.eventFormat.verbose shouldEqual verbose
+        }
+      }
+
+      "still allow populated packageIds in templateIds (for backwards compatibility)" in {
+        inside(UpdateServiceRequestValidator.validate(txReq, ledgerEnd)) { case Right(req) =>
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
+          hasExpectedFilters(req)
+          req.updateFormat.includeTransactions.value.eventFormat.verbose shouldEqual verbose
+        }
+      }
+
       "current definition populate the right api request" in {
         val result = UpdateServiceRequestValidator.validate(
           updatesReqBuilder(Some(Seq.empty)).update(
@@ -515,16 +528,14 @@ class UpdateServiceRequestValidatorTest
               CumulativeFilter(
                 templateFilters = Set(
                   TemplateFilter(
-                    NameTypeConRef.assertFromString(
-                      "#somePackageName:includedModule:includedTemplate"
-                    ),
+                    TypeConRef.assertFromString("packageId:includedModule:includedTemplate"),
                     includeCreatedEventBlob = true,
                   )
                 ),
                 interfaceFilters = Set(
                   InterfaceFilter(
-                    interfaceTypeRef = Ref.NameTypeConRef.assertFromString(
-                      "#somePackageName:includedModule:includedTemplate"
+                    interfaceTypeRef = Ref.TypeConRef.assertFromString(
+                      "packageId:includedModule:includedTemplate"
                     ),
                     includeView = true,
                     includeCreatedEventBlob = true,
@@ -535,82 +546,6 @@ class UpdateServiceRequestValidatorTest
           )
         )
       }
-
-      "allow request with missing end_offset when descending_order is false" in {
-        inside(
-          UpdateServiceRequestValidator.validate(
-            txReq.update(_.optionalEndInclusive := None, _.descendingOrder := false),
-            ledgerEnd,
-          )
-        ) { case Right(req) =>
-          req.startExclusive shouldEqual None
-          req.endInclusive shouldEqual None
-          req.descendingOrder shouldEqual false
-          val filtersByParty =
-            req.updateFormat.includeTransactions.map(_.eventFormat.filtersByParty).value
-          filtersByParty should have size 1
-          hasExpectedFilters(req)
-          req.updateFormat.includeTransactions.value.eventFormat.verbose shouldEqual verbose
-        }
-      }
-
-      "return correct error when end_offset is zero and descending_order is false" in {
-        requestMustFailWith(
-          request = UpdateServiceRequestValidator.validate(
-            txReq.withEndInclusive(0L).withDescendingOrder(false),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "NON_POSITIVE_OFFSET(8,0): Offset 0 in end_inclusive is not a positive integer: " +
-              "the offset has to be either a positive integer (>0) or not defined at all",
-          metadata = Map.empty,
-        )
-      }
-
-      "allow descending_order true when end_offset is present and positive" in {
-        inside(
-          UpdateServiceRequestValidator.validate(
-            txReq.update(_.descendingOrder := true),
-            ledgerEnd,
-          )
-        ) { case Right(req) =>
-          req.startExclusive shouldBe None
-          req.endInclusive shouldBe offset
-          req.descendingOrder shouldBe true
-          hasExpectedFilters(req)
-        }
-      }
-
-      "return correct error when end_offset is not present and descending_order is true" in {
-        requestMustFailWith(
-          request = UpdateServiceRequestValidator.validate(
-            txReq
-              .update(_.optionalEndInclusive := None)
-              .update(_.descendingOrder := true),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "DESCENDING_ORDER_MISSING_END(8,0): end_inclusive is not provided when descending_order is true",
-          metadata = Map.empty,
-        )
-      }
-
-      "return correct error when end_offset is zero and descending_order is true" in {
-        requestMustFailWith(
-          request = UpdateServiceRequestValidator.validate(
-            txReq.withEndInclusive(0L).update(_.descendingOrder := true),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "NON_POSITIVE_OFFSET(8,0): Offset 0 in end_inclusive is not a positive integer: " +
-              "the offset has to be a positive integer (>0)",
-          metadata = Map.empty,
-        )
-      }
-
     }
 
     "validating transaction by id requests" should {

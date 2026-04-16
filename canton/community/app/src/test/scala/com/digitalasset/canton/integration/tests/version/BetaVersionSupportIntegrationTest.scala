@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.version
@@ -24,7 +24,7 @@ trait BetaVersionSupportIntegrationTest
     with HasCloseContext {
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P3S2M2_Manual
+    EnvironmentDefinition.P3_S1M1_S1M1_Manual
       .addConfigTransforms(ConfigTransforms.setBetaSupport(true)*)
       .addConfigTransforms(ConfigTransforms.setAlphaVersionSupport(false)*)
       .addConfigTransforms(

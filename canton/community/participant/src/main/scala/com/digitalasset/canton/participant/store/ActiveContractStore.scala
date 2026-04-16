@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -6,8 +6,7 @@ package com.digitalasset.canton.participant.store
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.ReassignmentCounter
-import com.digitalasset.canton.config.CantonRequireTypes.String36
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String36}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -83,6 +82,8 @@ trait ActiveContractStore
     *   - [[ActiveContractStore.ChangeBeforeCreation]] for every change that occurs before the
     *     creation timestamp. This is reported only if no
     *     [[ActiveContractStore.DoubleContractCreation]] is reported.
+    *   - [[ActiveContractStore.ChangeAfterArchival]] if this creation is later than the earliest
+    *     archival of the contract.
     */
   def markContractsCreated(
       contracts: Seq[(LfContractId, ReassignmentCounter)],
@@ -149,6 +150,9 @@ trait ActiveContractStore
     *   - [[ActiveContractStore.DoubleContractArchival]] if the contract is archived a second time.
     *   - [[ActiveContractStore.SimultaneousDeactivation]] if the contract is unassigned at the same
     *     time or has been archived by a different request at the same time.
+    *   - [[ActiveContractStore.ChangeAfterArchival]] for every change that occurs after the
+    *     archival timestamp. This is reported only if no
+    *     [[ActiveContractStore.DoubleContractArchival]] is reported.
     *   - [[ActiveContractStore.ChangeBeforeCreation]] if this archival is earlier than the latest
     *     creation of the contract.
     */
@@ -223,6 +227,8 @@ trait ActiveContractStore
     *   irregularities are reported:
     *   - [[ActiveContractStore.SimultaneousActivation]] if an assignment from another synchronizer
     *     or a creation has been added with the same timestamp.
+    *   - [[ActiveContractStore.ChangeAfterArchival]] if this timestamp is after the earliest
+    *     archival of the contract.
     *   - [[ActiveContractStore.ChangeBeforeCreation]] if this timestamp is before the latest
     *     creation of the contract.
     *   - [[ActiveContractStore.ReassignmentCounterShouldIncrease]] if the reassignment counter does
@@ -253,6 +259,8 @@ trait ActiveContractStore
     *   are reported:
     *   - [[ActiveContractStore.SimultaneousDeactivation]] if an unassignment to another
     *     synchronizer or a creation has been added with the same timestamp.
+    *   - [[ActiveContractStore.ChangeAfterArchival]] if this timestamp is after the earliest
+    *     archival of the contract.
     *   - [[ActiveContractStore.ChangeBeforeCreation]] if this timestamp is before the latest
     *     creation of the contract.
     *   - [[ActiveContractStore.ReassignmentCounterShouldIncrease]] if the reassignment counter does
@@ -363,7 +371,7 @@ object ActiveContractStore {
   }
 
   sealed trait ActivenessChangeDetail extends Product with Serializable with PrettyPrinting {
-    def name: String36
+    def name: LengthLimitedString
 
     def reassignmentCounterO: Option[ReassignmentCounter]
     def remoteSynchronizerIdxO: Option[Int]
@@ -372,8 +380,6 @@ object ActiveContractStore {
     def contractChange: ContractChange
 
     def isReassignment: Boolean
-
-    def isActivation: Boolean = changeType == ChangeType.Activation
   }
 
   object ActivenessChangeDetail {
@@ -410,7 +416,6 @@ object ActiveContractStore {
       override def contractChange: ContractChange = ContractChange.Created
 
       override def isReassignment: Boolean = false
-
       override protected def pretty: Pretty[Create.this.type] = prettyOfClass(
         param("reassignment counter", _.reassignmentCounter)
       )
@@ -614,13 +619,21 @@ object ActiveContractStore {
   }
 
   /** The state of a contract is changed before its `creation`. */
-  // TODO(i31579): double-check if this can be removed
   final case class ChangeBeforeCreation(
       contractId: LfContractId,
       creation: TimeOfChange,
       change: TimeOfChange,
   ) extends AcsWarning {
     override def timeOfChanges: List[TimeOfChange] = List(creation, change)
+  }
+
+  /** The state of a contract is changed after its `archival`. */
+  final case class ChangeAfterArchival(
+      contractId: LfContractId,
+      archival: TimeOfChange,
+      change: TimeOfChange,
+  ) extends AcsWarning {
+    override def timeOfChanges: List[TimeOfChange] = List(archival, change)
   }
 
   /** ReassignmentCounter should increase monotonically with the time of change. */
@@ -842,9 +855,13 @@ trait ActiveContractSnapshot {
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[LfContractId, TimeOfChange]]
 
-  /** Returns a map to the latest reassignment counter of the contracts just before the given
-    * timestamp. Filters out contract ids that have not been active just before
-    * `timestampExclusive`.
+  /** Returns a map to the latest reassignment counter of the contracts before the given timestamp.
+    * Fails if not all given contract ids are active in the ACS, or if the ACS has not defined their
+    * latest reassignment counter.
+    *
+    * @throws java.lang.IllegalArgumentException
+    *   if not all given contract ids are active in the ACS, if the ACS does not contain the latest
+    *   reassignment counter for each given contract id.
     */
   def contractsReassignmentCounterSnapshotBefore(
       contractIds: Set[LfContractId],
@@ -861,17 +878,6 @@ trait ActiveContractSnapshot {
     *   The lower bound for the changes. Must not be larger than the upper bound.
     * @param toInclusive
     *   The upper bound for the changes. Must not be smaller than the lower bound.
-    * @param maxResultSize
-    *   The maximum number of changes to retrieve. When there are more than maxResultSize changes,
-    *   we retrieve the first maxResultSize ordered by timestamp, repair_counter. We never break a
-    *   batch in the middle of changes with the same (timestamp, repair_counter). If there are more
-    *   than maxResultSize for the same (timestamp, repair_counter), the batch continues until the
-    *   end of these changes. We could probably also return a Boolean to indicate whether there's
-    *   more to be fetched.
-    *
-    * @return
-    *   The changes and the nr of changes returned.
-    *
     * @throws java.lang.IllegalArgumentException
     *   If the intervals are in the wrong order.
     */
@@ -884,27 +890,16 @@ trait ActiveContractSnapshot {
    * lastActivationTime <= `fromExclusive`. Therefore, for retrieving the reassignment counter of archived contracts,
    * we may need to look at activations between (`fromExclusive`, `toInclusive`], and at activations taking
    * place at a time <= `fromExclusive`.
-   * The number of changes returned is at most `maxResultSize`, as long as for every toc returned, we return all changes.
-   * In other words, there is no toc in the returned result for which we return just some of the associated changes.
-   * For this reason, and only for this reason, the size of returned changes can grow larger than `maxResultSize`.
-   * Note that there is a natural limit to how many changes there can be at the same toc. Changes with the same toc can
-   * only come from the same transaction. Daml transactions have a recommended limit of 10000 changes. Transactions
-   * issued by the repair service, e.g., when importing contracts, have a limit of 1000 changes.
    *
    * The implementation assumes that:
    * - reassignment counters for a contract are strictly increasing for different activations of that contract
    * - the activations/deactivations retrieved from the DB really describe a well-formed
    * set of contracts, e.g., a contract is not archived twice, etc TODO(i12904)
    */
-  def changesBetween(
-      fromExclusive: TimeOfChange,
-      toInclusive: TimeOfChange,
-      maxResultSize: PositiveInt,
-  )(implicit
+  def changesBetween(fromExclusive: TimeOfChange, toInclusive: TimeOfChange)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[
-    (LazyList[(TimeOfChange, ActiveContractIdsChange)], Int)
-  ]
+  ): FutureUnlessShutdown[LazyList[(TimeOfChange, ActiveContractIdsChange)]]
+
 }
 
 object ActiveContractSnapshot {

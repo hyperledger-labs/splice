@@ -1,14 +1,11 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.BaseTest.UnsupportedExternalPartyTest.{
-  MultiPartySubmission,
-  MultiSynchronizerParties,
-}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionRoutingError.ConfigurationErrors.InvalidPrescribedSynchronizerId
@@ -18,7 +15,7 @@ import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.{
 }
 import com.digitalasset.canton.integration.EnvironmentDefinition
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -36,7 +33,7 @@ sealed trait GeneralSynchronizerRouterIntegrationTest
       connectToDefaultSynchronizers()
     }
 
-  "the auto reassignment transactions should fail gracefully" onlyRunWithLocalParty (MultiSynchronizerParties) when {
+  "the auto reassignment transactions should fail gracefully" when {
     "there is no common synchronizer" in { implicit env =>
       import env.*
 
@@ -323,7 +320,7 @@ sealed trait GeneralSynchronizerRouterIntegrationTest
       assertInAcsSync(List(participant1), synchronizer1, singleId.toLf)
     }
 
-    "reassign the contracts of a multi-party submission to a common synchronizer" onlyRunWithLocalParty (MultiPartySubmission) in {
+    "reassign the contracts of a multi-party submission to a common synchronizer" in {
       implicit env =>
         import env.*
 
@@ -408,7 +405,7 @@ class GeneralSynchronizerRouterIntegrationTestPostgres
     extends GeneralSynchronizerRouterIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseBftSequencer(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"), Set("sequencer3"))

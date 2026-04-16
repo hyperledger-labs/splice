@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.packagemeta
@@ -197,7 +197,7 @@ class PackageMetadataSpec extends AnyWordSpec with Matchers {
       )
 
       packageMetadata.resolveTypeConRef(
-        Ref.NameTypeConRef(Ref.PackageRef.Name(pkgName1), template1B.qualifiedName)
+        Ref.TypeConRef(Ref.PackageRef.Name(pkgName1), template1B.qualifiedName)
       ) shouldBe Set(template1B_v2, template1B_v3).map(_.toFullIdentifier(pkgName1))
     }
 
@@ -219,13 +219,12 @@ class PackageMetadataSpec extends AnyWordSpec with Matchers {
       )
 
       packageMetadata.resolveTypeConRef(
-        Ref.NameTypeConRef(Ref.PackageRef.Name(pkgName1), interface1.qualifiedName)
+        Ref.TypeConRef(Ref.PackageRef.Name(pkgName1), interface1.qualifiedName)
       ) shouldBe Set(interface1).map(_.toFullIdentifier(pkgName1))
     }
 
     "return an empty set if any of the resolution sets in PackageMetadata are empty" in new Scope {
-      val nameTypeConRef =
-        Ref.NameTypeConRef(Ref.PackageRef.Name(pkgName1), template1B.qualifiedName)
+      val typeConRef = Ref.TypeConRef(Ref.PackageRef.Name(pkgName1), template1B.qualifiedName)
 
       PackageMetadata(
         templates = Set.empty, // No known templates
@@ -235,13 +234,13 @@ class PackageMetadataSpec extends AnyWordSpec with Matchers {
             preference = irrelevantPackagePreference,
           )
         ),
-      ).resolveTypeConRef(nameTypeConRef) shouldBe Set.empty
+      ).resolveTypeConRef(typeConRef) shouldBe Set.empty
 
       intercept[IllegalArgumentException](
         PackageMetadata(
           templates = Set(template1B), // We know about a template...
           packageNameMap = Map.empty, // But not about package names.
-        ).resolveTypeConRef(nameTypeConRef)
+        ).resolveTypeConRef(typeConRef)
       ).getMessage shouldBe s"Unknown package id: $pkgId1"
     }
   }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -9,19 +9,18 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.ViewHash
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.protocol.messages.{EncryptedView, EncryptedViewMessage}
-import com.digitalasset.canton.sequencing.protocol.Recipients
+import com.digitalasset.canton.sequencing.protocol.{MaxRequestSizeToDeserialize, Recipients}
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{MaxBytesToDecompress, MonadUtil}
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
@@ -44,7 +43,6 @@ object EncryptedViewMessageFactory {
       viewTree: viewType.View,
       viewKeyData: (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext,
@@ -54,11 +52,7 @@ object EncryptedViewMessageFactory {
       signature <- viewTree.toBeSigned
         .parTraverse(rootHash =>
           cryptoSnapshot
-            .sign(
-              rootHash.unwrap,
-              SigningKeyUsage.ProtocolOnly,
-              signingTimestampOverrides,
-            )
+            .sign(rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
             .leftMap(err => FailedToSignViewMessage(err))
         )
       (sessionKey, sessionKeyRandomnessMap) = viewKeyData
@@ -81,7 +75,7 @@ object EncryptedViewMessageFactory {
         EncryptedView
           .compressed[VT](cryptoSnapshot.pureCrypto, sessionKey, viewType)(
             viewTree,
-            MaxBytesToDecompress(maxRequestSize.value),
+            MaxRequestSizeToDeserialize.Limit(maxRequestSize.value),
           )
           .leftMap[EncryptedViewMessageCreationError](FailedToEncryptViewMessage.apply)
       )

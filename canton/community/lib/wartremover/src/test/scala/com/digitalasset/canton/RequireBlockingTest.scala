@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -7,6 +7,8 @@ import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.wartremover.test.WartTestTraverser
+
+import scala.concurrent.blocking
 
 class RequireBlockingTest extends AnyWordSpec with Matchers {
 
@@ -52,14 +54,36 @@ class RequireBlockingTest extends AnyWordSpec with Matchers {
       result.errors.foreach(_ should include(RequireBlocking.messageSynchronized))
     }
 
-    "detect renamed synchronized (fails on Scala 2)" in {
+    "detect nested synchronized blocks in the body" in {
+      // Technically we shouldn't require another blocking around the inner synchronized,
+      // but that's a false positive we can live with as nested synchronization calls are anyway
+      // dangerous for their deadlock potential.
       val result = WartTestTraverser(RequireBlocking) {
-        val x = new Object()
-        import x.synchronized as foo
-        foo(19)
+        blocking(this.synchronized(new Object().synchronized(17)))
       }
-      if (ScalaVersion.isScala3) assertIsErrorSynchronized(result)
-      else result.errors shouldBe Seq.empty
+      assertIsErrorSynchronized(result)
+    }
+
+    "detect escaping synchronized blocks in the body" in {
+      // The inner synchronize call escapes the blocking scope
+      val result = WartTestTraverser(RequireBlocking) {
+        val f = blocking {
+          this.synchronized { () =>
+            this.synchronized(42)
+          }
+        }
+        f()
+      }
+      assertIsErrorSynchronized(result)
+    }
+
+    "allow synchronized statements inside blocking calls" in {
+      val result = WartTestTraverser(RequireBlocking) {
+        blocking(this.synchronized(42))
+        blocking(synchronized(23))
+        blocking(synchronized(blocking(new Object().synchronized(17))))
+      }
+      result.errors shouldBe Seq.empty
     }
 
     "forbid Thread.sleep" in {
@@ -69,14 +93,13 @@ class RequireBlockingTest extends AnyWordSpec with Matchers {
       assertIsErrorThreadSleep(result)
     }
 
-    "forbid renamed Thread.sleep (fails on Scala 2)" in {
+    "fail to forbid renamed Thread.sleep" in {
       val result = WartTestTraverser(RequireBlocking) {
         import Thread.sleep as foo
         foo(1)
       }
-
-      if (ScalaVersion.isScala3) assertIsErrorThreadSleep(result)
-      else result.errors shouldBe Seq.empty
+      // assertIsErrorThreadSleep(result)
+      result.errors shouldBe Seq.empty
     }
   }
 }

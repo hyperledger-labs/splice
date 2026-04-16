@@ -1,10 +1,12 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
-import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  TestCommon,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{
   AcceptedAppPayment,
   ReceiverAmuletAmount,
@@ -14,11 +16,10 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  SpliceTestConsoleEnvironment,
-  TestCommon,
-}
-import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import com.daml.nonempty.*
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.concurrent.duration.DurationInt
 
@@ -33,8 +34,8 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       splitwellBackend.participantClient.synchronizers.config(splitwellUpgradeAlias).value
 
     val url = inside(upgradeConfig.sequencerConnections.connections.forgetNE) {
-      case Seq(GrpcSequencerConnection(endpoints, _, _, _, _)) =>
-        endpoints.head.toURI(false).toString
+      case Seq(GrpcSequencerConnection(topEndpoint +-: _, _, _, _, _)) =>
+        topEndpoint.toURI(false).toString
     }
 
     // This can be a bit slow since it first pushes all vetting transactions before pushing

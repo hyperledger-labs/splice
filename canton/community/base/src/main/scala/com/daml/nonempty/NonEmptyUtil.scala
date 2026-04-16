@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.nonempty
@@ -7,7 +7,6 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import io.scalaland.chimney.Transformer
 import io.scalaland.chimney.dsl.TransformerOps
 import monocle.Lens
-import monocle.function.Each
 import pureconfig.{ConfigReader, ConfigWriter}
 
 import scala.collection.immutable
@@ -21,7 +20,7 @@ import scala.reflect.ClassTag
 object NonEmptyUtil {
 
   def fromElement[A](xs: A): NonEmpty[Set[A]] =
-    NonEmpty(Set, xs)
+    fromUnsafe(Set(xs))
 
   def fromUnsafe[A](xs: A with immutable.Iterable[?]): NonEmpty[A] =
     NonEmpty.from(xs).getOrElse(throw new NoSuchElementException)
@@ -61,11 +60,6 @@ object NonEmptyUtil {
 
     implicit class NonEmptyLensOps[A, F[_], B](val lens: Lens[A, NonEmpty[F[B]]]) extends AnyVal {
       def toNEF: Lens[A, NonEmptyF[F, B]] = lensToNEF(lens)
-    }
-
-    implicit def eachNonEmpty[A, B](implicit F: Each[A, B]): Each[NonEmpty[A], B] = {
-      type K[T[_]] = Each[T[A], B]
-      NonEmptyColl.Instance.subst[K](F)
     }
   }
 

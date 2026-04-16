@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission.routing
@@ -40,9 +40,9 @@ private[routing] class ContractsReassigner(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, Unit] =
     if (synchronizerRankTarget.reassignments.nonEmpty) {
-      val targetPsid = synchronizerRankTarget.synchronizerId
+      val targetPSId = synchronizerRankTarget.synchronizerId
       logger.info(
-        s"Automatic transaction reassignment to synchronizer $targetPsid"
+        s"Automatic transaction reassignment to synchronizer $targetPSId"
       )
 
       def getStakeholders(
@@ -86,13 +86,13 @@ private[routing] class ContractsReassigner(
                 synchronizerState.getTopologySnapshotFor(sourceSynchronizerId)
               )
               targetTopology <- EitherT.fromEither[FutureUnlessShutdown](
-                synchronizerState.getTopologySnapshotFor(targetPsid)
+                synchronizerState.getTopologySnapshotFor(targetPSId)
               )
 
               _ <- perform(
                 Source(sourceSynchronizerId),
                 Source(sourceTopology),
-                Target(targetPsid),
+                Target(targetPSId),
                 Target(targetTopology),
                 ReassignmentSubmitterMetadata(
                   submitter = lfParty,

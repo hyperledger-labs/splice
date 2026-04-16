@@ -21,10 +21,6 @@ on:
         description: "Splice version from which the initial-package-config should be chosen"
         type: string
         required: true
-      protocol_version:
-        description: "Canton protocol version"
-        type: string
-        required: true
 
 jobs:
 
@@ -120,7 +116,7 @@ jobs:
       - name: Run Tests
         uses: ./splice-shared-gha/.github/actions/tests/scala_test
         with:
-          cache_version: 8
+          cache_version: 7
           start_canton_options: -F -w
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
@@ -135,4 +131,3 @@ jobs:
           failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
           daml_base_version: ${{ inputs.daml_base_version }}
-          protocol_version: ${{ inputs.protocol_version }}

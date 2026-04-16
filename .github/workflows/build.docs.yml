@@ -25,7 +25,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          cache_version: 8
+          cache_version: 7
           test_name: docs
           save_nix_cache: true
           save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
@@ -43,7 +43,7 @@ jobs:
           cmd: "Test/compile docs/bundle"
 
       - name: Upload documentation artifacts
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: docs/html/html
@@ -51,7 +51,7 @@ jobs:
       - name: Post-SBT job
         uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
         with:
-          cache_version: 8
+          cache_version: 7
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Report Failures on Slack & Github

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -7,10 +7,10 @@ import cats.data.EitherT
 import cats.implicits.toFunctorFilterOps
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.crypto.{SyncCryptoError, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
@@ -18,13 +18,12 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.RequestRefused
-import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
@@ -70,17 +69,15 @@ private[mediator] object VerdictSender {
       sequencerSend: SequencerClientSend,
       crypto: SynchronizerCryptoClient,
       mediatorId: MediatorId,
-      batchingConfig: BatchingConfig,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): VerdictSender =
-    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, batchingConfig, loggerFactory)
+    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, loggerFactory)
 }
 
 private[mediator] class DefaultVerdictSender(
     sequencerSend: SequencerClientSend,
     crypto: SynchronizerCryptoClient,
     mediatorId: MediatorId,
-    batchingConfig: BatchingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends VerdictSender
@@ -166,13 +163,9 @@ private[mediator] class DefaultVerdictSender(
         sequencerSend
           .send(
             batch,
-            timestamps = SendRequestTimestamps(
-              topologyTimestamp = Some(requestId.unwrap),
-              // We use `clock.now` to stay consistent with how other submission requests are signed.
-              approximateTimestampForSigning = sequencerSend.clock.now,
-              maxSequencingTime = decisionTime,
-            ),
+            Some(requestId.unwrap),
             callback = callback,
+            maxSequencingTime = decisionTime,
             aggregationRule = aggregationRule,
             amplify = true,
           )
@@ -232,13 +225,7 @@ private[mediator] class DefaultVerdictSender(
             )
 
         SignedProtocolMessage
-          .signAndCreate(
-            result,
-            snapshot,
-            // `ConfirmationResultMessage`s are signed and verified with a `fixed` timestamp,
-            // so no approximate timestamp is needed.
-            None,
-          )
+          .signAndCreate(result, snapshot)
           .map(signedResult => List(OpenEnvelope(signedResult, recipients)(protocolVersion)))
       }
 
@@ -339,29 +326,22 @@ private[mediator] class DefaultVerdictSender(
     if (recipientsByViewTypeAndRootHash.nonEmpty) {
       for {
         snapshot <- crypto.awaitSnapshot(requestId.unwrap)
-        envs <- MonadUtil.parTraverseWithLimit(batchingConfig.parallelism)(
-          recipientsByViewTypeAndRootHash.toSeq
-        ) { case ((viewType, rootHash), flatRecipients) =>
-          val rejection = ConfirmationResultMessage.create(
-            crypto.psid,
-            viewType,
-            requestId,
-            rootHash,
-            rejectionReason,
-          )
-
-          val recipients = Recipients.recipientGroups(flatRecipients.map(r => NonEmpty(Set, r)))
-
-          SignedProtocolMessage
-            .trySignAndCreate(
-              rejection,
-              snapshot,
-              // `ConfirmationResultMessage`s are signed and verified with a `fixed` timestamp,
-              // so no approximate timestamp is needed.
-              None,
+        envs <- recipientsByViewTypeAndRootHash.toSeq
+          .parTraverse { case ((viewType, rootHash), flatRecipients) =>
+            val rejection = ConfirmationResultMessage.create(
+              crypto.psid,
+              viewType,
+              requestId,
+              rootHash,
+              rejectionReason,
             )
-            .map(_ -> recipients)
-        }
+
+            val recipients = Recipients.recipientGroups(flatRecipients.map(r => NonEmpty(Set, r)))
+
+            SignedProtocolMessage
+              .trySignAndCreate(rejection, snapshot)
+              .map(_ -> recipients)
+          }
         batches = envs.map(Batch.of(protocolVersion, _))
         mediatorGroupO = // we always use RHMs to figure out the mediator group, to address rejections from a correct mediator that participants that received the RHMs expect
           rootHashMessages.headOption // one RHM is enough because sequencer checks that all RHMs specify the same mediator recipient
@@ -376,7 +356,7 @@ private[mediator] class DefaultVerdictSender(
                   )
                 }
             }
-        _ <- MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(batches) { batch =>
+        _ <- batches.parTraverse_ { batch =>
           mediatorGroupO.traverse_ {
             // if no mediator could be detected from RHMs, participants will also detect this and there's not need to send a reject
             mediatorGroup =>
@@ -394,15 +374,12 @@ private[mediator] class DefaultVerdictSender(
                 sendVerdict <-
                   shouldSendVerdict(mediatorGroup, snapshot.ipsSnapshot)
               } yield {
-                FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-                  sendResultBatch(
-                    requestId,
-                    batch,
-                    decisionTime,
-                    aggregationRule = aggregationRuleO,
-                    sendVerdict,
-                  ),
-                  s"Failed to send REJECT verdict for request=$requestId",
+                sendResultBatch(
+                  requestId,
+                  batch,
+                  decisionTime,
+                  aggregationRule = aggregationRuleO,
+                  sendVerdict,
                 )
               }
           }

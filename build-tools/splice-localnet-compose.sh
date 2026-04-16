@@ -21,27 +21,16 @@ export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
 
-# let docker assign a port to postgres. In CI, we have another postgres instance running, so can't use the default 5432
-DB_PORT=""
-export DB_PORT
+# the port will be assigned by docker
+TEST_PORT=""
+export TEST_PORT
 
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
-ALPHA_PROTOCOL_VERSION_ENV=""
-
-function usage() {
-    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
-    echo ""
-    echo "Options:"
-    echo "  -D                        Completely tear down the localnet (using 'docker compose down') instead of just stopping the containers (using 'docker compose stop')"
-    echo "  -M                        Start the localnet with the 'multi-sync' profile enabled"
-    echo "  -u                        Enable unstable Canton protocol versions. WARNING: This should be used only for temporary test environments that be be reset often."
-    echo "  -p <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
-}
 
 if [[ $# -lt 1 ]]; then
-    usage
+    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
     exit 1
 fi
 
@@ -51,7 +40,7 @@ case $1 in
         ;;
     *)
         echo "Invalid action: $1. Use 'start' or 'stop'."
-        usage
+        echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
         exit 1
         ;;
 esac
@@ -65,29 +54,14 @@ while [[ $# -gt 0 ]]; do
         -M)
             MULTI_SYNC_PROFILE=( --profile multi-sync )
             ;;
-        -p)
-            shift
-            if [[ -z "$1" ]]; then
-                echo "Error: -P requires a protocol version argument."
-                usage
-                exit 1
-            fi
-            CANTON_PROTOCOL_VERSION=$1
-            export CANTON_PROTOCOL_VERSION
-            ;;
-        -u)
-            ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
-            ;;
         *)
             echo "Unknown option: $1"
-            usage
+            echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
             exit 1
             ;;
     esac
     shift
 done
-
-export ALPHA_PROTOCOL_VERSION_ENV
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"

@@ -1,11 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
 
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
-import com.digitalasset.canton.ledger.participant.state.{RepairIndex, SynchronizerIndex}
+import com.digitalasset.canton.ledger.participant.state.{
+  RepairIndex,
+  SequencerIndex,
+  SynchronizerIndex,
+}
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestData
 import com.digitalasset.canton.participant.protocol.{
   MessageCleanReplayStartingPoint,
@@ -33,8 +38,9 @@ import com.digitalasset.canton.{
   SequencerCounter,
 }
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.event.Level
 
-final class SyncEphemeralStateFactoryTest
+class SyncEphemeralStateFactoryTest
     extends AsyncWordSpec
     with BaseTest
     with CloseableTest
@@ -63,7 +69,12 @@ final class SyncEphemeralStateFactoryTest
         val ses = new InMemorySequencedEventStore(loggerFactory, timeouts)
 
         for {
-          startingPoints <- SyncEphemeralStateFactory.startingPoints(rjs, ses, None, None)
+          startingPoints <- SyncEphemeralStateFactory.startingPoints(
+            rjs,
+            ses,
+            None,
+            None,
+          )
         } yield {
           startingPoints shouldBe ProcessingStartingPoints.tryCreate(
             MessageCleanReplayStartingPoint.default,
@@ -87,7 +98,7 @@ final class SyncEphemeralStateFactoryTest
           withCleanSc <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
-            Some(SynchronizerIndex.forSequencedUpdate(ts)),
+            Some(SynchronizerIndex.of(SequencerIndex(ts))),
             None,
           )
         } yield {
@@ -135,23 +146,28 @@ final class SyncEphemeralStateFactoryTest
           sp1 <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
-            Some(SynchronizerIndex.forSequencedUpdate(ts0)),
+            Some(SynchronizerIndex.of(SequencerIndex(ts0))),
             None,
           )
           sp2 <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
-            Some(SynchronizerIndex.forSequencedUpdate(ts1)),
+            Some(SynchronizerIndex.of(SequencerIndex(ts1))),
             None,
           )
           synchronizerIndex = Some(
             SynchronizerIndex(
               repairIndex = None,
-              sequencerIndex = Some(ts3),
+              sequencerIndex = Some(SequencerIndex(ts3)),
               recordTime = ts3,
             )
           )
-          sp3 <- SyncEphemeralStateFactory.startingPoints(rjs, ses, synchronizerIndex, None)
+          sp3 <- SyncEphemeralStateFactory.startingPoints(
+            rjs,
+            ses,
+            synchronizerIndex,
+            None,
+          )
           sp3WithRecordTimeIncrease <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
@@ -160,14 +176,19 @@ final class SyncEphemeralStateFactoryTest
           )
           _ <- rjs.insert(RequestData.initial(rc + 4L, ts6))
           _ <- rjs.insert(RequestData.initial(rc + 3L, ts5))
-          sp3a <- SyncEphemeralStateFactory.startingPoints(rjs, ses, synchronizerIndex, None)
+          sp3a <- SyncEphemeralStateFactory.startingPoints(
+            rjs,
+            ses,
+            synchronizerIndex,
+            None,
+          )
           sp3b <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
             Some(
               SynchronizerIndex(
                 repairIndex = None,
-                sequencerIndex = Some(ts4),
+                sequencerIndex = Some(SequencerIndex(ts4)),
                 recordTime = ts4,
               )
             ),
@@ -282,13 +303,13 @@ final class SyncEphemeralStateFactoryTest
             sp0 <- SyncEphemeralStateFactory.startingPoints(
               rjs,
               ses,
-              Some(SynchronizerIndex.forSequencedUpdate(ts0)),
+              Some(SynchronizerIndex.of(SequencerIndex(ts0))),
               None,
             )
             sp2 <- SyncEphemeralStateFactory.startingPoints(
               rjs,
               ses,
-              Some(SynchronizerIndex.forSequencedUpdate(ts1)),
+              Some(SynchronizerIndex.of(SequencerIndex(ts1))),
               None,
             )
           } yield {
@@ -347,7 +368,7 @@ final class SyncEphemeralStateFactoryTest
               Some(
                 SynchronizerIndex(
                   repairIndex = None,
-                  sequencerIndex = Some(ts0),
+                  sequencerIndex = Some(SequencerIndex(ts0)),
                   recordTime = ts0,
                 )
               ),
@@ -361,7 +382,7 @@ final class SyncEphemeralStateFactoryTest
                   repairIndex = Some(
                     RepairIndex(timestamp = ts1, counter = repairCounter)
                   ),
-                  sequencerIndex = Some(ts1),
+                  sequencerIndex = Some(SequencerIndex(ts1)),
                   recordTime = ts1,
                 )
               ),
@@ -392,7 +413,7 @@ final class SyncEphemeralStateFactoryTest
                       counter = repairCounter + 1L,
                     )
                   ),
-                  sequencerIndex = Some(ts2),
+                  sequencerIndex = Some(SequencerIndex(ts2)),
                   recordTime = ts2,
                 )
               ),
@@ -533,142 +554,47 @@ final class SyncEphemeralStateFactoryTest
         }
       }
 
-      def genesisLsuProcessingStartingPoints(
-          upgradeTime: CantonTimestamp,
-          repairCounter: Long = 0,
-      ): ProcessingStartingPoints = ProcessingStartingPoints.tryCreate(
-        cleanReplay = MessageCleanReplayStartingPoint(
-          RequestCounter.Genesis,
-          SequencerCounter.Genesis,
-          upgradeTime,
-        ),
-        processing = MessageProcessingStartingPoint(
-          nextRequestCounter = RequestCounter.Genesis,
-          nextSequencerCounter = SequencerCounter.Genesis,
-          lastSequencerTimestamp = upgradeTime,
-          currentRecordTime = upgradeTime.immediateSuccessor,
-          nextRepairCounter = RepairCounter(repairCounter),
-        ),
-      )
-
-      "return the right result across LSU (empty state)" in {
+      "return the right result across migrations" in {
         val rjs = new InMemoryRequestJournalStore(loggerFactory)
         val ses = new InMemorySequencedEventStore(loggerFactory, timeouts)
-
-        val beforeLsu = CantonTimestamp.ofEpochSecond(20)
-        val upgradeTime = CantonTimestamp.ofEpochSecond(30)
-
-        val synchronizerPredecessor = SynchronizerPredecessor(
-          DefaultTestIdentities.physicalSynchronizerId,
-          upgradeTime,
-          isLateUpgrade = false,
-        )
-
-        val lastRepair = 42L
-        val indexWithoutRepair = SynchronizerIndex.forSequencedUpdate(beforeLsu)
-        val indexWithRepair = indexWithoutRepair.max(
-          SynchronizerIndex.forRepairUpdate(
-            RepairIndex(indexWithoutRepair.recordTime, RepairCounter(lastRepair))
-          )
+        val ts0 = CantonTimestamp.ofEpochSecond(0)
+        val predecessor = SynchronizerPredecessor(
+          psid = DefaultTestIdentities.physicalSynchronizerId,
+          upgradeTime = ts0,
         )
 
         for {
-          computedWithoutRepair <- SyncEphemeralStateFactory.startingPoints(
+          /*
+          This fails because:
+          - synchronizer is defined, but
+          - sequenced event store is empty (which means there is no event for ts0)
+           */
+          failure <- loggerFactory
+            .assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+              SyncEphemeralStateFactory.startingPoints(
+                rjs,
+                ses,
+                synchronizerIndexO = Some(SynchronizerIndex.of(SequencerIndex(ts0))),
+                None,
+              ),
+              forExactly(1, _)(
+                _.errorMessage should include("An internal error has occurred.")
+              ),
+            )
+            .failed
+
+          _ =
+            failure.getMessage shouldBe s"SequencerIndex with timestamp $ts0 is not found in sequenced event store"
+
+          success <- SyncEphemeralStateFactory.startingPoints(
             rjs,
             ses,
-            synchronizerIndexO = Some(indexWithoutRepair),
-            Some(synchronizerPredecessor),
+            synchronizerIndexO = Some(SynchronizerIndex.of(SequencerIndex(ts0))),
+            synchronizerPredecessor = Some(predecessor),
           )
 
-          computedWithRepair <- SyncEphemeralStateFactory.startingPoints(
-            rjs,
-            ses,
-            synchronizerIndexO = Some(indexWithRepair),
-            Some(synchronizerPredecessor),
-          )
-
-          computedWithoutIndex <- SyncEphemeralStateFactory.startingPoints(
-            rjs,
-            ses,
-            synchronizerIndexO = None,
-            Some(synchronizerPredecessor),
-          )
-        } yield {
-          computedWithoutRepair shouldBe genesisLsuProcessingStartingPoints(upgradeTime)
-          computedWithRepair shouldBe genesisLsuProcessingStartingPoints(
-            upgradeTime,
-            repairCounter = lastRepair + 1,
-          )
-          computedWithoutIndex shouldBe ProcessingStartingPoints.default
-        }
-      }
-
-      "return the right result across LSU (data in store)" in {
-        val rjs = new InMemoryRequestJournalStore(loggerFactory)
-        val ses = new InMemorySequencedEventStore(loggerFactory, timeouts)
-
-        val rc = RequestCounter(0)
-        val sc = SequencerCounter(0)
-
-        val beforeLsu = CantonTimestamp.ofEpochSecond(20)
-        val upgradeTime = CantonTimestamp.ofEpochSecond(30)
-        val afterLsu = CantonTimestamp.ofEpochSecond(40)
-
-        val synchronizerPredecessor = SynchronizerPredecessor(
-          DefaultTestIdentities.physicalSynchronizerId,
-          upgradeTime,
-          isLateUpgrade = false,
-        )
-
-        for {
-          _ <- rjs.insert(
-            RequestData.clean(rc, afterLsu, afterLsu.plusSeconds(2))
-          )
-          _ <- ses.store(Seq(dummyEvent(synchronizerId)(afterLsu)))
-          _ <- ses.store(Seq(dummyEvent(synchronizerId)(afterLsu.plusSeconds(1))))
-
-          withSequencedUpdate <- SyncEphemeralStateFactory.startingPoints(
-            rjs,
-            ses,
-            synchronizerIndexO = Some(SynchronizerIndex.forSequencedUpdate(beforeLsu)),
-            Some(synchronizerPredecessor),
-          )
-
-          _ = withSequencedUpdate shouldBe genesisLsuProcessingStartingPoints(upgradeTime)
-
-          withFloatingUpdate <- SyncEphemeralStateFactory.startingPoints(
-            rjs,
-            ses,
-            synchronizerIndexO = Some(SynchronizerIndex.forFloatingUpdate(beforeLsu)),
-            Some(synchronizerPredecessor),
-          )
-
-          _ = withFloatingUpdate shouldBe genesisLsuProcessingStartingPoints(upgradeTime)
-
-          nonGenesisWithCleanReplay <- SyncEphemeralStateFactory.startingPoints(
-            rjs,
-            ses,
-            synchronizerIndexO = Some(SynchronizerIndex.forSequencedUpdate(afterLsu)),
-            Some(synchronizerPredecessor),
-          )
-        } yield {
-
-          // Commit time is after `afterLsu` so there is clean replay...
-          nonGenesisWithCleanReplay.cleanReplay shouldBe MessageCleanReplayStartingPoint(
-            rc,
-            sc,
-            afterLsu.immediatePredecessor,
-          )
-
-          // ... processing starts after
-          nonGenesisWithCleanReplay.processing shouldBe MessageProcessingStartingPoint(
-            rc + 1,
-            sc + 1L,
-            afterLsu,
-            afterLsu,
-            RepairCounter.Genesis,
-          )
-        }
+          _ = success shouldBe ProcessingStartingPoints.default
+        } yield succeed
       }
     }
   }

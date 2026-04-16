@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.repair
@@ -12,12 +12,10 @@ import com.digitalasset.canton.participant.admin.data.RepairContract
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.{BaseTest, LfPackageId, ReassignmentCounter}
-import com.digitalasset.daml.lf.transaction.{CreationTime, TransactionCoder}
+import com.digitalasset.canton.{BaseTest, ReassignmentCounter, SynchronizerAlias}
 import org.scalatest.Assertion
 
 import scala.jdk.CollectionConverters.*
-import scala.util.chaining.scalaUtilChainingOps
 
 trait RepairTestUtil {
   this: BaseTest =>
@@ -57,50 +55,42 @@ trait RepairTestUtil {
 
   protected def readContractInstance(
       participant: LocalParticipantReference,
+      synchronizerAlias: String,
+      synchronizerId: SynchronizerId,
+      contractId: ContractId[?],
+  ): RepairContract =
+    readContractInstance(
+      participant,
+      SynchronizerAlias.tryCreate(synchronizerAlias),
+      synchronizerId,
+      contractId,
+    )
+
+  protected def readContractInstance(
+      participant: LocalParticipantReference,
+      synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       contractId: ContractId[?],
   ): RepairContract = {
-    val create = participant.ledger_api.javaapi.event_query
-      .by_contract_id(
-        contractId.toLf.coid,
-        includeCreatedEventBlob = true,
-        requestingParties = Seq.empty,
-      )
-      .pipe(queryResult =>
-        if (queryResult.hasCreated) queryResult.getCreated
-        else sys.error(s"No create for ${contractId.toLf.coid}")
-      )
-    val createdEvent = create
-      .pipe(created =>
-        if (created.hasCreatedEvent) created.getCreatedEvent
-        else sys.error(s"No created event for ${contractId.toLf.coid}")
-      )
-    val contractCreatedEventBlob = createdEvent.getCreatedEventBlob
-    val contractInst = TransactionCoder
-      .decodeFatContractInstance(contractCreatedEventBlob)
-      .fold(
-        err => sys.error(s"Failed to decode created event blob for ${contractId.toLf.coid}: $err"),
-        identity,
-      )
-      .pipe { fci =>
-        fci
-          .traverseCreateAt {
-            case absolute: CreationTime.CreatedAt => Right(absolute)
-            case _ => Left(s"Unable to determine create time for ${fci.createdAt}")
-          }
-          .fold(sys.error, identity)
-      }
+    val contract = participant.testing
+      .pcs_search(synchronizerAlias, exactId = contractId.toLf.coid)
+      .headOption
+      .value
+      ._2
+
     RepairContract(
-      synchronizerId = synchronizerId,
-      contract = contractInst,
-      reassignmentCounter = ReassignmentCounter.Genesis,
-      representativePackageId =
-        LfPackageId.assertFromString(createdEvent.getRepresentativePackageId),
+      synchronizerId,
+      contract.inst,
+      ReassignmentCounter.Genesis,
+      // Contracts read from the PCS have the representative package ID the same as the original package ID
+      // TODO(#24610): Use the Ledger API Active contract service to get the correct representative package ID
+      representativePackageId = contract.templateId.packageId,
     )
   }
 
   protected def createContractInstance(
       participant: LocalParticipantReference,
+      synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       payer: PartyId,
       owner: PartyId,
@@ -108,12 +98,14 @@ trait RepairTestUtil {
   ): RepairContract =
     readContractInstance(
       participant,
+      synchronizerAlias,
       synchronizerId,
       createContract(participant, payer, owner, currency),
     )
 
   protected def createArchivedContractInstance(
       participant: LocalParticipantReference,
+      synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       payer: PartyId,
       owner: PartyId,
@@ -121,7 +113,7 @@ trait RepairTestUtil {
   ): RepairContract = {
     val archivedContractId = createContract(participant, payer, owner, currency)
     val archivedContract =
-      readContractInstance(participant, synchronizerId, archivedContractId)
+      readContractInstance(participant, synchronizerAlias, synchronizerId, archivedContractId)
     exerciseContract(participant, owner, archivedContractId)
     archivedContract
   }

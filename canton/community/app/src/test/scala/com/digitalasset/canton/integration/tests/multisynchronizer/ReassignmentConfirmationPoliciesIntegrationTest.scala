@@ -1,13 +1,14 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{
   AcsInspection,
@@ -19,7 +20,6 @@ import com.digitalasset.canton.integration.util.{
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
-  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
@@ -43,9 +43,6 @@ sealed trait ReassignmentConfirmationPoliciesPartyIntegrationTest
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1_S1M1
-      .addConfigTransforms(
-        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag
-      )
       .withSetup { implicit env =>
         import env.*
 
@@ -169,10 +166,10 @@ sealed trait ReassignmentConfirmationPoliciesPartyIntegrationTest
       .reassignmentId
 
     PartyToParticipantDeclarative(Set(participant1, participant2), Set(daId, acmeId))(
-      owningParticipants = Map(alice.partyId -> participant1),
+      owningParticipants = Map(alice -> participant1),
       targetTopology = Map(
         // Only: alice -> P2 -> acme
-        alice.partyId -> Map(
+        alice -> Map(
           acmeId -> (PositiveInt.one, Set((participant2, Confirmation)))
         )
       ),
@@ -188,7 +185,7 @@ class ReassignmentConfirmationPoliciesPartyIntegrationTestPostgres
     extends ReassignmentConfirmationPoliciesPartyIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseBftSequencer(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2")).map(_.map(InstanceName.tryCreate))

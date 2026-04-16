@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -54,7 +54,9 @@ trait TopologyManagementHelper { this: BaseTest =>
       val encryptionKmsKeyId = kmsKeys.encryptionKeyId
         .valueOrFail(s"node [${node.name}] expects an encryption key id")
 
+      // To refer in docs
       val intermediateNsKmsKeyId = namespaceKmsKeyId
+      // user-manual-entry-begin: ManualRegisterKmsIntermediateNamespaceKey
       val intermediateKey = node.keys.secret
         .register_kms_signing_key(
           intermediateNsKmsKeyId,

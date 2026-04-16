@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponseV1, UpdateHistoryItemV2}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateHistoryItemV2}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -205,8 +205,8 @@ class UpdateHistorySanityCheckPlugin(
           val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
           // One of them might have more snapshots than the other.
           val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
-          val otherComparable = otherScanSnapshots.take(minSize)
-          val founderComparable = founderSnapshots.take(minSize)
+          val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
+          val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
           val different = otherComparable.zipWithIndex.collect {
             case (otherItem, idx) if founderComparable(idx) != otherItem =>
               (idx, otherItem, founderComparable(idx))
@@ -217,17 +217,23 @@ class UpdateHistorySanityCheckPlugin(
     }
   }
 
+  private def toComparableSnapshot(acsResponse: AcsResponse) = {
+    acsResponse.copy(createdEvents =
+      acsResponse.createdEvents.map(_.copy(eventId = "different across nodes"))
+    )
+  }
+
   private def getAllSnapshots(
       scan: ScanAppBackendReference,
       before: CantonTimestamp,
-      acc: List[AcsResponseV1],
-  ): List[AcsResponseV1] = {
+      acc: List[AcsResponse],
+  ): List[AcsResponse] = {
     val acsSnapshotPeriodHours = scanStorageConfigV1.dbAcsSnapshotPeriodHours
     val migrationId = scan.config.domainMigrationId
     scan.getDateOfMostRecentSnapshotBefore(before, migrationId) match {
       case Some(snapshotDate) =>
         val snapshot = scan
-          .getAcsSnapshotAtV1(
+          .getAcsSnapshotAt(
             CantonTimestamp.assertFromInstant(snapshotDate.toInstant),
             migrationId,
             pageSize = 1000,

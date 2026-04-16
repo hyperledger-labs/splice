@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -12,19 +12,16 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.resource.ToDbPrimitive
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.admin.v30 as adminProtoV30
 import com.digitalasset.canton.topology.admin.v30.Synchronizer.Kind
-import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LedgerParticipantId, LfPartyId, ProtoDeserializationError}
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
-
-import scala.language.implicitConversions
 
 /** Top level trait representing an identity within the system */
 sealed trait Identity
@@ -139,8 +136,9 @@ object Member {
     * [[Member]] have their own persistence schemes ([[ParticipantId]]).
     */
   object DbStorageImplicits {
-    implicit val memberIdToDbPrimitive: ToDbPrimitive[Member, String300] =
-      ToDbPrimitive(_.toLengthLimitedString)
+    implicit val setParameterMember: SetParameter[Member] = (v: Member, pp) =>
+      pp >> v.toLengthLimitedString
+
     implicit val getResultMember: GetResult[Member] = GetResult { r =>
       Member
         .fromProtoPrimitive_(r.nextString())
@@ -156,8 +154,6 @@ sealed trait Synchronizer
     with Serializable {
 
   def logical: SynchronizerId
-
-  def toProtoPrimitive: String
 
   def isCompatibleWith(other: Synchronizer): Boolean = (this, other) match {
     case (a: PhysicalSynchronizerId, b: PhysicalSynchronizerId) => a == b
@@ -184,24 +180,6 @@ object Synchronizer {
       case Kind.Id(lsidP) => SynchronizerId.fromProtoPrimitive(lsidP, "id")
       case Kind.PhysicalId(psidP) => PhysicalSynchronizerId.fromProtoPrimitive(psidP, "physical_id")
     }
-
-  /** Parses a string protobuf field to either a logical or physical synchronizer ID. Fails if the
-    * string can't be parsed to either.
-    * @param value
-    *   value to parse
-    * @param fieldName
-    *   name of the proto field
-    */
-  def fromLogicalOrPhysicalString(
-      value: String,
-      fieldName: String,
-  ): Either[ProtoDeserializationError, Synchronizer] =
-    SynchronizerId
-      .fromProtoPrimitive(value, fieldName)
-      .orElse(
-        PhysicalSynchronizerId
-          .fromProtoPrimitive(value, fieldName)
-      )
 }
 
 final case class SynchronizerId(uid: UniqueIdentifier) extends Synchronizer with Identity {
@@ -217,11 +195,6 @@ object SynchronizerId {
   implicit val synchronizerIdEncoder: Encoder[SynchronizerId] =
     Encoder.encodeString.contramap(_.unwrap.toProtoPrimitive)
 
-  val orderingIdentifierThenNamespace =
-    Ordering.by[SynchronizerId, UniqueIdentifier](_.uid)(
-      UniqueIdentifier.orderingIdentifierThenNamespace
-    )
-
   // Instances for slick (db) queries
   implicit val getResultSynchronizerId: GetResult[SynchronizerId] =
     UniqueIdentifier.getResult.andThen(SynchronizerId(_))
@@ -229,8 +202,10 @@ object SynchronizerId {
   implicit val getResultSynchronizerIdO: GetResult[Option[SynchronizerId]] =
     UniqueIdentifier.getResultO.andThen(_.map(SynchronizerId(_)))
 
-  implicit val synchronizerIdToDbPrimitive: ToDbPrimitive[SynchronizerId, String255] =
-    ToDbPrimitive(_.toLengthLimitedString)
+  implicit val setParameterSynchronizerId: SetParameter[SynchronizerId] =
+    (d: SynchronizerId, pp: PositionedParameters) => pp >> d.toLengthLimitedString
+  implicit val setParameterSynchronizerIdO: SetParameter[Option[SynchronizerId]] =
+    (d: Option[SynchronizerId], pp: PositionedParameters) => pp >> d.map(_.toLengthLimitedString)
 
   def fromProtoPrimitive(
       proto: String,
@@ -248,10 +223,11 @@ object SynchronizerId {
 
 final case class PhysicalSynchronizerId(
     logical: SynchronizerId,
-    serial: NonNegativeInt,
     protocolVersion: ProtocolVersion,
+    serial: NonNegativeInt,
 ) extends Synchronizer {
   def suffix: String = s"$protocolVersion${PhysicalSynchronizerId.secondaryDelimiter}$serial"
+
   def uid: UniqueIdentifier = logical.uid
 
   def toLengthLimitedString: String300 =
@@ -259,27 +235,17 @@ final case class PhysicalSynchronizerId(
       s"${logical.toLengthLimitedString}${PhysicalSynchronizerId.primaryDelimiter}$suffix"
     )
 
-  /** Synchronizer identifier to use for the computation of the external signing hash
-    */
-  def forExternalTransactionHashing: Synchronizer =
-    if (protocolVersion <= ProtocolVersion.v34) logical
-    // TODO(i30737): From PV35, we use the physical synchronizer ID to maintain deduplication guarantees during LSU.
-    // This will likely be revised when the mediator transaction data is migrated during LSUs
-    else this
+  def toProtoPrimitive: String = toLengthLimitedString.unwrap
 
-  override def toProtoPrimitive: String = toLengthLimitedString.unwrap
-
-  override protected def pretty: Pretty[PhysicalSynchronizerId] =
+  override protected def pretty: Pretty[PhysicalSynchronizerId.this.type] =
     prettyOfString(_ =>
       logical.show ++ PhysicalSynchronizerId.primaryDelimiter ++ protocolVersion.show ++
         PhysicalSynchronizerId.secondaryDelimiter ++ serial.show
     )
-
-  def incrementSerial: PhysicalSynchronizerId = this.copy(serial = serial.increment.toNonNegative)
 }
 
 object PhysicalSynchronizerId {
-  private val primaryDelimiter: String = "::" // Between lsid and suffix
+  private val primaryDelimiter: String = "::" // Between LSId and suffix
   private val secondaryDelimiter: String = "-" // Between components of the suffix
 
   def apply(
@@ -288,13 +254,13 @@ object PhysicalSynchronizerId {
   ): PhysicalSynchronizerId =
     PhysicalSynchronizerId(
       synchronizerId,
-      staticSynchronizerParameters.serial,
       staticSynchronizerParameters.protocolVersion,
+      staticSynchronizerParameters.serial,
     )
 
   implicit val physicalSynchronizerIdOrdering: Ordering[PhysicalSynchronizerId] =
     Ordering.by(psid =>
-      (psid.logical.toLengthLimitedString.unwrap, psid.serial, psid.protocolVersion)
+      (psid.logical.toLengthLimitedString.unwrap, psid.protocolVersion, psid.serial)
     )
 
   def fromString(raw: String): Either[String, PhysicalSynchronizerId] = {
@@ -316,7 +282,7 @@ object PhysicalSynchronizerId {
           s"Cannot parse ${suffixComponents(1)} to an int"
         )
         serial <- NonNegativeInt.create(serialInt).leftMap(_.message)
-      } yield PhysicalSynchronizerId(lsid, serial, pv)
+      } yield PhysicalSynchronizerId(lsid, pv, serial)
     } else
       Left(s"Unable to parse `$raw` as physical synchronizer id")
   }
@@ -376,11 +342,6 @@ object ParticipantId {
 
   implicit val ordering: Ordering[ParticipantId] = Ordering.by(_.uid.toProtoPrimitive)
 
-  val orderingIdentifierThenNamespace =
-    Ordering.by[ParticipantId, UniqueIdentifier](_.uid)(
-      UniqueIdentifier.orderingIdentifierThenNamespace
-    )
-
   def fromProtoPrimitive(
       proto: String,
       fieldName: String,
@@ -400,12 +361,8 @@ object ParticipantId {
   // Instances for slick (db) queries
   implicit val getResultParticipantId: GetResult[ParticipantId] =
     UniqueIdentifier.getResult.andThen(ParticipantId(_))
-  implicit val participantIdToDbPrimitive: ToDbPrimitive[ParticipantId, String255] =
-    ToDbPrimitive(_.uid.toLengthLimitedString)
-}
-
-object Party {
-  implicit def partyToPartyId(party: Party): PartyId = party.partyId
+  implicit val setParameterParticipantId: SetParameter[ParticipantId] =
+    (p: ParticipantId, pp: PositionedParameters) => pp >> p.uid.toLengthLimitedString
 }
 
 sealed trait Party extends Identity with Product with Serializable {
@@ -421,20 +378,18 @@ final case class ExternalParty private (
     partyId: PartyId,
     signingFingerprints: NonEmpty[Seq[Fingerprint]],
     signingThreshold: PositiveInt,
-    preferredHashingSchemeVersion: HashingSchemeVersion,
 ) extends Party {
   override def uid: UniqueIdentifier = partyId.uid
 
   /** The annotation ensures that [[ExternalParty]] is used only in tests.
     */
   @VisibleForTesting
-  private[canton] def copy(
+  def copy(
       partyId: PartyId = partyId,
       signingFingerprints: NonEmpty[Seq[Fingerprint]] = signingFingerprints,
       signingThreshold: PositiveInt = signingThreshold,
-      preferredHashingSchemeVersion: HashingSchemeVersion = preferredHashingSchemeVersion,
   ): ExternalParty =
-    new ExternalParty(partyId, signingFingerprints, signingThreshold, preferredHashingSchemeVersion)
+    new ExternalParty(partyId, signingFingerprints, signingThreshold)
 }
 
 object ExternalParty {
@@ -446,9 +401,7 @@ object ExternalParty {
       partyId: PartyId,
       signingFingerprints: NonEmpty[Seq[Fingerprint]],
       signingThreshold: PositiveInt,
-      preferredHashingSchemeVersion: HashingSchemeVersion,
-  ) =
-    new ExternalParty(partyId, signingFingerprints, signingThreshold, preferredHashingSchemeVersion)
+  ) = new ExternalParty(partyId, signingFingerprints, signingThreshold)
 }
 
 /** A party identifier based on a unique identifier
@@ -462,8 +415,8 @@ object PartyId {
   implicit val ordering: Ordering[PartyId] = Ordering.by(x => x.toProtoPrimitive)
   implicit val getResultPartyId: GetResult[PartyId] =
     UniqueIdentifier.getResult.andThen(PartyId(_))
-  implicit val partyIdToDbPrimitive: ToDbPrimitive[PartyId, String255] =
-    ToDbPrimitive(_.uid.toLengthLimitedString)
+  implicit val setParameterPartyId: SetParameter[PartyId] =
+    (p: PartyId, pp: PositionedParameters) => pp >> p.uid.toLengthLimitedString
 
   def tryCreate(identifier: String, namespace: Namespace): PartyId =
     PartyId(UniqueIdentifier.tryCreate(identifier, namespace))

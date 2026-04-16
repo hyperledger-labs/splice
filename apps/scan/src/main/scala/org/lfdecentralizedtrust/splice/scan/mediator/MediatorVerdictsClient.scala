@@ -3,23 +3,23 @@
 
 package org.lfdecentralizedtrust.splice.scan.mediator
 
-import com.daml.grpc.adapter.client.pekko.ClientAdapter
-import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.HasRunOnClosing
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.mediator.admin.v30
-import com.digitalasset.canton.networking.grpc.{ClientChannelBuilder, GrpcManagedChannel}
-import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.{ClientChannelBuilder, GrpcManagedChannel}
+import com.digitalasset.canton.mediator.admin.v30
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.HasRunOnClosing
 import org.lfdecentralizedtrust.splice.admin.api.client.{
   GrpcClientMetrics,
   GrpcMetricsClientInterceptor,
 }
+import com.digitalasset.canton.tracing.TraceContextGrpc
+import com.daml.grpc.adapter.client.pekko.ClientAdapter
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Success}
+import scala.concurrent.ExecutionContext
 
 final class MediatorVerdictsClient(
     mediatorAdminClientConfig: com.digitalasset.canton.config.FullClientConfig,
@@ -43,9 +43,7 @@ final class MediatorVerdictsClient(
 
   def streamVerdicts(
       resumeFromTs: Option[CantonTimestamp]
-  )(implicit
-      tc: TraceContext
-  ): Source[v30.Verdict, Future[Option[v30.VerdictsResponse.Complete]]] = {
+  )(implicit tc: TraceContext): Source[v30.Verdict, NotUsed] = {
     val req = v30.VerdictsRequest(
       mostRecentlyReceivedRecordTime = resumeFromTs.map(_.toProtoTimestamp)
     )
@@ -59,45 +57,12 @@ final class MediatorVerdictsClient(
         )
     )
 
-    val completePromise = Promise[Option[v30.VerdictsResponse.Complete]]()
-
     ClientAdapter
       .serverStreaming(
         req,
         stub.verdicts,
       )
-      .takeWhile(
-        response => {
-          response.payload match {
-            case v30.VerdictsResponse.Payload.Complete(complete) =>
-              logger.info(s"Received Complete message from mediator verdicts stream: $complete")
-              completePromise.trySuccess(Some(complete)).discard
-              false
-            case _ => true
-          }
-        },
-        inclusive = false,
-      )
-      .collect { case v30.VerdictsResponse(v30.VerdictsResponse.Payload.Verdict(verdict)) =>
-        verdict
-      }
-      .watchTermination() { (_, done) =>
-        done.onComplete {
-          case Success(_) =>
-            if (completePromise.trySuccess(None)) {
-              logger.info(
-                "Mediator verdicts stream completed without a Complete message"
-              )
-            }
-          case Failure(ex) =>
-            if (!managedChannel.isClosing)
-              logger.info(
-                s"Mediator verdicts stream terminated with an error",
-                ex,
-              )
-            completePromise.tryFailure(ex)
-        }
-        completePromise.future
-      }
+      .mapConcat(_.verdict)
+      .mapMaterializedValue(_ => NotUsed)
   }
 }

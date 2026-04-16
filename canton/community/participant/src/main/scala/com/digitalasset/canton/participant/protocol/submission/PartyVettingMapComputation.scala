@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -80,7 +80,7 @@ final class PartyVettingMapComputation(
         )
 
     def getPartyHostingOnAdmissibleSynchronizers(
-        prescribedPsidO: Option[PhysicalSynchronizerId]
+        prescribedPSIdO: Option[PhysicalSynchronizerId]
     ): FutureUnlessShutdown[
       Map[PhysicalSynchronizerId, Map[LfPartyId, Set[ParticipantId]]]
     ] =
@@ -91,7 +91,7 @@ final class PartyVettingMapComputation(
           .forParties(submitters, informees, synchronizerState)
           .leftSemiflatMap(err => FutureUnlessShutdown.failed(err.asGrpcError))
           .merge
-        withPrescribedPsidConsidered <- prescribedPsidO match {
+        withPrescribedPsidConsidered <- prescribedPSIdO match {
           case Some(psid) =>
             val admissibleSyncshronizers = partyHostingOnAllAdmissibleSyncs.keySet
             partyHostingOnAllAdmissibleSyncs
@@ -113,10 +113,10 @@ final class PartyVettingMapComputation(
 
     for {
       _ <- validateAnySynchronizerReady
-      prescribedPsidO <- prescribedSynchronizerIdO.traverse(toPhysicalSyncId)
+      prescribedPSIdO <- prescribedSynchronizerIdO.traverse(toPhysicalSyncId)
 
       // Get the hosting participants for parties on the admissible synchronizers
-      partyHostingOnAdmissibleSyncs <- getPartyHostingOnAdmissibleSynchronizers(prescribedPsidO)
+      partyHostingOnAdmissibleSyncs <- getPartyHostingOnAdmissibleSynchronizers(prescribedPSIdO)
 
       // Compute the vetting state per participant with the validity computed at the provided `vettingValidityTimestamp`
       //   Note: a package is vetting-valid if there exists a VettedPackage reference in the VettedPackages topology transaction

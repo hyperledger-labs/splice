@@ -1,7 +1,6 @@
 .daml
 *.dar
 !daml/dars/*
-!apps/app/src/test/resources/*.dar
 *.iml
 *.log
 *.clog

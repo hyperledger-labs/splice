@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.dynamicsynchronizerparameters
@@ -11,7 +11,7 @@ import com.digitalasset.canton.integration.plugins.{
   UseProgrammableSequencer,
   UseReferenceBlockSequencer,
 }
-import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
+import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -35,11 +35,14 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with HasProgrammableSequencer
-    with HasCycleUtils {
+    with HasCycleUtils
+    with LogicalUpgradeUtils {
+
+  override protected def testName: String = "ledger-time-record-time-tolerance-changes"
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
-      .addConfigTransform(ConfigTransforms.useStaticTime)
+      .addConfigTransforms(ConfigTransforms.useStaticTime)
       .withSetup { implicit env =>
         import env.*
 
@@ -123,7 +126,7 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
       val command2Time = environment.now
       // Make sure that anything sequenced after this point gets assigned a sequencing time based on the
       // updated simclock, else the test could flake with `LOCAL_VERDICT_LEDGER_TIME_OUT_OF_BOUND`.
-      waitForTargetTimeOnSequencer(sequencer1, command2Time, logger)
+      waitForTargetTimeOnSequencer(sequencer1, command2Time)
       val command2ExpectedConfirmationRequestMaxSequencingTimes = List(
         (
           command2Time,

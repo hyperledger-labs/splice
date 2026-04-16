@@ -3,7 +3,7 @@
   "main": "src/index.ts",
   "devDependencies": {
     "@types/node-fetch": "^2.6.12",
-    "@types/sinon": "^21.0.1",
+    "@types/sinon": "^21.0.0",
     "sinon": "^21.0.3"
   },
   "dependencies": {

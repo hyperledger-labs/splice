@@ -41,9 +41,10 @@ import {
   CantonBftSynchronizerNode,
   configForSv,
   DecentralizedSynchronizerNode,
+  InstalledMigrationSpecificSv,
   installScanBulkStorage,
   installSvLoopback,
-  SynchronizerNodes,
+  SvParticipant,
   valuesForSvApp,
   valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -66,6 +67,7 @@ import {
 } from '../../common/src/automation';
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
+import { buildCrossStackCantonDependencies } from './canton';
 import { installInfo } from './info';
 
 export function installSvKeySecret(
@@ -118,7 +120,8 @@ export type InstalledSv = {
   validatorApp: Resource;
   svApp: InstalledHelmChart;
   scan: InstalledHelmChart;
-  canton: SynchronizerNodes;
+  decentralizedSynchronizer: DecentralizedSynchronizerNode;
+  participant: SvParticipant;
   ingress: Resource;
 };
 
@@ -249,13 +252,17 @@ export async function installSvNode(
       }
     );
 
-  const canton = new SynchronizerNodes(
+  const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,
     {
-      ...config.nodeConfigs,
-      self: { ...config.cometBft, nodeName: config.nodeName },
+      name: config.nodeName,
+      onboardingName: config.onboardingName,
+      nodeConfigs: {
+        ...config.nodeConfigs,
+        self: { ...config.cometBft, nodeName: config.nodeName },
+      },
     },
-    config.ingressName
+    config
   );
 
   const svApp = installSvApp(
@@ -264,7 +271,8 @@ export async function installSvNode(
     xns,
     dependsOn,
     appsPostgres,
-    canton
+    canton.participant,
+    canton.decentralizedSynchronizer
   );
 
   const scan = installScan(
@@ -272,8 +280,9 @@ export async function installSvNode(
     config,
     decentralizedSynchronizerUpgradeConfig,
     dependsOn,
-    canton,
+    canton.decentralizedSynchronizer,
     svApp,
+    canton.participant,
     appsPostgres
   );
 
@@ -333,7 +342,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return { canton, validatorApp, svApp, scan, ingress };
+  return { ...canton, validatorApp, svApp, scan, ingress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -355,7 +364,7 @@ async function installValidator(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   svConfig: SvConfig,
   backupConfigSecret: Resource | undefined,
-  sv: SynchronizerNodes,
+  sv: InstalledMigrationSpecificSv,
   svApp: Resource,
   scan: Resource
 ) {
@@ -369,7 +378,7 @@ async function installValidator(
     xns,
     ...commonValidatorAppValues,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     validatorWalletUsers: svUserIds(svConfig.auth0Client.getCfg()).apply(ids =>
       ids.concat(svConfig.validatorWalletUser ? [svConfig.validatorWalletUser] : [])
@@ -418,23 +427,14 @@ function installSvApp(
   xns: ExactNamespace,
   dependsOn: CnInput<Resource>[],
   postgres: Postgres,
-  synchronizerNodes: SynchronizerNodes
+  participant: SvParticipant,
+  decentralizedSynchronizer: DecentralizedSynchronizerNode
 ) {
-  const { participant } = synchronizerNodes;
-  const decentralizedSynchronizer = synchronizerNodes.active;
-  const allSynchronizerDependencies = [
-    synchronizerNodes.active,
-    synchronizerNodes.legacy,
-    synchronizerNodes.upgrade,
-  ]
-    .filter((n): n is NonNullable<typeof n> => n !== undefined)
-    .flatMap(n => n.dependencies);
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
   const commonSvAppValues = valuesForSvApp(
     decentralizedSynchronizerMigrationConfig,
-    { ...config, skipInitialization: svsConfig?.synchronizer?.skipInitialization },
-    synchronizerNodes,
-    config.ingressName
+    config,
+    decentralizedSynchronizer
   );
 
   const svValues = {
@@ -459,6 +459,18 @@ function installSvApp(
       config.onboarding.type == 'found-dso'
         ? undefined
         : decentralizedSynchronizer.sv1InternalSequencerAddress,
+    domain:
+      // defaults for ports and address are fine,
+      // we need to include a dummy value though
+      // because helm does not distinguish between an empty object and unset.
+      {
+        ...(commonSvAppValues.domain || {}),
+        sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
+        mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
+        // required to prevent participants from using new nodes when the domain is upgraded
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+        skipInitialization: svsConfig?.synchronizer?.skipInitialization,
+      },
     scan: {
       publicUrl: publicScanUrl(config),
       internalUrl: internalScanUrl(config),
@@ -523,7 +535,7 @@ function installSvApp(
       dependsOn: dependsOn
         .concat([postgres])
         .concat(participant.asDependencies)
-        .concat(allSynchronizerDependencies),
+        .concat(decentralizedSynchronizer.dependencies),
     },
     undefined,
     appsAffinityAndTolerations
@@ -535,60 +547,16 @@ function installScan(
   config: SvConfig,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependsOn: CnInput<Resource>[],
-  synchronizerNodes: SynchronizerNodes,
+  decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: pulumi.Resource,
+  participant: SvParticipant,
   postgres: Postgres
 ) {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
-  const lsuEnabled = decentralizedSynchronizerMigrationConfig.lsuEnabled;
-  const { active, participant } = synchronizerNodes;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
-
-  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
-    return {
-      bftSequencerConfig: {
-        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
-      },
-    };
-  };
-
-  const synchronizerValues = lsuEnabled
-    ? {
-        synchronizers: {
-          current: {
-            sequencer: active.namespaceInternalSequencerAddress,
-            mediator: active.namespaceInternalMediatorAddress,
-            ...(useCantonBft ? bftSequencerConfigFor(active) : {}),
-          },
-          ...(synchronizerNodes.upgrade
-            ? {
-                successor: {
-                  sequencer: synchronizerNodes.upgrade.namespaceInternalSequencerAddress,
-                  mediator: synchronizerNodes.upgrade.namespaceInternalMediatorAddress,
-                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
-                    ? bftSequencerConfigFor(synchronizerNodes.upgrade)
-                    : {}),
-                },
-              }
-            : {}),
-          ...(synchronizerNodes.legacy
-            ? {
-                legacy: {
-                  sequencer: synchronizerNodes.legacy.namespaceInternalSequencerAddress,
-                  mediator: synchronizerNodes.legacy.namespaceInternalMediatorAddress,
-                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
-                    ? bftSequencerConfigFor(synchronizerNodes.legacy)
-                    : {}),
-                },
-              }
-            : {}),
-        },
-      }
-    : {
-        sequencerAddress: active.namespaceInternalSequencerAddress,
-        mediatorAddress: active.namespaceInternalMediatorAddress,
-      };
-
+  const externalSequencerP2pAddress = (
+    decentralizedSynchronizerNode as unknown as CantonBftSynchronizerNode
+  ).externalSequencerP2pAddress;
   const scanValues = {
     ...spliceInstanceNames,
     metrics: {
@@ -598,11 +566,23 @@ function installScan(
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: getAdditionalJvmOptions(config.scanApp?.additionalJvmOptions),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
+    sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+    mediatorAddress: decentralizedSynchronizerNode.namespaceInternalMediatorAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    ...synchronizerValues,
+    ...(useCantonBft
+      ? {
+          bftSequencers: [
+            {
+              p2pUrl: externalSequencerP2pAddress,
+              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+            },
+          ],
+        }
+      : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     apiRequestLogLevel: config.logging?.apiRequestLogLevel,
@@ -631,7 +611,7 @@ function installScan(
   return installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, config.version, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
     dependsOn: dependsOn
-      .concat(active.dependencies)
+      .concat(decentralizedSynchronizerNode.dependencies)
       .concat(
         spliceConfig.pulumiProjectConfig.interAppsDependencies && !useCantonBft
           ? [svApp]

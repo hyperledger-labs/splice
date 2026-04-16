@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.data
@@ -8,11 +8,12 @@ import com.daml.ledger.api.v2.state_service.ActiveContract as LapiActiveContract
 import com.digitalasset.canton.data.Counter
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.util.{GrpcStreamingUtils, ResourceUtil}
+import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.{LfPackageId, ReassignmentCounter}
 import com.digitalasset.daml.lf.transaction.{CreationTime, TransactionCoder}
 import com.google.protobuf.ByteString
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
+
+import java.io.ByteArrayInputStream
 
 /** A contract to add/import with admin repairs.
   */
@@ -38,16 +39,23 @@ object RepairContract {
       acsSnapshot: ByteString
   ): Either[String, List[RepairContract]] =
     for {
+      decompressedBytes <-
+        ByteStringUtil
+          .decompressGzip(acsSnapshot, None)
+          .leftMap(err => s"Failed to decompress bytes: $err")
       contracts <- ResourceUtil.withResource(
-        // TODO(i28137): This is vulnerable to zip bombs.
-        new GzipCompressorInputStream(acsSnapshot.newInput())
-      ) { decompressed =>
-        GrpcStreamingUtils.parseDelimitedFromTrusted[ActiveContract](decompressed, ActiveContract)
+        new ByteArrayInputStream(decompressedBytes.toByteArray)
+      ) { inputSource =>
+        GrpcStreamingUtils
+          .parseDelimitedFromTrusted[ActiveContract](
+            inputSource,
+            ActiveContract,
+          )
       }
-      repairContracts <- contracts.traverse(c => fromLapiActiveContract(c.contract))
+      repairContracts <- contracts.traverse(c => toRepairContract(c.contract))
     } yield repairContracts
 
-  def fromLapiActiveContract(contract: LapiActiveContract): Either[String, RepairContract] =
+  def toRepairContract(contract: LapiActiveContract): Either[String, RepairContract] =
     for {
       event <- Either.fromOption(
         contract.createdEvent,
@@ -86,24 +94,4 @@ object RepairContract {
       representativePackageId = representativePackageId,
     )
 
-  def toLapiActiveContract(
-      repairContract: RepairContract,
-      targetSynchronizerId: SynchronizerId,
-  ): Either[String, LapiActiveContract] =
-    for {
-      blob <- TransactionCoder
-        .encodeFatContractInstance(repairContract.contract)
-        .leftMap(err => s"Unable to encode contract event payload: ${err.errorMessage}")
-    } yield {
-      val createdEvent = com.daml.ledger.api.v2.event.CreatedEvent.defaultInstance
-        .withCreatedEventBlob(blob)
-        .withRepresentativePackageId(repairContract.representativePackageId.toString)
-        .withContractId(repairContract.contractId.coid)
-
-      LapiActiveContract(
-        createdEvent = Some(createdEvent),
-        synchronizerId = targetSynchronizerId.toProtoPrimitive,
-        reassignmentCounter = repairContract.reassignmentCounter.v,
-      )
-    }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -11,8 +11,8 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
+import com.digitalasset.canton.topology.client.StoreBasedSynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.NoPackageDependencies
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContext
@@ -35,8 +35,8 @@ class SortedReconciliationIntervalsProviderFactory(
       .toRight(s"Can not obtain topology factory for $synchronizerId")
       .toEitherT[FutureUnlessShutdown]
     topologyClient <- EitherT.right(
-      topologyFactory.createTopologyClient(
-        NoPackageDependencies,
+      topologyFactory.createCachingTopologyClient(
+        StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
         synchronizerPredecessor,
       )
     )
@@ -45,6 +45,7 @@ class SortedReconciliationIntervalsProviderFactory(
       SequencedTime(subscriptionTs),
       EffectiveTime(subscriptionTs),
       ApproximateTime(subscriptionTs),
+      potentialTopologyChange = true,
     )
 
     new SortedReconciliationIntervalsProvider(

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release.kms.driver
@@ -18,14 +18,14 @@ class AwsKmsDriverCliIntegrationTest extends KmsCliIntegrationTest {
     s"community/aws-kms-driver/target/scala-2.13/aws-kms-driver_2.13-$driverVersion.jar"
 
   override lazy val kmsConfigs: Seq[String] =
-    Seq("community/app/src/test/resources/aws-kms-driver.conf")
+    Seq("enterprise/app/src/test/resources/aws-kms-driver.conf")
 
   // Run Canton with EXTRA_CLASSPATH set to the driver.jar
   override lazy val cantonProcessEnvVar: Seq[(String, String)] =
     Seq("AWS_PROFILE" -> "sts", "EXTRA_CLASSPATH" -> driverJar)
 
   override lazy val bootstrapScript: String =
-    "community/app/src/test/resources/scripts/aws_kms_participant1.canton"
+    "enterprise/app/src/test/resources/scripts/aws_kms_participant1.canton"
 
   override lazy val testName: String = s"aws-kms-$packageName"
 }

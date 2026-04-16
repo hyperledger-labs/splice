@@ -1,15 +1,16 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.health
 
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.ParticipantStatus.SubmissionReady
 import com.digitalasset.canton.admin.api.client.data.{
   MediatorStatus,
   ParticipantStatus,
   SequencerStatus,
 }
-import com.digitalasset.canton.topology.{MediatorId, SequencerId}
+import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.version.{
   ProtocolVersion,
   ProtocolVersionCompatibility,
@@ -33,14 +34,14 @@ private[health] trait StatusIntegrationTestUtil extends Matchers {
   protected def assertSequencerUnconnectedStatus(
       status: SequencerStatus,
       connectedMediators: List[MediatorId],
-      sequencerId: SequencerId,
+      synchronizerAlias: SynchronizerAlias,
       testedProtocolVersion: ProtocolVersion,
   ): Unit = {
     status.connectedParticipants shouldBe List()
     status.connectedMediators shouldBe connectedMediators
 
     status.uptime.toNanos should be > 0L
-    status.uid shouldBe sequencerId.uid
+    status.uid.identifier.str shouldBe synchronizerAlias.unwrap
 
     assertSequencerVersioningInfo(status, testedProtocolVersion)
   }

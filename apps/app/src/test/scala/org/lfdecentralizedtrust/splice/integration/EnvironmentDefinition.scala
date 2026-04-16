@@ -18,9 +18,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
@@ -36,11 +34,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceEnvironmentFactory,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvCantonIdentifierConfig,
-  SvAppBackendConfig,
-  SvSynchronizerNodeConfig,
-}
+import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
@@ -80,10 +74,6 @@ case class EnvironmentDefinition(
       ConfigTransforms.withBftSequencers() +: this.configTransformsWithContext(context)
     else configTransformsWithContext(context)
   }
-  def updateTestingConfig(
-      update: TestingConfigInternal => TestingConfigInternal
-  ): EnvironmentDefinition =
-    copy(testingConfig = update(testingConfig))
 
   def withManualStart: EnvironmentDefinition = {
     this
@@ -97,10 +87,8 @@ case class EnvironmentDefinition(
     this
       .withAllocatedUsers()
       .withInitializedNodes()
-      .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
-      .withProtocolVersion
       .withEagerAppActivityMarkerConversion
 
   def withAllocatedUsers(
@@ -176,70 +164,10 @@ case class EnvironmentDefinition(
         )(config),
     )
 
-  def withProtocolVersion: EnvironmentDefinition =
-    addConfigTransforms((_, config) => {
-      val protocolVersionO = sys.env.get("PROTOCOL_VERSION").filter(_ != "")
-      protocolVersionO.fold(config)(pv =>
-        ConfigTransforms.updateAllSvAppConfigs_(
-          updateAllSynchronizerNodeConfigs(
-            _.focus(_.protocolVersion).replace(ProtocolVersion.tryCreate(pv))
-          )
-        )(config)
-      )
-    })
-
   def withInitializedNodes(): EnvironmentDefinition =
     copy(setup = implicit env => {
       this.setup(env)
       EnvironmentDefinition.waitForNodeInitialization(env)
-    })
-
-  def withMultiSyncFeatureFlag(): EnvironmentDefinition =
-    copy(setup = implicit env => {
-      this.setup(env)
-      env.validators.local.foreach { validator =>
-        val connectedSynchronizers = validator.participantClient.synchronizers.list_connected()
-        if (connectedSynchronizers.length <= 1) {
-          logger.info(
-            s"Participant ${validator.participantClient.id} is connected to ${connectedSynchronizers.length}, not enabling multi-synchronizer feature flag"
-          )(TraceContext.empty)
-        } else {
-          connectedSynchronizers.foreach { sync =>
-            val existingEntries: Seq[
-              com.digitalasset.canton.admin.api.client.data.topology.ListSynchronizerTrustCertificateResult
-            ] = validator.participantClient.topology.synchronizer_trust_certificates.list(
-              Some(sync.synchronizerId),
-              filterUid = validator.participantClient.id.filterString,
-            )
-            val existing = existingEntries match {
-              case Seq(e) => e
-              case _ =>
-                sys.error(
-                  s"Expected exactly one trust certificate for ${validator.participantClient.id} on ${sync.synchronizerId} but got $existingEntries"
-                )
-            }
-            if (
-              existing.item.featureFlags
-                .contains(ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer)
-            ) {
-              logger.info(
-                s"Participant ${validator.participantClient.id} already has multi synchronizer feature flag enabled for ${sync.synchronizerId}"
-              )(TraceContext.empty)
-            } else {
-              logger.info(
-                s"Enabling multi-synchronizer feature flag for ${validator.participantClient.id} on ${sync.synchronizerId}"
-              )(TraceContext.empty)
-              validator.participantClient.topology.synchronizer_trust_certificates.propose(
-                validator.participantClient.id,
-                sync.synchronizerId,
-                featureFlags = Seq(
-                  ParticipantTopologyFeatureFlag.EnableUnsafeMultiSynchronizer
-                ),
-              )
-            }
-          }
-        }
-      }
     })
 
   def withPreSetup(preSetup: SpliceTestConsoleEnvironment => Unit): EnvironmentDefinition =
@@ -301,6 +229,23 @@ case class EnvironmentDefinition(
       )(config)
     )
 
+  def withHttpSettingsForHigherThroughput: EnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      config.copy(pekkoConfig =
+        Some(
+          ConfigFactory.parseString(
+            """
+              |pekko.http.host-connection-pool {
+              |  max-connections = 1000
+              |  min-connections = 20
+              |  max-open-requests = 1024
+              |}
+              |""".stripMargin
+          )
+        )
+      )
+    )
+
   def withTrafficTopupsEnabled: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
@@ -349,29 +294,8 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withBftSequencers(namePredicate: String => Boolean = _ => true): EnvironmentDefinition =
-    addConfigTransformToFront((_, config) =>
-      ConfigTransforms.withBftSequencers(namePredicate)(config)
-    )
-
-  def withBftSequencersSuccessor: EnvironmentDefinition =
-    addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
-
-  def withSvBftSequencerConnectionDisabled(): EnvironmentDefinition =
-    addConfigTransforms(
-      (_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs_(
-          _.copy(bftSequencerConnection = false)
-        )(config),
-      (_, config) =>
-        ConfigTransforms.updateAllValidatorConfigs_ { validatorConfig =>
-          if (validatorConfig.svValidator)
-            validatorConfig.copy(
-              disableSvValidatorBftSequencerConnection = true
-            )
-          else validatorConfig
-        }(config),
-    )
+  def withBftSequencers: EnvironmentDefinition =
+    addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
 
   def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
     addConfigTransforms((_, conf) =>
@@ -397,27 +321,15 @@ case class EnvironmentDefinition(
   ): EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllSvAppConfigs_(
-        _.focus(_.localSynchronizerNodes.current)
+        _.focus(_.localSynchronizerNode)
           .modify(
-            _.focus(_.sequencer.sequencerAvailabilityDelay)
-              .replace(duration)
+            _.map(d =>
+              d.focus(_.sequencer.sequencerAvailabilityDelay)
+                .replace(duration)
+            )
           )
       )(config)
     )
-
-  def updateAllSynchronizerNodeConfigs(
-      f: SvSynchronizerNodeConfig => SvSynchronizerNodeConfig
-  ): SvAppBackendConfig => SvAppBackendConfig =
-    c =>
-      c.focus(_.localSynchronizerNodes)
-        .modify(
-          _.focus(_.current)
-            .modify(f)
-            .focus(_.successor)
-            .modify(_.map(f))
-            .focus(_.legacy)
-            .modify(_.map(f))
-        )
 
   def withOnboardingParticipantPromotionDelayEnabled(): EnvironmentDefinition = {
     addConfigTransform((_, config) =>
@@ -550,12 +462,9 @@ case class EnvironmentDefinition(
       .addConfigTransform((_, conf) =>
         ConfigTransforms
           .updateAllSvAppConfigs_(
-            _.focus(_.localSynchronizerNodes.current)
-              .modify(
-                _.focus(_.topologyChangeDelayDuration)
-                  // same as canton for sim time
-                  .replace(NonNegativeFiniteDuration.Zero)
-              )
+            _.focus(_.topologyChangeDelayDuration)
+              // same as canton for sim time
+              .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
       .withSequencerConnectionsFromScanDisabled(10_000)

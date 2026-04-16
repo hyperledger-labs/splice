@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer.reference
 
 import cats.data.EitherT
-import com.daml.metrics.OpenTelemetryOnDemandMetricsReader
 import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton
@@ -17,34 +16,35 @@ import com.digitalasset.canton.config.{
   DefaultProcessingTimeouts,
   ProcessingTimeout,
 }
-import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
-import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase.RateLimitManagerImplTest
+import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase.EnterpriseRateLimitManagerTest
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.{LedgerApiServerHistograms, MetricsUtils}
+import com.digitalasset.canton.metrics.{
+  LedgerApiServerHistograms,
+  MetricsUtils,
+  OpenTelemetryOnDemandMetricsReader,
+}
 import com.digitalasset.canton.protocol.SynchronizerParameters
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.protocol.RecipientsTest.*
-import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.sequencing.traffic.{
   EventCostCalculator,
   TrafficPurchased,
   TrafficReceipt,
 }
-import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.synchronizer.block.AsyncWriterParameters
 import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory
 import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerNodeParameterConfig,
   SequencerNodeParameters,
-  TimeAdvancingTopologyConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStore, DbSequencerStoreTest}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
@@ -65,13 +65,12 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.store.{
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.{
   DefaultTrafficConsumedManagerFactory,
-  SequencerRateLimitManagerImpl,
+  EnterpriseSequencerRateLimitManager,
   TrafficConsumedManagerFactory,
   TrafficPurchasedManager,
 }
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SimClock}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -107,7 +106,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
   private def eventCostFunction(
       @unused recipients: Recipients,
       config: TrafficControlParameters,
-  ): Batch[ClosedUncompressedEnvelope] => Option[SequencingSubmissionCost] = { batch =>
+  ): Batch[ClosedEnvelope] => Option[SequencingSubmissionCost] = { batch =>
     Some(
       SequencingSubmissionCost(
         eventCostCalculator
@@ -179,22 +178,12 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
           .build(loggerFactory)
           .forOwnerAndSynchronizer(request.sender)
           .currentSnapshotApproximation
-          .futureValueUS
       SignedContent
         .create(
           cryptoSnapshot.pureCrypto,
           cryptoSnapshot,
           request,
           signingTimestamp.orElse(Some(cryptoSnapshot.ipsSnapshot.timestamp)),
-          // Timestamp overrides do not need to share the same reference here, since the max sequencing
-          // time is not derived from it. Therefore, it is safe to use different reference timestamps
-          // for different attempts, regardless of the chosen max sequencing time.
-          Some(
-            SigningTimestampOverrides(
-              approximateTimestamp = clock.now,
-              validityPeriodEnd = Some(request.maxSequencingTime),
-            )
-          ),
           HashPurpose.SubmissionRequestSignature,
           testedProtocolVersion,
         )
@@ -234,7 +223,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       availableUpToInclusive: CantonTimestamp = CantonTimestamp.MaxValue,
       sequencerTrafficConfig: SequencerTrafficConfig = SequencerTrafficConfig(),
   )(
-      f: (Sequencer, RateLimitManagerImplTest) => FutureUnlessShutdown[Unit]
+      f: (Sequencer, EnterpriseRateLimitManagerTest) => FutureUnlessShutdown[Unit]
   )(implicit mat: Materializer, env: Env): FutureUnlessShutdown[Assertion] = {
     val (sequencer, rlm) = createSequencer(
       config,
@@ -266,7 +255,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
   )(implicit
       mat: Materializer,
       env: Env,
-  ): (Sequencer, RateLimitManagerImplTest) = {
+  ): (Sequencer, EnterpriseRateLimitManagerTest) = {
     val parameters = List(
       SynchronizerParameters.WithValidity(
         validFrom = CantonTimestamp.Epoch.immediatePredecessor,
@@ -307,7 +296,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
       asyncWriter = AsyncWriterParameters(),
-      timeAdvancingTopology = TimeAdvancingTopologyConfig(),
     )
     // Important to create the histograms before the factory, because creating the factory will
     // register them once and for all and we can't add more afterwards
@@ -363,7 +351,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
             .getOrElse(None)
         }
     }
-    val rateLimitManager = new RateLimitManagerImplTest(
+    val rateLimitManager = new EnterpriseRateLimitManagerTest(
       trafficPurchasedManager,
       env.trafficConsumedStore,
       loggerFactory,
@@ -431,8 +419,8 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ),
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        lsuSequencingBounds = None,
-        drSequencingTimeUpperBound = None,
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS
@@ -440,7 +428,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
   private def getStateFor(
       member: Member,
       sequencer: Sequencer,
-  ): EitherT[FutureUnlessShutdown, TrafficControlError, Option[TrafficState]] =
+  ): FutureUnlessShutdown[Option[TrafficState]] =
     sequencer
       .trafficStatus(Seq(member), TimestampSelector.LastUpdatePerMember)
       .map(_.trafficStates.get(member))
@@ -468,11 +456,9 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
             _ <- readForMembers(List(sender), sequencer)
             allMemberStates <- sequencer
               .trafficStatus(Seq.empty, TimestampSelector.LastUpdatePerMember)
-              .valueOrFail("trafficStatus failure")
 
             filteredMemberStates <- sequencer
               .trafficStatus(Seq(p11), TimestampSelector.LastUpdatePerMember)
-              .valueOrFail("trafficStatus failure")
 
           } yield {
             val allMediatorsAndParticipants =
@@ -504,7 +490,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         for {
           _ <- sequencer.sendAsyncSigned(sign(request)).valueOrFail("Send async")
           messages1 <- readForMembers(List(sender), sequencer)
-          traffic1Sender <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          traffic1Sender <- getStateFor(sender, sequencer)
           _ = traffic1Sender.value.extraTrafficPurchased.value shouldBe 1000L
           _ = traffic1Sender.value.extraTrafficConsumed.value should be > 0L
         } yield {
@@ -648,14 +634,14 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
 
         for {
           // Check sender has no status
-          senderLive1 <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderLive1 <- getStateFor(sender, sequencer)
           _ = senderLive1 shouldBe Some(TrafficState.empty(CantonTimestamp.MinValue))
           _ = env.currentBalances.put(sender, Right(NonNegativeLong.tryCreate(1000L))).discard
           _ = env.currentBalances.put(p11, Right(p11ExtraTrafficLimit)).discard
           _ <- sequencer.sendAsyncSigned(sign(request1)).valueOrFail("Send async")
           messages1 <- readForMembers(List(sender, p11), sequencer)
           // Sender traffic consumed should have increased
-          senderLive2 <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderLive2 <- getStateFor(sender, sequencer)
           _ = senderLive2.value.extraTrafficConsumed.value > 0L shouldBe true
           // Send another message
           _ <- sequencer.sendAsyncSigned(sign(request2)).valueOrFail("Send async")
@@ -664,10 +650,10 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
             sequencer,
             startTimestamp = firstEventTimestamp(p11)(messages1).map(_.immediateSuccessor),
           )
-          senderLive3 <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderLive3 <- getStateFor(sender, sequencer)
           _ =
             senderLive3.value.extraTrafficConsumed.value > senderLive2.value.extraTrafficConsumed.value shouldBe true
-          recipientState <- getStateFor(p11, sequencer).valueOrFail("trafficStatus failure")
+          recipientState <- getStateFor(p11, sequencer)
           _ =
             recipientState.value.extraTrafficConsumed.value shouldBe 0
         } yield {
@@ -735,8 +721,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
 
       val customCostCalculator = new EventCostCalculator(loggerFactory) {
         // Set a fixed payload size, so we can reliably compute what the cost should be based on the number of recipients
-        override protected def payloadSize(envelope: ClosedEnvelope): ParsingResult[Int] =
-          Right(100)
+        override protected def payloadSize(envelope: ClosedEnvelope): Int = 100
       }
 
       val trafficConfig = config.copy(readVsWriteScalingFactor = PositiveInt.tryCreate(200))
@@ -777,13 +762,13 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
 
         for {
           // Check sender has no status
-          senderLive1 <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderLive1 <- getStateFor(sender, sequencer)
           _ = senderLive1 shouldBe Some(TrafficState.empty(CantonTimestamp.MinValue))
           _ = env.currentBalances.put(sender, Right(NonNegativeLong.tryCreate(120L))).discard
           _ <- sequencer.sendAsyncSigned(sign(request1)).valueOrFail("Send async")
           messages1 <- readForMembers(List(sender, p11), sequencer)
           // Sender traffic remainder should have decreased
-          traffic1Sender <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          traffic1Sender <- getStateFor(sender, sequencer)
           /*
               Cost should be:
                100 + 100 * 7 * 200 / 10000 = 114
@@ -845,17 +830,17 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
           _ <- sequencer.sendAsyncSigned(sign(request1)).valueOrFail("Send async")
           messages1 <- readForMembers(List(sender, p11, p12), sequencer)
           // Sender traffic should have decreased
-          traffic1Sender <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          traffic1Sender <- getStateFor(sender, sequencer)
           _ =
             traffic1Sender.value.availableTraffic shouldBe senderExtraTrafficLimit.value - messageContent.length.toLong
 
-          p11GetTraffic <- getStateFor(p11, sequencer).valueOrFail("trafficStatus failure")
+          p11GetTraffic <- getStateFor(p11, sequencer)
           _ = {
             val expected = expectedTrafficStateP11
             // in timestamp because reference and bft sequencer generate a different one, and we only really car about the traffic values
             p11GetTraffic.value.copy(timestamp = CantonTimestamp.MinValue) shouldBe expected
           }
-          p12GetTraffic <- getStateFor(p12, sequencer).valueOrFail("trafficStatus failure")
+          p12GetTraffic <- getStateFor(p12, sequencer)
           _ =
             p12GetTraffic.value.copy(timestamp =
               CantonTimestamp.MinValue
@@ -916,7 +901,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         for {
           _ <- sequencer.sendAsyncSigned(sign(request)).value
           messages <- readForMembers(Seq(sender), sequencer)
-          senderTraffic <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderTraffic <- getStateFor(sender, sequencer)
         } yield {
           checkRejection(
             messages,
@@ -937,16 +922,9 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
                                      |  trafficState = TrafficState(extraTrafficLimit = 0, extraTrafficConsumed = 0, baseTrafficRemainder = 0, lastConsumedCost = 0, timestamp = ${event.timestamp}, serial = 1, availableTraffic = 0)
                                      |)""".stripMargin
           }
-
-          // 134L or 154L == raw byte size of the signed submission request
-          val expectedWastedSequencing =
-            if (testedProtocolVersion >= ProtocolVersion.v35) 154L else 134L
-
+          // 134L == raw byte size of the signed submission request
           eventually() {
-            assertLongValue(
-              "daml.sequencer.traffic-control.wasted-sequencing",
-              expectedWastedSequencing,
-            )
+            assertLongValue("daml.sequencer.traffic-control.wasted-sequencing", 134L)
           }
           assertMemberIsInContext("daml.sequencer.traffic-control.wasted-sequencing", sender)
           assertInContext(
@@ -1100,7 +1078,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
           _ = res.left.toOption.map(
             _.cause.contains("Submission was rejected because no traffic is available")
           ) shouldBe Some(true)
-          senderTraffic <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderTraffic <- getStateFor(sender, sequencer)
         } yield {
           senderTraffic.value.extraTrafficConsumed.value shouldBe 0L
           senderTraffic.value.extraTrafficRemainder shouldBe 1L
@@ -1128,7 +1106,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         for {
           _ <- sequencer.sendAsyncSigned(sign(request)).value
           messages <- readForMembers(Seq(sender), sequencer)
-          senderTraffic <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderTraffic <- getStateFor(sender, sequencer)
         } yield {
           eventually() {
             assertLongValue("daml.sequencer.traffic-control.wasted-traffic", 5L) // Cost of "hello"
@@ -1171,7 +1149,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         for {
           _ <- sequencer.sendAsyncSigned(sign(request)).valueOrFail("Send async")
           messages <- readForMembers(List(sender, p11), sequencer)
-          senderTraffic <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
+          senderTraffic <- getStateFor(sender, sequencer)
         } yield {
           senderTraffic shouldBe empty
           checkMessages(
@@ -1197,86 +1175,12 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         }
       }
     }
-
-    def testConfirmationResponseCharge(freeConfirmationResponses: Boolean)(implicit
-        env: FixtureParam
-    ) = {
-      import env.*
-
-      val config = env.config.copy(freeConfirmationResponses = freeConfirmationResponses)
-
-      withSequencerAndRLM(config, clock) { case (sequencer, _rlm) =>
-        val messageContent = "hello"
-        val sender: ParticipantId = p11
-        // Request only addressed to a mediator (group) is categorized as a confirmation response
-        val recipients = Recipients.cc(mg0)
-        val request = createSendRequest(
-          sender,
-          messageContent,
-          recipients,
-          sequencingSubmissionCost = eventCostFunction(recipients, config),
-        )
-        request.isConfirmationResponse shouldBe true
-
-        if (freeConfirmationResponses) {
-          // Give no traffic to the sender
-          env.currentBalances.put(sender, Right(NonNegativeLong.zero)).discard
-        } else {
-          env.currentBalances.put(sender, Right(NonNegativeLong.tryCreate(500))).discard
-        }
-
-        for {
-          _ <- sequencer.sendAsyncSigned(sign(request)).valueOrFail("Send async")
-          messages <- readForMembers(List(sender), sequencer)
-          senderTraffic <- getStateFor(sender, sequencer).valueOrFail("trafficStatus failure")
-        } yield {
-          val expectedConsumedTraffic =
-            if (freeConfirmationResponses) 0L else messageContent.length.toLong
-          senderTraffic.value.extraTrafficConsumed.value shouldBe expectedConsumedTraffic
-
-          val expectedTrafficReceipt =
-            if (freeConfirmationResponses)
-              // The traffic receipt is empty, this effectively means the traffic state hasn't changed, which is expected since no traffic was charged
-              Option.empty[TrafficReceipt]
-            else
-              Some(
-                TrafficReceipt(
-                  consumedCost = NonNegativeLong.tryCreate(messageContent.length.toLong),
-                  extraTrafficConsumed = NonNegativeLong.tryCreate(messageContent.length.toLong),
-                  baseTrafficRemainder = NonNegativeLong.zero,
-                )
-              )
-          checkMessages(
-            Seq(
-              EventDetails(
-                previousTimestamp = None,
-                to = sender,
-                messageId = Some(request.messageId),
-                trafficReceipt = expectedTrafficReceipt,
-                EnvelopeDetails(messageContent, recipients),
-              )
-            ),
-            messages,
-            expectEnvelopes = false,
-          )
-        }
-      }
-    }
-
-    "charge for confirmation responses when freeConfirmationResponses = false" in { implicit env =>
-      testConfirmationResponseCharge(freeConfirmationResponses = false).futureValueUS
-    }
-
-    "not charge for confirmation responses when freeConfirmationResponses = true" in {
-      implicit env =>
-        testConfirmationResponseCharge(freeConfirmationResponses = true).futureValueUS
-    }
   }
 }
 
 object ReferenceSequencerWithTrafficControlApiTestBase {
   // Test class allowing to override some behaviors of the rate limit manager to test the reaction of the sequencer
-  private[sequencer] class RateLimitManagerImplTest(
+  private[sequencer] class EnterpriseRateLimitManagerTest(
       trafficPurchasedManager: TrafficPurchasedManager,
       trafficConsumedStore: TrafficConsumedStore,
       loggerFactory: NamedLoggerFactory,
@@ -1289,12 +1193,11 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
         DefaultTrafficConsumedManagerFactory,
       eventCostCalculator: EventCostCalculator,
   )(implicit executionContext: ExecutionContext)
-      extends SequencerRateLimitManagerImpl(
+      extends EnterpriseSequencerRateLimitManager(
         trafficPurchasedManager,
         trafficConsumedStore,
         loggerFactory,
         timeouts,
-        BatchingConfig(),
         metrics,
         synchronizerSyncCryptoApi,
         protocolVersion,
@@ -1334,7 +1237,6 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
     override def validateRequestAndConsumeTraffic(
         request: SubmissionRequest,
         sequencingTime: CantonTimestamp,
-        sequencingTopologySnapshot: TopologySnapshot,
         submissionTimestamp: Option[CantonTimestamp],
         latestSequencerEventTimestamp: Option[CantonTimestamp],
         warnIfApproximate: Boolean,
@@ -1349,7 +1251,6 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
           super.validateRequestAndConsumeTraffic(
             request,
             sequencingTime,
-            sequencingTopologySnapshot,
             submissionTimestamp,
             latestSequencerEventTimestamp,
             warnIfApproximate,

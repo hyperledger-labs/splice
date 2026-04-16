@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -16,7 +16,6 @@ import com.digitalasset.canton.protocol.messages.{ConfirmationResponse, Confirma
 import com.digitalasset.canton.protocol.{LocalRejectError, RequestId, RootHash}
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, Recipients}
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -27,7 +26,6 @@ class BadRootHashMessagesRequestProcessor(
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClient,
     participantId: ParticipantId,
-    clock: Clock,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -35,7 +33,6 @@ class BadRootHashMessagesRequestProcessor(
       ephemeral,
       crypto,
       sequencerClient,
-      clock,
     ) {
 
   /** Sends `reject` for the given `rootHash`. Also ticks the record order publisher.

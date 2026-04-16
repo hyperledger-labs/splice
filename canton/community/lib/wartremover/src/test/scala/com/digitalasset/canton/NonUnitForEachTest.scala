@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -8,10 +8,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.wartremover.test.WartTestTraverser
 
-import scala.annotation.unused
 import scala.collection.mutable
 
-class NonUnitForEachTest extends AnyWordSpec with Matchers {
+class NonUnitForEachTest extends AnyWordSpec with Matchers with org.mockito.MockitoSugar {
 
   private def assertErrors(result: WartTestTraverser.Result, expectedErrors: Int): Assertion = {
     result.errors.length shouldBe expectedErrors
@@ -106,12 +105,11 @@ class NonUnitForEachTest extends AnyWordSpec with Matchers {
           if (false) throw new Exception else if (true) builder += i else ()
         }
 
-        @unused class C {
+        class C {
           val b = Set.newBuilder[Int]
           Seq.empty[Int].foreach(x => b += x)
         }
       }
-      result.errors.foreach(println)
       result.errors shouldBe empty
     }
 
