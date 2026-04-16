@@ -88,8 +88,7 @@ class SequencerPruningTrigger(
         .getMigrationInfo(migrationId)
         .map(_.flatMap(_.recordTimeRange.get(synchronizerId.logical)))
       _ <- recordTimeRangeO match {
-        case Some(range)
-            if (range.max - status.lowerBound).compareTo(retentionPeriod.asJava) > 0 =>
+        case Some(range) if (range.max - status.lowerBound).compareTo(retentionPeriod.asJava) > 0 =>
           for {
             rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
             dsoRulesActiveSequencerConfig = rulesAndState.lookupActiveSequencerIdConfigFor(
@@ -113,7 +112,8 @@ class SequencerPruningTrigger(
           } yield ()
         case _ =>
           logger.debug(
-            s"Synchronizer on migration id $migrationId does not yet have $retentionPeriod of data, record time range: ${status.lowerBound}, ${recordTimeRangeO.map(_.max)}"
+            s"Synchronizer on migration id $migrationId does not yet have $retentionPeriod of data, record time range: ${status.lowerBound}, ${recordTimeRangeO
+                .map(_.max)}"
           )
           Future.unit
       }
