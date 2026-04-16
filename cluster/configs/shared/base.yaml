@@ -87,6 +87,7 @@ initialRound: 0
 #  canton-network:
 #    installDataOnly: true
 monitoring:
+  enableGrafanaServiceAccountToken: false
   alerting:
     enableNoDataAlerts: false
     alerts:

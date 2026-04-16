@@ -418,7 +418,7 @@
         "value": null
       }
     },
-    "name": "user-validator1-participant-pg",
+    "name": "user-validator1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -432,7 +432,7 @@
         "value": null
       }
     },
-    "name": "user-validator1-validator-pg",
+    "name": "user-validator1-validator-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -695,7 +695,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-participant-pg-passwd",
+    "name": "validator1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -832,7 +832,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-validator-pg-passwd",
+    "name": "validator1-validator-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },

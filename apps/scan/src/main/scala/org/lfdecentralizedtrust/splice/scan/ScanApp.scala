@@ -3,9 +3,23 @@
 
 package org.lfdecentralizedtrust.splice.scan
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.time.{Clock, WallClock}
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
@@ -24,10 +38,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
-import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
-import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
-import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
+import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
@@ -42,7 +53,10 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanVerdictAutomationService,
 }
 import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanSynchronizerConfig}
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanEventStore,
@@ -51,41 +65,27 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanRewardsReferenceStore,
   ScanStore,
 }
-import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
-import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.{
   ChoiceContextContractFetcher,
   PageLimit,
   S3BucketConnection,
   UpdateHistory,
 }
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.util.HasHealth
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.LifeCycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
-import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
+import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
+import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
-import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 /** Class representing a Scan app instance.
   *
@@ -125,15 +125,25 @@ class ScanApp(
       ledgerClient: SpliceLedgerClient,
   )(implicit traceContext: TraceContext) = Future.unit
 
-  def synchronizerNode(config: ScanSynchronizerConfig): ScanSynchronizerNode =
+  def synchronizerNode(syncConfig: ScanSynchronizerConfig): ScanSynchronizerNode =
     new ScanSynchronizerNode(
       new SequencerAdminConnection(
-        config.sequencer,
+        syncConfig.sequencer,
         amuletAppParameters.loggingConfig.api,
         loggerFactory,
         nodeMetrics.grpcClientMetrics,
         retryProvider,
-      )
+      ),
+      if (config.enableAppActivityRecordAndTrafficIngestion) {
+        Some(
+          new SequencerTrafficClient(
+            syncConfig.sequencer,
+            ScanApp.this,
+            nodeMetrics.grpcClientMetrics,
+            loggerFactory,
+          )
+        )
+      } else None,
     )
 
   override def initialize(
@@ -291,17 +301,6 @@ class ScanApp(
         loggerFactory,
       )
       // Conditionally create traffic summary ingestion dependencies
-      sequencerTrafficClientO =
-        if (config.enableAppActivityRecordAndTrafficIngestion) {
-          Some(
-            new SequencerTrafficClient(
-              config.synchronizerNodes.current.sequencer,
-              ScanApp.this,
-              nodeMetrics.grpcClientMetrics,
-              loggerFactory,
-            )
-          )
-        } else None
       appActivityRecordStoreO =
         if (config.enableAppActivityRecordAndTrafficIngestion) {
           Some(
@@ -384,6 +383,7 @@ class ScanApp(
         } else None
       verdictAutomation = new ScanVerdictAutomationService(
         config,
+        syncNodes,
         clock,
         retryProvider,
         loggerFactory,
@@ -392,7 +392,6 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         synchronizerId,
         nodeMetrics.verdictIngestion,
-        sequencerTrafficClientO,
         rewardsReferenceStoreO,
       )
       scanHandler = new HttpScanHandler(

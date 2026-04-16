@@ -797,7 +797,8 @@ abstract class ScanAppReference(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  ): Seq[DsoRules_CloseVoteRequestResult] = {
+      pageToken: Option[BigInt] = None,
+  ): (Seq[DsoRules_CloseVoteRequestResult], Option[BigInt]) = {
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.ListVoteRequestResults(
@@ -807,6 +808,7 @@ abstract class ScanAppReference(
           effectiveFrom,
           effectiveTo,
           limit,
+          pageToken,
         )
       )
     }
