@@ -9,6 +9,7 @@ import { Resource } from '@pulumi/pulumi';
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
 import { spliceConfig } from './config/config';
+import { GcpProject } from './config/gcpConfig';
 import { hyperdiskSupportConfig } from './config/hyperdiskSupportConfig';
 import {
   appsAffinityAndTolerations,
@@ -202,7 +203,7 @@ export class CloudPostgres
     const userImportOpts =
       existingInstanceName !== undefined
         ? {
-            import: `${existingInstanceName}/cnadmin`,
+            import: `${GcpProject}/${existingInstanceName}/cnadmin`,
             ignoreChanges: ['password'],
           }
         : {};
