@@ -10,7 +10,9 @@ ARG RUNNER_VERSION
 LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:${RUNNER_VERSION}"
 #Ideally, we'd reduce duplication between this and splice-test-ci, but we're not tackling that right now
 
-RUN sudo apt-get update && \
+RUN sudo sed -i 's/archive.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sudo sed -i 's/security.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sudo apt-get update && \
     sudo apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip moreutils && \
     sudo rm -rf /var/lib/apt/lists/*
 
