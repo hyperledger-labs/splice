@@ -202,7 +202,7 @@ export class CloudPostgres
     const userImportOpts =
       existingInstanceName !== undefined
         ? {
-            import: `cnadmin//${existingInstanceName}`,
+            import: `${existingInstanceName}/cnadmin`,
             ignoreChanges: ['password'],
           }
         : {};

@@ -15,7 +15,7 @@ declare -a plugins
 plugins=(
   # currently used
   "pulumi/command=1.2.1"
-  "pulumi/gcp=9.17.0"
+  "pulumi/gcp=9.20.0"
   "pulumi/kubernetes=4.28.0"
   "pulumi/random=4.19.2"
   "pulumi/std=2.3.2"
