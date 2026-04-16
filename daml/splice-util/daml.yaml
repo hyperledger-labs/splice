@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-util
 source: daml
-version: 0.1.5
+version: 0.1.6
 dependencies:
   - daml-prim
   - daml-stdlib
