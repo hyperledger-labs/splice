@@ -50,27 +50,14 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .map(_.participantId)
         .map(ParticipantId.tryFromProtoPrimitive)
         .toSeq
-      currentHostingParticipants <- participantAdminConnection
+      currentHostingParticipantIds <- participantAdminConnection
         .getPartyToParticipant(
           dsoRules.domain,
           dsoParty,
           topologySnapshot = TopologySnapshot.Sequenced,
         )
-        .map(_.mapping.participants)
-    } yield {
-      val (svsToOffboard, svsToKeep) =
-        currentHostingParticipants.partition(e => offboardedParticipants.contains(e.participantId))
-      val participantIdsToOffboard = svsToOffboard.map(_.participantId)
-      if (svsToKeep.forall(_.onboarding)) {
-        // realistically this is only a problem in tests (SvOnboardingViaNonFoundingSvIntegrationTest)
-        logger.info(
-          s"Not offboarding participants $participantIdsToOffboard as otherwise we cannot satisfy the DSO threshold."
-        )
-        Seq.empty
-      } else {
-        participantIdsToOffboard
-      }
-    }
+        .map(_.mapping.participantIds)
+    } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
   }
 
   override protected def completeTask(task: ParticipantId)(implicit
