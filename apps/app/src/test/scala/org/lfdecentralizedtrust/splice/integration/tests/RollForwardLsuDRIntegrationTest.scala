@@ -196,7 +196,7 @@ class RollForwardLsuDRIntegrationTest
       logSuffix = "roll-forward-lsu-before-dr",
       extraSequencerConfig =
         Seq(s"parameters.lsu-repair.global-max-sequencing-time-exclusive=${maxSequencingTime}"),
-      overrideSvDbsSuffix = Some("lsubeforedr"),
+      overrideSvDbsSuffix = Some("lsu_drbeforedr"),
     )() {
       val allNodes = Seq[AppBackendReference](
         sv1ScanBackend,
