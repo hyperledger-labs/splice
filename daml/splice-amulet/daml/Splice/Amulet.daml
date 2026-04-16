@@ -7,12 +7,14 @@ module Splice.Amulet where
 import Prelude
 import DA.Action (void)
 import DA.Assert
+import DA.List (unique)
 import DA.Map as Map
 import DA.TextMap as TextMap
-import DA.Optional (fromOptional, optionalToList)
+import DA.Optional (fromOptional, isNone, optionalToList)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -397,6 +399,18 @@ template RewardCouponV2
     observer if providerIsObserver then [provider] ++ optionalToList beneficiary else []
     ensure amount > 0.0
 
+    interface instance Api.RewardAssignmentV1.RewardCoupon for RewardCouponV2 where
+      view = Api.RewardAssignmentV1.RewardCouponView with
+        dso
+        provider
+        beneficiary = fromOptional provider beneficiary
+        amount
+        expiresAt
+        meta = Api.Token.MetadataV1.emptyMetadata
+        maxNumNewBeneficiaries = maxNumNewCouponV2Beneficiaries
+
+      rewardCoupon_assignBeneficiariesImpl _self arg = rewardCouponV2_assignBeneficiariesImpl this arg
+
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
 -- hosted by a validator operator.
@@ -572,6 +586,48 @@ requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfi
   config1 <- fetchReferenceData (ForDso with dso = amulet.dso) externalPartyConfigState1Cid
   let round = min config0.holdingFeesOpenRoundNumber config1.holdingFeesOpenRoundNumber
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
+
+
+-- | Maximum number of new beneficiaries that can be assigned to a RewardCouponV2.
+-- Set to the same limit as the one for featured-app-marker beneficiaries to minimize migration effort
+-- for app providers.
+maxNumNewCouponV2Beneficiaries : Int
+maxNumNewCouponV2Beneficiaries = 20
+
+-- | Implementation of the 'RewardCoupon_AssignBeneficiaries' choice for 'RewardCouponV2'.
+rewardCouponV2_assignBeneficiariesImpl
+  : RewardCouponV2
+  -> Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries
+  -> Update Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult
+rewardCouponV2_assignBeneficiariesImpl coupon arg = do
+  let newBeneficiaries = arg.newBeneficiaries
+  require "Beneficiary has not been assigned yet" (isNone coupon.beneficiary)
+  require "Beneficaries are unique" (unique (map (.beneficiary) newBeneficiaries))
+  require "Beneficiary weights are between 0.0 and 1.0"
+    (all (\b -> 0.0 < b.weight && b.weight <= 1.0) newBeneficiaries)
+  require "Beneficiary weights add up to 1.0" (sum (map (.weight) newBeneficiaries) == 1.0)
+  require ("No more than " <> show maxNumNewCouponV2Beneficiaries <> " beneficiaries assigned")
+    (length newBeneficiaries <= maxNumNewCouponV2Beneficiaries)
+
+  additionalCoupons <- forA arg.additionalCoupons $ \cid -> do
+    c <- fetchAndArchive (ForOwner with dso = coupon.dso; owner = coupon.provider) (fromInterfaceContractId @RewardCouponV2 cid)
+    require "Additional coupon has not been assigned yet" (isNone c.beneficiary)
+    require "Additional coupon has same provider" (c.provider == coupon.provider)
+    pure c
+
+  let allCoupons = coupon :: additionalCoupons
+
+  -- create coupons for new beneficiaries for each coupon
+  perBeneficiaryCids <- forA newBeneficiaries $ \newBeneficiary -> do
+    cids <- forA allCoupons $ \c ->
+      toInterfaceContractId <$> create c with
+        amount = c.amount * newBeneficiary.weight
+        beneficiary = Some newBeneficiary.beneficiary
+        providerIsObserver = True
+    pure (newBeneficiary.beneficiary, cids)
+
+  return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
+    newBeneficiariesCouponCids = perBeneficiaryCids
 
 
 -- instances

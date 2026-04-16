@@ -14,6 +14,8 @@ import DA.Time
 
 import Daml.Script
 
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
+
 import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.CryptoHash qualified as CryptoHash
@@ -27,6 +29,7 @@ import Splice.Scripts.Util
 
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 import Splice.Testing.TokenStandard.WalletClient as WalletClient
+import Splice.Testing.Utils
 
 
 -- Reward accounting tests
@@ -297,6 +300,79 @@ test_mint_of_hidden_coupon = do
 
   -- check balance
   WalletClient.checkBalance alice app.registry.instrumentId 1000.0
+
+
+-- Coupon assignment
+--------------------
+
+test_coupon_assignment : Script ()
+test_coupon_assignment = testCouponAssignment False
+
+test_hidden_coupon_assignment : Script ()
+test_hidden_coupon_assignment = testCouponAssignment True
+
+testCouponAssignment : Bool -> Script ()
+testCouponAssignment hideCoupon = do
+  (app, alice, _) <- setupAliceWithCoupon hideCoupon
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  -- get the original coupon before creating the extra one
+  let queryParty = if hideCoupon then app.dso else alice
+  [(couponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon queryParty
+
+  -- create a second coupon with a different amount and round
+  extraCouponCid <- submit app.dso $ createCmd RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        amount = 500.0
+        round = Round 1
+        expiresAt = demoTime `addRelTime` hours 36 `addRelTime` minutes 10
+        providerIsObserver = not hideCoupon
+        beneficiary = None
+
+  -- assign both coupons to bob, alice, and charlie
+  let weights = [(bob, 0.3), (alice, 0.5), (charlie, 0.2)]
+  Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult{..} <-
+    submitMulti [alice] [app.dso] $ exerciseCmd couponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+      additionalCoupons = [toInterfaceContractId extraCouponCid]
+      newBeneficiaries = map (uncurry Api.RewardAssignmentV1.RewardBeneficiary) weights
+      extraArgs = emptyExtraArgs
+
+  -- original coupons are archived after assignment
+  None <- queryContractId alice extraCouponCid
+
+  -- both coupons are split by the same weights, preserving their original round and expiresAt
+  let round0Expiry = demoTime `addRelTime` hours 36
+      round1Expiry = demoTime `addRelTime` hours 36 `addRelTime` minutes 10
+      couponSpecs = [(Round 0, 1000.0, round0Expiry), (Round 1, 500.0, round1Expiry)]
+  let mkExpected beneficiary round expiresAt amount = RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        amount
+        round
+        expiresAt
+        providerIsObserver = True
+        beneficiary = Some beneficiary
+  forA_ newBeneficiariesCouponCids $ \(beneficiary, cids) -> do
+    let Some (_, weight) = find (\(p, _) -> p == beneficiary) weights
+    -- each beneficiary gets one coupon per original coupon
+    length cids === 2
+    forA_ (zip cids couponSpecs) $ \(cid, (round, couponAmount, expiresAt)) -> do
+      Some coupon <- queryContractId beneficiary (fromInterfaceContractId @RewardCouponV2 cid)
+      coupon === mkExpected beneficiary round expiresAt (couponAmount * weight)
+
+  -- verify assigned coupons cannot be further assigned by provider
+  let Some (_, bobCouponCid :: _) = find (\(p, _) -> p == bob) newBeneficiariesCouponCids
+  submitMustFail alice $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    additionalCoupons = []
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
+    extraArgs = emptyExtraArgs
+  -- nor by the beneficiary
+  submitMustFail bob $ exerciseCmd bobCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    additionalCoupons = []
+    newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary charlie 1.0]
+    extraArgs = emptyExtraArgs
 
 
 -- Claiming expired reward coupons

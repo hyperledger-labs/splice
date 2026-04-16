@@ -7,9 +7,12 @@ import DA.Time
 import Daml.Script
 
 import qualified DA.Map as Map
+import DA.List (sort)
 import DA.List.Total (head)
 import Splice.Amulet
 import Splice.AmuletRules
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
+import Splice.Testing.Utils (emptyExtraArgs)
 import Splice.Round
 import Splice.Util
 import Splice.Wallet.MintingDelegation
@@ -265,5 +268,112 @@ testMintingDelegation_AcceptWithExistingDelegationArchival = do
 
   submitMustFail bobValidator.primaryParty $ exerciseCmd proposalWrongDelegate MintingDelegationProposal_Accept with
     existingDelegationCid = Some mintingDelegationCid2
+
+  pure ()
+
+testMintingDelegation_AssignAndMint : Script ()
+testMintingDelegation_AssignAndMint = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  rewardCouponExtraBeneficiary <- allocateParty "rewardCouponExtraBeneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  -- Create a ValidatorRight for beneficiary (needed for liveness record)
+  validatorRightCid <- submit beneficiary $ createCmd ValidatorRight with
+    dso = app.dso
+    user = beneficiary
+    validator = beneficiary
+
+  (_, openRound) <- getLatestOpenRound app
+
+  -- Create a liveness record as an additional transfer input
+  livenessActivityRecordCid <- submit app.dso $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = beneficiary
+    round = openRound.round
+
+  -- Create two RewardCouponV2 with provider = beneficiary, beneficiary = None (unassigned)
+  let coupon1Amount = 1000.0
+  coupon1Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = beneficiary
+    amount = coupon1Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+
+  let coupon2Amount = 500.0
+  coupon2Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = beneficiary
+    amount = coupon2Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+
+  -- Advance rounds so coupons can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  balanceBefore <- getNormalizedBalance beneficiary
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+  now2 <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  let context = TransferContext with
+        openMiningRound = openMiningRoundCid
+        issuingMiningRounds = Map.fromList
+          [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now2 ]
+        validatorRights = Map.fromList [(beneficiary, validatorRightCid)]
+        featuredAppRight = None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  -- Assign reward coupons to beneficiary and the rewardCouponExtraBeneficiary, and mint beneficiary's share
+  let weights = [(beneficiary, 0.6), (rewardCouponExtraBeneficiary, 0.4)]
+  submitMulti [delegate] [beneficiary, rewardCouponExtraBeneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_AssignAndMint with
+    couponCid = toInterfaceContractId coupon1Cid
+    assignBeneficiaries = Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+      additionalCoupons = [toInterfaceContractId coupon2Cid]
+      newBeneficiaries = map (uncurry Api.RewardAssignmentV1.RewardBeneficiary) weights
+      extraArgs = emptyExtraArgs
+    inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  balanceAfter <- getNormalizedBalance beneficiary
+  let reward = balanceAfter - balanceBefore
+
+  let Some (_, issuingRound) = head issuingRounds
+
+  -- Expected: beneficiary gets 60% of coupon amounts + validator faucet reward
+  let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingRound
+  let expectedRewardCouponAmount = (coupon1Amount + coupon2Amount) * 0.6
+  let expectedTotal = expectedValidatorFaucetAmount + expectedRewardCouponAmount
+
+  require ("Combined reward should match expected " <> show expectedTotal <> ", got: " <> show reward)
+    (reward >= expectedTotal - 1.0 && reward <= expectedTotal + 1.0)
+
+  -- Verify rewardCouponExtraBeneficiary's coupons amounts
+  rewardCouponExtraBeneficiaryCoupons <- query @RewardCouponV2 rewardCouponExtraBeneficiary
+  let rewardCouponExtraBeneficiaryAmounts = map (\(_, c) -> c.amount) rewardCouponExtraBeneficiaryCoupons
+  require "rewardCouponExtraBeneficiary coupon amounts should be 40% of originals"
+    (sort rewardCouponExtraBeneficiaryAmounts == sort [coupon1Amount * 0.4, coupon2Amount * 0.4])
 
   pure ()
