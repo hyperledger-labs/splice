@@ -54,7 +54,7 @@ class RollForwardLsuDRIntegrationTest
   override protected def runEventHistorySanityCheck: Boolean = false
   override protected lazy val resetRequiredTopologyState: Boolean = false
 
-  override def dbsSuffix = "lsu"
+  override def dbsSuffix = "lsu_dr"
   override def usesDbs = super.usesDbs ++ super.usesDbs.map(_ + "beforedr")
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
