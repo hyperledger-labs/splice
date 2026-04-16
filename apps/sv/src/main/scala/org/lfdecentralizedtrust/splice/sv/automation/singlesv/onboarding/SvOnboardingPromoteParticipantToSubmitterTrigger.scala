@@ -140,7 +140,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       val observingParticipantIds = orderedDsoHostingParticipants.lastOption match {
         case Some(dsoHosting) =>
           dsoHosting.mapping.participants
-            .filter(_.permission == ParticipantPermission.Observation)
+            .filter(_.onboarding)
             .map(_.participantId)
         case _ =>
           Seq.empty[ParticipantId]
