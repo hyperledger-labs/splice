@@ -700,7 +700,7 @@ class ParticipantAdminConnection(
       newParticipant: ParticipantId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      // onboarding flag is cleared in SvOnboardingPromoteToSubmitterTrigger
+      // onboarding flag is cleared in SvClearOnboardingFlagTrigger
       val newHostingParticipant =
         HostingParticipant(newParticipant, ParticipantPermission.Submission, onboarding = true)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
