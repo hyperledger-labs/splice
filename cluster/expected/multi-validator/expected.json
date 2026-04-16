@@ -396,6 +396,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
                     "value": "canton.participants.participant_INDEX.storage.parameters.max-connections = 33"
                   }
@@ -842,6 +846,10 @@
                   {
                     "name": "JAVA_TOOL_OPTIONS",
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
                   },
                   {
                     "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
@@ -1292,6 +1300,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
                     "value": "canton.participants.participant_INDEX.storage.parameters.max-connections = 33"
                   }
@@ -1740,6 +1752,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
                     "value": "canton.participants.participant_INDEX.storage.parameters.max-connections = 33"
                   }
@@ -2186,6 +2202,10 @@
                   {
                     "name": "JAVA_TOOL_OPTIONS",
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
                   },
                   {
                     "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
@@ -2706,6 +2726,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
                   },
@@ -3157,6 +3181,10 @@
                   {
                     "name": "JAVA_TOOL_OPTIONS",
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
@@ -3612,6 +3640,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
                   },
@@ -4065,6 +4097,10 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   },
                   {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
+                  },
+                  {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
                   },
@@ -4516,6 +4552,10 @@
                   {
                     "name": "JAVA_TOOL_OPTIONS",
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET",
+                    "value": "true"
                   },
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",

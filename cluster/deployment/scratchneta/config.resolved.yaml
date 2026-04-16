@@ -91,7 +91,11 @@ monitoring:
     enableNoDataAlerts: false
     loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
 multiValidator:
-  postgresPvcSize: '100Gi'
+  extraParticipantEnvVars:
+    - name: 'MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN'
+      value: "canton.participants.participant_INDEX.ledger-api.max-token-lifetime = Inf\n"
+  postgresPvcSize: '500Gi'
+  requiresOnboardingSecret: true
   resources:
     participant:
       limits:
@@ -112,21 +116,21 @@ multiValidator:
         memory: '2400Mi'
 operatorDeployment:
   reference:
-    deploymentDir: 'cluster/deployment'
-    gitReference: 'refs/heads/main'
+    deploymentDir: 'splice/cluster/deployment'
+    gitReference: 'refs/heads/tom-da/basicScratch'
     privateConfigsDir: 'cluster/configs/configs-private'
     publicConfigsDir: 'cluster/configs/configs'
     pulumiBaseDir: 'splice/cluster/pulumi'
-    pulumiStacksDir: 'cluster/stacks/prod'
+    pulumiStacksDir: 'cluster/stacks/scratchnets'
     repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
     spliceRoot: 'splice'
 pulumiProjectConfig:
   default:
     allowDowngrade: true
     cloudSql:
-      enabled: false
+      enabled: true
       enterprisePlus: false
-      protected: false
+      protected: true
       tier: 'db-custom-2-7680'
     hasPublicInfo: false
     installDataOnly: false
@@ -361,7 +365,7 @@ svs:
       appsAsync: false
       appsLogLevel: 'DEBUG'
       cantonAsync: false
-      cantonLogLevel: 'DEBUG'
+      cantonLogLevel: 'INFO'
       cometbftLogLevel: 'debug'
     mediator:
       resources:
@@ -399,13 +403,17 @@ svs:
           cpu: '2'
           memory: '2Gi'
     sequencer:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_DABFT_SCALE_SETTINGS'
+          value: "canton.sequencers.sequencer.sequencer.config {\n  epoch-length = 64\n  consensus-empty-block-creation-timeout = 500.milliseconds\n  min-requests-in-batch = 16\n}\n"
+        - name: 'ADDITIONAL_CONFIG_HIGH_THROUGHPUT_SETTINGS'
+          value: "canton.sequencers.sequencer.sequencer.block.throughput-cap {\n  enabled = true\n  messages = {\n    confirmation-request = {\n      global-tps-cap = 100\n      per-client-tps-cap = 60\n      global-kbps-cap = 20000\n      per-client-kbps-cap = 12000\n    }\n    topology = {\n      global-tps-cap = 200\n      per-client-tps-cap = 10\n      global-kbps-cap = 2000\n      per-client-kbps-cap = 500\n    }\n  }\n  strict = false\n}\n"
       resources:
         limits:
-          cpu: '3'
-          memory: '4Gi'
+          memory: '8Gi'
         requests:
-          cpu: '1'
-          memory: '2Gi'
+          cpu: '4'
+          memory: '4Gi'
     svApp:
       resources:
         limits:
@@ -440,15 +448,19 @@ synchronizerMigration:
   active:
     id: 0
     releaseReference:
-      deploymentDir: 'cluster/deployment'
-      gitReference: 'refs/heads/main'
+      deploymentDir: 'splice/cluster/deployment'
+      gitReference: 'refs/heads/tom-da/basicScratch'
       privateConfigsDir: 'cluster/configs/configs-private'
       publicConfigsDir: 'cluster/configs/configs'
       pulumiBaseDir: 'splice/cluster/pulumi'
-      pulumiStacksDir: 'cluster/stacks/prod'
-      repoUrl: 'https://github.com/hyperledger-labs/splice'
+      pulumiStacksDir: 'cluster/stacks/scratchnets'
+      repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
       spliceRoot: 'splice'
-    version: 'local'
+    sequencer:
+      enableBftSequencer: true
+    version: '0.6.0-snapshot.20260409.2552.0.v7b526e34'
+  frozenMigrationId: 0
+  lsuEnabled: true
 validator1:
   deduplicationDuration: '30m'
   logging:

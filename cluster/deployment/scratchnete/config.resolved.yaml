@@ -1,4 +1,6 @@
 # This file is generated automatically. Do not edit directly.
+chaosMesh:
+  dabftLatency: '50ms'
 cloudArmor:
   allRulesPreviewOnly: true
   enabled: false
@@ -34,8 +36,7 @@ infra:
 initialRound: 0
 loadTester:
   enable: true
-  iterationsPerMinute: 900
-  minRate: 0.95
+  iterationsPerMinute: 1200
 monitoring:
   alerting:
     alerts:
@@ -98,8 +99,8 @@ multiValidator:
   extraParticipantEnvVars:
     - name: 'MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN'
       value: "canton.participants.participant_INDEX.ledger-api.max-token-lifetime = Inf\n"
-  postgresPvcSize: '100Gi'
-  requiresOnboardingSecret: true
+  postgresPvcSize: '500Gi'
+  requiresOnboardingSecret: false
   resources:
     participant:
       limits:
@@ -136,6 +137,8 @@ pulumiProjectConfig:
       enterprisePlus: false
       protected: true
       tier: 'db-custom-2-7680'
+    cloudsql:
+      protected: false
     hasPublicInfo: false
     installDataOnly: false
     interAppsDependencies: true
@@ -412,6 +415,12 @@ svs:
           value: "canton.sequencers.sequencer.sequencer.config {\n  epoch-length = 64\n  consensus-empty-block-creation-timeout = 500.milliseconds\n  min-requests-in-batch = 16\n}\n"
         - name: 'ADDITIONAL_CONFIG_HIGH_THROUGHPUT_SETTINGS'
           value: "canton.sequencers.sequencer.sequencer.block.throughput-cap {\n  enabled = true\n  messages = {\n    confirmation-request = {\n      global-tps-cap = 100\n      per-client-tps-cap = 60\n      global-kbps-cap = 20000\n      per-client-kbps-cap = 12000\n    }\n    topology = {\n      global-tps-cap = 200\n      per-client-tps-cap = 10\n      global-kbps-cap = 2000\n      per-client-kbps-cap = 500\n    }\n  }\n  strict = false\n}\n"
+      cloudSql:
+        enterprisePlus: true
+        flags:
+          maintenance_work_mem: '2000000'
+          max_wal_size: '20480'
+        tier: 'db-perf-optimized-N-4'
       resources:
         limits:
           memory: '8Gi'
@@ -462,7 +471,7 @@ synchronizerMigration:
       spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: '0.6.0-snapshot.20260331.2401.0.va8cdbd51'
+    version: '0.6.0-snapshot.20260409.2552.0.v7b526e34'
   frozenMigrationId: 0
   lsuEnabled: true
 validator1:
