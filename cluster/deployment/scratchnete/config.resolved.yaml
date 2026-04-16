@@ -136,7 +136,7 @@ pulumiProjectConfig:
     cloudSql:
       enabled: true
       enterprisePlus: false
-      protected: false
+      protected: true
       tier: 'db-custom-2-7680'
     hasPublicInfo: false
     installDataOnly: false
