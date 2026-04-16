@@ -487,13 +487,27 @@ object DamlPlugin extends AutoPlugin {
       }
       IO.delete(projectDir / codegenDir)
       BuildUtil.runCommand(
-        Seq("dpm", "codegen-java", "--output-directory", codegenDir, s"${darFile.getAbsolutePath}=$packagePrefix", "--decoderClass", decoderClass),
+        Seq(
+          "dpm",
+          "codegen-java",
+          "--output-directory",
+          codegenDir,
+          s"${darFile.getAbsolutePath}=$packagePrefix",
+          "--decoderClass",
+          decoderClass,
+        ),
         log,
         optCwd = Some(projectDir),
       )
     } else {
       BuildUtil.runCommand(
-        Seq("dpm", "codegen-java", "--output-directory", managedSourceDir.getAbsolutePath, s"${darFile.getAbsolutePath}=$basePackageName.java"),
+        Seq(
+          "dpm",
+          "codegen-java",
+          "--output-directory",
+          managedSourceDir.getAbsolutePath,
+          s"${darFile.getAbsolutePath}=$basePackageName.java",
+        ),
         log,
       )
     }
