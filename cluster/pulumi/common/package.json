@@ -7,7 +7,7 @@
     "@google-cloud/storage": "^7.19.0",
     "@kubernetes/client-node": "^1.4.0",
     "@pulumi/command": "1.2.1",
-    "@pulumi/gcp": "^9.17.0",
+    "@pulumi/gcp": "^9.20.0",
     "@pulumi/kubernetes": "4.28.0",
     "@pulumi/pulumi": "^3.228.0",
     "@pulumi/random": "4.19.2",
