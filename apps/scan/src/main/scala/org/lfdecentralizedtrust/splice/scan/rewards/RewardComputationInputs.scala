@@ -5,6 +5,8 @@ package org.lfdecentralizedtrust.splice.scan.rewards
 
 import com.digitalasset.daml.lf.data.Numeric
 import com.digitalasset.daml.lf.data.{assertRight as damlRight}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import scala.jdk.OptionConverters.RichOptional
 
 /** Derived parameters passed to computeRewardTotals.
   *
@@ -95,12 +97,42 @@ final case class RewardComputationInputs(
 object RewardComputationInputs {
   private val scale: Numeric.Scale = Numeric.Scale.assertFromInt(10)
   private[rewards] val zero: Numeric = fromLong(0L)
+  private val defaultDevelopmentFundPercentage: BigDecimal = BigDecimal("0.05")
 
   private[rewards] def fromLong(x: Long): Numeric =
     damlRight(Numeric.fromLong(scale, x))
 
   private[scan] def fromBigDecimal(x: BigDecimal): Numeric =
     Numeric.assertFromBigDecimal(scale, x)
+
+  /** Build RewardComputationInputs and batchSize from an OpenMiningRound contract.
+    *
+    * Returns `None` for pre-CIP-104 rounds where `trafficPrice` or `rewardConfig` is absent.
+    */
+  def fromOpenMiningRound(
+      round: OpenMiningRound
+  ): Option[(RewardComputationInputs, Int)] =
+    for {
+      rewardConfig <- round.rewardConfig.toScala
+      trafficPrice <- round.trafficPrice.toScala
+    } yield {
+      val issuance = round.issuanceConfig
+      val devFundPct: BigDecimal = issuance.optDevelopmentFundPercentage.toScala
+        .fold(defaultDevelopmentFundPercentage)(BigDecimal(_))
+
+      val inputs = RewardComputationInputs(
+        amuletToIssuePerYear = fromBigDecimal(issuance.amuletToIssuePerYear),
+        appRewardPercentage = fromBigDecimal(issuance.appRewardPercentage),
+        featuredAppRewardCap = fromBigDecimal(issuance.featuredAppRewardCap),
+        unfeaturedAppRewardCap = fromBigDecimal(issuance.unfeaturedAppRewardCap),
+        developmentFundPercentage = fromBigDecimal(devFundPct),
+        tickDurationMicros = round.tickDuration.microseconds,
+        amuletPrice = fromBigDecimal(round.amuletPrice),
+        trafficPrice = fromBigDecimal(trafficPrice),
+        appRewardCouponThreshold = fromBigDecimal(rewardConfig.appRewardCouponThreshold),
+      )
+      (inputs, rewardConfig.batchSize.toInt)
+    }
 
   private def div(a: Numeric, b: Numeric): Numeric =
     damlRight(Numeric.divide(scale, a, b))
