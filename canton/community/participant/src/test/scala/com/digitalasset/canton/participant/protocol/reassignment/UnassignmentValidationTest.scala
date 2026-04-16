@@ -1,14 +1,17 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxEitherId
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
-import com.digitalasset.canton.crypto.{Signature, SigningKeyUsage}
+import com.digitalasset.canton.crypto.{
+  Signature,
+  SigningKeyUsage,
+  SynchronizerSnapshotSyncCryptoApi,
+}
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   FullUnassignmentTree,
@@ -16,13 +19,16 @@ import com.digitalasset.canton.data.{
   UnassignmentViewTree,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetectionHelpers.mkActivenessResult
+import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentDataHelpers.TestValidator
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
   ParsedReassignmentRequest,
   ReassignmentProcessorError,
 }
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.{
-  ContractAuthenticationFailure,
+  ContractValidationError,
+  MultiSynchronizerIsNotEnabled,
   ReassigningParticipantsMismatch,
   StakeholdersMismatch,
   SubmitterMustBeStakeholder,
@@ -35,17 +41,18 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ContractValidator
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.digitalasset.daml.lf.transaction.FatContractInstance
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.http.NotImplementedException
+import com.digitalasset.canton.util.{ContractValidator, ReassignmentTag}
+import com.digitalasset.canton.version.ProtocolVersion
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
-import scala.concurrent.ExecutionContext
 
-class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecutionContext {
+class UnassignmentValidationTest
+    extends AnyWordSpec
+    with BaseTest
+    with ProtocolVersionChecksAnyWordSpec
+    with HasExecutionContext {
   private val sourceSynchronizer = Source(
     SynchronizerId.tryFromString("synchronizer::source").toPhysical
   )
@@ -56,7 +63,8 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
 
   private val signatory: LfPartyId = LfPartyId.assertFromString("signatory::party")
   private val observer: LfPartyId = LfPartyId.assertFromString("observer::party")
-
+  private val alice: LfPartyId = LfPartyId.assertFromString("alice::party")
+  private val bob: LfPartyId = LfPartyId.assertFromString("bob::party")
   private val nonStakeholder: LfPartyId = LfPartyId.assertFromString("nonStakeholder::party")
 
   private val receiverParty2: LfPartyId = PartyId(
@@ -67,6 +75,10 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     ParticipantId.tryFromProtoPrimitive("PAR::bothsynchronizers::confirmingParticipant")
   private val observingParticipant =
     ParticipantId.tryFromProtoPrimitive("PAR::bothsynchronizers::observingParticipant")
+  private val aliceParticipant =
+    ParticipantId.tryFromProtoPrimitive("PAR::bothsynchronizers::aliceParticipant")
+  private val bobParticipant =
+    ParticipantId.tryFromProtoPrimitive("PAR::bothsynchronizers::bobParticipant")
   private val otherParticipant = ParticipantId.tryFromProtoPrimitive("PAR::sync::participant")
 
   private val uuid = new UUID(3L, 4L)
@@ -100,7 +112,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
   private val reassigningParticipants: Set[ParticipantId] =
     Set(confirmingParticipant, observingParticipant)
 
-  private val identityFactory: TestingIdentityFactory = TestingTopology()
+  private def mkTestingTopology(multiSyncFor: ParticipantId*) = TestingTopology()
     .withSynchronizers(sourceSynchronizer.unwrap)
     .withReversedTopology(
       Map(
@@ -109,6 +121,8 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
           receiverParty2 -> ParticipantPermission.Submission,
         ),
         observingParticipant -> Map(observer -> ParticipantPermission.Observation),
+        aliceParticipant -> Map(alice -> ParticipantPermission.Submission),
+        bobParticipant -> Map(bob -> ParticipantPermission.Submission),
       )
     )
     .withSimpleParticipants(
@@ -120,10 +134,19 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
           ExampleTransactionFactory.packageId,
           wrongTemplateId.packageId,
         ),
-        observingParticipant -> Seq(ExampleTransactionFactory.packageId, wrongTemplateId.packageId),
+        observingParticipant -> Seq(
+          ExampleTransactionFactory.packageId,
+          wrongTemplateId.packageId,
+        ),
+        aliceParticipant -> Seq(ExampleTransactionFactory.packageId),
+        bobParticipant -> Seq(ExampleTransactionFactory.packageId),
       )
     )
+    .enableMultiSynchronizer(multiSyncFor*)
     .build(loggerFactory)
+
+  private lazy val identityFactory: TestingIdentityFactory =
+    mkTestingTopology(confirmingParticipant, observingParticipant)
 
   "unassignment validation" should {
     "succeed without errors" in {
@@ -138,37 +161,44 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       validation.reassigningParticipantValidationResult.isTargetTsValidatable shouldBe false
     }
 
-    "fail if contract validation fails" in {
+    def testContractValidationAgainstRepresentativePackage(
+        invalidRpId: ReassignmentTag[LfPackageId]
+    ): Unit = {
 
       val expected = "bad-contract"
 
-      val failingContractValidator = new ContractValidator {
-        override def authenticate(contract: FatContractInstance, targetPackageId: PackageId)(
-            implicit
-            ec: ExecutionContext,
-            traceContext: TraceContext,
-            loggingContext: LoggingContext,
-        ): EitherT[FutureUnlessShutdown, String, Unit] =
-          EitherT.fromEither[FutureUnlessShutdown](expected.asLeft[Unit])
-        override def authenticateHash(
-            contract: FatContractInstance,
-            contractHash: LfHash,
-        ): Either[String, Unit] = throw new NotImplementedException()
-      }
+      val failingContractValidator =
+        new TestValidator(Map((contract.contractId, invalidRpId.unwrap) -> expected))
 
       inside(
         performValidation(
           contract,
           contractValidator = failingContractValidator,
+          sourceValidationPackageId = invalidRpId match {
+            case Source(pkgId) => Some(pkgId)
+            case Target(_) => None
+          },
+          targetValidationPackageId = invalidRpId match {
+            case Source(_) => None
+            case Target(pkgId) => Some(pkgId)
+          },
         ).futureValueUS.value.commonValidationResult.contractAuthenticationResultF.futureValueUS.left.value
-      ) {
-        case ContractAuthenticationFailure(ref, reason, contractId) =>
-          ref shouldBe ReassignmentRef(contract.contractId)
-          contractId shouldBe contract.contractId
-          reason should include(expected)
-        case other => fail(s"Did not expect $other")
+      ) { case ContractValidationError(ref, contractId, representativePackageId, reason) =>
+        ref shouldBe ReassignmentRef(contract.contractId)
+        contractId shouldBe contract.contractId
+        representativePackageId shouldBe invalidRpId.unwrap
+        reason should include(expected)
       }
+    }
 
+    "fail if contract validation fails with source package" in {
+      val invalidRpId = LfPackageId.assertFromString("invalid-representative-package")
+      testContractValidationAgainstRepresentativePackage(Source(invalidRpId))
+    }
+
+    "fail if contract validation fails with target package" in {
+      val invalidRpId = LfPackageId.assertFromString("invalid-representative-package")
+      testContractValidationAgainstRepresentativePackage(Target(invalidRpId))
     }
 
     "fail when inconsistent stakeholders are given" in {
@@ -179,16 +209,18 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
        */
 
       def createUnassignmentTree(metadata: ContractMetadata): FullUnassignmentTree =
-        ReassignmentDataHelpers(
-          ExampleContractFactory.modify(contract, metadata = Some(metadata)),
-          sourceSynchronizer,
-          targetSynchronizer,
-          identityFactory,
-        ).unassignmentRequest(
-          submitter = signatory,
-          submittingParticipant = confirmingParticipant,
-          sourceMediator = sourceMediator,
-        )(reassigningParticipants)
+        ReassignmentDataHelpers
+          .apply(
+            ExampleContractFactory.modify(contract, metadata = Some(metadata)),
+            sourceSynchronizer,
+            targetSynchronizer,
+            identityFactory,
+          )
+          .unassignmentRequest(
+            submitter = signatory,
+            submittingParticipant = confirmingParticipant,
+            sourceMediator = sourceMediator,
+          )(reassigningParticipants)
           .toFullUnassignmentTree(
             pureCrypto,
             pureCrypto,
@@ -283,33 +315,107 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       )
 
       // Missing reassigning participant
-      val missingConfirmingReassigningParticipant = Set.empty[ParticipantId]
+      val missingObservingReassigningParticipant = Set(confirmingParticipant)
       unassignmentValidation(
-        reassigningParticipants = missingConfirmingReassigningParticipant
+        reassigningParticipants = missingObservingReassigningParticipant
       ) shouldBe Seq(
         ReassigningParticipantsMismatch(
           ReassignmentRef(contract.contractId),
           expected = reassigningParticipants,
-          declared = missingConfirmingReassigningParticipant,
+          declared = missingObservingReassigningParticipant,
         )
       )
 
-      // Empty set
+      // If the request declares no reassigning participants, the validator treats this participant
+      // as non-reassigning for this check and therefore skips reassigning-participant validation.
       unassignmentValidation(
         reassigningParticipants = Set.empty
-      ) shouldBe Seq(
-        ReassigningParticipantsMismatch(
-          ReassignmentRef(contract.contractId),
-          expected = reassigningParticipants,
-          declared = Set.empty,
-        )
+      ) shouldBe Seq()
+    }
+
+    "multi-synchronizer topology feature flag" should {
+      val contract = ExampleContractFactory.build(
+        signatories = Set(alice),
+        stakeholders = Set(alice, bob),
       )
+
+      "fail if a stakeholder is hosted on a participant without the flag enabled on source synchronizer" onlyRunWithOrGreaterThan ProtocolVersion.v35 in {
+        def commonValidation(contract: ContractInstance, participants: ParticipantId*) =
+          performValidation(
+            contract = contract,
+            identityFactory = mkTestingTopology(participants*),
+            targetTopology = Some(Target(mkTestingTopology(participants*).topologySnapshot())),
+          ).futureValueUS.value.commonValidationResult.multiSynchronizerFeatureFlagCheckResult
+
+        commonValidation(contract) shouldBe Some(
+          MultiSynchronizerIsNotEnabled(
+            Set(aliceParticipant, bobParticipant),
+            sourceSynchronizer.unwrap,
+          )
+        )
+
+        // fail even if only the observer is hosted on a participant without multi-synchronizer enabled,
+        // as all stakeholders need to be hosted on participants with multi-synchronizer enabled
+        commonValidation(contract, aliceParticipant) shouldBe Some(
+          MultiSynchronizerIsNotEnabled(
+            Set(bobParticipant),
+            sourceSynchronizer.unwrap,
+          )
+        )
+
+        commonValidation(contract, bobParticipant) shouldBe Some(
+          MultiSynchronizerIsNotEnabled(
+            Set(aliceParticipant),
+            sourceSynchronizer.unwrap,
+          )
+        )
+
+        commonValidation(contract, aliceParticipant, bobParticipant) shouldBe None
+      }
+
+      "fail if a stakeholder is hosted on a participant without the flag enabled on target synchronizer" onlyRunWithOrGreaterThan ProtocolVersion.v35 in {
+        def reassigningParticipantValidation(
+            contract: ContractInstance,
+            participants: ParticipantId*
+        ) =
+          performValidation(
+            contract = contract,
+            identityFactory = mkTestingTopology(participants*),
+            targetTopology = Some(Target(mkTestingTopology(participants*).topologySnapshot())),
+            reassigningParticipantsOverride = Set(aliceParticipant, bobParticipant),
+            validatingParticipant = aliceParticipant,
+          ).futureValueUS.value.reassigningParticipantValidationResult.errors
+
+        reassigningParticipantValidation(contract) should contain(
+          MultiSynchronizerIsNotEnabled(
+            Set(aliceParticipant, bobParticipant),
+            targetSynchronizer.unwrap,
+          )
+        )
+
+        reassigningParticipantValidation(contract, aliceParticipant) should contain(
+          MultiSynchronizerIsNotEnabled(
+            Set(bobParticipant),
+            targetSynchronizer.unwrap,
+          )
+        )
+
+        reassigningParticipantValidation(contract, bobParticipant) should contain(
+          MultiSynchronizerIsNotEnabled(
+            Set(aliceParticipant),
+            targetSynchronizer.unwrap,
+          )
+        )
+
+        reassigningParticipantValidation(contract, aliceParticipant, bobParticipant) shouldBe Nil
+      }
     }
   }
 
   private val cryptoSnapshot = identityFactory
     .forOwnerAndSynchronizer(confirmingParticipant, sourceSynchronizer.unwrap)
     .currentSnapshotApproximation
+    .futureValueUS
 
   private val reassignmentId = ReassignmentId.tryCreate("00")
 
@@ -317,6 +423,7 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
       view: FullUnassignmentTree,
       recipients: Recipients,
       signatureO: Option[Signature],
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
   ): ParsedReassignmentRequest[FullUnassignmentTree] = ParsedReassignmentRequest(
     RequestCounter(1),
     CantonTimestamp.Epoch,
@@ -332,54 +439,81 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
     cryptoSnapshot,
     cryptoSnapshot.ipsSnapshot.findDynamicSynchronizerParameters().futureValueUS.value,
     reassignmentId,
+    NonNegativeLong.tryCreate(915),
   )
 
   private def validateUnassignmentTree(
       fullUnassignmentTree: FullUnassignmentTree,
       targetTopology: Option[Target[TopologySnapshot]],
       contractValidator: ContractValidator = ContractValidator.AllowAll,
+      validatingParticipant: ParticipantId = confirmingParticipant,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi = cryptoSnapshot,
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, UnassignmentValidationResult] = {
     val recipients = Recipients.cc(
       reassigningParticipants.toSeq.head,
       reassigningParticipants.toSeq.tail*
     )
     val signature = cryptoSnapshot
-      .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+      .sign(
+        fullUnassignmentTree.rootHash.unwrap,
+        SigningKeyUsage.ProtocolOnly,
+        None, // not needed for unit tests; session signing keys disabled
+      )
       .futureValueUS
       .value
-    val parsed = mkParsedRequest(fullUnassignmentTree, recipients, Some(signature))
+    val parsed = mkParsedRequest(fullUnassignmentTree, recipients, Some(signature), cryptoSnapshot)
 
     val getTopologyAtTs = new GetTopologyAtTimestamp {
-      import com.digitalasset.canton.tracing.TraceContext
+
       override def maybeAwaitTopologySnapshot(
-          targetPSId: Target[PhysicalSynchronizerId],
+          targetPsid: Target[PhysicalSynchronizerId],
           requestedTimestamp: Target[CantonTimestamp],
-      )(implicit tc: TraceContext) = EitherT.rightT(targetTopology)
+      )(implicit
+          traceContext: TraceContext
+      ): EitherT[
+        FutureUnlessShutdown,
+        ReassignmentProcessorError,
+        Option[Target[TopologySnapshot]],
+      ] = EitherT.rightT[FutureUnlessShutdown, ReassignmentProcessorError](targetTopology)
+
     }
 
-    val unassignmentValidation = UnassignmentValidation(
-      isReassigningParticipant = true,
-      participantId = confirmingParticipant,
+    val unassignmentValidation = new UnassignmentValidation(
+      participantId = validatingParticipant,
       contractValidator = contractValidator,
-      activenessF = FutureUnlessShutdown.pure(mkActivenessResult()),
       getTopologyAtTs = getTopologyAtTs,
     )
 
-    unassignmentValidation.perform(parsedRequest = parsed)
+    unassignmentValidation.perform(
+      parsedRequest = parsed,
+      activenessF = FutureUnlessShutdown.pure(mkActivenessResult()),
+    )
   }
 
   private def performValidation(
       contract: ContractInstance = contract,
       reassigningParticipantsOverride: Set[ParticipantId] = reassigningParticipants,
       submitter: LfPartyId = signatory,
+      validatingParticipant: ParticipantId = confirmingParticipant,
       identityFactory: TestingIdentityFactory = identityFactory,
       targetTopology: Option[Target[TopologySnapshot]] = Some(
         Target(identityFactory.topologySnapshot())
       ),
       contractValidator: ContractValidator = ContractValidator.AllowAll,
+      sourceValidationPackageId: Option[LfPackageId] = None,
+      targetValidationPackageId: Option[LfPackageId] = None,
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, UnassignmentValidationResult] = {
     val unassignmentRequest =
-      ReassignmentDataHelpers(contract, sourceSynchronizer, targetSynchronizer, identityFactory)
+      ReassignmentDataHelpers
+        .apply(
+          contract = contract,
+          sourceSynchronizer = sourceSynchronizer,
+          targetSynchronizer = targetSynchronizer,
+          identityFactory = identityFactory,
+          targetTimestamp = Target(CantonTimestamp.Epoch),
+          sourceValidationPackageId = sourceValidationPackageId,
+          targetValidationPackageId = targetValidationPackageId,
+        )
         .unassignmentRequest(
           submitter,
           submittingParticipant = confirmingParticipant,
@@ -394,10 +528,17 @@ class UnassignmentValidationTest extends AnyWordSpec with BaseTest with HasExecu
         uuid,
       )
 
+    val cryptoSnapshot = identityFactory
+      .forOwnerAndSynchronizer(validatingParticipant, sourceSynchronizer.unwrap)
+      .currentSnapshotApproximation
+      .futureValueUS
+
     validateUnassignmentTree(
       fullUnassignmentTree,
       targetTopology,
       contractValidator,
+      validatingParticipant,
+      cryptoSnapshot,
     )
   }
 }

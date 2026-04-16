@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.SynchronizerAlias
 
 // TODO(DACH-NY/canton-network-node#736): these should eventually be defined analogue to Canton's `participant1` references etc
@@ -27,6 +27,15 @@ trait CommonAppInstanceReferences {
         sv1Backend.config.domains.global.alias
       )
       .logical
+
+  def decentralizedSynchronizerPSId(implicit
+      env: SpliceTestConsoleEnvironment
+  ): PhysicalSynchronizerId =
+    sv1Backend.participantClientWithAdminToken.synchronizers
+      .physical_id_of(
+        sv1Backend.config.domains.global.alias
+      )
+
   def decentralizedSynchronizerAlias(implicit
       env: SpliceTestConsoleEnvironment
   ): SynchronizerAlias =

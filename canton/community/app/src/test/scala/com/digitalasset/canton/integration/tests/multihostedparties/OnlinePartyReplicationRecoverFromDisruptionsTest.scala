@@ -1,11 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multihostedparties
 
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -14,14 +15,14 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.party.PartyReplicationTestInterceptorImpl
-import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
+import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.LostSequencerSubscription
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{config, integration}
-import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
+
+import scala.concurrent.duration.DurationInt
 
 /** Objective: Ensure OnPR is resilient against sequencer restarts and SP-synchronizer reconnects.
   *
@@ -35,7 +36,7 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
     with OnlinePartyReplicationTestHelpers
     with SharedEnvironment {
 
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   private var alice: PartyId = _
   private var carol: PartyId = _
@@ -67,17 +68,10 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
       .addConfigTransforms(
-        (ConfigTransforms.unsafeEnableOnlinePartyReplication(
-          Map("participant1" -> (() => createSourceParticipantTestInterceptor()))
-        ) :+
-          // TODO(#24326): While the SourceParticipant (SP=P1) uses AcsInspection to consume the
-          //  ACS snapshot (rather than the Ledger Api), ensure ACS pruning does not trigger AcsInspection
-          //  TimestampBeforePruning. Allow a generous 5 minutes for the SP to consume all active contracts
-          //  in this test.
-          ConfigTransforms.updateParticipantConfig("participant1")(
-            _.focus(_.parameters.journalGarbageCollectionDelay)
-              .replace(config.NonNegativeFiniteDuration.ofMinutes(5))
-          ))*
+        ConfigTransforms.enableAlphaOnlinePartyReplicationSupport(
+          Map("participant1" -> (() => createSourceParticipantTestInterceptor())),
+          enableUnsafeSequencerChannelSupport = true,
+        )*
       )
       .withSetup { implicit env =>
         import env.*
@@ -133,9 +127,11 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
       )
     )
 
-    clue("Wait until OnPR has begun replicating contracts and SP is paused")(eventually() {
-      hasSourceParticipantBeenPaused shouldBe true
-    })
+    clue("Wait until OnPR has begun replicating contracts and SP is paused")(
+      eventually(timeUntilSuccess = 1.minute) {
+        hasSourceParticipantBeenPaused shouldBe true
+      }
+    )
 
     (requestId, onPRSetup.expectedNumContracts)
   }
@@ -340,6 +336,13 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
   }
 }
 
+@RollbackTest
+class OnlinePartyReplicationRecoverFromDisruptionsTestH2
+    extends OnlinePartyReplicationRecoverFromDisruptionsTest {
+  registerPlugin(new UseH2(loggerFactory))
+}
+
+@RollbackTest
 class OnlinePartyReplicationRecoverFromDisruptionsTestPostgres
     extends OnlinePartyReplicationRecoverFromDisruptionsTest {
   registerPlugin(new UsePostgres(loggerFactory))

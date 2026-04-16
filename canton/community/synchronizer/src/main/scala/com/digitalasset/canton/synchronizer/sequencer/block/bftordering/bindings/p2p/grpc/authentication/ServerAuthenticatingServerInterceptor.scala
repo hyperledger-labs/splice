@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.authentication
@@ -73,7 +73,7 @@ private[bftordering] class ServerAuthenticatingServerInterceptor(
         implicit val executor: Executor = (command: Runnable) => ec.execute(command)
         val authenticationServiceChannel = GrpcManagedChannel(
           s"server-authenticationServiceChannel-$endpoint",
-          createChannelBuilder(endpoint.endpointConfig).build(),
+          createChannelBuilder(endpoint.endpointConfig, maxInboundMessageSize = None).build(),
           this,
           loggerFactory.getTracedLogger(getClass),
         )

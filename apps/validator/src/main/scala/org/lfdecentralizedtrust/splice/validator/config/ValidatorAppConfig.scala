@@ -17,9 +17,10 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   WalletSweepConfig,
 }
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelays
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
-import com.digitalasset.canton.sequencing.SequencerConnectionPoolDelays
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
 import java.nio.file.Path
 
@@ -177,7 +178,7 @@ case class ValidatorAppBackendConfig(
     parameters: SpliceParametersConfig = SpliceParametersConfig(),
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
-      ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
+      ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
       SequencerConnectionPoolDelays.default,
     /** The configuration for sweeping funds periodically to other validator's wallet
@@ -216,6 +217,7 @@ case class ValidatorAppBackendConfig(
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
     acsStoreDescriptorUserVersion: Option[Long] = None,
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
@@ -225,7 +227,7 @@ case class ValidatorAppBackendConfig(
 }
 
 object ValidatorAppBackendConfig {
-  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE = NonNegativeFiniteDuration.ofSeconds(10)
+  val DefaultSequencerRequestAmplificationPatience = NonNegativeFiniteDuration.ofSeconds(10)
 }
 
 case class ValidatorAppClientConfig(

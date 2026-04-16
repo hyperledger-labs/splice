@@ -177,6 +177,36 @@ export function buildDsoConfigChanges(
       newValue: after?.nextScheduledSynchronizerUpgrade?.migrationId || '',
     },
     {
+      fieldName: 'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime',
+      label: 'Next scheduled logical synchronizer upgrade topology freeze time',
+      currentValue: before?.nextScheduledLogicalSynchronizerUpgrade?.topologyFreezeTime || '',
+      newValue: after?.nextScheduledLogicalSynchronizerUpgrade?.topologyFreezeTime || '',
+    },
+    {
+      fieldName: 'nextScheduledLogicalSynchronizerUpgradeUpgradeTime',
+      label: 'Next scheduled logical synchronizer upgrade upgrade time',
+      currentValue: before?.nextScheduledLogicalSynchronizerUpgrade?.upgradeTime || '',
+      newValue: after?.nextScheduledLogicalSynchronizerUpgrade?.upgradeTime || '',
+    },
+    {
+      fieldName: 'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial',
+      label: 'Next scheduled logical synchronizer upgrade new physical synchronizer serial',
+      currentValue:
+        before?.nextScheduledLogicalSynchronizerUpgrade?.newPhysicalSynchronizerSerial || '',
+      newValue: after?.nextScheduledLogicalSynchronizerUpgrade?.newPhysicalSynchronizerSerial || '',
+    },
+    {
+      fieldName: 'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion',
+      label:
+        'Next scheduled logical synchronizer upgrade new physical synchronizer protocol version',
+      currentValue:
+        before?.nextScheduledLogicalSynchronizerUpgrade?.newPhysicalSynchronizerProtocolVersion ||
+        '',
+      newValue:
+        after?.nextScheduledLogicalSynchronizerUpgrade?.newPhysicalSynchronizerProtocolVersion ||
+        '',
+    },
+    {
       fieldName: 'voteCooldownTime',
       label: 'The minimum time between two votes (or vote changes) by the same SV',
       currentValue: before?.voteCooldownTime?.microseconds || '',

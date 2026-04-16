@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
@@ -82,8 +83,10 @@ final class MediatorRuntime(
   val inspectionService: ServerServiceDefinition = MediatorInspectionServiceGrpc.bindService(
     new GrpcMediatorInspectionService(
       mediator.state.finalizedResponseStore,
-      mediator.state.recordOrderTimeAwaiter,
+      () => mediator.getCurrentWatermark,
+      ts => traceContext => mediator.awaitWatermark(ts)(traceContext),
       batchingConfig.maxItemsInBatch,
+      mediator.lsuSuccessorAfterUpgradeTime,
       loggerFactory,
     ),
     ec,
@@ -119,6 +122,7 @@ object MediatorRuntimeFactory {
       syncCrypto: SynchronizerCryptoClient,
       topologyClient: SynchronizerTopologyClientWithInit,
       topologyTransactionProcessor: TopologyTransactionProcessor,
+      topologyManager: SynchronizerTopologyManager,
       topologyManagerStatus: TopologyManagerStatus,
       synchronizerOutboxFactory: SynchronizerOutboxFactory,
       timeTracker: SynchronizerTimeTracker,
@@ -127,6 +131,7 @@ object MediatorRuntimeFactory {
       metrics: MediatorMetrics,
       config: MediatorConfig,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext,
       esf: ExecutionSequencerFactory,
@@ -139,6 +144,10 @@ object MediatorRuntimeFactory {
       syncCrypto.pureCrypto,
       sequencerClient.protocolVersion,
       nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
+      fetchAggregatorConfig =
+        nodeParameters.batchingConfig.mediatorFetchFinalizedResponsesAggregator,
+      storeAggregatorConfig =
+        nodeParameters.batchingConfig.mediatorStoreFinalizedResponsesAggregator,
       nodeParameters.processingTimeouts,
       loggerFactory,
     )
@@ -162,6 +171,7 @@ object MediatorRuntimeFactory {
       )
 
     val synchronizerOutbox = synchronizerOutboxFactory.create(
+      topologyManager,
       topologyClient,
       sequencerClient,
       timeTracker,
@@ -175,16 +185,19 @@ object MediatorRuntimeFactory {
       topologyClient,
       syncCrypto,
       topologyTransactionProcessor,
+      topologyManager,
       topologyManagerStatus,
       synchronizerOutbox,
       timeTracker,
       state,
+      asynchronousProcessing = config.asynchronousProcessing,
       sequencerCounterTrackerStore,
       sequencedEventStore,
       nodeParameters,
       clock,
       metrics,
       loggerFactory,
+      futureSupervisor,
     )
 
     EitherT.pure[FutureUnlessShutdown, String](

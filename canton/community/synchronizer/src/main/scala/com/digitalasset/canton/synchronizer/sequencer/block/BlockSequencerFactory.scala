@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -8,17 +8,20 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator
 import com.digitalasset.canton.synchronizer.block.BlockSequencerStateManager
-import com.digitalasset.canton.synchronizer.block.data.SequencerBlockStore
+import com.digitalasset.canton.synchronizer.block.data.{BlockEphemeralState, SequencerBlockStore}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.DatabaseSequencerConfig.TestingInterceptor
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
+import com.digitalasset.canton.synchronizer.sequencer.time.{
+  DisasterRecoverySequencingTimeUpperBound,
+  LsuSequencingBounds,
+}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitManager,
   SequencerTrafficConfig,
@@ -28,7 +31,7 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.store.{
   TrafficPurchasedStore,
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.{
-  EnterpriseSequencerRateLimitManager,
+  SequencerRateLimitManagerImpl,
   TrafficPurchasedManager,
 }
 import com.digitalasset.canton.time.Clock
@@ -40,7 +43,8 @@ import io.opentelemetry.api.trace
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.annotation.nowarn
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 import BlockSequencerFactory.OrderingTimeFixMode
 
@@ -54,7 +58,7 @@ abstract class BlockSequencerFactory(
     override val loggerFactory: NamedLoggerFactory,
     testingInterceptor: Option[TestingInterceptor],
     metrics: SequencerMetrics,
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContextExecutor)
     extends DatabaseSequencerFactory(
       blockSequencerConfig.toDatabaseSequencerConfig,
       storage,
@@ -105,7 +109,7 @@ abstract class BlockSequencerFactory(
       authenticationServices: Option[AuthenticationServices],
       synchronizerLoggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext,
+      ec: ExecutionContextExecutor,
       materializer: Materializer,
       tracer: Tracer,
   ): BlockOrderer
@@ -123,8 +127,8 @@ abstract class BlockSequencerFactory(
       clock: Clock,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       synchronizerLoggerFactory: NamedLoggerFactory,
+      lsuSequencingBounds: Option[LsuSequencingBounds],
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       executionContext: ExecutionContext,
@@ -173,11 +177,12 @@ abstract class BlockSequencerFactory(
       protocolVersion: ProtocolVersion,
       trafficConfig: SequencerTrafficConfig,
   ): SequencerRateLimitManager =
-    new EnterpriseSequencerRateLimitManager(
+    new SequencerRateLimitManagerImpl(
       trafficPurchasedManager,
       trafficConsumedStore,
       loggerFactory,
       nodeParameters.processingTimeouts,
+      nodeParameters.batchingConfig,
       metrics,
       synchronizerSyncCryptoApi,
       protocolVersion,
@@ -185,13 +190,39 @@ abstract class BlockSequencerFactory(
       eventCostCalculator = new EventCostCalculator(loggerFactory),
     )
 
+  @nowarn("cat=deprecation")
+  private def getHeadState(
+      synchronizerSyncCryptoApi: SynchronizerCryptoClient
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[BlockEphemeralState]] =
+    for {
+      // first read the head block info, to get the latest sequenced timestamp
+      headBlockInfo <- store.readHeadBlockInfo()
+      headStateO <- headBlockInfo
+        .map(_.lastTs)
+        .flatTraverse[FutureUnlessShutdown, BlockEphemeralState] { lastTs =>
+          for {
+            // we can use the head snapshot, because we load the dynamic parameter history and then
+            // compute the highest max sequencing time
+            parameterChanges <- synchronizerSyncCryptoApi.headSnapshot.ipsSnapshot
+              .listDynamicSynchronizerParametersChanges()
+            maxSequencingTimeBound = SequencerUtils.maxSequencingTimeUpperBoundAt(
+              lastTs,
+              parameterChanges,
+            )
+            initialHeadO <- store.readHead(maxSequencingTimeBound)
+          } yield initialHeadO
+        }
+
+    } yield headStateO
+
   override final def create(
       sequencerId: SequencerId,
       clock: Clock,
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      lsuSequencingBounds: Option[LsuSequencingBounds],
+      drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot] = None,
       authenticationServices: Option[AuthenticationServices] = None,
@@ -199,52 +230,33 @@ abstract class BlockSequencerFactory(
       traceContext: TraceContext,
       tracer: trace.Tracer,
       actorMaterializer: Materializer,
-  ): FutureUnlessShutdown[Sequencer] = {
-    val initialBlockHeight =
-      nodeParameters.processingTimeouts.unbounded
-        .awaitUS(s"Reading the $name store head to get the initial block height")(
-          store.readHead
-        )
-        .map(
-          _.map(_.latestBlock.height + 1)
-        )
-
-    initialBlockHeight match {
-      case UnlessShutdown.Outcome(result) =>
-        logger.info(
-          s"Creating $name sequencer at block height $result"
-        )
-      case UnlessShutdown.AbortedDueToShutdown =>
-        logger.info(
-          s"$name sequencer creation stopped because of shutdown"
-        )
-    }
-
-    val balanceManager = new TrafficPurchasedManager(
-      trafficPurchasedStore,
-      trafficConfig,
-      futureSupervisor,
-      metrics,
-      nodeParameters.processingTimeouts,
-      loggerFactory,
-    )
-
-    val rateLimitManager = makeRateLimitManager(
-      balanceManager,
-      synchronizerSyncCryptoApi,
-      protocolVersion,
-      trafficConfig,
-    )
-
-    val synchronizerLoggerFactory =
-      loggerFactory.append("psid", synchronizerSyncCryptoApi.psid.toString)
-
+  ): FutureUnlessShutdown[Sequencer] =
     for {
-      initialBlockHeight <- FutureUnlessShutdown(Future.successful(initialBlockHeight))
+      initialHeadO <- getHeadState(synchronizerSyncCryptoApi)
+      initialBlockHeight = initialHeadO.map(_.latestBlock.height + 1)
+      _ = logger.info(s"Creating $name sequencer at block height $initialBlockHeight")
+
+      balanceManager = new TrafficPurchasedManager(
+        trafficPurchasedStore,
+        trafficConfig,
+        futureSupervisor,
+        metrics,
+        nodeParameters.processingTimeouts,
+        loggerFactory,
+      )
+      rateLimitManager = makeRateLimitManager(
+        balanceManager,
+        synchronizerSyncCryptoApi,
+        protocolVersion,
+        trafficConfig,
+      )
       _ <- balanceManager.initialize
-      stateManager <- FutureUnlessShutdown.lift(
+    } yield {
+      val synchronizerLoggerFactory =
+        loggerFactory.append("psid", synchronizerSyncCryptoApi.psid.toString)
+      val stateManager =
         BlockSequencerStateManager.create(
-          synchronizerSyncCryptoApi.psid,
+          initialHeadO,
           store,
           trafficConsumedStore,
           nodeParameters.asyncWriter,
@@ -255,8 +267,7 @@ abstract class BlockSequencerFactory(
           blockSequencerConfig.streamInstrumentation,
           metrics.block,
         )
-      )
-    } yield {
+
       val blockOrderer = createBlockOrderer(
         synchronizerSyncCryptoApi,
         clock,
@@ -278,15 +289,14 @@ abstract class BlockSequencerFactory(
         clock,
         rateLimitManager,
         orderingTimeFixMode,
-        sequencingTimeLowerBoundExclusive,
         synchronizerLoggerFactory,
+        lsuSequencingBounds,
         runtimeReady,
       )
       testingInterceptor
         .map(_(clock)(sequencer)(ec))
         .getOrElse(sequencer)
     }
-  }
 
   override def onClosed(): Unit =
     LifeCycle.close(store)(logger)

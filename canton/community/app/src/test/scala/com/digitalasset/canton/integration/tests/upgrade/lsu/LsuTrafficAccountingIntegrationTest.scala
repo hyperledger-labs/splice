@@ -1,0 +1,540 @@
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.integration.tests.upgrade.lsu
+
+import com.daml.ledger.api.v2.commands.Command
+import com.digitalasset.canton.config
+import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt, PositiveLong}
+import com.digitalasset.canton.console.{
+  CommandFailure,
+  InstanceReference,
+  LocalParticipantReference,
+  LocalSequencerReference,
+}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.integration.*
+import com.digitalasset.canton.integration.EnvironmentDefinition.S2M1
+import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.tests.TrafficBalanceSupport
+import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.synchronizer.sequencer.traffic.LsuTrafficState
+import com.digitalasset.canton.topology.{Party, SynchronizerId}
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
+
+import java.time.Duration
+import scala.jdk.CollectionConverters.*
+import scala.util.Random
+
+/** This test ensures that traffic transfers works for LSU.
+  *
+  * Topology:
+  *   - P1 connected to S1
+  *   - P2 connected to S2
+  *
+  * This test:
+  *   - Generates purchased/consumed traffic by performing some activity on the predecessor
+  *   - Performs an LSU (S1->S3, S2->S4)
+  *   - Runs parts of `TrafficControlTest` to ensure traffic control is working as expected after an
+  *     LSU
+  *
+  * Instances:
+  *   - Old synchronizer: sequencer1, sequencer2
+  *   - New synchronizer: sequencer3, sequencer4
+  */
+abstract class LsuTrafficAccountingIntegrationTest extends LsuBase with TrafficBalanceSupport {
+
+  override protected def testName: String = "lsu-traffic-accounting"
+
+  registerPlugin(new UsePostgres(loggerFactory))
+
+  override protected lazy val newOldSequencers: Map[String, String] =
+    Map("sequencer3" -> "sequencer1", "sequencer4" -> "sequencer2")
+  override protected lazy val newOldMediators: Map[String, String] = Map("mediator2" -> "mediator1")
+  override protected lazy val upgradeTime: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(30)
+
+  private def getExerciseCommand(
+      participant: LocalParticipantReference,
+      synchronizerId: SynchronizerId,
+      party: Party,
+      pkg: String,
+  )(implicit
+      env: TestConsoleEnvironment
+  ): Command = {
+    import env.*
+
+    val createCommand = ledger_api_utils.create(
+      pkg,
+      "Test",
+      "DummyWithParam",
+      Map("operator" -> party),
+    )
+
+    val created = participant.ledger_api.commands.submit(
+      Seq(party),
+      Seq(createCommand),
+      synchronizerId = Some(synchronizerId),
+      readAs = Seq(party),
+    )
+
+    val contractId = created.events
+      .map(_.getCreated.contractId)
+      .headOption
+      .value
+
+    // Ensure we get the same input every test to get the same event cost
+    val random = new Random(50L)
+    val input = random.alphanumeric
+      .take(trafficControlParameters.maxBaseTrafficAmount.value.toInt * 3)
+      .mkString
+
+    ledger_api_utils.exercise(
+      pkg,
+      "Test",
+      "DummyWithParam",
+      "ChoiceWithParam",
+      // This is too big for the max burst base rate
+      Map("paramString" -> input),
+      contractId,
+    )
+  }
+
+  private val topUpAmount = 250_000L
+
+  override lazy val environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition.P2S4M2_Config
+      .withNetworkBootstrap { implicit env =>
+        new NetworkBootstrapper(
+          S2M1(synchronizerOwnersOverride =
+            Some(Seq[InstanceReference](env.sequencer1, env.mediator1))
+          )
+        )
+      }
+      .addConfigTransforms(configTransforms*)
+      .withSetup { implicit env =>
+        import env.*
+
+        defaultEnvironmentSetup(
+          connectParticipants = false,
+          // Done below
+          changeDynamicSynchronizerParameters = false,
+        )
+        participant1.synchronizers.connect_by_config(synchronizerConnectionConfig(sequencer1))
+        participant2.synchronizers.connect_by_config(synchronizerConnectionConfig(sequencer2))
+
+        participants.all.dars.upload(CantonExamplesPath)
+
+        oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer1, sequencer2), Seq(mediator1))
+        newSynchronizerNodes = SynchronizerNodes(Seq(sequencer3, sequencer4), Seq(mediator2))
+
+        sequencer1.topology.synchronizer_parameters.propose_update(
+          synchronizerId = daId,
+          _.update(
+            // Enable traffic control
+            trafficControl = Some(trafficControlParameters),
+            // "Deactivate" ACS commitments to not consume traffic in the background
+            reconciliationInterval = config.PositiveDurationSeconds.ofDays(365),
+          ),
+          mustFullyAuthorize = true,
+        )
+
+        // Fill up base rate
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+      }
+
+  "Traffic transfer during an LSU" should {
+    "create and assert non-empty traffic state on the sequencer" in { implicit env =>
+      import env.*
+
+      val participantTopUpAmount = PositiveLong.tryCreate(500_000L)
+      val mediatorTopUpAmount = PositiveLong.tryCreate(250_000L)
+
+      initialTrafficPurchase(
+        Map(
+          participant1 -> participantTopUpAmount,
+          mediator1 -> mediatorTopUpAmount,
+        ),
+        sequencer1,
+      )
+
+      clue("ping to activate the top-up and create a non-trivial extra traffic remainder") {
+        (1 to 4).foreach(_ => participant1.health.ping(participant1.id))
+      }
+
+      // Sequencer should show the top-up
+      clue("check nodes' traffic state on sequencer1") {
+        eventually() {
+          nodeSeesExtraTrafficPurchased(
+            sequencer1,
+            Map(
+              participant1.id -> participantTopUpAmount.value,
+              mediator1.id -> mediatorTopUpAmount.value,
+            ),
+          )
+        }
+      }
+
+      val trafficState = participant1.traffic_control.traffic_state(daId)
+      trafficState.extraTrafficPurchased.value shouldBe 500000L
+      trafficState.extraTrafficRemainder should be < 500000L
+      trafficState.baseTrafficRemainder.value should be < maxBaseTrafficAmount
+      trafficState.serial shouldBe Some(PositiveInt.tryCreate(1))
+
+      sequencer1.traffic_control
+        .traffic_state_of_members(Seq(mediator1.id))
+        .trafficStates(mediator1.id)
+        .extraTrafficPurchased
+        .value should be > 0L
+    }
+
+    "perform an LSU" in { implicit env =>
+      import env.*
+
+      val fixture = fixtureWithDefaults()
+
+      participant1.health.ping(participant2)
+
+      val alice = participant1.parties.enable("Alice")
+      val bank = participant2.parties.enable("Bank")
+      IouSyntax.createIou(participant2)(bank, alice).discard
+
+      // Before upgrade time has been reached on the old sequencer we expect an error
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        sequencer1.traffic_control.get_lsu_state(),
+        _.shouldBeCantonErrorCode(SequencerError.NoLsuAnnounced),
+      )
+
+      performSynchronizerNodesLsu(fixture)
+
+      // Generate some non-trivial base traffic remainder state
+      environment.simClock.value.advanceTo(upgradeTime.minusMillis(20L))
+      participant1.health.ping(participant2)
+
+      environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
+
+      val oldTrafficStateSeq1 = eventuallyGetTraffic(sequencer1)
+
+      // Sanity check: setting LSU traffic on a sequencer1 without a lower bound set produces an error
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        sequencer1.traffic_control.set_lsu_state(oldTrafficStateSeq1),
+        _.shouldBeCantonErrorCode(SequencerError.MissingSynchronizerPredecessor),
+      )
+
+      val oldTrafficStateSeq2 = eventuallyGetTraffic(sequencer2)
+
+      environment.simClock.value.advance(Duration.ofSeconds(1))
+
+      // Participants should not be able to connect to the new sequencers before the traffic state has been set
+      participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe false
+
+      clue("check that traffic state is not available on new sequencers before it's set") {
+        loggerFactory.assertThrowsAndLogs[CommandFailure](
+          sequencer3.traffic_control.traffic_state_of_all_members(),
+          _.shouldBeCantonErrorCode(TrafficControlErrors.LsuTrafficNotInitialized),
+        )
+      }
+
+      clue("test the check for all members to be present") {
+        val oldTrafficStateSeq1Parsed = LsuTrafficState
+          .fromByteString(testedProtocolVersion, oldTrafficStateSeq1)
+          .valueOrFail("Failed to parse traffic state from sequencer1")
+
+        val missingParticipant1 = LsuTrafficState(oldTrafficStateSeq1Parsed.membersTraffic.filter {
+          case (member, _) => member != participant1.id.member
+        })(LsuTrafficState.protocolVersionRepresentativeFor(testedProtocolVersion)).toByteString
+
+        loggerFactory.assertThrowsAndLogs[CommandFailure](
+          sequencer3.traffic_control.set_lsu_state(missingParticipant1),
+          log => {
+            log.shouldBeCantonErrorCode(SequencerError.InvalidTrafficState)
+            log.errorMessage should (include(
+              "The provided traffic states must contain traffic state for all members"
+            ) and include(participant1.id.toString))
+          },
+        )
+      }
+
+      logger.debug("Setting traffic state on new sequencers")
+      sequencer3.traffic_control.set_lsu_state(oldTrafficStateSeq1)
+      sequencer4.traffic_control.set_lsu_state(oldTrafficStateSeq2)
+
+      sequencer3.traffic_control
+        .traffic_state_of_members(Seq(mediator1.id))
+        .trafficStates(mediator1.id)
+        .extraTrafficPurchased
+        .value should be > 0L
+
+      // Command is expected to return an error if called again
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        sequencer3.traffic_control.set_lsu_state(oldTrafficStateSeq1),
+        _.shouldBeCantonErrorCode(SequencerError.LsuTrafficAlreadyInitialized),
+      )
+
+      eventually(maxPollInterval = 100.millis) {
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
+      }
+
+      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now, logger)
+
+      logger.debug("Comparing traffic states on old and new sequencers")
+      val members = Seq(participant1.id.member, participant2.id.member, mediator1.id.member)
+
+      def getTraffic(sequencer: LocalSequencerReference) = members
+        .map(m =>
+          m -> sequencer.underlying.value.sequencer.sequencer
+            .getTrafficStateAt(m, upgradeTime.immediateSuccessor)
+            .futureValueUS
+            .value
+            .value
+        )
+        .toMap
+
+      val oldSNTrafficStateSeq1 = getTraffic(sequencer1)
+      val oldSNTrafficStateSeq2 = getTraffic(sequencer2)
+
+      // check that we have non-trivial base traffic remainder case in the test
+      oldSNTrafficStateSeq1.exists { case (_, trafficState) =>
+        trafficState.baseTrafficRemainder.value < maxBaseTrafficAmount
+      } shouldBe true
+
+      val newSNTrafficStateSeq1 = getTraffic(sequencer3)
+      val newSNTrafficStateSeq2 = getTraffic(sequencer4)
+
+      // check that traffic didn't fork during the LSU before and after the upgrade
+      newSNTrafficStateSeq1 shouldEqual oldSNTrafficStateSeq1
+      newSNTrafficStateSeq2 shouldEqual oldSNTrafficStateSeq2
+      // sanity checks
+      oldSNTrafficStateSeq1 shouldEqual oldSNTrafficStateSeq2
+      newSNTrafficStateSeq1 shouldEqual newSNTrafficStateSeq2
+
+      // make sure participant has initialized its traffic correctly when connecting to the new synchronizer
+      val newPNTrafficStateP1 = participant1.traffic_control.traffic_state(daId)
+      newPNTrafficStateP1 shouldBe newSNTrafficStateSeq1.get(participant1.id.member).value
+
+      oldSynchronizerNodes.all.stop()
+
+      val aliceIou =
+        participant1.ledger_api.javaapi.state.acs.await(IouSyntax.modelCompanion)(alice)
+      val bob = participant1.parties.enable("Bob")
+
+      participant1.ledger_api.javaapi.commands
+        .submit(Seq(alice), aliceIou.id.exerciseTransfer(bob.toLf).commands().asScala.toSeq)
+
+      val bobIou = participant1.ledger_api.javaapi.state.acs.await(IouSyntax.modelCompanion)(bob)
+
+      participant2.ledger_api.javaapi.commands
+        .submit(Seq(bank), bobIou.id.exerciseArchive().commands().asScala.toSeq)
+
+      // Subsequent call should be successful
+      participant1.underlying.value.sync
+        .performLsu(daId, fixture.synchronizerSuccessor)
+        .futureValueUS
+        .value shouldBe ()
+    }
+
+    "fail to exercise a large command with not enough traffic (after LSU)" in { implicit env =>
+      import env.*
+      val clock = env.environment.simClock.value
+
+      val trafficBefore = participant2.traffic_control.traffic_state(daId)
+      logger.debug(s"Traffic before adv time: $trafficBefore")
+
+      // Re-fill the base rate to give some credit to the mediator, still won't be enough for the submission request though
+      clock.advance(trafficControlParameters.maxBaseTrafficAccumulationDuration.asJava)
+      participant2.health.ping(participant2)
+      val trafficAfter = participant2.traffic_control.traffic_state(daId)
+      logger.debug(s"Traffic after adv time: $trafficAfter")
+
+      participant2.ledger_api.packages.upload_dar(CantonTestsPath, synchronizerId = daId)
+
+      logger.debug("Uploaded DAR to participant2")
+      clock.advance(trafficControlParameters.maxBaseTrafficAccumulationDuration.asJava)
+
+      val claire = participant2.parties.enable("Claire")
+
+      val pkg = participant2.packages.find_by_module("Test").headOption.map(_.packageId).value
+
+      val exerciseCommand =
+        getExerciseCommand(participant2, sequencer3.synchronizer_id, claire, pkg)
+
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        participant2.ledger_api.commands.submit(
+          Seq(claire),
+          Seq(exerciseCommand),
+          workflowId = sequencer3.name,
+          readAs = Seq(claire),
+        ),
+        _.warningMessage should include("AboveTrafficLimit"),
+        _.warningMessage should include("AboveTrafficLimit"),
+        _.errorMessage should include("Request failed for participant2"),
+      )
+
+      val trafficState1 = participant2.traffic_control.traffic_state(daId)
+      trafficState1.extraTrafficPurchased shouldBe NonNegativeLong.zero
+      trafficState1.extraTrafficRemainder shouldBe 0L
+    }
+
+    "allow participants to top up (after LSU)" in { implicit env =>
+      import env.*
+      updateBalanceForMember(participant1, PositiveLong.tryCreate(topUpAmount), sequencer3)
+      updateBalanceForMember(participant2, PositiveLong.tryCreate(topUpAmount), sequencer3)
+
+      eventually() {
+        val trafficState1 = participant1.traffic_control.traffic_state(daId)
+        val trafficState2 = participant2.traffic_control.traffic_state(daId)
+
+        trafficState1.extraTrafficPurchased.value shouldBe (topUpAmount)
+        trafficState1.serial shouldBe Some(PositiveInt.tryCreate(2))
+        trafficState2.extraTrafficPurchased.value shouldBe topUpAmount
+        trafficState2.serial shouldBe Some(PositiveInt.tryCreate(1))
+      }
+    }
+
+    "charge for time proofs (after LSU)" in { implicit env =>
+      import env.*
+      val clock = env.environment.simClock.value
+      clock.advance(Duration.ofSeconds(1))
+      val trafficBeforeCommand = getTrafficForMember(participant1, sequencer3).value
+      participant1.runningNode.value.getNode.value.sync
+        .lookupSynchronizerTimeTracker(sequencer3.physical_synchronizer_id)
+        .value
+        .fetchTimeProof()
+        .futureValueUS
+        .discard
+      val trafficAfterCommand = getTrafficForMember(participant1, sequencer3).value
+      (trafficBeforeCommand.baseTrafficRemainder.value - trafficAfterCommand.baseTrafficRemainder.value) shouldBe baseEventCost
+    }
+
+    "succeed to run a big transaction with enough credit (after LSU)" in { implicit env =>
+      import env.*
+
+      val clock = env.environment.simClock.value
+
+      val claire = participant2.parties.testing.find("Claire")
+      val pkg = participant2.packages.find_by_module("Test").headOption.map(_.packageId).value
+
+      val exerciseCommand =
+        getExerciseCommand(participant2, sequencer3.synchronizer_id, claire, pkg)
+      val trafficBeforeCommand = participant2.traffic_control.traffic_state(daId)
+
+      // Fill in base rate
+      clock.advance(Duration.ofSeconds(1))
+
+      // Now it should succeed
+      participant2.ledger_api.commands.submit(
+        Seq(claire),
+        Seq(exerciseCommand),
+        synchronizerId = Some(sequencer3.synchronizer_id),
+        readAs = Seq(claire),
+      )
+
+      val trafficAfterCommand = participant2.traffic_control.traffic_state(daId)
+      // Make sure we used extra traffic
+      trafficAfterCommand.extraTrafficRemainder should be < trafficBeforeCommand.extraTrafficRemainder
+      // Total limit stays the same
+      trafficAfterCommand.extraTrafficPurchased.value shouldBe topUpAmount
+
+      // Make sure base rate is full
+      clock.advance(Duration.ofSeconds(1))
+
+      // Run it again to compare the 2 traffic consumptions
+      val exerciseCommandRerun =
+        getExerciseCommand(participant2, sequencer3.synchronizer_id, claire, pkg)
+
+      val trafficBeforeRerun = participant2.traffic_control.traffic_state(daId)
+
+      // Fill in base rate
+      clock.advance(Duration.ofSeconds(1))
+
+      participant2.ledger_api.commands.submit(
+        Seq(claire),
+        Seq(exerciseCommandRerun),
+        synchronizerId = Some(sequencer3.synchronizer_id),
+        readAs = Seq(claire),
+      )
+
+      val trafficAfterRerun = participant2.traffic_control.traffic_state(daId)
+
+      // Make sure we used extra traffic
+      trafficAfterRerun.extraTrafficRemainder should be < trafficBeforeRerun.extraTrafficRemainder
+      // Total limit stays the same
+      trafficAfterRerun.extraTrafficPurchased.value shouldBe topUpAmount
+
+      // Because there's _some_ differences between the 2 runs (contract ID is different, timestamps are different),
+      // and views are gzipped, the cost can be slightly different, so allow for some thin margin of error
+      val consumptionRound1 =
+        trafficBeforeCommand.extraTrafficRemainder - trafficAfterCommand.extraTrafficRemainder
+      val consumptionRound2 =
+        trafficBeforeRerun.extraTrafficRemainder - trafficAfterRerun.extraTrafficRemainder
+
+      (consumptionRound1 - consumptionRound2) should equal(0L +- 100L)
+    }
+
+    "update traffic state of sequencer and participant on top ups (after LSU)" in { implicit env =>
+      import env.*
+
+      val topUpAmount = PositiveLong.tryCreate(500000L)
+
+      updateBalanceForMember(participant1, topUpAmount, sequencer3)
+
+      clue("check participant1' traffic state on participant1") {
+        eventually() {
+          participant1.traffic_control
+            .traffic_state(daId)
+            .extraTrafficPurchased
+            .value shouldBe 500000L
+        }
+      }
+
+      // Sequencer should show the top-up
+      clue(s"check participant1' traffic state on sequencer2") {
+        eventually() {
+          val seqStatus = sequencer3.traffic_control.traffic_state_of_members_approximate(
+            Seq(participant1.id)
+          )
+          val p1s = seqStatus.trafficStates.get(participant1.id).value
+          p1s.extraTrafficPurchased.value shouldBe topUpAmount.value
+        }
+      }
+
+      // the top-up only becomes active on the next sequencing timestamp.
+      // since we use simclock and have no other traffic going on, we need to ping here
+      participant1.health.ping(participant1.id)
+
+      participant1.traffic_control
+        .traffic_state(daId)
+        .extraTrafficPurchased
+        .value shouldBe 500000L
+    }
+  }
+}
+
+final class LsuReferenceTrafficAccountingIntegrationTest
+    extends LsuTrafficAccountingIntegrationTest {
+  registerPlugin(
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
+      loggerFactory,
+      MultiSynchronizer.tryCreate(Set("sequencer1", "sequencer2"), Set("sequencer3", "sequencer4")),
+    )
+  )
+}
+
+// TODO(#16789) Re-enable test once dynamic onboarding (traffic control) is supported for DA BFT
+//final class LsuBftOrderingTrafficAccountingIntegrationTest
+//  extends LsuTrafficAccountingIntegrationTest {
+//    registerPlugin(
+//      new UseBftSequencer(
+//        loggerFactory,
+//        MultiSynchronizer.tryCreate(Set("sequencer1", "sequencer2"), Set("sequencer3", "sequencer4")),
+//      )
+//    )
+//}

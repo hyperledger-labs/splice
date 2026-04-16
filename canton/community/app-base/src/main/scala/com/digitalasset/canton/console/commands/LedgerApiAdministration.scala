@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -13,6 +13,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.AllocateExternalPar
 import com.daml.ledger.api.v2.commands.{Command, DisclosedContract, PrefetchContractKey}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
+import com.daml.ledger.api.v2.event.Event.Event
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   CostEstimationHints,
@@ -89,6 +90,7 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.NamedLogging
@@ -105,6 +107,7 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId, config}
 import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.field_mask.FieldMask
@@ -114,7 +117,8 @@ import io.grpc.stub.StreamObserver
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.ExecutionContext
+import scala.annotation.tailrec
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -179,9 +183,12 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Description(
         """This function connects to the update stream for the given parties and collects updates
           |until either `completeAfter` updates have been received or `timeout` has elapsed.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
+          |
+          |The returned updates can be filtered to be between the given offsets (default: no
+          |filtering).
+          |
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
@@ -193,6 +200,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
           synchronizerFilter: Option[SynchronizerId] = None,
+          descendingOrder: Boolean = false,
       ): Seq[UpdateWrapper] = {
 
         val resultFilterWithSynchronizer = synchronizerFilter match {
@@ -211,6 +219,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             updateFormat,
             beginOffsetExclusive,
             endOffsetInclusive,
+            descendingOrder,
           ),
           "getUpdates",
           observer,
@@ -222,10 +231,14 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Description(
         """This function connects to the update stream for the given parties and collects updates
           |until either `completeAfter` transactions have been received or `timeout` has elapsed.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-          |including create event blobs for explicit disclosure, consider using `tx_with_tx_format`.
+          |
+          |The returned updates can be filtered to be between the given offsets (default: no
+          |filtering).
+          |
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error. If you need to specify
+          |filtering conditions for template IDs and including create event blobs for explicit
+          |disclosure, consider using `tx_with_tx_format`.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
@@ -294,21 +307,23 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get reassignments")
       @Help.Description(
-        """This function connects to the update stream for the given parties and template ids and collects reassignment
-          |events (assigned and unassigned) until either `completeAfter` updates have been received or `timeout` has
-          |elapsed.
+        """This function connects to the update stream for the given parties and template ids and
+          |collects reassignment events (assigned and unassigned) until either `completeAfter`
+          |updates have been received or `timeout` has elapsed.
+          |
           |If the party ids set is empty then the reassignments for all the parties will be fetched.
-          |If the template ids collection is empty then the reassignments for all the template ids will be fetched.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
+          |If the template ids collection is empty then the reassignments for all the template ids
+          |will be fetched. The returned updates can be filtered to be between the given offsets
+          |(default: no filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
       def reassignments(
-          partyIds: Set[PartyId],
-          filterTemplates: Seq[TemplateId],
+          partyIds: Set[Party],
           completeAfter: PositiveInt,
+          filterTemplates: Seq[TemplateId] = Nil,
           beginOffsetExclusive: Long = 0L,
           endOffsetInclusive: Option[Long] = None,
           verbose: Boolean = false,
@@ -392,14 +407,18 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get topology transactions")
       @Help.Description(
-        """This function connects to the update stream for the given parties and collects topology transaction
-          |events until either `completeAfter` updates have been received or `timeout` has elapsed.
-          |If the party ids seq is empty then the topology transactions for all the parties will be fetched.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
-          |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned."""
+        """This function connects to the update stream for the given parties and collects topology
+          |transaction events until either `completeAfter` updates have been received or `timeout`
+          |has elapsed.
+          |
+          |If the party ids seq is empty then the topology transactions for all the parties will be
+          |fetched. The returned updates can be filtered to be between the given offsets (default:
+          |no filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffsetExclusive` is
+          |lower than the pruning offset, this command fails with a `NOT_FOUND` error.
+          |If the beginOffsetExclusive is zero then the participant begin is taken as beginning
+          |offset.
+          |If the endOffsetInclusive is None then a continuous stream is returned."""
       )
       def topology_transactions(
           completeAfter: PositiveInt,
@@ -455,12 +474,16 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get updates")
       @Help.Description(
-        """This function connects to the update stream for the given transaction format and collects updates
-          |until either `completeAfter` transactions have been received or `timeout` has elapsed.
-          |The returned transactions can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-          |`transactions` instead.
+        """This function connects to the update stream for the given transaction format and collects
+          |updates until either `completeAfter` transactions have been received or `timeout` has
+          |elapsed.
+          |
+          |The returned transactions can be filtered to be between the given offsets (default: no
+          |filtering).
+          |
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error. If you only need to
+          |filter by a set of parties, consider using `transactions` instead.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
@@ -491,21 +514,29 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       }
 
       @Help.Summary("Subscribe to the update stream")
-      @Help.Description("""This function connects to the update stream and passes updates to `observer` until the stream
-          |is completed.
-          |The updates as described in the update format will be returned.
-          |Use `EventFormat(Map(myParty.toLf -> Filters()))` to return transactions or reassignments for
-          |`myParty: PartyId`.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
+      @Help.Description(
+        """This function connects to the update stream and passes updates to `observer` until the
+          |stream is completed. The updates as described in the update format will be returned.
+          |
+          |Use `EventFormat(Map(myParty.toLf -> Filters()))` to return transactions or reassignments
+          |for `myParty: PartyId`.
+          |
+          |The returned updates can be filtered to be between the given offsets (default: no
+          |filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned.""")
+          |If the endOffset is None then a continuous stream is returned.
+          |If the descendingOrder is true, then the updates are streamed from the most recent
+          |(endOffsetInclusive) to the oldest. In such case endOffsetInclusive must be defined.
+          """
+      )
       def subscribe_updates(
           observer: StreamObserver[UpdateWrapper],
           updateFormat: UpdateFormat,
           beginOffsetExclusive: Long = 0L,
           endOffsetInclusive: Option[Long] = None,
+          descendingOrder: Boolean = false,
       ): AutoCloseable =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -514,20 +545,27 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               beginExclusive = beginOffsetExclusive,
               endInclusive = endOffsetInclusive,
               updateFormat = updateFormat,
+              descendingOrder = descendingOrder,
             )
           )
         }
 
       @Help.Summary("Starts measuring throughput at the update service")
       @Help.Description(
-        """This function will subscribe on behalf of `parties` to the update stream and
-          |notify various metrics:
-          |The metric `<name>.<metricSuffix>` counts the number of update trees emitted.
-          |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of events emitted as part of update.
-          |The metric `<name>.<metricSuffix>-tx-size` tracks the number of bytes emitted as part of update trees.
+        """This function will subscribe on behalf of `parties` to the update stream and notify
+          |various metrics:
+          |- The metric `<name>.<metricSuffix>` counts the number of update trees emitted.
+          |- The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of events emitted as
+          |  part of update.
+          |- The metric `<name>.<metricSuffix>-tx-size` tracks the number of bytes emitted as part
+          |  of update trees.
           |
           |To stop measuring, you need to close the returned `AutoCloseable`.
-          |Use the `onUpdate` parameter to register a callback that is called on every update tree."""
+          |
+          |If the set of parties is empty, we will subscribe as any party.
+          |
+          |Use the `onUpdate` parameter to register a callback that is called on every update tree.
+          """
       )
       def start_measuring(
           parties: Set[Party],
@@ -543,25 +581,58 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             .forParticipant(name)
             .consoleThroughput
 
-          override def onNext(tx: UpdateWrapper): Unit = {
-            val (s, serializedSize) = tx match {
-              case TransactionWrapper(transaction) =>
-                Transaction
-                  .fromProto(ApiTransaction.toJavaProto(transaction))
-                  .getRootNodeIds
-                  .size
-                  .toLong -> transaction.serializedSize
-              case reassignmentWrapper: ReassignmentWrapper =>
-                1L -> reassignmentWrapper.reassignment.serializedSize
-              case topologyTransaction: TopologyTransactionWrapper =>
-                throw new RuntimeException(
-                  s"Unexpectedly received a topology transaction: $topologyTransaction."
-                )
+          private def countRootNodes(nodes: Iterator[(Int, Int)]): Int = {
+            @tailrec
+            def loop(remaining: Iterator[(Int, Int)], count: Int): Int = {
+              val fst = remaining.nextOption()
+              fst match {
+                case None =>
+                  count
+                case Some((_, lastDescId)) =>
+                  val nextPossibleRoot = remaining.dropWhile { case (id, _) => id <= lastDescId }
+                  loop(nextPossibleRoot, count + 1)
+              }
             }
-            consoleMetrics.metric.mark(s)
-            consoleMetrics.nodeCount.update(s)
-            consoleMetrics.transactionSize.update(serializedSize)
+            loop(nodes, 0)
+          }
+
+          override def onNext(tx: UpdateWrapper): Unit = {
             onUpdate(tx)
+            FutureUtil.doNotAwait(
+              Future {
+                val (s, serializedSize) = tx match {
+                  case TransactionWrapper(transaction) =>
+                    val num = countRootNodes(
+                      transaction.events.view
+                        .map(_.event)
+                        .flatMap {
+                          case Event.Empty => List.empty
+                          case Event.Created(value) => List((value.nodeId, value.nodeId))
+                          case Event.Archived(value) => List((value.nodeId, value.nodeId))
+                          case Event.Exercised(value) =>
+                            List((value.nodeId, value.lastDescendantNodeId))
+                        }
+                        .iterator
+                    )
+                    val rt =
+                      transaction.recordTime.flatMap(CantonTimestamp.fromProtoTimestamp(_).toOption)
+                    logger.info(
+                      s"Measured transaction update=${transaction.updateId} with rt=$rt and nodes=$num name=$metricName"
+                    )
+                    num.toLong -> transaction.serializedSize
+                  case reassignmentWrapper: ReassignmentWrapper =>
+                    1L -> reassignmentWrapper.reassignment.serializedSize
+                  case topologyTransaction: TopologyTransactionWrapper =>
+                    throw new RuntimeException(
+                      s"Unexpectedly received a topology transaction: $topologyTransaction."
+                    )
+                }
+                consoleMetrics.metric.mark(s)
+                consoleMetrics.nodeCount.update(s)
+                consoleMetrics.transactionSize.update(serializedSize)
+              },
+              "metrics-update",
+            )
           }
 
           override def onError(t: Throwable): Unit = t match {
@@ -588,7 +659,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
         val eventFormat = EventFormat(
           filtersByParty = parties.map(_.toLf -> Filters(Nil)).toMap,
-          filtersForAnyParty = None,
+          filtersForAnyParty = Option.when(parties.isEmpty)(Filters(Nil)),
           verbose = false,
         )
         val updateFormat = UpdateFormat(
@@ -612,8 +683,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get an update by its ID")
       @Help.Description(
-        """Get an update by its ID. Returns None if the update is not (yet) known at the participant or all the events
-          |of the update are filtered due to the update format or if the update has been pruned via `pruning.prune`."""
+        """Get an update by its ID. Returns None if the update is not (yet) known at the participant
+          |or all the events of the update are filtered due to the update format or if the update
+          |has been pruned via `pruning.prune`.
+          """
       )
       def update_by_id(id: String, updateFormat: UpdateFormat): Option[UpdateWrapper] =
         consoleEnvironment.run {
@@ -626,9 +699,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get an update by its offset")
       @Help.Description(
-        """Get an update by its offset. Returns None if the update is not (yet) known at the participant or all the
-          |events of the update are filtered due to the update format or if the update has been pruned via
-          |`pruning.prune`."""
+        """Get an update by its offset. Returns None if the update is not (yet) known at the
+          |participant or all the events of the update are filtered due to the update format or if
+          |the update has been pruned via `pruning.prune`.
+          """
       )
       def update_by_offset(
           offset: Long,
@@ -647,19 +721,18 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     @Help.Group("Interactive Submission")
     object interactive_submission extends Helpful {
 
-      @Help.Summary(
-        """Prepare a transaction for interactive submission
-           Note that the hash in the response is provided for convenience. Callers should re-compute the hash
-           of the transactions (and possibly compare it to the provided one) before signing it.
-          """
-      )
+      @Help.Summary("Prepare a transaction for interactive submission")
       @Help.Description(
-        """Prepare a transaction for interactive submission.
-          |Similar to submit, except instead of submitting the transaction to the network,
-          |a serialized version of the transaction will be returned, along with a hash.
-          |This allows non-hosted parties to sign the hash with they private key before submitting it via the
-          |execute command. If you wish to directly submit a command instead without the external signing step,
-          |use submit instead."""
+        """Similar to submit, except instead of submitting the transaction to the network, a
+          |serialized version of the transaction will be returned, along with a hash.
+          |
+          |This allows non-hosted parties to sign the hash with they private key before submitting
+          |it via the execute command. If you wish to directly submit a command instead without the
+          |external signing step, use submit instead.
+          |
+          |Note that the hash in the response is provided for convenience. Callers should re-compute
+          |the hash of the transactions (and possibly compare it to the provided one) before signing
+          |it."""
       )
       def prepare(
           actAs: Seq[Party],
@@ -675,6 +748,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           prefetchContractKeys: Seq[PrefetchContractKey] = Seq.empty,
           maxRecordTime: Option[CantonTimestamp] = None,
           estimateTrafficCost: Option[CostEstimationHints] = None,
+          tapsMaxPasses: Option[Int] = None,
+          hashingSchemeVersion: HashingSchemeVersion =
+            HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
       ): PrepareResponseProto =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -692,6 +768,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               prefetchContractKeys,
               maxRecordTime,
               estimateTrafficCost,
+              tapsMaxPasses,
+              hashingSchemeVersion,
             )
           )
         }
@@ -700,11 +778,15 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Execute a prepared submission"
       )
       @Help.Description(
-        """
-          preparedTransaction: the prepared transaction bytestring, typically obtained from the preparedTransaction field of the [[prepare]] response.
-          transactionSignatures: the signatures of the hash of the transaction. The hash is typically obtained from the preparedTransactionHash field of the [[prepare]] response.
-            Note however that the caller should re-compute the hash and ensure it matches the one provided in [[prepare]], to be certain they're signing a hash that correctly represents
-            the transaction they want to submit.
+        """Parameters:
+          |- preparedTransaction: The prepared transaction bytestring, typically obtained from the
+          |  preparedTransaction field of the prepare response.
+          |- transactionSignatures: The signatures of the hash of the transaction. The hash is
+          |  typically obtained from the preparedTransactionHash field of the prepare response.
+          |
+          |  Note however that the caller should re-compute the hash and ensure it matches the one
+          |  provided in prepare, to be certain they're signing a hash that correctly represents
+          |  the transaction they want to submit.
           """
       )
       def execute(
@@ -734,11 +816,12 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Execute a prepared submission and wait for it to complete (successfully or not)"
       )
       @Help.Description(
-        """
-          Similar to execute, except it will wait for the command to be completed before returning.
-          Equivalent of "submitAndWait" in the CommandService.
-          IMPORTANT: this command assumes that the executing participant is trusted to return a valid command completion.
-          A dishonest executing participant could incorrectly respond that the command failed even though it succeeded.
+        """Similar to execute, except it will wait for the command to be completed before returning.
+          |Equivalent of "submitAndWait" in the CommandService.
+          |
+          |IMPORTANT: This command assumes that the executing participant is trusted to return a
+          |valid command completion. A dishonest executing participant could incorrectly respond
+          |that the command failed even though it succeeded.
           """
       )
       def execute_and_wait(
@@ -768,10 +851,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Execute a prepared submission and return the resulting transaction"
       )
       @Help.Description(
-        """
-          Similar to executeAndWait, but returns the resulting transaction.
-          IMPORTANT: this command assumes that the executing participant is trusted to return a valid command completion.
-          A dishonest executing participant could incorrectly respond that the command failed even though it succeeded.
+        """Similar to executeAndWait, but returns the resulting transaction.
+          |
+          |IMPORTANT: This command assumes that the executing participant is trusted to return a
+          |valid command completion. A dishonest executing participant could incorrectly respond
+          |that the command failed even though it succeeded.
           """
       )
       def execute_and_wait_for_transaction(
@@ -784,6 +868,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           deduplicationPeriod: Option[DeduplicationPeriod] = None,
           minLedgerTimeAbs: Option[Instant] = None,
           includeCreatedEventBlob: Boolean = false,
+          customEventFormat: Option[EventFormat] = None,
       ): ApiTransaction =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -797,25 +882,31 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               hashingSchemeVersion = hashingSchemeVersion,
               transactionShape = transactionShape,
               includeCreatedEventBlob = includeCreatedEventBlob,
+              customEventFormat = customEventFormat,
             )
           )
         }.getTransaction
 
       @Help.Summary("Get the preferred package version for constructing a command submission")
       @Help.Description(
-        """A preferred package is the highest-versioned package for a provided package-name
-           that is vetted by all the participants hosting the provided parties.
-           Ledger API clients should use this endpoint for constructing command submissions
-           that are compatible with the provided preferred package, by making informed decisions on:
-             - which are the compatible packages that can be used to create contracts
-             - which contract or exercise choice argument version can be used in the command
-             - which choices can be executed on a template or interface of a contract
-           parties: The parties whose vetting state should be considered when computing the preferred package
-           packageName: The package name for which the preferred package is requested
-           synchronizerId: The synchronizer whose topology state to use for resolving this query.
-                           If not specified. the topology state of all the synchronizers the participant is connected to will be used.
-           vettingValidAt: The timestamp at which the package vetting validity should be computed
-                           If not provided, the participant's current clock time is used.
+        """A preferred package is the highest-versioned package for a provided package-name that is
+          |vetted by all the participants hosting the provided parties.
+          |
+          |Ledger API clients should use this endpoint for constructing command submissions that are
+          |compatible with the provided preferred package, by making informed decisions on:
+          |- which are the compatible packages that can be used to create contracts
+          |- which contract or exercise choice argument version can be used in the command
+          |- which choices can be executed on a template or interface of a contract
+          |
+          |Parameters:
+          |- parties: The parties whose vetting state should be considered when computing the
+          |  preferred package.
+          |- packageName: The package name for which the preferred package is requested.
+          |- synchronizerId: The synchronizer whose topology state to use for resolving this query.
+          |  If not specified. the topology state of all the synchronizers the participant is
+          |  connected to will be used.
+          |- vettingValidAt: The timestamp at which the package vetting validity should be computed
+          |  If not provided, the participant's current clock time is used.
           """
       )
       def preferred_package_version(
@@ -838,24 +929,28 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get the preferred packages for constructing a command submission")
       @Help.Description(
-        """A preferred package is the highest-versioned package for a provided package-name
-           that is vetted by all the participants hosting the provided parties.
-           Ledger API clients should use this endpoint for constructing command submissions
-           that are compatible with the provided preferred package, by making informed decisions on:
-             - which are the compatible packages that can be used to create contracts
-             - which contract or exercise choice argument version can be used in the command
-             - which choices can be executed on a template or interface of a contract
-
-           Generally it is enough to provide the requirements for the command's root package-names.
-           Additional package-name requirements can be provided when additional informees need to use
-           package dependencies of the command's root packages.
-
-           parties: The parties whose vetting state should be considered when computing the preferred package
-           packageName: The package name for which the preferred package is requested
-           synchronizerId: The synchronizer whose topology state to use for resolving this query.
-                           If not specified. the topology state of all the synchronizers the participant is connected to will be used.
-           vettingValidAt: The timestamp at which the package vetting validity should be computed
-                           If not provided, the participant's current clock time is used.
+        """A preferred package is the highest-versioned package for a provided package-name that is
+          |vetted by all the participants hosting the provided parties.
+          |
+          |Ledger API clients should use this endpoint for constructing command submissions that are
+          |compatible with the provided preferred package, by making informed decisions on:
+          |- which are the compatible packages that can be used to create contracts
+          |- which contract or exercise choice argument version can be used in the command
+          |- which choices can be executed on a template or interface of a contract
+          |
+          |Generally it is enough to provide the requirements for the command's root package-names.
+          |Additional package-name requirements can be provided when additional informees need to
+          |use package dependencies of the command's root packages.
+          |
+          |Parameters:
+          |- parties: The parties whose vetting state should be considered when computing the
+          |  preferred package.
+          |- packageName: The package name for which the preferred package is requested.
+          |- synchronizerId: The synchronizer whose topology state to use for resolving this query.
+          |  If not specified. the topology state of all the synchronizers the participant is
+          |  connected to will be used.
+          |- vettingValidAt: The timestamp at which the package vetting validity should be computed
+          |  If not provided, the participant's current clock time is used.
           """
       )
       def preferred_packages(
@@ -883,15 +978,22 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Submit command and wait for the resulting transaction, returning the transaction or failing otherwise"
       )
       @Help.Description(
-        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
-          | If the timeout is set, it also waits for the transaction to appear at all other configured
-          | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
-          | the timeout only specifies how long to wait at the other participants.
-          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
-          | the allotted time.
-          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
-          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
-          | return before the transaction appears at all the involved participants."""
+        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction
+          |to commit, and returns the "flattened" transaction.
+          |
+          |If the timeout is set, it also waits for the transaction to appear at all other
+          |configured participants who were involved in the transaction. The call blocks until the
+          |transaction commits or fails; the timeout only specifies how long to wait at the other
+          |participants.
+          |
+          |Fails if the transaction does not commit, or if it does not become visible to the
+          |involved participants in the allotted time.
+          |
+          |Note that if the optTimeout is set and the involved parties are concurrently
+          |enabled/disabled or their participants are connected/disconnected, the command may
+          |currently result in spurious timeouts or may return before the transaction appears at all
+          |the involved participants.
+          """
       )
       def submit(
           actAs: Seq[Party],
@@ -909,6 +1011,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
           transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
           includeCreatedEventBlob: Boolean = false,
+          tapsMaxPasses: Option[Int] = None,
+          customEventFormat: Option[EventFormat] = None,
       ): ApiTransaction = {
         val externalParties = actAs.collect { case externalParty: ExternalParty => externalParty }
 
@@ -939,6 +1043,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               does not host the party.
                */
               transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+              tapsMaxPasses = tapsMaxPasses,
+              customEventFormat = customEventFormat,
             )
 
           case _ =>
@@ -959,6 +1065,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                   userPackageSelectionPreference,
                   transactionShape,
                   includeCreatedEventBlob = includeCreatedEventBlob,
+                  tapsMaxPasses,
+                  optTimeout,
+                  customEventFormat = customEventFormat,
                 )
               )
             }
@@ -968,11 +1077,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Submit command asynchronously")
       @Help.Description(
-        """Provides access to the command submission service of the Ledger API.
-          |See https://docs.daml.com/app-dev/services.html for documentation of the parameters."""
+        """Provides access to the command submission service of the Ledger API."""
       )
       def submit_async(
-          actAs: Seq[PartyId],
+          actAs: Seq[Party],
           commands: Seq[Command],
           synchronizerId: Option[SynchronizerId] = None,
           workflowId: String = "",
@@ -984,28 +1092,61 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           disclosedContracts: Seq[DisclosedContract] = Seq.empty,
           userId: String = userId,
           userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
-      ): Unit = consoleEnvironment.run {
-        ledgerApiCommand(
-          LedgerApiCommands.CommandSubmissionService.Submit(
-            actAs.map(_.toLf),
-            readAs.map(_.toLf),
-            commands,
-            workflowId,
-            commandId,
-            deduplicationPeriod,
-            submissionId,
-            minLedgerTimeAbs,
-            disclosedContracts,
-            synchronizerId,
-            userId,
-            userPackageSelectionPreference,
+          tapsMaxPasses: Option[Int] = None,
+      ): Unit = {
+        val externalParties = actAs.collect { case externalParty: ExternalParty => externalParty }
+
+        // TODO(#27461) Support multiple submitting parties
+        if (externalParties.sizeIs > 1)
+          consoleEnvironment.raiseError(
+            s"submit_async supports at most one external party, found: ${externalParties.map(_.partyId)}"
           )
-        )
+
+        externalParties.headOption match {
+          case Some(externalParty) =>
+            external.submit_async(
+              externalParty,
+              commands,
+              synchronizerId,
+              commandId,
+              deduplicationPeriod,
+              submissionId,
+              minLedgerTimeAbs,
+              readAs,
+              disclosedContracts,
+              userId,
+              userPackageSelectionPreference,
+              tapsMaxPasses = tapsMaxPasses,
+            )
+
+          case _ =>
+            consoleEnvironment.run {
+              ledgerApiCommand(
+                LedgerApiCommands.CommandSubmissionService.Submit(
+                  actAs.map(_.toLf),
+                  readAs.map(_.toLf),
+                  commands,
+                  workflowId,
+                  commandId,
+                  deduplicationPeriod,
+                  submissionId,
+                  minLedgerTimeAbs,
+                  disclosedContracts,
+                  synchronizerId,
+                  userId,
+                  userPackageSelectionPreference,
+                  tapsMaxPasses,
+                )
+              )
+            }
+        }
       }
 
       @Help.Summary("Investigate successful and failed commands")
       @Help.Description(
-        """Find the status of commands. Note that only recent commands which are kept in memory will be returned."""
+        """Find the status of commands. Note that only recent commands which are kept in memory will
+          |be returned.
+          """
       )
       def status(
           commandIdPrefix: String = "",
@@ -1025,7 +1166,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Investigate failed commands")
       @Help.Description(
-        """Same as status(..., state = CommandState.Failed)."""
+        """Same as status(..., state = CommandState.COMMAND_STATE_FAILED)."""
       )
       def failed(commandId: String = "", limit: PositiveInt = PositiveInt.tryCreate(10)): Seq[
         CommandStatus
@@ -1033,16 +1174,35 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         status(commandId, CommandState.COMMAND_STATE_FAILED, limit)
       }
 
+      @Help.Summary("Investigate succeeded commands")
+      @Help.Description(
+        """Same as status(..., state = CommandState.COMMAND_STATE_SUCCEEDED)."""
+      )
+      def succeeded(commandId: String = "", limit: PositiveInt = PositiveInt.tryCreate(10)): Seq[
+        CommandStatus
+      ] = check(FeatureFlag.Preview) {
+        status(commandId, CommandState.COMMAND_STATE_SUCCEEDED, limit)
+      }
+
       @Help.Summary(
         "Submit assign command and wait for the resulting reassignment, returning the reassignment or failing otherwise"
       )
       @Help.Description(
-        """Submits an assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
-          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
-          | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
-          | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-          | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
+        """Submits an assignment command on behalf of `submitter` party, waits for the resulting
+          |assignment to commit, and returns the reassignment.
+          |
+          |If timeout is set, it also waits for the reassignment(s) to appear at all other
+          |configured participants who were involved in the assignment. The call blocks until the
+          |assignment commits or fails.
+          |
+          |Fails if the assignment does not commit, or if it does not become visible to the involved
+          |participants in time.
+          |
+          |Timeout specifies the time how long to wait until the reassignment appears in the update
+          |stream for the submitting and all the involved participants.
+          |
+          |The `reassignmentId` should be the one returned by the corresponding submit_unassign
+          |command."""
       )
       def submit_assign(
           submitter: PartyId,
@@ -1070,12 +1230,22 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Submit assign command and wait for the resulting reassignment, returning the reassignment or failing otherwise"
       )
       @Help.Description(
-        """Submits an assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
-          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
-          | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
-          | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-          | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
+        """Submits an assignment command on behalf of `submitter` party, waits for the
+          |resulting assignment to commit, and returns the reassignment.
+          |
+          |If timeout is set, it also waits for the reassignment(s) to appear at all other
+          |configured participants who were involved in the assignment. The call blocks until the
+          |assignment commits or fails.
+          |
+          |Fails if the assignment does not commit, or if it does not become visible to the involved
+          |participants in time.
+          |
+          |Timeout specifies the time how long to wait until the reassignment appears in the update
+          |stream for the submitting and all the involved participants.
+          |
+          |The reassignmentId should be the one returned by the corresponding submit_unassign
+          |command.
+          """
       )
       def submit_assign_with_format(
           submitter: PartyId,
@@ -1110,11 +1280,19 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Submit unassign command and wait for the resulting reassignment, returning the reassignment or failing otherwise"
       )
       @Help.Description(
-        """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
-          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
-          | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
-          | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
+        """Submits an unassignment command on behalf of `submitter` party, waits for the resulting
+          |unassignment to commit, and returns the reassignment.
+          |
+          |If timeout is set, it also waits for the reassignment(s) to appear at all other
+          |configured participants who were involved in the unassignment. The call blocks until the
+          |unassignment commits or fails.
+          |
+          |Fails if the unassignment does not commit, or if it does not become visible to the
+          |involved participants in time.
+          |
+          |Timeout specifies the time how long to wait until the reassignment appears in the update
+          |stream for the submitting and all the involved participants.
+          """
       )
       def submit_unassign(
           submitter: PartyId,
@@ -1142,11 +1320,19 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         "Submit unassign command and wait for the resulting reassignment, returning the reassignment or failing otherwise"
       )
       @Help.Description(
-        """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
-          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
-          | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
-          | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
+        """Submits an unassignment command on behalf of `submitter` party, waits for the resulting
+          |unassignment to commit, and returns the reassignment.
+          |
+          |If timeout is set, it also waits for the reassignment(s) to appear at all other
+          |configured participants who were involved in the unassignment. The call blocks until the
+          |unassignment commits or fails.
+          |
+          |Fails if the unassignment does not commit, or if it does not become visible to the
+          |involved participants in time.
+          |
+          |Timeout specifies the time how long to wait until the reassignment appears in the update
+          |stream for the submitting and all the involved participants.
+          |"""
       )
       def submit_unassign_with_format(
           submitter: PartyId,
@@ -1216,8 +1402,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Submit assign command asynchronously")
       @Help.Description(
-        """Provides access to the command submission service of the Ledger API.
-          |See https://docs.daml.com/app-dev/services.html for documentation of the parameters."""
+        """Provides access to the command submission service of the Ledger API."""
       )
       def submit_assign_async(
           submitter: PartyId,
@@ -1246,8 +1431,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Submit unassign command asynchronously")
       @Help.Description(
-        """Provides access to the command submission service of the Ledger API.
-          |See https://docs.daml.com/app-dev/services.html for documentation of the parameters."""
+        """Provides access to the command submission service of the Ledger API."""
       )
       def submit_unassign_async(
           submitter: PartyId,
@@ -1277,6 +1461,49 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Submit commands on behalf of external parties")
       @Help.Group("Command Submission")
       private[canton] object external {
+        def submit_async(
+            actAs: ExternalParty, // TODO(#27461) Support multiple submitting parties
+            commands: Seq[Command],
+            synchronizerId: Option[SynchronizerId] = None,
+            commandId: String = "",
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = "",
+            minLedgerTimeAbs: Option[Instant] = None,
+            readAs: Seq[Party] = Seq.empty,
+            disclosedContracts: Seq[DisclosedContract] = Seq.empty,
+            userId: String = userId,
+            userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+            // External party specifics
+            verboseHashing: Boolean = false,
+            tapsMaxPasses: Option[Int] = None,
+        ): Unit = {
+
+          val prepared = ledger_api.interactive_submission.prepare(
+            actAs = Seq(actAs.partyId),
+            commands = commands,
+            synchronizerId = synchronizerId,
+            commandId = if (commandId.isEmpty) UUID.randomUUID().toString else commandId,
+            minLedgerTimeAbs = minLedgerTimeAbs,
+            readAs = readAs,
+            disclosedContracts = disclosedContracts,
+            userId = userId,
+            userPackageSelectionPreference = userPackageSelectionPreference,
+            verboseHashing = verboseHashing,
+            prefetchContractKeys = Seq(),
+            tapsMaxPasses = tapsMaxPasses,
+            hashingSchemeVersion = actAs.preferredHashingSchemeVersion.toLedgerApiProto,
+          )
+
+          submit_prepared_async(
+            preparedTransaction = prepared,
+            actAs = actAs,
+            deduplicationPeriod = deduplicationPeriod,
+            submissionId = submissionId,
+            minLedgerTimeAbs = minLedgerTimeAbs,
+            userId = userId,
+          )
+        }
+
         def submit(
             actAs: ExternalParty, // TODO(#27461) Support multiple submitting parties
             commands: Seq[Command],
@@ -1294,6 +1521,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             includeCreatedEventBlob: Boolean = false,
             // External party specifics
             verboseHashing: Boolean = false,
+            tapsMaxPasses: Option[Int] = None,
+            customEventFormat: Option[EventFormat] = None,
         ): ApiTransaction = {
 
           val prepared = ledger_api.interactive_submission.prepare(
@@ -1308,6 +1537,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             userPackageSelectionPreference = userPackageSelectionPreference,
             verboseHashing = verboseHashing,
             prefetchContractKeys = Seq(),
+            tapsMaxPasses = tapsMaxPasses,
+            hashingSchemeVersion = actAs.preferredHashingSchemeVersion.toLedgerApiProto,
           )
 
           submit_prepared(
@@ -1320,7 +1551,39 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             userId = userId,
             transactionShape = transactionShape,
             includeCreatedEventBlob = includeCreatedEventBlob,
+            customEventFormat = customEventFormat,
           )
+        }
+
+        def submit_prepared_async(
+            actAs: ExternalParty, // TODO(#27461) Support multiple submitting parties
+            preparedTransaction: PrepareResponseProto,
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = "",
+            minLedgerTimeAbs: Option[Instant] = None,
+            userId: String = userId,
+        ): Unit = {
+
+          val prepared = preparedTransaction.preparedTransaction.getOrElse(
+            consoleEnvironment.raiseError("Prepared transaction was empty")
+          )
+
+          val signatures = Map(
+            actAs.partyId -> consoleEnvironment.global_secret
+              .sign(preparedTransaction.preparedTransactionHash, actAs)
+          )
+
+          ledger_api.interactive_submission
+            .execute(
+              preparedTransaction = prepared,
+              transactionSignatures = signatures,
+              submissionId = submissionId,
+              hashingSchemeVersion = preparedTransaction.hashingSchemeVersion,
+              userId = userId,
+              deduplicationPeriod = deduplicationPeriod,
+              minLedgerTimeAbs = minLedgerTimeAbs,
+            )
+            .discard
         }
 
         def submit_prepared(
@@ -1333,6 +1596,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             userId: String = userId,
             transactionShape: TransactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
             includeCreatedEventBlob: Boolean = false,
+            customEventFormat: Option[EventFormat] = None,
         ): ApiTransaction = {
 
           val prepared = preparedTransaction.preparedTransaction.getOrElse(
@@ -1355,6 +1619,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               deduplicationPeriod = deduplicationPeriod,
               minLedgerTimeAbs = minLedgerTimeAbs,
               includeCreatedEventBlob = includeCreatedEventBlob,
+              customEventFormat = customEventFormat,
             )
 
           optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
@@ -1386,7 +1651,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Investigate successful and failed commands", FeatureFlag.Testing)
       @Help.Description(
-        """Find the status of commands. Note that only recent commands which are kept in memory will be returned."""
+        """Find the status of commands. Note that only recent commands which are kept in memory will
+          |be returned.
+          """
       )
       def status(
           commandIdPrefix: String = "",
@@ -1419,21 +1686,23 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       object acs extends Helpful {
         @Help.Summary("List the set of active contract entries of a given party")
         @Help.Description(
-          """This command will return the current set of active contracts and incomplete reassignments for the given party.
+          """This command will return the current set of active contracts and incomplete
+            |reassignments for the given party.
             |
-            |Supported arguments:
-            |- party: for which party you want to load the acs
-            |- limit: limit (default set via canton.parameter.console)
-            |- verbose: whether the resulting events should contain detailed type information
-            |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
-            |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
-            |  must be no greater than the current ledger end offset and must be greater than or equal to the
-            |  last pruning offset. If no offset is specified then the current participant end will be used.
-            |- timeout: the maximum wait time for the complete acs to arrive
-            |- includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it works only
-            |  if the filterTemplate is non-empty
-            |- resultFilter: custom filter of the results, applies before limit"""
+            |Parameters:
+            |- party: For which party you want to load the acs.
+            |- limit: Limit (default set via canton.parameter.console).
+            |- verbose: Whether the resulting events should contain detailed type information.
+            |- filterTemplate: List of templates ids to filter for, empty sequence acts as a wildcard.
+            |- activeAtOffsetO: The offset at which the snapshot of the active contracts will be
+            |  computed, it must be no greater than the current ledger end offset and must be greater
+            |  than or equal to the last pruning offset. If no offset is specified then the current
+            |  participant end will be used.
+            |- timeout: The maximum wait time for the complete acs to arrive.
+            |- includeCreatedEventBlob: Whether the result should contain the createdEventBlobs, it
+            |  works only if the filterTemplate is non-empty.
+            |- resultFilter: Custom filter of the results, applies before limit.
+            """
         )
         def of_party(
             party: Party,
@@ -1484,18 +1753,21 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         @Help.Description(
           """This command will return the current set of active contracts for the given party.
             |
-            |Supported arguments:
-            |- party: for which party you want to load the acs
-            |- limit: limit (default set via canton.parameter.console)
-            |- verbose: whether the resulting events should contain detailed type information
-            |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-            |- filterInterfaces: list of interface ids to filter for, empty sequence does not influence the resulting filter
-            |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
-            |  must be no greater than the current ledger end offset and must be greater than or equal to the
-            |  last pruning offset. If no offset is specified then the current participant end will be used.
-            |- timeout: the maximum wait time for the complete acs to arrive
-            |- includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it works only
-            |  if the filterTemplate is non-empty"""
+            |Parameters:
+            |- party: For which party you want to load the acs.
+            |- limit: Limit (default set via canton.parameter.console).
+            |- verbose: Whether the resulting events should contain detailed type information.
+            |- filterTemplate: List of templates ids to filter for, empty sequence acts as a wildcard.
+            |- filterInterfaces: List of interface ids to filter for, empty sequence does not
+            |  influence the resulting filter.
+            |- activeAtOffsetO: The offset at which the snapshot of the active contracts will be
+            |  computed, it must be no greater than the current ledger end offset and must be greater
+            |  than or equal to the last pruning offset. If no offset is specified then the current
+            |  participant end will be used.
+            |- timeout: The maximum wait time for the complete acs to arrive.
+            |- includeCreatedEventBlob: Whether the result should contain the createdEventBlobs, it
+            |  works only if the filterTemplate is non-empty.
+            """
         )
         def active_contracts_of_party(
             party: Party,
@@ -1522,20 +1794,24 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
         @Help.Summary("List the set of incomplete unassigned events of a given party")
         @Help.Description(
-          """This command will return the current set of incomplete unassigned events for the given party.
+          """This command will return the current set of incomplete unassigned events for the given
+            |party.
             |
-            |Supported arguments:
-            |- party: for which party you want to load the acs
-            |- limit: limit (default set via canton.parameter.console)
-            |- verbose: whether the resulting events should contain detailed type information
-            |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-            |- filterInterfaces: list of interface ids to filter for, empty sequence does not influence the resulting filter
-            |- activeAtOffsetO: the offset at which the snapshot of the events will be computed, it
-            |  must be no greater than the current ledger end offset and must be greater than or equal to the
-            |  last pruning offset. If no offset is specified then the current participant end will be used.
-            |- timeout: the maximum wait time for the complete acs to arrive
-            |- includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it works only
-            |  if the filterTemplate is non-empty"""
+            |Parameters:
+            |- party: For which party you want to load the acs.
+            |- limit: Limit (default set via canton.parameter.console).
+            |- verbose: Whether the resulting events should contain detailed type information.
+            |- filterTemplate: List of templates ids to filter for, empty sequence acts as a wildcard.
+            |- filterInterfaces: List of interface ids to filter for, empty sequence does not
+            |  influence the resulting filter.
+            |- activeAtOffsetO: The offset at which the snapshot of the events will be computed, it
+            |  must be no greater than the current ledger end offset and must be greater than or
+            |  equal to the last pruning offset. If no offset is specified then the current
+            |  participant end will be used.
+            |- timeout: The maximum wait time for the complete acs to arrive.
+            |- includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it
+            |  works only if the filterTemplate is non-empty.
+            """
         )
         def incomplete_unassigned_of_party(
             party: Party,
@@ -1563,20 +1839,24 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
         @Help.Summary("List the set of incomplete assigned events of a given party")
         @Help.Description(
-          """This command will return the current set of incomplete assigned events for the given party.
+          """This command will return the current set of incomplete assigned events for the given
+            |party.
             |
-            |Supported arguments:
-            |- party: for which party you want to load the acs
-            |- limit: limit (default set via canton.parameter.console)
-            |- verbose: whether the resulting events should contain detailed type information
-            |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-            |- filterInterfaces: list of interface ids to filter for, empty sequence does not influence the resulting filter
-            |- activeAtOffsetO: the offset at which the snapshot of the events will be computed, it must be no
-            |  greater than the current ledger end offset and must be greater than or equal to the last
-            |  pruning offset. If no offset is specified then the current participant end will be used.
-            |- timeout: the maximum wait time for the complete acs to arrive
-            |- includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it works only
-            |  if the filterTemplate is non-empty"""
+            |Parameters:
+            |- party: For which party you want to load the acs.
+            |- limit: Limit (default set via canton.parameter.console).
+            |- verbose: Whether the resulting events should contain detailed type information.
+            |- filterTemplate: List of templates ids to filter for, empty sequence acts as a wildcard.
+            |- filterInterfaces: List of interface ids to filter for, empty sequence does not
+            |  influence the resulting filter.
+            |- activeAtOffsetO: The offset at which the snapshot of the events will be computed, it
+            |  must be no greater than the current ledger end offset and must be greater than or equal
+            |  to the last pruning offset. If no offset is specified then the current participant end
+            |  will be used.
+            |- timeout: The maximum wait time for the complete acs to arrive.
+            |- includeCreatedEventBlob: Whether the result should contain the createdEventBlobs, it
+            |  works only if the filterTemplate is non-empty.
+            """
         )
         def incomplete_assigned_of_party(
             party: Party,
@@ -1607,21 +1887,24 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
         @Help.Description(
           """This command will return the current set of active contracts for all parties.
-
-             Supported arguments:
-             - limit: limit (default set via canton.parameter.console)
-             - verbose: whether the resulting events should contain detailed type information
-             - filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-             - filterInterfaces: list of interface ids to filter for, empty sequence does not influence the resulting filter
-             - activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
-               must be no greater than the current ledger end offset and must be greater than or equal to the
-               last pruning offset. If no offset is specified then the current participant end will be used.
-             - timeout: the maximum wait time for the complete acs to arrive
-             - identityProviderId: limit the response to parties governed by the given identity provider
-             - includeCreatedEventBlob: whether the result should contain the createdEventBlobs, it works only
-               if the filterTemplate is non-empty
-             - resultFilter: custom filter of the results, applies before limit
-          """
+            |
+            |Parameters:
+            |- limit: Limit (default set via canton.parameter.console).
+            |- verbose: Whether the resulting events should contain detailed type information.
+            |- filterTemplate: List of templates ids to filter for, empty sequence acts as a wildcard.
+            |- filterInterfaces: List of interface ids to filter for, empty sequence does not
+            |  influence the resulting filter.
+            |- activeAtOffsetO: The offset at which the snapshot of the active contracts will be
+            |  computed, it must be no greater than the current ledger end offset and must be greater
+            |  than or equal to the last pruning offset. If no offset is specified then the current
+            |  participant end will be used.
+            |- timeout: The maximum wait time for the complete acs to arrive.
+            |- identityProviderId: Limit the response to parties governed by the given identity
+            |  provider.
+            |- includeCreatedEventBlob: Whether the result should contain the createdEventBlobs, it
+            |  works only if the filterTemplate is non-empty.
+            |- resultFilter: Custom filter of the results, applies before limit.
+            """
         )
         def of_all(
             limit: PositiveInt = defaultLimit,
@@ -1638,7 +1921,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             for {
               parties <- ledgerApiCommand(
                 LedgerApiCommands.PartyManagementService.ListKnownParties(
-                  identityProviderId = identityProviderId
+                  identityProviderId = identityProviderId,
+                  filterParty = "",
                 )
               ).toEither
               localParties <- parties.filter(_.isLocal).map(_.party).traverse(LfPartyId.fromString)
@@ -1680,7 +1964,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           "Wait until the party sees the given contract in the active contract service"
         )
         @Help.Description(
-          "Will throw an exception if the contract is not found to be active within the given timeout"
+          """Will throw an exception if the contract is not found to be active within the given
+            |timeout.
+            """
         )
         def await_active_contract(
             party: Party,
@@ -1695,7 +1981,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         @Help.Summary("Generic search for contracts")
         @Help.Description(
           """This search function returns an untyped ledger-api event.
-            |The find will wait until the contract appears or throw an exception once it times out."""
+            |The find will wait until the contract appears or throw an exception once it times out.
+            """
         )
         def find_generic(
             partyId: Party,
@@ -1720,12 +2007,16 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Allocate a new party")
       @Help.Description(
         """Allocates a new party on the ledger.
-          party: a hint for generating the party identifier
-          annotations: key-value pairs associated with this party and stored locally on this Ledger API server
-          identityProviderId: identity provider id
-          synchronizerId: The synchronizer on which the party should be allocated.
-                          The participant must be connected to the synchronizer.
-                          The parameter may be omitted if the participant is connected to only one synchronizer."""
+          |
+          |Parameters:
+          |- party: A hint for generating the party identifier.
+          |- annotations: Key-value pairs associated with this party and stored locally on this
+          |  Ledger API server.
+          |- identityProviderId: Identity provider ID.
+          |- synchronizerId: The synchronizer on which the party should be allocated. The
+          |  participant must be connected to the synchronizer. The parameter may be omitted if the
+          |  participant is connected to only one synchronizer.
+          """
       )
       def allocate(
           party: String,
@@ -1751,15 +2042,21 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Generate topology transactions for an external party", FeatureFlag.Preview)
       @Help.Description(
-        """Convenience function to generate the necessary topology transactions.
-           For more complex setups, please generate your topology transactions manually.
-          synchronizerId: SynchronizerId for which the transactions should be generated.
-          partyHint: the prefix for the party
-          publicKey: the signing public key of the external party
-          localParticipantObservationOnly: if true, then the allocating participant will only be an observer
-          otherConfirmingParticipantUids: list of other participants that will be confirming daml transactions on behalf of the party
-          confirmationThreshold: number of confirming participants which need to approve a daml transaction
-          observingParticipantUids: list of other participants that should observe the transactions of the external party
+        """Convenience function to generate the necessary topology transactions. For more complex
+          |setups, please generate your topology transactions manually.
+          |
+          |Parameters:
+          |- synchronizerId: SynchronizerId for which the transactions should be generated.
+          |- partyHint: The prefix for the party.
+          |- publicKey: The signing public key of the external party.
+          |- localParticipantObservationOnly: If true, then the allocating participant will only be
+          |  an observer.
+          |- otherConfirmingParticipantUids: List of other participants that will be confirming daml
+          |  transactions on behalf of the party.
+          |- confirmationThreshold: Number of confirming participants which need to approve a daml
+          |  transaction.
+          |- observingParticipantUids: List of other participants that should observe the
+          |  transactions of the external party.
           """
       )
       def generate_topology(
@@ -1788,14 +2085,20 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Allocate a new external party", FeatureFlag.Preview)
       @Help.Description(
         """Allocates a new external party on the ledger.
-          synchronizerId: SynchronizerId on which to allocate the party
-          transactions: onboarding transactions and their individual signatures
-          multiSignatures: Signatures over the combined hash of all onboarding transactions"""
+          |
+          |Parameters:
+          |- synchronizerId: SynchronizerId on which to allocate the party.
+          |- transactions: Onboarding transactions and their individual signatures.
+          |- multiSignatures: Signatures over the combined hash of all onboarding transactions.
+          """
       )
       def allocate_external(
           synchronizerId: SynchronizerId,
           transactions: Seq[(GenericTopologyTransaction, Seq[Signature])],
           multiSignatures: Seq[Signature],
+          synchronize: Boolean = true,
+          identityProviderId: String = "",
+          userId: String = "",
       ): AllocateExternalPartyResponse =
         check(FeatureFlag.Preview)(consoleEnvironment.run {
           ledgerApiCommand(
@@ -1803,6 +2106,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               synchronizerId = synchronizerId,
               transactions = transactions,
               multiHashSignatures = multiSignatures,
+              synchronize = synchronize,
+              identityProviderId = identityProviderId,
+              userId = userId,
             )
           )
         })
@@ -1810,13 +2116,18 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("List parties known by the Ledger API server")
       @Help.Description(
         """Lists parties known by the Ledger API server.
-           identityProviderId: identity provider id"""
+          |
+          |Parameters:
+          |- identityProviderId: Identity provider ID.
+          |- filterParty: Filter party by name.
+          """
       )
-      def list(identityProviderId: String = ""): Seq[PartyDetails] = {
+      def list(identityProviderId: String = "", filterParty: String = ""): Seq[PartyDetails] = {
         val proto = consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.PartyManagementService.ListKnownParties(
-              identityProviderId = identityProviderId
+              identityProviderId = identityProviderId,
+              filterParty = filterParty,
             )
           )
         }
@@ -1826,8 +2137,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Get party details for known parties")
       @Help.Description(
-        """Get party details for parties known by the Ledger API server for the given identity provider.
-           identityProviderId: identity provider id"""
+        """Get party details for parties known by the Ledger API server for the given identity
+          |provider.
+          """
       )
       def get(
           parties: Seq[PartyId],
@@ -1847,10 +2159,19 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Update participant-local party details")
       @Help.Description(
         """Currently you can update only the annotations.
-           |You cannot update other user attributes.
-          party: party to be updated,
-          modifier: a function to modify the party details, e.g.: `partyDetails => { partyDetails.copy(annotations = partyDetails.annotations.updated("a", "b").removed("c")) }`
-          identityProviderId: identity provider id"""
+          |You cannot update other user attributes.
+          |
+          |Parameters:
+          |- party: Party to be updated.
+          |- modifier: A function to modify the party details, e.g.:
+          |  partyDetails => {
+          |    partyDetails.copy(
+          |      annotations = partyDetails
+          |        .annotations
+          |        .updated("a", "b").removed("c"))
+          |  }
+          |- identityProviderId: Identity provider ID.
+          """
       )
       def update(
           party: Party,
@@ -1903,9 +2224,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Update party's identity provider id")
       @Help.Description(
         """Updates party's identity provider id.
-          party: party to be updated
-          sourceIdentityProviderId: source identity provider id
-          targetIdentityProviderId: target identity provider id
+          |
+          |Parameters:
+          |- party: Party to be updated.
+          |- sourceIdentityProviderId: Source identity provider ID.
+          |- targetIdentityProviderId: Target identity provider ID.
           """
       )
       def update_idp(
@@ -1929,13 +2252,21 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     object packages extends Helpful {
 
       @Help.Summary("Upload packages from Dar file")
-      @Help.Description("""Uploading the Dar can be done either through the ledger Api server or through the Canton admin Api.
-          |The Ledger Api is the portable method across ledgers. The Canton admin Api is more powerful as it allows for
-          |controlling Canton specific behaviour.
-          |In particular, a Dar uploaded using the ledger Api will not be available in the Dar store and can not be downloaded again.
-          |Additionally, Dars uploaded using the ledger Api will be vetted, but the system will not wait
-          |for the Dars to be successfully registered with all connected synchronizers. As such, if a Dar is uploaded and then
-          |used immediately thereafter, a command might bounce due to missing package vettings.""")
+      @Help.Description(
+        """Uploading the Dar can be done either through the ledger API server or through the Canton
+          |admin API.
+          |
+          |The Ledger API is the portable method across ledgers. The Canton admin API is more
+          |powerful as it allows for controlling Canton specific behaviour.
+          |In particular, a Dar uploaded using the ledger API will not be available in the Dar store
+          |and can not be downloaded again.
+          |
+          |Additionally, Dars uploaded using the ledger API will be vetted, but the system will not
+          |wait for the Dars to be successfully registered with all connected synchronizers. As
+          |such, if a Dar is uploaded and then used immediately thereafter, a command might bounce
+          |due to missing package vettings.
+          """
+      )
       def upload_dar(darPath: String, synchronizerId: Option[SynchronizerId] = None): Unit =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -1952,7 +2283,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Validate a DAR against the current participants' state")
       @Help.Description(
         """Performs the same DAR and Daml package validation checks that the upload call performs,
-         but with no effects on the target participants: the DAR is not persisted or vetted."""
+          |but with no effects on the target participants: the DAR is not persisted or vetted.
+          """
       )
       def validate_dar(darPath: String): Unit =
         consoleEnvironment.run {
@@ -1993,12 +2325,17 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Subscribe to the command completion stream")
       @Help.Description(
-        """This function connects to the command completion stream and passes command completions to `observer` until
-          |the stream is completed.
+        """This function connects to the command completion stream and passes command completions to
+          |`observer` until the stream is completed.
+          |
           |Only completions for parties in `parties` will be returned.
-          |The returned completions start at `beginOffset` (default: the zero value denoting the participant begin).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error."""
+          |
+          |The returned completions start at `beginOffset` (default: the zero value denoting the
+          |participant begin).
+          |
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+          |the pruning offset, this command fails with a `NOT_FOUND` error.
+          """
       )
       def subscribe(
           observer: StreamObserver[Completion],
@@ -2023,7 +2360,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     object identity_provider_config extends Helpful {
       @Help.Summary("Create a new identity provider configuration")
       @Help.Description(
-        """Create an identity provider configuration. The request will fail if the maximum allowed number of separate configurations is reached."""
+        """Create an identity provider configuration.
+          |
+          |The request fails if the maximum allowed number of separate configurations is reached.
+          """
       )
       def create(
           identityProviderId: String,
@@ -2049,7 +2389,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       }
 
       @Help.Summary("Update an identity provider")
-      @Help.Description("""Update identity provider""")
+      @Help.Description("""Update identity provider.""")
       def update(
           identityProviderId: String,
           isDeactivated: Boolean = false,
@@ -2077,7 +2417,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       }
 
       @Help.Summary("Delete an identity provider configuration")
-      @Help.Description("""Delete an existing identity provider configuration""")
+      @Help.Description("""Delete an existing identity provider configuration.""")
       def delete(identityProviderId: String): Unit =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -2088,7 +2428,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         }
 
       @Help.Summary("Get an identity provider configuration")
-      @Help.Description("""Get identity provider configuration by id""")
+      @Help.Description("""Get identity provider configuration by id.""")
       def get(identityProviderId: String): IdentityProviderConfig = {
         val config = consoleEnvironment.run {
           ledgerApiCommand(
@@ -2101,7 +2441,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       }
 
       @Help.Summary("List identity provider configurations")
-      @Help.Description("""List all existing identity provider configurations""")
+      @Help.Description("""List all existing identity provider configurations.""")
       def list(): Seq[IdentityProviderConfig] = {
         val configs = consoleEnvironment.run {
           ledgerApiCommand(
@@ -2118,20 +2458,27 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Create a user with the given id")
       @Help.Description(
-        """Users are used to dynamically managing the rights given to Daml users.
-          |They allow us to link a stable local identifier (of an application) with a set of parties.
-          id: the id used to identify the given user
-          actAs: the set of parties this user is allowed to act as
-          primaryParty: the optional party that should be linked to this user by default
-          readAs: the set of parties this user is allowed to read as
-          participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
-          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
-          isDeactivated: flag (default false) indicating if the user is active
-          annotations: the set of key-value pairs linked to this user
-          identityProviderId: identity provider id
-          readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
-          executeAs: the set of parties for whom this user is allowed to operate interactive submissions
-          executeAsAnyParty: flag (default false) indicating if the user is allowed to operate interactive submissions as any party
+        """Users are used to dynamically managing the rights given to Daml users. They allow us to
+          |link a stable local identifier (of an application) with a set of parties.
+          |
+          |Parameters:
+          |- id: The id used to identify the given user.
+          |- actAs: The set of parties this user is allowed to act as.
+          |- primaryParty: The optional party that should be linked to this user by default.
+          |- readAs: The set of parties this user is allowed to read as.
+          |- participantAdmin: Flag (default false) indicating if the user is allowed to use the
+          |  admin commands of the Ledger API.
+          |- identityProviderAdmin: Flag (default false) indicating if the user is allowed to manage
+          |  users and parties assigned to the same identity provider.
+          |- isDeactivated: Flag (default false) indicating if the user is active.
+          |- annotations: The set of key-value pairs linked to this user.
+          |- identityProviderId: Identity provider ID.
+          |- readAsAnyParty: Flag (default false) indicating if the user is allowed to read as any
+          |  party.
+          |- executeAs: The set of parties for whom this user is allowed to operate interactive
+          |  submissions.
+          |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
+          |  interactive submissions as any party.
           """
       )
       def create(
@@ -2174,9 +2521,17 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Description(
         """Currently you can update the annotations, active status and primary party.
           |You cannot update other user attributes.
-          id: id of the user to be updated
-          modifier: a function for modifying the user; e.g: `user => { user.copy(isActive = false, primaryParty = None, annotations = user.annotations.updated("a", "b").removed("c")) }`
-          identityProviderId: identity provider id
+          |
+          |Parameters:
+          |- id: ID of the user to be updated.
+          |- modifier: A function for modifying the user; e.g:
+          |  user => {
+          |    user.copy(
+          |      isActive = false,
+          |      primaryParty = None,
+          |      annotations = user.annotations.updated("a", "b").removed("c"))
+          |  }
+          |- identityProviderId: Identity provider ID.
           """
       )
       def update(
@@ -2209,13 +2564,16 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         User.fromLapiUser(rawUpdatedUser)
       }
 
-      @Help.Summary("Get the user data of the user with the given id")
+      @Help.Summary("Get the user data of the user with the given ID")
       @Help.Description(
         """Fetch the data associated with the given user id failing if there is no such user.
           |You will get the user's primary party, active status and annotations.
           |If you need the user rights, use rights.list instead.
-          id: user id
-          identityProviderId: identity provider id"""
+          |
+          |Parameters:
+          |- id: User ID.
+          |- identityProviderId: Identity provider ID.
+          """
       )
       def get(id: String, identityProviderId: String = ""): User = User.fromLapiUser(
         doGet(
@@ -2225,9 +2583,14 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
 
       @Help.Summary("Delete a user")
-      @Help.Description("""Delete a user by id.
-         id: user id
-         identityProviderId: identity provider id""")
+      @Help.Description(
+        """Delete a user by ID.
+          |
+          |Parameters:
+          |- id: User ID.
+          |- identityProviderId: Identity provider ID.
+          """
+      )
       def delete(id: String, identityProviderId: String = ""): Unit =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -2239,11 +2602,17 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         }
 
       @Help.Summary("List users")
-      @Help.Description("""List users of this participant node
-          filterUser: filter results using the given filter string
-          pageToken: used for pagination (the result contains a page token if there are further pages)
-          pageSize: default page size before the filter is applied
-          identityProviderId: identity provider id""")
+      @Help.Description(
+        """List users of this participant node.
+          |
+          |Parameters:
+          |- filterUser: Filter results using the given filter string.
+          |- pageToken: Used for pagination (the result contains a page token if there are further
+          |  pages).
+          |- pageSize: Default page size before the filter is applied.
+          |- identityProviderId: Identity provider ID.
+          """
+      )
       def list(
           filterUser: String = "",
           pageToken: String = "",
@@ -2267,12 +2636,14 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
       }
 
-      @Help.Summary("Update user's identity provider id")
+      @Help.Summary("Update user's identity provider ID")
       @Help.Description(
-        """Updates user's identity provider id.
-          id: the id used to identify the given user
-          sourceIdentityProviderId: source identity provider id
-          targetIdentityProviderId: target identity provider id
+        """Updates user's identity provider ID.
+          |
+          |Parameters:
+          |- id: The id used to identify the given user.
+          |- sourceIdentityProviderId: Source identity provider ID.
+          |- targetIdentityProviderId: Target identity provider ID.
           """
       )
       def update_idp(
@@ -2319,18 +2690,27 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       object rights extends Helpful {
 
         @Help.Summary("Grant new rights to a user")
-        @Help.Description("""Users are used to dynamically managing the rights given to Daml applications.
+        @Help.Description(
+          """Users are used to dynamically managing the rights given to Daml applications.
           |This function is used to grant new rights to an existing user.
-          id: the id used to identify the given user
-          actAs: the set of parties this user is allowed to act as
-          readAs: the set of parties this user is allowed to read as
-          participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
-          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
-          identityProviderId: identity provider id
-          readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
-          executeAs: the set of parties for whom this user is allowed to operate interactive submissions
-          executeAsAnyParty: flag (default false) indicating if the user is allowed to operate interactive submissions as any party
-          """)
+          |
+          |Parameters:
+          |- id: The ID used to identify the given user.
+          |- actAs: The set of parties this user is allowed to act as.
+          |- readAs: The set of parties this user is allowed to read as.
+          |- participantAdmin: Flag (default false) indicating if the user is allowed to use the
+          |  admin commands of the Ledger API.
+          |- identityProviderAdmin: Flag (default false) indicating if the user is allowed to manage
+          |  users and parties assigned to the same identity provider.
+          |- identityProviderId: Identity provider ID.
+          |- readAsAnyParty: Flag (default false) indicating if the user is allowed to read as any
+          |  party.
+          |- executeAs: The set of parties for whom this user is allowed to operate interactive
+          |  submissions.
+          |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
+          |  interactive submissions as any party.
+          """
+        )
         def grant(
             id: String,
             actAs: Set[PartyId] = Set(),
@@ -2366,17 +2746,25 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           }
 
         @Help.Summary("Revoke user rights")
-        @Help.Description("""Use to revoke specific rights from a user.
-          id: the id used to identify the given user
-          actAs: the set of parties this user should not be allowed to act as
-          readAs: the set of parties this user should not be allowed to read as
-          participantAdmin: if set to true, the participant admin rights will be removed
-          identityProviderAdmin: if set to true, the identity provider admin rights will be removed
-          identityProviderId: identity provider id
-          readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
-          executeAs: the set of parties for whom this user is allowed to operate interactive submissions
-          executeAsAnyParty: flag (default false) indicating if the user is allowed to operate interactive submissions as any party
-          """)
+        @Help.Description(
+          """Use to revoke specific rights from a user.
+            |
+            |Parameters:
+            |- id: The ID used to identify the given user.
+            |- actAs: The set of parties this user should not be allowed to act as.
+            |- readAs: The set of parties this user should not be allowed to read as.
+            |- participantAdmin: If set to true, the participant admin rights will be removed.
+            |- identityProviderAdmin: If set to true, the identity provider admin rights will be
+            |  removed.
+            |- identityProviderId: Identity provider ID.
+            |- readAsAnyParty: Flag (default false) indicating if the user is allowed to read as any
+            |  party.
+            |- executeAs: The set of parties for whom this user is allowed to operate interactive
+            |  submissions.
+            |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
+            |  interactive submissions as any party.
+            """
+        )
         def revoke(
             id: String,
             actAs: Set[PartyId] = Set(),
@@ -2412,9 +2800,14 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           }
 
         @Help.Summary("List rights of a user")
-        @Help.Description("""Lists the rights of a user, or the rights of the current user.
-            id: user id
-            identityProviderId: identity provider id""")
+        @Help.Description(
+          """Lists the rights of a user, or the rights of the current user.
+            |
+            |Parameters:
+            |- id: User ID.
+            |- identityProviderId: Identity provider ID.
+            """
+        )
         def list(id: String, identityProviderId: String = ""): UserRights =
           consoleEnvironment.run {
             ledgerApiCommand(
@@ -2431,8 +2824,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     @Help.Group("Time")
     object time {
       @Help.Summary("Get the participants time")
-      @Help.Description("""Returns the current timestamp of the participant which is either the
-                         system clock or the static time""")
+      @Help.Description(
+        """Returns the current timestamp of the participant which is either the system clock or the
+          |static time.
+          """
+      )
       def get(): CantonTimestamp =
         consoleEnvironment.run {
           ledgerApiCommand(LedgerApiCommands.Time.Get)
@@ -2440,7 +2836,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Set the participants time", FeatureFlag.Testing)
       @Help.Description(
-        """Sets the participants time if the participant is running in static time mode"""
+        """Sets the participants time if the participant is running in static time mode."""
       )
       def set(currentTime: CantonTimestamp, nextTime: CantonTimestamp): Unit =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
@@ -2453,20 +2849,29 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     object event_query extends Helpful {
 
       @Help.Summary("Get events by contract Id")
-      @Help.Description("""Return events associated with the given contract Id""")
+      @Help.Description(
+        """Return events associated with the given contract ID.
+          |If `requestingParties` is empty, events are fetched for all parties.
+          |Otherwise the query is restricted to the provided reader parties."""
+      )
       def by_contract_id(
           contractId: String,
           requestingParties: Seq[Party],
+          includeCreatedEventBlob: Boolean = false,
       ): GetEventsByContractIdResponse =
         consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.QueryService
-              .GetEventsByContractId(contractId, requestingParties.map(_.toLf))
+              .GetEventsByContractId(
+                contractId,
+                requestingParties.map(_.toLf),
+                includeCreatedEventBlob,
+              )
           )
         }
     }
 
-    @Help.Summary("Group of commands that utilize java bindings")
+    @Help.Summary("Group of commands that utilize Java bindings")
     @Help.Group("Ledger Api (Java bindings)")
     object javaapi extends Helpful {
 
@@ -2478,10 +2883,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           "Prepare a transaction for interactive submission"
         )
         @Help.Description(
-          "Prepare a transaction for interactive submission"
+          "Prepare a transaction for interactive submission."
         )
         def prepare(
-            actAs: Seq[PartyId],
+            actAs: Seq[Party],
             commands: Seq[javab.data.Command],
             synchronizerId: Option[SynchronizerId] = None,
             commandId: String = UUID.randomUUID().toString,
@@ -2494,6 +2899,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             prefetchContractKeys: Seq[javab.data.PrefetchContractKey] = Seq.empty,
             maxRecordTime: Option[CantonTimestamp] = None,
             estimateTrafficCost: Option[CostEstimationHints] = None,
+            tapsMaxPasses: Option[Int] = None,
+            hashingSchemeVersion: HashingSchemeVersion =
+              HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
         ): PrepareResponseProto =
           consoleEnvironment.run {
             ledgerApiCommand(
@@ -2511,6 +2919,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 prefetchContractKeys.map(k => PrefetchContractKey.fromJavaProto(k.toProto)),
                 maxRecordTime,
                 estimateTrafficCost,
+                tapsMaxPasses,
+                hashingSchemeVersion,
               )
             )
           }
@@ -2521,18 +2931,25 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       object commands extends Helpful {
 
         @Help.Summary(
-          "Submit java codegen command and wait for the resulting transaction, returning the transaction or failing otherwise"
+          "Submit Java codegen command and wait for the resulting transaction, returning the transaction or failing otherwise"
         )
         @Help.Description(
-          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
-            | If the timeout is set, it also waits for the transaction to appear at all other configured
-            | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
-            | the timeout only specifies how long to wait at the other participants.
-            | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
-            | the allotted time.
-            | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
-            | participants are connected/disconnected, the command may currently result in spurious timeouts or may
-            | return before the transaction appears at all the involved participants."""
+          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction
+            |to commit, and returns the "flattened" transaction.
+            |
+            |If the timeout is set, it also waits for the transaction to appear at all other
+            |configured participants who were involved in the transaction. The call blocks until the
+            |transaction commits or fails; the timeout only specifies how long to wait at the other
+            |participants.
+            |
+            |Fails if the transaction does not commit, or if it does not become visible to the
+            |involved participants in the allotted time.
+            |
+            |Note that if the optTimeout is set and the involved parties are concurrently
+            |enabled/disabled or their participants are connected/disconnected, the command may
+            |currently result in spurious timeouts or may return before the transaction appears at all
+            |the involved participants.
+            """
         )
         def submit(
             actAs: Seq[Party],
@@ -2550,6 +2967,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
             transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
             includeCreatedEventBlob: Boolean = false,
+            tapsMaxPasses: Option[Int] = None,
+            customEventFormat: Option[EventFormat] = None,
         ): Transaction = {
           val externalParties = actAs.collect { case externalParty: ExternalParty => externalParty }
 
@@ -2575,6 +2994,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 userId,
                 userPackageSelectionPreference,
                 includeCreatedEventBlob = includeCreatedEventBlob,
+                tapsMaxPasses = tapsMaxPasses,
+                customEventFormat = customEventFormat,
               )
 
             case _ =>
@@ -2595,6 +3016,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                     userPackageSelectionPreference,
                     transactionShape,
                     includeCreatedEventBlob = includeCreatedEventBlob,
+                    tapsMaxPasses,
+                    optTimeout,
+                    customEventFormat = customEventFormat,
                   )
                 )
               }
@@ -2607,13 +3031,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           }
         }
 
-        @Help.Summary("Submit java codegen command asynchronously")
-        @Help.Description(
-          """Provides access to the command submission service of the Ledger API.
-            |See https://docs.daml.com/app-dev/services.html for documentation of the parameters."""
-        )
+        @Help.Summary("Submit Java codegen command asynchronously")
+        @Help.Description("Provides access to the command submission service of the Ledger API.")
         def submit_async(
-            actAs: Seq[PartyId],
+            actAs: Seq[Party],
             commands: Seq[javab.data.Command],
             synchronizerId: Option[SynchronizerId] = None,
             workflowId: String = "",
@@ -2640,14 +3061,23 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           )
 
         @Help.Summary(
-          "Submit assign command and wait for the resulting java codegen reassignment, returning the reassignment or failing otherwise"
+          "Submit assign command, await Java codegen reassignment, then return it or fail"
         )
         @Help.Description(
-          """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
-            | If timeout is set, it also waits for the reassignment(s) to appear at all other
-            | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
-            | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-            | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
+          """Submits an unassignment command on behalf of `submitter` party, waits for the resulting
+            |unassignment to commit, and returns the reassignment.
+            |
+            |If timeout is set, it also waits for the reassignment(s) to appear at all other
+            |participants who were involved in the unassignment.
+            |
+            |The call blocks until the unassignment commits or fails.
+            |
+            |Fails if the unassignment does not commit, or if it does not become visible to the
+            |involved participants in time.
+            |
+            |Timeout specifies the time how long to wait until the reassignment appears in the update
+            |stream for the submitting and all the involved participants.
+            """
         )
         def submit_unassign(
             submitter: PartyId,
@@ -2676,15 +3106,25 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             .pipe(Reassignment.fromProto)
 
         @Help.Summary(
-          "Submit assign command and wait for the resulting java codegen reassignment, returning the reassignment or failing otherwise"
+          "Submit assign command, await Java codegen reassignment, then return it or fail"
         )
         @Help.Description(
-          """Submits a assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
-            | If timeout is set, it also waits for the reassignment(s) to appear at all other
-            | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
-            | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-            | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-            | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
+          """Submits a assignment command on behalf of `submitter` party, waits for the resulting
+            |assignment to commit, and returns the reassignment.
+            |
+            |If timeout is set, it also waits for the reassignment(s) to appear at all other
+            |participants who were involved in the assignment.
+            |
+            |The call blocks until the assignment commits or fails.
+            |
+            |Fails if the assignment does not commit, or if it does not become visible to the
+            |involved participants in time.
+            |
+            |Timeout specifies the time how long to wait until the reassignment appears in the update
+            |stream for the submitting and all the involved participants.
+            |
+            |The `reassignmentId` should be the one returned by the corresponding submit_unassign
+            |command."""
         )
         def submit_assign(
             submitter: PartyId,
@@ -2716,6 +3156,40 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         @Help.Summary("Submit commands on behalf of external parties")
         @Help.Group("Command Submission")
         private[canton] object external {
+          def submit_async(
+              actAs: ExternalParty, // TODO(#27461) Support multiple submitting parties
+              commands: Seq[javab.data.Command],
+              synchronizerId: Option[SynchronizerId] = None,
+              commandId: String = "",
+              deduplicationPeriod: Option[DeduplicationPeriod] = None,
+              submissionId: String = "",
+              minLedgerTimeAbs: Option[Instant] = None,
+              readAs: Seq[Party] = Seq.empty,
+              disclosedContracts: Seq[javab.data.DisclosedContract] = Seq.empty,
+              userId: String = userId,
+              userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+              tapsMaxPasses: Option[Int] = None,
+          ): Unit = {
+            val protoCommands = commands.map(_.toProtoCommand).map(Command.fromJavaProto)
+            val protoDisclosedContracts =
+              disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto))
+
+            ledger_api.commands.external.submit_async(
+              actAs = actAs,
+              commands = protoCommands,
+              synchronizerId = synchronizerId,
+              commandId = commandId,
+              deduplicationPeriod = deduplicationPeriod,
+              submissionId = submissionId,
+              minLedgerTimeAbs = minLedgerTimeAbs,
+              readAs = readAs,
+              disclosedContracts = protoDisclosedContracts,
+              userId = userId,
+              userPackageSelectionPreference = userPackageSelectionPreference,
+              tapsMaxPasses = tapsMaxPasses,
+            )
+          }
+
           def submit(
               actAs: ExternalParty, // TODO(#27461) Support multiple submitting parties
               commands: Seq[javab.data.Command],
@@ -2730,6 +3204,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               userId: String = userId,
               userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
               includeCreatedEventBlob: Boolean = false,
+              tapsMaxPasses: Option[Int] = None,
+              customEventFormat: Option[EventFormat] = None,
           ): Transaction = {
             val protoCommands = commands.map(_.toProtoCommand).map(Command.fromJavaProto)
             val protoDisclosedContracts =
@@ -2749,6 +3225,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               userId = userId,
               userPackageSelectionPreference = userPackageSelectionPreference,
               includeCreatedEventBlob = includeCreatedEventBlob,
+              tapsMaxPasses = tapsMaxPasses,
+              customEventFormat = customEventFormat,
             )
 
             javab.data.Transaction.fromProto(ApiTransaction.toJavaProto(tx))
@@ -2766,11 +3244,15 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         @Help.Description(
           """This function connects to the update stream for the given parties and collects updates
             |until either `completeAfter` updates have been received or `timeout` has elapsed.
-            |The returned updates can be filtered to be between the given offsets (default: no filtering).
-            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error.
+            |
+            |The returned updates can be filtered to be between the given offsets (default: no
+            |filtering).
+            |
+            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+            |the pruning offset, this command fails with a `NOT_FOUND` error.
             |If the beginOffset is zero then the participant begin is taken as beginning offset.
-            |If the endOffset is None then a continuous stream is returned."""
+            |If the endOffset is None then a continuous stream is returned.
+            """
         )
         def updates(
             updateFormat: UpdateFormat,
@@ -2817,12 +3299,17 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         @Help.Description(
           """This function connects to the update stream for the given parties and collects updates
             |until either `completeAfter` transactions have been received or `timeout` has elapsed.
-            |The returned updates can be filtered to be between the given offsets (default: no filtering).
-            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-            |including create event blobs for explicit disclosure, consider using `tx_with_tx_format`.
+            |
+            |The returned updates can be filtered to be between the given offsets (default: no
+            |filtering).
+            |
+            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+            |the pruning offset, this command fails with a `NOT_FOUND` error. If you need to specify
+            |filtering conditions for template IDs and including create event blobs for explicit
+            |disclosure, consider using `tx_with_tx_format`.
             |If the beginOffset is zero then the participant begin is taken as beginning offset.
-            |If the endOffset is None then a continuous stream is returned."""
+            |If the endOffset is None then a continuous stream is returned.
+            """
         )
         def transactions(
             partyIds: Set[Party],
@@ -2858,14 +3345,19 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           "Get transactions in the format expected by the Java bindings"
         )
         @Help.Description(
-          """This function connects to the update stream for the given transaction format and collects updates
-            |until either `completeAfter` transactions have been received or `timeout` has elapsed.
-            |The returned transactions can be filtered to be between the given offsets (default: no filtering).
-            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-            |`flat` or `trees` instead.
+          """This function connects to the update stream for the given transaction format and collects
+            |updates until either `completeAfter` transactions have been received or `timeout` has
+            |elapsed.
+            |
+            |The returned transactions can be filtered to be between the given offsets (default: no
+            |filtering).
+            |
+            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than
+            |the pruning offset, this command fails with a `NOT_FOUND` error. If you only need to
+            |filter by a set of parties, consider using `flat` or `trees` instead.
             |If the beginOffset is zero then the participant begin is taken as beginning offset.
-            |If the endOffset is None then a continuous stream is returned."""
+            |If the endOffset is None then a continuous stream is returned.
+            """
         )
         def transactions_with_tx_format(
             transactionFormat: TransactionFormat,
@@ -2919,14 +3411,21 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           @Help.Description(
             """This function can be used for contracts with a code-generated Java model.
               |You can refine your search using the `filter` function argument.
-              |You can restrict search to a synchronizer by specifying the optional synchronizer id.
-              |The command will wait until the contract appears or throw an exception once it times out."""
+              |You can restrict search to a synchronizer by specifying the optional synchronizer ID.
+              |The command will wait until the contract appears or throw an exception once it times out.
+              |Optionally, an `UnknownTrailingFieldPolicy` can be specified to control how unknown
+              |trailing fields in the contract payload are handled during decoding.
+              """
           )
           def await[
               TC <: javab.data.codegen.Contract[TCid, T],
               TCid <: javab.data.codegen.ContractId[T],
               T <: javab.data.Template,
-          ](companion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
+          ](
+              companion: javab.data.codegen.ContractCompanion[TC, TCid, T],
+              unknownTrailingFieldPolicy: javab.data.codegen.UnknownTrailingFieldPolicy =
+                javab.data.codegen.UnknownTrailingFieldPolicy.STRICT,
+          )(
               partyId: Party,
               predicate: TC => Boolean = (_: TC) => true,
               synchronizerFilter: Option[SynchronizerId] = None,
@@ -2934,7 +3433,12 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           ): TC = {
             val result = new AtomicReference[Option[TC]](None)
             ConsoleMacros.utils.retry_until_true(timeout) {
-              val tmp = filter(companion)(partyId, predicate, synchronizerFilter)
+              val tmp =
+                filter(companion, unknownTrailingFieldPolicy)(
+                  partyId,
+                  predicate,
+                  synchronizerFilter,
+                )
               result.set(tmp.headOption)
               tmp.nonEmpty
             }
@@ -2953,13 +3457,20 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           @Help.Description(
             """To use this function, ensure a code-generated Java model for the target template exists.
               |You can refine your search using the `predicate` function argument.
-              |You can restrict search to a synchronizer by specifying the optional synchronizer id."""
+              |You can restrict search to a synchronizer by specifying the optional synchronizer ID.
+              |Optionally, an `UnknownTrailingFieldPolicy` can be specified to control how unknown
+              |trailing fields in the contract payload are handled during decoding.
+              """
           )
           def filter[
               TC <: javab.data.codegen.Contract[TCid, T],
               TCid <: javab.data.codegen.ContractId[T],
               T <: javab.data.Template,
-          ](templateCompanion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
+          ](
+              templateCompanion: javab.data.codegen.ContractCompanion[TC, TCid, T],
+              unknownTrailingFieldPolicy: javab.data.codegen.UnknownTrailingFieldPolicy =
+                javab.data.codegen.UnknownTrailingFieldPolicy.STRICT,
+          )(
               partyId: Party,
               predicate: TC => Boolean = (_: TC) => true,
               synchronizerFilter: Option[SynchronizerId] = None,
@@ -2977,7 +3488,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               .collect { case entry if synchronizerPredicate(entry) => entry.event }
               .flatMap { ev =>
                 JavaDecodeUtil
-                  .decodeCreated(templateCompanion)(
+                  .decodeCreated(templateCompanion, unknownTrailingFieldPolicy)(
                     javab.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(ev))
                   )
                   .toList
@@ -2991,14 +3502,19 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Group("EventQuery")
       object event_query extends Helpful {
 
-        @Help.Summary("Get events in java codegen by contract Id")
-        @Help.Description("""Return events associated with the given contract Id""")
+        @Help.Summary("Get events in Java codegen by contract ID")
+        @Help.Description(
+          """Return events associated with the given contract ID.
+            |If `requestingParties` is empty, events are fetched for all parties.
+            |Otherwise the query is restricted to the provided reader parties."""
+        )
         def by_contract_id(
             contractId: String,
             requestingParties: Seq[Party],
+            includeCreatedEventBlob: Boolean = false,
         ): com.daml.ledger.api.v2.EventQueryServiceOuterClass.GetEventsByContractIdResponse =
           ledger_api.event_query
-            .by_contract_id(contractId, requestingParties)
+            .by_contract_id(contractId, requestingParties, includeCreatedEventBlob)
             .pipe(GetEventsByContractIdResponse.toJavaProto)
       }
     }

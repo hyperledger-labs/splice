@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -17,7 +17,7 @@ import com.digitalasset.canton.sequencing.{
   ApplicationHandler,
   HandlerResult,
   TracedProtocolEvent,
-  UnsignedEnvelopeBox,
+  UnthrottledAsync,
   WithCounter,
 }
 import com.digitalasset.canton.topology.DefaultTestIdentities.*
@@ -33,7 +33,7 @@ import org.mockito.ArgumentMatchers.eq as isEq
 
 import java.util.UUID
 
-class MediatorEventProcessorTest
+final class MediatorEventProcessorTest
     extends BaseTestWordSpec
     with HasExecutionContext
     with HasTestCloseContext {
@@ -59,8 +59,8 @@ class MediatorEventProcessorTest
     )
 
     val processor = new MediatorEventsProcessor(
-      identityClientEventHandler =
-        ApplicationHandler.success[UnsignedEnvelopeBox, DefaultOpenEnvelope](),
+      identityClientEventHandler = ApplicationHandler.success(UnthrottledAsync.immediate),
+      lsuSequencingTestMessageHandler = ApplicationHandler.success(UnthrottledAsync.immediate),
       eventHandler,
       deduplicator,
       loggerFactory,
@@ -199,7 +199,7 @@ class MediatorEventProcessorTest
       )
 
       loggerFactory.assertLogs(
-        processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS,
+        processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS.future.futureValueUS,
         _.shouldBeCantonError(
           MediatorError.MalformedMessage.code,
           _ should include(
@@ -221,7 +221,7 @@ class MediatorEventProcessorTest
       )
 
       loggerFactory.assertLogs(
-        processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS,
+        processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS.future.futureValueUS,
         _.shouldBeCantonError(
           MediatorError.MalformedMessage.code,
           _ should include(
@@ -239,7 +239,7 @@ class MediatorEventProcessorTest
       val envelopes = Seq(response, response, response)
       val event = mkEvent(ts(0), envelopes*)
 
-      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS
+      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS.future.futureValueUS
 
       verifyZeroInteractions(deduplicator)
       verify(handler, times(3)).handleMediatorEvent(any[MediatorEvent.Response])(
@@ -252,7 +252,7 @@ class MediatorEventProcessorTest
       val (processor, deduplicator, handler) = mkEventProcessor()
       val event = mkEvent(ts(0))
 
-      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS
+      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS.future.futureValueUS
 
       verify(handler).observeTimestampWithoutEvent(isEq(ts(0)))(isEq(event.traceContext))
       verifyNoMoreInteractions(deduplicator, handler)
@@ -262,7 +262,7 @@ class MediatorEventProcessorTest
       val (processor, deduplicator, handler) = mkEventProcessor(isUniqueDeduplicationResult = false)
       val event = mkEvent(ts(0), request(0))
 
-      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS
+      processor.handle(Seq(event)).futureValueUS.unwrap.futureValueUS.future.futureValueUS
 
       verify(deduplicator).rejectDuplicate(
         isEq(ts(0)),
@@ -291,7 +291,13 @@ class MediatorEventProcessorTest
         )(isEq(event2.traceContext), any[CloseContext])
       )
         .thenReturn(FutureUnlessShutdown.pure(false -> FutureUnlessShutdown.unit))
-      processor.handle(Seq(event1, event2, event3)).futureValueUS.unwrap.futureValueUS
+      processor
+        .handle(Seq(event1, event2, event3))
+        .futureValueUS
+        .unwrap
+        .futureValueUS
+        .future
+        .futureValueUS
 
       // check that the deduplication check was executed
       verify(deduplicator).rejectDuplicate(
@@ -363,7 +369,13 @@ class MediatorEventProcessorTest
         ),
       )
 
-      processor.handle(Seq(event1, event2, event3)).futureValueUS.unwrap.futureValueUS
+      processor
+        .handle(Seq(event1, event2, event3))
+        .futureValueUS
+        .unwrap
+        .futureValueUS
+        .future
+        .futureValueUS
 
       // check that the deduplication check was executed
       verify(deduplicator).rejectDuplicate(

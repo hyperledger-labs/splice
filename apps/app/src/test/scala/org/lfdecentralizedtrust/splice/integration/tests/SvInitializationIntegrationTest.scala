@@ -14,10 +14,13 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_24
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   override protected def runEventHistorySanityCheck: Boolean = false
@@ -110,7 +113,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     // Increase the decentralized namespace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
     // do this by falsely adding the sequencer namespace to the decentralized namespace
     val sv1SequencerAdminConnection =
-      sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
+      sv1Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection
     val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
     val newDecentralizedNamespace = MonadUtil
       .parTraverseWithLimit(PositiveInt.tryCreate(4))(
@@ -136,24 +139,50 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     try {
       startSv(4, sv4Backend, sv4ValidatorBackend, sv4ScanBackend)
 
+      def nodeStates = {
+        val rulesAndState =
+          sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
+        rulesAndState.svNodeStates.values
+          .map(
+            _.payload.state.synchronizerNodes
+              .get(decentralizedSynchronizerId.toProtoPrimitive)
+          )
+      }
+
       clue("All SVs have reported their Scan URLs in DSO rules") {
         eventually() {
-          val rulesAndState =
-            sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
-          rulesAndState.svNodeStates.values
-            .flatMap(
-              _.payload.state.synchronizerNodes
-                .get(decentralizedSynchronizerId.toProtoPrimitive)
-                .scan
-                .toScala
-            )
-            .map(_.publicUrl) should contain theSameElementsAs Seq(
+          nodeStates.flatMap(_.scan.toScala.map(_.publicUrl)) should contain theSameElementsAs Seq(
             "http://localhost:5012",
             "http://localhost:5112",
             "http://localhost:5212",
             "http://localhost:5312",
           )
         }
+      }
+
+      clue("physical synchronizers configs are set") {
+        val allPhysicalConfigs = nodeStates.flatMap(_.physicalSynchronizers.toScala.value.asScala)
+        allPhysicalConfigs.size shouldBe 4
+        allPhysicalConfigs.map(_._1).toSeq.distinct.loneElement shouldBe java.lang.Long.valueOf(0)
+        val configs = allPhysicalConfigs.map(_._2)
+        configs.map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+          "http://localhost:5108",
+          "http://localhost:5208",
+          "http://localhost:5308",
+          "http://localhost:5408",
+        )
+      }
+      clue("backwards compatible synchronizers configs is set") {
+        val allSequencerConfigs = nodeStates.map(_.sequencer.toScala.value)
+        allSequencerConfigs.size shouldBe 4
+        allSequencerConfigs.map(_.migrationId).toSeq.distinct.loneElement shouldBe java.lang.Long
+          .valueOf(0)
+        allSequencerConfigs.map(_.url) should contain theSameElementsAs Seq(
+          "http://localhost:5108",
+          "http://localhost:5208",
+          "http://localhost:5308",
+          "http://localhost:5408",
+        )
       }
     } finally {
       // Remove the sequencer again, otherwise the logic for resetting the namespace to only contain
@@ -178,6 +207,18 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         .futureValue
         .headOption
         .value
+
+      // Ensure that it's actually gone to avoid races in the ResetDecentralizedNamespace plugin
+      // where the topology is submitted to all but has not yet gone through
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.topology.decentralized_namespaces
+          .list(TopologyStoreId.Synchronizer(decentralizedSynchronizerId))
+          .loneElement
+          .item
+          .owners
+          .map(_.fingerprint)
+          .forgetNE should not contain sv1SequencerId.fingerprint
+      }
     }
   }
 

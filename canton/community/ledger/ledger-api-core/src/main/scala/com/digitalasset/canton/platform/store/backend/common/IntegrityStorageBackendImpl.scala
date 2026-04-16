@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -7,9 +7,9 @@ import anorm.SqlParser.{byteArray, int, long, str}
 import anorm.{RowParser, ~}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.platform.store.backend.IntegrityStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.`SimpleSql ops`
+import com.digitalasset.canton.platform.store.backend.{IntegrityStorageBackend, PersistentEventType}
 import com.digitalasset.canton.protocol.UpdateId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.common.annotations.VisibleForTesting
@@ -65,7 +65,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
        AND event_sequential_id <= lapi_parameters.ledger_end_sequential_id
        GROUP BY event_sequential_id
        HAVING count(*) > 1
-       FETCH NEXT #$maxReportedDuplicates ROWS ONLY
+       ${QueryStrategy.limitClause(Some(maxReportedDuplicates))}
        """
 
   private val allEventIds: String =
@@ -85,7 +85,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
        AND event_offset <= lapi_parameters.ledger_end
        GROUP BY event_offset, node_id
        HAVING count(*) > 1
-       FETCH NEXT #$maxReportedDuplicates ROWS ONLY
+       ${QueryStrategy.limitClause(Some(maxReportedDuplicates))}
        """
 
   final case class EventSequentialIdsRow(min: Long, max: Long, count: Long)
@@ -170,7 +170,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
           FROM lapi_update_meta as meta1, lapi_update_meta as meta2
           WHERE meta1.update_id = meta2.update_id and
                 meta1.event_offset != meta2.event_offset
-          FETCH NEXT 1 ROWS ONLY
+          ${QueryStrategy.limitClause(Some(1))}
       """
       .asSingleOpt(updateId("uId") ~ offset("offset1") ~ offset("offset2"))(connection)
       .foreach { case uId ~ offset1 ~ offset2 =>
@@ -185,7 +185,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
           FROM lapi_command_completions
           GROUP BY completion_offset
           HAVING count(*) > 1
-          FETCH NEXT 1 ROWS ONLY
+          ${QueryStrategy.limitClause(Some(1))}
       """
       .asSingleOpt(offset("completion_offset") ~ int("offset_count"))(connection)
       .foreach { case offset ~ count =>
@@ -288,6 +288,63 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         )
       )
 
+    val filterTableName = "lapi_filter_achs_stakeholder"
+
+    // Verify no duplicate filter table entry
+    val filterTableEntries: Vector[(Long, Int)] = SQL"""
+        select
+          event_sequential_id, count(*) as count
+        from #$filterTableName
+        group by event_sequential_id, template_id, party_id
+        having count(*) > 1
+        ${QueryStrategy.limitClause(Some(maxReportedDuplicates))}
+    """
+      .asVectorOf(long("event_sequential_id") ~ int("count") map { case eventSeqId ~ count =>
+        (eventSeqId, count)
+      })(connection)
+    // duplicate filter table entries
+    filterTableEntries
+      .foreach { case (eventSeqId, count) =>
+        throw new RuntimeException(
+          s"duplicate entries found ($count in total) in filter table $filterTableName at event sequential id $eventSeqId"
+        )
+      }
+
+    // Verify all fields in lapi_filter_achs_stakeholder are also in lapi_filter_activate_stakeholder
+    val invalidEntries = SQL"""
+        select event_sequential_id
+        from lapi_filter_achs_stakeholder achs
+        where not exists (
+          select 1
+          from lapi_filter_activate_stakeholder activate
+          where achs.event_sequential_id = activate.event_sequential_id
+            and achs.template_id = activate.template_id
+            and achs.party_id = activate.party_id
+        )
+        order by event_sequential_id
+        ${QueryStrategy.limitClause(Some(maxReportedDuplicates))}
+      """.asVectorOf(long("event_sequential_id"))(connection)
+
+    if (invalidEntries.nonEmpty) {
+      throw new RuntimeException(
+        "lapi_filter_achs_stakeholder contains entries not present in lapi_filter_activate_stakeholder at event " +
+          s"sequential ids (first $maxReportedDuplicates shown): ${invalidEntries.mkString(", ")}"
+      )
+    }
+
+    // verify lapi_achs_state contains at most one row
+    val lapiAchsStateRowCount = SQL"""
+          select count(*) as count
+          from lapi_achs_state
+        """
+      .asSingle(int("count"))(connection)
+
+    if (lapiAchsStateRowCount > 1) {
+      throw new RuntimeException(
+        s"lapi_achs_state table contains more than one row: $lapiAchsStateRowCount rows found"
+      )
+    }
+
     // Verify no duplicate completion entry
     val internalContractIds = SQL"""
           SELECT
@@ -307,13 +364,14 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         s"duplicate internal_contract_id-s found in table par_contracts (first 10 shown) $firstTenDuplicatedInternalIds"
       )
 
-    val pruning_started_up_to_inclusive =
-      SQL"""SELECT started_up_to_inclusive FROM par_pruning_operation
-          """
-        .asSingleOpt(long("started_up_to_inclusive"))(connection)
-        .getOrElse(-1L)
-
     if (!inMemoryCantonStore) {
+      val pruning_started_up_to_inclusive =
+        SQL"""SELECT started_up_to_inclusive FROM par_pruning_operation
+          """
+          .asSingleOpt(long("started_up_to_inclusive").?)(connection)
+          .flatten
+          .getOrElse(-1L)
+
       val referencedInternalContractIdsWithOffset = SQL"""
               SELECT internal_contract_id, event_offset
               FROM lapi_events_activate_contract
@@ -368,7 +426,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         )
         AND lapi_parameters.ledger_end is not null
         AND event_offset <= lapi_parameters.ledger_end
-    """
+      """
         .asVectorOf(
           long("lapi_events_deactivate_contract.deactivated_event_sequential_id") ~ long(
             "event_offset"
@@ -457,6 +515,68 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
             .take(10)
             .mkString("[", ", ", "]")}"
       )
+
+    val lapi_pruning_started_up_to_inclusive =
+      SQL"""SELECT participant_pruned_up_to_inclusive FROM lapi_parameters"""
+        .asSingleOpt(long("participant_pruned_up_to_inclusive").?)(connection)
+        .flatten
+        .getOrElse(-1L)
+
+    val witnessedShouldHavePruned =
+      SQL"""
+        SELECT event_offset
+        FROM lapi_events_various_witnessed
+        WHERE event_offset <= $lapi_pruning_started_up_to_inclusive
+      """
+        .asVectorOf(long("event_offset"))(connection)
+        .sorted
+    if (witnessedShouldHavePruned.nonEmpty)
+      throw new RuntimeException(
+        s"some events in various_witnessed have not been pruned, offsets (first 10 shown) ${witnessedShouldHavePruned
+            .take(10)
+            .mkString("[", ", ", "]")}"
+      )
+
+    val activateShouldHavePruned =
+      SQL"""
+        SELECT event_offset
+        FROM lapi_events_activate_contract
+        WHERE event_offset <= $lapi_pruning_started_up_to_inclusive
+        AND EXISTS (
+          SELECT 1
+          FROM lapi_events_deactivate_contract
+          WHERE lapi_events_deactivate_contract.deactivated_event_sequential_id = lapi_events_activate_contract.event_sequential_id
+          AND lapi_events_deactivate_contract.event_offset <= $lapi_pruning_started_up_to_inclusive
+          AND lapi_events_activate_contract.event_type <> ${PersistentEventType.Assign.asInt}
+          AND lapi_events_deactivate_contract.event_type <> ${PersistentEventType.Unassign.asInt}
+        )
+      """
+        .asVectorOf(long("event_offset"))(connection)
+        .sorted
+
+    if (activateShouldHavePruned.nonEmpty)
+      throw new RuntimeException(
+        s"some events in activate have not been pruned, offsets (first 10 shown) ${activateShouldHavePruned
+            .take(10)
+            .mkString("[", ", ", "]")}"
+      )
+
+    val deactivateShouldHavePruned =
+      SQL"""
+        SELECT event_offset
+        FROM lapi_events_deactivate_contract
+        WHERE event_offset < $lapi_pruning_started_up_to_inclusive
+        AND deactivated_event_sequential_id IS NULL
+      """
+        .asVectorOf(long("event_offset"))(connection)
+        .sorted
+
+    if (deactivateShouldHavePruned.nonEmpty)
+      throw new RuntimeException(
+        s"some events in deactivate have not been pruned, offsets (first 10 shown) ${deactivateShouldHavePruned
+            .take(10)
+            .mkString("[", ", ", "]")}"
+      )
   } catch {
     case t: Throwable if !failForEmptyDB =>
       val failure = t.getMessage
@@ -501,6 +621,12 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
     SQL"DELETE FROM lapi_ledger_end_synchronizer_index".executeUpdate()(connection).discard
     SQL"DELETE FROM par_command_deduplication".executeUpdate()(connection).discard
     SQL"DELETE FROM par_in_flight_submission".executeUpdate()(connection).discard
+    // clean these tables manually, as the ledger_end=1 is an actual ledger-end, and as these tables are cleaned by
+    // initialization based on offsets, some rubbish can remains (which can cause problems for example for integrity
+    // checking which motivated this change)
+    SQL"DELETE FROM lapi_command_completions".executeUpdate()(connection).discard
+    SQL"DELETE FROM lapi_party_entries".executeUpdate()(connection).discard
+    SQL"DELETE FROM lapi_update_meta".executeUpdate()(connection).discard
   }
 
   private final case class CompletionEntry(

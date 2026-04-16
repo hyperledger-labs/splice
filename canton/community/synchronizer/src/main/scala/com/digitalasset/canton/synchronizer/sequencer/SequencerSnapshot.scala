@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -15,6 +15,7 @@ import com.digitalasset.canton.sequencing.traffic.{TrafficConsumed, TrafficPurch
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
+import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregations
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.*
@@ -242,6 +243,7 @@ final case class SequencerInitialState(
     //  even though this should not happen during a normal protocol run.
     latestSequencerEventTimestamp: Option[CantonTimestamp],
     initialTopologyEffectiveTimestamp: Option[CantonTimestamp],
+    latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
 )
 
 object SequencerInitialState {
@@ -249,6 +251,7 @@ object SequencerInitialState {
       synchronizerId: PhysicalSynchronizerId,
       snapshot: SequencerSnapshot,
       times: SeqView[(CantonTimestamp, CantonTimestamp)],
+      latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
   ): SequencerInitialState = {
     // TODO(#14504) Update since we now also need to look at top-ups
     /* Take the sequencing time of the last topology update for the latest topology client timestamp.
@@ -267,6 +270,7 @@ object SequencerInitialState {
       snapshot,
       sequencedTimes.maxOption,
       effectiveTimes.maxOption,
+      latestPendingTopologyTransactionTimestamp,
     )
   }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
@@ -15,6 +15,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.ExecutionContext
 
 object LedgerApiServerInternals {
@@ -31,7 +32,8 @@ object LedgerApiServerInternals {
       mutableLedgerEndCache: MutableLedgerEndCache,
       stringInterningView: StringInterningView,
   )(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      scheduler: ScheduledExecutorService,
   ): ResourceOwner[(InMemoryState, InMemoryStateUpdater.UpdaterFlow)] =
     for {
       inMemoryState <- InMemoryState.owner(
@@ -53,8 +55,6 @@ object LedgerApiServerInternals {
       inMemoryStateUpdater <- InMemoryStateUpdater.owner(
         inMemoryState = inMemoryState,
         prepareUpdatesParallelism = indexServiceConfig.inMemoryStateUpdaterParallelism,
-        preparePackageMetadataTimeOutWarning =
-          indexServiceConfig.preparePackageMetadataTimeOutWarning.underlying,
         offsetCheckpointCacheUpdateInterval =
           indexServiceConfig.offsetCheckpointCacheUpdateInterval.underlying,
         metrics = metrics,

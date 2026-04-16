@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import cats.data.EitherT
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.admin.package_management_service.{
   PackageManagementServiceGrpc,
   UploadDarFileRequest,
@@ -12,13 +11,14 @@ import com.daml.ledger.api.v2.admin.package_management_service.{
   ValidateDarFileResponse,
 }
 import com.daml.nonempty.NonEmpty
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.tracing.DefaultOpenTelemetry
 import com.daml.tracing.TelemetrySpecBase.*
 import com.digitalasset.base.error.ErrorsAssertions
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
-import com.digitalasset.canton.ledger.api.health.HealthStatus
+import com.digitalasset.canton.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
   EnrichedVettedPackages,
   ListVettedPackagesOpts,
@@ -46,16 +46,17 @@ import com.digitalasset.canton.protocol.{
   LfSubmittedTransaction,
   LfVersionedTransaction,
 }
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   ExternalPartyOnboardingDetails,
   ParticipantId,
+  PartyId,
   PhysicalSynchronizerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, LfKeyResolver, LfPackageId, LfPartyId}
 import com.digitalasset.daml.lf.data.Ref.{CommandId, Party, SubmissionId, UserId, WorkflowId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
@@ -70,7 +71,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level.DEBUG
 
-import java.util.concurrent.CompletionStage
 import scala.concurrent.Future
 
 // TODO(#17635) Very thin layer. Revisit utility of testing
@@ -223,7 +223,7 @@ object ApiPackageManagementServiceSpec {
         processedDisclosedContracts: ImmArray[LfFatContractInst],
     )(implicit
         traceContext: TraceContext
-    ): CompletionStage[SubmissionResult] =
+    ): Future[SubmissionResult] =
       throw new UnsupportedOperationException()
 
     override def submitReassignment(
@@ -233,11 +233,11 @@ object ApiPackageManagementServiceSpec {
         submissionId: Option[SubmissionId],
         workflowId: Option[WorkflowId],
         reassignmentCommands: Seq[ReassignmentCommand],
-    )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] =
+    )(implicit traceContext: TraceContext): Future[SubmissionResult] =
       throw new UnsupportedOperationException()
 
     override def allocateParty(
-        hint: Party,
+        partyId: PartyId,
         submissionId: SubmissionId,
         synchronizerIdO: Option[SynchronizerId],
         externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
@@ -247,7 +247,8 @@ object ApiPackageManagementServiceSpec {
     override def prune(
         pruneUpToInclusive: Offset,
         submissionId: SubmissionId,
-    ): CompletionStage[PruningResult] =
+        safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
+    ): Future[PruningResult] =
       throw new UnsupportedOperationException()
 
     override def computePartyVettingMap(
@@ -288,7 +289,7 @@ object ApiPackageManagementServiceSpec {
 
     override def getRoutingSynchronizerState(implicit
         traceContext: TraceContext
-    ): RoutingSynchronizerState =
+    ): FutureUnlessShutdown[RoutingSynchronizerState] =
       throw new UnsupportedOperationException()
 
     override def estimateTrafficCost(
@@ -318,9 +319,9 @@ object ApiPackageManagementServiceSpec {
     ): Future[(Option[EnrichedVettedPackages], Option[EnrichedVettedPackages])] =
       throw new UnsupportedOperationException()
 
-    override def protocolVersionForSynchronizerId(
+    override def physicalSynchronizerIdForSynchronizerId(
         synchronizerId: SynchronizerId
-    ): Option[ProtocolVersion] =
+    ): Option[PhysicalSynchronizerId] =
       throw new UnsupportedOperationException()
 
     override def participantId: ParticipantId = DefaultTestIdentities.participant1

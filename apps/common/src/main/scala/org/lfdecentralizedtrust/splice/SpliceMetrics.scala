@@ -26,8 +26,6 @@ trait SpliceMetrics extends BaseMetrics {
 
   // Not used by splice
   override def grpcMetrics: GrpcServerMetricsX = ???
-  // Not used by splice
-  override def declarativeApiMetrics: DeclarativeApiMetrics = ???
 }
 
 abstract class BaseSpliceMetrics(
@@ -40,6 +38,11 @@ abstract class BaseSpliceMetrics(
   override val prefix = MetricName(nodeType)
 
   private implicit val mc: MetricsContext = MetricsContext.Empty
+  // Not used by splice
+  override val declarativeApiMetrics: DeclarativeApiMetrics = new DeclarativeApiMetrics(
+    prefix,
+    openTelemetryMetricsFactory,
+  )
 
   override def grpcClientMetrics: GrpcClientMetrics =
     new DamlGrpcClientMetrics(openTelemetryMetricsFactory, component = nodeType)

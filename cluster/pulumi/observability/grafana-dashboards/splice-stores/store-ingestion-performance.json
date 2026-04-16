@@ -1,0 +1,269 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "repeat": "test",
+      "repeatDirection": "h",
+      "title": "$test",
+      "type": "row"
+    },
+    {
+      "title": "Total Items",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_items{test=\"${test}\"}",
+          "legendFormat": "Total Items",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total Batches",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_batches{test=\"${test}\"}",
+          "legendFormat": "Total Batches",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_time_ns{test=\"${test}\"} / 1e9",
+          "legendFormat": "Total Time (s)",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Avg Item Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_avg_item_time_ns{test=\"${test}\"} / 1e6",
+          "legendFormat": "Avg Item Time (ms)",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "CPU-to-Wall-Clock Ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 0.5 },
+              { "color": "orange", "value": 1.0 },
+              { "color": "red", "value": 2.0 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_cpu_to_wall_clock_ratio{test=\"${test}\"}",
+          "legendFormat": "CPU/Wall-clock Ratio (>0.7: CPU-bound, 0.7~0.25: balanced, <0.25:I/O-bound)",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Peak Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-purple" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_peak_heap_bytes{test=\"${test}\"}",
+          "legendFormat": "Peak Heap",
+          "range": true, "refId": "A"
+        }
+      ]
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(splice_perf_ingestion_total_items, test)",
+        "hide": 2,
+        "includeAll": true,
+        "multi": true,
+        "name": "test",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(splice_perf_ingestion_total_items, test)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Store Ingestion Performance",
+  "uid": "splice-perf-ingestion",
+  "version": 1,
+  "weekStart": ""
+}

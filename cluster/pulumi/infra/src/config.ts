@@ -18,72 +18,6 @@ export const clusterBaseDomain = clusterHostname.split('.')[0];
 
 export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 
-const MonitoringConfigSchema = z
-  .object({
-    alerting: z.object({
-      enableNoDataAlerts: z.boolean(),
-      alerts: z.object({
-        pruning: z.object({
-          participantRetentionDays: z.number(),
-          sequencerRetentionDays: z.number(),
-          mediatorRetentionDays: z.number(),
-        }),
-        ingestion: z.object({
-          thresholdEntriesPerBatch: z.number(),
-        }),
-        delegatelessContention: z.object({
-          thresholdPerNamespace: z.number(),
-        }),
-        trafficWaste: z.object({
-          kilobytes: z.number(),
-          overMinutes: z.number(),
-          quantile: z.number(),
-        }),
-        confirmationRequests: z.object({
-          total: z.object({
-            rate: z.number(),
-            overMinutes: z.number(),
-          }),
-        }),
-        cloudSql: z.object({
-          maintenance: z.boolean(),
-        }),
-        cometbft: z.object({
-          expectedMaxBlocksPerSecond: z.number(),
-        }),
-        loadTester: z.object({
-          minRate: z.number(),
-        }),
-        svNames: z.array(z.string()).default([]),
-        mediators: z.object({
-          acknowledgementLagSeconds: z.number(),
-        }),
-        deployment: z.object({
-          pendingPeriodMinutes: z.number(),
-        }),
-        sequencerClientDelay: z.object({
-          seconds: z.number(),
-        }),
-        acsCommitments: z.object({
-          checkpointDelay: z.object({
-            seconds: z.number(),
-          }),
-          completedDelay: z.object({
-            seconds: z.number(),
-          }),
-        }),
-        sequencerRateLimits: z.object({
-          rejectionRateThreshold: z.number(),
-          circuitBreakerStateThreshold: z.number(),
-        }),
-        // so existing overrides don't break
-        gcpQuotas: z.object({ enabled: z.literal(true) }).optional(),
-      }),
-      logAlerts: z.object({}).catchall(z.string()).default({}),
-      loggedSecretsFilter: z.string().optional(),
-    }),
-  })
-  .strict();
 const CloudArmorConfigSchema = z.object({
   enabled: z.boolean(),
   // "preview" is not pulumi preview, but https://cloud.google.com/armor/docs/security-policy-overview#preview_mode
@@ -114,12 +48,6 @@ export const InfraConfigSchema = z.object({
       })
       .optional(),
     enableGCReaperJob: z.boolean().default(false),
-    prometheus: z.object({
-      storageSize: z.string(),
-      retentionDuration: z.string(),
-      retentionSize: z.string(),
-      installPrometheusPushgateway: z.boolean().default(false),
-    }),
     gkeGateway: z.object({
       proxyForIstioHttp: z.boolean(),
     }),
@@ -130,7 +58,6 @@ export const InfraConfigSchema = z.object({
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
-  monitoring: MonitoringConfigSchema,
   cloudArmor: CloudArmorConfigSchema,
 });
 
@@ -150,7 +77,6 @@ console.error(
 );
 
 export const infraConfig = fullConfig.infra;
-export const monitoringConfig = fullConfig.monitoring;
 export const cloudArmorConfig: CloudArmorConfig = fullConfig.cloudArmor;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];

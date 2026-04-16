@@ -1,16 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.authentication.grpc
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
-import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protobuf.{Hello, HelloServiceGrpc}
 import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationToken,
@@ -63,7 +60,10 @@ class SequencerClientAuthenticationTest extends FixtureAsyncWordSpec with BaseTe
       new AuthenticationTokenManager(
         (_: TraceContext) =>
           EitherT.pure[FutureUnlessShutdown, Status](
-            AuthenticationTokenWithExpiry(clientNextTokenRefresh.get(), CantonTimestamp.Epoch)
+            AuthenticationTokenWithExpiry(
+              clientNextTokenRefresh.get(),
+              CantonTimestamp.ofEpochSecond(100),
+            )
           ),
         false,
         AuthenticationTokenManagerConfig(),
@@ -84,9 +84,13 @@ class SequencerClientAuthenticationTest extends FixtureAsyncWordSpec with BaseTe
         logger,
         "auth-test-client-channel",
       )
-    val managers = NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(10)) -> tokenManager).toMap
     val clientAuthentication =
-      new SequencerClientTokenAuthentication(synchronizerId, participantId, managers, loggerFactory)
+      new SequencerClientTokenAuthentication(
+        synchronizerId,
+        participantId,
+        tokenManager,
+        loggerFactory,
+      )
     val client = HelloServiceGrpc
       .stub(clientChannel.channel)
       .withInterceptors(clientAuthentication.reauthorizationInterceptor)

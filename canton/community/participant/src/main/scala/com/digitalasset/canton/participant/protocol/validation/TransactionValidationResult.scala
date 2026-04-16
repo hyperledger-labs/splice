@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -39,6 +39,7 @@ final case class TransactionValidationResult(
     hostedWitnesses: Set[LfPartyId],
     replayCheckResult: Option[String],
     validatedExternalTransactionHash: Option[Hash],
+    commitAfterFailedActivenessCheck: Boolean,
 ) {
 
   def commitSet(
@@ -50,5 +51,6 @@ final case class TransactionValidationResult(
       consumedInputsOfHostedParties,
       transient,
       createdContracts,
+      commitAfterFailedActivenessCheck,
     )
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.traffic
@@ -77,7 +77,9 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
         SignedProtocolMessage
           .trySignAndCreate(
             setTrafficPurchased,
-            synchronizerCrypto.currentSnapshotApproximation,
+            synchronizerCrypto.currentSnapshotApproximation.futureValueUS,
+            signingTimestampOverrides =
+              None, // not needed for unit tests; session signing keys disabled
           )
           .failOnShutdown
           .futureValue
@@ -155,7 +157,7 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
 
       val (tcp, observedTs, updates) = mkTrafficProcessor()
 
-      tcp(events).futureValueUS.unwrap.futureValueUS
+      tcp(events).futureValueUS.unwrap.futureValueUS.future.futureValueUS
 
       observedTs.get().result() shouldBe Seq(ts1, ts2, ts3)
       updates.get().result() shouldBe Seq.empty

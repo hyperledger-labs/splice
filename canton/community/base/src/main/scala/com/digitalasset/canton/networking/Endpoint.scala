@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking
@@ -9,24 +9,18 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
-import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import io.grpc.Attributes
 
 import java.net.URI
 
 /** Networking endpoint where host could be a hostname or ip address. */
-final case class Endpoint(host: String, port: Port) extends UniformCantonConfigValidation {
+final case class Endpoint(host: String, port: Port) {
   override def toString: String = s"$host:$port"
 
   def toURI(useTls: Boolean) = new URI(s"${if (useTls) "https" else "http"}://$toString")
 }
 
 object Endpoint {
-  implicit val endpointCantonConfigValidator: CantonConfigValidator[Endpoint] = {
-    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[Endpoint]
-  }
 
   implicit val endpointOrdering: Ordering[Endpoint] =
     Ordering.by(_.toString)
@@ -44,7 +38,7 @@ object Endpoint {
     */
   def fromUris(
       connections: NonEmpty[Seq[URI]]
-  ): Either[String, (NonEmpty[Seq[Endpoint]], Boolean)] =
+  ): Either[String, (NonEmpty[Set[Endpoint]], Boolean)] =
     for {
       endpointsWithTlsFlag <- connections.toNEF.traverse(fromUri)
       (endpoints, tlsFlags) = (endpointsWithTlsFlag.map(_._1), endpointsWithTlsFlag.map(_._2))
@@ -56,7 +50,7 @@ object Endpoint {
           s"All synchronizer connections must either use TLS or all not use TLS",
         )
       )
-    } yield (endpoints, useTls)
+    } yield (endpoints.toSet, useTls)
 
   private def fromUri(uri: URI): Either[String, (Endpoint, Boolean)] = {
     val (scheme, host, portO) = (

@@ -1,21 +1,16 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.crypto.kms.KmsKeyId
 
 /** Encapsulates possible configurations for different encrypted private stores */
-sealed trait EncryptedPrivateStoreConfig extends UniformCantonConfigValidation {
+sealed trait EncryptedPrivateStoreConfig {
   def reverted: Boolean
 }
 
 object EncryptedPrivateStoreConfig {
-
-  implicit val encryptedPrivateStoreConfigCantonConfigValidator
-      : CantonConfigValidator[EncryptedPrivateStoreConfig] =
-    CantonConfigValidatorDerivation[EncryptedPrivateStoreConfig]
 
   /** Configuration for a KMS encrypted private store
     * @param wrapperKeyId

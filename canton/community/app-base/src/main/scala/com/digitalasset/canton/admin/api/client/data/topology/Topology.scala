@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.data.topology
@@ -353,36 +353,36 @@ object ListSequencerSynchronizerStateResult {
     } yield ListSequencerSynchronizerStateResult(context, item)
 }
 
-final case class ListSynchronizerUpgradeAnnouncementResult(
+final case class ListLsuAnnouncementResult(
     context: BaseResult,
-    item: SynchronizerUpgradeAnnouncement,
-)
+    item: LsuAnnouncement,
+) extends TopologyResult[LsuAnnouncement]
 
-object ListSynchronizerUpgradeAnnouncementResult {
+object ListLsuAnnouncementResult {
   def fromProtoV30(
-      value: v30.ListSynchronizerUpgradeAnnouncementResponse.Result
-  ): ParsingResult[ListSynchronizerUpgradeAnnouncementResult] =
+      value: v30.ListLsuAnnouncementResponse.Result
+  ): ParsingResult[ListLsuAnnouncementResult] =
     for {
       contextProto <- ProtoConverter.required("context", value.context)
       context <- BaseResult.fromProtoV30(contextProto)
       itemProto <- ProtoConverter.required("item", value.item)
-      item <- SynchronizerUpgradeAnnouncement.fromProtoV30(itemProto)
-    } yield ListSynchronizerUpgradeAnnouncementResult(context, item)
+      item <- LsuAnnouncement.fromProtoV30(itemProto)
+    } yield ListLsuAnnouncementResult(context, item)
 }
 
-final case class ListSequencerConnectionSuccessorResult(
+final case class ListLsuSequencerConnectionSuccessorResult(
     context: BaseResult,
-    item: SequencerConnectionSuccessor,
-)
+    item: LsuSequencerConnectionSuccessor,
+) extends TopologyResult[LsuSequencerConnectionSuccessor]
 
-object ListSequencerConnectionSuccessorResult {
+object ListLsuSequencerConnectionSuccessorResult {
   def fromProtoV30(
-      value: v30.ListSequencerConnectionSuccessorResponse.Result
-  ): ParsingResult[ListSequencerConnectionSuccessorResult] =
+      value: v30.ListLsuSequencerConnectionSuccessorResponse.Result
+  ): ParsingResult[ListLsuSequencerConnectionSuccessorResult] =
     for {
       contextProto <- ProtoConverter.required("context", value.context)
       context <- BaseResult.fromProtoV30(contextProto)
       itemProto <- ProtoConverter.required("item", value.item)
-      item <- SequencerConnectionSuccessor.fromProtoV30(itemProto)
-    } yield ListSequencerConnectionSuccessorResult(context, item)
+      item <- LsuSequencerConnectionSuccessor.fromProtoV30(itemProto)
+    } yield ListLsuSequencerConnectionSuccessorResult(context, item)
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.examples
@@ -15,7 +15,7 @@ import com.digitalasset.canton.platform.apiserver.services.command.interactive.c
   PreparedTransactionEncoder,
 }
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.util.{ConcurrentBufferedLogger, HexString, ResourceUtil}
+import com.digitalasset.canton.util.{HexString, ResourceUtil}
 import com.digitalasset.canton.version.{CommonGenerators, HashingSchemeVersion}
 import monocle.macros.syntax.lens.*
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -43,16 +43,6 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
   override protected def additionalConfigTransform: Seq[ConfigTransform] = Seq(
     _.focus(_.parameters.portsFile).replace(Option(portsFiles.pathAsString))
   )
-  private def mkProcessLogger(logErrors: Boolean = true) = new ConcurrentBufferedLogger {
-    override def out(s: => String): Unit = {
-      logger.info(s)
-      super.out(s)
-    }
-    override def err(s: => String): Unit = {
-      if (logErrors) logger.error(s)
-      super.err(s)
-    }
-  }
   private val processLogger = mkProcessLogger()
 
   override def beforeAll(): Unit = {
@@ -99,67 +89,6 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
           participant1.id.uid.toProtoPrimitive,
           "run-demo",
           "-a", // Automatically accept all transactions (by default the script stops to ask users to explicitly confirm)
-        ),
-        cwd = interactiveSubmissionFolder.toJava,
-      ),
-      processLogger,
-    )
-  }
-
-  "run the multi-hosted external party onboarding demo" in { implicit env =>
-    import env.*
-    runScript(interactiveSubmissionFolder / "multi-hosted.canton")(environment)
-    environment.writePortsFile()
-
-    val privateKeyFile = File.newTemporaryFile()
-
-    runAndAssertCommandSuccess(
-      Process(
-        Seq(
-          "python",
-          (interactiveSubmissionFolder / "external_party_onboarding_multi_hosting.py").pathAsString,
-          "--party-name",
-          "alice",
-          "--private-key-file",
-          privateKeyFile.pathAsString,
-          "--threshold",
-          "2",
-          "--admin-endpoint",
-          s"${participant1.config.adminApi.address}:${participant1.config.adminApi.port.unwrap}",
-          s"${participant2.config.adminApi.address}:${participant2.config.adminApi.port.unwrap}",
-          "--synchronizer-id",
-          sequencer1.synchronizer_id.toProtoPrimitive,
-          "-a", // Automatically accept all transactions (by default the script stops to ask users to explicitly confirm)
-          "onboard",
-        ),
-        cwd = interactiveSubmissionFolder.toJava,
-      ),
-      processLogger,
-    )
-
-    val alice = eventually() {
-      participant1.parties.list().find(_.party.toProtoPrimitive.contains("alice")).value.party
-    }
-
-    runAndAssertCommandSuccess(
-      Process(
-        Seq(
-          "python",
-          (interactiveSubmissionFolder / "external_party_onboarding_multi_hosting.py").pathAsString,
-          "--private-key-file",
-          privateKeyFile.pathAsString,
-          "--threshold",
-          "2",
-          "--admin-endpoint",
-          s"${participant3.config.adminApi.address}:${participant3.config.adminApi.port.unwrap}",
-          "--synchronizer-id",
-          sequencer1.synchronizer_id.toProtoPrimitive,
-          "-a", // Automatically accept all transactions (by default the script stops to ask users to explicitly confirm)
-          "update",
-          "--party-id",
-          alice.toProtoPrimitive,
-          "--participant-permission",
-          "confirmation",
         ),
         cwd = interactiveSubmissionFolder.toJava,
       ),

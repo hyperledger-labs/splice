@@ -256,7 +256,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-pg-passwd",
+    "name": "sv-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -330,6 +330,10 @@
       "timeout": 600,
       "values": {
         "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+          },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -492,7 +496,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-pg-passwd",
+    "name": "sv-da-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -569,6 +573,10 @@
           {
             "name": "GOOGLE_APPLICATION_CREDENTIALS",
             "value": "/app/gcp-credentials.json"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
           },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
@@ -765,7 +773,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-pg-passwd",
+    "name": "sv-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -839,6 +847,10 @@
       "timeout": 600,
       "values": {
         "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+          },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -1038,7 +1050,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-pg",
+    "name": "user-sv-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1052,7 +1064,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-pg",
+    "name": "user-sv-da-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1066,7 +1078,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-pg",
+    "name": "user-sv-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

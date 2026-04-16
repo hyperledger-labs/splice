@@ -1,11 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionValidation,
+  SequencerConnections,
+  StaticSynchronizerParameters,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.commands.{MediatorSetupGroup, SequencerAdministration}
 import com.digitalasset.canton.console.{
@@ -16,20 +19,34 @@ import com.digitalasset.canton.console.{
   MediatorReference,
   SequencerReference,
 }
-import com.digitalasset.canton.crypto.KeyPurpose
+import com.digitalasset.canton.crypto.{KeyPurpose, Signature}
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Temporary
+import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
-import com.digitalasset.canton.topology.store.{StoredTopologyTransactions, TimeQuery}
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, TopologyManagerError}
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransaction,
+  StoredTopologyTransactions,
+  TimeQuery,
+}
+import com.digitalasset.canton.topology.transaction.{
+  OwnerToKeyMapping,
+  SequencerSynchronizerState,
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyTransaction,
+}
+import com.digitalasset.canton.topology.{
+  DefaultTestIdentities,
+  PhysicalSynchronizerId,
+  TopologyManagerError,
+}
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.google.protobuf.ByteString
 import monocle.macros.syntax.lens.*
@@ -63,7 +80,7 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
       )
       .addConfigTransform(ConfigTransforms.globallyUniquePorts)
       // Apply protocol version updates to the `second` nodes defined above
-      .addConfigTransforms(ConfigTransforms.optSetProtocolVersion*)
+      .addConfigTransforms(ConfigTransforms.protocolVersionTransforms*)
 
   private def mediatorThatFailsFirstInit(
       mediatorReference: LocalMediatorReference,
@@ -140,6 +157,34 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
         // let's have effective proposals for both serials
         val proposals = multipleFullyAuthorized.map(_.focus(_.transaction.isProposal).replace(true))
 
+        // SequencerSynchronizerState as it is checked during sequencer initialization and will interfere with other tests
+        val sss = Seq(
+          StoredTopologyTransaction(
+            sequenced = SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+            validFrom = EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+            validUntil = None,
+            transaction = SignedTopologyTransaction.withSignatures(
+              TopologyTransaction(
+                TopologyChangeOp.Replace,
+                serial = PositiveInt.one,
+                SequencerSynchronizerState
+                  .create(
+                    DefaultTestIdentities.synchronizerId,
+                    PositiveInt.one,
+                    active = Seq(DefaultTestIdentities.sequencerId),
+                    observers = Seq.empty,
+                  )
+                  .value,
+                testedProtocolVersion,
+              ),
+              Signature.noSignatures,
+              isProposal = false,
+              protocolVersion = testedProtocolVersion,
+            ),
+            rejectionReason = None,
+          )
+        )
+
         def assertFailure(
             transactions: Seq[GenericStoredTopologyTransaction],
             errorMessage: String,
@@ -157,20 +202,25 @@ sealed trait RobustSynchronizerBootstrapIntegrationTest
 
         assertFailure(
           multipleFullyAuthorized,
+          "missing the synchronizer sequencer state",
+        )
+
+        assertFailure(
+          sss ++ multipleFullyAuthorized,
           "concurrently effective transactions with the same unique key",
         )
 
         assertFailure(
-          proposals,
+          sss ++ proposals,
           "muliple effective proposals with different serials",
         )
         assertFailure(
-          proposals ++ proposals,
+          sss ++ proposals ++ proposals,
           "multiple effective proposals for the same transaction hash",
         )
 
         assertFailure(
-          otks ++ proposals,
+          sss ++ otks ++ proposals,
           "effective proposals with serial less than or equal to the highest fully authorized transaction",
         )
 
@@ -307,7 +357,7 @@ class RobustSynchronizerBootstrapIntegrationTestPostgres
     extends RobustSynchronizerBootstrapIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("secondSequencer"), Set("sequencerToFail")).map(

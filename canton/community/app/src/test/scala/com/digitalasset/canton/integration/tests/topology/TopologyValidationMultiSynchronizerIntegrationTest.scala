@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -14,6 +14,7 @@ import com.digitalasset.canton.integration.util.{
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   HasCycleUtils,
   SharedEnvironment,
@@ -34,6 +35,9 @@ class TopologyValidationMultiSynchronizerIntegrationTest
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1_S1M1
+      .addConfigTransforms(
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag
+      )
       .withSetup { implicit env =>
         import env.*
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)

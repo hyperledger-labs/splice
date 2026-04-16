@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -6,12 +6,13 @@ package com.digitalasset.canton.platform.store.backend.common
 import com.digitalasset.canton.platform.store.backend.Conversions.IntArrayDBSerialization.encodeToByteArray
 import com.digitalasset.canton.platform.store.backend.DbDto
 import com.digitalasset.canton.platform.store.interning.StringInterning
+import com.digitalasset.daml.lf.data.Ref.{ChoiceName, Identifier, NameTypeConRef, Party}
 
 import java.sql.Connection
 import scala.reflect.ClassTag
 
-private[backend] trait Schema[FROM] {
-  def prepareData(in: Vector[FROM], stringInterning: StringInterning): Array[Array[Array[?]]]
+private[backend] trait Schema[From] {
+  def prepareData(in: Vector[From], stringInterning: StringInterning): Array[Array[Array[?]]]
   def executeUpdate(data: Array[Array[Array[?]]], connection: Connection): Unit
 }
 
@@ -20,99 +21,124 @@ private[backend] object AppendOnlySchema {
   type Batch = Array[Array[Array[?]]]
 
   private[backend] trait FieldStrategy {
-    def string[FROM](extractor: StringInterning => FROM => String): Field[FROM, String, ?] =
+    def string[From](extractor: StringInterning => From => String): Field[From, String, ?] =
       StringField(extractor)
 
-    def stringOptional[FROM](
-        extractor: StringInterning => FROM => Option[String]
-    ): Field[FROM, Option[String], ?] =
+    def stringOptional[From](
+        extractor: StringInterning => From => Option[String]
+    ): Field[From, Option[String], ?] =
       StringOptional(extractor)
 
-    def stringArray[FROM](
-        extractor: StringInterning => FROM => Iterable[String]
-    ): Field[FROM, Iterable[String], ?] =
+    def stringArray[From](
+        extractor: StringInterning => From => Iterable[String]
+    ): Field[From, Iterable[String], ?] =
       StringArray(extractor)
 
-    def bytea[FROM](
-        extractor: StringInterning => FROM => Array[Byte]
-    ): Field[FROM, Array[Byte], ?] =
+    def bytea[From](
+        extractor: StringInterning => From => Array[Byte]
+    ): Field[From, Array[Byte], ?] =
       Bytea(extractor)
 
-    def byteaOptional[FROM](
-        extractor: StringInterning => FROM => Option[Array[Byte]]
-    ): Field[FROM, Option[Array[Byte]], ?] =
+    def byteaOptional[From](
+        extractor: StringInterning => From => Option[Array[Byte]]
+    ): Field[From, Option[Array[Byte]], ?] =
       ByteaOptional(extractor)
 
-    def parties[FROM](
-        extractor: FROM => Set[String]
-    ): Field[FROM, Array[Byte], ?] =
+    def party[From](extractor: From => Party): Field[From, Int, ?] =
+      int[From](stringInterning => from => stringInterning.party.internalize(extractor(from)))
+
+    def partyOptional[From](extractor: From => Option[Party]): Field[From, Option[Int], ?] =
+      intOptional[From](stringInterning =>
+        from => extractor(from).map(stringInterning.party.internalize)
+      )
+
+    def parties[From](
+        extractor: From => Set[Party]
+    ): Field[From, Array[Byte], ?] =
       bytea(stringInterning =>
         from =>
           encodeToByteArray(
-            extractor(from)
-              .map(stringInterning.party.unsafe.internalize)
+            extractor(from).map(stringInterning.party.internalize)
           )
       )
 
-    def partiesOptional[FROM](
-        extractor: FROM => Option[Set[String]]
-    ): Field[FROM, Option[Array[Byte]], ?] =
+    def partiesOptional[From](
+        extractor: From => Option[Set[Party]]
+    ): Field[From, Option[Array[Byte]], ?] =
       byteaOptional(stringInterning =>
         from =>
           extractor(from)
-            .map(_.map(stringInterning.party.unsafe.internalize))
+            .map(_.map(stringInterning.party.internalize))
             .map(encodeToByteArray)
       )
 
-    def bigint[FROM](extractor: StringInterning => FROM => Long): Field[FROM, Long, ?] =
+    def template[From](extractor: From => NameTypeConRef): Field[From, Int, ?] =
+      int[From](intern => from => intern.templateId.internalize(extractor(from)))
+
+    def templateOptional[From](
+        extractor: From => Option[NameTypeConRef]
+    ): Field[From, Option[Int], ?] =
+      intOptional[From](intern => from => extractor(from).map(intern.templateId.internalize))
+
+    def interface[From](extractor: From => Identifier): Field[From, Int, ?] =
+      int[From](intern => from => intern.interfaceId.internalize(extractor(from)))
+
+    def interfaceOptional[From](
+        extractor: From => Option[Identifier]
+    ): Field[From, Option[Int], ?] =
+      intOptional[From](intern => from => extractor(from).map(intern.interfaceId.internalize))
+
+    def choice[From](extractor: From => ChoiceName): Field[From, Int, ?] =
+      int[From](intern => from => intern.choiceName.internalize(extractor(from)))
+
+    def choiceOptional[From](extractor: From => Option[ChoiceName]): Field[From, Option[Int], ?] =
+      intOptional[From](intern => from => extractor(from).map(intern.choiceName.internalize))
+
+    def bigint[From](extractor: StringInterning => From => Long): Field[From, Long, ?] =
       Bigint(extractor)
 
-    def bigintOptional[FROM](
-        extractor: StringInterning => FROM => Option[Long]
-    ): Field[FROM, Option[Long], ?] =
+    def bigintOptional[From](
+        extractor: StringInterning => From => Option[Long]
+    ): Field[From, Option[Long], ?] =
       BigintOptional(extractor)
 
-    def smallintOptional[FROM](
-        extractor: StringInterning => FROM => Option[Int]
-    ): Field[FROM, Option[Int], ?] =
+    def smallintOptional[From](
+        extractor: StringInterning => From => Option[Int]
+    ): Field[From, Option[Int], ?] =
       SmallintOptional(extractor)
 
-    def smallint[FROM](
-        extractor: StringInterning => FROM => Int
-    ): Field[FROM, Int, ?] =
+    def smallint[From](
+        extractor: StringInterning => From => Int
+    ): Field[From, Int, ?] =
       Smallint(extractor)
 
-    def int[FROM](extractor: StringInterning => FROM => Int): Field[FROM, Int, ?] =
+    def int[From](extractor: StringInterning => From => Int): Field[From, Int, ?] =
       Integer(extractor)
 
-    def intOptional[FROM](
-        extractor: StringInterning => FROM => Option[Int]
-    ): Field[FROM, Option[Int], ?] =
+    def intOptional[From](
+        extractor: StringInterning => From => Option[Int]
+    ): Field[From, Option[Int], ?] =
       IntOptional(extractor)
 
-    def booleanOptional[FROM](
-        extractor: StringInterning => FROM => Option[Boolean]
-    ): Field[FROM, Option[Boolean], ?] =
+    def booleanOptional[From](
+        extractor: StringInterning => From => Option[Boolean]
+    ): Field[From, Option[Boolean], ?] =
       BooleanOptional(extractor)
 
-    def boolean[FROM](
-        extractor: StringInterning => FROM => Boolean
-    ): Field[FROM, Boolean, ?] =
+    def boolean[From](
+        extractor: StringInterning => From => Boolean
+    ): Field[From, Boolean, ?] =
       BooleanMandatory(extractor)
 
-    def insert[FROM](tableName: String)(fields: (String, Field[FROM, ?, ?])*): Table[FROM]
+    def insert[From](tableName: String)(fields: (String, Field[From, ?, ?])*): Table[From]
   }
 
   def apply(fieldStrategy: FieldStrategy): Schema[DbDto] = {
     def idFilter[T <: DbDto.IdFilterDbDto](tableName: String): Table[T] =
       fieldStrategy.insert(tableName)(
         "event_sequential_id" -> fieldStrategy.bigint(_ => _.idFilter.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.idFilter.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.idFilter.party_id)
-        ),
+        "template_id" -> fieldStrategy.template(_.idFilter.template_id),
+        "party_id" -> fieldStrategy.party(_.idFilter.party_id),
         "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
           dto => Option.when(dto.idFilter.first_per_sequential_id)(true)
         ),
@@ -134,6 +160,7 @@ private[backend] object AppendOnlySchema {
         "external_transaction_hash" -> fieldStrategy.byteaOptional(_ =>
           _.external_transaction_hash
         ),
+        "traffic_cost" -> fieldStrategy.bigintOptional(_ => _.traffic_cost),
 
         // event related columns
         "event_type" -> fieldStrategy.smallint(_ => _.event_type),
@@ -174,6 +201,7 @@ private[backend] object AppendOnlySchema {
         "external_transaction_hash" -> fieldStrategy.byteaOptional(_ =>
           _.external_transaction_hash
         ),
+        "traffic_cost" -> fieldStrategy.bigintOptional(_ => _.traffic_cost),
 
         // event related columns
         "event_type" -> fieldStrategy.smallint(_ => _.event_type),
@@ -183,11 +211,9 @@ private[backend] object AppendOnlySchema {
           _.deactivated_event_sequential_id
         ),
         "additional_witnesses" -> fieldStrategy.partiesOptional(_.additional_witnesses),
-        "exercise_choice" -> fieldStrategy.intOptional(stringInterning =>
-          _.exercise_choice.map(stringInterning.choiceName.unsafe.internalize)
-        ),
-        "exercise_choice_interface" -> fieldStrategy.intOptional(stringInterning =>
-          _.exercise_choice_interface_id.map(stringInterning.interfaceId.unsafe.internalize)
+        "exercise_choice" -> fieldStrategy.choiceOptional(_.exercise_choice),
+        "exercise_choice_interface" -> fieldStrategy.interfaceOptional(
+          _.exercise_choice_interface_id
         ),
         "exercise_argument" -> fieldStrategy.byteaOptional(_ => _.exercise_argument),
         "exercise_result" -> fieldStrategy.byteaOptional(_ => _.exercise_result),
@@ -211,9 +237,7 @@ private[backend] object AppendOnlySchema {
         // contract related columns
         "contract_id" -> fieldStrategy.bytea(_ => _.contract_id.toBytes.toByteArray),
         "internal_contract_id" -> fieldStrategy.bigintOptional(_ => _.internal_contract_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
-        ),
+        "template_id" -> fieldStrategy.template(_.template_id),
         "package_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
@@ -241,6 +265,7 @@ private[backend] object AppendOnlySchema {
         "external_transaction_hash" -> fieldStrategy.byteaOptional(_ =>
           _.external_transaction_hash
         ),
+        "traffic_cost" -> fieldStrategy.bigintOptional(_ => _.traffic_cost),
 
         // event related columns
         "event_type" -> fieldStrategy.smallint(_ => _.event_type),
@@ -248,11 +273,9 @@ private[backend] object AppendOnlySchema {
         "node_id" -> fieldStrategy.int(_ => _.node_id),
         "additional_witnesses" -> fieldStrategy.parties(_.additional_witnesses),
         "consuming" -> fieldStrategy.booleanOptional(_ => _.consuming),
-        "exercise_choice" -> fieldStrategy.intOptional(stringInterning =>
-          _.exercise_choice.map(stringInterning.choiceName.unsafe.internalize)
-        ),
-        "exercise_choice_interface" -> fieldStrategy.intOptional(stringInterning =>
-          _.exercise_choice_interface_id.map(stringInterning.interfaceId.unsafe.internalize)
+        "exercise_choice" -> fieldStrategy.choiceOptional(_.exercise_choice),
+        "exercise_choice_interface" -> fieldStrategy.interfaceOptional(
+          _.exercise_choice_interface_id
         ),
         "exercise_argument" -> fieldStrategy.byteaOptional(_ => _.exercise_argument),
         "exercise_result" -> fieldStrategy.byteaOptional(_ => _.exercise_result),
@@ -273,9 +296,7 @@ private[backend] object AppendOnlySchema {
         // contract related columns
         "contract_id" -> fieldStrategy.byteaOptional(_ => _.contract_id.map(_.toBytes.toByteArray)),
         "internal_contract_id" -> fieldStrategy.bigintOptional(_ => _.internal_contract_id),
-        "template_id" -> fieldStrategy.intOptional(stringInterning =>
-          _.template_id.map(stringInterning.templateId.unsafe.internalize)
-        ),
+        "template_id" -> fieldStrategy.templateOptional(_.template_id),
         "package_id" -> fieldStrategy.intOptional(stringInterning =>
           _.package_id.map(stringInterning.packageId.unsafe.internalize)
         ),
@@ -293,9 +314,7 @@ private[backend] object AppendOnlySchema {
         "typ" -> fieldStrategy.string(_ => _.typ),
         "rejection_reason" -> fieldStrategy.stringOptional(_ => _.rejection_reason),
         "is_local" -> fieldStrategy.booleanOptional(_ => _.is_local),
-        "party_id" -> fieldStrategy.intOptional(stringInterning =>
-          _.party.map(stringInterning.party.unsafe.internalize)
-        ),
+        "party_id" -> fieldStrategy.partyOptional(_.party),
       )
 
     val partyToParticipant: Table[DbDto.EventPartyToParticipant] =
@@ -303,9 +322,7 @@ private[backend] object AppendOnlySchema {
         "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
         "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
         "update_id" -> fieldStrategy.bytea(_ => _.update_id),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
+        "party_id" -> fieldStrategy.party(_.party_id),
         "participant_id" -> fieldStrategy.int(stringInterning =>
           dto => stringInterning.participantId.unsafe.internalize(dto.participant_id)
         ),
@@ -348,6 +365,7 @@ private[backend] object AppendOnlySchema {
         "message_uuid" -> fieldStrategy.stringOptional(_ => _.message_uuid),
         "is_transaction" -> fieldStrategy.boolean(_ => _.is_transaction),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
+        "traffic_cost" -> fieldStrategy.bigint(_ => _.traffic_cost),
       )
 
     val stringInterningTable: Table[DbDto.StringInterningDto] =

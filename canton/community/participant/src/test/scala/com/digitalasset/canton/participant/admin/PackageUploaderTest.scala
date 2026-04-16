@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -27,6 +27,7 @@ import com.digitalasset.canton.{
   BaseTest,
   HasActorSystem,
   HasExecutionContext,
+  HasExecutorService,
   LedgerSubmissionId,
   LfPackageId,
   LfPackageName,
@@ -34,16 +35,20 @@ import com.digitalasset.canton.{
 }
 import com.digitalasset.daml.lf.archive.{DamlLf, Dar, Decode}
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.engine.EngineLoggingConfig
 import com.digitalasset.daml.lf.language.Ast
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.ScheduledExecutorService
+
 class PackageUploaderTest
     extends AnyWordSpec
     with BaseTest
     with HasActorSystem
-    with HasExecutionContext {
+    with HasExecutionContext
+    with HasExecutorService {
 
   "validateDar" should {
     "succeed on valid DAR" in withTestEnv() { env =>
@@ -266,9 +271,10 @@ class PackageUploaderTest
   ) extends AutoCloseable {
     val clockNow: CantonTimestamp = CantonTimestamp.ofEpochMilli(1337L)
     private val clock = new SimClock(start = clockNow, loggerFactory = loggerFactory)
+    implicit val scheduler: ScheduledExecutorService = scheduledExecutor()
     val mutablePackageMetadataViewImpl = new MutablePackageMetadataViewImpl(
       clock = clock,
-      damlPackageStore = packageStore,
+      packageStore = packageStore,
       new PackageUpgradeValidator(CachingConfigs.defaultPackageUpgradeCache, loggerFactory),
       loggerFactory = loggerFactory,
       packageMetadataViewConfig = PackageMetadataViewConfig(),
@@ -284,6 +290,9 @@ class PackageUploaderTest
         enableLfBeta = false,
         enableStackTraces = false,
         paranoidMode = true,
+        submissionPhaseLogging = EngineLoggingConfig(),
+        validationPhaseLogging = EngineLoggingConfig(),
+        loggerFactory = loggerFactory,
       ),
       enableStrictDarValidation = enableStrictDarValidation,
       packageMetadataView = mutablePackageMetadataViewImpl,

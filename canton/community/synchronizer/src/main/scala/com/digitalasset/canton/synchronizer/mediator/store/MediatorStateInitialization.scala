@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator.store
@@ -35,7 +35,9 @@ private[mediator] trait MediatorStateInitialization { self: NamedLogging =>
       ),
       "The store most not be initialized more than once!",
     )
-    implicit val directExecutionContext: DirectExecutionContext = DirectExecutionContext(logger)
+    implicit val directExecutionContext: DirectExecutionContext = DirectExecutionContext(
+      noTracingLogger
+    )
     doInitialize(firstEventTs).map(_ =>
       initialized.set(MediatorStateInitialization.State.Initialized)
     )

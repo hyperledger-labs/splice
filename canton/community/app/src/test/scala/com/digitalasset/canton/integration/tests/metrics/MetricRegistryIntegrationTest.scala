@@ -1,19 +1,21 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.metrics
 
 import com.daml.metrics.MetricsFilterConfig
 import com.daml.metrics.api.MetricQualification
+import com.digitalasset.canton.admin.api.client.data.TrafficControlParameters
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsReporterConfig}
+import com.digitalasset.canton.sequencing.TrafficControlParameters as InternalTrafficControlParameters
 import monocle.macros.syntax.lens.*
 import org.scalatest.BeforeAndAfterAll
 
@@ -41,6 +43,17 @@ sealed trait MetricRegistryIntegrationTest
       targetDir.delete()
     }
   }
+
+  private val trafficControlParameters = TrafficControlParameters(
+    // Enough to not have to deal with purchase
+    maxBaseTrafficAmount = NonNegativeNumeric.tryCreate(20 * 100000L),
+    maxBaseTrafficAccumulationDuration = config.PositiveFiniteDuration.ofSeconds(1L),
+    setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L),
+    readVsWriteScalingFactor = InternalTrafficControlParameters.DefaultReadVsWriteScalingFactor,
+    enforceRateLimiting = true,
+    baseEventCost = NonNegativeLong.zero,
+    freeConfirmationResponses = true,
+  )
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
@@ -73,7 +86,12 @@ sealed trait MetricRegistryIntegrationTest
       )
       .withSetup { implicit env =>
         import env.*
-
+        sequencer1.topology.synchronizer_parameters.propose_update(
+          synchronizerId = sequencer1.synchronizer_id,
+          _.update(
+            trafficControl = Some(trafficControlParameters)
+          ),
+        )
         participant1.synchronizers.connect_local(sequencer1, alias = daName)
       }
 
@@ -82,6 +100,12 @@ sealed trait MetricRegistryIntegrationTest
 
     participant1.health.ping(participant1)
 
+    val phase = participant1.metrics.get_histogram(
+      "daml.participant.phase.duration.seconds",
+      attributes = Map("phase" -> "1b_request-generation"),
+    )
+    phase.count should be > 0L
+
     val updatesBefore =
       participant1.metrics.get_long_point("daml.participant.api.indexer.updates").value
 
@@ -89,6 +113,9 @@ sealed trait MetricRegistryIntegrationTest
       participant1.metrics
         .get_long_point("daml.participant.api.index.ledger_end_sequential_id")
         .value
+    val deactivationDistanceCountBefore = participant1.metrics
+      .get_histogram("daml.participant.api.indexer.deactivation_distances")
+      .count
 
     participant1.health.ping(participant1)
 
@@ -100,7 +127,12 @@ sealed trait MetricRegistryIntegrationTest
       participant1.metrics
         .get_long_point("daml.participant.api.index.ledger_end_sequential_id")
         .value
+    val deactivationDistanceCountAfter = participant1.metrics
+      .get_histogram("daml.participant.api.indexer.deactivation_distances")
+      .count
+
     ledgerEndAfter should be > ledgerEndBefore
+    deactivationDistanceCountAfter should be > deactivationDistanceCountBefore
   }
 
   "verify that metrics go up when we bong" in { implicit env =>
@@ -116,6 +148,13 @@ sealed trait MetricRegistryIntegrationTest
       )
       .count should be > 0L
 
+    participant1.metrics
+      .get_long_point(
+        "daml.sequencer-client.traffic-control.submitted-event-cost",
+        Map("type" -> "send-confirmation-request"),
+      )
+      .value > 0
+
     // to ensure the expected metrics really exist and the periodic background writer had time to actually write the metrics
     // PLEASE NOTE: the expected metrics are used in performance tests, maintaining consistency here is key to catch
     // mismatch in CI.
@@ -130,6 +169,7 @@ sealed trait MetricRegistryIntegrationTest
         new File(targetDir, _) should exist
       )
     }
+
     nodes.local.stop()
   }
 
@@ -165,12 +205,14 @@ sealed trait MetricRegistryIntegrationTest
       loggerFactory.assertLogs(
         participant1.health.ping(participant1)
       )
+
     }
+
   }
 
 }
 
 class MetricRegistryIntegrationTestDefault extends MetricRegistryIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }

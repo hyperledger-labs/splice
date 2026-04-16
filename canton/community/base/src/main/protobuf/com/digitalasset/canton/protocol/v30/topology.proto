@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -57,7 +57,7 @@ message Enums {
     reserved 16; // was TrafficControlState
     TOPOLOGY_MAPPING_CODE_SEQUENCING_DYNAMIC_PARAMETERS_STATE = 17;
     TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING = 18;
-    TOPOLOGY_MAPPING_CODE_SYNCHRONIZER_MIGRATION_ANNOUNCEMENT = 19;
+    TOPOLOGY_MAPPING_CODE_LSU_ANNOUNCEMENT = 19;
     TOPOLOGY_MAPPING_CODE_SEQUENCER_CONNECTION_SUCCESSOR = 20;
   }
 
@@ -66,6 +66,8 @@ message Enums {
     // UNUSED in PV >= 34 - Was meant to tactically fix a bug in the external signing hash computation
     // in model conformance in PV 33
     PARTICIPANT_FEATURE_FLAG_PV33_EXTERNAL_SIGNING_LOCAL_CONTRACT_IN_SUBVIEW = 1;
+    // This flag indicates that the participant supports reassignments between synchronizers.
+    PARTICIPANT_FEATURE_FLAG_ENABLE_UNSAFE_MULTI_SYNCHRONIZER = 2;
   }
 }
 
@@ -147,11 +149,12 @@ message OwnerToKeyMapping {
   reserved 3; // was synchronizer = 3;
 }
 
-// [doc-entry-start: PartyToKeyMapping]
 // mapping a party to a key
 // authorization: whoever controls the party uid
 // UNIQUE(party)
 message PartyToKeyMapping {
+  // Deprecated in favor of PartyToParticipant
+  option deprecated = true;
   // the party
   string party = 1;
   // the authorization threshold
@@ -161,7 +164,6 @@ message PartyToKeyMapping {
 
   reserved 2; // was synchronizer_id = 2
 }
-// [doc-entry-end: PartyToKeyMapping]
 
 // the trust certificate issued by the participant confirming that the participant
 // wishes to be present on the given synchronizer
@@ -195,8 +197,10 @@ message ParticipantSynchronizerPermission {
   // optional individual limits for this participant
   ParticipantSynchronizerLimits limits = 4;
 
-  // optional earliest time when participant can log in (again)
-  // used to temporarily disable participants
+  // Optional earliest time when participant can log in (again).
+  // Used to temporarily disable participants.
+  // A participant cannot login before the sequencer has reached login_after, i.e.,
+  // the sequencer must have produced an event with timestamp login_after.
   // In microseconds of UTC time since Unix epoch
   optional int64 login_after = 5;
 }
@@ -241,6 +245,7 @@ message VettedPackages {
   reserved 3; // was synchronizer_id = 3;
 }
 
+// [doc-entry-start: PartyToParticipant]
 // Mapping that maps a party to a participant
 // The PartyToParticipant mapping may also specify a list of signing keys for setting up an external party, in which
 // case the keys and the threshold take precedence over any PartyToKeyMapping for the same party.
@@ -297,6 +302,7 @@ message PartyToParticipant {
   // The max number of keys is 20
   optional com.digitalasset.canton.crypto.v30.SigningKeysWithThreshold party_signing_keys = 6;
 }
+// [doc-entry-end: PartyToParticipant]
 
 // which dynamic synchronizer parameters are supposed to be used on the given synchronizer
 // authorization: whoever controls the synchronizer
@@ -366,7 +372,7 @@ message SequencerSynchronizerState {
 // removing this mapping unfreezes the topology state again.
 // authorization: whoever controls the synchronizer
 // UNIQUE(successor_physical_synchronizer_id.logical)
-message SynchronizerUpgradeAnnouncement {
+message LsuAnnouncement {
   // the physical synchronizer id of the successor synchronizer
   string successor_physical_synchronizer_id = 1;
   // when the upgrade happens
@@ -375,26 +381,20 @@ message SynchronizerUpgradeAnnouncement {
 
 // a sequencer can announce its connections on the successor synchronizer
 // authorization: whoever controls the sequencer
-// UNIQUE(sequencer_id, synchronizer_id)
-message SequencerConnectionSuccessor {
+// UNIQUE(sequencer_id, successor_physical_synchronizer_id.logical)
+message LsuSequencerConnectionSuccessor {
   // the sequencer id
   string sequencer_id = 1;
-  // to synchronizer id
-  string synchronizer_id = 2;
+  // the physical synchronizer id of the successor synchronizer
+  string successor_physical_synchronizer_id = 2;
   // the connection details with which members can connect to the sequencer on the successor synchronizer
   SequencerConnection connection = 3;
 
   message SequencerConnection {
-    oneof connection_type {
-      Grpc grpc = 1;
-    }
-
-    message Grpc {
-      // connection information to sequencer (http[s]://<host>:<port>")
-      // all endpoints must agree on using HTTPS or HTTP
-      repeated string endpoints = 1;
-      optional bytes custom_trust_certificates = 2;
-    }
+    // connection information to sequencer (http[s]://<host>:<port>")
+    // all endpoints must agree on using HTTPS or HTTP
+    repeated string endpoints = 1;
+    optional bytes custom_trust_certificates = 2;
   }
 }
 
@@ -418,10 +418,11 @@ message TopologyMapping {
     SequencerSynchronizerState sequencer_synchronizer_state = 13;
     DynamicSequencingParametersState sequencing_dynamic_parameters_state = 15;
 
-    PartyToKeyMapping party_to_key_mapping = 16;
+    // Deprecated in favor of PartyToParticipant
+    PartyToKeyMapping party_to_key_mapping = 16 [deprecated = true];
 
-    SynchronizerUpgradeAnnouncement synchronizer_upgrade_announcement = 17;
-    SequencerConnectionSuccessor sequencer_connection_successor = 18;
+    LsuAnnouncement synchronizer_upgrade_announcement = 17;
+    LsuSequencerConnectionSuccessor sequencer_connection_successor = 18;
   }
   reserved 2; // was identifier_delegation
   reserved 10; // was authority_of

@@ -1,14 +1,23 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.validations
 
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{CachingConfigs, CryptoConfig, CryptoProvider}
+import com.digitalasset.canton.config.{
+  BatchingConfig,
+  CachingConfigs,
+  CryptoConfig,
+  CryptoProvider,
+  SessionEncryptionKeyCacheConfig,
+}
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreExtended, CryptoPrivateStoreFactory}
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreExtended
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.topology.DefaultTestIdentities.participant1
 import com.digitalasset.canton.topology.{
@@ -31,17 +40,20 @@ class SyncSchemeValidationsTest extends AnyWordSpec with BaseTest with HasExecut
   private lazy val crypto: Crypto = Crypto
     .create(
       CryptoConfig(),
-      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+      CachingConfigs.defaultKmsMetadataCache,
+      SessionEncryptionKeyCacheConfig(),
       CachingConfigs.defaultPublicKeyConversionCache,
       new MemoryStorage(loggerFactory, timeouts),
-      CryptoPrivateStoreFactory.withoutKms(),
+      Option.empty[ReplicaManager],
       testedReleaseProtocolVersion,
       futureSupervisor,
       wallClock,
       executorService,
       timeouts,
+      BatchingConfig(),
       loggerFactory,
       NoReportingTracerProvider,
+      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
     .valueOrFailShutdown("Failed to create crypto object")
     .futureValue

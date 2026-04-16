@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interfaces
@@ -17,7 +17,6 @@ import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{PackageName, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.transaction.GlobalKey
 import com.digitalasset.daml.lf.value.Value as LfValue
 
 /** Generic ledger update event.
@@ -26,6 +25,18 @@ import com.digitalasset.daml.lf.value.Value as LfValue
   */
 sealed trait TransactionLogUpdate extends Product with Serializable with HasTraceContext {
   def offset: Offset
+  def completionStreamResponseO: Option[CompletionStreamResponse]
+
+  /** Traffic cost paid by this node for the ordering of the corresponding confirmation request.
+    * Only provided if the requesting parties are submitting parties (actAs)
+    */
+  def paidTrafficCost(requestingParties: Option[Set[Party]]): Option[EventSequentialId] =
+    completionStreamResponseO
+      .flatMap(_.completionResponse.completion)
+      .filter { completion =>
+        requestingParties.fold(true)(_.exists(completion.actAs.toSet))
+      }
+      .map(_.paidTrafficCost)
 }
 
 object TransactionLogUpdate {
@@ -46,6 +57,8 @@ object TransactionLogUpdate {
     *   The successful submission's completion details.
     * @param recordTime
     *   The time at which the transaction was recorded.
+    * @param externalTransactionHash
+    *   Hash of the transaction (for externall signed transactions only)
     */
   final case class TransactionAccepted(
       updateId: String,
@@ -54,7 +67,7 @@ object TransactionLogUpdate {
       effectiveAt: Timestamp,
       offset: Offset,
       events: Vector[Event],
-      completionStreamResponse: Option[CompletionStreamResponse],
+      completionStreamResponseO: Option[CompletionStreamResponse],
       synchronizerId: String,
       recordTime: Timestamp,
       externalTransactionHash: Option[CantonHash],
@@ -72,7 +85,11 @@ object TransactionLogUpdate {
       offset: Offset,
       completionStreamResponse: CompletionStreamResponse,
   )(implicit override val traceContext: TraceContext)
-      extends TransactionLogUpdate
+      extends TransactionLogUpdate {
+    override def completionStreamResponseO: Option[CompletionStreamResponse] = Some(
+      completionStreamResponse
+    )
+  }
 
   final case class ReassignmentAccepted(
       updateId: String,
@@ -80,13 +97,12 @@ object TransactionLogUpdate {
       workflowId: String,
       offset: Offset,
       recordTime: Timestamp,
-      completionStreamResponse: Option[CompletionStreamResponse],
+      completionStreamResponseO: Option[CompletionStreamResponse],
       reassignmentInfo: ReassignmentInfo,
       reassignment: Reassignment.Batch,
       synchronizerId: String,
   )(implicit override val traceContext: TraceContext)
       extends TransactionLogUpdate {
-
     def stakeholders: Set[Ref.Party] = reassignment.iterator.flatMap(_.stakeholders).toSet
   }
 
@@ -97,7 +113,9 @@ object TransactionLogUpdate {
       synchronizerId: String,
       events: Vector[PartyToParticipantAuthorization],
   )(implicit override val traceContext: TraceContext)
-      extends TransactionLogUpdate
+      extends TransactionLogUpdate {
+    override def completionStreamResponseO: Option[CompletionStreamResponse] = None
+  }
 
   /* Models all but divulgence events */
   sealed trait Event extends Product with Serializable {
@@ -137,7 +155,6 @@ object TransactionLogUpdate {
       createSignatories: Set[Party],
       createObservers: Set[Party],
       createKeyHash: Option[Hash],
-      createKey: Option[GlobalKey],
       createKeyMaintainers: Option[Set[Party]],
       authenticationData: Bytes,
   ) extends Event {
@@ -161,6 +178,7 @@ object TransactionLogUpdate {
       commandId: String,
       workflowId: String,
       contractKey: Option[LfValue.VersionedValue],
+      contractKeyHash: Option[Hash],
       treeEventWitnesses: Set[Party],
       flatEventWitnesses: Set[Party],
       submitters: Set[Party],
@@ -183,5 +201,4 @@ object TransactionLogUpdate {
       participant: Ref.ParticipantId,
       authorizationEvent: AuthorizationEvent,
   )
-
 }

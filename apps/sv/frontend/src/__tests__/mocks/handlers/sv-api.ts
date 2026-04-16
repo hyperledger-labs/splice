@@ -11,7 +11,9 @@ import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListFeaturedAppRightsByProviderResponse,
   ListOngoingValidatorOnboardingsResponse,
+  LookupFeaturedAppRightByContractIdResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
 } from '@lfdecentralizedtrust/sv-openapi';
@@ -115,25 +117,48 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
           })
         );
       } else {
+        // Simulate cursor-based pagination using descending synthetic entry_numbers.
+        // Each result is assigned an entry_number equal to (total - index), so the
+        // first result has the highest entry_number and the last has entry_number 1.
+        const allResults = voteResultsAmuletRules.dso_rules_vote_results
+          .concat(voteResultsDsoRules.dso_rules_vote_results)
+          .filter(r => {
+            const acceptedMatch =
+              data.accepted === undefined || data.accepted === null
+                ? true
+                : data.accepted
+                  ? r.outcome.tag === 'VRO_Accepted'
+                  : r.outcome.tag === 'VRO_Rejected';
+            const effectiveToMatch = data.effectiveTo
+              ? r.outcome.value
+                ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
+                : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+              : true;
+            const effectiveFromMatch = data.effectiveFrom
+              ? r.outcome.value
+                ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
+                : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
+              : true;
+            return acceptedMatch && effectiveToMatch && effectiveFromMatch;
+          });
+        const total = allResults.length;
+        const cursor = data.pageToken;
+        // Find the starting index: skip results whose entry_number >= cursor
+        const startIndex =
+          cursor !== undefined && cursor !== null
+            ? allResults.findIndex((_, i) => total - i < cursor)
+            : 0;
+        const limit = data.limit || 10;
+        const paged = allResults.slice(startIndex, startIndex + limit);
+        const lastEntryNumber =
+          paged.length > 0 ? total - (startIndex + paged.length - 1) : undefined;
+        const hasMore = startIndex + paged.length < total;
         return res(
           ctx.json<ListDsoRulesVoteResultsResponse>({
-            dso_rules_vote_results: voteResultsAmuletRules.dso_rules_vote_results
-              .concat(voteResultsDsoRules.dso_rules_vote_results)
-              .filter(r =>
-                data.accepted
-                  ? r.outcome.tag === 'VRO_Accepted'
-                  : r.outcome.tag === 'VRO_Rejected' &&
-                    (data.effectiveTo
-                      ? r.outcome.value
-                        ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
-                        : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
-                      : true) &&
-                    (data.effectiveFrom
-                      ? r.outcome.value
-                        ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
-                        : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
-                      : true)
-              ),
+            dso_rules_vote_results: paged,
+            ...(hasMore && lastEntryNumber !== undefined
+              ? { next_page_token: lastEntryNumber }
+              : {}),
           })
         );
       }
@@ -215,8 +240,9 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/sv/party-to-participant/:partyId`, (req, res, ctx) => {
-    const { partyId } = req.params;
-    if (partyId === 'a-party-id::1014912492' || partyId === svPartyId) {
+    const normalizedPartyId = decodeURIComponent(String(req.params.partyId));
+
+    if (normalizedPartyId === 'a-party-id::1014912492' || normalizedPartyId === svPartyId) {
       return res(
         ctx.json({
           participant_ids: [svPartyId],
@@ -226,4 +252,52 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       return res(ctx.status(404));
     }
   }),
+
+  rest.get(
+    `${svUrl}/v0/admin/sv/featured-app-rights/by-provider/:providerPartyId`,
+    (req, res, ctx) => {
+      const providerPartyId = decodeURIComponent(String(req.params.providerPartyId));
+      const featuredAppRights =
+        providerPartyId === 'a-party-id::1014912492'
+          ? [
+              {
+                template_id: 'featured-app-right-template-id',
+                contract_id: 'rightCid123',
+                payload: {},
+                created_event_blob: '',
+                created_at: '2026-02-26T13:00:00.000000Z',
+              },
+            ]
+          : [];
+
+      return res(
+        ctx.json<ListFeaturedAppRightsByProviderResponse>({
+          featured_app_rights: featuredAppRights,
+        })
+      );
+    }
+  ),
+
+  rest.get(
+    `${svUrl}/v0/admin/sv/featured-app-rights/by-contract-id/:contractId`,
+    (req, res, ctx) => {
+      const contractId = decodeURIComponent(String(req.params.contractId));
+      const featuredAppRight =
+        contractId === 'rightCid123'
+          ? {
+              template_id: 'featured-app-right-template-id',
+              contract_id: 'rightCid123',
+              payload: { provider: 'a-party-id::1014912492' },
+              created_event_blob: '',
+              created_at: '2026-02-26T13:00:00.000000Z',
+            }
+          : undefined;
+
+      return res(
+        ctx.json<LookupFeaturedAppRightByContractIdResponse>({
+          featured_app_right: featuredAppRight,
+        })
+      );
+    }
+  ),
 ];

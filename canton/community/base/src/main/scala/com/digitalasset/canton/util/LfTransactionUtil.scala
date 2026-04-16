@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -23,21 +23,21 @@ object LfTransactionUtil {
     case _: LfNodeFetch => None
     case nx: LfNodeExercises if nx.consuming => Some(nx.targetCoid)
     case _: LfNodeExercises => None
-    case _: LfNodeLookupByKey => None
+    case _: LfNodeQueryByKey => None
   }
 
-  def contractId(node: LfActionNode): Option[LfContractId] = node match {
-    case n: LfNodeCreate => Some(n.coid)
-    case n: LfNodeFetch => Some(n.coid)
-    case n: LfNodeExercises => Some(n.targetCoid)
-    case n: LfNodeLookupByKey => n.result
+  def contractIds(node: LfActionNode): Vector[LfContractId] = node match {
+    case n: LfNodeCreate => Vector(n.coid)
+    case n: LfNodeFetch => Vector(n.coid)
+    case n: LfNodeExercises => Vector(n.targetCoid)
+    case n: LfNodeQueryByKey => n.result
   }
 
-  def usedContractId(node: LfActionNode): Option[LfContractId] = node match {
-    case _: LfNodeCreate => None
-    case n: LfNodeFetch => Some(n.coid)
-    case n: LfNodeExercises => Some(n.targetCoid)
-    case n: LfNodeLookupByKey => n.result
+  def usedContractId(node: LfActionNode): Vector[LfContractId] = node match {
+    case _: LfNodeCreate => Vector.empty
+    case n: LfNodeFetch => Vector(n.coid)
+    case n: LfNodeExercises => Vector(n.targetCoid)
+    case n: LfNodeQueryByKey => n.result
   }
 
   /** Whether or not a node has a random seed */
@@ -45,7 +45,7 @@ object LfTransactionUtil {
     case _: LfNodeCreate => true
     case _: LfNodeExercises => true
     case _: LfNodeFetch => false
-    case _: LfNodeLookupByKey => false
+    case _: LfNodeQueryByKey => false
     case _: LfNodeRollback => false
   }
 
@@ -139,11 +139,11 @@ object LfTransactionUtil {
     case n: LfNodeCreate => n.keyOpt.fold(n.stakeholders)(_.maintainers)
     case n: LfNodeFetch => n.stakeholders
     case n: LfNodeExercises => n.stakeholders
-    case n: LfNodeLookupByKey =>
-      n.result match {
-        case None => n.keyMaintainers
+    case LfNodeLookupByKey(_, _, key, result, _) =>
+      result match {
+        case None => key.maintainers
         // TODO(#3013) use signatories or stakeholders
-        case Some(_) => n.keyMaintainers
+        case Some(_) => key.maintainers
       }
   }
 

@@ -25,7 +25,7 @@ jobs:
       - name: Setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          cache_version: 7
+          cache_version: 8
           test_name: deployment_test
           with_sbt: false
           target: 'oss'

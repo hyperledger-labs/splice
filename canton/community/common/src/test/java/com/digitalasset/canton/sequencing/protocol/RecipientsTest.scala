@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.sequencing.protocol.Recipients.cc
 import com.digitalasset.canton.sequencing.protocol.RecipientsTest.*
 import com.digitalasset.canton.topology.ParticipantId
@@ -123,6 +124,8 @@ object RecipientsTest {
   lazy val p17 = ParticipantId("participant17")
   lazy val p18 = ParticipantId("participant18")
   lazy val p19 = ParticipantId("participant19")
+
+  lazy val mg0 = MediatorGroupRecipient(NonNegativeInt.zero)
 
   lazy val recP1 = participantRecipient(p1)
   lazy val recP2 = participantRecipient(p2)

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -52,7 +52,7 @@ class SpanningTest extends AnyWordSpec with BaseTest with BeforeAndAfterEach {
       withNewTrace("Outer.nestedFuture") { _ => span =>
         span.addEvent("running Outer.foo")
         EitherT.pure(
-          HandlerResult.asynchronous(FutureUnlessShutdown.outcomeF(inner))
+          HandlerResult.asynchronousUnit(FutureUnlessShutdown.outcomeF(inner))
         )
       }
     }

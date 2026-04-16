@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false">
+  <!-- propagate logback changes to jul handlers -->
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder"/>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <!-- For some reason our test setup depends on the STDOUT logger being defined. Without it the FILE logger
+           below does not log anything. We thus just turn the log level to OFF here to make
+           check-sbt-output.sh check for unexpected build problems only (see #3535).
+       -->
+      <level>OFF</level>
+    </filter>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>${LOG_FILE_NAME:-log/canton_network_test.clog}</file>
+    <append>${LOG_APPEND:-true}</append>
+    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
+      <fieldNames>
+        <version>[ignore]</version>
+        <levelValue>[ignore]</levelValue>
+      </fieldNames>
+    </encoder>
+  </appender>
+
+  <!-- Include general rewrite rules for messages we also want to rewrite in production
+       By setting the REWRITE_TESTING variable we can include the warning suppression of testing messages.
+  -->
+  <property name="REWRITE_TESTING" value="true" />
+  <include resource="rewrite-appender.xml"/>
+
+  <root level="INFO">
+    <appender-ref ref="REWRITE_LOG_LEVEL_SYNC"/>
+  </root>
+
+  <!-- Ensure everything is logged before the JVM exits -->
+  <shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook" />
+
+  <!-- Note that com.daml logs valuable info at TRACE level.
+       Set to TRACE for troubleshooting.
+  -->
+  <logger name="com.daml" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
+  <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
+  <logger name="org.lfdecentralizedtrust.splice" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
+  <!-- The TransactionsReader is quite noisy. -->
+  <logger name="com.digitalasset.canton.platform.store.dao.events.TransactionsReaderCanton" level="${LOG_LEVEL_CANTON:-INFO}"/>
+  <!-- netty reports ssl errors on DEBUG level ... -->
+  <logger name="io.grpc.netty.shaded.io.netty.handler.ssl" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
+
+  <!-- Set the logging level for Pekko so that if someone configures pekko to actually log something, this will end up in the log -->
+  <logger name="pekko" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
+  <!-- janino can be too verbose in tests -->
+  <logger name="org.codehaus.janino" level="WARN"/>
+
+  <!-- Enable for database-relevant debug logs -->
+<!--  <logger name="slick" level="DEBUG"/>-->
+<!--  <logger name="com.zaxxer.hikari" level="DEBUG"/>-->
+<!--  <logger name="org.testcontainers" level="DEBUG"/>-->
+</configuration>

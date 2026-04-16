@@ -6,7 +6,7 @@ import { CloudSqlConfigSchema } from './cloudSql';
 import { defaultActiveMigration, SynchronizerMigrationSchema } from './migrationSchema';
 
 // This is a config that's relevant for all (most) pulumi projects. For project-specific configuration,
-// define a config schema in the project itself, and parse the Yaml file there. See e.g. cluster/pulumi/infra/src/config.ts
+// define a config schema in the project itself, and parse the Yaml file there. See e.g. cluster/pulumi/observability/src/config.ts
 const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   isExternalCluster: z.boolean(),
@@ -36,10 +36,12 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+export type SingleK8sResourceSchema = z.infer<typeof SingleResourceSchema>;
 export const SingleResourceSchema = z
   .object({
     memory: z.string().optional(),
     cpu: z.string().optional(),
+    ephemeralStorage: z.string().optional(),
   })
   .optional();
 

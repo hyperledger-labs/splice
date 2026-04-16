@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
@@ -109,8 +109,9 @@ object CommitSet {
       consumedInputsOfHostedParties: Map[LfContractId, Set[LfPartyId]],
       transient: Map[LfContractId, Set[LfPartyId]],
       createdContracts: Map[LfContractId, GenContractInstance],
+      commitAfterFailedActivenessCheck: Boolean,
   )(implicit loggingContext: ErrorLoggingContext): CommitSet =
-    if (activenessResult.isSuccessful) {
+    if (activenessResult.isSuccessful || commitAfterFailedActivenessCheck) {
       val archivals = (consumedInputsOfHostedParties ++ transient).map {
         case (cid, hostedStakeholders) =>
           cid -> CommitSet.ArchivalCommit(hostedStakeholders)

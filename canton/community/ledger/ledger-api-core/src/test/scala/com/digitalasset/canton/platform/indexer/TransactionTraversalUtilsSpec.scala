@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer
@@ -9,6 +9,7 @@ import com.digitalasset.canton.platform.indexer.TransactionTraversalUtils.{
   arrangeNodeIdsInExecutionOrder,
   executionOrderTraversalForIngestion,
 }
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder.CreateKey
 import com.digitalasset.daml.lf.transaction.test.{
   NodeIdTransactionBuilder,
@@ -381,7 +382,11 @@ class TransactionTraversalUtilsSpec extends AnyFlatSpec with BaseTest {
       argument = Value.ValueUnit,
       signatories = List("signatory"),
       observers = List("observer"),
-      key = if (withKey) CreateKey.SignatoryMaintainerKey(Value.ValueUnit) else CreateKey.NoKey,
+      key =
+        if (withKey)
+          CreateKey
+            .SignatoryMaintainerKey(Value.ValueUnit, crypto.Hash.hashPrivateKey("dummy-key-hash"))
+        else CreateKey.NoKey,
     )
   def exercise(
       choice: String,

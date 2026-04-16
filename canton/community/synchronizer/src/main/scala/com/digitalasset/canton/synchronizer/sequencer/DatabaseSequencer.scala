@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -18,9 +18,11 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.metrics.MetricsHelper
 import com.digitalasset.canton.resource.{DbExceptionRetryPolicy, Storage}
 import com.digitalasset.canton.scheduler.PruningScheduler
+import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.SequencerWriter.ResetWatermark
@@ -36,12 +38,18 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore.SequencerPruningResult
 import com.digitalasset.canton.synchronizer.sequencer.store.{
+  PayloadId,
   SequencerMemberId,
   SequencerMemberValidator,
   SequencerStore,
 }
+import com.digitalasset.canton.synchronizer.sequencer.time.{
+  DisasterRecoverySequencingTimeUpperBound,
+  LsuSequencingBounds,
+}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
+  LsuTrafficState,
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficStatus,
@@ -73,7 +81,8 @@ object DatabaseSequencer {
       timeouts: ProcessingTimeout,
       storage: Storage,
       sequencerStore: SequencerStore,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      lsuSequencingBounds: Option[LsuSequencingBounds],
+      drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
       clock: Clock,
       topologyClientMember: Member,
       cryptoApi: SynchronizerCryptoClient,
@@ -114,7 +123,8 @@ object DatabaseSequencer {
       metrics,
       loggerFactory,
       blockSequencerMode = false,
-      sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+      lsuSequencingBounds = lsuSequencingBounds,
+      drSequencingTimeUpperBound = drSequencingTimeUpperBound,
       rateLimitManagerO = None,
     )
   }
@@ -139,7 +149,8 @@ class DatabaseSequencer(
     metrics: SequencerMetrics,
     loggerFactory: NamedLoggerFactory,
     blockSequencerMode: Boolean,
-    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+    lsuSequencingBounds: Option[LsuSequencingBounds],
+    drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
     rateLimitManagerO: Option[SequencerRateLimitManager],
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
@@ -147,6 +158,7 @@ class DatabaseSequencer(
       health,
       clock,
       SignatureVerifier(cryptoApi),
+      cryptoApi.psid.protocolVersion,
     )
     with FlagCloseable {
 
@@ -172,7 +184,8 @@ class DatabaseSequencer(
     protocolVersion,
     loggerFactory,
     blockSequencerMode,
-    sequencingTimeLowerBoundExclusive,
+    lsuSequencingBounds,
+    drSequencingTimeUpperBound,
     metrics,
   )
 
@@ -251,13 +264,15 @@ class DatabaseSequencer(
     )
   }
 
-  private val reader =
+  protected val reader =
     new SequencerReader(
       config.reader,
       sequencerStore,
       cryptoApi,
       eventSignaller,
       topologyClientMember,
+      lsuSequencingBounds,
+      metrics,
       timeouts,
       loggerFactory,
     )
@@ -323,7 +338,8 @@ class DatabaseSequencer(
     writer.blockSequencerWrite(outcome)
 
   override protected def sendAsyncSignedInternal(
-      signedSubmission: SignedContent[SubmissionRequest]
+      signedSubmission: SignedContent[SubmissionRequest],
+      skipLsuChecks: Boolean = false,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
@@ -333,6 +349,26 @@ class DatabaseSequencer(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource] =
     reader.read(member, timestamp)
+
+  override protected def readPayloadsFromTimestampsInternal(timestamps: Seq[CantonTimestamp])(
+      implicit traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] =
+    FutureUnlessShutdown.failed(
+      new UnsupportedOperationException(
+        "readPayloadsFromTimestampsInternal is not supported by the database sequencer"
+      )
+    )
+
+  override def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]] =
+    EitherT.liftF(
+      FutureUnlessShutdown.failed(
+        io.grpc.Status.UNIMPLEMENTED
+          .withDescription("Traffic summaries are not implemented on the database sequencer")
+          .asRuntimeException()
+      )
+    )
 
   /** Internal method to be used in the sequencer integration.
     */
@@ -471,10 +507,7 @@ class DatabaseSequencer(
           DbExceptionRetryPolicy,
         )
     )
-    waitForWatermarkToPassTimestamp
-      .flatMap { _ =>
-        snapshot(timestamp)
-      }
+    waitForWatermarkToPassTimestamp.flatMap(_ => snapshot(timestamp))
   }
 
   override def onClosed(): Unit =
@@ -491,7 +524,7 @@ class DatabaseSequencer(
 
   override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SequencerTrafficStatus] =
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus] =
     throw new UnsupportedOperationException(
       "Traffic control is not supported by the database sequencer"
     )
@@ -522,11 +555,11 @@ class DatabaseSequencer(
       "Traffic control is not supported by the database sequencer"
     )
 
-  override private[sequencer] def updateSynchronizerSuccessor(
+  override private[sequencer] def updateLsuSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit =
-    reader.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+    reader.updateLsuSuccessor(successorO, announcementEffectiveTime)
 
   // TODO(#27919): provide a proper implementation
   override def sequencingTime(implicit
@@ -535,4 +568,25 @@ class DatabaseSequencer(
     FutureUnlessShutdown.pure(None)
 
   override private[canton] def orderer: Option[BlockOrderer] = None
+
+  override def getLsuTrafficControlState(trafficTsOverride: Option[CantonTimestamp] = None)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
+    throw new UnsupportedOperationException(
+      "Traffic control is not supported by the database sequencer"
+    )
+
+  override def setLsuTrafficControlState(state: LsuTrafficState)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
+    throw new UnsupportedOperationException(
+      "Traffic control is not supported by the database sequencer"
+    )
+
+  override def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
+    throw new UnsupportedOperationException(
+      "LSU sanity check is not supported by the database sequencer"
+    )
 }

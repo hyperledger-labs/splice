@@ -1,16 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.authentication.grpc
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{BatchingConfig, DefaultProcessingTimeouts}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protobuf.{Hello, HelloServiceGrpc}
 import com.digitalasset.canton.sequencing.authentication.grpc.{
   AuthenticationTokenManagerTest,
@@ -61,7 +59,8 @@ class SequencerAuthenticationServerInterceptorTest
 
     lazy val service = new GrpcHelloService()
 
-    lazy val store: MemberAuthenticationStore = new MemberAuthenticationStore()
+    lazy val store: MemberAuthenticationStore =
+      new MemberAuthenticationStore(PositiveInt.tryCreate(10), loggerFactory)
     lazy val synchronizerId = SynchronizerId(
       UniqueIdentifier.tryFromProtoPrimitive("popo::pipi")
     ).toPhysical
@@ -77,6 +76,7 @@ class SequencerAuthenticationServerInterceptorTest
       _ => (),
       FutureUnlessShutdown.unit,
       DefaultProcessingTimeouts.testing,
+      BatchingConfig(),
       loggerFactory,
     ) {
       override protected def isParticipantActive(participant: ParticipantId)(implicit
@@ -135,21 +135,14 @@ class SequencerAuthenticationServerInterceptorTest
       store
         .saveToken(StoredAuthenticationToken(participantId, neverExpire, token.token))
 
-      val obtainToken = NonEmpty
-        .mk(
-          Seq,
-          (
-            Endpoint("localhost", Port.tryCreate(10)),
-            ((_: TraceContext) => EitherT.pure[FutureUnlessShutdown, Status](token)): TokenFetcher,
-          ),
-        )
-        .toMap
+      val tokenFetcher =
+        ((_: TraceContext) => EitherT.pure[FutureUnlessShutdown, Status](token)): TokenFetcher
 
       val clientAuthentication =
         SequencerClientTokenAuthentication(
           synchronizerId,
           participantId,
-          obtainToken,
+          tokenFetcher,
           isClosed = false,
           AuthenticationTokenManagerConfig(),
           AuthenticationTokenManagerTest.mockClock,
@@ -166,23 +159,15 @@ class SequencerAuthenticationServerInterceptorTest
       store
         .saveToken(StoredAuthenticationToken(participantId, neverExpire, token.token))
 
-      val obtainToken = NonEmpty
-        .mk(
-          Seq,
-          (
-            Endpoint("localhost", Port.tryCreate(10)),
-            (
-                (_: TraceContext) => EitherT.pure[FutureUnlessShutdown, Status](incorrectToken)
-            ): TokenFetcher,
-          ),
-        )
-        .toMap
+      val tokenFetcher = (
+          (_: TraceContext) => EitherT.pure[FutureUnlessShutdown, Status](incorrectToken)
+      ): TokenFetcher
 
       val clientAuthentication =
         SequencerClientTokenAuthentication(
           synchronizerId,
           participantId,
-          obtainToken,
+          tokenFetcher,
           isClosed = false,
           AuthenticationTokenManagerConfig(),
           AuthenticationTokenManagerTest.mockClock,

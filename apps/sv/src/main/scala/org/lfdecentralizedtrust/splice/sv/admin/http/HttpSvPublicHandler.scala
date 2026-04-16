@@ -14,8 +14,8 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.ByteString
-import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -28,17 +28,17 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as v0}
 import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource as r0
+import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.{Secrets, SvOnboardingToken}
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
 import java.util.Base64
@@ -54,12 +54,10 @@ class HttpSvPublicHandler(
     config: SvAppBackendConfig,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    localSynchronizerNode: Option[LocalSynchronizerNode],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     dsoPartyMigration: DsoPartyMigration,
-    cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
-    isBftSequencer: Boolean,
     initialRound: String,
 )(implicit
     ec: ExecutionContext,
@@ -110,7 +108,7 @@ class HttpSvPublicHandler(
 
               case Some(vo) =>
                 val storedSecret =
-                  Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty);
+                  Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty)
 
                 if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
                   Future.failed(
@@ -151,7 +149,7 @@ class HttpSvPublicHandler(
           } else {
             Future.failed(
               HttpErrorHandler.badRequest(
-                s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is ${svParty}, validate your SV sponsor URL"
+                s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is $svParty, validate your SV sponsor URL"
               )
             )
           }
@@ -527,35 +525,44 @@ class HttpSvPublicHandler(
   )(extracted: TraceContext): Future[r0.OnboardSvSequencerResponse] = {
     implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
-      (for {
-        sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
-        sequencerConnection <- localSynchronizerNode
-          .map(_.sequencerAdminConnection)
-          .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
-      } yield {
-        getSequencerOnboardingState(sequencerConnection, sequencerId)
-      }).fold(
-        errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
-        _.map(onboardingState =>
-          r0.OnboardSvSequencerResponseOK(
-            definitions.OnboardSvSequencerResponse(
-              Base64.getEncoder.encodeToString(onboardingState.toByteArray)
+      Codec.decode(Codec.Sequencer)(body.sequencerId) match {
+        case Left(err) => Future.failed(HttpErrorHandler.badRequest(err))
+        case Right(sequencerId) =>
+          synchronizerNodeService
+            .activeSynchronizerNode()
+            .flatMap(node =>
+              getSequencerOnboardingState(
+                node.config.sequencer.isBftSequencer,
+                node.sequencerAdminConnection,
+                sequencerId,
+              )
             )
-          )
-        ),
-      )
+            .map(onboardingState =>
+              r0.OnboardSvSequencerResponseOK(
+                definitions.OnboardSvSequencerResponse(
+                  Base64.getEncoder.encodeToString(onboardingState.toByteArray)
+                )
+              )
+            )
+      }
     }
   }
 
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: CometBftClient => Future[T]) = cometBftClient
-    .fold {
-      notFound(definitions.ErrorResponse("CometBFT is not configured."))
-        .pure[Future]
-    } {
-      call
-    }
+  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap { node =>
+        node.cometbftNode
+          .map(_.cometBftClient)
+          .fold {
+            notFound(definitions.ErrorResponse("CometBFT is not configured."))
+              .pure[Future]
+          } {
+            call
+          }
+      }
 
   private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
     // wait for a bit as it is possible the store ingression is not complete
@@ -586,6 +593,7 @@ class HttpSvPublicHandler(
 
   /** Returns the sequencing time the first topology transaction where the new sequencer is active */
   private def waitForNewSequencerObservedByExistingSequencer(
+      isBftSequencer: Boolean,
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
@@ -650,6 +658,7 @@ class HttpSvPublicHandler(
   }
 
   private def getSequencerOnboardingState(
+      isBftSequencer: Boolean,
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
@@ -658,6 +667,7 @@ class HttpSvPublicHandler(
     )
     for {
       _ <- waitForNewSequencerObservedByExistingSequencer(
+        isBftSequencer,
         sequencerAdminConnection,
         sequencerId,
       )
@@ -788,7 +798,6 @@ class HttpSvPublicHandler(
   )(implicit tc: TraceContext): Future[Unit] =
     for {
       dsoRules <- dsoStore.getDsoRules()
-      now = clock.now
       cmds = Seq(
         dsoRules.exercise(
           _.exerciseDsoRules_OnboardValidator(

@@ -1,17 +1,16 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multihostedparties
 
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.damltests.java.automaticreassignmenttransactions as M
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.SynchronizerRouterIntegrationTestSetup
 import com.digitalasset.canton.integration.util.{
   EntitySyntax,
@@ -34,7 +33,7 @@ class AutomaticReassignmentDecentralizedPartyIntegrationTest
     with EntitySyntax {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))
@@ -47,50 +46,54 @@ class AutomaticReassignmentDecentralizedPartyIntegrationTest
   private var aggregate: M.Aggregate.ContractId = _
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S1M1_S1M1.withSetup { implicit env =>
-      import env.*
-
-      def disableAssignmentExclusivityTimeout(d: InitializedSynchronizer): Unit =
-        d.synchronizerOwners.foreach(
-          _.topology.synchronizer_parameters
-            .propose_update(
-              d.synchronizerId,
-              _.update(
-                assignmentExclusivityTimeout = config.NonNegativeFiniteDuration.Zero
-              ),
-            )
-        )
-
-      disableAssignmentExclusivityTimeout(getInitializedSynchronizer(daName))
-      disableAssignmentExclusivityTimeout(getInitializedSynchronizer(acmeName))
-
-      participants.all.synchronizers.connect_local(sequencer1, daName)
-      participants.all.synchronizers.connect_local(sequencer2, acmeName)
-      participants.all.dars.upload(CantonTestsPath, synchronizerId = daId)
-      participants.all.dars.upload(CantonTestsPath, synchronizerId = acmeId)
-
-      participant1.health.ping(participant2, synchronizerId = Some(daId))
-      participant1.health.ping(participant2, synchronizerId = Some(acmeId))
-
-      val dso = "dso"
-      // multi host dso on two participant on the two synchronizers
-      PartiesAllocator(participants.all.toSet)(
-        Seq(dso -> participant1),
-        Map(
-          dso -> Map(
-            daId -> (PositiveInt.one, Set(
-              (participant1.id, ParticipantPermission.Submission),
-              (participant2.id, ParticipantPermission.Submission),
-            )),
-            acmeId -> (PositiveInt.one, Set(
-              (participant1.id, ParticipantPermission.Submission),
-              (participant2.id, ParticipantPermission.Submission),
-            )),
-          )
-        ),
+    EnvironmentDefinition.P2_S1M1_S1M1
+      .addConfigTransforms(
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag
       )
-      decentralizedParty = dso.toPartyId(participant1)
-    }
+      .withSetup { implicit env =>
+        import env.*
+
+        def disableAssignmentExclusivityTimeout(d: InitializedSynchronizer): Unit =
+          d.synchronizerOwners.foreach(
+            _.topology.synchronizer_parameters
+              .propose_update(
+                d.synchronizerId,
+                _.update(
+                  assignmentExclusivityTimeout = config.NonNegativeFiniteDuration.Zero
+                ),
+              )
+          )
+
+        disableAssignmentExclusivityTimeout(getInitializedSynchronizer(daName))
+        disableAssignmentExclusivityTimeout(getInitializedSynchronizer(acmeName))
+
+        participants.all.synchronizers.connect_local(sequencer1, daName)
+        participants.all.synchronizers.connect_local(sequencer2, acmeName)
+        participants.all.dars.upload(CantonTestsPath, synchronizerId = daId)
+        participants.all.dars.upload(CantonTestsPath, synchronizerId = acmeId)
+
+        participant1.health.ping(participant2, synchronizerId = Some(daId))
+        participant1.health.ping(participant2, synchronizerId = Some(acmeId))
+
+        val dso = "dso"
+        // multi host dso on two participant on the two synchronizers
+        PartiesAllocator(participants.all.toSet)(
+          Seq(dso -> participant1),
+          Map(
+            dso -> Map(
+              daId -> (PositiveInt.one, Set(
+                (participant1.id, ParticipantPermission.Submission),
+                (participant2.id, ParticipantPermission.Submission),
+              )),
+              acmeId -> (PositiveInt.one, Set(
+                (participant1.id, ParticipantPermission.Submission),
+                (participant2.id, ParticipantPermission.Submission),
+              )),
+            )
+          ),
+        )
+        decentralizedParty = dso.toPartyId(participant1)
+      }
 
   /** Ensure contract with id `cid` is assigned to synchronizer `synchronizerId`
     */

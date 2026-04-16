@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -11,18 +11,18 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Segment
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap.bootstrapEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.EpochInProgress
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions.RetransmissionsManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.{
   IgnoringModuleRef,
-  IgnoringUnitTestContext,
   IgnoringUnitTestEnv,
+  ProgrammableUnitTestContext,
+  ProgrammableUnitTestEnv,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
@@ -46,6 +46,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Consensus,
   ConsensusSegment,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   failingCryptoProvider,
@@ -69,34 +70,51 @@ class PreIssConsensusModuleTest
 
   private val clock = new SimClock(loggerFactory = loggerFactory)
 
-  private implicit val context: IgnoringUnitTestContext[Consensus.Message[IgnoringUnitTestEnv]] =
-    IgnoringUnitTestContext()
-
   "PreIssConsensusModule" should {
     "set up the epoch store and state correctly" in {
       implicit val metricsContext: MetricsContext = MetricsContext.Empty
       implicit val config: BftBlockOrdererConfig = BftBlockOrdererConfig()
       val metrics = SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
+      val defaultBootstrapEpoch =
+        bootstrapEpoch(
+          // Corresponds to the activation time in the topology passed to the module's constructor
+          TestBootstrapTopologyActivationTime
+        )
+      val aBootstrapActivationTime = TopologyActivationTime(aTimestamp)
+      val aBootstrapEpoch = bootstrapEpoch(aBootstrapActivationTime)
 
       Table(
         (
           "latest completed epoch",
           "latest epoch",
           "expected epoch info in state",
+          "completed last blocks",
         ),
-        (GenesisEpoch, GenesisEpoch, GenesisEpoch.info),
-        (GenesisEpoch, anEpoch, anEpoch.info),
-        (anEpoch, anEpoch, anEpoch.info),
-        (anEpoch.copy(lastBlockCommits = someLastBlockCommits), anEpoch, anEpoch.info),
-      ).forEvery { (latestCompletedEpoch, latestEpoch, expectedEpochInfoInState) =>
-        val epochStore = mock[EpochStore[IgnoringUnitTestEnv]]
-        when(epochStore.latestEpoch(includeInProgress = false)).thenReturn(() =>
-          latestCompletedEpoch
-        )
-        when(epochStore.latestEpoch(includeInProgress = true)).thenReturn(() => latestEpoch)
-        when(epochStore.loadEpochProgress(latestEpoch.info)).thenReturn(() =>
-          EpochStore.EpochInProgress(Seq.empty, Seq.empty)
-        )
+        // Case 1: no epochs in the store and no last blocks
+        (None, None, defaultBootstrapEpoch.info, Seq.empty),
+        // Case 2: only a completed epoch and no last blocks
+        (Some(anEpoch), None, defaultBootstrapEpoch.info, Seq.empty),
+        // Case 3: only an in-progress epoch and no last blocks
+        (None, Some(anEpoch), anEpoch.info, Seq.empty),
+        // Case 4: both completed and in-progress epochs and no last blocks
+        (Some(aBootstrapEpoch), Some(anEpoch), anEpoch.info, Seq.empty),
+        // Case 5: both completed and in-progress epochs and last commits/blocks
+        (
+          Some(anEpoch.copy(lastBlockCommits = someLastBlockCommits)),
+          Some(anotherEpoch),
+          anotherEpoch.info,
+          someLastBlocks,
+        ),
+      ).forEvery { (latestCompletedEpochO, latestEpochO, expectedEpochInfoInState, lastBlocks) =>
+        val epochStore = mock[EpochStore[ProgrammableUnitTestEnv]]
+        when(epochStore.latestEpoch(includeInProgress = eqTo(false))(anyTraceContext))
+          .thenReturn(() => latestCompletedEpochO)
+        when(epochStore.latestEpoch(includeInProgress = eqTo(true))(anyTraceContext))
+          .thenReturn(() => latestEpochO)
+        val latestEpoch = latestEpochO.getOrElse(defaultBootstrapEpoch)
+        val latestCompletedEpoch = latestCompletedEpochO.getOrElse(defaultBootstrapEpoch)
+        val epochInProgress = EpochStore.EpochInProgress(Seq.empty, Seq.empty)
+        when(epochStore.loadEpochProgress(latestEpoch.info)).thenReturn(() => epochInProgress)
         when(
           epochStore.loadCompleteBlocks(
             EpochNumber(
@@ -105,17 +123,45 @@ class PreIssConsensusModuleTest
             EpochNumber(latestCompletedEpoch.info.number),
           )
         )
-          .thenReturn(() => Seq.empty)
+          .thenReturn(() => lastBlocks)
+        implicit val context
+            : ProgrammableUnitTestContext[Consensus.Message[ProgrammableUnitTestEnv]] =
+          new ProgrammableUnitTestContext[Consensus.Message[ProgrammableUnitTestEnv]]()
         val preIssConsensusModule = createPreIssConsensusModule(epochStore)
-        val (epochState, lastCompletedEpochRestored, previousEpochsCommitCerts) =
-          preIssConsensusModule.restoreEpochStateFromDB()
 
-        verify(epochStore).latestEpoch(includeInProgress = true)
-        verify(epochStore).latestEpoch(includeInProgress = false)
+        preIssConsensusModule.receive(Consensus.Init.KickOff)
+
+        verify(epochStore, times(1)).latestEpoch(includeInProgress = true)
+        verify(epochStore, times(1)).latestEpoch(includeInProgress = false)
+        var selfMessages = context.runPipedMessages()
+        selfMessages should contain only
+          Consensus.Init.LatestEpochsLoaded(latestCompletedEpoch, latestEpoch)
+
+        selfMessages.foreach(preIssConsensusModule.receive)
+
         verify(epochStore).loadEpochProgress(latestEpoch.info)
+        verify(epochStore).loadCompleteBlocks(
+          EpochNumber(
+            latestCompletedEpoch.info.number - RetransmissionsManager.HowManyEpochsToKeep + 1
+          ),
+          EpochNumber(latestCompletedEpoch.info.number),
+        )
+        selfMessages = context.runPipedMessages()
+        selfMessages should contain only
+          Consensus.Init.EpochInitDataLoaded(
+            latestCompletedEpoch,
+            latestEpoch,
+            epochInProgress,
+            lastBlocks,
+          )
 
-        lastCompletedEpochRestored shouldBe latestCompletedEpoch
-        previousEpochsCommitCerts shouldBe empty
+        val epochState =
+          preIssConsensusModule.initialEpochState(
+            latestCompletedEpoch.lastBlockCommits,
+            latestEpoch,
+            epochInProgress,
+          )
+
         epochState.epoch.info shouldBe expectedEpochInfoInState
         epochState
           .segmentModuleRefFactory(
@@ -134,50 +180,16 @@ class PreIssConsensusModuleTest
           .latestCompletedEpochLastCommits shouldBe latestCompletedEpoch.lastBlockCommits
       }
     }
-
-    "correctly load commit certificates from previously completed epochs" in {
-      val completedBlocks =
-        createCompletedBlocks(EpochNumber(3), numberOfBlocks = 3) ++
-          createCompletedBlocks(EpochNumber(4), numberOfBlocks = 4) ++
-          createCompletedBlocks(EpochNumber(5), numberOfBlocks = 3) ++
-          createCompletedBlocks(EpochNumber(6), numberOfBlocks = 5) ++
-          createCompletedBlocks(EpochNumber(7), numberOfBlocks = 2)
-
-      val epochStore = mock[EpochStore[IgnoringUnitTestEnv]]
-      when(
-        epochStore.loadCompleteBlocks(
-          EpochNumber(3),
-          EpochNumber(7),
-        )
-      ).thenReturn(() => completedBlocks)
-
-      val result =
-        PreIssConsensusModule.loadPreviousEpochCommitCertificates(epochStore)(EpochNumber(7), 5)
-
-      result.keySet should contain theSameElementsAs Set(
-        EpochNumber(3),
-        EpochNumber(4),
-        EpochNumber(5),
-        EpochNumber(6),
-        EpochNumber(7),
-      )
-
-      result(EpochNumber(3)) should have size 3
-      result(EpochNumber(4)) should have size 4
-      result(EpochNumber(5)) should have size 3
-      result(EpochNumber(6)) should have size 5
-      result(EpochNumber(7)) should have size 2
-    }
   }
 
   private def createPreIssConsensusModule(
-      epochStore: EpochStore[IgnoringUnitTestEnv]
-  ): PreIssConsensusModule[IgnoringUnitTestEnv] = {
+      epochStore: EpochStore[ProgrammableUnitTestEnv]
+  ): PreIssConsensusModule[ProgrammableUnitTestEnv] = {
     implicit val metricsContext: MetricsContext = MetricsContext.Empty
     implicit val config: BftBlockOrdererConfig = BftBlockOrdererConfig()
 
     val orderingTopology = OrderingTopology.forTesting(Set(myId))
-    new PreIssConsensusModule[IgnoringUnitTestEnv](
+    new PreIssConsensusModule[ProgrammableUnitTestEnv](
       OrderingTopologyInfo(
         myId,
         orderingTopology,
@@ -187,16 +199,15 @@ class PreIssConsensusModuleTest
         failingCryptoProvider,
         Seq(myId),
       ),
-      epochLength,
       epochStore,
       None,
       clock,
       SequencerMetrics.noop(getClass.getSimpleName).bftOrdering,
-      new SegmentModuleRefFactory[IgnoringUnitTestEnv] {
+      new SegmentModuleRefFactory[ProgrammableUnitTestEnv] {
         override def apply(
-            context: IgnoringUnitTestContext[Consensus.Message[IgnoringUnitTestEnv]],
+            context: ProgrammableUnitTestContext[Consensus.Message[ProgrammableUnitTestEnv]],
             epoch: EpochState.Epoch,
-            cryptoProvider: CryptoProvider[IgnoringUnitTestEnv],
+            cryptoProvider: CryptoProvider[ProgrammableUnitTestEnv],
             latestCompletedEpochLastCommits: Seq[SignedMessage[Commit]],
             epochInProgress: EpochInProgress,
         )(
@@ -206,7 +217,7 @@ class PreIssConsensusModuleTest
           new IgnoringSegmentModuleRef(latestCompletedEpochLastCommits)
       },
       new Random(4),
-      new ConsensusModuleDependencies[IgnoringUnitTestEnv](
+      new ConsensusModuleDependencies[ProgrammableUnitTestEnv](
         fakeModuleExpectingSilence,
         fakeModuleExpectingSilence,
         fakeModuleExpectingSilence,
@@ -219,7 +230,6 @@ class PreIssConsensusModuleTest
 
 object PreIssConsensusModuleTest {
 
-  private val epochLength = DefaultEpochLength
   private val myId = BftNodeId("self")
   private val aTimestamp =
     CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:00:00.000Z"))
@@ -230,6 +240,16 @@ object PreIssConsensusModuleTest {
         BlockNumber.First,
         EpochLength(0),
         TopologyActivationTime(aTimestamp),
+      ),
+      lastBlockCommits = Seq.empty,
+    )
+  private val anotherEpoch =
+    EpochStore.Epoch(
+      EpochInfo(
+        EpochNumber(1),
+        BlockNumber.First,
+        EpochLength(0),
+        TopologyActivationTime(aTimestamp.immediateSuccessor),
       ),
       lastBlockCommits = Seq.empty,
     )
@@ -248,6 +268,25 @@ object PreIssConsensusModuleTest {
       )
       .fakeSign
   )
+  private def someLastBlocks(implicit synchronizerProtocolVersion: ProtocolVersion) =
+    someLastBlockCommits.map { commitMsg =>
+      EpochStore.Block(
+        anEpoch.info.number,
+        BlockNumber.First,
+        CommitCertificate(
+          PrePrepare
+            .create(
+              BlockMetadata.mk(anEpoch.info.number, BlockNumber.First),
+              ViewNumber.First,
+              OrderingBlock(Seq()),
+              CanonicalCommitSet.empty,
+              from = myId,
+            )
+            .fakeSign,
+          Seq(commitMsg),
+        ),
+      )
+    }
 
   final class IgnoringSegmentModuleRef[-MessageT](
       val latestCompletedEpochLastCommits: Seq[SignedMessage[Commit]]

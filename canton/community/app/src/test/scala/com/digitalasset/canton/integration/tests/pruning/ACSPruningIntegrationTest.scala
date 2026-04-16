@@ -1,12 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
 
-import com.digitalasset.canton.config.{CantonConfig, DbConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.environment.CantonEnvironment
+import com.digitalasset.canton.config.PositiveDurationSeconds
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 import java.time.Duration as JDuration
@@ -14,7 +13,7 @@ import scala.math.Ordering.Implicits.*
 
 trait ACSPruningIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment[CantonConfig, CantonEnvironment]
+    with SharedEnvironment
     with HasCycleUtils {
 
   // These three parameters are needed to be able to wait sufficiently long to trigger a pruning timeout
@@ -74,10 +73,10 @@ trait ACSPruningIntegrationTest
 
 class AcsPruningIntegrationTestPostgres extends ACSPruningIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 }
 
 //class AcsPruningIntegrationTestH2 extends ACSPruningIntegrationTest {
 //  registerPlugin(new UseH2(loggerFactory))
-//  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+//  registerPlugin(new UseBftSequencer(loggerFactory))
 //}

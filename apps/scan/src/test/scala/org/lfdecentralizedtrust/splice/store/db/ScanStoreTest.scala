@@ -1466,6 +1466,7 @@ abstract class ScanStoreTest
           PageLimit.tryCreate(1),
         )
         .futureValue
+        .resultsInPage
         .toList
         .loneElement shouldBe result2
       store
@@ -1478,6 +1479,7 @@ abstract class ScanStoreTest
           PageLimit.tryCreate(1),
         )
         .futureValue
+        .resultsInPage
         .toList
         .size shouldBe (0)
       store
@@ -1490,6 +1492,7 @@ abstract class ScanStoreTest
           PageLimit.tryCreate(1),
         )
         .futureValue
+        .resultsInPage
         .toList
         .size shouldBe (1)
       store
@@ -1502,6 +1505,7 @@ abstract class ScanStoreTest
           PageLimit.tryCreate(1),
         )
         .futureValue
+        .resultsInPage
         .toList
         .size shouldBe (0)
       store
@@ -1514,6 +1518,7 @@ abstract class ScanStoreTest
           PageLimit.tryCreate(1),
         )
         .futureValue
+        .resultsInPage
         .toList
         .size shouldBe (1)
     }
@@ -1885,6 +1890,7 @@ trait AmuletTransferUtil { self: StoreTestBase =>
         ),
         Optional.empty(),
         Optional.empty(), // voteCooldownTime
+        Optional.empty(), // nextScheduledLogicalSynchronizerUpgrade
       ),
       Collections.emptyMap(),
       true,
@@ -2185,6 +2191,7 @@ class DbScanStoreTest
             PageLimit.tryCreate(1),
           )
           .futureValue
+          .resultsInPage
           .toList should have size 0
         // should have the active acs entry
         storeReingest.listVoteRequests().futureValue.toList should contain(activeVoteRequest)

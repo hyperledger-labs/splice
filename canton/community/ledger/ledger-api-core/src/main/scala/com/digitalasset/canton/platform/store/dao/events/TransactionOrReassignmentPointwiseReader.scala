@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -15,8 +15,9 @@ import com.digitalasset.canton.ledger.api.TransactionShape
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.InternalUpdateFormat
+import com.digitalasset.canton.platform.store.LedgerApiContractStore
+import com.digitalasset.canton.platform.store.ScalaPbStreamingOptimizations.ScalaPbMessageWithPrecomputedSerializedSize
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.IdRange
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
@@ -38,14 +39,14 @@ final class TransactionOrReassignmentPointwiseReader(
     val metrics: LedgerApiServerMetrics,
     val lfValueTranslation: LfValueTranslation,
     val queryValidRange: QueryValidRange,
-    val contractStore: ContractStore,
+    val contractStore: LedgerApiContractStore,
     val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends NamedLogging {
 
   protected val dbMetrics: metrics.index.db.type = metrics.index.db
 
-  val directEC: DirectExecutionContext = DirectExecutionContext(logger)
+  val directEC: DirectExecutionContext = DirectExecutionContext(noTracingLogger)
 
   private def fetchRawAcsDeltaEvents(
       firstEventSequentialId: Long,
@@ -161,8 +162,10 @@ final class TransactionOrReassignmentPointwiseReader(
               .map(_.internalEventFormat.eventProjectionProperties),
             lfValueTranslation = lfValueTranslation,
           )(rawEvents)(
-            convertReassignment = (r: Reassignment) => GetUpdateResponse(Update.Reassignment(r)),
-            convertTransaction = (t: Transaction) => GetUpdateResponse(Update.Transaction(t)),
+            convertReassignment = (r: Reassignment) =>
+              GetUpdateResponse(Update.Reassignment(r)).withPrecomputedSerializedSize(),
+            convertTransaction = (t: Transaction) =>
+              GetUpdateResponse(Update.Transaction(t)).withPrecomputedSerializedSize(),
           ),
         )
       )

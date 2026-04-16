@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.traffic
 
 import cats.syntax.functor.*
 import com.daml.ledger.api.v2.commands.Command
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.ParticipantStatus.SubmissionReady
 import com.digitalasset.canton.admin.api.client.data.{
   ComponentHealthState,
@@ -28,7 +29,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.EnvironmentDefinition.S1M1
 import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
-import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{
+  UseH2,
+  UsePostgres,
+  UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
+}
 import com.digitalasset.canton.integration.tests.TrafficBalanceSupport
 import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
 import com.digitalasset.canton.integration.{
@@ -39,8 +45,10 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.participant.admin.AdminWorkflowServices
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.sequencing.TrafficControlParameters as InternalTrafficControlParameters
-import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
+import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.LostSequencerSubscription
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.OutdatedTrafficCost
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
@@ -51,10 +59,21 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerTrafficStatus,
   TimestampSelector,
 }
+import com.digitalasset.canton.synchronizer.sequencer.{HasProgrammableSequencer, SendDecision}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
-import com.digitalasset.canton.topology.{Member, PartyId}
-import com.digitalasset.canton.{ProtocolVersionChecksFixtureAnyWordSpec, config}
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
+import com.digitalasset.canton.topology.transaction.{
+  MultiTransactionSignature,
+  SignedTopologyTransaction,
+  SynchronizerTrustCertificate,
+  TopologyTransaction,
+  VettedPackage,
+  VettedPackages,
+}
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, Member, Party}
+import com.digitalasset.canton.{TestPredicateFiltersFixtureAnyWordSpec, config}
 import monocle.macros.syntax.lens.*
 import org.scalatest.Assertion
 
@@ -65,8 +84,11 @@ trait TrafficControlTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with OnboardsNewSequencerNode
-    with ProtocolVersionChecksFixtureAnyWordSpec
+    with TestPredicateFiltersFixtureAnyWordSpec
+    with HasProgrammableSequencer
     with TrafficBalanceSupport {
+
+  registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 
   private val baseEventCost = 500L
   private val trafficControlParameters = TrafficControlParameters(
@@ -77,6 +99,7 @@ trait TrafficControlTest
     setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L),
     enforceRateLimiting = true,
     baseEventCost = NonNegativeLong.tryCreate(baseEventCost),
+    freeConfirmationResponses = true,
   )
 
   protected val pruningWindow = config.NonNegativeFiniteDuration.ofSeconds(5)
@@ -97,7 +120,7 @@ trait TrafficControlTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .buildBaseEnvironmentDefinition(
-        numParticipants = 3,
+        numParticipants = 4,
         numSequencers = 2,
         numMediators = 1,
       )
@@ -189,6 +212,139 @@ trait TrafficControlTest
     unregisteredStatuses shouldBe empty
   }
 
+  "return correct traffic state for member with purchased traffic but no consumed traffic" in {
+    implicit env =>
+      import env.*
+
+      /*
+       * In this test, we want to ensure a node initializes its traffic state correctly in the following scenarios:
+       * - A node has never received any event from the sequencer, but has purchased traffic
+       * - A node has received at least one event from the sequencer, has purchased traffic, but never consumed any traffic (even free)
+       * In both cases we expect the node to initialize its traffic state with the correct amount of traffic purchased.
+       *
+       * In practice this is not so straightforward to achieve because for a node to connect to a synchronizer it must
+       * send a number of topology transactions, which involve exchanges with the sequencer and cost traffic.
+       * To work around this, we will onboard a participant node (P4) on the synchronizer by submitting the
+       * necessary topology through a sequencer node, avoiding P4 to pay traffic for them.
+       * Additionally, we'll use the programmable sequencer to make sure P4 does not get any event sequenced
+       * and does not consume traffic.
+       */
+
+      participant4.start()
+      participant4.health.wait_for_running()
+
+      // Traffic can only be purchased for members registered on the synchronizer, i.e. with an NSD, STC and OTK
+      val stcForP4 = SynchronizerTrustCertificate(
+        participant4.id,
+        synchronizer1Id,
+      )
+      val stcTx = TopologyTransaction(
+        op = Replace,
+        serial = PositiveInt.one,
+        mapping = stcForP4,
+        testedProtocolVersion,
+      )
+      // We also need to load the vetted admin packages ahead of time otherwise P4 will try to do it upon connection
+      val vettedPackages = VettedPackages.tryCreate(
+        participant4.id,
+        VettedPackage.unbounded(AdminWorkflowServices.PingPackages.keys.toSeq),
+      )
+      val vettedPackagesTx = TopologyTransaction(
+        op = Replace,
+        serial = PositiveInt.one,
+        mapping = vettedPackages,
+        testedProtocolVersion,
+      )
+      // Sign both transactions at once with P4 namespace key
+      val hashes = NonEmpty.mk(Set, stcTx.hash, vettedPackagesTx.hash)
+      val multiHash =
+        MultiTransactionSignature.computeCombinedHash(hashes, participant4.crypto.pureCrypto)
+      val signature = participant4.crypto.privateCrypto
+        .sign(multiHash, participant4.fingerprint, SigningKeyUsage.NamespaceOnly)
+        .futureValueUS
+        .value
+      val signedStc = SignedTopologyTransaction.withTopologySignatures(
+        stcTx,
+        NonEmpty.mk(Seq, MultiTransactionSignature(hashes, signature)),
+        isProposal = false,
+        testedProtocolVersion,
+      )
+      val signedVettedPackages = SignedTopologyTransaction.withTopologySignatures(
+        vettedPackagesTx,
+        NonEmpty.mk(Seq, MultiTransactionSignature(hashes, signature)),
+        isProposal = false,
+        testedProtocolVersion,
+      )
+
+      val otkAndNsdForP4 =
+        participant4.topology.transactions
+          .list(filterMappings = Seq(Code.OwnerToKeyMapping, Code.NamespaceDelegation))
+          .result
+          .map(_.transaction)
+
+      // Load everything from sequencer1
+      sequencer1.topology.transactions.load(
+        otkAndNsdForP4 ++ Seq(signedStc, signedVettedPackages),
+        synchronizer1Id,
+        forceFlags = ForceFlags(ForceFlag.AlienMember),
+      )
+
+      // Now we can top up P4
+      updateBalanceForMember(participant4, PositiveLong.tryCreate(topUpAmount))
+
+      // And observe its traffic state is correct on the sequencer admin API
+      sequencer1.traffic_control
+        .traffic_state_of_members(Seq(participant4))
+        .trafficStates(participant4.id)
+        .extraTrafficPurchased
+        .value shouldBe topUpAmount
+
+      val seq = getProgrammableSequencer("sequencer1")
+
+      // By not sequencing anything coming from P4 we guarantee it does not consume any traffic
+      seq.withSendPolicy_(
+        "catch everything from P4",
+        {
+          case request if request.sender == participant4.member => SendDecision.Drop
+          case _ => SendDecision.Process
+        },
+      ) {
+        // Then we can connect P4 to the synchronizer and make sure it sees its top up amount
+        participant4.synchronizers.register(sequencer1, daName, manualConnect = true)
+        participant4.synchronizers.reconnect_local(daName)
+        // At this point it's the first time P4 ever connects the synchronizer, before it ever received any event from it
+        // Still check that it initializes its traffic state correctly
+        participant4.traffic_control
+          .traffic_state(synchronizer1Id)
+          .extraTrafficPurchased
+          .value shouldBe topUpAmount
+
+        // Make some topology change that will be broadcast to P4 to make sure it receives an event from the sequencer
+        val newMaxRequestSize =
+          DynamicSynchronizerParameters.defaultMaxRequestSize.value.increment.toNonNegative
+        sequencer1.topology.synchronizer_parameters.propose_update(
+          synchronizer1Id,
+          _.update(maxRequestSize = newMaxRequestSize),
+        )
+        utils.retry_until_true(
+          participant4.topology.synchronizer_parameters
+            .latest(synchronizer1Id)
+            .maxRequestSize == newMaxRequestSize
+        )
+
+        // Then we restart it and do the same check
+        // This is different because at this point P4 has received events from the sequencer, but it still never
+        // has consumed any traffic. So make sure this works as well
+        participant4.stop()
+        participant4.start()
+        participant4.synchronizers.reconnect_local(daName)
+        participant4.traffic_control
+          .traffic_state(synchronizer1Id)
+          .extraTrafficPurchased
+          .value shouldBe topUpAmount
+      }
+  }
+
   "send an error if topping up for an unknown member" in { implicit env =>
     import env.*
     loggerFactory.assertThrowsAndLogs[CommandFailure](
@@ -204,7 +360,7 @@ trait TrafficControlTest
     clock.advance(trafficControlParameters.maxBaseTrafficAccumulationDuration.asJava)
     participant1.ledger_api.packages.upload_dar(CantonTestsPath, synchronizerId = daId)
 
-    val alice = participant1.parties.enable(
+    val alice = participant1.parties.testing.enable(
       "Alice",
       synchronizeParticipants = Seq(participant1),
     )
@@ -260,7 +416,7 @@ trait TrafficControlTest
 
     val clock = env.environment.simClock.value
 
-    val alice = participant1.parties.find("Alice")
+    val alice = participant1.parties.testing.find("Alice")
     val pkg = participant1.packages.find_by_module("Test").headOption.map(_.packageId).value
 
     val exerciseCommand = getExerciseCommand(alice, pkg)
@@ -427,8 +583,8 @@ trait TrafficControlTest
 
       onboardNewSequencer(
         daId,
-        newSequencerReference = sequencer2,
-        existingSequencerReference = sequencer1,
+        newSequencer = sequencer2,
+        existingSequencer = sequencer1,
         synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
       )
 
@@ -602,6 +758,7 @@ trait TrafficControlTest
       .keys should contain theSameElementsAs List(
       participant1.id,
       participant2.id,
+      participant4.id,
       mediator1.id,
     )
   }
@@ -776,7 +933,7 @@ trait TrafficControlTest
     )
   }
 
-  private def getExerciseCommand(alice: PartyId, pkg: String)(implicit
+  private def getExerciseCommand(alice: Party, pkg: String)(implicit
       env: TestConsoleEnvironment
   ): Command = {
     import env.*

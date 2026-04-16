@@ -62,6 +62,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DbVotesTxLogStoreQueryBuilder,
   Limit,
   PageLimit,
+  ResultsPage,
   SortOrder,
   TxLogStore,
   UpdateHistory,
@@ -515,6 +516,28 @@ class DbScanStore(
       } yield contractWithStateFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
 
+  override def listFeaturedAppRightsByProvider(
+      providerPartyId: PartyId
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+    waitUntilAcsIngested {
+      for {
+        rows <- storage.query(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            acsStoreId,
+            domainMigrationId,
+            FeaturedAppRight.COMPANION,
+            additionalWhere = sql"""
+                  and featured_app_right_provider = $providerPartyId
+               """,
+          ),
+          "listFeaturedAppRightsByProvider",
+        )
+      } yield rows.map(contractWithStateFromRow(FeaturedAppRight.COMPANION))
+    }
+
   override def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry] = waitUntilAcsIngested {
@@ -898,7 +921,8 @@ class DbScanStore(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
+      after: Option[Long] = None,
+  )(implicit tc: TraceContext): Future[ResultsPage[DsoRules_CloseVoteRequestResult]] = {
     val query = listVoteRequestResultsQuery(
       txLogTableName = ScanTables.txLogTableName,
       txLogStoreId = txLogStoreId,
@@ -913,15 +937,18 @@ class DbScanStore(
       effectiveFrom = effectiveFrom,
       effectiveTo = effectiveTo,
       limit = limit,
+      after = after,
     )
     for {
       rows <- storage.query(query, "listVoteRequestResults")
-      recentVoteResults = applyLimit("listVoteRequestResults", limit, rows)
+      limited = applyLimit("listVoteRequestResults", limit, rows)
+      recentVoteResults = limited
         .map(
           txLogEntryFromRow[VoteRequestTxLogEntry](txLogConfig)
         )
         .map(_.result.getOrElse(throw txMissingField()))
-    } yield recentVoteResults
+      afterToken = limited.lastOption.map(_.entryNumber)
+    } yield ResultsPage(recentVoteResults, afterToken)
   }
 
   override def listVoteRequestsByTrackingCid(

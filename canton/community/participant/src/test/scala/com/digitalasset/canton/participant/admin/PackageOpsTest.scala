@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -6,11 +6,13 @@ package com.digitalasset.canton.participant.admin
 import cats.Eval
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.{InitialPageToken, ListVettedPackagesOpts, PageToken}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.participant.admin.PackageService.{DarDescription, DarMainPackageId}
 import com.digitalasset.canton.participant.store.{
@@ -25,11 +27,12 @@ import com.digitalasset.canton.participant.topology.{
   PackageOps,
   PackageOpsImpl,
   TopologyComponentFactory,
-  TopologyManagerLookup,
+  TopologyLookup,
 }
 import com.digitalasset.canton.store.{IndexedPhysicalSynchronizer, IndexedSynchronizer}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.client.{SynchronizerTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.{
@@ -48,17 +51,21 @@ import scala.concurrent.ExecutionContext
 
 trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatchersSugar {
   protected type T <: CommonTestSetup
-  protected def buildSetup: T
+  protected def buildSetup(includeSync2InStateManager: Boolean): T
   protected def sutName: String
 
-  protected final def withTestSetup[R](test: T => R): R = test(buildSetup)
+  protected final def withTestSetup[R](test: T => R): R = test(buildSetup(false))
+  protected final def withTestSetupSync2[R](test: T => R): R = test(buildSetup(true))
 
   s"$sutName.hasPackageVettingEntry" should {
     "return true" when {
       "one synchronizer topology snapshot has the package vetted" in withTestSetup { env =>
         import env.*
         unvettedPackagesForSnapshots(Set.empty)
-        packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe true)
+        packageOps
+          .synchronizersWithVettedPackageEntry(Set(pkgId1))
+          .failOnShutdown
+          .map(_ shouldBe Map(pkgId1 -> Set(synchronizerId1)))
       }
     }
 
@@ -66,7 +73,10 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
       "one synchronizer topology snapshot has the package unvetted" in withTestSetup { env =>
         import env.*
         unvettedPackagesForSnapshots(Set(pkgId1))
-        packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe false)
+        packageOps
+          .synchronizersWithVettedPackageEntry(Set(pkgId1))
+          .failOnShutdown
+          .map(_ shouldBe empty)
       }
     }
   }
@@ -102,9 +112,11 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
 
   protected trait CommonTestSetup {
     def packageOps: PackageOps
+    def includeSync2InStateManager: Boolean
 
     val stateManager = mock[SyncPersistentStateManager]
-    val participantId = ParticipantId(UniqueIdentifier.tryCreate("participant", "one"))
+    val participantId1 = ParticipantId(UniqueIdentifier.tryCreate("participant", "one"))
+    val participantId2 = ParticipantId(UniqueIdentifier.tryCreate("participant", "two"))
 
     private val anotherSynchronizerTopologySnapshot = mock[TopologySnapshot]
 
@@ -112,12 +124,20 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
     val pkgId2 = LfPackageId.assertFromString("pkgId2")
     val pkgId3 = LfPackageId.assertFromString("pkgId3")
 
+    // Synchronizer names are intentially chosen such that sorting by identifier
+    // then namespace is different from sorting by the string "identifier::namespace".
     val synchronizerId1 = SynchronizerId(
-      UniqueIdentifier.tryCreate("synchronizer", "one")
+      UniqueIdentifier.tryCreate("synchronizerA", "one")
     ).toPhysical
-    private val synchronizerId2 = SynchronizerId(
-      UniqueIdentifier.tryCreate("synchronizer", "two")
+    val synchronizerId2 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer1", "two")
     ).toPhysical
+    val synchronizerId3 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer", "three")
+    ).toPhysical
+
+    val syncPersistentStateDummy = mock[SyncPersistentState]
+    val logicalSyncPersistentStateDummy = mock[LogicalSyncPersistentState]
 
     val physicalSyncPersistentState = mock[PhysicalSyncPersistentState]
     val logicalSyncPersistentState = mock[LogicalSyncPersistentState]
@@ -131,8 +151,38 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
       IndexedPhysicalSynchronizer.tryCreate(synchronizerId1, index = 1)
     )
 
-    when(stateManager.getAll).thenReturn(Map(synchronizerId1 -> syncPersistentState))
-    when(stateManager.getAllLatest).thenReturn(Map(synchronizerId1.logical -> syncPersistentState))
+    val persistentStatesList: Map[PhysicalSynchronizerId, SyncPersistentState] =
+      if (includeSync2InStateManager)
+        Map(
+          synchronizerId1 -> syncPersistentState,
+          synchronizerId2 -> syncPersistentStateDummy,
+          synchronizerId3 -> syncPersistentStateDummy,
+        )
+      else
+        Map(synchronizerId1 -> syncPersistentState)
+
+    when(stateManager.getAll).thenReturn(persistentStatesList)
+    when(stateManager.get(synchronizerId1)).thenReturn(Some(syncPersistentState))
+    when(stateManager.getAllLogical).thenReturn(
+      if (includeSync2InStateManager)
+        Map(
+          synchronizerId1.logical -> logicalSyncPersistentState,
+          synchronizerId2.logical -> logicalSyncPersistentStateDummy,
+          synchronizerId3.logical -> logicalSyncPersistentStateDummy,
+        )
+      else
+        Map(synchronizerId1.logical -> logicalSyncPersistentState)
+    )
+    when(stateManager.getAllLatest).thenReturn(
+      if (includeSync2InStateManager)
+        Map(
+          synchronizerId1.logical -> syncPersistentState,
+          synchronizerId2.logical -> syncPersistentStateDummy,
+          synchronizerId3.logical -> syncPersistentStateDummy,
+        )
+      else
+        Map(synchronizerId1.logical -> syncPersistentState)
+    )
 
     private val topologyComponentFactory = mock[TopologyComponentFactory]
     when(topologyComponentFactory.createHeadTopologySnapshot()(any[ExecutionContext]))
@@ -158,7 +208,7 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
     ): Unit =
       when(
         anotherSynchronizerTopologySnapshot.determinePackagesWithNoVettingEntry(
-          participantId,
+          participantId1,
           Set(pkgId1),
         )
       ).thenReturn(FutureUnlessShutdown.pure(unvettedForSynchronizerSnapshot))
@@ -167,7 +217,9 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
 
 class PackageOpsTest extends PackageOpsTestBase {
   protected type T = TestSetup
-  protected def buildSetup: T = new TestSetup()
+  protected def buildSetup(includeSync2InStateManager: Boolean): T = new TestSetup(
+    includeSync2InStateManager
+  )
   protected def sutName: String = classOf[PackageOpsImpl].getSimpleName
 
   s"$sutName.vetPackages" should {
@@ -178,7 +230,12 @@ class PackageOpsTest extends PackageOpsTestBase {
         arrangeCurrentlyVetted(List(pkgId1))
         expectNewVettingState(List(pkgId1, pkgId2))
         packageOps
-          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync, psid)
+          .vetPackages(
+            Seq(pkgId1, pkgId2),
+            PackageVettingSynchronization.NoSync,
+            None,
+            synchronizerId1,
+          )
           .value
           .unwrap
           .map(inside(_) { case UnlessShutdown.Outcome(Right(_)) => succeed })
@@ -192,11 +249,16 @@ class PackageOpsTest extends PackageOpsTestBase {
         // Not ordered to prove that we check set-equality not ordered
         arrangeCurrentlyVetted(List(pkgId2, pkgId1))
         packageOps
-          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync, psid)
+          .vetPackages(
+            Seq(pkgId1, pkgId2),
+            PackageVettingSynchronization.NoSync,
+            None,
+            synchronizerId1,
+          )
           .value
           .unwrap
           .map(inside(_) { case UnlessShutdown.Outcome(Right(_)) =>
-            verify(topologyManager, never).proposeAndAuthorize(
+            verify(topologyManagerSync1, never).proposeAndAuthorize(
               any[TopologyChangeOp],
               any[TopologyMapping],
               any[Option[PositiveInt]],
@@ -223,11 +285,11 @@ class PackageOpsTest extends PackageOpsTestBase {
         val str = String255.tryCreate("DAR descriptor")
         packageOps
           .revokeVettingForPackages(
-            pkgId1,
             List(pkgId1, pkgId2),
             DarDescription(mainPackageId, str, str, str),
-            psid,
+            synchronizerId1,
             ForceFlags.none,
+            None,
           )
           .value
           .unwrap
@@ -244,16 +306,16 @@ class PackageOpsTest extends PackageOpsTestBase {
         val str = String255.tryCreate("DAR descriptor")
         packageOps
           .revokeVettingForPackages(
-            pkgId3,
             List(pkgId3),
             DarDescription(mainPackageId, str, str, str),
-            psid,
+            synchronizerId1,
             ForceFlags.none,
+            None,
           )
           .value
           .unwrap
           .map(inside(_) { case UnlessShutdown.Outcome(Right(_)) =>
-            verify(topologyManager, never).proposeAndAuthorize(
+            verify(topologyManagerSync1, never).proposeAndAuthorize(
               any[TopologyChangeOp],
               any[TopologyMapping],
               any[Option[PositiveInt]],
@@ -270,17 +332,75 @@ class PackageOpsTest extends PackageOpsTestBase {
     }
   }
 
-  protected class TestSetup extends CommonTestSetup {
-    val topologyManager = mock[SynchronizerTopologyManager]
+  s"$sutName.getVettedPackages" should {
+    "query synchronizers in the correct order" in withTestSetupSync2 { env =>
+      import env.*
 
-    val psid = SynchronizerId.tryFromString("test::synchronizer").toPhysical
+      arrangeCurrentlyVetted(List(pkgId1), queryAtApproximateTime = true)
+      packageOps
+        .getVettedPackages(
+          ListVettedPackagesOpts(None, None, InitialPageToken, PositiveInt.tryCreate(100))
+        )
+        .value
+        .unwrap
+        .map(inside(_) { case UnlessShutdown.Outcome(Right(vettedPackages)) =>
+          vettedPackages should have length 6
+          vettedPackages.sorted(PageToken.orderingVettedPackages) should equal(
+            vettedPackages
+          )
+          vettedPackages.sortBy(vp =>
+            vp.synchronizerId.toProtoPrimitive -> vp.participantId.toProtoPrimitive
+          ) should not equal vettedPackages
+        })
+    }
+  }
+
+  protected class TestSetup(override val includeSync2InStateManager: Boolean)
+      extends CommonTestSetup {
+    val topologyManagerSync1 = mock[SynchronizerTopologyManager]
+    val topologyManagerSync2 = mock[SynchronizerTopologyManager]
+    val topologyManagerSync3 = mock[SynchronizerTopologyManager]
+
+    val syncPersistentState1 = mock[SyncPersistentState]
+    val syncPersistentState2 = mock[SyncPersistentState]
+    val syncPersistentState3 = mock[SyncPersistentState]
+
+    val topologyTestSetup: Map[
+      PhysicalSynchronizerId,
+      (
+          SynchronizerTopologyManager,
+          SyncPersistentState,
+          SynchronizerTopologyClient,
+          CantonTimestamp,
+      ),
+    ] = Map(
+      synchronizerId1 -> (topologyManagerSync1, syncPersistentState1, mock[
+        SynchronizerTopologyClient
+      ], CantonTimestamp
+        .assertFromLong(1337L)),
+      synchronizerId2 -> (topologyManagerSync2, syncPersistentState2, mock[
+        SynchronizerTopologyClient
+      ], CantonTimestamp
+        .assertFromLong(1338L)),
+      synchronizerId3 -> (topologyManagerSync3, syncPersistentState3, mock[
+        SynchronizerTopologyClient
+      ], CantonTimestamp
+        .assertFromLong(1339L)),
+    )
 
     val packageOps = new PackageOpsImpl(
-      participantId = participantId,
+      participantId = participantId1,
       stateManager = stateManager,
-      topologyManagerLookup = new TopologyManagerLookup(
-        lookupByPsid = _ => Some(topologyManager),
-        lookupActivePsidByLsid = _ => Some(topologyManager.psid),
+      topologyLookup = new TopologyLookup(
+        mock[Clock],
+        TopologyConfig(),
+        timeouts,
+        futureSupervisor: FutureSupervisor,
+        topologyManagerO = topologyTestSetup.get(_).map(_._1),
+        psidLookup = lsid => topologyTestSetup.keySet.find(_.logical == lsid),
+        topologyClientO = topologyTestSetup.view.mapValues(_._3).get,
+        syncPersistentStateO = topologyTestSetup.get(_).map(_._2),
+        loggerFactory = loggerFactory,
       ),
       initialProtocolVersion = testedProtocolVersion,
       loggerFactory = loggerFactory,
@@ -288,29 +408,59 @@ class PackageOpsTest extends PackageOpsTestBase {
       futureSupervisor = futureSupervisor,
     )
 
-    val topologyStore = mock[TopologyStore[SynchronizerStore]]
-    when(topologyManager.psid).thenReturn(psid)
-    when(topologyManager.store).thenReturn(topologyStore)
+    def arrangeCurrentlyVetted(
+        currentlyVettedPackages: List[LfPackageId],
+        queryAtApproximateTime: Boolean = false,
+    ) =
+      for {
+        (psId, (topologyManager, persistentState, topologyClient, approxTime)) <- topologyTestSetup
+      } yield {
+        when(persistentState.topologyStore).thenReturn(mock[TopologyStore[SynchronizerStore]])
+        when(persistentState.psid).thenReturn(psId)
+        when(topologyClient.approximateTimestamp).thenReturn(approxTime)
+        val asOfExpectedTime = if (queryAtApproximateTime) approxTime else CantonTimestamp.MaxValue
+        when(
+          persistentState.topologyStore.findPositiveTransactions(
+            eqTo(asOfExpectedTime),
+            eqTo(false),
+            eqTo(false),
+            eqTo(Seq(VettedPackages.code)),
+            eqTo(Some(NonEmpty(Seq, participantId1.uid))),
+            eqTo(None),
+            any[Option[(Option[UniqueIdentifier], Int)]],
+          )(anyTraceContext)
+        ).thenReturn(
+          FutureUnlessShutdown.pure(
+            packagesVettedStoredTx(currentlyVettedPackages, Seq(participantId1))
+          )
+        )
+
+        when(
+          persistentState.topologyStore.findPositiveTransactions(
+            eqTo(asOfExpectedTime),
+            eqTo(false),
+            eqTo(false),
+            eqTo(Seq(VettedPackages.code)),
+            eqTo(None),
+            eqTo(None),
+            any[Option[(Option[UniqueIdentifier], Int)]],
+          )(anyTraceContext)
+        ).thenReturn(
+          FutureUnlessShutdown.pure(
+            packagesVettedStoredTx(currentlyVettedPackages, Seq(participantId1, participantId2))
+          )
+        )
+      }
+
     val txSerial = PositiveInt.tryCreate(1)
-    def arrangeCurrentlyVetted(currentlyVettedPackages: List[LfPackageId]) =
-      when(
-        topologyStore.findPositiveTransactions(
-          eqTo(CantonTimestamp.MaxValue),
-          eqTo(true),
-          eqTo(false),
-          eqTo(Seq(VettedPackages.code)),
-          eqTo(Some(NonEmpty(Seq, participantId.uid))),
-          eqTo(None),
-        )(anyTraceContext)
-      ).thenReturn(FutureUnlessShutdown.pure(packagesVettedStoredTx(currentlyVettedPackages)))
 
     def expectNewVettingState(newVettedPackagesState: List[LfPackageId]) =
       when(
-        topologyManager.proposeAndAuthorize(
+        topologyManagerSync1.proposeAndAuthorize(
           eqTo(TopologyChangeOp.Replace),
           eqTo(
             VettedPackages.tryCreate(
-              participantId,
+              participantId1,
               VettedPackage.unbounded(newVettedPackagesState),
             )
           ),
@@ -325,20 +475,26 @@ class PackageOpsTest extends PackageOpsTestBase {
         EitherT.rightT(signedTopologyTransaction(List(pkgId2)))
       )
 
-    def packagesVettedStoredTx(vettedPackages: List[LfPackageId]) =
+    def packagesVettedStoredTx(
+        vettedPackages: List[LfPackageId],
+        participantIds: Seq[ParticipantId],
+    ) =
       StoredTopologyTransactions(
-        Seq(
+        participantIds.map(participantId =>
           StoredTopologyTransaction(
             sequenced = SequencedTime(CantonTimestamp.MaxValue),
             validFrom = EffectiveTime(CantonTimestamp.MinValue),
             validUntil = None,
-            transaction = signedTopologyTransaction(vettedPackages),
+            transaction = signedTopologyTransaction(vettedPackages, participantId),
             rejectionReason = None,
           )
         )
       )
 
-    private def signedTopologyTransaction(vettedPackages: List[LfPackageId]) =
+    private def signedTopologyTransaction(
+        vettedPackages: List[LfPackageId],
+        participantId: ParticipantId = participantId1,
+    ) =
       SignedTopologyTransaction.withSignatures(
         transaction = TopologyTransaction(
           op = TopologyChangeOp.Replace,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -105,6 +105,7 @@ class SubmitRequestValidatorTest
       synchronizerId = synchronizerId,
       prefetchContractKeys = Seq.empty,
       disclosedContracts = Nil,
+      tapsMaxPasses = None,
     )
   }
 
@@ -192,6 +193,7 @@ class SubmitRequestValidatorTest
       synchronizerId = Some(SynchronizerId.tryFromString(api.synchronizerId)),
       packageMap = packageMap,
       prefetchKeys = prefetchKeys,
+      tapsMaxPasses = None,
     )
   }
 

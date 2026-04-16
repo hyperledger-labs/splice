@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.multisynchronizer
@@ -10,12 +10,11 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.examples.java.iou.{Dummy, GetCash, Iou}
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.UpdateFormatHelpers.getUpdateFormat
 import com.digitalasset.canton.integration.util.{
@@ -24,13 +23,14 @@ import com.digitalasset.canton.integration.util.{
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{Party, PartyId, SynchronizerId}
 
 import scala.jdk.CollectionConverters.*
 
@@ -45,23 +45,27 @@ abstract class UpdateServiceIntegrationTest
   private var otherParty: PartyId = _
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P1_S2M1_S2M1.withSetup { implicit env =>
-      import env.*
+    EnvironmentDefinition.P1_S2M1_S2M1
+      .addConfigTransforms(
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag
+      )
+      .withSetup { implicit env =>
+        import env.*
 
-      participant1.synchronizers.connect_local(sequencer1, alias = daName)
-      participant1.synchronizers.connect_local(sequencer3, alias = acmeName)
+        participant1.synchronizers.connect_local(sequencer1, alias = daName)
+        participant1.synchronizers.connect_local(sequencer3, alias = acmeName)
 
-      participant1.dars.upload(CantonExamplesPath, synchronizerId = daId)
-      participant1.dars.upload(CantonExamplesPath, synchronizerId = acmeId)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = daId)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = acmeId)
 
-      // Allocate parties
-      otherParty = participant1.parties.enable(otherPartyName, synchronizer = daName)
-      participant1.parties.enable(otherPartyName, synchronizer = acmeName)
+        // Allocate parties
+        otherParty = participant1.parties.enable(otherPartyName, synchronizer = daName)
+        participant1.parties.enable(otherPartyName, synchronizer = acmeName)
 
-    }
+      }
 
   private lazy val plugin =
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
@@ -195,14 +199,12 @@ abstract class UpdateServiceIntegrationTest
     )
 
     // reassignments for specific party and single specific template
-    suppressPackageIdWarning(
-      checkReassignments(
-        partyIds = Set(submittingParty.toLf),
-        templateIds = Seq(Iou.TEMPLATE_ID_WITH_PACKAGE_ID),
-        ledgerEndBeforeUnassignments = ledgerEndBeforeUnassignments,
-        ledgerEndAfterAssignments = ledgerEndAfterAssignments,
-        expectedReassignmentsSize = 2,
-      )
+    checkReassignments(
+      partyIds = Set(submittingParty.toLf),
+      templateIds = Seq(Iou.TEMPLATE_ID),
+      ledgerEndBeforeUnassignments = ledgerEndBeforeUnassignments,
+      ledgerEndAfterAssignments = ledgerEndAfterAssignments,
+      expectedReassignmentsSize = 2,
     )
 
     checkReassignmentsPointwise(
@@ -311,7 +313,7 @@ abstract class UpdateServiceIntegrationTest
   }
 
   private def checkReassignments(
-      partyIds: Set[PartyId],
+      partyIds: Set[Party],
       templateIds: Seq[Identifier],
       ledgerEndBeforeUnassignments: Long,
       ledgerEndAfterAssignments: Long,

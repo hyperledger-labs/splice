@@ -305,6 +305,7 @@ declare -A subcommand_whitelist
 source "${TOOLS_LIB}/pulumi-helpers"
 source "${TOOLS_LIB}/pulumi-commands"
 source "${TOOLS_LIB}/hard-domain-migration-commands"
+source "${TOOLS_LIB}/logical-synchronizer-upgrade-commands"
 source "${TOOLS_LIB}/disaster-recovery-commands"
 
 function _prompt_to_confirm() {
@@ -543,7 +544,7 @@ function subcmd_gcloud_alert_logs_ui() {
 
     base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
     cluster=$(basename "$PWD")
-    expected_file="../../expected/infra/expected-${cluster}.json"
+    expected_file="../../expected/observability/expected-${cluster}.json"
     _info "Using filter from $expected_file"
     query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
     encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
@@ -841,7 +842,7 @@ function subcmd_create() {
       fi
     fi
 
-    for stack in infra canton-network sv-runbook validator-runbook; do
+    for stack in infra observability canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
 
@@ -868,6 +869,7 @@ function subcmd_delete() {
     _cluster_must_exist
 
     _info "Taking down pulumi infrastructure stack."
+    subcmd_pulumi observability down --yes --skip-preview
     subcmd_pulumi infra down --yes --skip-preview
 
     _info "Deleting GKE cluster."
@@ -1351,7 +1353,6 @@ function subcmd_wait() {
 
     namespace="${1-}"
     app="${2-}"
-    migration_id=${3:-0}
 
     if [ -z "$namespace" ]; then
         _log "Waiting for all pods to become ready"
@@ -1363,8 +1364,8 @@ function subcmd_wait() {
             _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=3s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
-            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app,migration=$migration_id"
-            _log "Pod for app $app ready in namespace $namespace for migration id $migration_id"
+            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app"
+            _log "Pod for app $app ready in namespace $namespace"
         fi
     fi
 }
@@ -2101,6 +2102,9 @@ function subcmd_silence_grafana_alerts() {
     until=$(date -u -d "+${duration}" '+%FT%TZ')
 
     _info "Fetching token"
+    if ! kubectl get secret -n observability grafana-service-account-token-secret &>/dev/null; then
+        _error "Grafana service account token secret not found. Set monitoring.enableGrafanaServiceAccountToken to true in the cluster config and redeploy the observability stack."
+    fi
     token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
 
     shift 1

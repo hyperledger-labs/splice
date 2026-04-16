@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.upgrading
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.damltests.appinstall.v2.java.appinstall.{
   AppInstall as AppInstallV2,
@@ -15,8 +14,8 @@ import com.digitalasset.canton.damltests.featuredapprightimpl.v1.java.featuredap
 import com.digitalasset.canton.damltests.featuredapprightimpl.v2.java.featuredapprightimpl.FeaturedAppRightImpl as FeaturedAppRightImplV2
 import com.digitalasset.canton.damltests.featuredapprightimpl.v2.java.featuredapprightv1.FeaturedAppRight
 import com.digitalasset.canton.damltests.{appinstall, featuredapprightimpl}
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -28,6 +27,7 @@ import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.Interp
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.util.SetupPackageVetting
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfPackageName, SynchronizerAlias}
 import com.digitalasset.daml.lf.data.Ref
 import monocle.macros.syntax.lens.*
@@ -42,9 +42,9 @@ import UpgradingBaseTest.Syntax.*
 final class ComplexTopologyAwarePackageSelectionIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
-
+  registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
@@ -75,10 +75,11 @@ final class ComplexTopologyAwarePackageSelectionIntegrationTest
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1_S1M1
-      .addConfigTransform(
+      .addConfigTransforms(
         ConfigTransforms.updateAllParticipantConfigs_(
           _.focus(_.ledgerApi.topologyAwarePackageSelection.enabled).replace(true)
-        )
+        ),
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
       )
       .withSetup { implicit env =>
         import env.*
@@ -379,7 +380,14 @@ final class ComplexTopologyAwarePackageSelectionIntegrationTest
               ).create().commands().asScala.toSeq,
               userPackageSelectionPreference = userPackagePreferenceSet,
             ),
-          _.shouldBeCantonErrorCode(CommandExecutionErrors.UserPackagePreferenceNotVetted),
+          entry => {
+            entry.shouldBeCantonErrorCode(CommandExecutionErrors.PackageSelectionFailed)
+            entry.message should (include(
+              "No synchronizers satisfy the topology requirements for the submitted command"
+            ) and include(
+              show"$GlobalSynchronizerId: Failed to select package-id for package-name '${FeaturedAppRightImplV1.PACKAGE_NAME}' appearing in a command root node due to: No vetted package candidate satisfies the package-id filter 'Commands.package_id_selection_preference'=${FeaturedAppRightImplV1.PACKAGE_NAME} -> $AppRightV2"
+            ) and include(show"Candidates: $AppRightV1"))
+          },
         )
       }
     }

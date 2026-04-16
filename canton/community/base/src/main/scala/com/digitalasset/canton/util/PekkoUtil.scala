@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -25,6 +25,7 @@ import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   HasLoggerName,
   NamedLoggerFactory,
+  NamedLogging,
   NamedLoggingContext,
 }
 import com.digitalasset.canton.util.BatchN.{CatchUpMode, MaximizeConcurrency}
@@ -72,7 +73,7 @@ import java.util.{Timer, TimerTask}
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -194,7 +195,8 @@ object PekkoUtil extends HasLoggerName {
   def statefulMapAsync[Out, Mat, S, T](graph: FlowOps[Out, Mat], initial: S)(
       f: (S, Out) => Future[(S, T)]
   )(implicit loggingContext: NamedLoggingContext): graph.Repr[T] = {
-    val directExecutionContext = DirectExecutionContext(loggingContext.tracedLogger)
+    val directExecutionContext =
+      DirectExecutionContext(NamedLogging.loggerWithoutTracing(loggingContext.tracedLogger))
     graph
       .scanAsync((initial, Option.empty[T])) { case ((state, _), next) =>
         f(state, next)
@@ -224,7 +226,8 @@ object PekkoUtil extends HasLoggerName {
     // where the future may have been started before the first one aborted.
     // So we just need to throw away the results of the futures and convert them into aborts.
     if (parallelism == 1) {
-      val directExecutionContext = DirectExecutionContext(loggingContext.tracedLogger)
+      val directExecutionContext =
+        DirectExecutionContext(NamedLogging.loggerWithoutTracing(loggingContext.tracedLogger))
       statefulMapAsync(graph, initial = false) { (aborted, next) =>
         if (aborted) Future.successful(true -> AbortedDueToShutdown)
         else f(next).unwrap.map(us => !us.isOutcome -> us)(directExecutionContext)
@@ -334,7 +337,7 @@ object PekkoUtil extends HasLoggerName {
       Context: SingletonTraverse.Aux[Context, C],
   ): graph.Repr[Context[UnlessShutdown[T]]] = {
     implicit val directExecutionContext: ExecutionContext =
-      DirectExecutionContext(loggingContext.tracedLogger)
+      DirectExecutionContext(NamedLogging.loggerWithoutTracing(loggingContext.tracedLogger))
     statefulMapAsync(graph, initial = Option(initial)) {
       case (oldState @ Some(s), next) =>
         // Since the context contains at most one element, it is fine to use traverse with futures here
@@ -460,7 +463,8 @@ object PekkoUtil extends HasLoggerName {
       loggingContext: NamedLoggingContext,
       materializer: Materializer,
   ): Source[WithKillSwitch[A], (KillSwitch, Future[Done])] = {
-    val directExecutionContext = DirectExecutionContext(loggingContext.tracedLogger)
+    val directExecutionContext =
+      DirectExecutionContext(NamedLogging.loggerWithoutTracing(loggingContext.tracedLogger))
 
     // Use immediate acknowledgements and buffer size 1 to minimize the risk that
     // several materializations of the returned source concurrently restart stuff.
@@ -906,6 +910,14 @@ object PekkoUtil extends HasLoggerName {
       ): U#Repr[Iterable[A]] =
         graph.via(BatchN(maxBatchSize, maxBatchCount, catchUpMode))
 
+      def batchNWeighted(
+          maxBatchWeight: Long,
+          maxBatchCount: Int,
+          catchUpMode: CatchUpMode = MaximizeConcurrency,
+          weightFn: A => Long,
+      ): U#Repr[Iterable[A]] =
+        graph.via(BatchN.weighted(maxBatchWeight, maxBatchCount, catchUpMode)(weightFn))
+
       def dropIf(count: Int)(condition: A => Boolean): U#Repr[A] =
         PekkoUtil.dropIf(graph, count, condition)
     }
@@ -1205,7 +1217,7 @@ object PekkoUtil extends HasLoggerName {
       logger = logger,
       metrics = recoveringQueueMetrics,
     )
-
+    private val lock = new Mutex()
     private val timer: Timer = new Timer()
     private var shuttingDown: Boolean = false
     private var shuttingDownTimerCancelled: Boolean = false
@@ -1365,7 +1377,7 @@ object PekkoUtil extends HasLoggerName {
     }
 
     private def blockingSynchronized[U](u: => U): U =
-      blocking(synchronized(u))
+      (lock.exclusive(u))
 
     initializeConsumer()
   }
@@ -1393,6 +1405,7 @@ object PekkoUtil extends HasLoggerName {
       delegate: FutureQueue[(Long, T)],
       loggerFactory: NamedLoggerFactory,
   ) extends CompletingAndShutdownable {
+    private val lock = new Mutex()
     private val logger = loggerFactory.getLogger(this.getClass)
     private var index = initialEndIndex + 1
     private var shutdownInitiated = false
@@ -1449,7 +1462,7 @@ object PekkoUtil extends HasLoggerName {
     }
 
     private def blockingSynchronized[U](u: => U): U =
-      blocking(synchronized(u))
+      (lock.exclusive(u))
 
     push()
   }
@@ -1487,6 +1500,7 @@ object PekkoUtil extends HasLoggerName {
       logger: Logger,
       metrics: RecoveringQueueMetrics,
   ) {
+    private val lock = new Mutex()
     private val blocked: mutable.Queue[(T, Promise[Done])] =
       mutable.Queue()
     private val buffered: mutable.Queue[T] = mutable.Queue()
@@ -1586,7 +1600,7 @@ object PekkoUtil extends HasLoggerName {
     }
 
     private def blockingSynchronized[U](u: => U): U =
-      blocking(synchronized(u))
+      (lock.exclusive(u))
 
     private def updateMetrics(): Unit = {
       metrics.buffered.mark(buffered.size.toLong)(MetricsContext.Empty)
@@ -1632,10 +1646,11 @@ object PekkoUtil extends HasLoggerName {
   ) extends FutureQueue[T] {
     private var index: Long = futureQueueConsumer.fromExclusive
     private var lastOffer: Future[Done] = Future.successful(Done)
+    private val lock = new Mutex()
 
     @SuppressWarnings(Array("com.digitalasset.canton.SynchronizedFuture"))
-    override def offer(elem: T): Future[Done] = blocking(
-      synchronized(
+    override def offer(elem: T): Future[Done] = (
+      lock.exclusive(
         if (lastOffer.isCompleted) {
           index = index + 1
           lastOffer = futureQueueConsumer.futureQueue.offer(index -> elem)

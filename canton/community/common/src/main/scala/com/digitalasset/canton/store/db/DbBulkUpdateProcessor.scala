@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.db
@@ -23,7 +23,9 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 /** Implementation of aggregated bulk update operations for DB stores */
-trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
+trait DbBulkUpdateProcessor[A, B]
+    extends BatchAggregator.Processor[A, Try[B]]
+    with DbStorage.Implicits {
 
   protected implicit def executionContext: ExecutionContext
   protected def storage: DbStorage
@@ -39,7 +41,7 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   protected def bulkUpdateWithCheck(items: NonEmpty[Seq[Traced[A]]], queryBaseName: String)(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
-  ): FutureUnlessShutdown[Iterable[Try[B]]] = {
+  ): FutureUnlessShutdown[immutable.Iterable[Try[B]]] = {
     val bulkUpdate = bulkUpdateAction(items)
     for {
       updateCounts <- storage.queryAndUpdate(bulkUpdate, s"$queryBaseName update")

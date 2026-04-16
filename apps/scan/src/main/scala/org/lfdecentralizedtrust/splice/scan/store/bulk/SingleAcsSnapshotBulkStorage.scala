@@ -46,10 +46,15 @@ class SingleAcsSnapshotBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
+  case class AcsSnapshotChunk(
+      chunkBytes: ByteString,
+      numContracts: Int,
+  )
+
   private def getAcsSnapshotChunk(
       timestamp: TimestampWithMigrationId,
       after: Option[Long],
-  ): Future[(Position, ByteString)] = {
+  ): Future[(Position, AcsSnapshotChunk)] = {
     for {
       snapshot <- acsSnapshotStore.queryAcsSnapshot(
         timestamp.migrationId,
@@ -61,14 +66,17 @@ class SingleAcsSnapshotBulkStorage(
       )
     } yield {
       val encoded = snapshot.createdEventsInPage.map(event =>
-        CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(event.eventId, event.event)
+        CompactJsonScanHttpEncodings().javaToHttpActiveContract(event.eventId, event.event)
       )
       val contractsStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
       val contractsBytes = ByteString(contractsStr.getBytes(StandardCharsets.UTF_8))
       logger.debug(
         s"Read ${encoded.length} contracts from ACS, to a bytestring of size ${contractsBytes.length} bytes"
       )
-      (snapshot.afterToken.fold(End: Position)(Index(_)), contractsBytes)
+      (
+        snapshot.afterToken.fold(End: Position)(Index(_)),
+        AcsSnapshotChunk(contractsBytes, encoded.length),
+      )
     }
 
   }
@@ -80,6 +88,10 @@ class SingleAcsSnapshotBulkStorage(
         case Index(i) => getAcsSnapshotChunk(timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
+      .map(chunk => {
+        historyMetrics.BulkStorage.incContractsCount(chunk.numContracts)
+        chunk.chunkBytes
+      })
       .via(
         S3ZstdObjects(
           storageConfig,

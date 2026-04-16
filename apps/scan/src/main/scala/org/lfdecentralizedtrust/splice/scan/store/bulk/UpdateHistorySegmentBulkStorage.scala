@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.admin.http.{ScanHttpEncodings, ScanJsonSupport}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   PageLimit,
@@ -56,9 +56,14 @@ class UpdateHistorySegmentBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
+  case class UpdatesChunk(
+      updateBytes: ByteString,
+      numUpdates: Int,
+  )
+
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
-  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, ByteString)]] = {
+  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, UpdatesChunk)]] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
@@ -88,7 +93,7 @@ class UpdateHistorySegmentBulkStorage(
               Some(
                 (
                   TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
-                  updatesBytes,
+                  UpdatesChunk(updatesBytes, updatesInSegment.length),
                 )
               )
             )
@@ -108,7 +113,7 @@ class UpdateHistorySegmentBulkStorage(
             appConfig.updatesPollingInterval.underlying,
             actorSystem.scheduler,
           ) {
-            Future.successful(Some((afterTs, ByteString.empty)))
+            Future.successful(Some((afterTs, UpdatesChunk(ByteString.empty, 0))))
           }
         }
     } yield {
@@ -124,11 +129,14 @@ class UpdateHistorySegmentBulkStorage(
         ScanHttpEncodings.V1,
       )
     )
-    /* When we add new fields, we make them optional, and they will be None until a coordinated switching point.
-     * We therefore want to drop null values from the JSON, to avoid emitting a lot of "fieldX: null" in the dumps until the switching point,
-     * otherwise we'll break BFT guarantees when SVs adopt a version with the optional field asynchronously.
-     */
-    val updatesStr = encoded.map(_.asJson.dropNullValues.noSpacesSortKeys).mkString("\n") + "\n"
+    // Import custom encoders that omit null OmitNullString fields.
+    // When we add new optional OmitNullString fields, they will be None until a coordinated
+    // switching point.  The custom encoders ensure the null keys are absent from the JSON so that
+    // SVs adopting a new version asynchronously do not break BFT guarantees.
+    import ScanJsonSupport.*
+    val updatesStr = encoded
+      .map(u => u.asJson.noSpacesSortKeys)
+      .mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
       s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption
@@ -142,6 +150,10 @@ class UpdateHistorySegmentBulkStorage(
   ): Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
+      .map(chunk => {
+        historyMetrics.BulkStorage.incUpdatesCount(chunk.numUpdates)
+        chunk.updateBytes
+      })
       .via(
         // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
         // since it assumes that it gets at least one chunk to write.

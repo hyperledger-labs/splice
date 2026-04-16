@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.traffic
@@ -7,11 +7,13 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, SessionSigningKeysConfig}
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.crypto.KeyPurpose.Signing
 import com.digitalasset.canton.crypto.SigningError.InvariantViolation
+import com.digitalasset.canton.crypto.provider.jce.JceSecurityProvider
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.signer.{SyncCryptoSigner, SyncCryptoSignerWithSessionKeys}
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore
 import com.digitalasset.canton.crypto.{
@@ -23,6 +25,7 @@ import com.digitalasset.canton.crypto.{
   SignatureDelegation,
   SignatureDelegationValidityPeriod,
   SigningAlgorithmSpec,
+  SigningError,
   SigningKeySpec,
   SigningKeyUsage,
   SigningKeysWithThreshold,
@@ -66,9 +69,11 @@ import com.digitalasset.canton.protocol.{
   TransactionMetadata,
   WellFormedTransaction,
 }
+import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.{Batch, MediatorGroupRecipient, Recipients}
 import com.digitalasset.canton.sequencing.traffic.TrafficStateController
 import com.digitalasset.canton.store.SessionKeyStore
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.{
   SynchronizerTopologyClientWithInit,
@@ -78,11 +83,9 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, PhysicalSynchro
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HashingSchemeVersion.V2
 import com.digitalasset.canton.{LedgerSubmissionId, LfKeyResolver, WorkflowId}
-import com.google.crypto.tink.subtle.Ed25519Sign
 import com.google.protobuf.ByteString
-import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
-import org.bouncycastle.asn1.x509.{AlgorithmIdentifier, SubjectPublicKeyInfo}
 
+import java.security.{GeneralSecurityException, KeyPairGenerator}
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.util.Random
@@ -104,6 +107,8 @@ class TrafficCostEstimator(
     psid: PhysicalSynchronizerId,
     participantId: ParticipantId,
     trafficStateController: TrafficStateController,
+    defaultMaxSequencingTimeOffset: NonNegativeFiniteDuration,
+    clock: Clock,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -138,7 +143,7 @@ class TrafficCostEstimator(
       },
     )
 
-    def estimateCost = for {
+    def estimateCost(freeConfirmationResponses: Boolean) = for {
       transactionMetadata <- EitherT.fromEither[FutureUnlessShutdown](
         TransactionMetadata.fromTransactionMeta(
           transactionMeta.ledgerEffectiveTime,
@@ -166,12 +171,16 @@ class TrafficCostEstimator(
         costHints,
         disclosedContractInstances,
       )
-      confirmationResponseEstimatedCost <- estimateConfirmationResponseCost(
-        trafficStateController,
-        submitterInfo,
-        client,
-        snapshot,
-      )
+      confirmationResponseEstimatedCost <-
+        if (freeConfirmationResponses)
+          EitherT.pure[FutureUnlessShutdown, String](NonNegativeLong.zero)
+        else
+          estimateConfirmationResponseCost(
+            trafficStateController,
+            submitterInfo,
+            client,
+            snapshot,
+          )
     } yield SubmissionCostEstimation(
       snapshot.timestamp,
       confirmationRequestEstimatedCost,
@@ -179,13 +188,13 @@ class TrafficCostEstimator(
     )
 
     EitherT
-      .liftF[FutureUnlessShutdown, String, Boolean](
-        snapshot.trafficControlParameters(psid.protocolVersion).map(_.isDefined)
+      .liftF[FutureUnlessShutdown, String, Option[TrafficControlParameters]](
+        snapshot.trafficControlParameters(psid.protocolVersion)
       )
       .flatMap {
         // If traffic control is disabled, cost is 0.
         // Short circuit early to avoid unnecessarily generation a confirmation request / response
-        case false =>
+        case None =>
           EitherT.pure(
             SubmissionCostEstimation(
               snapshot.timestamp,
@@ -193,7 +202,7 @@ class TrafficCostEstimator(
               NonNegativeLong.zero,
             )
           )
-        case true => estimateCost
+        case Some(params) => estimateCost(params.freeConfirmationResponses)
       }
   }
 
@@ -246,7 +255,7 @@ class TrafficCostEstimator(
                   signatures = signatures,
                   transactionUUID = UUID.randomUUID(),
                   mediatorGroup = mediatorGroupIndex,
-                  maxRecordTimeO = None,
+                  maxRecordTime = None,
                 )
               )
             )
@@ -256,6 +265,7 @@ class TrafficCostEstimator(
             Some(LedgerSubmissionId.assertFromString(UUID.randomUUID().toString))
           )
       }
+      now = clock.now
       // Generate a confirmation request
       mockedConfirmationRequest <- confirmationRequestFactory
         .createConfirmationRequest(
@@ -269,9 +279,13 @@ class TrafficCostEstimator(
           keyResolver,
           mediatorGroupRecipient,
           client,
+          now,
           sessionKeyStore,
           lookupContractsWithDisclosed,
-          CantonTimestamp.MaxValue,
+          // We use `clock.now` + `defaultMaxSequencingTimeOffset` so that, when session signing keys are enabled,
+          // the request’s time span is covered by a session signing key, ensuring session keys are accounted for
+          // when computing the cost.
+          now.add(defaultMaxSequencingTimeOffset.asJava),
           psid.protocolVersion,
         )
         .leftMap(_.toString)
@@ -326,11 +340,15 @@ class TrafficCostEstimator(
           NonEmpty.mk(Seq, confirmationResponse),
           psid.protocolVersion,
         )
-        SignedProtocolMessage.trySignAndCreate(confirmationResponses, client)
+        SignedProtocolMessage.trySignAndCreate(
+          confirmationResponses,
+          client,
+          None, // `ConfirmationResponses` are always signed with a `fixed` timestamp.
+        )
       }
       batch = Batch.of(
         psid.protocolVersion,
-        (signedConfirmationResponse -> Recipients.cc(mediatorGroupRecipient)),
+        signedConfirmationResponse -> Recipients.cc(mediatorGroupRecipient),
       )
       estimatedCost <- EitherT.liftF(
         trafficStateController
@@ -348,16 +366,16 @@ class TrafficCostEstimator(
   ): Seq[Signature] =
     // If hints are provided, use them to mock a signature with the expected algorithm
     if (costHints.signingAlgorithmSpec.nonEmpty) {
-      costHints.signingAlgorithmSpec.map(mockSignature)
+      costHints.signingAlgorithmSpec.map(mockSignature(_, None))
     } else {
-      // Otherwise mock threshold-many signatures from the first keys in the party to key mapping
+      // Otherwise mock threshold-many signatures from the first keys in the party signing keys
       partyAuth.keys.forgetNE
         .flatMap { key =>
           synchronizerCrypto.pureCrypto.signingAlgorithmSpecs.allowed
             .find(_.supportedSigningKeySpecs.contains(key.keySpec))
+            .map(mockSignature(_, Some(key.fingerprint)))
         }
         .take(partyAuth.threshold.value)
-        .map(mockSignature)
         .toSeq
     }
 }
@@ -365,14 +383,22 @@ class TrafficCostEstimator(
 object TrafficCostEstimator {
   // Mock values
   // session signing keys is a def to avoid compression effects with identical data
-  private def sessionSigningKey = {
-    val rawKeyPair = Ed25519Sign.KeyPair.newKeyPair()
-    val algoId = new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519)
-    val publicKey = new SubjectPublicKeyInfo(algoId, rawKeyPair.getPublicKey).getEncoded
+  private def trySessionSigningKey = {
+    val keyPair =
+      try {
+        val kpg = KeyPairGenerator.getInstance(
+          SigningKeySpec.EcCurve25519.jcaCurveName,
+          JceSecurityProvider.bouncyCastleProvider,
+        )
+        kpg.generateKeyPair()
+      } catch {
+        case ex: GeneralSecurityException =>
+          throw new RuntimeException("Failed to generate Curve25519 signing key pair", ex)
+      }
     SigningPublicKey
       .create(
         format = CryptoKeyFormat.DerX509Spki,
-        key = ByteString.copyFrom(publicKey),
+        key = ByteString.copyFrom(keyPair.getPublic.getEncoded),
         keySpec = SigningKeySpec.EcCurve25519,
         usage = SigningKeyUsage.ProtocolOnly,
       )
@@ -397,8 +423,10 @@ object TrafficCostEstimator {
       throw new UnsupportedOperationException(
         "Private store should not be used in this mock implementation"
       )
+
     override def sign(
         topologySnapshot: TopologySnapshot,
+        signingTimestampOverrides: Option[SigningTimestampOverrides],
         hash: Hash,
         usage: NonEmpty[Set[SigningKeyUsage]],
     )(implicit
@@ -411,7 +439,11 @@ object TrafficCostEstimator {
         allowedSigningKeySpecs,
       )
       maybeWithSignatureDelegation <- EitherT.fromEither[FutureUnlessShutdown](
-        maybeAddSignatureDelegation(signature, topologySnapshot)
+        maybeAddSignatureDelegation(
+          signature,
+          topologySnapshot,
+          signingTimestampOverrides.map(_.approximateTimestamp),
+        )
       )
     } yield maybeWithSignatureDelegation
 
@@ -420,20 +452,35 @@ object TrafficCostEstimator {
     private def maybeAddSignatureDelegation(
         signature: Signature,
         topologySnapshot: TopologySnapshot,
+        approximateTimestampForSigning: Option[CantonTimestamp],
     ) = if (withSessionKeys) {
-      SignatureDelegation
-        .create(
-          TrafficCostEstimator.sessionSigningKey,
-          SignatureDelegationValidityPeriod(
-            topologySnapshot.timestamp,
-            PositiveFiniteDuration.ofMinutes(5),
-          ),
-          signature,
-        )
-        .leftMap(err =>
-          SyncCryptoError.SyncCryptoSigningError(InvariantViolation(err)): SyncCryptoError
-        )
-        .map(signature.addSignatureDelegation)
+      for {
+        sessionSigningKey <-
+          try {
+            Right(TrafficCostEstimator.trySessionSigningKey)
+          } catch {
+            case ex: GeneralSecurityException =>
+              Left(SyncCryptoError.SyncCryptoSigningError(SigningError.GeneralError(ex)))
+            case ex: IllegalStateException =>
+              Left(SyncCryptoError.SyncCryptoSigningError(SigningError.GeneralError(ex)))
+          }
+        signatureDelegation <- SignatureDelegation
+          .create(
+            sessionSigningKey,
+            // this delegation validation period is an approximation of the real one (i.e., without the tolerance shift),
+            // but it’s a good enough estimate to provide an accurate assessment of the transaction size and
+            // compute its cost.
+            SignatureDelegationValidityPeriod(
+              approximateTimestampForSigning.getOrElse(topologySnapshot.timestamp),
+              SessionSigningKeysConfig.default.keyValidityDuration,
+            ),
+            signature,
+          )
+          .leftMap(err =>
+            SyncCryptoError.SyncCryptoSigningError(InvariantViolation(err)): SyncCryptoError
+          )
+          .map(signature.addSignatureDelegation)
+      } yield signatureDelegation
     } else Right(signature)
 
     private def mockParticipantSignature(
@@ -469,7 +516,7 @@ object TrafficCostEstimator {
             Seq.empty,
           ): SyncCryptoError,
         )
-      } yield mockSignature(signingAlgorithm)
+      } yield mockSignature(signingAlgorithm, Some(key.fingerprint))
   }
 
   private def mockHash = Hash
@@ -480,11 +527,12 @@ object TrafficCostEstimator {
     )
 
   private def mockSignature(
-      spec: SigningAlgorithmSpec
+      spec: SigningAlgorithmSpec,
+      signedBy: Option[Fingerprint],
   ) = Signature.create(
     spec.supportedSignatureFormats.head1,
     ByteString.copyFrom(Random.nextBytes(spec.approximateSignatureSize)),
-    Fingerprint.tryFromString(mockHash.toHexString),
+    signedBy.getOrElse(Fingerprint.tryFromString(mockHash.toHexString)),
     Some(spec),
     None,
   )

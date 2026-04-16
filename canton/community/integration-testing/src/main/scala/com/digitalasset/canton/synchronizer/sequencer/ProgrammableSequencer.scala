@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -8,6 +8,7 @@ import cats.syntax.functorFilter.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -24,6 +25,8 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.protocol.messages.{
   ConfirmationResponses,
   SignedProtocolMessage,
@@ -31,9 +34,11 @@ import com.digitalasset.canton.protocol.messages.{
 }
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
+import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.External
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerAdminStatus
@@ -45,17 +50,19 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
+  LsuTrafficState,
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.topology.processing.EffectiveTime
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{FutureUtil, MonadUtil}
+import io.grpc.ServerServiceDefinition
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.stream.KillSwitches
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
@@ -105,9 +112,8 @@ class ProgrammableSequencer(
 
   override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: com.digitalasset.canton.tracing.TraceContext
-  ): FutureUnlessShutdown[
-    SequencerTrafficStatus
-  ] = baseSequencer.trafficStatus(members, selector)
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus] =
+    baseSequencer.trafficStatus(members, selector)
 
   override def sequencingTime(implicit
       traceContext: TraceContext
@@ -282,10 +288,9 @@ class ProgrammableSequencer(
         logger.debug(s"Immediately allowing message ${submission.messageId}")
         sendAndCheck(signedSubmission)
 
-      case SendDecision.Reject =>
+      case SendDecision.Reject(error) =>
         semaphore.release()
         logger.debug(s"Rejecting message ${submission.messageId}")
-        val error = SequencerErrors.InternalTesting("Message rejected by send policy.")
         EitherT.leftT[FutureUnlessShutdown, Unit](error)
 
       case SendDecision.Drop =>
@@ -430,6 +435,8 @@ class ProgrammableSequencer(
 
   override def adminStatus: SequencerAdminStatus = baseSequencer.adminStatus
 
+  override def adminServices: Seq[ServerServiceDefinition] = baseSequencer.adminServices
+
   override def isEnabled(member: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
@@ -444,13 +451,33 @@ class ProgrammableSequencer(
   ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp] =
     baseSequencer.awaitContainingBlockLastTimestamp(timestamp)
 
-  override private[sequencer] def updateSynchronizerSuccessor(
+  override private[sequencer] def updateLsuSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit =
-    baseSequencer.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+    baseSequencer.updateLsuSuccessor(successorO, announcementEffectiveTime)
 
   override private[canton] def orderer: Option[BlockOrderer] = baseSequencer.orderer
+
+  override def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]] =
+    baseSequencer.getTrafficSummaries(timestamps)
+
+  override def getLsuTrafficControlState(trafficTsOverride: Option[CantonTimestamp] = None)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
+    baseSequencer.getLsuTrafficControlState(trafficTsOverride)
+
+  override def setLsuTrafficControlState(state: LsuTrafficState)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
+    baseSequencer.setLsuTrafficControlState(state)
+
+  override def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
+    baseSequencer.performLsuSequencingTest(mediatorGroupRecipient)
 }
 
 /** Utilities for using the [[ProgrammableSequencer]] from tests */
@@ -472,17 +499,33 @@ trait HasProgrammableSequencer {
       }
   }
 
+  def signModifiedSubmissionRequestForParticipant(
+      request: SubmissionRequest,
+      node: ParticipantNode,
+      psid: PhysicalSynchronizerId,
+      staticSynchronizerParameters: StaticSynchronizerParameters,
+      approximateTimestampOverride: Option[CantonTimestamp] = None,
+  )(implicit executionContext: ExecutionContext): SignedContent[SubmissionRequest] =
+    signModifiedSubmissionRequest(
+      request,
+      node.sync.syncCrypto.tryForSynchronizer(psid, staticSynchronizerParameters),
+      approximateTimestampOverride,
+    )
+
   // Sign a (modified) submission request
   def signModifiedSubmissionRequest(
       request: SubmissionRequest,
       syncCrypto: SynchronizerCryptoClient,
+      approximateTimestampForSigning: Option[CantonTimestamp],
   )(implicit executionContext: ExecutionContext): SignedContent[SubmissionRequest] =
     SignedContent
       .create(
         syncCrypto.pureCrypto,
-        syncCrypto.currentSnapshotApproximation,
+        syncCrypto.currentSnapshotApproximation.futureValueUS,
         request,
         None,
+        SigningTimestampOverrides
+          .createOption(approximateTimestampForSigning, Some(request.maxSequencingTime)),
         HashPurpose.SubmissionRequestSignature,
         testedProtocolVersion,
       )
@@ -520,10 +563,10 @@ object ProgrammableSequencer {
 
           val localVerdicts = submissionRequest.batch.envelopes
             .flatMap(
-              _.closeEnvelope
-                .openEnvelope(participant.crypto.pureCrypto, BaseTest.testedProtocolVersion)
-                .value
-                .protocolMessage match {
+              _.toOpenEnvelope(
+                participant.crypto.pureCrypto,
+                BaseTest.testedProtocolVersion,
+              ).value.protocolMessage match {
                 case SignedProtocolMessage(
                       TypedSignedProtocolMessageContent(confirmations: ConfirmationResponses),
                       _,

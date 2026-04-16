@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -31,6 +31,7 @@ object DefaultTestIdentities {
   val (participant1, party1) = createParticipantAndParty(1)
   val (participant2, party2) = createParticipantAndParty(2)
   val (participant3, party3) = createParticipantAndParty(3)
+  val (participant4, party4) = createParticipantAndParty(4)
 
   val defaultDynamicSynchronizerParameters: DynamicSynchronizerParameters =
     DynamicSynchronizerParameters.initialValues(

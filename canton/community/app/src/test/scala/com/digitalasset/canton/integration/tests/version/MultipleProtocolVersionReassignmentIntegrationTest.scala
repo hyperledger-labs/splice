@@ -1,14 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.version
 
 import com.daml.ledger.api.v2.commands.Command
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.examples.java.cycle as M
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.util.{
   AcsInspection,
   HasCommandRunnersHelpers,
@@ -51,7 +50,8 @@ sealed trait MultipleProtocolVersionReassignmentIntegrationTest
         ConfigTransforms.updateParticipantConfig("participant1") {
           _.focus(_.parameters.minimumProtocolVersion)
             .replace(Some(ParticipantProtocolVersion(beforeLastStable)))
-        }
+        },
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
       )
       .addConfigTransforms(ConfigTransforms.dontWarnOnDeprecatedPV*)
       .withSetup { implicit env =>
@@ -173,7 +173,7 @@ class MultipleProtocolVersionReassignmentIntegrationTestPostgres
     extends MultipleProtocolVersionReassignmentIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer.tryCreate(
         Set("sequencer1"),
@@ -189,7 +189,7 @@ class MultipleProtocolVersionReassignmentIntegrationTestPostgres
 //    extends MultipleProtocolVersionReassignmentIntegrationTest {
 //  registerPlugin(new UseH2(loggerFactory))
 //  registerPlugin(
-//    new UseReferenceBlockSequencer[DbConfig.H2](
+//    new UseBftSequencer(
 //      loggerFactory,
 //      sequencerGroups = MultiSynchronizer.tryCreate(Set("sequencer1"), Set("sequencer2"), Set("sequencer3"), Set("sequencer4")),
 //    )

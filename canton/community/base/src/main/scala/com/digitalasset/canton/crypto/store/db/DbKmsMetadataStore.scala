@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store.db
@@ -55,7 +55,7 @@ class DbKmsMetadataStore(
       ]] = {
     val loader: Fingerprint => FutureUnlessShutdown[Option[KmsMetadata]] = getMetadata
     ScaffeineCache.buildAsync[FutureUnlessShutdown, Fingerprint, Option[KmsMetadata]](
-      cache = kmsCacheConfig.buildScaffeine(),
+      cache = kmsCacheConfig.buildScaffeine(loggerFactory),
       loader = loader,
     )(logger, "kmsMetadata")
   }
@@ -76,6 +76,11 @@ class DbKmsMetadataStore(
       fingerprint: Fingerprint
   )(implicit tc: TraceContext): FutureUnlessShutdown[Option[KmsMetadataStore.KmsMetadata]] =
     cache.get(fingerprint)
+
+  override def getAll(fingerprints: Seq[Fingerprint])(implicit
+      tc: TraceContext
+  ): FutureUnlessShutdown[Map[Fingerprint, Option[KmsMetadata]]] =
+    cache.getAll(fingerprints)
 
   /** Store kms metadata in the store
     */

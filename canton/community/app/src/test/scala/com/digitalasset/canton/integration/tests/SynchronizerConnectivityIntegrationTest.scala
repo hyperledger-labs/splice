@@ -1,12 +1,21 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
 
 import com.daml.test.evidence.scalatest.OperabilityTestHelpers
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnection,
+  SequencerConnectionPoolDelays,
+  SequencerConnectionValidation,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+  SynchronizerConnectionConfig,
+}
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{DbConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
@@ -27,16 +36,9 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.{
   SyncServiceUnknownSynchronizer,
 }
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.NotConnectedToAnySynchronizer
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError.ConnectionErrors.SynchronizerIsNotAvailable
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError.InitialOnboardingError
-import com.digitalasset.canton.sequencing.SequencerConnectionValidation.ThresholdActive
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.MemberAccessDisabled
-import com.digitalasset.canton.sequencing.{
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
@@ -92,7 +94,6 @@ sealed trait SynchronizerConnectivityIntegrationTest
           participant1.synchronizers.connect_local(sequencer1, alias = daName),
           _.shouldBeCommandFailure(SyncServiceInconsistentConnectivity),
         )
-
       }
 
       "Still reported as not available on a second attempt" in { implicit env =>
@@ -327,7 +328,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
               ) or include("Token refresh aborted due to shutdown")
               // the participant might not actually get the dispatched transaction delivered,
               // because the sequencer may cut the participant's connection before delivering the topology broadcast
-              or include regex ("Waiting for transaction .* to be observed"))
+              or include regex "Waiting for transaction .* to be observed")
           },
         )
 
@@ -336,7 +337,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
           entry => {
             entry.shouldBeCommandFailure(InitialOnboardingError)
             entry.commandFailureMessage should include(
-              s"${participant1.id} has previously been off-boarded and cannot onboard again"
+              s"${participant1.id} is either active on the synchronizer or has previously been offboarded"
             )
           },
         )
@@ -383,7 +384,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
                 sequencer1.sequencerConnection.withSequencerId(sequencerId = sequencer2.id)
               ),
             ),
-            validation = ThresholdActive,
+            validation = SequencerConnectionValidation.ThresholdActive,
           ),
           _.shouldBeCantonErrorCode(SyncServiceError.SyncServiceInconsistentConnectivity),
         )
@@ -399,16 +400,18 @@ sealed trait SynchronizerConnectivityIntegrationTest
             daName,
             SequencerConnections.tryMany(
               Seq(
-                sequencer1.config.publicApi.clientConfig.asSequencerConnection(seq1Alias),
-                sequencer2.config.publicApi.clientConfig.asSequencerConnection(seq2Alias),
-              ),
+                sequencer1.config.publicApi.clientConfig
+                  .asSequencerConnection(seq1Alias, sequencerId = None),
+                sequencer2.config.publicApi.clientConfig
+                  .asSequencerConnection(seq2Alias, sequencerId = None),
+              ).map(SequencerConnection.fromInternal),
               sequencerTrustThreshold = PositiveInt.one,
               sequencerLivenessMargin = NonNegativeInt.zero,
               SubmissionRequestAmplification.NoAmplification,
               SequencerConnectionPoolDelays.default,
             ),
           ),
-          validation = ThresholdActive,
+          validation = SequencerConnectionValidation.ThresholdActive,
         )
         // now check that the connection for sequencer1 got updated with the sequencer id
 
@@ -463,19 +466,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
 //  registerPlugin(new UseH2(loggerFactory))
 //}
 
-class SynchronizerConnectivityReferenceIntegrationTestPostgres
-    extends SynchronizerConnectivityIntegrationTest {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
-      loggerFactory,
-      sequencerGroups = UseReferenceBlockSequencer.MultiSynchronizer(
-        Seq(Set(InstanceName.tryCreate("sequencer1")), Set(InstanceName.tryCreate("sequencer2")))
-      ),
-    )
-  )
-}
-
+@UnstableTest // TODO(#28493) Remove annotation
 class SynchronizerConnectivityBftOrderingIntegrationTestPostgres
     extends SynchronizerConnectivityIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))

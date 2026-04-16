@@ -1,0 +1,6 @@
+name: ADDITIONAL_CONFIG_PARTICIPANT_PRUNING
+value: |
+  # Ignore missing ACS commitment and commitment mismatches
+  canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
+  # Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.
+  canton.participants.participant.parameters.batching.max-pruning-batch-size = 50000

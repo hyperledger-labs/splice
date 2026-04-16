@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -9,9 +9,8 @@ import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedString,
   LengthLimitedStringWrapper,
 }
+import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-
-import scala.annotation.tailrec
 
 /** Utility class for clients who want to '''make use''' of pretty printing. Import this as follows:
   * {{{
@@ -71,22 +70,8 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
     def limit(maxLength: Int): Shown =
       Shown(if (s.length <= maxLength) s else s.take(maxLength) + "...")
 
-    def readableLoggerName(maxLength: Int): Shown = {
-      @tailrec
-      def go(result: String): String =
-        if (result.length <= maxLength) {
-          result
-        } else {
-          val newResult = result.replaceFirst("^(([a-z]\\.)*[a-z])[a-zA-Z0-9-]*", "$1")
-          if (newResult == result) {
-            result
-          } else {
-            go(newResult)
-          }
-        }
-
-      Shown(go(s))
-    }
+    def readableQualifiedName(maxLength: Int): Shown =
+      NamedLogging.readableQualifiedName(s, maxLength)
   }
 
   implicit class ShowStringSyntax(s: String) extends StringOperators(s)
@@ -137,7 +122,7 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
 
     def limit(n: Int): Iterable[Shown] = {
       val (prefix, remainder) = trav.splitAt(n)
-      val ellipsis = if (remainder.isEmpty) Seq.empty else Seq(Shown("..."))
+      val ellipsis = if (remainder.isEmpty) Seq.empty else Seq(Shown(s"... ${remainder.size} more"))
       prefix.map(e => e: Shown) ++ ellipsis
     }
   }

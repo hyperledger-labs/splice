@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.aws
@@ -6,6 +6,7 @@ package com.digitalasset.canton.crypto.kms.aws
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
+import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{KmsConfig, ProcessingTimeout}
@@ -41,6 +42,7 @@ import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
 import software.amazon.awssdk.core.exception.SdkClientException
 import software.amazon.awssdk.http.SdkHttpConfigurationOption
+import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.kms.model.*
@@ -58,6 +60,7 @@ import scala.jdk.FutureConverters.*
 class AwsKms(
     override val config: KmsConfig.Aws,
     private val kmsClient: KmsAsyncClient,
+    httpClientO: Option[SdkAsyncHttpClient],
     override val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends Kms
@@ -83,21 +86,21 @@ class AwsKms(
       case err: CompletionException =>
         Option(err.getCause) match {
           case Some(kmsErr: KmsException) if kmsErr.retryable() =>
-            kmsErrorGen(ErrorUtil.messageWithStacktrace(err), true)
+            kmsErrorGen(ThrowableUtil.messageWithStacktrace(err), true)
           // we look for network failure errors to retry on
           case Some(sdkErr: SdkClientException)
               if errorMessagesToRetry.exists(sdkErr.getMessage.contains(_)) || sdkErr.retryable() =>
-            kmsErrorGen(ErrorUtil.messageWithStacktrace(err), true)
+            kmsErrorGen(ThrowableUtil.messageWithStacktrace(err), true)
           // we retry on resource exceptions as well
           case Some(resourceException: ResourceExhaustedException) =>
             logger.debug(
               s"ResourceExhaustedException with retry: ${resourceException.isRetryable}"
             )(TraceContext.empty)
-            kmsErrorGen(ErrorUtil.messageWithStacktrace(err), true)
+            kmsErrorGen(ThrowableUtil.messageWithStacktrace(err), true)
           case _ =>
-            kmsErrorGen(ErrorUtil.messageWithStacktrace(err), false)
+            kmsErrorGen(ThrowableUtil.messageWithStacktrace(err), false)
         }
-      case err => kmsErrorGen(ErrorUtil.messageWithStacktrace(err), true)
+      case err => kmsErrorGen(ThrowableUtil.messageWithStacktrace(err), true)
     }
 
   /** Creates an AWS KMS key based on a series of specifications and returns its key identifier.
@@ -133,9 +136,9 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsCreateKeyRequestError(ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err => KmsCreateKeyRequestError(ThrowableUtil.messageWithStacktrace(err)))
       response <- EitherTUtil.fromFuture[KmsError, aws.CreateKeyResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.createKey(keyRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(kmsClient.createKey(keyRequest).asScala),
         err => errorHandler(err, (errStr, retryable) => KmsCreateKeyError(errStr, retryable)),
       )
       kmsKeyId <- EitherT
@@ -206,9 +209,13 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsGetPublicKeyRequestError(keyId, ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err =>
+            KmsGetPublicKeyRequestError(keyId, ThrowableUtil.messageWithStacktrace(err))
+          )
       pkResponse <- EitherTUtil.fromFuture[KmsError, aws.GetPublicKeyResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.getPublicKey(getPublicKeyRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(
+          kmsClient.getPublicKey(getPublicKeyRequest).asScala
+        ),
         err =>
           errorHandler(err, (errStr, retryable) => KmsGetPublicKeyError(keyId, errStr, retryable)),
       )
@@ -360,7 +367,8 @@ class AwsKms(
   override protected def keyExistsAndIsActiveInternal(keyId: KmsKeyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[FutureUnlessShutdown, KmsError, Unit] = getMetadataForActiveKeys(keyId).map(_ => ())
+  ): EitherT[FutureUnlessShutdown, KmsError, Unit] =
+    getMetadataForActiveKeys(keyId).map(_ => ())
 
   private def encrypt(
       keyId: KmsKeyId,
@@ -382,9 +390,9 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsEncryptRequestError(keyId, ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err => KmsEncryptRequestError(keyId, ThrowableUtil.messageWithStacktrace(err)))
       response <- EitherTUtil.fromFuture[KmsError, aws.EncryptResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.encrypt(encryptRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(kmsClient.encrypt(encryptRequest).asScala),
         err => errorHandler(err, (errStr, retryable) => KmsEncryptError(keyId, errStr, retryable)),
       )
       encryptedData = response.ciphertextBlob
@@ -427,9 +435,9 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsDecryptRequestError(keyId, ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err => KmsDecryptRequestError(keyId, ThrowableUtil.messageWithStacktrace(err)))
       response <- EitherTUtil.fromFuture[KmsError, aws.DecryptResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.decrypt(decryptRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(kmsClient.decrypt(decryptRequest).asScala),
         err => errorHandler(err, (errStr, retryable) => KmsDecryptError(keyId, errStr, retryable)),
       )
       decryptedData = response.plaintext
@@ -499,9 +507,9 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsSignRequestError(keyId, ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err => KmsSignRequestError(keyId, ThrowableUtil.messageWithStacktrace(err)))
       response <- EitherTUtil.fromFuture[KmsError, aws.SignResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.sign(signRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(kmsClient.sign(signRequest).asScala),
         err => errorHandler(err, (errStr, retryable) => KmsSignError(keyId, errStr, retryable)),
       )
     } yield ByteString.copyFrom(response.signature().asByteBuffer())
@@ -525,9 +533,9 @@ class AwsKms(
               .build
           }
           .toEitherT[FutureUnlessShutdown]
-          .leftMap(err => KmsDeleteKeyRequestError(keyId, ErrorUtil.messageWithStacktrace(err)))
+          .leftMap(err => KmsDeleteKeyRequestError(keyId, ThrowableUtil.messageWithStacktrace(err)))
       _ <- EitherTUtil.fromFuture[KmsError, aws.ScheduleKeyDeletionResponse](
-        FutureUnlessShutdown.outcomeF(
+        synchronizeWithClosingF(functionFullName)(
           kmsClient.scheduleKeyDeletion(scheduleKeyDeletionRequest).asScala
         ),
         err => errorHandler(err, (errStr, retryable) => KmsDeleteKeyError(keyId, errStr, retryable)),
@@ -552,10 +560,10 @@ class AwsKms(
           }
           .toEitherT[FutureUnlessShutdown]
           .leftMap(err =>
-            KmsRetrieveKeyMetadataRequestError(keyId, ErrorUtil.messageWithStacktrace(err))
+            KmsRetrieveKeyMetadataRequestError(keyId, ThrowableUtil.messageWithStacktrace(err))
           )
       response <- EitherTUtil.fromFuture[KmsError, aws.DescribeKeyResponse](
-        FutureUnlessShutdown.outcomeF(kmsClient.describeKey(describeRequest).asScala),
+        synchronizeWithClosingF(functionFullName)(kmsClient.describeKey(describeRequest).asScala),
         err =>
           errorHandler(
             err,
@@ -565,7 +573,7 @@ class AwsKms(
     } yield response.keyMetadata()
 
   override def onClosed(): Unit =
-    LifeCycle.close(kmsClient)(logger)
+    LifeCycle.close(kmsClient, LifeCycle.toCloseableOption(httpClientO))(logger)
 
 }
 
@@ -614,23 +622,21 @@ object AwsKms extends Kms.SupportedSchemes {
       loggerFactory: NamedLoggerFactory,
       tracerProvider: TracerProvider = NoReportingTracerProvider,
   ): Either[KmsError, AwsKms] = {
-    val kmsAsyncClientDefault = {
-      val builder = KmsAsyncClient
-        .builder()
-        .region(Region.of(config.region))
-        /* We can access AWS in multiple ways, for example: (1) using the AWS security token service (sts)
+    val kmsAsyncClientBuilder = KmsAsyncClient
+      .builder()
+      .region(Region.of(config.region))
+      /* We can access AWS in multiple ways, for example: (1) using the AWS security token service (sts)
          profile (2) setting up the following environment variables: AWS_ACCESS_KEY_ID,
          AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN */
-        .credentialsProvider(DefaultCredentialsProvider.create())
+      .credentialsProvider(DefaultCredentialsProvider.builder().build())
 
-      config.endpointOverride.map(URI.create).fold(builder)(builder.endpointOverride)
-    }
+    config.endpointOverride.map(URI.create).foreach(kmsAsyncClientBuilder.endpointOverride)
 
-    val kmsAsyncClientBuilder = if (config.disableSslVerification) {
+    val httpClientO = Option.when(config.disableSslVerification) {
       loggerFactory
         .getLogger(getClass)
         .info("Disabling SSL verification")
-      val httpClient = NettyNioAsyncHttpClient
+      NettyNioAsyncHttpClient
         .builder()
         .buildWithDefaults(
           AttributeMap
@@ -638,44 +644,40 @@ object AwsKms extends Kms.SupportedSchemes {
             .put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.box(true))
             .build()
         )
-      kmsAsyncClientDefault
-        // this disables SSL certificate checks in the underlying http client
-        .httpClient(httpClient)
-    } else kmsAsyncClientDefault
+    }
+    // this disables SSL certificate checks in the underlying http client.
+    // setting the http client explicitly also means we need to close it ourselves.
+    httpClientO.foreach(kmsAsyncClientBuilder.httpClient)
 
-    for {
-      kms <-
-        Either
-          .catchOnly[aws.KmsException] {
-            val builder =
-              if (config.auditLogging)
-                kmsAsyncClientBuilder
-                  .overrideConfiguration(
-                    ClientOverrideConfiguration
-                      .builder()
-                      .addExecutionInterceptor(
-                        new AwsTraceContextInterceptor(loggerFactory, tracerProvider)
-                      )
-                      .addExecutionInterceptor(new AwsRequestResponseLogger(loggerFactory))
-                      .build()
-                  )
-              else
-                kmsAsyncClientBuilder
-
-            new AwsKms(
-              config,
-              builder
-                .region(Region.of(config.region))
-                /* We can access AWS in multiple ways, for example: (1) using the AWS security token service (sts)
-                 profile (2) setting up the following environment variables: AWS_ACCESS_KEY_ID,
-                 AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN */
-                .credentialsProvider(DefaultCredentialsProvider.create())
-                .build(),
-              timeouts,
-              loggerFactory,
+    if (config.auditLogging)
+      kmsAsyncClientBuilder
+        .overrideConfiguration(
+          ClientOverrideConfiguration
+            .builder()
+            .addExecutionInterceptor(
+              new AwsTraceContextInterceptor(loggerFactory, tracerProvider)
             )
-          }
-          .leftMap[KmsError](err => KmsCreateClientError(ErrorUtil.messageWithStacktrace(err)))
-    } yield kms
+            .addExecutionInterceptor(new AwsRequestResponseLogger(loggerFactory))
+            .build()
+        )
+
+    Either
+      .catchOnly[aws.KmsException] {
+        new AwsKms(
+          config,
+          kmsAsyncClientBuilder
+            .region(Region.of(config.region))
+            /* We can access AWS in multiple ways, for example: (1) using the AWS security token service (sts)
+             profile (2) setting up the following environment variables: AWS_ACCESS_KEY_ID,
+             AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN */
+            .credentialsProvider(DefaultCredentialsProvider.builder().build())
+            .build(),
+          httpClientO,
+          timeouts,
+          loggerFactory,
+        )
+      }
+      .leftMap[KmsError](err => KmsCreateClientError(ThrowableUtil.messageWithStacktrace(err)))
+
   }
 }
