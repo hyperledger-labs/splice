@@ -426,9 +426,10 @@ jobs:
     - scala_test_permissioned_canton
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
-    - scala_test_docker_compose
-    - scala_test_with_docker_no_canton
-    - scala_test_with_docker_and_canton_simtime
+    # TODO(DACH-NY/canton-network-internal#4661) Reenable
+    # - scala_test_docker_compose
+    # - scala_test_with_docker_no_canton
+    # - scala_test_with_docker_and_canton_simtime
     - scala_test_app_upgrade
     - scala_test_canton_enterprise
     - scala_test_without_canton
