@@ -40,9 +40,12 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
 
       actAndCheck(
         "Fail to purchase extra traffic for SV1", {
-          intercept[CommandFailure] {
-            buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now)
-          }
+          loggerFactory.assertThrowsAndLogs[CommandFailure](
+            buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now),
+            _.errorMessage should include(
+              "splice.lfdecentralizedtrust.org/insufficient-topup-amount"
+            ),
+          )
         },
       )(
         "The failure was ignored by the tx log parser",
