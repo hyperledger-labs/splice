@@ -66,6 +66,6 @@ interface RewardCoupon where
 
 
 data RewardCoupon_AssignBeneficiariesResult = RewardCoupon_AssignBeneficiariesResult with
-    newBeneficiariesCouponCids : [ContractId RewardCoupon]
+    newBeneficiariesCouponCids : [(Party, [ContractId RewardCoupon])]
       -- ^ The coupons created for the newly assigned beneficiaries.
   deriving (Eq, Show)

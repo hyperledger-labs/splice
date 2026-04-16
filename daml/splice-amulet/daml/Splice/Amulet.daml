@@ -618,15 +618,16 @@ rewardCouponV2_assignBeneficiariesImpl coupon arg = do
   let allCoupons = coupon :: additionalCoupons
 
   -- create coupons for new beneficiaries for each coupon
-  allNewCids <- forA allCoupons $ \c ->
-    forA newBeneficiaries $ \newBeneficiary ->
-      create c with
+  perBeneficiaryCids <- forA newBeneficiaries $ \newBeneficiary -> do
+    cids <- forA allCoupons $ \c ->
+      toInterfaceContractId <$> create c with
         amount = c.amount * newBeneficiary.weight
         beneficiary = Some newBeneficiary.beneficiary
         providerIsObserver = True
+    pure (newBeneficiary.beneficiary, cids)
 
   return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
-    newBeneficiariesCouponCids = map toInterfaceContractId (concat allNewCids)
+    newBeneficiariesCouponCids = perBeneficiaryCids
 
 
 -- instances
