@@ -1,7 +1,7 @@
 !include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
 pulumiProjectConfig:
   default:
-    cloudsql:
+    cloudSql:
       protected: false
 multiValidator:
   postgresPvcSize: '500Gi'
