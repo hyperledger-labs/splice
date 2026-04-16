@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
@@ -192,18 +193,32 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     logger.info(
       s"Proposing participant ${task.participantId} be promoted to Submission rights for the DSO party, will wait for it to take effect."
     )
-    participantAdminConnection
-      .ensureHostingParticipantIsPromotedToSubmitter(
-        task.synchronizerId,
-        dsoParty,
-        task.participantId,
-        RetryFor.ClientCalls,
-      )
-      .map(_ =>
-        TaskSuccess(
-          show"Participant ${task.participantId} was promoted to Submission rights for the DSO party"
+    for {
+      activationTx <- participantAdminConnection
+        .getDsoPartyToParticipantTransaction(
+          task.synchronizerId,
+          task.participantId,
+          dsoParty,
         )
-      )
+        .getOrElseF(
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(
+                s"Transaction where the participant ${task.participantId} was activated not found."
+              )
+              .asRuntimeException()
+          )
+        )
+      activationTime = activationTx.base.validFrom
+      result <- participantAdminConnection
+        .clearOnboardingFlag(
+          dsoParty,
+          task.synchronizerId,
+          activationTime,
+        )
+    } yield TaskSuccess(
+      show"Participant ${task.participantId} was promoted to Submission rights for the DSO party: $result"
+    )
   }
 
   override protected def isStaleTask(

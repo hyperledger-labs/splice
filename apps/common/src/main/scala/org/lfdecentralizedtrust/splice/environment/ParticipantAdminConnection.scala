@@ -15,6 +15,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
+  PartyOnboardingFlagStatus,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{
@@ -22,7 +23,7 @@ import com.digitalasset.canton.admin.participant.v30.{
   ExportPartyAcsResponse,
   PruningServiceGrpc,
 }
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -34,8 +35,8 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
-  SequencerConnections,
   SequencerConnectionValidation,
+  SequencerConnections,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.{
@@ -414,7 +415,7 @@ class ParticipantAdminConnection(
     val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
 
     for {
-      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, true)
+      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
       beforeActivationOffset = activationOffset - 1L
       _ = logger.info(
         show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
@@ -808,6 +809,24 @@ class ParticipantAdminConnection(
       isProposal = true,
       waitForAuthorization = false,
     )
+  }
+
+  def clearOnboardingFlag(party: PartyId, synchronizerId: SynchronizerId, activationTime: Instant)(
+      implicit tranceContext: TraceContext
+  ): Future[PartyOnboardingFlagStatus] = {
+    for {
+      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
+      beforeActivationOffset = activationOffset - 1L
+      result <- runCmd(
+        ParticipantAdminCommands.PartyManagement
+          .ClearPartyOnboardingFlag(
+            party,
+            synchronizerId,
+            NonNegativeLong.tryCreate(beforeActivationOffset),
+            waitForActivationTimeout = None, // i.e., default
+          )
+      )
+    } yield result
   }
 
   def ensureHostingParticipantIsPromotedToSubmitter(
