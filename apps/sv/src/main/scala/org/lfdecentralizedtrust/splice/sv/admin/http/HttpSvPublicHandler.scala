@@ -473,14 +473,16 @@ class HttpSvPublicHandler(
                 )
               )
             else
-              authorizeParticipantForHostingDsoParty(ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId))
+              authorizeParticipantForHostingDsoParty(
+                ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
+              )
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
   }
 
   private def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId,
+      participantId: ParticipantId
   )(implicit tc: TraceContext): Future[r0.OnboardSvPartyMigrationAuthorizeResponse] = {
     dsoPartyMigration
       .authorizeParticipantForHostingDsoParty(participantId)
