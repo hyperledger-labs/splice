@@ -8,7 +8,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.store.{Limit, MultiDomainAcsStore, SynchronizerStore}
+import org.lfdecentralizedtrust.splice.util.Contract
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -49,6 +51,13 @@ class CachingScanRewardsReferenceStore private[splice] (
       asOf: CantonTimestamp
   )(implicit tc: TraceContext): Future[Set[String]] =
     featuredAppPartiesCache.get(asOf)
+
+  override def lookupOpenMiningRoundByNumber(
+      roundNumber: Long
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
+    store.lookupOpenMiningRoundByNumber(roundNumber)
 
   override val storeName: String = store.storeName
   override def defaultLimit: Limit = store.defaultLimit

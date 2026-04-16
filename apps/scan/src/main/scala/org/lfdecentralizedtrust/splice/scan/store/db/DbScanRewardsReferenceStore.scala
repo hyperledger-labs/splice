@@ -18,11 +18,21 @@ import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsArchiveConfig,
+  AcsQueries,
+  AcsTables,
   DbAppStore,
   DbTcsStore,
   StoreDescriptor,
 }
-import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  TemplateJsonDecoder,
+}
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -62,7 +72,9 @@ class DbScanRewardsReferenceStore(
         )
       ),
     )
-    with ScanRewardsReferenceStore {
+    with ScanRewardsReferenceStore
+    with AcsTables
+    with AcsQueries {
 
   override def waitUntilInitialized: Future[Unit] = multiDomainAcsStore.waitUntilAcsIngested()
 
@@ -137,4 +149,38 @@ class DbScanRewardsReferenceStore(
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
     tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf)
+
+  override def lookupOpenMiningRoundByNumber(
+      roundNumber: Long
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
+    val storeId = multiDomainAcsStore.acsStoreId
+    val migrationId = multiDomainAcsStore.domainMigrationId
+    val pqn = PackageQualifiedName.fromJavaCodegenCompanion(OpenMiningRound.COMPANION)
+    val columns = SelectFromAcsTableResult.sqlColumnsCommaSeparated()
+    val query =
+      sql"""(
+         select #$columns
+         from #${ScanRewardsReferenceTables.acsTableName} acs
+         where acs.store_id = $storeId
+           and acs.migration_id = $migrationId
+           and acs.package_name = ${pqn.packageName}
+           and acs.template_id_qualified_name = ${pqn.qualifiedName}
+           and acs.round = $roundNumber
+       ) union all (
+         select #$columns
+         from #${ScanRewardsReferenceTables.archiveTableName} acs
+         where acs.store_id = $storeId
+           and acs.migration_id = $migrationId
+           and acs.package_name = ${pqn.packageName}
+           and acs.template_id_qualified_name = ${pqn.qualifiedName}
+           and acs.round = $roundNumber
+       ) limit 1""".as[SelectFromAcsTableResult]
+    for {
+      result <- futureUnlessShutdownToFuture(
+        storage.query(query, "lookupOpenMiningRoundByNumber")
+      )
+    } yield result.headOption.map(contractFromRow(OpenMiningRound.COMPANION)(_))
+  }
 }
