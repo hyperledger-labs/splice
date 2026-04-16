@@ -23,3 +23,7 @@ jobs:
       - uses: ./splice-shared-gha/.github/actions/nix/cleanup_nix_cache
         with:
           max_age_days: ${{ inputs.max_age_days || '30' }}
+          workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          failure_notifications_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
+          failure_notifications_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
+          failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
