@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p
@@ -27,6 +27,10 @@ trait P2PConnectionState {
       p2pAddress: P2PAddress
   )(implicit traceContext: TraceContext): P2PEndpointIdAssociationResult
 
+  /** Called by the P2P network output module to ensure connectivity with a peer. It must call
+    * either `createNetworkRef` to create a new network reference or `actionIfPresent` if a network
+    * reference already exists for the given P2P address ID.
+    */
   def addNetworkRefIfMissing(
       p2pAddressId: P2PAddress.Id
   )(

@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-
 /* @ts-expect-error typings unavailable */
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
@@ -24,6 +23,12 @@ export class ValidatorClient {
   private validatorBaseUrl: string;
 
   private token: string;
+  /** Expected featured app status
+   * true: this party should be featured
+   * false: this party should not be featured
+   * undefined: do not attempt to modify the featured app status of this party
+   */
+  public featured: boolean | undefined;
   private _partyId: string | undefined;
 
   private headers = (): Record<string, string> => ({
@@ -31,9 +36,10 @@ export class ValidatorClient {
     Authorization: `Bearer ${this.token}`,
   });
 
-  constructor(validatorBaseUrl: string, token: string) {
+  constructor(validatorBaseUrl: string, token: string, featured: boolean | undefined) {
     this.validatorBaseUrl = validatorBaseUrl;
     this.token = token;
+    this.featured = featured;
 
     this.http = new HttpClient();
   }
@@ -53,13 +59,9 @@ export class ValidatorClient {
     // -*--- VALIDATOR APIS -------------------------------------------------------*-
     register: async (): Promise<void> => {
       try {
-        await this.http.post.success(
-          `${this.validatorBaseUrl}/api/validator/v0/register`,
-          undefined,
-          {
-            headers: this.headers(),
-          },
-        );
+        await this.http.post.success(`${this.validatorBaseUrl}/api/validator/v0/register`, null, {
+          headers: this.headers(),
+        });
       } catch (error) {
         throw new Error(`Error registering validator: ${error}`);
       }
@@ -71,7 +73,7 @@ export class ValidatorClient {
         return this.http.post
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/token-standard/transfers/${transferOfferCid}/accept`,
-            undefined,
+            null,
             {
               retry: (_, resp) => {
                 if (resp?.error_code === 404) {
@@ -91,7 +93,7 @@ export class ValidatorClient {
       },
       getBalance: (): GetBalanceResponse | undefined => {
         return this.http.get
-          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/balance`, undefined, {
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/balance`, null, {
             headers: this.headers(),
           })
           .then(resp => jsonStringDecoder(getBalanceResponse, resp.body));
@@ -130,7 +132,7 @@ export class ValidatorClient {
         return this.http.get
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/token-standard/transfers`,
-            undefined,
+            null,
             {
               headers: this.headers(),
             },
@@ -146,10 +148,24 @@ export class ValidatorClient {
       },
       userStatus: (): UserStatusResponse | undefined => {
         return this.http.get
-          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`, undefined, {
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`, null, {
             headers: this.headers(),
           })
           .then(resp => jsonStringDecoder(userStatusResponse, resp.body));
+      },
+      selfGrantFeatureAppRight: (): void => {
+        this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/self-grant-feature-app-right`,
+          null,
+          { retry: false, headers: this.headers() },
+        );
+      },
+      cancelFeaturedAppRights: (): void => {
+        this.http.delete.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/cancel-featured-app-rights`,
+          null,
+          { retry: false, headers: this.headers() },
+        );
       },
     },
   };

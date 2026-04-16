@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.crashrecovery
@@ -27,7 +27,6 @@ import com.digitalasset.canton.config.{
   BatchingConfig,
   CachingConfigs,
   CantonConfig,
-  DbConfig,
   DefaultProcessingTimeouts,
   RequireTypes,
 }
@@ -46,9 +45,9 @@ import com.digitalasset.canton.integration.bootstrap.{
 import com.digitalasset.canton.integration.plugins.UseExternalProcess.ShutdownPhase
 import com.digitalasset.canton.integration.plugins.{
   PostgresDumpRestore,
+  UseBftSequencer,
   UseExternalProcess,
   UsePostgres,
-  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -147,7 +146,7 @@ abstract class BaseSynchronizerRestartTest
         sys.error(s"logging was used but shouldn't be")
     }
   )
-  val sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+  val sequencerPlugin = new UseBftSequencer(loggerFactory)
   registerPlugin(sequencerPlugin)
   registerPlugin(external)
 
@@ -208,7 +207,7 @@ abstract class BaseSynchronizerRestartTest
     import storage.api.*
 
     val res = for {
-      headStateO <- blockStore.readHead
+      headStateO <- blockStore.readHeadUnbounded()
       headState = headStateO.value
       query =
         sqlu"""delete from seq_block_height where height = ${headState.latestBlock.height}"""
@@ -372,6 +371,7 @@ class SequencerRestartTest
     setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L),
     enforceRateLimiting = true,
     baseEventCost = NonNegativeLong.tryCreate(baseEventCost),
+    freeConfirmationResponses = true,
   )
 
   "sequencer operates normally after restarting and participants reconnect to it automatically" in {

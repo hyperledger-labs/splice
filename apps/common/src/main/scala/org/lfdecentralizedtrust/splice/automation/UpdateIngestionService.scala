@@ -7,7 +7,6 @@ import cats.data.NonEmptyList
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -17,12 +16,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTr
 import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerConnection,
-  SpliceLedgerSubscription,
+  ServiceWithGuaranteedShutdown,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Ingestion for ACS and transfer stores.
   * We ingest them independently but we ensure that the acs store
@@ -41,16 +40,16 @@ class UpdateIngestionService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends LedgerIngestionService(config, backoffClock) {
+) extends RetryingService(config, backoffClock, "update ingestion") {
 
   private val filter = ingestionSink.ingestionFilter
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
 
-  override protected def newLedgerSubscription()(implicit
+  override protected def instantiateService()(implicit
       traceContext: TraceContext
-  ): Future[SpliceLedgerSubscription[?]] =
+  ): Future[ServiceWithGuaranteedShutdown[?]] =
     for {
       ingestionStart <- ingestionSink.initialize()
       subscribeFrom <- ingestionStart match {
@@ -85,7 +84,7 @@ class UpdateIngestionService(
             _ <- ingestAcsAndInFlight(acsOffset)
           } yield acsOffset
       }
-    } yield new SpliceLedgerSubscription(
+    } yield new ServiceWithGuaranteedShutdown(
       source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
       retryProvider = retryProvider,
@@ -96,7 +95,7 @@ class UpdateIngestionService(
       msgs: Seq[GetTreeUpdatesResponse]
   )(implicit traceContext: TraceContext): Future[Unit] = {
     // if paused, this step will backpressure the source
-    waitForResumePromise.future.flatMap { _ =>
+    waitForResume().flatMap { _ =>
       NonEmptyList.fromFoldable(msgs) match {
         case Some(batch) =>
           logger.debug(s"Processing batch of ${batch.size} elements")
@@ -123,38 +122,5 @@ class UpdateIngestionService(
     source.batch(config.ingestion.maxBatchSize.toLong, Vector(_))(_ :+ _)
 
   // Kick-off the ingestion
-  startIngestion()
-
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  @volatile
-  private var waitForResumePromise = Promise.successful(())
-
-  /** Note that any in-flight events being processed when `pause` is called will still be processed.
-    */
-  @VisibleForTesting
-  def pause(): Future[Unit] = blocking {
-    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
-      logger.info("Pausing UpdateIngestionService.")
-      blocking {
-        synchronized {
-          if (waitForResumePromise.isCompleted) {
-            waitForResumePromise = Promise()
-          }
-          Future.successful(())
-        }
-      }
-    }
-  }
-
-  @VisibleForTesting
-  def resume(): Unit = blocking {
-    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
-      logger.info("Resuming UpdateIngestionService.")
-      blocking {
-        synchronized {
-          val _ = waitForResumePromise.trySuccess(())
-        }
-      }
-    }
-  }
+  start()
 }

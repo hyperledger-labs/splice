@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -24,6 +24,7 @@ import com.digitalasset.canton.admin.participant.v30.{
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -33,10 +34,19 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnections,
+  SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.topology.{
+  KnownPhysicalSynchronizerId,
+  NodeIdentity,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SequencerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -45,13 +55,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
-import com.digitalasset.canton.topology.{
-  NodeIdentity,
-  ParticipantId,
-  PartyId,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-}
+import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.github.blemale.scaffeine.Scaffeine
@@ -67,11 +71,12 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   RecreateOnAuthorizedStateChange,
   TopologyResult,
+  TopologySnapshot,
 }
 
 import java.time.Instant
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton admin API that we rely
@@ -108,9 +113,9 @@ class ParticipantAdminConnection(
       _.getSchedule(_),
     )
 
-  private val synchronizerIdCache =
+  private val synchronizerIdAliasCache =
     Scaffeine()
-      .expireAfterWrite(10.minutes)
+      .expireAfterWrite(1.minutes)
       .maximumSize(100)
       .buildAsync[SynchronizerAlias, SynchronizerId]()
 
@@ -135,43 +140,59 @@ class ParticipantAdminConnection(
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[SynchronizerId] = {
-    synchronizerIdCache.getFuture(
+    synchronizerIdAliasCache.getFuture(
       synchronizerAlias,
       alias => getPhysicalSynchronizerId(alias).map(_.logical),
     )
   }
 
-  private def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+  def lookupPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] =
-    // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make
-    // a new request to the sequencer to query the domain id. ListConnectedSynchronizers
-    // on the other hand relies on a cache
-    listConnectedDomains().map(
-      _.find(
-        _.synchronizerAlias == synchronizerAlias
-      ).fold(
-        throw Status.NOT_FOUND
-          .withDescription(s"Domain with alias $synchronizerAlias is not connected")
-          .asRuntimeException()
-      )(_.physicalSynchronizerId)
-    )
+  ): Future[Option[PhysicalSynchronizerId]] =
+    OptionT(for {
+      configuredDomains <- runCmd(
+        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+      )
+    } yield configuredDomains.collectFirst {
+      case (configuredSynchronizer, psid, _)
+          if configuredSynchronizer.synchronizerAlias == synchronizerAlias =>
+        psid.toOption
+    }.flatten)
+      .orElseF(
+        runCmd(
+          ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
+        ).map(Some(_)).recover {
+          case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND => None
+        }
+      )
+      .value
 
-  /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
-    *  but in some cases we want to check the domain id
-    * without risking a full domain connection.
-    */
-  def getSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
+  def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
-  ): Future[SynchronizerId] =
-    getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias).map(_.logical)
-
-  def getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
-      traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] =
-    runCmd(
-      ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
+  ): Future[PhysicalSynchronizerId] = runCmd(
+    ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+  ).map(
+    _.collectFirst {
+      case (_, KnownPhysicalSynchronizerId(psid), _) if psid.logical == synchronizerId => psid
+    }.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription(
+          s"No synchronizer registered and handshaked for id $synchronizerId"
+        )
+        .asRuntimeException()
     )
+  )
+  def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] = lookupPhysicalSynchronizerId(synchronizerAlias).map(
+    _.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription(
+          s"No synchronizer registered and handshaked for $synchronizerAlias"
+        )
+        .asRuntimeException()
+    )
+  )
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -273,7 +294,7 @@ class ParticipantAdminConnection(
   def ensureDomainRegisteredAndConnected(
       config: SynchronizerConnectionConfig,
       overwriteExistingConnection: Boolean,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
@@ -300,7 +321,7 @@ class ParticipantAdminConnection(
             case Some(_) =>
               modifySynchronizerConnectionConfigAndReconnect(
                 config.synchronizerAlias,
-                newSequencerConnectionPool,
+                reconnectOnSynchronizerConfigurationChange,
                 _ => Some(config),
               )
                 .map(_ => ())
@@ -332,7 +353,7 @@ class ParticipantAdminConnection(
 
   def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(implicit
       tc: TraceContext
-  ): Future[NonNegativeLong] =
+  ): Future[Long] =
     runCmd(
       ParticipantAdminCommands.PartyManagement
         .GetHighestOffsetByTimestamp(synchronizerId, timestamp, force)
@@ -341,7 +362,7 @@ class ParticipantAdminConnection(
   def downloadAcsSnapshot(
       parties: Set[PartyId],
       synchronizerId: SynchronizerId,
-      timestampOrOffset: Either[Instant, NonNegativeLong],
+      timestampOrOffset: Either[Instant, Long],
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Seq[ByteString]] = {
     logger.info(
@@ -366,7 +387,7 @@ class ParticipantAdminConnection(
   }
 
   private def resolveOffset(
-      timestampOrOffset: Either[Instant, NonNegativeLong],
+      timestampOrOffset: Either[Instant, Long],
       synchronizerId: SynchronizerId,
       force: Boolean,
   )(implicit tc: TraceContext) = {
@@ -401,7 +422,7 @@ class ParticipantAdminConnection(
           party,
           synchronizerId,
           targetParticipantId,
-          beforeActivationOffset,
+          beforeActivationOffset.value,
           waitForActivationTimeout = None, // i.e., default
           observer,
         )
@@ -413,14 +434,14 @@ class ParticipantAdminConnection(
   def downloadAcsSnapshotNonChunked(
       parties: Set[PartyId],
       filterSynchronizerId: SynchronizerId,
-      timestampOrOffset: Either[Instant, NonNegativeLong],
+      timestampOrOffset: Either[Instant, Long],
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] =
     downloadAcsSnapshot(parties, filterSynchronizerId, timestampOrOffset, force).map(chunks =>
       ByteString.copyFrom(chunks.asJava)
     )
 
-  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
+  def uploadAcsSnapshot(acsBytes: Seq[ByteString], synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
@@ -435,12 +456,13 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsBytes(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             excludedStakeholders = Set.empty,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+            synchronizerId = synchronizerId,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
@@ -448,17 +470,21 @@ class ParticipantAdminConnection(
     )
   }
 
-  def importPartyAcs(acsBytes: ByteString)(implicit tc: TraceContext): Future[Unit] = {
+  def importPartyAcs(acsBytes: ByteString, synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
     retryProvider.retryForClientCalls(
       "import_party_acs",
       "Imports the acs in the participant",
       runCmd(
         ParticipantAdminCommands.PartyManagement
           .ImportPartyAcs(
-            acsBytes,
+            acsBytes.newInput(),
+            synchronizerId,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+            party = None,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
@@ -533,7 +559,7 @@ class ParticipantAdminConnection(
 
   private def modifyOrRegisterSynchronizerConnectionConfig(
       config: SynchronizerConnectionConfig,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Boolean] =
@@ -550,7 +576,7 @@ class ParticipantAdminConnection(
           ensureDomainRegisteredAndConnected(
             config,
             overwriteExistingConnection = true,
-            newSequencerConnectionPool = newSequencerConnectionPool,
+            reconnectOnSynchronizerConfigurationChange = reconnectOnSynchronizerConfigurationChange,
             retryFor = retryFor,
           ).map(_ => false)
       }
@@ -558,13 +584,13 @@ class ParticipantAdminConnection(
 
   def modifySynchronizerConnectionConfigAndReconnect(
       domain: SynchronizerAlias,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       configModified <- modifySynchronizerConnectionConfig(domain, f)
       _ <-
-        if (configModified && !newSequencerConnectionPool) {
+        if (configModified && reconnectOnSynchronizerConfigurationChange) {
           logger.info(
             s"reconnect to the domain $domain for new sequencer configuration to take effect"
           )
@@ -574,19 +600,19 @@ class ParticipantAdminConnection(
 
   def modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
       config: SynchronizerConnectionConfig,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       configModified <- modifyOrRegisterSynchronizerConnectionConfig(
         config,
-        newSequencerConnectionPool,
+        reconnectOnSynchronizerConfigurationChange,
         f,
         retryFor,
       )
       _ <-
-        if (configModified && !newSequencerConnectionPool) {
+        if (configModified && reconnectOnSynchronizerConfigurationChange) {
           logger.info(
             s"reconnect to the domain ${config.synchronizerAlias} for new sequencer configuration to take effect"
           )
@@ -693,6 +719,7 @@ class ParticipantAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
+      topologySnapshot: TopologySnapshot = TopologySnapshot.Sequenced,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
@@ -703,6 +730,7 @@ class ParticipantAdminConnection(
             synchronizerId = synchronizerId,
             partyId = party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = topologySnapshot,
           )
             .map(result =>
               Either
@@ -751,7 +779,7 @@ class ParticipantAdminConnection(
       description,
       queryType =>
         EitherT(
-          getPartyToParticipant(synchronizerId, party, None, queryType)
+          getPartyToParticipant(synchronizerId, party, None, queryType, TopologySnapshot.Sequenced)
             .map { result =>
               val newHostingParticipants = participantChange(result.mapping.participants)
               Either.cond(
@@ -804,6 +832,7 @@ class ParticipantAdminConnection(
             synchronizerId,
             party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = TopologySnapshot.Sequenced,
           ).map(result => {
             Either.cond(
               result.mapping.participants
@@ -836,6 +865,17 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
+
+  def performManualLsu(
+      currentPsid: PhysicalSynchronizerId,
+      successorPsid: PhysicalSynchronizerId,
+      upgradeTime: Option[CantonTimestamp],
+      sequencerSuccessors: Map[SequencerId, GrpcConnection],
+  )(implicit tc: TraceContext): Future[Unit] =
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+    )
 }
 
 object ParticipantAdminConnection {
@@ -889,23 +929,6 @@ object ParticipantAdminConnection {
     */
   sealed trait HasParticipantId {
     def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId]
-  }
-
-  object HasParticipantId {
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] def Const(participantId: ParticipantId): HasParticipantId =
-      new HasParticipantId {
-        override def getParticipantId()(implicit
-            traceContext: TraceContext
-        ): Future[ParticipantId] =
-          Future successful participantId
-      }
-
-    /** For tests that don't care about the random separation provided by the
-      * participant ID in the hash.
-      */
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] val ForTesting = Const(ParticipantId("OnlyForTesting"))
   }
 
   def dropSequencerId(config: SynchronizerConnectionConfig): SynchronizerConnectionConfig =

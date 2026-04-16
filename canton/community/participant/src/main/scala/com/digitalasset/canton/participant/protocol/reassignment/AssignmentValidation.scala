@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -38,7 +38,7 @@ import com.digitalasset.canton.util.ReassignmentTag.Target
 import scala.concurrent.ExecutionContext
 
 private[reassignment] class AssignmentValidation(
-    targetPSId: Target[PhysicalSynchronizerId],
+    targetPsid: Target[PhysicalSynchronizerId],
     staticSynchronizerParameters: Target[StaticSynchronizerParameters],
     participantId: ParticipantId,
     reassignmentCoordination: ReassignmentCoordination,
@@ -58,7 +58,7 @@ private[reassignment] class AssignmentValidation(
     val assignmentRequest: FullAssignmentTree = parsedRequest.fullViewTree
 
     val reassignmentId = parsedRequest.reassignmentId
-    val sourcePSId = assignmentRequest.sourceSynchronizer
+    val sourcePsid = assignmentRequest.sourceSynchronizer
     val targetSnapshot = Target(parsedRequest.snapshot).map(_.ipsSnapshot)
     val isReassigningParticipant = assignmentRequest.isReassigningParticipant(participantId)
 
@@ -115,11 +115,12 @@ private[reassignment] class AssignmentValidation(
       contracts = assignmentRequest.contracts,
       submitterMetadata = assignmentRequest.submitterMetadata,
       reassignmentId = reassignmentId,
-      sourcePSId = sourcePSId,
+      sourcePsid = sourcePsid,
       isReassigningParticipant = isReassigningParticipant,
       hostedConfirmingReassigningParties = hostedConfirmingReassigningParties,
       commonValidationResult = commonValidationResult,
       reassigningParticipantValidationResult = reassigningParticipantValidationResult,
+      loggerFactory = loggerFactory,
     )
   }
 
@@ -159,12 +160,23 @@ private[reassignment] class AssignmentValidation(
         parsedRequest
       )
 
+      multiSynchronizerCheckResult <-
+        ReassignmentValidation
+          .checkMultiSynchronizerEnabled(
+            topologySnapshot = parsedRequest.snapshot.ipsSnapshot,
+            stakeholders = parsedRequest.fullViewTree.stakeholders,
+            psid = targetPsid.unwrap,
+          )
+          .value
+          .map(_.swap.toOption)
+
     } yield AssignmentValidationResult.CommonValidationResult(
       activenessResult = activenessResult,
       participantSignatureVerificationResult = participantSignatureVerificationResult,
       contractAuthenticationResultF = contractAuthenticationResultF,
       submitterCheckResult = submitterCheckResult,
       reassignmentIdResult = reassignmentIdResult,
+      multiSynchronizerFeatureFlagCheckResult = multiSynchronizerCheckResult,
     )
   }
 
@@ -185,7 +197,7 @@ private[reassignment] class AssignmentValidation(
       // TODO(i26479): Check that reassignmentData.unassignmentRequest.targetTimestamp is in the past
       exclusivityTimeoutError <- AssignmentValidation.checkExclusivityTimeout(
         reassignmentCoordination,
-        targetPSId,
+        targetPsid,
         staticSynchronizerParameters,
         unassignmentData,
         assignmentRequestTs,
@@ -281,7 +293,7 @@ object AssignmentValidation {
     */
   def checkExclusivityTimeout(
       reassignmentCoordination: ReassignmentCoordination,
-      targetPSId: Target[PhysicalSynchronizerId],
+      targetPsid: Target[PhysicalSynchronizerId],
       staticSynchronizerParameters: Target[StaticSynchronizerParameters],
       unassignmentData: UnassignmentData,
       requestTimestamp: CantonTimestamp,
@@ -299,10 +311,10 @@ object AssignmentValidation {
       cryptoSnapshotTargetTs <- reassignmentCoordination
         .cryptoSnapshot(
           /*
-          `targetPSId` can differ from `unassignmentData.targetPSId` if the target synchronizer is upgraded
+          `targetPsid` can differ from `unassignmentData.targetPsid` if the target synchronizer is upgraded
           between unassignment and assignment.
            */
-          targetPSId,
+          targetPsid,
           staticSynchronizerParameters,
           targetTimestamp,
         )
@@ -314,7 +326,7 @@ object AssignmentValidation {
           targetTimestamp,
         )
         .leftMap[ReassignmentProcessorError](
-          ReassignmentParametersError(targetPSId.unwrap, _)
+          ReassignmentParametersError(targetPsid.unwrap, _)
         )
 
       validationError = Option.when(

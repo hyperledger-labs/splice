@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
@@ -7,21 +7,59 @@ import cats.syntax.either.*
 import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.lifecycle.ClosingException
-import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.ThrowableUtil
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.scalalogging.Logger
 
 import java.util.concurrent.*
+import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory
 import java.util.concurrent.atomic.AtomicReference
-import java.util.function.Predicate
 import scala.concurrent.{ExecutionContextExecutor, blocking}
 import scala.util.chaining.*
 
 /** Factories and utilities for dealing with threading.
   */
 object Threading {
+
+  // A reflection-based wrapper for (private) `scala.concurrent.impl.ExecutionContextImpl$DefaultThreadFactory`
+  //  that allows to customize threads created by it, such as specifying the threads' context classloader.
+  private final class CantonForkJoinWorkerThreadFactory(
+      maxExtraThreads: PositiveInt,
+      name: String,
+      uncaughtExceptionHandler: Thread.UncaughtExceptionHandler,
+  ) extends ForkJoinWorkerThreadFactory {
+
+    private val threadFactoryConstructor =
+      Class
+        .forName("scala.concurrent.impl.ExecutionContextImpl$DefaultThreadFactory")
+        .getDeclaredConstructor(
+          classOf[Boolean],
+          classOf[Int],
+          classOf[String],
+          classOf[Thread.UncaughtExceptionHandler],
+        )
+    threadFactoryConstructor.setAccessible(true)
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    private val factoryDelegate =
+      threadFactoryConstructor
+        .newInstance(
+          Boolean.box(true),
+          Int.box(maxExtraThreads.value),
+          name,
+          uncaughtExceptionHandler,
+        )
+        .asInstanceOf[ForkJoinPool.ForkJoinWorkerThreadFactory]
+
+    override def newThread(pool: ForkJoinPool): ForkJoinWorkerThread = {
+      val thread = factoryDelegate.newThread(pool)
+      // Ensure the threads' context classloader is always set to the application classloader to avoid
+      //  class / resource access issues.
+      thread.setContextClassLoader(this.getClass.getClassLoader)
+      thread
+    }
+  }
 
   /** Creates a singled threaded scheduled executor.
     * @param name
@@ -47,10 +85,13 @@ object Threading {
     *   used for created threads. Prefer dash separated names.
     * @param logger
     *   where uncaught exceptions are logged
+    * @param executorServiceMetrics
+    *   ExecutorServiceMetrics to monitor the executor service
     */
   def singleThreadedExecutor(
       name: String,
       logger: Logger,
+      executorServiceMetrics: ExecutorServiceMetrics,
   ): ExecutionContextIdlenessExecutorService = {
     val executor = new ThreadPoolExecutor(
       1,
@@ -60,9 +101,13 @@ object Threading {
       new LinkedBlockingQueue[Runnable](),
       threadFactory(name, logger, exitOnFatal = true),
     )
+
+    val monitoredExecutor = executorServiceMetrics.monitorExecutorService(name, executor)
+
     new ThreadPoolIdlenessExecutorService(
       executor,
-      createReporter(name, logger, exitOnFatal = true)(_),
+      monitoredExecutor,
+      ThrowableUtil.createReporter(name, logger, exitOnFatal = true)(_),
       name,
     )
   }
@@ -90,105 +135,70 @@ object Threading {
       logger: Logger,
       exitOnFatal: Boolean,
   ): Thread.UncaughtExceptionHandler =
-    (t: Thread, e: Throwable) => createReporter(t.getName, logger, exitOnFatal)(e)
-
-  /** @param exitOnFatal
-    *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
-    *   termination of specific threads.
-    */
-  def createReporter(name: String, logger: Logger, exitOnFatal: Boolean)(
-      throwable: Throwable
-  ): Unit = {
-    if (exitOnFatal) doExitOnFatal(name, logger)(throwable)
-    throwable match {
-      case ex: io.grpc.StatusRuntimeException
-          if ex.getStatus.getCode == io.grpc.Status.Code.CANCELLED =>
-        logger.info(s"Grpc channel cancelled in $name.", ex)
-      case ClosingException(_) =>
-        logger.info(s"Unclean shutdown due to cancellation in $name.", throwable)
-      case _: Throwable =>
-        logger.error(s"A fatal error has occurred in $name. Terminating thread.", throwable)
-    }
-  }
-
-  private def doExitOnFatal(name: String, logger: Logger)(throwable: Throwable): Unit =
-    throwable match {
-      case _: LinkageError | _: VirtualMachineError =>
-        // Output the error reason both to stderr and the logger,
-        // because System.exit tends to terminate the JVM before everything has been output.
-        Console.err.println(
-          s"A fatal error has occurred in $name. Terminating immediately.\n${ErrorUtil.messageWithStacktrace(throwable)}"
-        )
-        Console.err.flush()
-        logger.error(s"A fatal error has occurred in $name. Terminating immediately.", throwable)
-        System.exit(-1)
-      case _: Throwable => // no fatal error, nothing to do
-    }
+    (t: Thread, e: Throwable) => ThrowableUtil.createReporter(t.getName, logger, exitOnFatal)(e)
 
   def newExecutionContext(
       name: String,
       logger: Logger,
-  ): ExecutionContextIdlenessExecutorService =
-    newExecutionContext(name, logger, None)
-
-  def newExecutionContext(
-      name: String,
-      logger: Logger,
-      metrics: ExecutorServiceMetrics,
-  ): ExecutionContextIdlenessExecutorService =
-    newExecutionContext(name, logger, Some(metrics))
-
-  def newExecutionContext(
-      name: String,
-      logger: Logger,
-      maybeMetrics: Option[ExecutorServiceMetrics],
+      executorServiceMetrics: ExecutorServiceMetrics,
   ): ExecutionContextIdlenessExecutorService =
     newExecutionContext(
       name,
       logger,
-      maybeMetrics,
       detectNumberOfThreads(logger),
+      executorServiceMetrics,
     )
 
   /** Yields an `ExecutionContext` like `scala.concurrent.ExecutionContext.global`, except that it
     * has its own thread pool.
     *
+    * @param executorServiceMetrics
+    *   ExecutorServiceMetrics to monitor the executor service
     * @param exitOnFatal
     *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
     *   termination of specific threads.
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.AsInstanceOf"))
   def newExecutionContext(
       name: String,
       logger: Logger,
-      maybeMetrics: Option[ExecutorServiceMetrics],
       parallelism: PositiveInt,
+      executorServiceMetrics: ExecutorServiceMetrics,
       maxExtraThreads: PositiveInt = PositiveInt.tryCreate(256),
+      keepAliveMillis: PositiveInt = PositiveInt.tryCreate(60000),
+      corePoolSize: Option[PositiveInt] = None,
+      maxPoolSize: Option[PositiveInt] = None,
+      minRunnable: Option[PositiveInt] = None,
       exitOnFatal: Boolean = true,
   ): ExecutionContextIdlenessExecutorService = {
-    val reporter = createReporter(name, logger, exitOnFatal)(_)
-    val handler = ((_, cause) => reporter(cause)): Thread.UncaughtExceptionHandler
+    val uncaughtExceptionReporter =
+      ThrowableUtil.createReporter(name, logger, exitOnFatal)(_)
 
-    val threadFactoryConstructor = Class
-      .forName("scala.concurrent.impl.ExecutionContextImpl$DefaultThreadFactory")
-      .getDeclaredConstructor(
-        classOf[Boolean],
-        classOf[Int],
-        classOf[String],
-        classOf[Thread.UncaughtExceptionHandler],
+    val uncaughtExceptionHandler =
+      ((_, cause) => uncaughtExceptionReporter(cause)): Thread.UncaughtExceptionHandler
+
+    val threadFactory =
+      new CantonForkJoinWorkerThreadFactory(maxExtraThreads, name, uncaughtExceptionHandler)
+
+    val forkJoinPool =
+      createForkJoinPool(
+        parallelism,
+        keepAliveMillis,
+        threadFactory,
+        uncaughtExceptionHandler,
+        logger,
+        corePoolSize,
+        maxPoolSize,
+        minRunnable,
       )
-    threadFactoryConstructor.setAccessible(true)
-    val threadFactory = threadFactoryConstructor
-      .newInstance(Boolean.box(true), Int.box(maxExtraThreads.value), name, handler)
-      .asInstanceOf[ForkJoinPool.ForkJoinWorkerThreadFactory]
 
-    val forkJoinPool = createForkJoinPool(parallelism, threadFactory, handler, logger)
-    val executorService =
-      maybeMetrics.fold(forkJoinPool: ExecutorService)(
-        _.monitorExecutorService(name, forkJoinPool)
-      )
+    val monitoredPool = executorServiceMetrics.monitorExecutorService(name, forkJoinPool)
 
-    new ForkJoinIdlenessExecutorService(forkJoinPool, executorService, reporter, name)
+    new ForkJoinIdlenessExecutorService(
+      forkJoinPool,
+      monitoredPool,
+      uncaughtExceptionReporter,
+      name,
+    )
   }
 
   /** Minimum parallelism of ForkJoinPool. Currently greater than one to work around a bug that
@@ -199,9 +209,13 @@ object Threading {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   private def createForkJoinPool(
       parallelism: PositiveInt,
+      keepAliveMillis: PositiveInt,
       threadFactory: ForkJoinPool.ForkJoinWorkerThreadFactory,
       handler: Thread.UncaughtExceptionHandler,
       logger: Logger,
+      corePoolSize: Option[PositiveInt],
+      maxPoolSize: Option[PositiveInt],
+      minRunnable: Option[PositiveInt],
   ): ForkJoinPool = {
     val tunedParallelism =
       if (parallelism >= minParallelismForForkJoinPool) parallelism
@@ -215,44 +229,21 @@ object Threading {
         minParallelismForForkJoinPool
       }
 
-    try {
-      val java11ForkJoinPoolConstructor = classOf[ForkJoinPool].getConstructor(
-        classOf[Int],
-        classOf[ForkJoinPool.ForkJoinWorkerThreadFactory],
-        classOf[Thread.UncaughtExceptionHandler],
-        classOf[Boolean],
-        classOf[Int],
-        classOf[Int],
-        classOf[Int],
-        classOf[Predicate[?]],
-        classOf[Long],
-        classOf[TimeUnit],
-      )
-
-      java11ForkJoinPoolConstructor.newInstance(
-        Int.box(tunedParallelism.unwrap),
-        threadFactory,
-        handler,
-        Boolean.box(true),
-        Int.box(tunedParallelism.unwrap),
-        Int.box(Int.MaxValue),
-        //
-        // Choosing tunedParallelism here instead of the default of 1.
-        // With the default, we would get only 1 running thread in the presence of blocking calls.
-        Int.box(tunedParallelism.unwrap),
-        null,
-        Long.box(60),
-        TimeUnit.SECONDS,
-      )
-    } catch {
-      case _: NoSuchMethodException =>
-        logger.warn(
-          "Unable to create ForkJoinPool of Java 11. " +
-            "Using fallback instead, which has been tested less than the default one. " +
-            "Do not use this setting in production."
-        )
-        new ForkJoinPool(tunedParallelism.unwrap, threadFactory, handler, true)
-    }
+    new ForkJoinPool(
+      tunedParallelism.unwrap,
+      threadFactory,
+      handler,
+      true,
+      corePoolSize.getOrElse(tunedParallelism).unwrap,
+      maxPoolSize.map(_.value).getOrElse(Int.MaxValue),
+      //
+      // Choosing tunedParallelism here instead of the default of 1.
+      // With the default, we would get only 1 running thread in the presence of blocking calls.
+      minRunnable.getOrElse(tunedParallelism).unwrap,
+      null,
+      keepAliveMillis.value.toLong,
+      TimeUnit.MILLISECONDS,
+    )
   }
 
   def directExecutionContext(logger: Logger): ExecutionContextExecutor = DirectExecutionContext(

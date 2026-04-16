@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
-import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenSet, withRetries } from 'auth0';
 
 import { config, isMainNet } from '../config';
 import { infraStack } from '../stackReferences';
@@ -47,14 +47,9 @@ export class Auth0Fetch implements Auth0Client {
   private auth0Cache: Auth0CacheMap | undefined;
   private hasDiffsToSave = false;
 
-  private k8sApi: CoreV1Api;
   private cfg: Auth0Config;
 
   constructor(cfg: Auth0Config) {
-    const kc = new KubeConfig();
-    kc.loadFromDefault();
-
-    this.k8sApi = kc.makeApiClient(CoreV1Api);
     this.cfg = cfg;
   }
 
@@ -81,32 +76,41 @@ export class Auth0Fetch implements Auth0Client {
       domain: this.cfg.auth0Domain,
       clientId: this.cfg.auth0MgtClientId,
       clientSecret: this.cfg.auth0MgtClientSecret,
-      // scope: 'read:clients read:client_keys',
-      retry: {
-        enabled: true,
-        maxRetries: 10,
-      },
     });
+    // enable retries
+    const reqOptions = {
+      ...withRetries(10),
+      timeoutInSeconds: 30,
+    };
 
     const secrets = new Map() as Auth0SecretMap;
-    let page = 0;
-    /* eslint-disable no-constant-condition */
-    while (true) {
-      const clients = await client.clients.getAll({
-        per_page: 50, // Even though 50 is the default, if it's not given explicitly, the page argument is ignored
-        page: page++,
-      });
-
-      if (clients.data.length === 0) {
-        return secrets;
+    let page = await client.clients.list({ per_page: 50 }, reqOptions);
+    for (const client of page.data) {
+      if (client.client_id && client.client_secret) {
+        secrets.set(client.client_id, client as Auth0ClientSecret);
       }
-
-      for (const client of clients.data) {
+    }
+    while (page.hasNextPage()) {
+      page = await page.getNextPage();
+      for (const client of page.data) {
         if (client.client_id && client.client_secret) {
           secrets.set(client.client_id, client as Auth0ClientSecret);
         }
       }
     }
+    return secrets;
+  }
+
+  private getK8sClient(): CoreV1Api {
+    const kc = new KubeConfig();
+    kc.loadFromDefault();
+    return kc.makeApiClient(CoreV1Api);
+  }
+
+  // Each Pulumi stack gets its own cache secret to avoid concurrent write races
+  // when multiple stacks (e.g., validator1, splitwell) run in parallel.
+  private get cacheSecretName(): string {
+    return `${this.cfg.fixedTokenCacheName}-${pulumi.getProject()}-${pulumi.getStack()}`;
   }
 
   public async loadAuth0Cache(): Promise<void> {
@@ -120,12 +124,13 @@ export class Auth0Fetch implements Auth0Client {
     const cacheMap = {} as Auth0CacheMap;
 
     try {
-      const cacheSecret = await this.k8sApi.readNamespacedSecret({
-        name: this.cfg.fixedTokenCacheName,
+      const k8sApi = this.getK8sClient();
+      const cacheSecret = await k8sApi.readNamespacedSecret({
+        name: this.cacheSecretName,
         namespace: 'default',
       });
 
-      const data = cacheSecret.stringData;
+      const data = cacheSecret.data;
 
       for (const clientId in data) {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
@@ -159,38 +164,35 @@ export class Auth0Fetch implements Auth0Client {
       data[clientId] = Buffer.from(JSON.stringify(cachedToken)).toString('base64');
     }
 
+    const secretBody = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: this.cacheSecretName,
+      },
+      data,
+    };
+
     try {
       await pulumi.log.info('Attempting to create secret');
-      await this.k8sApi.createNamespacedSecret({
+      const k8sApi = this.getK8sClient();
+      await k8sApi.createNamespacedSecret({
         namespace: 'default',
-        body: {
-          apiVersion: 'v1',
-          kind: 'Secret',
-          metadata: {
-            name: this.cfg.fixedTokenCacheName,
-          },
-          data,
-        },
+        body: secretBody,
       });
     } catch (_) {
       try {
         await pulumi.log.info('Deleting existing secret');
-        await this.k8sApi.deleteNamespacedSecret({
-          name: this.cfg.fixedTokenCacheName,
+        const k8sApi = this.getK8sClient();
+        await k8sApi.deleteNamespacedSecret({
+          name: this.cacheSecretName,
           namespace: 'default',
         });
 
         await pulumi.log.info('Creating new secret');
-        await this.k8sApi.createNamespacedSecret({
+        await k8sApi.createNamespacedSecret({
           namespace: 'default',
-          body: {
-            apiVersion: 'v1',
-            kind: 'Secret',
-            metadata: {
-              name: this.cfg.fixedTokenCacheName,
-            },
-            data,
-          },
+          body: secretBody,
         });
       } catch (e) {
         await pulumi.log.error(`Auth0 cache update failed: ${JSON.stringify(e)}`);
@@ -576,7 +578,7 @@ export function getNamespaceConfig(
 }
 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
-  const temp = getSecretVersionOutput({
+  const temp = gcp.secretmanager.getSecretVersionOutput({
     secret: `pulumi-user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
   });
   return temp.apply(config => {

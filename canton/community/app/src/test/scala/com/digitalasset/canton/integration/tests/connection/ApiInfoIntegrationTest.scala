@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.connection
 
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.StorageConfig
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
+import com.digitalasset.canton.integration.plugins.UseBftSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -60,6 +59,6 @@ class ApiInfoIntegrationTestInMemory extends ApiInfoIntegrationTest {
       .addConfigTransform(ConfigTransforms.allInMemory)
       .addConfigTransform(_.focus(_.monitoring.logging.api.messagePayloads).replace(false))
 
-  registerPlugin(new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
 }

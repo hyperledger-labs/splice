@@ -104,6 +104,7 @@ class BftScanConnectionTest
                     synchronizerId,
                   ),
                   false,
+                  java.util.Optional.empty(),
                 ),
                 ByteString.EMPTY,
                 Instant.EPOCH,
@@ -193,6 +194,7 @@ class BftScanConnectionTest
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           jtime(n),
           ByteString.EMPTY,
+          0L,
         )
       ),
       synchronizerId = synchronizerId,
@@ -223,11 +225,9 @@ class BftScanConnectionTest
       loggerFactory,
     )
   }
-  val notFoundFailure = new BaseAppConnection.UnexpectedHttpResponse(
-    HttpResponse(
-      StatusCodes.NotFound,
-      entity = HttpEntity(ContentTypes.`application/json`, """{"error":"not_found"}"""),
-    )
+  val notFoundFailure = new BaseAppConnection.UnexpectedHttpJsonResponse(
+    StatusCodes.NotFound,
+    io.circe.Json.obj("error" -> io.circe.Json.fromString("not found")),
   )
   val notFoundCommandFailure = HttpCommandException(
     HttpRequest(),

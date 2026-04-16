@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String3, String300}
-import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref.HexString
@@ -141,6 +141,21 @@ trait AcsJdbcTypes {
       }
   }
 
+  protected implicit lazy val longArrayGetResult: GetResult[Array[Long]] =
+    (r: PositionedResult) => {
+      val sqlArray = r.rs.getArray(r.skip.currentPos)
+      if (sqlArray == null) Array.emptyLongArray
+      else
+        sqlArray.getArray match {
+          case arr: Array[java.lang.Long] => arr.map(_.longValue())
+          case arr: Array[Long] => arr
+          case x =>
+            throw new IllegalStateException(
+              s"Expected an array of longs, but got $x. Are you sure you selected a bigint array column?"
+            )
+        }
+    }
+
   protected implicit lazy val stringArrayOptGetResult: GetResult[Option[Array[String]]] =
     (r: PositionedResult) => {
       Option(r.rs.getArray(r.skip.currentPos)).map {
@@ -168,12 +183,23 @@ trait AcsJdbcTypes {
   protected implicit lazy val longArraySetParameter: SetParameter[Array[Long]] = (v, pp) =>
     pp.setObject(v, java.sql.Types.ARRAY)
 
-  private val stringArraySetParameter: SetParameter[Array[String]] =
+  protected implicit lazy val longSeqSetParameter: SetParameter[Seq[Long]] =
+    (longs: Seq[Long], pp: PositionedParameters) => longArraySetParameter(longs.toArray, pp)
+
+  protected implicit lazy val cantonTimestampArraySetParameter
+      : SetParameter[Array[CantonTimestamp]] =
+    (timestamps: Array[CantonTimestamp], pp: PositionedParameters) =>
+      longArraySetParameter(timestamps.map(_.toMicros), pp)
+
+  protected implicit lazy val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
       pp.setObject(
         pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
         JDBCType.ARRAY.getVendorTypeNumber,
       )
+
+  protected implicit lazy val stringSeqSetParameter: SetParameter[Seq[String]] =
+    (strings: Seq[String], pp: PositionedParameters) => stringArraySetParameter(strings.toArray, pp)
 
   protected implicit lazy val string3ArraySetParameter: SetParameter[Array[String3]] =
     (strings: Array[String3], pp: PositionedParameters) =>
@@ -299,6 +325,12 @@ trait AcsJdbcTypes {
         .getOrElse(throw new IllegalStateException("JSONB column didn't contain valid JSON."))
   }
 
+  protected implicit lazy val optionalJsonGetResult: GetResult[Option[Json]] = GetResult { prs =>
+    prs.<<?[String].flatMap { jsonString =>
+      circeParse(jsonString).toOption
+    }
+  }
+
   protected implicit lazy val jsonSetParameter: SetParameter[Json] =
     (json: Json, pp: PositionedParameters) => {
       pp.setObject(json.noSpaces, java.sql.Types.OTHER)
@@ -330,6 +362,12 @@ trait AcsJdbcTypes {
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
+  implicit val setParameterSynchronizerId: SetParameter[SynchronizerId] =
+    (d: SynchronizerId, pp: PositionedParameters) => pp >> d.toLengthLimitedString
+
+  implicit val setParameterSynchronizerIdO: SetParameter[Option[SynchronizerId]] =
+    (d: Option[SynchronizerId], pp: PositionedParameters) => pp >> d.map(_.toLengthLimitedString)
+
   protected def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
   ): Json = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)
@@ -339,22 +377,22 @@ trait AcsJdbcTypes {
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
 
+  private def lengthLimitedByteString(bs: ByteString, maxLength: Int): ByteString = {
+    require(
+      bs.size() <= maxLength,
+      s"ByteString should have a maximum length of $maxLength bytes but a ByteString of length ${bs.size()} was given",
+    )
+    bs
+  }
+
   /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
-    *  The hash is not guaranteed to be present. For consistency with historical data,
-    *  we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
+    * The hash is not guaranteed to be present. For consistency with historical data,
+    * we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
     */
-  protected def sanitizedExtTxnHash(
-      extTxnHash: ByteString,
-      maxLength: Int = 1024,
-  ): Option[Array[Byte]] = {
-    Option(extTxnHash)
+  protected def sanitizedExtTxnHash(extTxnHash: ByteString): Option[Array[Byte]] = {
+    Option(lengthLimitedByteString(extTxnHash, maxLength = 1024))
       .filterNot(_.isEmpty)
-      .map { nonNullExtTxnHash =>
-        val trimmedExtTxnHash =
-          if (nonNullExtTxnHash.size() > maxLength) nonNullExtTxnHash.substring(0, maxLength)
-          else nonNullExtTxnHash
-        trimmedExtTxnHash.toByteArray
-      }
+      .map(_.toByteArray)
   }
 
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](

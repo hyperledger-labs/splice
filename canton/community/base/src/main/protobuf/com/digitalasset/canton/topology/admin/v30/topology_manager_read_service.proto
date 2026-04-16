@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -16,6 +16,7 @@ service TopologyManagerReadService {
   rpc ListDecentralizedNamespaceDefinition(ListDecentralizedNamespaceDefinitionRequest) returns (ListDecentralizedNamespaceDefinitionResponse);
 
   rpc ListOwnerToKeyMapping(ListOwnerToKeyMappingRequest) returns (ListOwnerToKeyMappingResponse);
+  // Note that PartyToKeyMapping is deprecated in favor of PartyToParticipant
   rpc ListPartyToKeyMapping(ListPartyToKeyMappingRequest) returns (ListPartyToKeyMappingResponse);
 
   rpc ListSynchronizerTrustCertificate(ListSynchronizerTrustCertificateRequest) returns (ListSynchronizerTrustCertificateResponse);
@@ -29,8 +30,8 @@ service TopologyManagerReadService {
   rpc ListMediatorSynchronizerState(ListMediatorSynchronizerStateRequest) returns (ListMediatorSynchronizerStateResponse);
   rpc ListSequencerSynchronizerState(ListSequencerSynchronizerStateRequest) returns (ListSequencerSynchronizerStateResponse);
 
-  rpc ListSynchronizerUpgradeAnnouncement(ListSynchronizerUpgradeAnnouncementRequest) returns (ListSynchronizerUpgradeAnnouncementResponse);
-  rpc ListSequencerConnectionSuccessor(ListSequencerConnectionSuccessorRequest) returns (ListSequencerConnectionSuccessorResponse);
+  rpc ListLsuAnnouncement(ListLsuAnnouncementRequest) returns (ListLsuAnnouncementResponse);
+  rpc ListLsuSequencerConnectionSuccessor(ListLsuSequencerConnectionSuccessorRequest) returns (ListLsuSequencerConnectionSuccessorResponse);
 
   rpc ListAvailableStores(ListAvailableStoresRequest) returns (ListAvailableStoresResponse);
   rpc ListAll(ListAllRequest) returns (ListAllResponse);
@@ -44,7 +45,7 @@ service TopologyManagerReadService {
 
   // Fetch the topology state
   // The returned bytestring can be used directly to initialize a successor sequencer
-  rpc LogicalUpgradeState(LogicalUpgradeStateRequest) returns (stream LogicalUpgradeStateResponse);
+  rpc SequencerLsuState(SequencerLsuStateRequest) returns (stream SequencerLsuStateResponse);
 }
 
 message BaseQuery {
@@ -240,28 +241,29 @@ message ListSequencerSynchronizerStateResponse {
   repeated Result results = 1;
 }
 
-message ListSynchronizerUpgradeAnnouncementRequest {
+message ListLsuAnnouncementRequest {
   BaseQuery base_query = 1;
   string filter_synchronizer_id = 2;
 }
 
-message ListSynchronizerUpgradeAnnouncementResponse {
+message ListLsuAnnouncementResponse {
   message Result {
     BaseResult context = 1;
-    com.digitalasset.canton.protocol.v30.SynchronizerUpgradeAnnouncement item = 2;
+    com.digitalasset.canton.protocol.v30.LsuAnnouncement item = 2;
   }
   repeated Result results = 1;
 }
 
-message ListSequencerConnectionSuccessorRequest {
+message ListLsuSequencerConnectionSuccessorRequest {
   BaseQuery base_query = 1;
   string filter_sequencer_id = 2;
+  string filter_successor_physical_synchronizer_id = 3;
 }
 
-message ListSequencerConnectionSuccessorResponse {
+message ListLsuSequencerConnectionSuccessorResponse {
   message Result {
     BaseResult context = 1;
-    com.digitalasset.canton.protocol.v30.SequencerConnectionSuccessor item = 2;
+    com.digitalasset.canton.protocol.v30.LsuSequencerConnectionSuccessor item = 2;
   }
   repeated Result results = 1;
 }
@@ -327,9 +329,18 @@ message GenesisStateV2Response {
   bytes chunk = 1;
 }
 
-message LogicalUpgradeStateRequest {}
+message SequencerLsuStateRequest {
+  // Must be specified if the node is configured with more than one active synchronizer.
+  optional StoreId synchronizer_store = 1;
 
-message LogicalUpgradeStateResponse {
+  // The effective time used to fetch the topology transactions
+  // MUST be empty for regular LSUs.
+  // SHOULD be defined in a disaster recovery scenario when requesting the topology from a synchronizer
+  // without an announced LSU.
+  optional google.protobuf.Timestamp timestamp = 2;
+}
+
+message SequencerLsuStateResponse {
   // versioned stored topology transactions
   bytes chunk = 1;
 }

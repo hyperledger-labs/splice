@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer.grpc
@@ -13,7 +13,11 @@ import com.digitalasset.canton.common.sequencer.SequencerConnectClient.{
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, ClientChannelBuilder}
+import com.digitalasset.canton.networking.grpc.{
+  CantonGrpcUtil,
+  ClientChannelBuilder,
+  ClientChannelParams,
+}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnect
@@ -24,7 +28,7 @@ import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeR
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry
 import com.digitalasset.canton.util.retry.{AllExceptionRetryPolicy, Success}
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
@@ -36,8 +40,9 @@ import scala.concurrent.duration.DurationInt
 
 class GrpcSequencerConnectClient(
     sequencerConnection: GrpcSequencerConnection,
+    synchronizerAlias: SynchronizerAlias,
     val timeouts: ProcessingTimeout,
-    traceContextPropagation: TracingConfig.Propagation,
+    params: ClientChannelParams,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor)
     extends SequencerConnectClient
@@ -45,10 +50,18 @@ class GrpcSequencerConnectClient(
     with FlagCloseable {
 
   private val clientChannelBuilder = ClientChannelBuilder(loggerFactory)
-  private val builder =
-    sequencerConnection.mkChannelBuilder(clientChannelBuilder, traceContextPropagation)
+  private val builder = {
+    // TODO(i31759): Remove multiple endpoints from `SequencerConnection`
+    if (sequencerConnection.endpoints.sizeIs > 1) {
+      logger.warn(
+        s"Configuration for sequencer ${sequencerConnection.sequencerAlias} defines more than one endpoint. " ++
+          "This is deprecated and not supported. Only the first endpoint will be used."
+      )(TraceContext.empty)
+    }
+    sequencerConnection.mkChannelBuilder(clientChannelBuilder, params)
+  }
 
-  override def getSynchronizerClientBootstrapInfo(synchronizerAlias: SynchronizerAlias)(implicit
+  override def getSynchronizerClientBootstrapInfo()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, SynchronizerClientBootstrapInfo] =
     for {
@@ -93,13 +106,12 @@ class GrpcSequencerConnectClient(
     } yield SynchronizerClientBootstrapInfo(psid, sequencerId)
 
   override def getSynchronizerParameters(
-      synchronizerIdentifier: String
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, StaticSynchronizerParameters] = for {
     responseP <- CantonGrpcUtil
       .sendSingleGrpcRequest(
-        serverName = synchronizerIdentifier,
+        serverName = synchronizerAlias.unwrap,
         requestDescription = "get synchronizer parameters",
         channelBuilder = builder,
         stubFactory = v30.SequencerConnectServiceGrpc.stub,
@@ -120,36 +132,7 @@ class GrpcSequencerConnectClient(
 
   } yield synchronizerParameters
 
-  override def getSynchronizerId(
-      synchronizerIdentifier: String
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, PhysicalSynchronizerId] =
-    for {
-      responseP <- CantonGrpcUtil
-        .sendSingleGrpcRequest(
-          serverName = synchronizerIdentifier,
-          requestDescription = "get synchronizer id",
-          channelBuilder = builder,
-          stubFactory = v30.SequencerConnectServiceGrpc.stub,
-          timeout = timeouts.network.unwrap,
-          logger = logger,
-          logPolicy = CantonGrpcUtil.SilentLogPolicy,
-          hasRunOnClosing = this,
-          retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-          token = None,
-        )(_.getSynchronizerId(v30.SequencerConnect.GetSynchronizerIdRequest()))
-        .leftMap(err => Error.Transport(err.toString))
-
-      synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
-        PhysicalSynchronizerId
-          .fromProtoPrimitive(responseP.physicalSynchronizerId, "physical_synchronizer_id")
-          .leftMap[Error](err => Error.DeserializationFailure(err.toString))
-      )
-    } yield synchronizerId
-
   override def handshake(
-      synchronizerAlias: SynchronizerAlias,
       request: HandshakeRequest,
       dontWarnOnDeprecatedPV: Boolean,
   )(implicit
@@ -183,9 +166,8 @@ class GrpcSequencerConnectClient(
         )
     } yield handshakeResponse
 
-  def isActive(
+  override def isActive(
       participantId: ParticipantId,
-      synchronizerAlias: SynchronizerAlias,
       waitForActive: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -233,7 +215,6 @@ class GrpcSequencerConnectClient(
   }
 
   override def registerOnboardingTopologyTransactions(
-      synchronizerAlias: SynchronizerAlias,
       member: Member,
       topologyTransactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit] = {

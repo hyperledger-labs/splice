@@ -1,15 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.either.*
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.Event
 import org.openqa.selenium.bidi.log.{Log, LogEntry, LogLevel}
@@ -17,6 +18,7 @@ import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, Firefo
 import org.openqa.selenium.{
   By,
   JavascriptExecutor,
+  Keys,
   OutputType,
   TakesScreenshot,
   WebDriver,
@@ -39,9 +41,8 @@ import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
 
 import scala.collection.mutable
-import scala.concurrent.blocking
+import scala.concurrent.{ExecutionContext, Future, TimeoutException, blocking}
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
@@ -181,6 +182,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
+
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   private def registerWebDriver(name: String, webDriver: WebDriverType): Unit = blocking {
     synchronized {
       webDrivers += (name -> webDriver)
@@ -298,33 +301,38 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   protected def stopWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Stopping web drivers")
     // We process all browsers in parallel, for faster test termination.
-    webDrivers.values.toList.parTraverse { webDriver =>
-      Future {
-        webDriver.quit()
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { webDriver =>
+        Future {
+          webDriver.quit()
+        }
       }
-    }.futureValue
+      .futureValue
     logger.info("Stopped web drivers")
   }
 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
     eventually(60.seconds) {
-      webDrivers.values.toList.parTraverse { implicit webDriver =>
-        Future {
-          // Reset session storage so we see the login window again.
-          // You cannot reset session storage of about:blank so
-          // we exclude this.
-          if (currentUrl != "about:blank") {
-            webDriver.getSessionStorage().clear()
-            eventually() {
-              webDriver
-                .getSessionStorage()
-                .keySet
-                .asScala shouldBe empty withClue "webDriver sessionStorage"
+      MonadUtil
+        .parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) {
+          implicit webDriver =>
+            Future {
+              // Reset session storage so we see the login window again.
+              // You cannot reset session storage of about:blank so
+              // we exclude this.
+              if (currentUrl != "about:blank") {
+                webDriver.getSessionStorage().clear()
+                eventually() {
+                  webDriver
+                    .getSessionStorage()
+                    .keySet
+                    .asScala shouldBe empty withClue "webDriver sessionStorage"
+                }
+              }
             }
-          }
         }
-      }.futureValue
+        .futureValue
     }
     logger.info("Cleared web drivers")
   }
@@ -697,6 +705,12 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         ExpectedConditions.elementToBeClickable(_)
       }
     }
+    driver
+      .asInstanceOf[JavascriptExecutor]
+      .executeScript(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        driver.findElement(query.by),
+      )
     clickOn(query)
   }
 
@@ -710,14 +724,37 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     eventuallyClickOn(query)
   }
 
-  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
+  protected def eventuallyFindBase[T](
+      query: Query,
+      action: Query => T,
+      fallback: Option[() => T] = None,
+      timeUntilSuccess: Option[FiniteDuration],
+  )(implicit
+      driver: WebDriver
+  ): T = {
     clue(s"Waiting for $query to be found") {
-      waitForCondition(query) {
-        ExpectedConditions.visibilityOfElementLocated(_)
+      try {
+        waitForCondition(query, timeUntilSuccess) {
+          ExpectedConditions.visibilityOfElementLocated(_)
+        }
+        action(query)
+      } catch {
+        case e: TimeoutException =>
+          fallback match {
+            case Some(lazyFallback) => lazyFallback()
+            case None => throw e
+          }
       }
     }
-    find(query)
   }
+
+  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) =
+    eventuallyFindBase(query, find, None, None)
+
+  protected def eventuallyFindAll(query: Query, timeUntilSuccess: FiniteDuration = 5.seconds)(
+      implicit driver: WebDriver
+  ) =
+    eventuallyFindBase(query, findAll, Some(() => Iterator.empty), Some(timeUntilSuccess))
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType
@@ -736,6 +773,30 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         eventually()(
           dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
+      }
+    }
+  }
+
+  /** Sets date/time without using Selenium's clear/click (which can fail with "could not be
+    * scrolled into view" for elements in scrollable layouts). Use only when the standard
+    * setDateTime fails for a specific picker; other tests must continue using setDateTime.
+    */
+  protected def setDateTimeWithoutScroll(pickerId: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ): Assertion = {
+    clue(s"Selecting the date $dateTime (no-scroll path)") {
+      val dateTimePicker = webDriver.findElement(By.id(pickerId))
+      val digitsAndAmPm = dateTime.replaceAll("[^0-9APMapm]", "")
+      eventually() {
+        webDriver.executeScript("arguments[0].focus(); arguments[0].click();", dateTimePicker)
+        dateTimePicker.sendKeys(Keys.chord(Keys.CONTROL, "a"))
+        dateTimePicker.sendKeys(digitsAndAmPm)
+        val actual = dateTimePicker.getAttribute("value").toLowerCase
+        val expected = dateTime.toLowerCase
+        // MUI picker may display "a"/"p" instead of "am"/"pm"; normalize for comparison
+        val normalizeAmPm =
+          (s: String) => s.replaceAll("\\b(a)(?![m])", "am").replaceAll("\\b(p)(?![m])", "pm")
+        eventually()(normalizeAmPm(actual) shouldBe normalizeAmPm(expected))
       }
     }
   }

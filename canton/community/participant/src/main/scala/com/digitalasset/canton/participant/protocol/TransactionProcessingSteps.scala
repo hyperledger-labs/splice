@@ -1,17 +1,17 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.LightTransactionViewTree.ToFullViewTreesResult
@@ -19,12 +19,10 @@ import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.ledger.participant.state.*
+import com.digitalasset.canton.ledger.participant.state.Update.ContractInfo
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.SameAsContractPackageId
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
-import com.digitalasset.canton.lifecycle.{
-  FutureUnlessShutdown,
-  PromiseUnlessShutdown,
-  UnlessShutdown,
-}
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
@@ -32,10 +30,11 @@ import com.digitalasset.canton.logging.{
   NamedLoggingContext,
 }
 import com.digitalasset.canton.metrics.*
+import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.LedgerEffectAbsolutizer.ViewAbsoluteLedgerEffect
-import com.digitalasset.canton.participant.protocol.ProcessingSteps.ParsedRequest
+import com.digitalasset.canton.participant.protocol.ProcessingSteps.{DecryptedViews, ParsedRequest}
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
   MalformedPayload,
   NoMediatorError,
@@ -77,30 +76,30 @@ import com.digitalasset.canton.participant.protocol.validation.ModelConformanceC
 import com.digitalasset.canton.participant.protocol.validation.TimeValidator.TimeCheckFailure
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.*
-import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.participant.util.DAMLe.{ContractEnricher, TransactionEnricher}
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
+import com.digitalasset.canton.platform.store.cache.OnlyForTestingTransactionInMemoryStore
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ContractIdAbsolutizer.ContractIdAbsolutizationDataV1
+import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.WellFormedTransaction.{
   WithSuffixesAndMerged,
   WithoutSuffixes,
 }
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.InvalidContractIdInView
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.store.{ConfirmationRequestSessionKeyStore, SessionKeyStore}
-import com.digitalasset.canton.time.SynchronizerTimeTracker
+import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, LoggerUtil, RoseTree}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
   LedgerSubmissionId,
   LfKeyResolver,
@@ -111,13 +110,10 @@ import com.digitalasset.canton.{
   checked,
 }
 import com.digitalasset.daml.lf.transaction.CreationTime
-import com.google.protobuf.ByteString
 import monocle.PLens
 
-import java.util.concurrent.ConcurrentHashMap
 import scala.collection.immutable.SortedMap
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
 
 /** The transaction processor that coordinates the Canton transaction protocol.
@@ -134,6 +130,7 @@ class TransactionProcessingSteps(
     staticSynchronizerParameters: StaticSynchronizerParameters,
     crypto: SynchronizerCryptoClient,
     metrics: TransactionProcessingMetrics,
+    clock: Clock,
     transactionEnricher: TransactionEnricher,
     createNodeEnricher: ContractEnricher,
     authorizationValidator: AuthorizationValidator,
@@ -141,7 +138,8 @@ class TransactionProcessingSteps(
     tracker: CommandProgressTracker,
     protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
-    messagePayloadLoggingEnabled: Boolean,
+    onlyForTestingTransactionInMemoryStore: Option[OnlyForTestingTransactionInMemoryStore],
+    participantNodeParameters: ParticipantNodeParameters,
 )(implicit val ec: ExecutionContext)
     extends ProcessingSteps[
       SubmissionParam,
@@ -199,6 +197,7 @@ class TransactionProcessingSteps(
       mediator: MediatorGroupRecipient,
       ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      generateMaxSequencingTime: CantonTimestamp => CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -214,18 +213,48 @@ class TransactionProcessingSteps(
       disclosedContracts,
     ) = submissionParam
 
-    val tracked = new TrackedTransactionSubmission(
-      submitterInfo,
-      transactionMeta,
-      keyResolver,
-      wfTransaction,
-      mediator,
-      recentSnapshot,
-      ephemeralState.contractLookup,
-      disclosedContracts,
-    )
-
-    EitherT.rightT[FutureUnlessShutdown, TransactionSubmissionError]((tracked, None))
+    val now = clock.now
+    for {
+      maxSequencingTime <-
+        EitherT.right(
+          recentSnapshot.ipsSnapshot
+            .findDynamicSynchronizerParametersOrDefault(protocolVersion)
+            .map { synchronizerParameters =>
+              val maxSequencingTimeFromLET = CantonTimestamp(transactionMeta.ledgerEffectiveTime)
+                .add(synchronizerParameters.ledgerTimeRecordTimeTolerance.unwrap)
+              // For PV34 we didn't want to change the protocol so used adjusted the max sequencing time
+              // not to exceed the max record time if provided. For PV35 onwards we do this checking in phase 3
+              // so we restore the pre-existing.
+              if (protocolVersion >= ProtocolVersion.v35) {
+                maxSequencingTimeFromLET
+              } else {
+                submitterInfo.externallySignedSubmission
+                  .flatMap(_.maxRecordTime)
+                  .map(CantonTimestamp.apply)
+                  .map(_.min(maxSequencingTimeFromLET))
+                  .getOrElse(maxSequencingTimeFromLET)
+              }
+            }
+        )
+      tracked = new TrackedTransactionSubmission(
+        submitterInfo,
+        transactionMeta,
+        keyResolver,
+        wfTransaction,
+        mediator,
+        recentSnapshot,
+        ephemeralState.contractLookup,
+        disclosedContracts,
+        now,
+        maxSequencingTime,
+      )
+      submission <- EitherT.rightT[FutureUnlessShutdown, TransactionSubmissionError](
+        (
+          tracked,
+          None,
+        )
+      )
+    } yield submission
   }
 
   override def embedNoMediatorError(error: NoMediatorError): TransactionSubmissionError =
@@ -245,6 +274,8 @@ class TransactionProcessingSteps(
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
       contractLookup: ContractLookup { type ContractsCreatedAtTime <: CreationTime.CreatedAt },
       disclosedContracts: Map[LfContractId, ContractInstance],
+      override val approximateTimestampForSigning: CantonTimestamp,
+      override val maxSequencingTime: CantonTimestamp,
   )(implicit traceContext: TraceContext)
       extends TrackedSubmission {
 
@@ -299,7 +330,11 @@ class TransactionProcessingSteps(
       }
       mkTransactionSubmissionTrackingData(
         error,
-        submitterInfo.toCompletionInfo.copy(optDeduplicationPeriod = dedupInfo.some),
+        // Traffic cost is 0 because we failed during command deduplication,
+        // therefore the request has not been sent to the sequencer
+        submitterInfo
+          .toCompletionInfo(NonNegativeLong.zero)
+          .copy(optDeduplicationPeriod = dedupInfo.some),
       )
     }
 
@@ -315,21 +350,9 @@ class TransactionProcessingSteps(
 
     override def submissionId: Option[LedgerSubmissionId] = submitterInfo.submissionId
 
-    override def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp] = OptionT.liftF(
-      recentSnapshot.ipsSnapshot.findDynamicSynchronizerParametersOrDefault(protocolVersion).map {
-        synchronizerParameters =>
-          val maxSequencingTimeFromLET = CantonTimestamp(transactionMeta.ledgerEffectiveTime)
-            .add(synchronizerParameters.ledgerTimeRecordTimeTolerance.unwrap)
-          submitterInfo.externallySignedSubmission
-            .flatMap(_.maxRecordTimeO)
-            .map(CantonTimestamp.apply)
-            .map(_.min(maxSequencingTimeFromLET))
-            .getOrElse(maxSequencingTimeFromLET)
-      }
-    )
-
     override def prepareBatch(
         actualDeduplicationOffset: DeduplicationPeriod.DeduplicationOffset,
+        approximateTimestampForSigning: CantonTimestamp,
         maxSequencingTime: CantonTimestamp,
         sessionKeyStore: SessionKeyStore,
     ): EitherT[FutureUnlessShutdown, SubmissionTrackingData, PreparedBatch] = {
@@ -366,6 +389,7 @@ class TransactionProcessingSteps(
               keyResolver,
               mediator,
               recentSnapshot,
+              approximateTimestampForSigning,
               sessionKeyStore,
               TransactionProcessingSteps
                 .lookupContractsWithDisclosed(disclosedContracts, contractLookup),
@@ -392,6 +416,7 @@ class TransactionProcessingSteps(
         val batchSize = batch.toProtoVersioned.serializedSize
         val numRecipients = batch.allRecipients.size
         val numEnvelopes = batch.envelopesCount
+
         tracker
           .findHandle(
             submitterInfoWithDedupPeriod.commandId,
@@ -399,14 +424,16 @@ class TransactionProcessingSteps(
             submitterInfoWithDedupPeriod.actAs,
             submitterInfoWithDedupPeriod.submissionId,
           )
-          .recordEnvelopeSizes(batchSize, numRecipients, numEnvelopes)
+          .recordEnvelopeSizes(request.rootHash, batchSize, numRecipients, numEnvelopes)
 
         metrics.protocolMessages.confirmationRequestSize.update(batchSize)(MetricsContext.Empty)
 
         new PreparedTransactionBatch(
           batch,
           request.rootHash,
-          submitterInfoWithDedupPeriod.toCompletionInfo,
+          // At this stage we're still preparing the batch to be sent,
+          // so no traffic cost has been charged
+          submitterInfoWithDedupPeriod.toCompletionInfo(paidTrafficCost = NonNegativeLong.zero),
         ): PreparedBatch
       }
 
@@ -414,7 +441,9 @@ class TransactionProcessingSteps(
           rejectionCause: TransactionSubmissionTrackingData.RejectionCause
       ): Success[Outcome[Either[SubmissionTrackingData, PreparedBatch]]] = {
         val trackingData = TransactionSubmissionTrackingData(
-          submitterInfoWithDedupPeriod.toCompletionInfo,
+          // At this stage we're still preparing the batch to be sent,
+          // so no traffic cost has been charged
+          submitterInfoWithDedupPeriod.toCompletionInfo(paidTrafficCost = NonNegativeLong.zero),
           rejectionCause,
           psid,
         )
@@ -444,7 +473,9 @@ class TransactionProcessingSteps(
 
     override def submissionTimeoutTrackingData: SubmissionTrackingData =
       TransactionSubmissionTrackingData(
-        submitterInfo.toCompletionInfo.copy(optDeduplicationPeriod = None),
+        // Since we're timing out, we have to assume here the event has not been ordered and therefore
+        // no traffic was charged
+        submitterInfo.toCompletionInfo(NonNegativeLong.zero).copy(optDeduplicationPeriod = None),
         TransactionSubmissionTrackingData.TimeoutCause,
         psid,
       )
@@ -481,7 +512,11 @@ class TransactionProcessingSteps(
         case UnlessShutdown.Outcome(exception) =>
           SubmissionInternalError.Failure(exception)
       }): TransactionError
-      mkTransactionSubmissionTrackingData(error, submitterInfo.toCompletionInfo)
+      mkTransactionSubmissionTrackingData(
+        error,
+        // Traffic cost is 0 here because this is called when the request failed before being sent to the sequencer
+        submitterInfo.toCompletionInfo(NonNegativeLong.zero),
+      )
     }
 
     override def onPotentialFailure(
@@ -537,174 +572,22 @@ class TransactionProcessingSteps(
   ): TransactionSubmitted =
     TransactionSubmitted
 
-  // TODO(#8057) extract the decryption into a helper class that can be unit-tested.
   override def decryptViews(
       batch: NonEmpty[Seq[OpenEnvelope[EncryptedViewMessage[TransactionViewType]]]],
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TransactionProcessorError, DecryptedViews] =
+  ): EitherT[FutureUnlessShutdown, TransactionProcessorError, DecryptedViews[DecryptedView]] =
     metrics.protocolMessages.transactionMessageReceipt.timeEitherFUS {
-      // even if we encounter errors, we process the good views as normal
-      // such that the validation is available if the transaction confirmation request gets approved nevertheless.
-
-      val pureCrypto = snapshot.pureCrypto
-
-      def lightTransactionViewTreeDeserializer(
-          bytes: ByteString
-      ): Either[DefaultDeserializationError, LightTransactionViewTree] =
-        LightTransactionViewTree
-          .fromByteString((pureCrypto, computeRandomnessLength(pureCrypto)), protocolVersion)(
-            bytes
-          )
-          .leftMap(err => DefaultDeserializationError(err.message))
-
-      def decryptTree(
-          vt: TransactionViewMessage,
-          optRandomness: Option[SecureRandomness],
-      ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, LightTransactionViewTree] =
-        EncryptedViewMessage.decryptFor(
-          snapshot,
-          sessionKeyStore,
-          vt,
-          participantId,
-          optRandomness,
-        )(
-          lightTransactionViewTreeDeserializer
-        )
-
-      // To recover parallel processing to the largest possible extent, we'll associate a promise to each received
-      // view. The promise gets fulfilled once the randomness for that view is computed - either directly by decryption,
-      // because the participant is an informee of the view, or indirectly, because the participant is an informee on an
-      // ancestor view and so it contains that view's randomness.
-
-      // TODO(i12911): a malicious submitter can send a bogus view whose randomness cannot be decrypted/derived,
-      //  crashing the ConnectedSynchronizer
-      val randomnessMap =
-        batch.foldLeft(Map.empty[ViewHash, PromiseUnlessShutdown[SecureRandomness]]) {
-          case (m, evt) =>
-            m + (evt.protocolMessage.viewHash -> PromiseUnlessShutdown.supervised[SecureRandomness](
-              "secure-randomness",
-              futureSupervisor,
-            ))
-        }
-
-      // We keep track of all randomnesses used for the views, both the one used to
-      // encrypt the view and the one that is sent as part of the ancestor view, and check for mismatches at the end.
-      val allRandomnessMap = new ConcurrentHashMap[ViewHash, Seq[SecureRandomness]]()
-
-      def addRandomnessToMap(viewHash: ViewHash, toAdd: SecureRandomness): SecureRandomness = {
-        allRandomnessMap.compute(
-          viewHash,
-          (_, existing) => {
-            val updatedList =
-              if (existing == null || existing.isEmpty) Seq(toAdd)
-              else existing :+ toAdd
-            updatedList
-          },
-        )
-        toAdd
-      }
-
-      def checkRandomnessMap(): Unit =
-        allRandomnessMap.asScala.find { case (_, listRandomness) =>
-          listRandomness.distinct.sizeIs > 1
-        } match {
-          case Some((viewHash, _)) =>
-            ErrorUtil.internalError(
-              new IllegalArgumentException(
-                s"View $viewHash has different encryption keys associated with it."
-              )
-            )
-          case None => ()
-        }
-
-      def extractRandomnessFromView(
-          transactionViewEnvelope: OpenEnvelope[TransactionViewMessage]
-      ) = {
-        def completeRandomnessPromise(): FutureUnlessShutdown[SecureRandomness] = {
-          val message = transactionViewEnvelope.protocolMessage
-          val randomnessF = EncryptedViewMessage
-            .decryptRandomness(
-              snapshot,
-              sessionKeyStore,
-              message,
-              participantId,
-            )
-            .map(addRandomnessToMap(message.viewHash, _))
-            .valueOr { e =>
-              ErrorUtil.internalError(
-                new IllegalArgumentException(
-                  s"Can't decrypt the randomness of the view with hash ${message.viewHash} " +
-                    s"where I'm allegedly an informee. $e"
-                )
-              )
-            }
-          checked(randomnessMap(transactionViewEnvelope.protocolMessage.viewHash))
-            .completeWithUS(randomnessF)
-            .discard
-          randomnessF
-        }
-
-        if (
-          transactionViewEnvelope.recipients.leafRecipients.contains(MemberRecipient(participantId))
-        ) completeRandomnessPromise().map(_ => ())
-        else FutureUnlessShutdown.unit
-      }
-
-      def decryptViewWithRandomness(
-          viewMessage: TransactionViewMessage,
-          randomness: SecureRandomness,
-      ): EitherT[
-        FutureUnlessShutdown,
-        EncryptedViewMessageError,
-        (DecryptedView, Option[Signature]),
-      ] =
-        for {
-          ltvt <- decryptTree(viewMessage, Some(randomness))
-          _ = ltvt.subviewHashesAndKeys
-            .foreach { case ViewHashAndKey(subviewHash, subviewKey) =>
-              randomnessMap.get(subviewHash) match {
-                case Some(promise) =>
-                  promise.outcome_(addRandomnessToMap(subviewHash, subviewKey))
-                case None =>
-                  // TODO(i12911): make sure to not approve the request
-                  SyncServiceAlarm
-                    .Warn(
-                      s"View ${viewMessage.viewHash} lists a subview with hash $subviewHash, but " +
-                        s"I haven't received any views for this hash"
-                    )
-                    .report()
-              }
-            }
-        } yield (ltvt, viewMessage.submittingParticipantSignature)
-
-      def decryptView(
-          transactionViewEnvelope: OpenEnvelope[TransactionViewMessage]
-      ): FutureUnlessShutdown[Either[
-        EncryptedViewMessageError,
-        (WithRecipients[DecryptedView], Option[Signature]),
-      ]] = {
-        val extractRandomnessFromViewF = extractRandomnessFromView(transactionViewEnvelope)
-        for {
-          randomness <- randomnessMap(transactionViewEnvelope.protocolMessage.viewHash).futureUS
-          lightViewTreeE <- decryptViewWithRandomness(
-            transactionViewEnvelope.protocolMessage,
-            randomness,
-          ).value
-          _ <- extractRandomnessFromViewF
-        } yield lightViewTreeE.map { case (view, signature) =>
-          (WithRecipients(view, transactionViewEnvelope.recipients), signature)
-        }
-      }
-
-      EitherT.right {
-        for {
-          decryptionResult <- batch.toNEF.parTraverse(decryptView)
-          _ = checkRandomnessMap()
-        } yield DecryptedViews(decryptionResult)
-      }
+      new ViewMessageDecrypter(
+        participantId,
+        protocolVersion,
+        sessionKeyStore,
+        snapshot,
+        futureSupervisor,
+        loggerFactory,
+      ).decryptViews(batch)
     }
 
   override def absolutizeLedgerEffects(
@@ -810,6 +693,7 @@ class TransactionProcessingSteps(
       mediator: MediatorGroupRecipient,
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       synchronizerParameters: DynamicSynchronizerParametersWithValidity,
+      trafficCost: NonNegativeLong,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ParsedTransactionRequest] = {
     val workflowId = rootViewsWithMetadata.head1._1.unwrap.workflowIdO
     val effects = rootViewsWithMetadata.forgetNE.flatMap { case (_, _, effects) =>
@@ -835,6 +719,7 @@ class TransactionProcessingSteps(
       workflowId,
       snapshot,
       synchronizerParameters,
+      trafficCost,
     )
   }
 
@@ -847,20 +732,13 @@ class TransactionProcessingSteps(
     //   Also, check that all the view's informees received the derived randomness
     Right(parsedRequest.usedAndCreated.activenessSet)
 
-  override def authenticateInputContracts(
-      parsedRequest: ParsedTransactionRequest
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, TransactionProcessorError, Unit] =
-    // For transaction processing contract authentication is done as part of model conformance
-    EitherT.pure(())
-
   override def constructPendingDataAndResponse(
       parsedRequest: ParsedTransactionRequest,
       reassignmentLookup: ReassignmentLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -868,7 +746,6 @@ class TransactionProcessingSteps(
     TransactionProcessorError,
     StorePendingDataAndSendResponseAndCreateTimeout,
   ] = {
-
     val ParsedTransactionRequest(
       rc,
       requestTimestamp,
@@ -882,6 +759,7 @@ class TransactionProcessingSteps(
       _,
       snapshot,
       _,
+      trafficCost,
     ) = parsedRequest
 
     val ipsSnapshot = snapshot.ipsSnapshot
@@ -908,10 +786,10 @@ class TransactionProcessingSteps(
               modelConformanceChecker
                 .reInterpret(
                   viewTree.view,
-                  keyResolverFor(viewTree.view),
                   ledgerTime,
                   parsedRequest.preparationTime,
                   () => engineController.abortStatus,
+                  snapshot.ipsSnapshot,
                 )
             }
           }
@@ -925,7 +803,7 @@ class TransactionProcessingSteps(
           transactionEnricher,
           createNodeEnricher,
           logger,
-          messagePayloadLoggingEnabled,
+          participantNodeParameters.loggingConfig.api.messagePayloads,
         )
 
         consistencyResultE = ContractConsistencyChecker
@@ -943,12 +821,16 @@ class TransactionProcessingSteps(
         amSubmitter = parsedRequest.submitterMetadataO.exists(
           _.submittingParticipant == participantId
         )
+
         timeValidationE = TimeValidator.checkTimestamps(
           commonData,
           requestTimestamp,
           ledgerTimeRecordTimeTolerance = synchronizerParameters.ledgerTimeRecordTimeTolerance,
           preparationTimeRecordTimeTolerance =
             synchronizerParameters.preparationTimeRecordTimeTolerance,
+          maxRecordTime = parsedRequest.submitterMetadataO
+            .flatMap(_.externalAuthorization)
+            .flatMap(_.maxRecordTime),
           amSubmitter = amSubmitter,
           logger,
         )
@@ -963,18 +845,10 @@ class TransactionProcessingSteps(
         conformanceResultET = modelConformanceChecker
           .check(
             parsedRequest.rootViewTreesWithEffects,
-            keyResolverFor(_),
             ipsSnapshot,
             commonData,
             getEngineAbortStatus = () => engineController.abortStatus,
             reInterpretedTopLevelViews,
-          )
-
-        globalKeyHostedParties <-
-          InternalConsistencyChecker.hostedGlobalKeyParties(
-            parsedRequest.rootViewTrees,
-            participantId,
-            snapshot.ipsSnapshot,
           )
 
         internalConsistencyResultE = internalConsistencyChecker.check(
@@ -1070,6 +944,8 @@ class TransactionProcessingSteps(
         replayCheckResult = parallelChecksResult.replayCheckResult,
         validatedExternalTransactionHash =
           parallelChecksResult.authenticationValidatorResult.externalHash,
+        commitAfterFailedActivenessCheck =
+          participantNodeParameters.commitAfterFailedActivenessCheck,
       )
     }
 
@@ -1105,6 +981,8 @@ class TransactionProcessingSteps(
             freshOwnTimelyTx,
             engineController,
             decisionTimeTickRequest,
+            publishUpdate,
+            trafficCost,
           )
         StorePendingDataAndSendResponseAndCreateTimeout(
           pendingTransaction,
@@ -1140,17 +1018,19 @@ class TransactionProcessingSteps(
       _rootHash: RootHash,
       freshOwnTimelyTx: Boolean,
       error: TransactionError,
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
-  ): (Option[SequencedUpdate], Option[PendingSubmissionId]) = {
+  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId]) = {
     val rejection = Update.CommandRejected.FinalReason(error.rpcStatus())
-    completionInfoFromSubmitterMetadataO(submitterMetadata, freshOwnTimelyTx).map {
+    completionInfoFromSubmitterMetadataO(submitterMetadata, freshOwnTimelyTx, trafficCost).map {
       completionInfo =>
         Update.SequencedCommandRejected(
           completionInfo,
           rejection,
           psid.logical,
           ts,
+          isTransaction = true,
         )
     } -> None // Transaction processing doesn't use pending submissions
   }
@@ -1164,7 +1044,7 @@ class TransactionProcessingSteps(
 
   override def createRejectionEvent(rejectionArgs: TransactionProcessingSteps.RejectionArgs)(
       implicit traceContext: TraceContext
-  ): Either[TransactionProcessorError, Option[SequencedUpdate]] = {
+  ): Either[TransactionProcessorError, Option[SequencedEventUpdate]] = {
     val RejectionArgs(pendingTransaction, errorDetails) = rejectionArgs
 
     val PendingTransaction(
@@ -1178,10 +1058,12 @@ class TransactionProcessingSteps(
       _engineController,
       _abortedF,
       _decisionTimeTickRequest,
+      _publishUpdate,
+      trafficCost,
     ) = pendingTransaction
     val submitterMetaO = transactionValidationResult.submitterMetadataO
     val completionInfoO =
-      submitterMetaO.flatMap(completionInfoFromSubmitterMetadataO(_, freshOwnTimelyTx))
+      submitterMetaO.flatMap(completionInfoFromSubmitterMetadataO(_, freshOwnTimelyTx, trafficCost))
 
     errorDetails.logRejection(
       Map("requestId" -> pendingTransaction.requestId.toString)
@@ -1194,6 +1076,7 @@ class TransactionProcessingSteps(
         rejection,
         psid.logical,
         requestTime,
+        isTransaction = true,
       )
     )
     Right(updateO)
@@ -1202,6 +1085,7 @@ class TransactionProcessingSteps(
   private def completionInfoFromSubmitterMetadataO(
       meta: SubmitterMetadata,
       freshOwnTimelyTx: Boolean,
+      trafficCost: NonNegativeLong,
   ): Option[CompletionInfo] = {
     lazy val completionInfo = CompletionInfo(
       meta.actAs.toList,
@@ -1209,6 +1093,7 @@ class TransactionProcessingSteps(
       meta.commandId.unwrap,
       Some(meta.dedupPeriod),
       meta.submissionId,
+      trafficCost,
     )
 
     Option.when(freshOwnTimelyTx)(completionInfo)
@@ -1224,6 +1109,8 @@ class TransactionProcessingSteps(
       freshOwnTimelyTx: Boolean,
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
   ): PendingTransaction = {
@@ -1249,6 +1136,8 @@ class TransactionProcessingSteps(
       engineController.abort,
       engineAbortStatusF,
       decisionTimeTickRequest,
+      publishUpdate,
+      trafficCost,
     )
   }
 
@@ -1276,6 +1165,8 @@ class TransactionProcessingSteps(
     )
   }
 
+  // Assigning the internal contract ids to the contracts requires that all the contracts are
+  // already persisted in the contract store.
   private def computeCommitAndContractsAndEvent(
       requestTime: CantonTimestamp,
       updateId: UpdateId,
@@ -1306,7 +1197,14 @@ class TransactionProcessingSteps(
 
     val acceptedEvent =
       (acsChangeFactory: AcsChangeFactory) =>
-        (internalContractIds: Map[LfContractId, Long]) =>
+        (internalContractIds: Map[LfContractId, Long]) => {
+          val transaction = LfCommittedTransaction(lfTx.unwrap)
+          onlyForTestingTransactionInMemoryStore.foreach(
+            _.put(
+              updateId = updateId.toHexString,
+              lfVersionedTransaction = transaction,
+            )
+          )
           Update.SequencedTransactionAccepted(
             completionInfoO = completionInfoO,
             transactionMeta = TransactionMeta(
@@ -1321,15 +1219,30 @@ class TransactionProcessingSteps(
               optNodeSeeds = None, // optNodeSeeds is unused by the indexer
               optByKeyNodes = None, // optByKeyNodes is unused by the indexer
             ),
-            transaction = LfCommittedTransaction(lfTx.unwrap),
+            transactionInfo = Update.TransactionAccepted.TransactionInfo(transaction),
             updateId = updateId,
-            contractAuthenticationData = contractAuthenticationData,
             synchronizerId = psid.logical,
             recordTime = requestTime,
             externalTransactionHash = externalTransactionHash,
             acsChangeFactory = acsChangeFactory,
-            internalContractIds = internalContractIds,
+            contractInfos =
+              contractAuthenticationData.map { case (contractId, contractAuthenticationData) =>
+                contractId -> ContractInfo(
+                  internalContractId = checked {
+                    // the internal contract id must exist since we persisted the contracts before (in the ProtocolProcessor)
+                    internalContractIds.getOrElse(
+                      contractId,
+                      ErrorUtil.invalidState(
+                        s"The internal contract id for the contract $contractId was not found"
+                      ),
+                    )
+                  },
+                  contractAuthenticationData = contractAuthenticationData,
+                  representativePackageId = SameAsContractPackageId,
+                )
+              },
           )
+        }
     CommitAndStoreContractsAndPublishEvent(
       Some(commitSetF),
       contractsToBeStored,
@@ -1369,6 +1282,8 @@ class TransactionProcessingSteps(
         consumedInputsOfHostedParties = usedAndCreated.contracts.consumedInputsOfHostedStakeholders,
         transient = usedAndCreated.contracts.transient,
         createdContracts = createdContracts,
+        commitAfterFailedActivenessCheck =
+          participantNodeParameters.commitAfterFailedActivenessCheck,
       )
 
       commitAndContractsAndEvent = computeCommitAndContractsAndEvent(
@@ -1401,7 +1316,11 @@ class TransactionProcessingSteps(
     val ts = event.event.content.timestamp
     val submitterMetaO = pendingRequestData.transactionValidationResult.submitterMetadataO
     val completionInfoO = submitterMetaO.flatMap(
-      completionInfoFromSubmitterMetadataO(_, pendingRequestData.freshOwnTimelyTx)
+      completionInfoFromSubmitterMetadataO(
+        _,
+        pendingRequestData.freshOwnTimelyTx,
+        pendingRequestData.trafficCost,
+      )
     )
 
     def getCommitSetAndContractsToBeStoredAndEvent(
@@ -1620,6 +1539,7 @@ object TransactionProcessingSteps {
       workflowIdO: Option[WorkflowId],
       override val snapshot: SynchronizerSnapshotSyncCryptoApi,
       override val synchronizerParameters: DynamicSynchronizerParametersWithValidity,
+      override val trafficCost: NonNegativeLong,
   ) extends ParsedRequest[SubmitterMetadata] {
 
     lazy val rootViewTreesWithEffects
@@ -1672,7 +1592,7 @@ object TransactionProcessingSteps {
   def keyResolverFor(
       rootView: TransactionView
   )(implicit loggingContext: NamedLoggingContext): LfKeyResolver =
-    rootView.globalKeyInputs.fmap(_.unversioned.resolution)
+    rootView.keyMaintainers.fmap(_.unversioned.contracts.toVector)
 
   /** @throws java.lang.IllegalArgumentException
     *   if `receivedViewTrees` contains views with different transaction root hashes

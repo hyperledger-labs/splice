@@ -11,8 +11,8 @@ import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
   HistoryMetrics,
+  PageLimit,
   S3BucketConnection,
   TimestampWithMigrationId,
 }
@@ -46,53 +46,63 @@ class SingleAcsSnapshotBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
+  case class AcsSnapshotChunk(
+      chunkBytes: ByteString,
+      numContracts: Int,
+  )
+
   private def getAcsSnapshotChunk(
       timestamp: TimestampWithMigrationId,
       after: Option[Long],
-  ): Future[(Position, ByteString)] = {
+  ): Future[(Position, AcsSnapshotChunk)] = {
     for {
       snapshot <- acsSnapshotStore.queryAcsSnapshot(
         timestamp.migrationId,
         snapshot = timestamp.timestamp,
         after,
-        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
     } yield {
       val encoded = snapshot.createdEventsInPage.map(event =>
-        CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(event.eventId, event.event)
+        CompactJsonScanHttpEncodings().javaToHttpActiveContract(event.eventId, event.event)
       )
       val contractsStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
       val contractsBytes = ByteString(contractsStr.getBytes(StandardCharsets.UTF_8))
       logger.debug(
         s"Read ${encoded.length} contracts from ACS, to a bytestring of size ${contractsBytes.length} bytes"
       )
-      (snapshot.afterToken.fold(End: Position)(Index(_)), contractsBytes)
+      (
+        snapshot.afterToken.fold(End: Position)(Index(_)),
+        AcsSnapshotChunk(contractsBytes, encoded.length),
+      )
     }
 
   }
 
-  private def getSource: Source[TimestampWithMigrationId, NotUsed] = {
+  private def getSource: Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(Start: Position) {
         case Start => getAcsSnapshotChunk(timestamp, None).map(Some(_))
         case Index(i) => getAcsSnapshotChunk(timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
+      .map(chunk => {
+        historyMetrics.BulkStorage.incContractsCount(chunk.numContracts)
+        chunk.chunkBytes
+      })
       .via(
         S3ZstdObjects(
           storageConfig,
           appConfig,
           s3Connection,
-          { objIdx => s"${storageConfig.getSegmentKeyPrefix(timestamp, None)}/ACS_$objIdx.zstd" },
+          { objIdx => s"${storageConfig.getSegmentFolder(timestamp, None)}/ACS_$objIdx.zstd" },
           loggerFactory,
         )
       )
       .wireTap(_ => historyMetrics.BulkStorage.incAcsSnapshotObjects())
-      // emit back the timestamp w. migrationId upon completion
-      .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
-
+      .fold(Seq.empty[String])(_ :+ _)
   }
 }
 
@@ -112,7 +122,7 @@ object SingleAcsSnapshotBulkStorage {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] =
+  ): Flow[TimestampWithMigrationId, Seq[String], NotUsed] =
     Flow[TimestampWithMigrationId].flatMapConcat {
       new SingleAcsSnapshotBulkStorage(
         _,
@@ -138,7 +148,7 @@ object SingleAcsSnapshotBulkStorage {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[TimestampWithMigrationId, NotUsed] =
+  ): Source[Seq[String], NotUsed] =
     new SingleAcsSnapshotBulkStorage(
       timestamp,
       storageConfig,

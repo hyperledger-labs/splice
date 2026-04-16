@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -265,8 +265,8 @@ private class TranscodeTopologyAwarePackageBackedResolver(
         packagePreferenceBackend.getPreferredPackages(
           packageVettingRequirements =
             PackageVettingRequirements(packageNames.iterator.map(_ -> Set(party)).toMap),
-          packageFilter = PackagePreferenceBackend.PackageFilterRestriction(
-            supportedPackagesPerPackagename = userPackagePreferenceMap.view.mapValues(Set(_)).toMap,
+          packageFilter = PackagePreferenceBackend.SupportedPackagesFilter(
+            supportedPackagesPerPackageName = userPackagePreferenceMap.view.mapValues(Set(_)).toMap,
             restrictionDescription = "Commands.packageIdSelectionPreferences",
           ),
           synchronizerId = synchronizerIdO,

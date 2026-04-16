@@ -1,0 +1,346 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "SV values - cometBFT config (top-level, backwards compat)"
+templates:
+  - sv.yaml
+release:
+  name: mock-sv
+chart:
+  version: 0.1.1
+  appVersion: 0.1.0
+
+# Things we need just to pass the schema
+set:
+  domain:
+    sequencerPublicUrl: "https://sequencer.mock.com"
+    sequencerAddress: "sequencer-address"
+    mediatorAddress: "mediator-address"
+    sequencerPruningConfig:
+      enabled: false
+  scan:
+    publicUrl: "https://scan.mock.com"
+    internalUrl: "https://scan-internal.mock.com"
+  nodeIdentifier: "helm-mock-1-validator"
+  onboardingName: "some-sv"
+  participantAddress: "mock-address"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
+tests:
+  - it: "sets cometBFT config with enabled and connectionUri"
+    set:
+      cometBFT:
+        enabled: true
+        connectionUri: "http://cometbft.mock.com:26657"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current.comet-bft-config {
+              enabled = true
+              connection-uri = "http://cometbft.mock.com:26657"
+            }
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_ENABLED')]
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_CONNECTION_URI')]
+
+  - it: "sets cometBFT config with enabled only (no connectionUri)"
+    set:
+      cometBFT:
+        enabled: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current.comet-bft-config {
+              enabled = true
+            }
+
+  - it: "does not set cometBFT config when top-level cometBFT is absent"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')]
+
+  - it: "sets cometBFT external governance key config"
+    set:
+      cometBFT:
+        enabled: true
+        connectionUri: "http://cometbft.mock.com:26657"
+        externalGovernanceKey: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT_GOVERNANCE_KEY')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current.comet-bft-config {
+              governance-key {
+                public-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY}
+                private-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY}
+              }
+            }
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY')].valueFrom.secretKeyRef.name
+          value: "splice-app-sv-cometbft-governance-key"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY')].valueFrom.secretKeyRef.key
+          value: "public"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.name
+          value: "splice-app-sv-cometbft-governance-key"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.key
+          value: "private"
+
+---
+suite: "SV values - cometBFT config (synchronizers)"
+templates:
+  - sv.yaml
+release:
+  name: mock-sv
+chart:
+  version: 0.1.1
+  appVersion: 0.1.0
+
+# Things we need just to pass the schema - using synchronizers (new format)
+set:
+  synchronizers:
+    current:
+      sequencerPublicUrl: "https://sequencer.mock.com"
+      sequencerAddress: "sequencer-address"
+      mediatorAddress: "mediator-address"
+      sequencerPruningConfig:
+        enabled: false
+  scan:
+    publicUrl: "https://scan.mock.com"
+    internalUrl: "https://scan-internal.mock.com"
+  nodeIdentifier: "helm-mock-1-validator"
+  onboardingName: "some-sv"
+  participantAddress: "mock-address"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
+tests:
+  - it: "sets inline cometBFT under synchronizers.current with enabled and connectionUri"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer.test.com"
+          sequencerAddress: "sequencer-test-address"
+          mediatorAddress: "mediator-test-address"
+          sequencerPruningConfig:
+            enabled: false
+          cometBFT:
+            enabled: true
+            connectionUri: "http://cometbft.test.com:26657"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
+              sequencer {
+                admin-api {
+                  address = "sequencer-test-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-test-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-test-address"
+                  port = 5007
+                }
+              }
+              comet-bft-config {
+                enabled = true
+                connection-uri = "http://cometbft.test.com:26657"
+              }
+            }
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')]
+
+  - it: "sets inline cometBFT under synchronizers.current with enabled only (no connectionUri)"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer.test.com"
+          sequencerAddress: "sequencer-test-address"
+          mediatorAddress: "mediator-test-address"
+          sequencerPruningConfig:
+            enabled: false
+          cometBFT:
+            enabled: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
+              sequencer {
+                admin-api {
+                  address = "sequencer-test-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-test-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-test-address"
+                  port = 5007
+                }
+              }
+              comet-bft-config {
+                enabled = true
+              }
+            }
+
+  - it: "emits governance key secret env vars (but not ADDITIONAL_CONFIG) when synchronizers.current has externalGovernanceKey"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer.test.com"
+          sequencerAddress: "sequencer-test-address"
+          mediatorAddress: "mediator-test-address"
+          sequencerPruningConfig:
+            enabled: false
+          cometBFT:
+            enabled: true
+            connectionUri: "http://cometbft.test.com:26657"
+            externalGovernanceKey: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT_GOVERNANCE_KEY')]
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY')].valueFrom.secretKeyRef.name
+          value: "splice-app-sv-cometbft-governance-key"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY')].valueFrom.secretKeyRef.key
+          value: "public"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.name
+          value: "splice-app-sv-cometbft-governance-key"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.key
+          value: "private"
+
+  - it: "sets inline cometBFT under both synchronizers.current and synchronizers.successor"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer-current.test.com"
+          sequencerAddress: "sequencer-current-address"
+          mediatorAddress: "mediator-current-address"
+          sequencerPruningConfig:
+            enabled: false
+          cometBFT:
+            enabled: true
+            connectionUri: "http://cometbft-current.test.com:26657"
+        successor:
+          sequencerPublicUrl: "https://sequencer-successor.test.com"
+          sequencerAddress: "sequencer-successor-address"
+          mediatorAddress: "mediator-successor-address"
+          sequencerPruningConfig:
+            enabled: false
+          cometBFT:
+            enabled: true
+            connectionUri: "http://cometbft-successor.test.com:26657"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
+              sequencer {
+                admin-api {
+                  address = "sequencer-current-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-current-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer-current.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-current-address"
+                  port = 5007
+                }
+              }
+              comet-bft-config {
+                enabled = true
+                connection-uri = "http://cometbft-current.test.com:26657"
+              }
+            }
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_SUCCESSOR')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.successor {
+              sequencer {
+                admin-api {
+                  address = "sequencer-successor-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-successor-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer-successor.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-successor-address"
+                  port = 5007
+                }
+              }
+              comet-bft-config {
+                enabled = true
+                connection-uri = "http://cometbft-successor.test.com:26657"
+              }
+            }

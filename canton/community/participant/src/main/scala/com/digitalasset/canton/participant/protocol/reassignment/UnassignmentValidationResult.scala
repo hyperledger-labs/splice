@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.EitherT
 import cats.syntax.functor.*
 import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   ContractsReassignmentBatch,
@@ -40,8 +41,8 @@ final case class UnassignmentValidationResult(
 ) extends ReassignmentValidationResult {
   val submitterMetadata: ReassignmentSubmitterMetadata = unassignmentData.submitterMetadata
   val sourceSynchronizer: ReassignmentTag.Source[PhysicalSynchronizerId] =
-    unassignmentData.sourcePSId
-  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetPSId
+    unassignmentData.sourcePsid
+  val targetSynchronizer: Target[PhysicalSynchronizerId] = unassignmentData.targetPsid
   val stakeholders: Set[LfPartyId] = unassignmentData.stakeholders.all
   val targetTimestamp: Target[CantonTimestamp] = unassignmentData.targetTimestamp
 
@@ -76,6 +77,7 @@ final case class UnassignmentValidationResult(
   def createReassignmentAccepted(
       participantId: ParticipantId,
       recordTime: CantonTimestamp,
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
   ): AcsChangeFactory => InternalContractIds => Update.SequencedReassignmentAccepted = {
@@ -90,10 +92,11 @@ final case class UnassignmentValidationResult(
           commandId = submitterMetadata.commandId,
           optDeduplicationPeriod = None,
           submissionId = submitterMetadata.submissionId,
+          paidTrafficCost = trafficCost,
         )
       )
     (acsChangeFactory: AcsChangeFactory) =>
-      (internalContractIds: InternalContractIds) =>
+      (_: InternalContractIds) =>
         Update.SequencedReassignmentAccepted(
           optCompletionInfo = completionInfo,
           workflowId = submitterMetadata.workflowId,
@@ -120,7 +123,6 @@ final case class UnassignmentValidationResult(
           recordTime = recordTime,
           synchronizerId = sourceSynchronizer.unwrap.logical,
           acsChangeFactory = acsChangeFactory,
-          internalContractIds = internalContractIds,
         )
   }
 }
@@ -135,6 +137,7 @@ object UnassignmentValidationResult {
         Unit,
       ],
       submitterCheckResult: Option[ReassignmentValidationError],
+      multiSynchronizerFeatureFlagCheckResult: Option[ReassignmentValidationError],
   ) extends ReassignmentValidationResult.CommonValidationResult {
 
     // During unassignment the reassignment id is computed, rather than being passed in

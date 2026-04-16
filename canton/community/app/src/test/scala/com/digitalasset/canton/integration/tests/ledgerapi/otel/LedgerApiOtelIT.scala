@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.ledgerapi.otel
@@ -26,11 +26,12 @@ import com.daml.ledger.api.v2.transaction_filter.{
 }
 import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.api.v2.value.{Record, RecordField, Value}
+import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
-import com.digitalasset.canton.config.{CantonConfig, DbConfig, PemFile, TlsServerConfig}
-import com.digitalasset.canton.integration.plugins.{UseOtlp, UseReferenceBlockSequencer}
+import com.digitalasset.canton.config.{CantonConfig, PemFile}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2, UseOtlp}
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.ValueConversions.*
 import com.digitalasset.canton.integration.tests.ledgerapi.fixture.{CantonFixture, CreatesParties}
 import com.digitalasset.canton.integration.tests.ledgerapi.services.TestCommands
@@ -64,7 +65,8 @@ trait LedgerApiOtelITBase
   val otlpHeaders = Map("custom-key" -> "custom-value")
 
   registerPlugin(LedgerApiOtelOverrideConfig(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseH2(loggerFactory))
+  registerPlugin(new UseBftSequencer(loggerFactory))
 
   protected def useOtlp: UseOtlp
   registerPlugin(useOtlp)
@@ -137,12 +139,15 @@ trait LedgerApiOtelITBase
     SuppressionRule.LoggerNameContains("CommandSubmissionServiceImpl") &&
       SuppressionRule.Level(Level.INFO)
 
-  private def assertLogs(expected: Seq[(Option[String], Level, String)]): Assertion = {
+  private def assertLogs(traceId: Option[String], level: Level, message: String): Assertion = {
     val logEntries = loggerFactory.fetchRecordedLogEntries
     logEntries
-      .map(entry =>
-        (entry.mdc.get("trace-id"), entry.level, entry.message.takeWhile(_ != '('))
-      ) should contain theSameElementsInOrderAs expected
+      .map { entry =>
+        entry.mdc.get("trace-id") shouldBe traceId
+
+        entry.level shouldBe level
+        entry.message should include regex (message)
+      }
     Succeeded
   }
 
@@ -200,13 +205,9 @@ trait LedgerApiOtelITBase
             .transform(Success.apply)
             .map { _ =>
               assertLogs(
-                Seq(
-                  (
-                    traceContext.traceId,
-                    Level.INFO,
-                    "Phase 1 started: Submitting commands for interpretation: Commands",
-                  )
-                )
+                traceContext.traceId,
+                Level.INFO,
+                "Phase 1 started: Submitting \\d+ command\\(s\\) for interpretation on behalf of",
               )
               assertSpans(
                 traceContext,
@@ -456,6 +457,7 @@ class LedgerApiOtelIT extends LedgerApiOtelITBase {
               beginExclusive = offset,
               endInclusive = None,
               updateFormat = updateFormat(party),
+              descendingOrder = false,
             ),
             _,
           ),
@@ -487,7 +489,7 @@ class LedgerApiOtelIT extends LedgerApiOtelITBase {
 class LedgerApiOtelTlsIT extends LedgerApiOtelITBase {
 
   protected override lazy val useOtlp: UseOtlp = {
-    val pathPrefix = "./enterprise/app/src/test/resources/tls"
+    val pathPrefix = "./community/app/src/test/resources/tls"
     val certChainFile = PemFile(ExistingFile.tryCreate(s"$pathPrefix/ledger-api.crt"))
     val privateKeyFile = PemFile(ExistingFile.tryCreate(s"$pathPrefix/ledger-api.pem"))
     val trustCertCollectionFile = PemFile(ExistingFile.tryCreate(s"$pathPrefix/root-ca.crt"))

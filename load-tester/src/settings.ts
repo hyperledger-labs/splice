@@ -35,6 +35,7 @@ export const configSchema = z.object({
     .boolean()
     .or(z.enum(['true', 'false', '1', '0', '']).transform(val => val === 'true' || val === '1')),
   usersPerValidator: z.number().min(1),
+  featuredUsersPerValidator: z.number().min(0),
   validators: z.array(validatorSchema).min(1),
   test: z.object({
     duration: z.string().min(1),
@@ -45,7 +46,6 @@ export const configSchema = z.object({
   adaptiveScenario: z.object({
     enabled: z.boolean(),
     maxVUs: z.number(),
-    duration: z.string(),
   }),
 });
 
@@ -63,8 +63,7 @@ export default {
               executor: 'externally-controlled',
               vus: 1,
               maxVUs: config.adaptiveScenario.maxVUs,
-              // How long the test lasts
-              duration: config.adaptiveScenario.duration,
+              duration: config.test.duration,
             },
           }
         : {}),

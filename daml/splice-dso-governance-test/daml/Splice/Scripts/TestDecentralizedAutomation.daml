@@ -17,6 +17,7 @@ import Splice.Types
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
+import Splice.ExternalPartyConfigState
 import Splice.Fees
 
 import Splice.DsoRules
@@ -28,7 +29,21 @@ import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Scripts.TestTransferPreapproval
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry qualified as Registry
 import Splice.Wallet.Subscriptions
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.MetadataV1
+import Splice.Testing.Utils
+import Splice.AmuletTransferInstruction
+import Splice.Api.Token.TransferInstructionV1(TransferInstruction)
+import DA.Optional (fromSomeNote)
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.AmuletAllocation
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+
 
 
 testUnclaimedRewardsMerging : Script ()
@@ -506,3 +521,401 @@ testTransferPreapprovalExpiry = do
     sv = Some sv1
 
   pure ()
+
+
+testBootstrapExternalPartyConfigState : Script ()
+testBootstrapExternalPartyConfigState = do
+  (_, dso, (sv1, sv2, sv3, _)) <- initDevNet
+  -- archive to simulate bootstrapping with an older version
+  configStates <- query @ExternalPartyConfigState dso
+  submit dso $ forA configStates $ \(cid, _) -> archiveCmd cid
+  [] <- query @ExternalPartyConfigState dso
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+
+  let action = ARC_DsoRules (SRARC_CreateBootstrapExternalPartyConfigStateInstruction DsoRules_CreateBootstrapExternalPartyConfigStateInstruction)
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+    action
+    amuletRulesCid = None
+    confirmationCids
+    sv = Some sv1
+
+  [(instructionCid, _)] <- query @BootstrapExternalPartyConfigStateInstruction dso
+  [(round0Cid, _), (round1Cid, _), (round2Cid, _)] <- Registry.getActiveOpenRoundsSorted dso
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_BootstrapExternalPartyConfigState with
+    amuletRulesCid
+    instructionCid
+    openMiningRoundTriple = OpenMiningRoundTriple with
+      round0Cid
+      round1Cid
+      round2Cid
+    sv = sv1
+
+  configStates <- query @ExternalPartyConfigState dso
+  length configStates === 2
+  pure ()
+
+
+testExpireAmuletTransferInstruction : Script ()
+testExpireAmuletTransferInstruction = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  _  <- tap app sender 100.0
+  let registry = AmuletRegistry.AmuletRegistry
+        with
+          dso = app.dso
+          instrumentId = InstrumentId
+            with
+              admin = app.dso
+              id = "Amulet"
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets            
+  receiver <- allocateParty "receiver"
+  now <- getTime
+  transfer <- RegistryApi.getTransferFactory registry TransferInstructionV1.TransferFactory_Transfer
+    with
+      expectedAdmin = app.dso
+      transfer = TransferInstructionV1.Transfer with
+        sender = sender.primaryParty
+        receiver
+        amount = totalBalance
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` hours 1
+        inputHoldingCids = map toInterfaceContractId senderAmuletCids
+        meta = emptyMetadata
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
+
+  lockedAmuletsBeforeExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsBeforeExpire === 1          
+
+  liquidAmuletsBeforeExpire <- query @Amulet sender.primaryParty
+  assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  [(instrInterfaceCid, maybeView)] <- queryInterface @TransferInstruction app.dso
+  let instrView = fromSomeNote "Need view" maybeView
+
+  let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
+
+  let expireBatchChoice = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
+        inputs = [AmuletRules_ExpireTransferInstructionInput with 
+                    transferInstructionCid = instrInterfaceCid
+                    expireLock = True]
+        observers = stakeholders
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoice 
+      sv = sv1    
+
+  passTime (hours 2)
+
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoice 
+      sv = sv1
+
+  lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsAfterExpire === 0  
+
+  instructions <- query @AmuletTransferInstruction app.dso
+  instructions === []
+
+  senderAmulets <- query @Amulet sender.primaryParty
+  assertMsg "Sender should have their amulets back" (not $ null senderAmulets) 
+
+  let totalBalanceAfter = sum (map (\(_, a) -> a.amount.initialAmount) senderAmulets)
+
+  assertMsg ("Balance should be recovered, but got: " <> show totalBalanceAfter)
+            (totalBalanceAfter == totalBalance)
+
+  pure ()
+
+testExpireTransferInstructionAlreadyUnlocked : Script ()
+testExpireTransferInstructionAlreadyUnlocked = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  _  <- tap app sender 100.0
+  let registry = AmuletRegistry.AmuletRegistry
+        with
+          dso = app.dso
+          instrumentId = InstrumentId
+            with
+              admin = app.dso
+              id = "Amulet"
+
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets            
+  
+  receiver <- allocateParty "receiver"
+  now <- getTime
+  
+  transfer <- RegistryApi.getTransferFactory registry TransferInstructionV1.TransferFactory_Transfer
+    with
+      expectedAdmin = app.dso
+      transfer = TransferInstructionV1.Transfer with
+        sender = sender.primaryParty
+        receiver
+        amount = totalBalance
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` hours 1
+        inputHoldingCids = map toInterfaceContractId senderAmuletCids
+        meta = emptyMetadata
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
+
+  passTime (hours 2)
+
+  [(lockedAmuletCid, _)] <- query @LockedAmulet sender.primaryParty
+  
+  submit sender.primaryParty $ exerciseCmd lockedAmuletCid LockedAmulet_OwnerExpireLockV2
+
+  lockedAmuletsAfterOwnerExpire <- query @LockedAmulet sender.primaryParty
+  lockedAmuletsAfterOwnerExpire === []  
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  [(instrInterfaceCid, maybeView)] <- queryInterface @TransferInstruction app.dso
+  let instrView = fromSomeNote "Need view" maybeView
+  let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
+
+  let expireBatchChoiceTrue = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
+        inputs = [AmuletRules_ExpireTransferInstructionInput with 
+                    transferInstructionCid = instrInterfaceCid
+                    expireLock = True]
+        observers = stakeholders
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoiceTrue 
+      sv = sv1    
+
+  let expireBatchChoiceFalse = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
+        inputs = [AmuletRules_ExpireTransferInstructionInput with 
+                    transferInstructionCid = instrInterfaceCid
+                    expireLock = False]
+        observers = stakeholders
+
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoiceFalse 
+      sv = sv1
+
+  instructions <- query @AmuletTransferInstruction app.dso
+  instructions === []
+  pure ()
+
+testExpireAmuletAllocation : Script ()
+testExpireAmuletAllocation = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  _  <- tap app sender 100.0
+  
+  let registry = AmuletRegistry.AmuletRegistry
+        with
+          dso = app.dso
+          instrumentId = InstrumentId
+            with
+              admin = app.dso
+              id = "Amulet"
+              
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets            
+  
+  receiver <- allocateParty "receiver"
+  executor <- allocateParty "executor"
+  now <- getTime
+  
+  allocationReq <- RegistryApi.getAllocationFactory registry AllocationInstructionV1.AllocationFactory_Allocate
+    with
+      expectedAdmin = app.dso
+      allocation = AllocationV1.AllocationSpecification with
+        settlement = AllocationV1.SettlementInfo with
+          executor = executor
+          settlementRef = AllocationV1.Reference "test-settlement" None
+          requestedAt = now
+          allocateBefore = now `addRelTime` minutes 30
+          settleBefore = now `addRelTime` hours 1
+          meta = emptyMetadata
+        transferLegId = "leg-1"
+        transferLeg = AllocationV1.TransferLeg with
+          sender = sender.primaryParty
+          receiver = receiver
+          amount = totalBalance
+          instrumentId = registry.instrumentId
+          meta = emptyMetadata
+      requestedAt = now 
+      inputHoldingCids = map toInterfaceContractId senderAmuletCids
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty allocationReq.disclosures $ exerciseCmd allocationReq.factoryCid allocationReq.arg
+
+  lockedAmuletsBeforeExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsBeforeExpire === 1          
+
+  liquidAmuletsBeforeExpire <- query @Amulet sender.primaryParty
+  assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(extRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
+  [(allocCid, alloc)] <- query @AmuletAllocation app.dso
+  
+  let stakeholders = [alloc.allocation.transferLeg.sender, alloc.allocation.settlement.executor, alloc.allocation.transferLeg.receiver]
+
+  let expireBatchRequest = ExternalPartyAmuletRules_ExpireAmuletAllocations with
+        expectedDso = app.dso
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
+                    allocationCid = allocCid
+                    expireLock = True]
+        observers = stakeholders
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequest 
+      sv = sv1    
+
+  passTime (hours 2)
+
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequest 
+      sv = sv1
+
+  lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsAfterExpire === 0  
+
+  allocations <- query @AmuletAllocation app.dso
+  allocations === []
+
+  senderAmulets <- query @Amulet sender.primaryParty
+  assertMsg "Sender should have their amulets back" (not $ null senderAmulets) 
+
+  let totalBalanceAfter = sum (map (\(_, a) -> a.amount.initialAmount) senderAmulets)
+  assertMsg ("Balance should be recovered, but got: " <> show totalBalanceAfter)
+            (totalBalanceAfter == totalBalance)
+
+  pure ()
+
+testExpireAmuletAllocationAlreadyUnlocked : Script ()
+testExpireAmuletAllocationAlreadyUnlocked = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  _  <- tap app sender 100.0
+  let registry = AmuletRegistry.AmuletRegistry
+        with
+          dso = app.dso
+          instrumentId = InstrumentId
+            with
+              admin = app.dso
+              id = "Amulet"
+
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets            
+  
+  receiver <- allocateParty "receiver"
+  executor <- allocateParty "executor"
+  now <- getTime
+  
+  allocationReq <- RegistryApi.getAllocationFactory registry AllocationInstructionV1.AllocationFactory_Allocate
+    with
+      expectedAdmin = app.dso
+      allocation = AllocationV1.AllocationSpecification with
+        settlement = AllocationV1.SettlementInfo with
+          executor = executor
+          settlementRef = AllocationV1.Reference "test-settlement" None
+          requestedAt = now
+          allocateBefore = now `addRelTime` minutes 30
+          settleBefore = now `addRelTime` hours 1
+          meta = emptyMetadata
+        transferLegId = "leg-1"
+        transferLeg = AllocationV1.TransferLeg with
+          sender = sender.primaryParty
+          receiver = receiver
+          amount = totalBalance
+          instrumentId = registry.instrumentId
+          meta = emptyMetadata
+      requestedAt = now 
+      inputHoldingCids = map toInterfaceContractId senderAmuletCids
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty allocationReq.disclosures $ exerciseCmd allocationReq.factoryCid allocationReq.arg
+
+  passTime (hours 2)
+
+  [(lockedAmuletCid, _)] <- query @LockedAmulet sender.primaryParty
+  submit sender.primaryParty $ exerciseCmd lockedAmuletCid LockedAmulet_OwnerExpireLockV2
+
+  lockedAmuletsAfterOwnerExpire <- query @LockedAmulet sender.primaryParty
+  lockedAmuletsAfterOwnerExpire === []  
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(extRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
+  [(allocCid, alloc)] <- query @AmuletAllocation app.dso
+  
+  let stakeholders = [alloc.allocation.transferLeg.sender, alloc.allocation.settlement.executor, alloc.allocation.transferLeg.receiver]
+
+  let expireBatchRequestTrue = ExternalPartyAmuletRules_ExpireAmuletAllocations with
+        expectedDso = app.dso
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
+                    allocationCid = allocCid
+                    expireLock = True]
+        observers = stakeholders
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequestTrue 
+      sv = sv1    
+
+  let expireBatchRequestFalse = ExternalPartyAmuletRules_ExpireAmuletAllocations with
+        expectedDso = app.dso
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
+                    allocationCid = allocCid
+                    expireLock = False]
+        observers = stakeholders
+
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequestFalse 
+      sv = sv1
+
+  allocations <- query @AmuletAllocation app.dso
+  allocations === []
+  pure ()  

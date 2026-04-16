@@ -6,7 +6,7 @@
   openapi-generator-cli = super.callPackage ./openapi-generator-cli.nix {};
   jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
-  canton = super.callPackage ./canton.nix {inherit use_enterprise;};
+  canton = super.callPackage ./canton.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
   daml2js = super.callPackage ./daml2js.nix {inherit use_enterprise;};
   python3 = super.python3.override {
@@ -29,7 +29,6 @@
   });
   git-search-replace = super.callPackage ./git-search-replace.nix {};
   sphinx-lint = super.callPackage ./sphinx-lint.nix {};
-  jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
     let
       inherit (super.lib.strings) hasPrefix;

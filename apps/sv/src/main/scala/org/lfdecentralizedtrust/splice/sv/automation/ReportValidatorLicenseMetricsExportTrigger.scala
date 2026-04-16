@@ -54,7 +54,7 @@ class ReportValidatorLicenseMetricsExportTrigger(
     // We must synchronize here to avoid allocating the metrics for the same valdiator multiple times, which would lead to
     // duplicate metric labels being reported by OpenTelemetry.
     blocking {
-      synchronized {
+      mutex.exclusive {
         val metric = perValidatorMetrics.updateWith(validator) {
           case None =>
             Some(ValidatorLicenseMetrics(validator, version, contactPoint, context.metricsFactory))

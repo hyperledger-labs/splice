@@ -21,6 +21,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
 
+import Splice.ExternalPartyConfigState
 import Splice.Round
 import Splice.Types
 import Splice.ValidatorLicense
@@ -36,7 +37,6 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
-
 
 -- Types
 ---------
@@ -114,6 +114,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_CreateBootstrapExternalPartyConfigStateInstruction DsoRules_CreateBootstrapExternalPartyConfigStateInstruction
+    -- ^ Create BootstrapExternalPartyConfigStateInstruction
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -223,15 +225,31 @@ data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult wit
 data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
     newDsoRules : ContractId DsoRules
 
+data DsoRules_Amulet_ExpireTransferInstructionsResult = DsoRules_Amulet_ExpireTransferInstructionsResult
+  with
+    result : AmuletRules_Amulet_ExpireTransferInstructionsResult
+  deriving (Eq, Show)
+
+
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
+
+data DsoRules_Amulet_ExpireV2Result = DsoRules_Amulet_ExpireV2Result with
+  expireSum : AmuletExpireV2Summary
 
 data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
     expireSum : AmuletExpireSummary
 
+data DsoRules_LockedAmulet_ExpireAmuletV2Result = DsoRules_LockedAmulet_ExpireAmuletV2Result with
+    expireSum : AmuletExpireV2Summary
+
 data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
     summarizingRound: ContractId SummarizingMiningRound
     openRound : ContractId OpenMiningRound
+
+data DsoRules_UpdateExternalPartyConfigStatesResult = DsoRules_UpdateExternalPartyConfigStatesResult with
+    newExternalPartyConfigStateCid : ContractId ExternalPartyConfigState
+  deriving (Show, Eq)
 
 data DsoRules_CollectEntryRenewalPaymentResult = DsoRules_CollectEntryRenewalPaymentResult with
     ansEntry : ContractId AnsEntry
@@ -299,6 +317,16 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult = DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult
+  with
+    instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
+  deriving (Show, Eq)
+
+data DsoRules_ExpireAmuletAllocationsResult = DsoRules_ExpireAmuletAllocationsResult
+  with
+    result : ExternalPartyAmuletRules_ExpireAmuletAllocationsResult
+  deriving (Eq, Show)
 
 
 -- Workflow templates
@@ -384,6 +412,8 @@ data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
     outcome : VoteRequestOutcome  -- ^ The final result of the vote.
   deriving (Eq, Show)
 
+data DsoRules_BootstrapExternalPartyConfigStateResult = DsoRules_BootstrapExternalPartyConfigStateResult
+
 data VoteRequestOutcome
   = VRO_AcceptedButActionFailed with
       description : Text -- ^ Description of the failure.
@@ -427,11 +457,13 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
+    nextScheduledLogicalSynchronizerUpgrade: Optional LogicalSynchronizerUpgradeSchedule
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -439,6 +471,20 @@ data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     migrationId : Int
       -- ^ The incremental integer ID of the migration.
   deriving (Eq, Show)
+
+data LogicalSynchronizerUpgradeSchedule = LogicalSynchronizerUpgradeSchedule
+  with
+    topologyFreezeTime : Time
+      -- ^ The time at which topology transactions will be frozen. Note that this time is used by the automation
+      -- to initiate the topology transactions for freezing. The actual freeze time is the effective time of the topology transaction.
+    upgradeTime : Time
+      -- ^ The time at which the upgrade to the new physical synchronizer will happen.
+    newPhysicalSynchronizerSerial : Int
+      -- ^ The serial of the new physical synchronizer. Usually just the serial of the old physical synchronizer + 1.
+    newPhysicalSynchronizerProtocolVersion : Text
+      -- ^ The protocol version of the new physical synchronizer
+  deriving (Show, Eq)
+
 
 data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
@@ -1098,16 +1144,51 @@ template DsoRules with
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
 
+    nonconsuming choice DsoRules_ExpireAmuletAllocations : DsoRules_ExpireAmuletAllocationsResult
+      with
+        extAmuletRulesCid : ContractId ExternalPartyAmuletRules
+        expireAllocations : ExternalPartyAmuletRules_ExpireAmuletAllocations
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+
+        require ("expectedDso " <> show expireAllocations.expectedDso <> " matches the actualDso " <> show dso) (expireAllocations.expectedDso == dso)
+
+        res <- exercise extAmuletRulesCid (expireAllocations with expectedDso = dso)
+
+        pure DsoRules_ExpireAmuletAllocationsResult with result = res
+
+    nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        transferInsts : AmuletRules_Amulet_ExpireTransferInstructions
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        require ("expectedDso " <> show transferInsts.expectedDso <> " matches the actualDso " <> show dso) (transferInsts.expectedDso == dso)
+        res <- exercise amuletRulesCid (transferInsts with expectedDso = dso)
+        pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
+
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
         cid : ContractId Amulet
         choiceArg : Amulet_Expire
         sv : Optional Party
       controller sv
+      do deprecatedChoice "splice-dso-governance" "0.1.23" "DsoRules_Amulet_Expire"
+
+    nonconsuming choice DsoRules_Amulet_ExpireV2 : DsoRules_Amulet_ExpireV2Result
+      with
+        cid : ContractId Amulet
+        choiceArg : Amulet_ExpireV2
+        sv : Optional Party
+      controller sv
       do
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
-        return DsoRules_Amulet_ExpireResult with
+        return DsoRules_Amulet_ExpireV2Result with
           expireSum = result.expireSum
 
     nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : DsoRules_LockedAmulet_ExpireAmuletResult
@@ -1120,6 +1201,18 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
         return DsoRules_LockedAmulet_ExpireAmuletResult with
+          expireSum = result.expireSum
+
+    nonconsuming choice DsoRules_LockedAmulet_ExpireAmuletV2 : DsoRules_LockedAmulet_ExpireAmuletV2Result
+      with
+        cid : ContractId LockedAmulet
+        choiceArg : LockedAmulet_ExpireAmuletV2
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        result <- exercise cid choiceArg
+        return DsoRules_LockedAmulet_ExpireAmuletV2Result with
           expireSum = result.expireSum
 
 
@@ -1142,6 +1235,20 @@ template DsoRules with
         return DsoRules_AdvanceOpenMiningRoundsResult with
           summarizingRound = result.summarizingRoundCid
           openRound = result.openRoundCid
+
+    nonconsuming choice DsoRules_UpdateExternalPartyConfigStates : DsoRules_UpdateExternalPartyConfigStatesResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
+        externalPartyConfigStateCid1 : ContractId ExternalPartyConfigState
+        openMiningRoundTriple : OpenMiningRoundTriple
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid AmuletRules_UpdateExternalPartyConfigStates with ..
+        return DsoRules_UpdateExternalPartyConfigStatesResult with
+          newExternalPartyConfigStateCid = result.newExternalPartyConfigStateCid
 
 
     -- ANS entry and payment management driven directly by the DSO delegates
@@ -1257,6 +1364,8 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
+        _ <- getAndValidateSvParty this sv
+
         -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
         -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
@@ -1454,7 +1563,6 @@ template DsoRules with
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
 
-
     -- Unallocated unclaimed activity record
     ----------------------------------------
 
@@ -1532,6 +1640,27 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
+    nonconsuming choice DsoRules_CreateBootstrapExternalPartyConfigStateInstruction : DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult
+      controller dso
+      do
+        instructionCid <- create BootstrapExternalPartyConfigStateInstruction with dso
+        pure (DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult instructionCid)
+
+    nonconsuming choice DsoRules_BootstrapExternalPartyConfigState : DsoRules_BootstrapExternalPartyConfigStateResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
+        openMiningRoundTriple : OpenMiningRoundTriple
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        _ <- fetchAndArchive (ForDso dso) instructionCid
+        _ <- exercise amuletRulesCid AmuletRules_BootstrapExternalPartyConfigState with
+          openMiningRoundTriple
+          expectedDso = dso
+        pure DsoRules_BootstrapExternalPartyConfigStateResult
+
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1591,6 +1720,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateBootstrapExternalPartyConfigStateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1782,6 +1912,15 @@ template UnallocatedUnclaimedActivityRecord
     signatory dso
     ensure amount > 0.0
 
+-- | Instruction to bootstrap the external party config state.
+-- This exists so that the `ActionRequiringConfirmation` for this is independent of the
+-- current rounds which we need so that we can do deduplication by action hash
+-- in our automation.
+template BootstrapExternalPartyConfigStateInstruction
+  with
+   dso : Party
+  where
+    signatory dso
 
 -- instances
 ------------
@@ -1817,9 +1956,20 @@ instance Patchable DsoRulesConfig where
     maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
+    nextScheduledLogicalSynchronizerUpgrade = patch new.nextScheduledLogicalSynchronizerUpgrade base.nextScheduledLogicalSynchronizerUpgrade current.nextScheduledLogicalSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with
         time = patch new.time base.time current.time
         migrationId = patch new.migrationId base.migrationId current.migrationId
+
+instance HasCheckedFetch BootstrapExternalPartyConfigStateInstruction ForDso where
+  contractGroupId BootstrapExternalPartyConfigStateInstruction{..} = ForDso with dso
+
+instance Patchable LogicalSynchronizerUpgradeSchedule where
+  patch new base current = LogicalSynchronizerUpgradeSchedule with
+        topologyFreezeTime = patch new.topologyFreezeTime base.topologyFreezeTime current.topologyFreezeTime
+        upgradeTime = patch new.upgradeTime base.upgradeTime current.upgradeTime
+        newPhysicalSynchronizerSerial = patch new.newPhysicalSynchronizerSerial base.newPhysicalSynchronizerSerial current.newPhysicalSynchronizerSerial
+        newPhysicalSynchronizerProtocolVersion = patch new.newPhysicalSynchronizerProtocolVersion base.newPhysicalSynchronizerProtocolVersion current.newPhysicalSynchronizerProtocolVersion

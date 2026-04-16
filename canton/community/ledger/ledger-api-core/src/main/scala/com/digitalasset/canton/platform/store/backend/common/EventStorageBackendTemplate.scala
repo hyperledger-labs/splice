@@ -1,35 +1,40 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.SqlParser.*
 import anorm.{Row, RowParser, SimpleSql, ~}
+import cats.syntax.all.*
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.store.backend.Conversions.{
-  authorizationEventParser,
   contractId,
-  offset,
   parties,
   timestampFromMicros,
-  updateId,
 }
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.*
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
+  AchsAddActivationsParams,
+  AchsRemoveDeactivatedParams,
+}
 import com.digitalasset.canton.platform.store.backend.RowDef.*
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
   SqlStringInterpolation,
 }
+import com.digitalasset.canton.platform.store.backend.common.QueryStrategy.withoutNetworkTimeout
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
 import com.digitalasset.canton.platform.store.backend.{
+  Conversions,
   EventStorageBackend,
   PersistentEventType,
   RowDef,
 }
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.PaginationInput
+import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPageQuery
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.{ContractId, Party}
 import com.digitalasset.canton.protocol.ReassignmentId
@@ -52,41 +57,50 @@ object EventStorageBackendTemplate {
   private val MaxBatchSizeOfIncompleteReassignmentOffsetTempTablePopulation: Int = 500
 
   object RowDefs {
+    import CommonRowDefs.*
+
     // update related
     val workflowId: RowDef[Option[String]] =
       column("workflow_id", str(_).?)
-    def genSynchronizerId(columnName: String)(stringInterning: StringInterning): RowDef[String] =
-      column(columnName, int(_).map(stringInterning.synchronizerId.unsafe.externalize))
-    def synchronizerId(stringInterning: StringInterning): RowDef[String] =
-      genSynchronizerId("synchronizer_id")(stringInterning)
-    def sourceSynchronizerId(stringInterning: StringInterning): RowDef[String] =
+
+    def sourceSynchronizerId(stringInterning: StringInterning): RowDef[SynchronizerId] =
       genSynchronizerId("source_synchronizer_id")(stringInterning)
-    def targetSynchronizerId(stringInterning: StringInterning): RowDef[String] =
+
+    def targetSynchronizerId(stringInterning: StringInterning): RowDef[SynchronizerId] =
       genSynchronizerId("target_synchronizer_id")(stringInterning)
-    val eventOffset: RowDef[Long] =
-      column("event_offset", long)
+
+    val eventOffset: RowDef[Offset] =
+      offset("event_offset")
     val updateIdDef: RowDef[String] =
-      column("update_id", updateId(_).map(_.toHexString))
+      updateId.map(_.toHexString)
+
     def commandId(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[Option[String]] =
-      combine(
-        column("command_id", str(_).?),
-        column("submitters", parties(stringInterning)(_).?),
-      )(filteredCommandId(_, _, allQueryingPartiesO))
-    val traceContext: RowDef[Array[Byte]] =
-      column("trace_context", byteArray(_))
-    val recordTime: RowDef[Timestamp] =
-      column("record_time", timestampFromMicros)
+      (
+        CommonRowDefs.commandId.?,
+        submitters(stringInterning).?,
+      ).mapN(filteredCommandId(_, _, allQueryingPartiesO))
+
     val externalTransactionHash: RowDef[Option[Array[Byte]]] =
       column("external_transaction_hash", byteArray(_).?)
+
+    def trafficCost(
+        stringInterning: StringInterning,
+        allQueryingPartiesO: Option[Set[Party]],
+    ): RowDef[Option[Long]] =
+      (
+        CommonRowDefs.trafficCost.?,
+        submitters(stringInterning).?,
+      ).mapN(filteredTrafficCost(_, _, allQueryingPartiesO))
 
     // event related
     val nodeId: RowDef[Int] =
       column("node_id", int)
     val eventSequentialId: RowDef[Long] =
       column("event_sequential_id", long)
+
     def filteredAdditionalWitnesses(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
@@ -96,6 +110,7 @@ object EventStorageBackendTemplate {
       else
         column("additional_witnesses", parties(stringInterning)(_))
           .map(filterWitnesses(allQueryingPartiesO, _))
+
     val eventType: RowDef[PersistentEventType] =
       column("event_type", int(_).map(PersistentEventType.fromInt))
     val deactivatedEventSeqId: RowDef[Option[Long]] =
@@ -104,6 +119,7 @@ object EventStorageBackendTemplate {
     // contract related
     def representativePackageId(stringInterning: StringInterning): RowDef[Ref.PackageId] =
       column("representative_package_id", int(_).map(stringInterning.packageId.externalize))
+
     val contractIdDef: RowDef[ContractId] =
       column("contract_id", contractId)
     val internalContractId: RowDef[Long] =
@@ -112,11 +128,13 @@ object EventStorageBackendTemplate {
       column("reassignment_counter", long(_).?.map(_.getOrElse(0L)))
     val ledgerEffectiveTime: RowDef[Timestamp] =
       column("ledger_effective_time", timestampFromMicros)
+
     def templateId(stringInterning: StringInterning): RowDef[FullIdentifier] =
-      combine(
+      (
         column("template_id", int(_).map(stringInterning.templateId.externalize)),
         column("package_id", int(_).map(stringInterning.packageId.externalize)),
-      )(_ toFullIdentifier _)
+      ).mapN(_ toFullIdentifier _)
+
     def filteredStakeholderParties(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
@@ -132,21 +150,26 @@ object EventStorageBackendTemplate {
         "reassignment_id",
         byteArray(_).map(ReassignmentId.assertFromBytes(_).toProtoPrimitive),
       )
+
     def submitter(stringInterning: StringInterning): RowDef[Option[String]] =
       column("submitters", parties(stringInterning)(_).?.map(_.getOrElse(Seq.empty).headOption))
+
     val assignmentExclusivity: RowDef[Option[Timestamp]] =
       column("assignment_exclusivity", timestampFromMicros(_).?)
 
     // exercise related
     val consuming: RowDef[Boolean] =
       column("consuming", bool(_))
+
     def exerciseChoice(stringInterning: StringInterning): RowDef[ChoiceName] =
       column("exercise_choice", int(_).map(stringInterning.choiceName.externalize))
+
     def exerciseChoiceInterface(stringInterning: StringInterning): RowDef[Option[Identifier]] =
       column(
         "exercise_choice_interface",
         int(_).?.map(_.map(stringInterning.interfaceId.externalize)),
       )
+
     val exerciseArgument: RowDef[Array[Byte]] =
       column("exercise_argument", byteArray(_))
     val exerciseArgumentCompression: RowDef[Option[Int]] =
@@ -155,55 +178,66 @@ object EventStorageBackendTemplate {
       column("exercise_result", byteArray(_).?)
     val exerciseResultCompression: RowDef[Option[Int]] =
       column("exercise_result_compression", int(_).?)
+
     def exerciseActors(stringInterning: StringInterning): RowDef[Set[String]] =
       column("exercise_actors", parties(stringInterning)(_).map(_.map(_.toString).toSet))
+
     val exerciseLastDescendantNodeId: RowDef[Int] =
       column("exercise_last_descendant_node_id", int)
+
+    // party related
+    def partyId(stringInterning: StringInterning) =
+      column("party_id", int).map(stringInterning.party.externalize)
+
+    // participant related
+    def participantId(stringInterning: StringInterning) =
+      column("participant_id", int).map(stringInterning.participantId.externalize)
 
     // properties
     def commonEventPropertiesParser(
         stringInterning: StringInterning
     ): RowDef[CommonEventProperties] =
-      combine(
+      (
         eventSequentialId,
-        eventOffset,
+        eventOffset.map(_.unwrap),
         nodeId,
         workflowId,
-        synchronizerId(stringInterning),
-      )(CommonEventProperties.apply)
+        synchronizerId(stringInterning).map(_.toProtoPrimitive),
+      ).mapN(CommonEventProperties.apply)
 
     def commonUpdatePropertiesParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[CommonUpdateProperties] =
-      combine(
+      (
         updateIdDef,
         commandId(stringInterning, allQueryingPartiesO),
         traceContext,
         recordTime,
-      )(CommonUpdateProperties.apply)
+        trafficCost(stringInterning, allQueryingPartiesO),
+      ).mapN(CommonUpdateProperties.apply)
 
     def transactionPropertiesParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[TransactionProperties] =
-      combine(
+      (
         commonEventPropertiesParser(stringInterning),
         commonUpdatePropertiesParser(stringInterning, allQueryingPartiesO),
         externalTransactionHash,
-      )(TransactionProperties.apply)
+      ).mapN(TransactionProperties.apply)
 
     def reassignmentPropertiesParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[ReassignmentProperties] =
-      combine(
+      (
         commonEventPropertiesParser(stringInterning),
         commonUpdatePropertiesParser(stringInterning, allQueryingPartiesO),
         reassignmentId,
         submitter(stringInterning),
         reassignmentCounter,
-      )(ReassignmentProperties.apply)
+      ).mapN(ReassignmentProperties.apply)
 
     def thinCreatedEventPropertiesParser(
         stringInterning: StringInterning,
@@ -211,21 +245,21 @@ object EventStorageBackendTemplate {
         witnessIsAcsDelta: Boolean,
         eventIsAcsDeltaForParticipant: Boolean,
     ): RowDef[ThinCreatedEventProperties] =
-      combine(
+      (
         representativePackageId(stringInterning),
         filteredAdditionalWitnesses(stringInterning, allQueryingPartiesO)(witnessIsAcsDelta),
         internalContractId,
         static(allQueryingPartiesO.map(_.map(_.toString))),
         if (eventIsAcsDeltaForParticipant) reassignmentCounter else static(0L),
         static(eventIsAcsDeltaForParticipant),
-      )(ThinCreatedEventProperties.apply)
+      ).mapN(ThinCreatedEventProperties.apply)
 
     // raws
     def rawThinActiveContractParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[RawThinActiveContract] =
-      combine(
+      (
         commonEventPropertiesParser(stringInterning),
         thinCreatedEventPropertiesParser(
           stringInterning = stringInterning,
@@ -233,7 +267,7 @@ object EventStorageBackendTemplate {
           witnessIsAcsDelta = true,
           eventIsAcsDeltaForParticipant = true,
         ),
-      )(RawThinActiveContract.apply)
+      ).mapN(RawThinActiveContract.apply)
 
     def rawThinCreatedEventParser(
         stringInterning: StringInterning,
@@ -241,7 +275,7 @@ object EventStorageBackendTemplate {
         witnessIsAcsDelta: Boolean,
         eventIsAcsDeltaForParticipant: Boolean,
     ): RowDef[RawThinCreatedEvent] =
-      combine(
+      (
         transactionPropertiesParser(stringInterning, allQueryingPartiesO),
         thinCreatedEventPropertiesParser(
           stringInterning = stringInterning,
@@ -249,13 +283,13 @@ object EventStorageBackendTemplate {
           witnessIsAcsDelta = witnessIsAcsDelta,
           eventIsAcsDeltaForParticipant = eventIsAcsDeltaForParticipant,
         ),
-      )(RawThinCreatedEvent.apply)
+      ).mapN(RawThinCreatedEvent.apply)
 
     def rawThinAssignEventParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[RawThinAssignEvent] =
-      combine(
+      (
         reassignmentPropertiesParser(stringInterning, allQueryingPartiesO),
         thinCreatedEventPropertiesParser(
           stringInterning = stringInterning,
@@ -263,15 +297,15 @@ object EventStorageBackendTemplate {
           witnessIsAcsDelta = true,
           eventIsAcsDeltaForParticipant = true,
         ),
-        sourceSynchronizerId(stringInterning),
-      )(RawThinAssignEvent.apply)
+        sourceSynchronizerId(stringInterning).map(_.toProtoPrimitive),
+      ).mapN(RawThinAssignEvent.apply)
 
     def rawArchivedEventParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
         acsDeltaForParticipant: Boolean,
     ): RowDef[RawArchivedEvent] =
-      combine(
+      (
         transactionPropertiesParser(stringInterning, allQueryingPartiesO),
         contractIdDef,
         templateId(stringInterning),
@@ -280,14 +314,14 @@ object EventStorageBackendTemplate {
         ledgerEffectiveTime,
         if (acsDeltaForParticipant) deactivatedEventSeqId
         else static(None),
-      )(RawArchivedEvent.apply)
+      ).mapN(RawArchivedEvent.apply)
 
     def rawExercisedEventParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
         eventIsAcsDeltaForParticipant: Boolean,
     ): RowDef[RawExercisedEvent] =
-      combine(
+      (
         transactionPropertiesParser(stringInterning, allQueryingPartiesO),
         contractIdDef,
         templateId(stringInterning),
@@ -310,63 +344,73 @@ object EventStorageBackendTemplate {
         if (eventIsAcsDeltaForParticipant) deactivatedEventSeqId
         else static(Option.empty[Long]),
         static(eventIsAcsDeltaForParticipant),
-      )(RawExercisedEvent.apply)
+      ).mapN(RawExercisedEvent.apply)
 
     def rawUnassignEventParser(
         stringInterning: StringInterning,
         allQueryingPartiesO: Option[Set[Party]],
     ): RowDef[RawUnassignEvent] =
-      combine(
+      (
         reassignmentPropertiesParser(stringInterning, allQueryingPartiesO),
         contractIdDef,
         templateId(stringInterning),
         filteredStakeholderParties(stringInterning, allQueryingPartiesO),
         assignmentExclusivity,
-        targetSynchronizerId(stringInterning),
+        targetSynchronizerId(stringInterning).map(_.toProtoPrimitive),
         deactivatedEventSeqId,
-      )(RawUnassignEvent.apply)
+      ).mapN(RawUnassignEvent.apply)
+
+    private def authorizationEventParser(
+        authorizationLevelColumnName: String,
+        authorizationEventTypeColumnName: String,
+    ): RowDef[AuthorizationEvent] =
+      (
+        column(authorizationEventTypeColumnName, int),
+        column(authorizationLevelColumnName, int),
+      ).mapN(Conversions.authorizationEvent)
+
+    def partyToParticipantEventParser(
+        stringInterning: StringInterning
+    ): RowDef[RawParticipantAuthorization] =
+      (
+        eventOffset,
+        updateIdDef,
+        partyId(stringInterning),
+        participantId(stringInterning),
+        authorizationEventParser("participant_permission", "participant_authorization_event"),
+        recordTime,
+        synchronizerId(stringInterning).map(_.toProtoPrimitive),
+        traceContext,
+      ).mapN(
+        RawParticipantAuthorization.apply
+      )
+
+    private def synchronizerOffsetParser(
+        offsetColumnName: String,
+        stringInterning: StringInterning,
+    ): RowDef[SynchronizerOffset] =
+      (
+        offset(offsetColumnName),
+        synchronizerId(stringInterning),
+        recordTime,
+        publicationTime,
+      ).mapN(SynchronizerOffset.apply)
+
+    def completionSynchronizerOffsetParser(
+        stringInterning: StringInterning
+    ): RowDef[SynchronizerOffset] =
+      synchronizerOffsetParser("completion_offset", stringInterning)
+
+    def metaSynchronizerOffsetParser(
+        stringInterning: StringInterning
+    ): RowDef[SynchronizerOffset] =
+      synchronizerOffsetParser("event_offset", stringInterning)
   }
 
   val EventSequentialIdFirstLast: RowParser[(Long, Long)] =
     long("event_sequential_id_first") ~ long("event_sequential_id_last") map {
       case event_sequential_id_first ~ event_sequential_id_last =>
         (event_sequential_id_first, event_sequential_id_last)
-    }
-
-  val partyToParticipantEventRow =
-    long("event_sequential_id") ~
-      offset("event_offset") ~
-      updateId("update_id") ~
-      int("party_id") ~
-      int("participant_id") ~
-      authorizationEventParser("participant_permission", "participant_authorization_event") ~
-      int("synchronizer_id") ~
-      timestampFromMicros("record_time") ~
-      byteArray("trace_context").?
-
-  def partyToParticipantEventParser(
-      stringInterning: StringInterning
-  ): RowParser[EventStorageBackend.RawParticipantAuthorization] =
-    partyToParticipantEventRow map {
-      case _ ~
-          eventOffset ~
-          updateId ~
-          partyId ~
-          participantId ~
-          authorizationEvent ~
-          synchronizerId ~
-          recordTime ~
-          traceContext =>
-        EventStorageBackend.RawParticipantAuthorization(
-          offset = eventOffset,
-          updateId = updateId.toHexString,
-          partyId = stringInterning.party.unsafe.externalize(partyId),
-          participantId = stringInterning.participantId.unsafe.externalize(participantId),
-          authorizationEvent = authorizationEvent,
-          recordTime = recordTime,
-          synchronizerId = stringInterning.synchronizerId.unsafe.externalize(synchronizerId),
-          traceContext = traceContext,
-        )
     }
 
   private def filterWitnesses(
@@ -380,46 +424,35 @@ object EventStorageBackendTemplate {
       )
       .toSet
 
+  private def submittersInQueryingParties(
+      allQueryingPartiesO: Option[Set[Party]],
+      submitters: Option[Seq[Party]],
+  ): Boolean = allQueryingPartiesO match {
+    case Some(allQueryingParties) =>
+      submitters.getOrElse(Seq.empty).exists(allQueryingParties)
+    case None => submitters.nonEmpty
+  }
+
   private def filteredCommandId(
       commandId: Option[String],
       submitters: Option[Seq[Party]],
       allQueryingPartiesO: Option[Set[Party]],
-  ): Option[String] = {
-    def submittersInQueryingParties: Boolean = allQueryingPartiesO match {
-      case Some(allQueryingParties) =>
-        submitters.getOrElse(Seq.empty).exists(allQueryingParties)
-      case None => submitters.nonEmpty
-    }
-    commandId.filter(_ != "" && submittersInQueryingParties)
-  }
+  ): Option[String] =
+    commandId
+      .filter(_ != "")
+      .filter(_ => submittersInQueryingParties(allQueryingPartiesO, submitters))
 
-  private def synchronizerOffsetParser(
-      offsetColumnName: String,
-      stringInterning: StringInterning,
-  ): RowParser[SynchronizerOffset] =
-    offset(offsetColumnName) ~
-      int("synchronizer_id") ~
-      timestampFromMicros("record_time") ~
-      timestampFromMicros("publication_time") map {
-        case offset ~ internedSynchronizerId ~ recordTime ~ publicationTime =>
-          SynchronizerOffset(
-            offset = offset,
-            synchronizerId = stringInterning.synchronizerId.externalize(internedSynchronizerId),
-            recordTime = recordTime,
-            publicationTime = publicationTime,
-          )
-      }
-
-  private def completionSynchronizerOffsetParser(
-      stringInterning: StringInterning
-  ): RowParser[SynchronizerOffset] =
-    synchronizerOffsetParser("completion_offset", stringInterning)
-
-  private def metaSynchronizerOffsetParser(
-      stringInterning: StringInterning
-  ): RowParser[SynchronizerOffset] =
-    synchronizerOffsetParser("event_offset", stringInterning)
-
+  /** Filter the traffic cost value according to the submitting party: If the value is None, the
+    * cost is unknown, so we stick with that If the value is Some(cost) and the querying party is a
+    * submitting party, keep the cost Otherwise, set the cost to Some(0L)
+    */
+  private def filteredTrafficCost(
+      trafficCost: Option[Long],
+      submitters: Option[Seq[Party]],
+      allQueryingPartiesO: Option[Set[Party]],
+  ): Option[Long] =
+    trafficCost
+      .filter(_ => submittersInQueryingParties(allQueryingPartiesO, submitters))
 }
 
 abstract class EventStorageBackendTemplate(
@@ -446,63 +479,65 @@ abstract class EventStorageBackendTemplate(
       previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpToInclusiveOffset: Offset,
       incompleteReassignmentOffsets: Vector[Offset],
-  )(implicit connection: Connection, traceContext: TraceContext): Unit = {
-    /*
-    Incomplete assign: we need to retain the next deactivation if any (otherwise it becomes active)
-    Incomplete unassign: we need to retain the previous activation (otherwise it cannot be presented)
-    Deactivation: we need to prune the related activation (otherwise it becomes active)
-    Pruning always happens in pairs, never ever we prune only activation or deactivation under normal circumstances.
-    Only exception to this rule is when the deactivation reference was unable to be calculated: then we can prune this orphan deactivation.
-    Therefore, regarding activations and deactivations: we prune based on the identified deactivations.
-    We prune all witnessed events (cannot be active, cannot be incomplete).
-     */
+  )(implicit connection: Connection, traceContext: TraceContext): Unit =
+    // pruning events could be a long-running operation, so we disable the network timeout
+    withoutNetworkTimeout { implicit connection =>
+      /*
+      Incomplete assign: we need to retain the next deactivation if any (otherwise it becomes active)
+      Incomplete unassign: we need to retain the previous activation (otherwise it cannot be presented)
+      Deactivation: we need to prune the related activation (otherwise it becomes active)
+      Pruning always happens in pairs, never ever we prune only activation or deactivation under normal circumstances.
+      Only exception to this rule is when the deactivation reference was unable to be calculated: then we can prune this orphan deactivation.
+      Therefore, regarding activations and deactivations: we prune based on the identified deactivations.
+      We prune all witnessed events (cannot be active, cannot be incomplete).
+       */
 
-    def loadOffsets(
-        offsets: Vector[Offset],
-        purpose: String,
-    )(jdbcQueryString: String)(setParams: PreparedStatement => Offset => Unit): Unit =
-      if (offsets.nonEmpty) {
-        Using.resource(
-          connection.prepareStatement(jdbcQueryString)
-        ) { preparedStatement =>
-          val offsetBatches = offsets
-            .grouped(MaxBatchSizeOfIncompleteReassignmentOffsetTempTablePopulation)
-            .toVector
-          logger.info(
-            s"Loading ${offsets.size} offsets in ${offsetBatches.size} batches for $purpose"
-          )
-          offsetBatches.iterator.zipWithIndex
-            .foreach { case (batch, index) =>
-              batch.foreach { offset =>
-                setParams(preparedStatement)(offset)
-                preparedStatement.addBatch()
+      def loadOffsets(
+          offsets: Vector[Offset],
+          purpose: String,
+      )(jdbcQueryString: String)(setParams: PreparedStatement => Offset => Unit): Unit =
+        if (offsets.nonEmpty) {
+          Using.resource(
+            connection.prepareStatement(jdbcQueryString)
+          ) { preparedStatement =>
+            val offsetBatches = offsets
+              .grouped(MaxBatchSizeOfIncompleteReassignmentOffsetTempTablePopulation)
+              .toVector
+            logger.info(
+              s"Loading ${offsets.size} offsets in ${offsetBatches.size} batches for $purpose"
+            )
+            offsetBatches.iterator.zipWithIndex
+              .foreach { case (batch, index) =>
+                batch.foreach { offset =>
+                  setParams(preparedStatement)(offset)
+                  preparedStatement.addBatch()
+                }
+                preparedStatement.executeBatch().discard
+                logger.debug(
+                  s"Processed offset batch #${index + 1} / ${offsetBatches.size} for $purpose"
+                )
               }
-              preparedStatement.executeBatch().discard
-              logger.debug(
-                s"Processed offset batch #${index + 1} / ${offsetBatches.size} for $purpose"
-              )
-            }
-          logger.info(
-            s"Loaded ${offsets.size} offsets in ${offsetBatches.size} batches for $purpose"
-          )
+            logger.info(
+              s"Loaded ${offsets.size} offsets in ${offsetBatches.size} batches for $purpose"
+            )
+          }
         }
-      }
 
-    val pruningFromExclusiveEventSeqId =
-      maxEventSequentialId(previousPruneUpToInclusiveOffset)(connection)
-    val pruningToInclusiveEventSeqId =
-      maxEventSequentialId(Some(pruneUpToInclusiveOffset))(connection)
+      val pruningFromExclusiveEventSeqId =
+        maxEventSequentialId(previousPruneUpToInclusiveOffset)(connection)
+      val pruningToInclusiveEventSeqId =
+        maxEventSequentialId(Some(pruneUpToInclusiveOffset))(connection)
 
-    logger.info(
-      s"Start pruning Index DB events. Offsets in range ($previousPruneUpToInclusiveOffset, $pruneUpToInclusiveOffset] event sequential IDs in range ($pruningFromExclusiveEventSeqId, $pruningToInclusiveEventSeqId] with ${previousIncompleteReassignmentOffsets.size} incomplete offsets at the beginning and with ${incompleteReassignmentOffsets.size} at the end of the pruning range."
-    )
+      logger.info(
+        s"Start pruning Index DB events. Offsets in range ($previousPruneUpToInclusiveOffset, $pruneUpToInclusiveOffset] event sequential IDs in range ($pruningFromExclusiveEventSeqId, $pruningToInclusiveEventSeqId] with ${previousIncompleteReassignmentOffsets.size} incomplete offsets at the beginning and with ${incompleteReassignmentOffsets.size} at the end of the pruning range."
+      )
 
-    val currentIncompleteSet = incompleteReassignmentOffsets.toSet
-    val completedReassignments =
-      previousIncompleteReassignmentOffsets.filterNot(currentIncompleteSet)
+      val currentIncompleteSet = incompleteReassignmentOffsets.toSet
+      val completedReassignments =
+        previousIncompleteReassignmentOffsets.filterNot(currentIncompleteSet)
 
-    logger.info("Creating temporary table for storing pruning candidates")
-    SQL"""
+      logger.info("Creating temporary table for storing pruning candidates")
+      SQL"""
       -- Create temporary table for storing deactivated_contract candidates for pruning
       CREATE LOCAL TEMPORARY TABLE IF NOT EXISTS temp_candidate_deactivated (
         deactivate_event_sequential_id bigint NOT NULL,
@@ -510,10 +545,10 @@ abstract class EventStorageBackendTemplate(
       ) ON COMMIT DELETE ROWS
       """.execute().discard
 
-    // Please note: the big union + join query is deliberately pu in one CTE due to some H2 bug.
-    // (possibly the H2 bug is around multiple CTEs targeting the same table)
-    loadOffsets(completedReassignments, "populating candidates for completed reassignments")(
-      """-- first unfolding an offset to all respective event_sequential_id-s
+      // Please note: the big union + join query is deliberately pu in one CTE due to some H2 bug.
+      // (possibly the H2 bug is around multiple CTEs targeting the same table)
+      loadOffsets(completedReassignments, "populating candidates for completed reassignments")(
+        """-- first unfolding an offset to all respective event_sequential_id-s
         |WITH completed_ids AS (
         |  -- completed incomplete unassign: we carry the respective activation as well, both could be pruned now
         |  SELECT
@@ -535,14 +570,14 @@ abstract class EventStorageBackendTemplate(
         |INSERT INTO temp_candidate_deactivated(deactivate_event_sequential_id, activate_event_sequential_id)
         |SELECT event_sequential_id, deactivated_event_sequential_id
         |FROM completed_ids""".stripMargin
-    ) { preparedStatement => offset =>
-      preparedStatement.setLong(1, offset.unwrap)
-      preparedStatement.setLong(2, offset.unwrap)
-      preparedStatement.setLong(3, pruningFromExclusiveEventSeqId)
-    }
+      ) { preparedStatement => offset =>
+        preparedStatement.setLong(1, offset.unwrap)
+        preparedStatement.setLong(2, offset.unwrap)
+        preparedStatement.setLong(3, pruningFromExclusiveEventSeqId)
+      }
 
-    logger.info("Populating candidates for deactivated contracts in the pruned range")
-    SQL"""
+      logger.info("Populating candidates for deactivated contracts in the pruned range")
+      SQL"""
       -- Create temporary table for storing deactivated_contract candidates for pruning
       INSERT INTO temp_candidate_deactivated(deactivate_event_sequential_id, activate_event_sequential_id)
       SELECT event_sequential_id, deactivated_event_sequential_id
@@ -552,19 +587,19 @@ abstract class EventStorageBackendTemplate(
         AND event_sequential_id <= $pruningToInclusiveEventSeqId
       """.execute().discard
 
-    logger.info("Indexing temporary table for storing pruning candidates")
-    SQL"""
+      logger.info("Indexing temporary table for storing pruning candidates")
+      SQL"""
       -- Create temporary table for storing deactivated_contract candidates for pruning
       CREATE INDEX temp_candidate_deactivated_deactivate ON temp_candidate_deactivated USING btree (deactivate_event_sequential_id);
       CREATE INDEX temp_candidate_deactivated_activate ON temp_candidate_deactivated USING btree (activate_event_sequential_id);
       ${queryStrategy.analyzeTable("temp_candidate_deactivated")};
       """.execute().discard
 
-    loadOffsets(
-      incompleteReassignmentOffsets,
-      "removing candidates related to incomplete reassignments",
-    )(
-      """-- first unfolding an offset to all respective event_sequential_id-s
+      loadOffsets(
+        incompleteReassignmentOffsets,
+        "removing candidates related to incomplete reassignments",
+      )(
+        """-- first unfolding an offset to all respective event_sequential_id-s
         |WITH incomplete_ids AS (
         |  SELECT event_sequential_id FROM lapi_events_activate_contract WHERE event_offset = ?
         |  UNION ALL
@@ -579,103 +614,103 @@ abstract class EventStorageBackendTemplate(
         |    incomplete_ids.event_sequential_id = temp_candidate_deactivated.deactivate_event_sequential_id
         |    OR incomplete_ids.event_sequential_id = temp_candidate_deactivated.activate_event_sequential_id
         |)""".stripMargin
-    ) { preparedStatement => offset =>
-      preparedStatement.setLong(1, offset.unwrap)
-      preparedStatement.setLong(2, offset.unwrap)
-    }
+      ) { preparedStatement => offset =>
+        preparedStatement.setLong(1, offset.unwrap)
+        preparedStatement.setLong(2, offset.unwrap)
+      }
 
-    // activate
-    pruneWithLogging("Pruning lapi_events_activate_contract table") {
-      SQL"""
+      // activate
+      pruneWithLogging("Pruning lapi_events_activate_contract table") {
+        SQL"""
         DELETE from lapi_events_activate_contract
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_events_activate_contract.event_sequential_id = temp_candidate_deactivated.activate_event_sequential_id
         )"""
-    }
-    pruneWithLogging("Pruning lapi_filter_activate_stakeholder table") {
-      SQL"""
+      }
+      pruneWithLogging("Pruning lapi_filter_activate_stakeholder table") {
+        SQL"""
         DELETE from lapi_filter_activate_stakeholder
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_filter_activate_stakeholder.event_sequential_id = temp_candidate_deactivated.activate_event_sequential_id
         )"""
-    }
-    pruneWithLogging("Pruning lapi_filter_activate_witness table") {
-      SQL"""
+      }
+      pruneWithLogging("Pruning lapi_filter_activate_witness table") {
+        SQL"""
         DELETE from lapi_filter_activate_witness
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_filter_activate_witness.event_sequential_id = temp_candidate_deactivated.activate_event_sequential_id
         )"""
-    }
+      }
 
-    // deactivate
-    pruneWithLogging("Pruning lapi_events_deactivate_contract table") {
-      SQL"""
+      // deactivate
+      pruneWithLogging("Pruning lapi_events_deactivate_contract table") {
+        SQL"""
         DELETE from lapi_events_deactivate_contract
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_events_deactivate_contract.event_sequential_id = temp_candidate_deactivated.deactivate_event_sequential_id
         )"""
-    }
-    pruneWithLogging("Pruning lapi_filter_deactivate_stakeholder table") {
-      SQL"""
+      }
+      pruneWithLogging("Pruning lapi_filter_deactivate_stakeholder table") {
+        SQL"""
         DELETE from lapi_filter_deactivate_stakeholder
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_filter_deactivate_stakeholder.event_sequential_id = temp_candidate_deactivated.deactivate_event_sequential_id
         )"""
-    }
-    pruneWithLogging("Pruning lapi_filter_deactivate_witness table") {
-      SQL"""
+      }
+      pruneWithLogging("Pruning lapi_filter_deactivate_witness table") {
+        SQL"""
         DELETE from lapi_filter_deactivate_witness
         WHERE EXISTS (
           SELECT 1
           FROM temp_candidate_deactivated
           WHERE lapi_filter_deactivate_witness.event_sequential_id = temp_candidate_deactivated.deactivate_event_sequential_id
         )"""
-    }
+      }
 
-    logger.info("Dropping temporary table for storing pruning candidates")
-    SQL"""
+      logger.info("Dropping temporary table for storing pruning candidates")
+      SQL"""
       DROP INDEX temp_candidate_deactivated_deactivate;
       DROP INDEX temp_candidate_deactivated_activate;
       DROP TABLE temp_candidate_deactivated;
       """.execute().discard
 
-    // witnessed
-    pruneWithLogging("Pruning lapi_events_various_witnessed table") {
-      SQL"""
+      // witnessed
+      pruneWithLogging("Pruning lapi_events_various_witnessed table") {
+        SQL"""
         DELETE from lapi_events_various_witnessed
         WHERE
           event_sequential_id <= $pruningToInclusiveEventSeqId AND
           event_sequential_id > $pruningFromExclusiveEventSeqId"""
-    }
-    pruneWithLogging("Pruning lapi_filter_various_witness table") {
-      SQL"""
+      }
+      pruneWithLogging("Pruning lapi_filter_various_witness table") {
+        SQL"""
         DELETE from lapi_filter_various_witness
         WHERE
           event_sequential_id <= $pruningToInclusiveEventSeqId AND
           event_sequential_id > $pruningFromExclusiveEventSeqId"""
-    }
+      }
 
-    // meta
-    pruneWithLogging("Pruning lapi_update_meta table") {
-      SQL"""
+      // meta
+      pruneWithLogging("Pruning lapi_update_meta table") {
+        SQL"""
         DELETE FROM lapi_update_meta
         WHERE
           event_offset <= $pruneUpToInclusiveOffset AND
           ${QueryStrategy.offsetIsGreater("event_offset", previousPruneUpToInclusiveOffset)}"""
-    }
+      }
 
-    logger.info("Finished pruning of Index DB events.")
-  }
+      logger.info("Finished pruning of Index DB events.")
+    }(connection, noTracingLogger)
 
   private def pruneWithLogging(queryDescription: String)(query: SimpleSql[Row])(implicit
       connection: Connection,
@@ -727,7 +762,7 @@ abstract class EventStorageBackendTemplate(
           .withFetchSize(Some(eventSequentialIds.size))
       )(connection)
 
-  override def lookupAssignSequentialIdByOffset(
+  override def lookupActivationSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long] =
     SQL"""
@@ -739,7 +774,7 @@ abstract class EventStorageBackendTemplate(
         """
       .asVectorOf(long("event_sequential_id"))(connection)
 
-  override def lookupUnassignSequentialIdByOffset(
+  override def lookupDeactivationSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long] =
     SQL"""
@@ -751,29 +786,67 @@ abstract class EventStorageBackendTemplate(
         """
       .asVectorOf(long("event_sequential_id"))(connection)
 
+  def addActivationsToACHS(
+      params: AchsAddActivationsParams
+  )(connection: Connection): Unit =
+    SQL"""
+      INSERT INTO lapi_filter_achs_stakeholder
+      SELECT *
+      FROM lapi_filter_activate_stakeholder filters
+      WHERE
+        filters.event_sequential_id > ${params.startExclusive}
+        AND filters.event_sequential_id <= ${params.endInclusive}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM lapi_events_deactivate_contract deactivate_evs
+          WHERE
+            filters.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
+            AND deactivate_evs.event_sequential_id <= ${params.activeAt}
+        )
+    """.execute()(connection).discard
+
+  def removeDeactivatedFromACHS(
+      params: AchsRemoveDeactivatedParams
+  )(connection: Connection): Unit =
+    SQL"""
+      DELETE FROM lapi_filter_achs_stakeholder
+      WHERE EXISTS (
+        SELECT 1
+        FROM lapi_events_deactivate_contract deactivate_evs
+        WHERE
+          lapi_filter_achs_stakeholder.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
+          AND deactivate_evs.event_sequential_id <= ${params.endInclusive}
+          AND deactivate_evs.event_sequential_id > ${params.startExclusive}
+      )
+    """.execute()(connection).discard
+
   override def firstSynchronizerOffsetAfterOrAt(
       synchronizerId: SynchronizerId,
       afterOrAtRecordTimeInclusive: Timestamp,
   )(connection: Connection): Option[SynchronizerOffset] =
     List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
             synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
             record_time >= ${afterOrAtRecordTimeInclusive.micros}
           ORDER BY synchronizer_id ASC, record_time ASC, completion_offset ASC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection),
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
             synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
             record_time >= ${afterOrAtRecordTimeInclusive.micros}
           ORDER BY synchronizer_id ASC, record_time ASC, event_offset ASC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection),
     ).flatten
       .minByOption(_.recordTime)
       .filter(synchronizerOffset =>
@@ -802,24 +875,28 @@ abstract class EventStorageBackendTemplate(
         )
     }
     List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
             $synchronizerIdFilter
             ${QueryStrategy.offsetIsLessOrEqual("completion_offset", safeBeforeOrAtOffset)}
           ORDER BY $synchronizerIdOrdering completion_offset DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection),
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
             $synchronizerIdFilter
             ${QueryStrategy.offsetIsLessOrEqual("event_offset", safeBeforeOrAtOffset)}
           ORDER BY $synchronizerIdOrdering event_offset DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection),
     ).flatten
       .sortBy(_.offset)
       .reverse
@@ -830,51 +907,116 @@ abstract class EventStorageBackendTemplate(
   override def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
       beforeOrAtRecordTimeInclusive: Timestamp,
-  )(connection: Connection): Option[SynchronizerOffset] = {
+      beforeOrAtLedgerEndOffsetInclusive: Offset,
+  )(connection: Connection)(implicit traceContext: TraceContext): Option[SynchronizerOffset] = {
+    logger.debug(
+      s"Querying lastSynchronizerOffset: beforeOrAtRecordTime=$beforeOrAtRecordTimeInclusive, ledgerEndOffset=$beforeOrAtLedgerEndOffsetInclusive, synchronizerId=$synchronizerId"
+    )
+
+    val completionQueryResult =
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns =>
+          SQL"""
+        SELECT $columns
+        FROM lapi_command_completions
+        WHERE
+          synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
+          record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
+          ${QueryStrategy
+              .offsetIsLessOrEqual("completion_offset", Some(beforeOrAtLedgerEndOffsetInclusive))}
+        ORDER BY synchronizer_id DESC, record_time DESC, completion_offset DESC
+        ${QueryStrategy.limitClause(Some(1))}
+        """
+        )(connection)
+
+    logger.debug(s"lapi_command_completions query result: $completionQueryResult")
+
+    val metaQueryResult =
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns =>
+          SQL"""
+        SELECT $columns
+        FROM lapi_update_meta
+        WHERE
+          synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
+          record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
+          ${QueryStrategy
+              .offsetIsLessOrEqual("event_offset", Some(beforeOrAtLedgerEndOffsetInclusive))}
+        ORDER BY synchronizer_id DESC, record_time DESC, event_offset DESC
+        ${QueryStrategy.limitClause(Some(1))}
+        """
+        )(connection)
+
+    logger.debug(s"lapi_update_meta query result: $metaQueryResult")
+
+    List(completionQueryResult, metaQueryResult).flatten.maxByOption(_.offset)
+
+  }
+
+  def lastRecordTimeBeforeOrAtSynchronizerOffset(
+      synchronizerId: SynchronizerId,
+      beforeOrAtOffsetInclusive: Offset,
+  )(connection: Connection): Option[CantonTimestamp] = {
     val ledgerEndOffset = ledgerEndCache().map(_.lastOffset)
-    List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+    val safeBeforeOrAtOffset =
+      if (Option(beforeOrAtOffsetInclusive) > ledgerEndOffset) ledgerEndOffset
+      else Some(beforeOrAtOffsetInclusive)
+    val synchronizerIdFilter =
+      cSQL"synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND"
+    val synchronizerIdOrdering = cSQL"synchronizer_id,"
+    val completionQueryResult = RowDefs
+      .completionSynchronizerOffsetParser(stringInterning)
+      .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
-            synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
-            record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
-            ${QueryStrategy.offsetIsLessOrEqual("completion_offset", ledgerEndOffset)}
-          ORDER BY synchronizer_id DESC, record_time DESC, completion_offset DESC
+            $synchronizerIdFilter
+            ${QueryStrategy.offsetIsLessOrEqual("completion_offset", safeBeforeOrAtOffset)}
+          ORDER BY $synchronizerIdOrdering completion_offset DESC, record_time DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection)
+    val metaQueryResult = RowDefs
+      .metaSynchronizerOffsetParser(stringInterning)
+      .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
-            synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND
-            record_time <= ${beforeOrAtRecordTimeInclusive.micros} AND
-            ${QueryStrategy.offsetIsLessOrEqual("event_offset", ledgerEndOffset)}
-          ORDER BY synchronizer_id DESC, record_time DESC, event_offset DESC
+            $synchronizerIdFilter
+            ${QueryStrategy.offsetIsLessOrEqual("event_offset", safeBeforeOrAtOffset)}
+          ORDER BY $synchronizerIdOrdering event_offset DESC, record_time DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection)
+    List(
+      completionQueryResult,
+      metaQueryResult,
     ).flatten
-      .sortBy(_.offset)
-      .reverse
-      .headOption
+      .maxByOption(_.recordTime)
+      .map(_.recordTime)
+      .map(CantonTimestamp(_))
   }
 
   override def synchronizerOffset(offset: Offset)(
       connection: Connection
   ): Option[SynchronizerOffset] =
     List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
             completion_offset = $offset
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection),
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
             event_offset = $offset
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection),
     ).flatten.headOption // if both present they should be the same
       .filter(synchronizerOffset =>
         Option(synchronizerOffset.offset) <= ledgerEndCache().map(_.lastOffset)
@@ -884,22 +1026,26 @@ abstract class EventStorageBackendTemplate(
       afterOrAtPublicationTimeInclusive: Timestamp
   )(connection: Connection): Option[SynchronizerOffset] =
     List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
             publication_time >= ${afterOrAtPublicationTimeInclusive.micros}
           ORDER BY publication_time ASC, completion_offset ASC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection),
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
             publication_time >= ${afterOrAtPublicationTimeInclusive.micros}
           ORDER BY publication_time ASC, event_offset ASC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection),
     ).flatten
       .minByOption(_.offset)
       .filter(synchronizerOffset =>
@@ -917,22 +1063,26 @@ abstract class EventStorageBackendTemplate(
       else
         beforeOrAtPublicationTimeInclusive
     List(
-      SQL"""
-          SELECT completion_offset, record_time, publication_time, synchronizer_id
+      RowDefs
+        .completionSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_command_completions
           WHERE
             publication_time <= ${safePublicationTime.micros}
           ORDER BY publication_time DESC, completion_offset DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(completionSynchronizerOffsetParser(stringInterning))(connection),
-      SQL"""
-          SELECT event_offset, record_time, publication_time, synchronizer_id
+          """)(connection),
+      RowDefs
+        .metaSynchronizerOffsetParser(stringInterning)
+        .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_update_meta
           WHERE
             publication_time <= ${safePublicationTime.micros}
           ORDER BY publication_time DESC, event_offset DESC
           ${QueryStrategy.limitClause(Some(1))}
-          """.asSingleOpt(metaSynchronizerOffsetParser(stringInterning))(connection),
+          """)(connection),
     ).flatten
       .sortBy(_.offset)
       .reverse
@@ -973,27 +1123,28 @@ abstract class EventStorageBackendTemplate(
 
   override def fetchTopologyPartyEventIds(
       party: Option[Party]
-  )(connection: Connection): PaginationInput => Vector[Long] =
+  ): IdPageQuery =
     UpdateStreamingQueries.fetchEventIds(
       tableName = "lapi_events_party_to_participant",
       witnessO = party,
       templateIdO = None,
-      idFilter = None,
       stringInterning = stringInterning,
       hasFirstPerSequentialId = false,
-    )(connection)
+    )
 
   override def topologyPartyEventBatch(
       eventSequentialIds: SequentialIdBatch
-  )(connection: Connection): Vector[EventStorageBackend.RawParticipantAuthorization] =
-    SQL"""
-          SELECT *
+  )(connection: Connection): Vector[EventStorageBackend.RawParticipantAuthorization] = {
+    val query = (columns: CompositeSql) =>
+      SQL"""
+          SELECT $columns
           FROM lapi_events_party_to_participant e
           WHERE ${queryStrategy.inBatch("e.event_sequential_id", eventSequentialIds)}
           ORDER BY e.event_sequential_id -- deliver in index order
           """
-      .withFetchSize(Some(fetchSize(eventSequentialIds)))
-      .asVectorOf(partyToParticipantEventParser(stringInterning))(connection)
+        .withFetchSize(Some(fetchSize(eventSequentialIds)))
+    RowDefs.partyToParticipantEventParser(stringInterning).queryMultipleRows(query)(connection)
+  }
 
   override def topologyEventOffsetPublishedOnRecordTime(
       synchronizerId: SynchronizerId,
@@ -1002,16 +1153,15 @@ abstract class EventStorageBackendTemplate(
     stringInterning.synchronizerId
       .tryInternalize(synchronizerId)
       .flatMap(synchronizerInternedId =>
-        SQL"""
-          SELECT event_offset
+        RowDefs.eventOffset
+          .querySingleOptRow(columns => SQL"""
+          SELECT $columns
           FROM lapi_events_party_to_participant
           WHERE record_time = ${recordTime.toMicros}
                 AND synchronizer_id = $synchronizerInternedId
           ORDER BY synchronizer_id ASC, record_time ASC
           ${QueryStrategy.limitClause(Some(1))}
-          """
-          .asVectorOf(offset("event_offset"))(connection)
-          .headOption
+          """)(connection)
           .filter(offset => Option(offset) <= ledgerEndCache().map(_.lastOffset))
       )
 

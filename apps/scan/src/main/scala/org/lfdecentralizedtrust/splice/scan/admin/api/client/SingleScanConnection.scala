@@ -55,9 +55,10 @@ import org.lfdecentralizedtrust.tokenstandard.{
   transferinstruction,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -318,12 +319,61 @@ class SingleScanConnection private[client] (
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListFeaturedAppRightsByProvider(providerPartyId),
+    )
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId),
+    )
+  }
+
+  override def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.ListFeaturedAppRight)
+  }
+
   override def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListDsoSequencers(),
+    )
+  }
+
+  override def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupRollForwardLsu(),
+    )
+  }
+
+  override def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[ParticipantId]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId),
     )
   }
 
@@ -505,10 +555,11 @@ class SingleScanConnection private[client] (
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
+      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = runHttpCmd(
+  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])] = runHttpCmd(
     config.adminApi.url,
     HttpScanAppClient.ListVoteRequestResults(
       actionName,
@@ -517,6 +568,7 @@ class SingleScanConnection private[client] (
       effectiveFrom,
       effectiveTo,
       limit,
+      pageToken,
     ),
   )
 
@@ -744,6 +796,15 @@ class SingleScanConnection private[client] (
       tc: TraceContext,
   ): Future[allocationinstruction.v1.definitions.FactoryWithChoiceContext] =
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactoryRaw(arg))
+
+  override def getActivePhysicalSynchronizerSerial()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[NonNegativeInt] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetActivePhysicalSynchronizerSerial(),
+    )
 }
 
 object SingleScanConnection {

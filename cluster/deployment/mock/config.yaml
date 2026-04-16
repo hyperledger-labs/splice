@@ -1,3 +1,4 @@
+!include(../../configs/shared/base.yaml)
 validator1:
   kms:
     type: gcp
@@ -36,6 +37,8 @@ splitwell:
     maxDuration: "5m"
     retention: "30d"
 synchronizerMigration:
+  lsuEnabled: true
+  frozenMigrationId: 2
   archived:
     - id: 1
       version: 0.3.18
@@ -70,6 +73,9 @@ synchronizerMigration:
   upgrade:
     id: 4
     version: 0.3.21
+    enableLogicalSynchronizerDeploymentMode: true
+    sequencer:
+      enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
       repoUrl: https://github.com/hyperledger-labs/splice
@@ -84,6 +90,9 @@ pulumiProjectConfig:
     interAppsDependencies: false
     isExternalCluster: true
     hasPublicInfo: true
+    cloudSql:
+      enabled: true
+  sv-runbook:
     cloudSql:
       enabled: true
 monitoring:
@@ -123,8 +132,15 @@ loadTester:
   maxVUs: 30
   adaptiveScenario:
     enabled: true
+    scaleUpStep: 3
+    windowStartUTC: "02:30"
+    windowDurationMinutes: 150
 svs:
   default:
+    appsPg:
+      cloudSql:
+        enabled: true
+        tier: "apps-pg-override-tier"
     pruning:
       cometbft:
         retainBlocks: 5040000
@@ -152,6 +168,9 @@ svs:
         limits:
           memory: '2048Mi'
     svApp:
+      additionalPackagesToUnvet:
+        splice-wallet-payments: [ "0.1.15", "0.1.16" ]
+        splice-amulet: [ "0.1.15" ]
       permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -164,7 +183,7 @@ svs:
         limits:
           memory: '2Gi'
     participant:
-      additionalEnvVars:
+      additionalEnvVars: !append
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomParticipantJvmFlag"
@@ -201,11 +220,16 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    appsPg:
+      cloudSql:
+        tier: "apps-pg-override-tier-sv-1"
     periodicSnapshots:
       topology:
-        projectId: 'da-cn-test'
-        bucketName: 'da-cn-topology-snapshots'
-        backupInterval: '24h'
+        backupInterval: '12h'
+        bucketName: 'cn-topology-snapshots'
+        bucketSaKeySecret: 'gcp-topology-snapshot-bucket-sa-key-secret'
+        bucketSaIamAccount: 'da-cn-example@da-cn-shared.iam.gserviceaccount.com'
+        projectId: 'da-cn-shared'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -297,10 +321,109 @@ cluster:
       nodeType: c4-standard-16
       minNodes: 0
       maxNodes: 1
+gha:
+  githubRepo: "https://github.com/hyperledger-labs/splice"
+  runnerVersion: "0.5.10"
+  runnerHookVersion: "0.5.10"
+  runnerScaleSetVersion: "0.13.1"
+  runnerSpecs:
+    [
+      {
+        name: 'tiny',
+        k8s: false,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+          limits: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+        },
+      },
+      {
+        name: 'x-small',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '4',
+            memory: '6Gi',
+          },
+          limits: {
+            cpu: '4',
+            memory: '6Gi',
+          },
+        },
+      },
+      {
+        name: 'small',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '6',
+            memory: '18Gi',
+          },
+          limits: {
+            cpu: '6',
+            memory: '18Gi',
+          },
+        },
+      },
+      {
+        name: 'medium',
+        k8s: true,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '8',
+            memory: '26Gi',
+          },
+          limits: {
+            cpu: '8',
+            memory: '26Gi',
+          },
+        },
+      },
+      {
+        name: 'large',
+        k8s: true,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '8',
+            memory: '36Gi',
+          },
+          limits: {
+            cpu: '8',
+            memory: '36Gi',
+          },
+        },
+      },
+      {
+        name: 'x-large',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '10',
+            memory: '48Gi',
+          },
+          limits: {
+            cpu: '10',
+            memory: '48Gi',
+          },
+        },
+      },
+    ]
 networkWide:
   maxVettingDelay: 1m
 validators:
   validator-runbook:
+    postgresPvcSize: '200Gi'
     partyAllocator:
       enable: true
       maxParties: 1234

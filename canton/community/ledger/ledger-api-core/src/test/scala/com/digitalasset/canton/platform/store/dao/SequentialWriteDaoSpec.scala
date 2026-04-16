@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -6,9 +6,14 @@ package com.digitalasset.canton.platform.store.dao
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective
 import com.digitalasset.canton.ledger.participant.state.{SynchronizerIndex, Update}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
+  AchsLastPointers,
+  LedgerEnd,
+}
 import com.digitalasset.canton.platform.store.backend.{
   DbDto,
   IngestionStorageBackend,
@@ -17,14 +22,16 @@ import com.digitalasset.canton.platform.store.backend.{
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.dao.SequentialWriteDaoSpec.*
 import com.digitalasset.canton.platform.store.interning.{
-  DomainStringIterators,
   InternizingStringInterningView,
   StringInterning,
   StringInterningDomain,
+  StringInterningProvider,
 }
+import com.digitalasset.canton.protocol.TestUpdateId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, PackageId, Party, UserId}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -32,14 +39,14 @@ import com.google.protobuf.ByteString
 import org.mockito.MockitoSugar.mock
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 import java.sql.Connection
-import scala.concurrent.blocking
+import java.util.UUID
 
 class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
 
   behavior of "SequentialWriteDaoImpl"
+  private val lock = new Mutex()
 
   it should "store correctly in a happy path case" in {
     val storageBackendCaptor =
@@ -51,7 +58,6 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
       updateToDbDtos = updateToDbDtoFixture,
       ledgerEndCache = ledgerEndCache,
       stringInterningView = stringInterningViewFixture,
-      dbDtosToStringsForInterning = dbDtoToStringsForInterningFixture,
     )
     testee.store(someConnection, offset(2L), singlePartyFixture)
     ledgerEndCache().map(_.lastOffset) shouldBe Some(offset(2L))
@@ -130,7 +136,6 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
       updateToDbDtos = updateToDbDtoFixture,
       ledgerEndCache = ledgerEndCache,
       stringInterningView = stringInterningViewFixture,
-      dbDtosToStringsForInterning = dbDtoToStringsForInterningFixture,
     )
     testee.store(someConnection, offset(3L), None)
     ledgerEndCache().map(_.lastOffset) shouldBe Some(offset(3L))
@@ -170,8 +175,8 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
     override def batch(dbDtos: Vector[DbDto], stringInterning: StringInterning): Vector[DbDto] =
       dbDtos
 
-    override def insertBatch(connection: Connection, batch: Vector[DbDto]): Unit = blocking(
-      synchronized {
+    override def insertBatch(connection: Connection, batch: Vector[DbDto]): Unit = (
+      lock.exclusive {
         connection shouldBe someConnection
         captured = captured ++ batch
       }
@@ -186,14 +191,14 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
         params: ParameterStorageBackend.LedgerEnd,
         synchronizerIndexes: Map[SynchronizerId, SynchronizerIndex],
     )(connection: Connection): Unit =
-      blocking(synchronized {
+      (lock.exclusive {
         connection shouldBe someConnection
         captured = captured :+ params
       })
 
     private var ledgerEndCalled = false
     override def ledgerEnd(connection: Connection): Option[ParameterStorageBackend.LedgerEnd] =
-      blocking(synchronized {
+      (lock.exclusive {
         connection shouldBe someConnection
         ledgerEndCalled shouldBe false
         ledgerEndCalled = true
@@ -238,13 +243,32 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
 
     override def postProcessingEnd(connection: Connection): Option[Offset] =
       throw new UnsupportedOperationException
+
+    override def fetchACHSState(connection: Connection): Option[ParameterStorageBackend.AchsState] =
+      throw new UnsupportedOperationException
+
+    override def insertACHSState(achsState: ParameterStorageBackend.AchsState)(
+        connection: Connection
+    ): Unit = throw new UnsupportedOperationException
+
+    override def updateACHSValidAt(validAt: Long)(connection: Connection): Unit =
+      throw new UnsupportedOperationException
+
+    override def updateACHSLastPointers(lastPointers: AchsLastPointers)(
+        connection: Connection
+    ): Unit =
+      throw new UnsupportedOperationException
+
+    override def clearACHSState(connection: Connection): Unit =
+      throw new UnsupportedOperationException
+
   }
 }
 
 object SequentialWriteDaoSpec {
 
   private val serializableTraceContext =
-    SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
+    SerializableTraceContext(TraceContext.empty).toSerializedDamlProto
 
   private val externalTransactionHash =
     Hash
@@ -258,11 +282,19 @@ object SequentialWriteDaoSpec {
     ContractId.V1(com.digitalasset.daml.lf.crypto.Hash.hashPrivateKey(key))
 
   private def someUpdate(key: String) = Some(
-    Update.PartyAddedToParticipant(
-      party = Ref.Party.assertFromString(key),
-      participantId = Ref.ParticipantId.assertFromString("participant"),
-      recordTime = CantonTimestamp.now(),
-      submissionId = Some(Ref.SubmissionId.assertFromString("abc")),
+    state.Update.TopologyTransactionEffective(
+      updateId = TestUpdateId(UUID.randomUUID().toString),
+      events = Set(
+        TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization(
+          party = Ref.Party.assertFromString(key),
+          participant = Ref.ParticipantId.assertFromString("participant"),
+          authorizationEvent = TopologyTransactionEffective.AuthorizationEvent.Added(
+            TopologyTransactionEffective.AuthorizationLevel.Confirmation
+          ),
+        )
+      ),
+      synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
+      effectiveTime = CantonTimestamp.now(),
     )(TraceContext.empty)
   )
 
@@ -270,7 +302,7 @@ object SequentialWriteDaoSpec {
     ledger_offset = 1,
     recorded_at = 0,
     submission_id = null,
-    party = Some("party"),
+    party = Some(Ref.Party.assertFromString("party")),
     typ = "accept",
     rejection_reason = None,
     is_local = Some(true),
@@ -283,13 +315,14 @@ object SequentialWriteDaoSpec {
     workflow_id = None,
     submitters = None,
     node_id = 3,
-    representative_package_id = "3",
+    representative_package_id = Ref.PackageId.fromInt(3),
     create_key_hash = None,
     event_sequential_id = 0,
     synchronizer_id = SynchronizerId.tryFromString("x::synchronizer"),
     trace_context = serializableTraceContext,
     record_time = 0,
     external_transaction_hash = Some(externalTransactionHash),
+    traffic_cost = Some(1565L),
     internal_contract_id = 42L,
     event_type = 1,
     additional_witnesses = Some(Set.empty),
@@ -308,9 +341,9 @@ object SequentialWriteDaoSpec {
     submitters = None,
     node_id = 3,
     contract_id = hashCid("24"),
-    template_id = "",
-    package_id = "2",
-    exercise_choice = Some(""),
+    template_id = Ref.NameTypeConRef.assertFromString("#p:m:t"),
+    package_id = Ref.PackageId.fromInt(2),
+    exercise_choice = Some(Ref.ChoiceName.assertFromString("choice")),
     exercise_choice_interface_id = None,
     exercise_argument = Some(Array.empty),
     exercise_result = None,
@@ -323,6 +356,7 @@ object SequentialWriteDaoSpec {
     trace_context = serializableTraceContext,
     record_time = 0,
     external_transaction_hash = Some(externalTransactionHash),
+    traffic_cost = Some(1565L),
     deactivated_event_sequential_id = None,
     event_type = 3,
     additional_witnesses = None,
@@ -334,87 +368,92 @@ object SequentialWriteDaoSpec {
     target_synchronizer_id = None,
   )
 
-  val singlePartyFixture: Option[Update.PartyAddedToParticipant] =
+  val singlePartyFixture: Option[Update.TopologyTransactionEffective] =
     someUpdate("singleParty")
-  val partyAndCreateFixture: Option[Update.PartyAddedToParticipant] =
+  val partyAndCreateFixture: Option[Update.TopologyTransactionEffective] =
     someUpdate("partyAndCreate")
-  val allEventsFixture: Option[Update.PartyAddedToParticipant] =
+  val allEventsFixture: Option[Update.TopologyTransactionEffective] =
     someUpdate("allEventsFixture")
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private val someUpdateToDbDtoFixture: Map[Ref.Party, List[DbDto]] = Map(
-    singlePartyFixture.get.party -> List(someParty),
-    partyAndCreateFixture.get.party -> List(someParty, someEventActivate),
-    allEventsFixture.get.party -> List(
+    Ref.Party.assertFromString("singleParty") -> List(someParty),
+    Ref.Party.assertFromString("partyAndCreate") -> List(someParty, someEventActivate),
+    Ref.Party.assertFromString("allEventsFixture") -> List(
       someEventActivate,
-      DbDto.IdFilter(0L, "", "", first_per_sequential_id = true).activateStakeholder,
-      DbDto.IdFilter(0L, "", "", first_per_sequential_id = false).activateStakeholder,
+      DbDto
+        .IdFilter(
+          0L,
+          Ref.NameTypeConRef.assertFromString("#p:m:t"),
+          Ref.Party.assertFromString("party"),
+          first_per_sequential_id = true,
+        )
+        .activateStakeholder,
+      DbDto
+        .IdFilter(
+          0L,
+          Ref.NameTypeConRef.assertFromString("#p:m:t"),
+          Ref.Party.assertFromString("party"),
+          first_per_sequential_id = false,
+        )
+        .activateStakeholder,
       someEventDeactivate,
     ),
   )
 
   private val updateToDbDtoFixture: Offset => Update => Iterator[DbDto] =
     _ => {
-      case r: Update.PartyAddedToParticipant =>
-        someUpdateToDbDtoFixture(r.party).iterator
+      case r: Update.TopologyTransactionEffective =>
+        val party = r.events
+          .collectFirst {
+            case pa: Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization =>
+              pa.party
+          }
+          .getOrElse(throw new IllegalStateException())
+        someUpdateToDbDtoFixture(party).iterator
       case _ => throw new Exception
     }
-
-  private val dbDtoToStringsForInterningFixture: Iterable[DbDto] => DomainStringIterators = {
-    case iterable if iterable.sizeIs == 5 =>
-      new DomainStringIterators(
-        parties = Iterator.empty,
-        templateIds = List("1").iterator,
-        synchronizerIds = Iterator.empty,
-        packageIds = Iterator("2"),
-        userIds = Iterator.empty,
-        participantIds = Iterator.empty,
-        choiceNames = Iterator.empty,
-        interfaceIds = Iterator.empty,
-      )
-    case _ =>
-      new DomainStringIterators(
-        parties = Iterator.empty,
-        templateIds = Iterator.empty,
-        synchronizerIds = Iterator.empty,
-        packageIds = Iterator.empty,
-        userIds = Iterator.empty,
-        participantIds = Iterator.empty,
-        choiceNames = Iterator.empty,
-        interfaceIds = Iterator.empty,
-      )
-  }
 
   private val stringInterningViewFixture: StringInterning with InternizingStringInterningView =
     new StringInterning with InternizingStringInterningView {
       override def templateId: StringInterningDomain[NameTypeConRef] =
-        throw new NotImplementedException
+        ???
 
       override def packageId: StringInterningDomain[PackageId] =
-        throw new NotImplementedException
+        ???
 
-      override def party: StringInterningDomain[Party] = throw new NotImplementedException
+      override def party: StringInterningDomain[Party] = ???
 
       override def synchronizerId: StringInterningDomain[SynchronizerId] =
-        throw new NotImplementedException
+        ???
 
-      override def userId: StringInterningDomain[UserId] = throw new NotImplementedException
+      override def userId: StringInterningDomain[UserId] = ???
 
       override def participantId: StringInterningDomain[Ref.ParticipantId] =
-        throw new NotImplementedException
+        ???
 
       override def choiceName: StringInterningDomain[Ref.ChoiceName] =
-        throw new NotImplementedException
+        ???
 
       override def interfaceId: StringInterningDomain[Ref.Identifier] =
-        throw new NotImplementedException
+        ???
 
-      override def internize(
-          domainStringIterators: DomainStringIterators
+      override private[platform] def distinctNewRawStrings(
+          interningProviders: Iterable[StringInterningProvider]
+      ): Iterable[String] =
+        Nil
+
+      /** @return
+        *   If some of the entries were not part of the view: they will be added, and these will be
+        *   returned as a interned-id and raw, prefixed string pairs.
+        * @note
+        *   This method is thread-safe. This method should be called from Indexer, which maintains
+        *   consistency between StringInterning view and persistence.
+        */
+      override private[platform] def internize(
+          distinctRawStrings: Iterable[String]
       ): Iterable[(Int, String)] =
-        if (domainStringIterators.templateIds.isEmpty) Nil
-        else List(1 -> "a", 2 -> "b")
-
+        Iterator.iterate(1)(_ + 1).zip(distinctRawStrings).toVector
     }
 
   private val someConnection = mock[Connection]

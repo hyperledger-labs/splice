@@ -1,8 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.sequencer.bftordering
 
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.MockedNodeParameters
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -17,8 +19,8 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing.BftSequencerFactory
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.{
-  SequencerNodeParameterConfig,
   SequencerNodeParameters,
+  TimeAdvancingTopologyConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
@@ -51,6 +53,7 @@ class BftSequencerApiTest extends SequencerApiTest with RateLimitManagerTesting 
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
       asyncWriter = AsyncWriterParameters(),
+      timeAdvancingTopology = TimeAdvancingTopologyConfig(),
     )
 
   override final def createSequencer(crypto: SynchronizerCryptoClient)(implicit
@@ -64,12 +67,14 @@ class BftSequencerApiTest extends SequencerApiTest with RateLimitManagerTesting 
       new BftSequencerFactory(
         BftBlockOrdererConfig(),
         BlockSequencerConfig(),
+        producePostOrderingTopologyTicks = false,
         health = None,
         storage,
         testedProtocolVersion,
         sequencerId,
         params,
         SequencerTestMetrics,
+        new ExecutorServiceMetrics(NoOpMetricsFactory),
         loggerFactory,
         None,
       )
@@ -81,8 +86,8 @@ class BftSequencerApiTest extends SequencerApiTest with RateLimitManagerTesting 
         crypto,
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        sequencingTimeLowerBoundExclusive =
-          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
+        lsuSequencingBounds = None,
+        drSequencingTimeUpperBound = None,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS

@@ -170,12 +170,10 @@ class SplitwellApp(
       CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
     ) {
       withTraceContext { traceContext =>
-        requestLogger(traceContext) {
-          HttpErrorHandler(loggerFactory)(traceContext) {
-            concat(
-              SplitwellResource.routes(handler, _ => provide(traceContext))
-            )
-          }
+        HttpErrorHandler(loggerFactory)(traceContext) {
+          concat(
+            SplitwellResource.routes(handler, _ => provide(traceContext))
+          )
         }
       }
     }

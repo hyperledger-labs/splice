@@ -23,6 +23,7 @@ const ProjectFilterSchema = z.union([
   z.literal('canton-network'),
   z.literal('gha'),
   z.literal('infra'),
+  z.literal('observability'),
   z.literal('multi-validator'),
   z.literal('splitwell'),
   z.literal('sv-canton'),
@@ -39,6 +40,8 @@ export type ProjectFilter = z.infer<typeof ProjectFilterSchema>;
 function* iterateDefaultProjectFilters(): Generator<ProjectFilter> {
   yield 'canton-network';
   yield 'infra';
+  yield 'observability';
+  yield 'sv';
   yield 'sv-canton';
   yield 'validator-runbook';
 
@@ -73,7 +76,7 @@ export const OperatorDeploymentConfigSchema = z.object({
     .object({
       projectsToDeploy: z.array(ProjectFilterSchema).transform(arr => new Set(arr)),
     })
-    .default({
+    .prefault({
       projectsToDeploy: [...iterateDefaultProjectFilters()],
     }),
 });

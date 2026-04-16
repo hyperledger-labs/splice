@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.topology
@@ -9,8 +9,8 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Security.SecurityTest.Property.*
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
+import com.digitalasset.canton.config.PositiveDurationSeconds
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{DbConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.console.{
   CommandFailure,
   LocalParticipantReference,
@@ -21,15 +21,10 @@ import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.cycle as C
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UsePostgres,
-  UseReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{PartiesAllocator, PartyToParticipantDeclarative}
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
-import com.digitalasset.canton.participant.store.SyncPersistentState
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.ForceFlag.{
   AllowInsufficientParticipantPermissionForSignatoryParty,
@@ -62,14 +57,14 @@ import scala.concurrent.{Await, ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 
 @nowarn("msg=match may not be exhaustive")
+// Needed because of PartyToKeyMapping deprecation
+@nowarn("cat=deprecation")
 trait TopologyManagementIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with HasCycleUtils
     with SecurityTestSuite
     with AccessTestScenario {
-
-  protected val isBftSequencer: Boolean = false
 
   // TODO(#16283): disable participant / roll keys while the affected nodes are busy
 
@@ -227,6 +222,7 @@ trait TopologyManagementIntegrationTest
       )
       // propose a decentralized namespace with many owners, so that we have multiple
       // transactions with the same hash. This should not trip up the idempotent import.
+
       val dns = nodes.all
         .map { node =>
           node.topology.decentralized_namespaces
@@ -234,6 +230,7 @@ trait TopologyManagementIntegrationTest
               nodes.all.map(_.namespace).toSet,
               PositiveInt.tryCreate(nodes.all.size),
               daId,
+              synchronize = None,
             )
             .mapping
         }
@@ -262,7 +259,7 @@ trait TopologyManagementIntegrationTest
       // ignores duplicate transaction
       loggerFactory.assertLogsSeq(
         SuppressionRule.LevelAndAbove(DEBUG) && SuppressionRule
-          .forLogger[SyncPersistentState]
+          .forLogger[SynchronizerTopologyManager]
       )(
         {
           participant1.topology.transactions.load(Seq(tx), daId)
@@ -298,7 +295,7 @@ trait TopologyManagementIntegrationTest
       // ignores duplicate transaction
       loggerFactory.assertLogsSeq(
         SuppressionRule.LevelAndAbove(DEBUG) && SuppressionRule
-          .forLogger[SyncPersistentState]
+          .forLogger[SynchronizerTopologyManager]
       )(
         participant1.topology.transactions.load(Seq(tx), daId),
         { logEntries =>
@@ -1431,8 +1428,6 @@ trait TopologyManagementIntegrationTest
           .map(_.item.namespace.fingerprint) shouldBe Seq(key1.fingerprint)
       })
 
-      val timestamp = env.environment.clock.now
-
       // remove
       Seq(key1, key2).map(key =>
         clue(s"removing $key")(
@@ -1451,21 +1446,6 @@ trait TopologyManagementIntegrationTest
         forAll(Seq(key1.fingerprint, key2.fingerprint)) { fp =>
           known should not contain fp
         }
-      }
-
-      // WARNING: Skipping BFT Ordering Sequencer because it implements BFT Time, which does not depend on the current
-      // clock time for any given block; it depends on previous block times. Therefore, the current clock time cannot be
-      // used to query for a snapshot.
-      if (!isBftSequencer) clue(s"querying snapshot at $timestamp") {
-        // querying for snapshots should work
-        val sp = participant1.topology.namespace_delegations
-          .list(
-            daId,
-            timeQuery = TimeQuery.Snapshot(timestamp),
-            filterNamespace = key1.fingerprint.unwrap,
-          )
-          .map(_.item.namespace.fingerprint)
-        sp shouldBe Seq(key1.fingerprint)
       }
 
       // add and remove txs should be found
@@ -1579,8 +1559,8 @@ trait TopologyManagementIntegrationTest
 
       val announcementMapping = synchronizerOwners1
         .map { owner =>
-          owner.topology.synchronizer_upgrade.announcement.propose(
-            PhysicalSynchronizerId(daId, testedProtocolVersion, serial = NonNegativeInt.two),
+          owner.topology.lsu.announcement.propose(
+            PhysicalSynchronizerId(daId, NonNegativeInt.two, testedProtocolVersion),
             upgradeTime,
           )
         }
@@ -1591,7 +1571,7 @@ trait TopologyManagementIntegrationTest
       eventually() {
         forAll(
           synchronizerOwners1.map(
-            _.topology.synchronizer_upgrade.announcement
+            _.topology.lsu.announcement
               .list(daId)
               .loneElement
               .item
@@ -1599,8 +1579,8 @@ trait TopologyManagementIntegrationTest
         )(result => result shouldBe announcementMapping)
       }
       synchronizerOwners1.foreach(
-        _.topology.synchronizer_upgrade.announcement.revoke(
-          PhysicalSynchronizerId(daId, testedProtocolVersion, serial = NonNegativeInt.two),
+        _.topology.lsu.announcement.revoke(
+          PhysicalSynchronizerId(daId, NonNegativeInt.two, testedProtocolVersion),
           upgradeTime,
         )
       )
@@ -1671,6 +1651,7 @@ trait TopologyManagementIntegrationTest
               ParticipantPermission.Confirmation,
             )
           ),
+          partySigningKeysWithThreshold = None,
         )
         .value
 
@@ -1797,6 +1778,7 @@ trait TopologyManagementIntegrationTest
               ParticipantPermission.Submission,
             ),
           ),
+          partySigningKeysWithThreshold = None,
         )
         .value
 
@@ -1838,7 +1820,11 @@ trait TopologyManagementIntegrationTest
 
       // Load them to P1 and P2
       participant1.topology.transactions.load(p2SignedPreparedTx2, TopologyStoreId.Authorized)
-      participant2.topology.transactions.load(p2SignedPreparedTx2, TopologyStoreId.Authorized)
+      // We can't load to P2 to authorized store. They need to go directly into Synchronizer store
+      // as otherwise the state processor check will complain because the serial doesn't start at the right
+      // place
+      participant2.topology.transactions
+        .load(p2SignedPreparedTx2, TopologyStoreId.Synchronizer(sequencer1.synchronizer_id))
 
       eventually() {
         // Observe that Max is hosted on P1 with confirmation and P2 with submission
@@ -1928,16 +1914,8 @@ trait TopologyManagementIntegrationTest
 
 }
 
-class TopologyManagementReferenceIntegrationTestPostgres extends TopologyManagementIntegrationTest {
-  registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
-}
-
 class TopologyManagementBftOrderingIntegrationTestPostgres
     extends TopologyManagementIntegrationTest {
-
-  override protected val isBftSequencer: Boolean = true
-
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseBftSequencer(loggerFactory))
 }

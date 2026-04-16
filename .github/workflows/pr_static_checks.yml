@@ -21,3 +21,4 @@ jobs:
       self_hosted: false
       commit_sha: ${{ github.event.pull_request.head.sha }}
       skip_todo_check: true # runs from forks with on: pull_request run in context of the fork, so issue references will be broken
+      oss_only: true

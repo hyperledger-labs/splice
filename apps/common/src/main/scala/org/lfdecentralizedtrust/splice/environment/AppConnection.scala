@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import cats.data.EitherT
 import org.lfdecentralizedtrust.splice.admin.api.client.TraceContextPropagation.*
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.admin.api.client.{
@@ -32,13 +33,17 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import io.circe.Json
 import io.grpc.{CallCredentials, Deadline, Status}
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, Uri}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, MediaTypes, StatusCode, Uri}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
+import scala.jdk.FutureConverters.*
 
 abstract class BaseAppConnection(
     override val loggerFactory: NamedLoggerFactory
@@ -68,12 +73,74 @@ abstract class BaseAppConnection(
       mat: Materializer,
   ): Future[Result] = {
     val client: Client = command.createClient(url.toString())
+
+    def handleFailure(f: Either[Throwable, HttpResponse]): EitherT[Future, Throwable, Res] =
+      f match {
+        case Left(throwable: Throwable) =>
+          EitherT.left(Future.successful(throwable))
+        case Right(response: HttpResponse)
+            if response.entity.contentType.mediaType == MediaTypes.`application/json` =>
+          EitherT.left(
+            Unmarshal(response.entity)
+              .to[ByteString]
+              .flatMap(s =>
+                io.circe.jawn.parseByteBuffer(s.asByteBuffer) match {
+                  case Right(value) =>
+                    Future.successful(
+                      new BaseAppConnection.UnexpectedHttpJsonResponse(response.status, value)
+                    )
+                  case Left(failure) =>
+                    val truncated =
+                      if (s.length > 100) s.take(97).utf8String + "..." else s.utf8String
+                    logger.warn(
+                      s"Failed to parse the response body as json, even though the content type was application/json. Status code: ${response.status}, body: ${truncated}, parsing failure: $failure"
+                    )(TraceContext.empty)
+                    Future.successful(
+                      new BaseAppConnection.UnexpectedHttpMalformedJsonResponse(
+                        response.status,
+                        truncated,
+                      )
+                    )
+
+                }
+              )
+          )
+        case Right(response: HttpResponse)
+            if response.entity.contentType.mediaType == MediaTypes.`text/plain` || response.entity.contentType.mediaType == MediaTypes.`text/html` =>
+          EitherT.left(
+            response.entity
+              .getDataBytes()
+              .runFold(
+                "",
+                { (acc: String, chunk) =>
+                  if (acc.length > 100) { acc + "..." }
+                  else { acc ++ chunk.utf8String }
+                },
+                mat,
+              )
+              .toCompletableFuture
+              .asScala
+              .map { bs =>
+                new BaseAppConnection.UnexpectedHttpTextResponse(
+                  response.status,
+                  bs,
+                )
+              }
+          )
+        case Right(response: HttpResponse) =>
+          EitherT.left(
+            response
+              .discardEntityBytes()
+              .future
+              .map(_ => new BaseAppConnection.UnexpectedHttpNonJsonResponse(response.status))
+          )
+      }
+
     for {
       response <- EitherTUtil.toFuture(
-        command.submitRequest(client, tc.propagate(headers)).leftMap[Throwable] {
-          case Left(throwable) => throwable
-          case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
-        }
+        command
+          .submitRequest(client, tc.propagate(headers))
+          .leftFlatMap(handleFailure)
       )
       result <- toFuture(command.handleResponse(response))
     } yield result
@@ -81,8 +148,22 @@ abstract class BaseAppConnection(
 }
 
 object BaseAppConnection {
-  final class UnexpectedHttpResponse(val response: HttpResponse)
-      extends Throwable(s"Unexpected Http Response: $response")
+  def truncate(json: Json, maxLength: Int = 100): String = {
+    val jsonString = json.noSpaces
+    if (jsonString.length > maxLength) jsonString.take(maxLength - 3) + "..."
+    else jsonString
+  }
+  final class UnexpectedHttpJsonResponse(val statusCode: StatusCode, val content: Json)
+      extends Throwable(s"Unexpected Http Json Response (status $statusCode): ${truncate(content)}")
+  final class UnexpectedHttpMalformedJsonResponse(val statusCode: StatusCode, val content: String)
+      extends Throwable(
+        s"Unexpected Http response, with json header but a malformed Json content (status $statusCode): $content"
+      )
+  final class UnexpectedHttpTextResponse(val statusCode: StatusCode, val content: String)
+      extends Throwable(s"Unexpected text or html response (status $statusCode): $content")
+  final class UnexpectedHttpNonJsonResponse(val statusCode: StatusCode)
+      extends Throwable(s"Unexpected Http Response: $statusCode")
+
 }
 
 /** Base class for connecting and calling Canton gRPC APIs.

@@ -13,11 +13,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   metadatav1,
   transferinstructionv1,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, DarResourcesUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.{Resource, definitions}
 
@@ -174,6 +173,8 @@ class HttpTokenStandardTransferInstructionHandler(
               .asRuntimeException()
           )
         )
+      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+      externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder = new ChoiceContextBuilder(
         AmuletConfigSchedule(amuletRules.payload.configSchedule)
@@ -184,10 +185,12 @@ class HttpTokenStandardTransferInstructionHandler(
       )
 
       (
-        choiceContextBuilder.addContracts(
-          "amulet-rules" -> amuletRules,
-          "open-round" -> newestOpenRound.contract,
-        ),
+        choiceContextBuilder
+          .addContracts(
+            "amulet-rules" -> amuletRules,
+            "open-round" -> newestOpenRound.contract,
+          )
+          .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO),
         newestOpenRound.contract.payload,
       )
     }
@@ -273,7 +276,7 @@ object HttpTokenStandardTransferInstructionHandler {
         debugPackageName =
           if (excludeDebugFields) None
           else
-            DarResources
+            DarResourcesUtil
               .lookupPackageId(contract.identifier.getPackageId)
               .map(_.metadata.name),
         debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),

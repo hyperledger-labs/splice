@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -31,12 +31,14 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsReassignment,
   JsTransaction,
   JsTransactionTree,
+  OneOfSchemaExtension,
 }
 import com.digitalasset.canton.http.json.v2.JsUpdateServiceConverters.toUpdateFormat
 import com.digitalasset.canton.http.json.v2.LegacyDTOs.toTransactionTree
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
@@ -52,9 +54,11 @@ import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, path, query, webSocketBody}
 
 import scala.concurrent.{ExecutionContext, Future}
 
+@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsUpdateService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
+    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -82,11 +86,11 @@ class JsUpdateService(
     ),
     websocket(
       JsUpdateService.getUpdatesFlatEndpoint,
-      getFlats,
+      getUpdates,
     ),
     asList(
       JsUpdateService.getUpdatesFlatListEndpoint,
-      getFlats,
+      getUpdates,
       timeoutOpenEndedStream = (r: LegacyDTOs.GetUpdatesRequest) => r.endInclusive.isEmpty,
     ),
     websocket(
@@ -129,8 +133,8 @@ class JsUpdateService(
   ): TracedInput[(Long, List[String])] => Future[
     Either[JsCantonError, JsGetTransactionTreeResponse]
   ] = { req =>
-    implicit val tc: TraceContext = req.traceContext
-    updateServiceClient(caller.token())(req.traceContext)
+    implicit val tc: TraceContext = caller.traceContext()
+    updateServiceClient(caller.token())
       .getUpdateByOffset(
         update_service.GetUpdateByOffsetRequest(
           offset = req.in._1,
@@ -191,8 +195,8 @@ class JsUpdateService(
     Either[JsCantonError, JsGetTransactionResponse]
   ] =
     req => {
-      implicit val tc = req.traceContext
-      updateServiceClient(caller.token())(req.traceContext)
+      implicit val tc: TraceContext = caller.traceContext()
+      updateServiceClient(caller.token())
         .getUpdateByOffset(
           update_service.GetUpdateByOffsetRequest(
             offset = req.in.offset,
@@ -251,8 +255,8 @@ class JsUpdateService(
     Either[JsCantonError, JsGetUpdateResponse]
   ] =
     req => {
-      implicit val tc = req.traceContext
-      updateServiceClient(caller.token())(req.traceContext)
+      implicit val tc = caller.traceContext()
+      updateServiceClient(caller.token())
         .getUpdateByOffset(req.in)
         .flatMap(protocolConverters.GetUpdateResponse.toJson(_))
         .resultToRight
@@ -264,8 +268,8 @@ class JsUpdateService(
     Either[JsCantonError, JsGetUpdateResponse]
   ] =
     req => {
-      implicit val tc = req.traceContext
-      updateServiceClient(caller.token())(req.traceContext)
+      implicit val tc = caller.traceContext()
+      updateServiceClient(caller.token())
         .getUpdateById(req.in)
         .flatMap(protocolConverters.GetUpdateResponse.toJson(_))
         .resultToRight
@@ -276,8 +280,8 @@ class JsUpdateService(
   ): TracedInput[LegacyDTOs.GetTransactionByIdRequest] => Future[
     Either[JsCantonError, JsGetTransactionResponse]
   ] = { req =>
-    implicit val tc = req.traceContext
-    updateServiceClient(caller.token())(req.traceContext)
+    implicit val tc = caller.traceContext()
+    updateServiceClient(caller.token())
       .getUpdateById(
         update_service.GetUpdateByIdRequest(
           updateId = req.in.updateId,
@@ -301,8 +305,8 @@ class JsUpdateService(
     Either[JsCantonError, JsGetTransactionTreeResponse]
   ] =
     req => {
-      implicit val tc = req.traceContext
-      updateServiceClient(caller.token())(req.traceContext)
+      implicit val tc = caller.traceContext()
+      updateServiceClient(caller.token())
         .getUpdateById(
           update_service.GetUpdateByIdRequest(
             updateId = req.in._1,
@@ -325,24 +329,10 @@ class JsUpdateService(
   private def getUpdates(
       caller: CallerContext
   ): TracedInput[Unit] => Flow[LegacyDTOs.GetUpdatesRequest, JsGetUpdatesResponse, NotUsed] =
-    req => {
-      implicit val tc = req.traceContext
+    _ => {
+      implicit val tc = caller.traceContext()
       Flow[LegacyDTOs.GetUpdatesRequest].map { request =>
         toGetUpdatesRequest(request, forTrees = false)
-      } via
-        prepareSingleWsStream(
-          updateServiceClient(caller.token())(TraceContext.empty).getUpdates,
-          (r: update_service.GetUpdatesResponse) => protocolConverters.GetUpdatesResponse.toJson(r),
-        )
-    }
-
-  private def getFlats(
-      caller: CallerContext
-  ): TracedInput[Unit] => Flow[LegacyDTOs.GetUpdatesRequest, JsGetUpdatesResponse, NotUsed] =
-    req => {
-      implicit val tc = req.traceContext
-      Flow[LegacyDTOs.GetUpdatesRequest].map { req =>
-        toGetUpdatesRequest(req, forTrees = false)
       } via
         prepareSingleWsStream(
           updateServiceClient(caller.token())(TraceContext.empty).getUpdates,
@@ -357,8 +347,8 @@ class JsUpdateService(
     JsGetUpdateTreesResponse,
     NotUsed,
   ] =
-    wsReq => {
-      implicit val tc: TraceContext = wsReq.traceContext
+    _ => {
+      implicit val tc: TraceContext = caller.traceContext()
       Flow[LegacyDTOs.GetUpdatesRequest].map { req =>
         toGetUpdatesRequest(req, forTrees = true)
       } via
@@ -391,6 +381,7 @@ class JsUpdateService(
           beginExclusive = req.beginExclusive,
           endInclusive = req.endInclusive,
           updateFormat = req.updateFormat,
+          descendingOrder = req.descendingOrder,
         )
       case (None, None, _) =>
         throw RequestValidationErrors.InvalidArgument
@@ -403,6 +394,7 @@ class JsUpdateService(
           beginExclusive = req.beginExclusive,
           endInclusive = req.endInclusive,
           updateFormat = Some(toUpdateFormat(filter, verbose, forTrees)),
+          descendingOrder = req.descendingOrder,
         )
     }
 
@@ -441,13 +433,13 @@ object JsUpdateService extends DocumentationEndpoints {
         CodecFormat.Json,
       ](PekkoStreams)
     )
-    .description("Get updates stream")
+    .protoRef(update_service.UpdateServiceGrpc.METHOD_GET_UPDATES)
 
   val getUpdatesListEndpoint =
     updates.post
       .in(jsonBody[LegacyDTOs.GetUpdatesRequest])
       .out(jsonBody[Seq[JsGetUpdatesResponse]])
-      .description("Query updates list (blocking call)")
+      .protoRef(update_service.UpdateServiceGrpc.METHOD_GET_UPDATES)
       .inStreamListParamsAndDescription()
 
   val getUpdatesFlatEndpoint = updates.get
@@ -547,14 +539,14 @@ object JsUpdateService extends DocumentationEndpoints {
       .in(sttp.tapir.stringToPath("update-by-offset"))
       .in(jsonBody[update_service.GetUpdateByOffsetRequest])
       .out(jsonBody[JsGetUpdateResponse])
-      .description("Get update by offset")
+      .protoRef(update_service.UpdateServiceGrpc.METHOD_GET_UPDATE_BY_OFFSET)
 
   val getUpdateByIdEndpoint =
     updates.post
       .in(sttp.tapir.stringToPath("update-by-id"))
       .in(jsonBody[update_service.GetUpdateByIdRequest])
       .out(jsonBody[JsGetUpdateResponse])
-      .description("Get update by id")
+      .protoRef(update_service.UpdateServiceGrpc.METHOD_GET_UPDATE_BY_ID)
 
   override def documentation: Seq[AnyEndpoint] = List(
     getUpdatesEndpoint,
@@ -658,6 +650,9 @@ object JsUpdateServiceCodecs {
   implicit val jsTopologyParticipantAuthorizationRevokedRW
       : Codec[lapi.topology_transaction.ParticipantAuthorizationRevoked] =
     deriveRelaxedCodec
+  implicit val jsTopologyParticipantAuthorizationOnboardingRW
+      : Codec[lapi.topology_transaction.ParticipantAuthorizationOnboarding] =
+    deriveRelaxedCodec
   implicit val jsTopologyEventEventRW: Codec[lapi.topology_transaction.TopologyEvent.Event] =
     deriveConfiguredCodec
   implicit val jsTopologyEventParticipantAuthorizationAddedRW
@@ -668,6 +663,9 @@ object JsUpdateServiceCodecs {
     deriveRelaxedCodec
   implicit val jsParticipantAuthorizationRevokedRW
       : Codec[lapi.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationRevoked] =
+    deriveRelaxedCodec
+  implicit val jsParticipantAuthorizationOnboardingRW
+      : Codec[lapi.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationOnboarding] =
     deriveRelaxedCodec
 
   implicit val jsTopologyEventRW: Codec[lapi.topology_transaction.TopologyEvent] =
@@ -680,10 +678,12 @@ object JsUpdateServiceCodecs {
     Schema.derived.name(Some(SName("JsTopologyTransaction")))
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsUpdateSchema: Schema[JsUpdate.Update] = Schema.oneOfWrapped
+  implicit val jsUpdateSchema: Schema[JsUpdate.Update] =
+    Schema.oneOfWrapped[JsUpdate.Update].oneOfExtension()
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsUpdateTreeSchema: Schema[JsUpdateTree.Update] = Schema.oneOfWrapped
+  implicit val jsUpdateTreeSchema: Schema[JsUpdateTree.Update] =
+    Schema.oneOfWrapped[JsUpdateTree.Update].oneOfExtension()
 
 }
 
@@ -717,7 +717,8 @@ object JsUpdateServiceConverters {
     )
 
     val transactionFormat = TransactionFormat(
-      transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+      transactionShape =
+        if (forTrees) TRANSACTION_SHAPE_LEDGER_EFFECTS else TRANSACTION_SHAPE_ACS_DELTA,
       eventFormat = Some(eventFormat),
     )
 

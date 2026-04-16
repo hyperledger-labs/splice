@@ -1,18 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sbt._
+import sbt.*
 
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.4.4"
+  val version: String = "3.5.0-snapshot.20260401.14638.0.v9a1531c5"
+  val canton_library_version = "3.5.0-snapshot.20260407.18566.0.v64d1d1e6"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
-  val daml_java_codegen_version = version
+  // Downgrade once version is bumped to a version >= this
+  val daml_java_codegen_version = "3.5.0-snapshot.20260403.14643.0.v6a02ccee"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
@@ -24,12 +26,12 @@ object CantonDependencies {
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.11.7"
-  lazy val pekko_version = "1.2.0"
+  lazy val pekko_version = "1.2.1"
   lazy val pekko_http_version = "1.2.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.75.0"
+  lazy val grpc_version = "1.77.0"
   lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
@@ -37,7 +39,7 @@ object CantonDependencies {
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
-  lazy val bouncy_castle_version = "1.70"
+  lazy val bouncy_castle_version = "1.83"
 
   lazy val pureconfig_version = "0.14.0"
 
@@ -53,7 +55,7 @@ object CantonDependencies {
   lazy val pureconfig_cats = "com.github.pureconfig" %% "pureconfig-cats" % pureconfig_version
 
   lazy val scala_collection_contrib =
-    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.3.0"
+    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.2"
   lazy val scala_reflect = "org.scala-lang" % "scala-reflect" % scala_version
   lazy val shapeless = "com.chuusai" %% "shapeless" % "2.3.12"
 
@@ -80,54 +82,70 @@ object CantonDependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 
   lazy val daml_test_evidence_tag =
-    "com.daml" %% "test-evidence-tag" % daml_libraries_version
+    "com.daml" %% "test-evidence-tag" % canton_library_version
   lazy val daml_test_evidence_scalatest =
-    "com.daml" %% "test-evidence-scalatest" % daml_libraries_version
+    "com.daml" %% "test-evidence-scalatest" % canton_library_version
   lazy val daml_test_evidence_generator_scalatest =
-    "com.daml" %% "test-evidence-generator" % daml_libraries_version
-  lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
-  lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
-  lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
-  lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
-  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
+    "com.daml" %% "test-evidence-generator" % canton_library_version
+  lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive" % canton_library_version
+  lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % canton_library_version
+  lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % canton_library_version
+  lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % canton_library_version
+  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % canton_library_version
   lazy val daml_lf_transaction_test_lib =
-    "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
+    "com.daml" %% "daml-lf-transaction-test-lib" % canton_library_version
   lazy val daml_lf_api_type_signature =
-    "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
+    "com.daml" %% "daml-lf-api-type-signature" % canton_library_version
   lazy val daml_libs_scala_grpc_test_utils =
-    "com.daml" %% "grpc-test-utils" % daml_libraries_version
+    "com.daml" %% "grpc-test-utils" % canton_library_version
+  lazy val daml_grpc_utils =
+    "com.daml" %% "daml-grpc-utils" % canton_library_version
 
-  lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
-  lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
-  lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
-  lazy val daml_contextualized_logging =
-    "com.daml" %% "contextualized-logging" % daml_libraries_version
-  lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
-  lazy val daml_pekko_http_metrics = "com.daml" %% "pekko-http-metrics" % daml_libraries_version
-  lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
-  lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
-  lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
-  lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
-  lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
-  lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
-  lazy val daml_ledger_api_value_proto =
-    "com.daml" % "ledger-api-value-proto" % daml_libraries_version
+  lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
+  lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
+  lazy val canton_observability_metrics =
+    "com.daml" %% "observability-metrics" % canton_library_version
+  lazy val canton_contextualized_logging =
+    "com.daml" %% "contextualized-logging" % canton_library_version
+
+  lazy val canton_transcode_json = "com.daml" % "transcode-codec-json_3" % canton_library_version
+  lazy val canton_transcode_proto_scala =
+    "com.daml" % "transcode-codec-proto-scala_3" % canton_library_version
+  lazy val canton_transcode_daml_lf = "com.daml" % "transcode-daml-lf_3" % canton_library_version
+  // Transcode is written in Scala 3 and it depends on Scala 3 libraries
+  // For a 2.13 project to depend on transcode it needs to resolve the conflicting Scala 2.13/3 dependencies
+  lazy val excludeTranscodeConflictingDependencies = Keys.excludeDependencies ++= Seq(
+    ExclusionRule("com.lihaoyi", "fastparse_3"),
+    ExclusionRule("com.lihaoyi", "os-lib_3"),
+    ExclusionRule("com.lihaoyi", "sourcecode_3"),
+    ExclusionRule("com.lihaoyi", "ujson_3"),
+    ExclusionRule("com.lihaoyi", "upickle-core_3"),
+  )
+
+  lazy val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
+  lazy val os_lib = "com.lihaoyi" %% "os-lib" % "0.10.3"
+  lazy val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.4.2"
+
+  lazy val daml_nonempty = "com.daml" %% "nonempty" % canton_library_version
+  lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % canton_library_version
+  lazy val daml_tracing = "com.daml" %% "observability-tracing" % canton_library_version
+  lazy val daml_executors = "com.daml" %% "executors" % canton_library_version
+  lazy val daml_ports = "com.daml" %% "ports" % canton_library_version
+  lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % canton_library_version
   lazy val daml_ledger_api_value_scalapb =
-    "com.daml" %% "ledger-api-value-scalapb" % daml_libraries_version
+    "com.daml" %% "ledger-api-value-scalapb" % canton_library_version
   lazy val daml_ledger_api_value_java =
-    "com.daml" % "ledger-api-value-java-proto" % daml_libraries_version
-  lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
-  lazy val daml_libs_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
-  lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
-  lazy val daml_rs_grpc_testing_utils =
-    "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
-  lazy val daml_http_test_utils = "com.daml" %% "http-test-utils" % daml_libraries_version
-  lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
+    "com.daml" % "ledger-api-value-java-proto" % canton_library_version
+  lazy val daml_timer_utils = "com.daml" %% "timer-utils" % canton_library_version
+  lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % canton_library_version
+
+  lazy val daml_testing_utils =
+    "com.digitalasset.canton" %% "testing-utils" % canton_library_version
 
   lazy val bouncycastle_bcprov_jdk15on =
-    "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version
   lazy val bouncycastle_bcpkix_jdk15on =
-    "org.bouncycastle" % "bcpkix-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcpkix-jdk18on" % bouncy_castle_version
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
@@ -171,6 +189,7 @@ object CantonDependencies {
 
   lazy val apache_commons_codec = "commons-codec" % "commons-codec" % "1.11"
   lazy val apache_commons_io = "commons-io" % "commons-io" % "2.11.0"
+  lazy val apache_commons_compress = "org.apache.commons" % "commons-compress" % "1.27.1"
   lazy val log4j_core = "org.apache.logging.log4j" % "log4j-core" % log4j_version
   lazy val log4j_api = "org.apache.logging.log4j" % "log4j-api" % log4j_version
 
@@ -190,6 +209,7 @@ object CantonDependencies {
 
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
+  lazy val circe_parser = "io.circe" %% "circe-parser" % circe_version
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
 
   lazy val guava = "com.google.guava" % "guava" % "33.3.0-jre"
@@ -198,14 +218,14 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val opentelemetry_version = "1.43.0"
-  lazy val opentelemetry_java_instrumentation_version = "2.9.0"
+  lazy val opentelemetry_version = "1.60.1"
+  lazy val opentelemetry_java_instrumentation_version = "2.26.1"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_testing =
     "io.opentelemetry" % "opentelemetry-sdk-testing" % opentelemetry_version
   lazy val opentelemetry_sdk_autoconfigure =
-    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % s"$opentelemetry_version"
+    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % opentelemetry_version
   lazy val opentelemetry_prometheus =
     "io.opentelemetry" % "opentelemetry-exporter-prometheus" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_zipkin =

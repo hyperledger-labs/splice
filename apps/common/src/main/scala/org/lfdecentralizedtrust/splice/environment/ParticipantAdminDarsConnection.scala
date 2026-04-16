@@ -76,65 +76,103 @@ trait ParticipantAdminDarsConnection {
       tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
-
-    retryProvider.retry(
-      RetryFor.Automation,
-      "dar_vetting",
-      s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
-      lookupVettingState(
-        Some(synchronizerId),
-        TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
-      ).flatMap {
-        case None =>
-          for {
-            participantId <- getParticipantId()
-            _ <- ensureInitialMapping(
-              Right(
-                updateVettingStateForDars(
-                  dars,
-                  cantonFromDate,
-                  VettedPackages.tryCreate(
-                    participantId,
-                    Seq.empty,
-                  ),
-                )
+    lookupVettingState(
+      Some(synchronizerId),
+      TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+    ).flatMap {
+      case None =>
+        for {
+          participantId <- getParticipantId()
+          _ <- ensureInitialMapping(
+            Right(
+              addDarsToVettingState(
+                dars,
+                cantonFromDate,
+                VettedPackages.tryCreate(
+                  participantId,
+                  Seq.empty,
+                ),
               )
             )
-          } yield ()
-        case Some(_) =>
-          ensureTopologyMapping[VettedPackages](
-            TopologyStoreId.Synchronizer(synchronizerId),
-            s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
-            topologyTransactionType =>
-              EitherT(
-                getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
-                  if (
-                    dars
-                      .forall(dar =>
-                        vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
-                      )
-                  ) {
-                    // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
-                    Right(vettedPackages)
-                  } else {
-                    Left(vettedPackages)
-                  }
+          )
+        } yield ()
+      case Some(_) =>
+        ensureTopologyMapping[VettedPackages](
+          TopologyStoreId.Synchronizer(synchronizerId),
+          s"dars ${dars.map(_.packageId)} are vetted on $synchronizerId from $fromDate",
+          topologyTransactionType =>
+            EitherT(
+              getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
+                if (
+                  dars
+                    .forall(dar =>
+                      vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
+                    )
+                ) {
+                  // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
+                  Right(vettedPackages)
+                } else {
+                  Left(vettedPackages)
                 }
-              ),
-            currentVettingState =>
-              Right(
-                updateVettingStateForDars(
-                  dars = dars,
-                  packageValidFrom = cantonFromDate,
-                  currentVetting = currentVettingState,
-                )
-              ),
-            RetryFor.Automation,
-            maxSubmissionDelay = maxVettingDelay,
-          ).map(_ => ())
-      },
-      logger,
-    )
+              }
+            ),
+          currentVettingState =>
+            Right(
+              addDarsToVettingState(
+                dars = dars,
+                packageValidFrom = cantonFromDate,
+                currentVetting = currentVettingState,
+              )
+            ),
+          RetryFor.Automation,
+          maxSubmissionDelay = maxVettingDelay,
+        ).map(_ => ())
+    }
+  }
+
+  // TODO(DACH-NY/splice#4803): unvet dependencies
+  def unvetDars(
+      synchronizerId: SynchronizerId,
+      dars: Seq[DarResource],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    lookupVettingState(
+      Some(synchronizerId),
+      TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+    ).flatMap {
+      case None => Future.unit
+      case Some(_) =>
+        ensureTopologyMapping[VettedPackages](
+          TopologyStoreId.Synchronizer(synchronizerId),
+          s"dars ${dars.map(_.packageId)} are removed from $synchronizerId",
+          topologyTransactionType =>
+            EitherT(
+              getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
+                if (
+                  dars
+                    .forall(dar =>
+                      !vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
+                    )
+                ) {
+                  Right(vettedPackages)
+                } else {
+                  Left(vettedPackages)
+                }
+              }
+            ),
+          currentVettingState =>
+            Right(
+              removeDarsFromVettingState(
+                dars = dars,
+                currentVetting = currentVettingState,
+              )
+            ),
+          RetryFor.Automation,
+          maxSubmissionDelay = maxVettingDelay,
+        ).map(_ => ())
+    }
   }
 
   def lookupDar(mainPackageId: String)(implicit
@@ -143,17 +181,28 @@ trait ParticipantAdminDarsConnection {
     runCmd(
       ParticipantAdminConnection.LookupDarByteString(mainPackageId)
     )
-  private def updateVettingStateForDars(
+
+  private def removeDarsFromVettingState(
+      dars: Seq[DarResource],
+      currentVetting: VettedPackages,
+  ): VettedPackages = {
+    val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
+    currentVetting
+      .focus(_.packages)
+      .modify(packages => packages.filterNot(pkg => packageIdsToRemove.contains(pkg.packageId)))
+  }
+
+  private def addDarsToVettingState(
       dars: Seq[DarResource],
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
   ) = {
     dars.foldLeft(currentVetting)((currentVetting, dar) =>
-      updateVettingStateForDar(dar, packageValidFrom, currentVetting)
+      addVettingStateForDar(dar, packageValidFrom, currentVetting)
     )
   }
 
-  private def updateVettingStateForDar(
+  private def addVettingStateForDar(
       dar: DarResource,
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
@@ -161,7 +210,7 @@ trait ParticipantAdminDarsConnection {
     currentVetting
       .focus(_.packages)
       .modify(packages => {
-        def updateVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
+        def addVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
           // while the main package is guaranteed to not exist the dependencies might already have been vetted, and they might have been vetted with a later date so we make sure that the dependencies are available as early as we need them
           packages.find(_.packageId == packageId) match {
             case Some(existingVettingState) =>
@@ -188,7 +237,7 @@ trait ParticipantAdminDarsConnection {
             PackageId.assertFromString
           )
           .foldLeft(packages) { case (vettingState, newPackage) =>
-            updateVettingStateForPackage(newPackage, vettingState)
+            addVettingStateForPackage(newPackage, vettingState)
           }
       })
   }

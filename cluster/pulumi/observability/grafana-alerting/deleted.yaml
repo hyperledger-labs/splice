@@ -1,0 +1,20 @@
+apiVersion: 1
+deleteRules:
+  - orgId: 1
+    # SV Status - mediator -falling behind
+    uid: f15539f2-f6ea-4de4-8f7c-c56434d5bd52
+  - orgId: 1
+    # wasted traffic (sustained)
+    uid: adw5rd048zf9cb
+  - orgId: 1
+    # wasted traffic
+    uid: adw5rd048zf9ca
+  - orgId: 1
+    # Confirmation Requests By Member (replaced by sequencer caps, #2917)
+    uid: 88b8827c8d09
+  - orgId: 1
+    # Total Confirmation Requests (replaced by sequencer caps, #2917)
+    uid: 5dcddc9a5487
+deleteContactPoints:
+  - uid: grafana-default-email
+    orgId: 1

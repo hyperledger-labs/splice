@@ -13,10 +13,14 @@ source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 function component_to_deployments() {
   local -r component=$1
   local -r migration_id=$2
+  local -r namespace=$3
+  local -r logical_synchronizer_mode=${4:-false}
   if [[ "$component" == "sequencer" ]]; then
     echo "global-domain-$migration_id-sequencer"
   elif [[ "$component" == "mediator" ]]; then
     echo "global-domain-$migration_id-mediator"
+  elif [[ "$component" == "participant" && "$logical_synchronizer_mode" == "true" && "$namespace" == sv* ]]; then
+    echo "participant"
   elif [[ "$component" == "participant" ]]; then
     echo "participant-$migration_id"
   elif [[ "$component" == "cometbft" ]]; then
@@ -68,7 +72,7 @@ function restore_pvc_from_snapshot() {
   local -r namespace=$1
   local -r snapshot_name=$2
   local -r pvc_name=$3
-  local -r storage_class_name=${4:-"standard-rwo"}
+  local -r storage_class_name=$4
 
   _warning "This operation will delete pvc $pvc_name, and restore it from backup."
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
@@ -89,7 +93,8 @@ function down() {
   local -r namespace=$1
   local -r component=$2
   local -r migration_id=$3
-  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local -r logical_synchronizer_mode=${4:-false}
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
 
   for deployment_name in $deployment_names; do
     _info "Scaling down $component deployment $deployment_name"
@@ -101,7 +106,8 @@ function wait_down() {
   local -r namespace=$1
   local -r component=$2
   local -r migration_id=$3
-  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local -r logical_synchronizer_mode=${4:-false}
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
 
   for deployment_name in $deployment_names; do
     _info "Waiting for all pods of $deployment_name to get deleted"
@@ -113,7 +119,8 @@ function up() {
   local -r namespace=$1
   local -r component=$2
   local -r migration_id=$3
-  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local -r logical_synchronizer_mode=${4:-false}
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
 
   for deployment_name in $deployment_names; do
     up_one_with_retries "$namespace" "$component" "$deployment_name"
@@ -158,10 +165,13 @@ function restore_pvc_postgres() {
   local -r hyperdisk_enabled=$4
 
   local template_name
+  local storage_class
   if [ "$hyperdisk_enabled" = "true" ]; then
     template_name="pg-data-hd"
+    storage_class="hyperdisk-standard-rwo"
   else
     template_name="pg-data"
+    storage_class="standard-rwo"
   fi
 
   local -r ss_name="$component-pg"
@@ -172,7 +182,7 @@ function restore_pvc_postgres() {
   _info "Scaling down postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=0
 
-  restore_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name"
+  restore_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name" "$storage_class"
 
   _info "Scaling up postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=1
@@ -196,15 +206,15 @@ function restore_cloudsql_postgres() {
   local -r component=$2
   local -r run_id=$3
   local -r migration_id=$4
-  local -r internal=$5
+  local -r logical_synchronizer_mode=$5
   local -r restore_cluster=$6 # optional, cluster to restore into (if different than current)
   MAX_RETRIES=20
   retry_count=0
 
   local stack
 
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
-  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")"
 
   cloudsql_backup_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
   cloudsql_restore_instance_id=$cloudsql_backup_instance_id
@@ -262,13 +272,13 @@ function restore_component() {
   local -r component=$2
   local -r migration_id=$3
   local -r run_id=$4
-  local -r internal=$5
+  local -r logical_synchronizer_mode=$5
   local -r restore_cluster=$6 # cluster to restore into (if different from current)
   local -r hyperdisk_enabled=$7
-  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")
   local stack
 
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
 
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
@@ -284,18 +294,25 @@ function restore_component() {
       cometbft_snapshot_name="${cometbft_pvc_name}-$run_id"
     fi
 
-    restore_pvc_from_snapshot "$namespace" "$cometbft_snapshot_name" "$cometbft_pvc_name" "premium-rwo"
+    local cometbft_storage_class
+    if [ "$hyperdisk_enabled" = "true" ]; then
+      cometbft_storage_class="hyperdisk-standard-rwo"
+    else
+      cometbft_storage_class="premium-rwo"
+    fi
+
+    restore_pvc_from_snapshot "$namespace" "$cometbft_snapshot_name" "$cometbft_pvc_name" "$cometbft_storage_class"
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
-    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")"
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         restore_pvc_postgres "$namespace" "$instance" "$run_id" "$hyperdisk_enabled"
         ;;
       "canton:cloud:postgres")
-        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal" "$restore_cluster"
+        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$logical_synchronizer_mode" "$restore_cluster"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -307,11 +324,11 @@ function restore_component() {
 function wait_cloudsql_restore() {
   local -r namespace=$1
   local -r component=$2
-  local -r internal=$3
+  local -r logical_synchronizer_mode=$3
 
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
-  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")"
   cloudsql_restore_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
 
   local -i i=0
@@ -352,21 +369,21 @@ function wait_cloudsql_restore() {
 function wait_restore_component() {
   local -r namespace=$1
   local -r component=$2
-  local -r internal=$3
+  local -r logical_synchronizer_mode=$3
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$logical_synchronizer_mode")
 
   if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
-    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode")"
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"
         ;;
       "canton:cloud:postgres")
-        wait_cloudsql_restore "$namespace" "$component" "$internal"
+        wait_cloudsql_restore "$namespace" "$component" "$logical_synchronizer_mode"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -376,11 +393,11 @@ function wait_restore_component() {
 }
 
 function usage() {
-  echo "Usage: $0 [-r <restore_cluster>] <namespace> <run_id> <component>..."
+  echo "Usage: $0 [-r <restore_cluster>] <namespace> <migration_id> <run_id> <component>..."
 }
 
 function main() {
-  if [ "$#" -lt 5 ]; then
+  if [ "$#" -lt 4 ]; then
     usage
     exit 1
   fi
@@ -412,42 +429,44 @@ function main() {
   local -r namespace=$1
   local -r migration_id=$2
   local -r run_id=$3
-  local -r internal=$4
 
-  # Get resolved config and extract hyperdisk support flag
   local config
   config=$(get_resolved_config)
   local hyperdisk_enabled
   hyperdisk_enabled=$(echo "$config" | yq '.cluster.hyperdiskSupport.enabled // false')
+  local logical_synchronizer_mode
+  logical_synchronizer_mode=$(echo "$config" | yq ".synchronizerMigration[]? | select(.id == ${migration_id}) | .enableLogicalSynchronizerDeploymentMode // false")
+  if [ -z "$logical_synchronizer_mode" ]; then
+    logical_synchronizer_mode="false"
+  fi
 
-  for component in "${@:5}"; do
-    # verify all components exist and have a mapping
-    component_to_deployments "$component" "$migration_id"
+  for component in "${@:4}"; do
+    component_to_deployments "$component" "$migration_id" "$namespace" "$logical_synchronizer_mode"
   done
 
   _info " ** Scaling down ** "
-  for component in "${@:5}"; do
-    down "$namespace" "$component" "$migration_id"
+  for component in "${@:4}"; do
+    down "$namespace" "$component" "$migration_id" "$logical_synchronizer_mode"
   done
 
-  for component in "${@:5}"; do
-    wait_down "$namespace" "$component" "$migration_id"
+  for component in "${@:4}"; do
+    wait_down "$namespace" "$component" "$migration_id" "$logical_synchronizer_mode"
   done
 
   _info " ** Restoring ** "
-  for component in "${@:5}"; do
-    restore_component "$namespace" "$component" "$migration_id" "$run_id" "$internal" "$restore_cluster" "$hyperdisk_enabled"
+  for component in "${@:4}"; do
+    restore_component "$namespace" "$component" "$migration_id" "$run_id" "$logical_synchronizer_mode" "$restore_cluster" "$hyperdisk_enabled"
   done
 
   _info " ** Waiting for all restore operations to finish ** "
-  for component in "${@:5}"; do
-    wait_restore_component "$namespace" "$component" "$internal"
+  for component in "${@:4}"; do
+    wait_restore_component "$namespace" "$component" "$logical_synchronizer_mode"
   done
 
 
   _info " ** Scaling up ** "
-  for component in "${@:5}"; do
-    up "$namespace" "$component" "$migration_id"
+  for component in "${@:4}"; do
+    up "$namespace" "$component" "$migration_id" "$logical_synchronizer_mode"
   done
 
 

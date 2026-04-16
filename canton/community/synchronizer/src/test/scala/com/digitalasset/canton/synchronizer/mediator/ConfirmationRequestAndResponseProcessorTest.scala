@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.*
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
@@ -17,6 +18,7 @@ import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.Verdict.{Approve, MediatorReject}
+import com.digitalasset.canton.sequencing.UnthrottledAsyncF
 import com.digitalasset.canton.sequencing.client.TestSequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.mediator.store.{
@@ -41,6 +43,7 @@ import com.google.protobuf.ByteString
 import io.grpc.Status.Code
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.event.Level
 
 import java.util
 import scala.annotation.nowarn
@@ -252,7 +255,7 @@ class ConfirmationRequestAndResponseProcessorTest
   protected lazy val decisionTime = requestIdTs.plusSeconds(120)
 
   class Fixture(syncCryptoApi: SynchronizerCryptoClient = synchronizerSyncCryptoApi) {
-    private val sequencerSend: TestSequencerClientSend = new TestSequencerClientSend
+    private val sequencerSend: TestSequencerClientSend = new TestSequencerClientSend(wallClock)
 
     def drainInterceptedBatches(): List[Batch[DefaultOpenEnvelope]] = {
       val result = new util.ArrayList[TestSequencerClientSend.Request]()
@@ -279,15 +282,20 @@ class ConfirmationRequestAndResponseProcessorTest
       timeouts,
       loggerFactory,
     )
-    mediatorState.initialize(CantonTimestamp.MinValue).futureValueUS
     val processor = new ConfirmationRequestAndResponseProcessor(
       mediatorId,
       verdictSender,
       syncCryptoApi,
       timeTracker,
       mediatorState,
+      // this test calls processRequest and processResponses directly,
+      // which is not affected by the asynchronous processing flag, which is handled in the enclosing scope
+      // calling these methods
+      asynchronousProcessing = true,
       loggerFactory,
       timeouts,
+      BatchingConfig(),
+      futureSupervisor,
     )
   }
 
@@ -307,12 +315,16 @@ class ConfirmationRequestAndResponseProcessorTest
       testedProtocolVersion,
     )
     val participantCrypto = identityFactory.forOwner(participant)
-    SignedProtocolMessage
-      .trySignAndCreate(
-        confirmationResponses,
-        participantCrypto
-          .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
-          .currentSnapshotApproximation,
+    participantCrypto
+      .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
+      .currentSnapshotApproximation
+      .flatMap(snapshot =>
+        SignedProtocolMessage
+          .trySignAndCreate(
+            confirmationResponses,
+            snapshot,
+            None,
+          )
       )
   }
 
@@ -341,12 +353,17 @@ class ConfirmationRequestAndResponseProcessorTest
     )
 
     val participantCrypto = identity.forOwner(participant)
-    SignedProtocolMessage
-      .trySignAndCreate(
-        response,
-        participantCrypto
-          .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
-          .currentSnapshotApproximation,
+
+    participantCrypto
+      .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
+      .currentSnapshotApproximation
+      .flatMap(snapshot =>
+        SignedProtocolMessage
+          .trySignAndCreate(
+            response,
+            snapshot,
+            None,
+          )
       )
       .failOnShutdown
   }
@@ -355,7 +372,11 @@ class ConfirmationRequestAndResponseProcessorTest
     .forOwnerAndSynchronizer(participant, synchronizerId)
     .awaitSnapshot(CantonTimestamp.Epoch)
     .futureValueUS
-    .sign(tree.tree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+    .sign(
+      tree.tree.rootHash.unwrap,
+      SigningKeyUsage.ProtocolOnly,
+      None, // not needed for unit tests; session signing keys disabled
+    )
     .failOnShutdown
     .futureValue
 
@@ -454,12 +475,15 @@ class ConfirmationRequestAndResponseProcessorTest
               batchAlsoContainsTopologyTransaction = false,
             )
             .failOnShutdown,
-          _.shouldBeCantonError(
-            MediatorError.MalformedMessage,
-            _ should startWith(
-              s"Received a mediator confirmation request with id $requestId from $participant with an invalid signature. Rejecting request.\nDetailed error: SignatureWithWrongKey"
-            ),
-          ),
+          entry => {
+            entry.level shouldBe Level.WARN
+            entry.shouldBeCantonError(
+              MediatorError.MalformedMessage,
+              _ should startWith(
+                s"Received a mediator confirmation request with id $requestId from $participant with an invalid signature. Rejecting request.\nDetailed error: SignatureWithWrongKey"
+              ),
+            )
+          },
         )
       } yield {
         val sentResult = sut.verdictSender.sentResults.loneElement
@@ -928,7 +952,7 @@ class ConfirmationRequestAndResponseProcessorTest
               .map(party =>
                 party -> PartyInfo(
                   PositiveInt.one,
-                  Map(ParticipantId("one") -> ParticipantAttributes(Confirmation)),
+                  Map(participant -> ParticipantAttributes(Confirmation)),
                 )
               )
               .toMap
@@ -936,7 +960,8 @@ class ConfirmationRequestAndResponseProcessorTest
         }
 
       for {
-        _ <- sut.processor
+        // The innerFuture will complete when the request is finalized and stored, not before
+        unthrottledAsync <- sut.processor
           .processRequest(
             requestId,
             notSignificantCounter,
@@ -965,10 +990,15 @@ class ConfirmationRequestAndResponseProcessorTest
             participantResponseDeadline,
             decisionTime,
             mockTopologySnapshot,
+            BatchingConfig(),
             participantResponseDeadlineTick = None,
+            requestState.asInstanceOf[ResponseAggregation[?]].finalizedPromise,
           )
 
         _ = requestState shouldBe responseAggregation
+        _ = inside(unthrottledAsync) { case UnthrottledAsyncF(future) =>
+          future.isCompleted shouldBe false
+        }
         // receiving the confirmation response
         ts1 = CantonTimestamp.Epoch.plusMillis(1L)
         responses = List(
@@ -1009,6 +1039,7 @@ class ConfirmationRequestAndResponseProcessorTest
                     _,
                     actualVersion,
                     Right(_states),
+                    _,
                   )
                 ) =>
               actualRequestId shouldBe requestId
@@ -1017,8 +1048,9 @@ class ConfirmationRequestAndResponseProcessorTest
           }
           val completedView = ResponseAggregation.ViewState(
             Map(
-              submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                Set(ExampleTransactionFactory.submittingParticipant)
+              submitter -> ConsortiumVotingState.withDefaultValues(
+                hostingParticipants = Set(participant),
+                approvals = Set(ExampleTransactionFactory.submittingParticipant),
               )
             ),
             Seq(Quorum.empty),
@@ -1035,6 +1067,7 @@ class ConfirmationRequestAndResponseProcessorTest
             _,
             `ts1`,
             Right(states),
+            _,
           ) = updatedState.value
           assert(
             states === Map(
@@ -1042,27 +1075,37 @@ class ConfirmationRequestAndResponseProcessorTest
               view1Position ->
                 ResponseAggregation.ViewState(
                   Map(
-                    submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                      Set(ExampleTransactionFactory.submittingParticipant)
+                    submitter -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant),
+                      approvals = Set(ExampleTransactionFactory.submittingParticipant),
                     ),
-                    signatory -> ConsortiumVotingState.withDefaultValues(),
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    ),
                   ),
                   Seq(signatoryQuorum),
                   Nil,
                 ),
               view10Position ->
                 ResponseAggregation.ViewState(
-                  Map(signatory -> ConsortiumVotingState.withDefaultValues()),
+                  Map(
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    )
+                  ),
                   Seq(signatoryQuorum),
                   Nil,
                 ),
               view11Position ->
                 ResponseAggregation.ViewState(
                   Map(
-                    submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                      Set(ExampleTransactionFactory.submittingParticipant)
+                    submitter -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant),
+                      approvals = Set(ExampleTransactionFactory.submittingParticipant),
                     ),
-                    signatory -> ConsortiumVotingState.withDefaultValues(),
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    ),
                   ),
                   Seq(signatoryQuorum),
                   Nil,
@@ -1070,6 +1113,10 @@ class ConfirmationRequestAndResponseProcessorTest
               view110Position -> completedView,
             )
           )
+        }
+        // We're still missing one confirmation response, the innerFuture should still not be completed
+        _ = inside(unthrottledAsync) { case UnthrottledAsyncF(future) =>
+          future.isCompleted shouldBe false
         }
         // receiving the final confirmation response
         ts2 = CantonTimestamp.Epoch.plusMillis(2L)
@@ -1096,6 +1143,10 @@ class ConfirmationRequestAndResponseProcessorTest
             Some(requestId.unwrap),
             Recipients.cc(mediatorGroupRecipient),
           )
+        // Now the innerFuture should be completed as we get a finalized response
+        _ <- inside(unthrottledAsync) { case UnthrottledAsyncF(future) =>
+          future
+        }
         // records the request
         finalState <- sut.mediatorState
           .fetch(requestId)
@@ -1718,10 +1769,13 @@ class ConfirmationRequestAndResponseProcessorTest
               batchAlsoContainsTopologyTransaction = false,
             )
             .failOnShutdown,
-          _.shouldBeCantonError(
-            MediatorError.InvalidMessage,
-            _ shouldBe s"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: ${Set(observer, extra, signatory)}. Rejecting request...",
-          ),
+          entry => {
+            entry.level shouldBe Level.WARN
+            entry.shouldBeCantonError(
+              MediatorError.InvalidMessage,
+              _ shouldBe s"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: ${Set(observer, extra, signatory)}. Rejecting request...",
+            )
+          },
         )
       } yield succeed
     }

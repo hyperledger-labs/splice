@@ -1,4 +1,4 @@
-{ pkgs, x86Pkgs, npmPkgs, variant }:
+{ pkgs, x86Pkgs, variant }:
 let
   use_enterprise = if variant == "enterprise" then true else false;
   inherit (pkgs) stdenv fetchzip;
@@ -43,8 +43,6 @@ let
     lnav
     nix
     nodejs
-    nodePackages.node2nix
-    npmPkgs.syncpack
     openapi-generator-cli
     openjdk21
     pigz
@@ -108,6 +106,7 @@ let
     deno
     unzip
     which
+    xxd
     zip
 
     # Package required to install daml studio
@@ -124,7 +123,6 @@ let
     hub # Github CLI for todo checker
     jq
     nodejs
-    npmPkgs.syncpack
     openapi-generator-cli
     pre-commit
     python3
@@ -149,6 +147,7 @@ in pkgs.mkShell {
   CANTON_SEQUENCER_IMAGE_SHA256 = "${sources.canton_sequencer_image_sha256}";
   CANTON_MEDIATOR_IMAGE_SHA256 = "${sources.canton_mediator_image_sha256}";
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
+  DAML_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";

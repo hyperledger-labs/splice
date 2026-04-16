@@ -10,8 +10,9 @@ import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-
+import com.digitalasset.canton.util.Mutex
 import io.grpc.Status
+
 import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 
 abstract class DomainTimeSynchronization {
@@ -45,6 +46,7 @@ final class DomainTimeStore(
     None,
     None,
   )
+  private val mutex = Mutex()
 
   override def waitForDomainTimeSync()(implicit tc: TraceContext): Future[Unit] = {
     val promiseO = checkDomainTimeDelay()
@@ -64,7 +66,7 @@ final class DomainTimeStore(
   }
 
   private def checkDomainTimeDelay()(implicit tc: TraceContext): Option[Promise[Unit]] = blocking {
-    synchronized {
+    mutex.exclusive {
       val now = clock.now
       state.lastDomainTime match {
         // If we are just starting up, try to submit something to not delay startup.
@@ -93,7 +95,7 @@ final class DomainTimeStore(
 
   def ingestDomainTime(time: CantonTimestamp)(implicit tc: TraceContext): Future[Unit] = Future {
     blocking {
-      synchronized {
+      mutex.exclusive {
         val now = clock.now
         val newState = state.copy(lastDomainTime = Some(time))
         state.delayPromise match {

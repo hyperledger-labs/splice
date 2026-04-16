@@ -37,9 +37,14 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
+      after: Option[Long] = None,
   ): SqlStreamingAction[Vector[
     TxLogQueries.SelectFromTxLogTableResult
   ], TxLogQueries.SelectFromTxLogTableResult, Effect.Read] = {
+    val afterCondition = after match {
+      case Some(a) => Some(sql"""entry_number < $a""")
+      case None => None
+    }
     val actionNameCondition = actionName match {
       case Some(actionName) =>
         Some(sql"""#$actionNameColumnName like ${lengthLimited(
@@ -78,6 +83,7 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
         executedCondition,
         requesterCondition,
         effectivenessCondition,
+        afterCondition,
       ).flatten,
     )
     val whereClause = conditions.reduceLeft((a, b) => (a ++ sql""" and """ ++ b).toActionBuilder)
@@ -86,7 +92,7 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
       txLogTableName,
       txLogStoreId,
       where = whereClause.toActionBuilder,
-      orderLimit = sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(limit)}""",
+      orderLimit = sql"""order by entry_number desc limit ${sqlLimit(limit)}""",
     )
   }
 }

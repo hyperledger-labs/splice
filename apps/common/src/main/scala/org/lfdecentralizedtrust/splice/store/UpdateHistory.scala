@@ -10,6 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
 import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
+import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   Reassignment,
@@ -587,9 +588,12 @@ class UpdateHistory(
       .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
-    val safeExternalTransactionHash = sanitizedExtTxnHash(tree.getExternalTransactionHash)
+    val safeExternalTransactionHash: Option[Array[Byte]] = sanitizedExtTxnHash(
+      tree.getExternalTransactionHash
+    )
 
     import storage.DbStorageConverters.setParameterOptionalByteArray
+
     (sql"""
       insert into update_history_transactions(
         history_id, update_id, record_time,
@@ -1402,6 +1406,58 @@ class UpdateHistory(
     }
   }
 
+  def getUpdateByHash(
+      hash: String
+  )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
+    val parsedExtTxnHash = HexString.parseToByteString(hash).getOrElse(ByteString.EMPTY)
+    if (parsedExtTxnHash.isEmpty) {
+      Future.successful(None)
+    } else {
+      val safeExtTxnHash = sanitizedExtTxnHash(parsedExtTxnHash)
+
+      import storage.DbStorageConverters.setParameterOptionalByteArray
+      val query =
+        sql"""
+      select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id,
+        external_transaction_hash
+      from  update_history_transactions
+      where external_transaction_hash = $safeExtTxnHash
+      and history_id = $historyId
+        """
+
+      for {
+        rows <- storage
+          .query(
+            query.toActionBuilder.as[SelectFromTransactions],
+            "getUpdateByHash",
+          )
+        creates <- queryCreateEvents(rows.map(_.rowId))
+        exercises <- queryExerciseEvents(rows.map(_.rowId))
+      } yield {
+        rows.map { row =>
+          TreeUpdateWithMigrationId(
+            decodeTransaction(
+              row,
+              creates.getOrElse(row.rowId, Seq.empty),
+              exercises.getOrElse(row.rowId, Seq.empty),
+            ),
+            row.migrationId,
+          )
+        }.headOption
+      }
+    }
+  }
+
   private def queryCreateEvents(
       transactionRowIds: Seq[Long]
   )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromCreateEvents]]] = {
@@ -1566,7 +1622,9 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          // Import updates are not externally signed, so the transaction has no hash.
+          /*externalTransactionHash = */ ByteString.EMPTY,
+          /*paidTrafficCost = */ 0L,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1587,6 +1645,10 @@ class UpdateHistory(
           .map(EventId.nodeIdFromEventId)
       )
       .toMap
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      exerciseRows.map(r => EventId.nodeIdFromEventId(r.eventId)),
+      nodesWithChildren,
+    )
     val exerciseEvents = exerciseRows.map { row =>
       val nodeId = EventId.nodeIdFromEventId(row.eventId)
       new ExercisedEvent(
@@ -1610,7 +1672,10 @@ class UpdateHistory(
         /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
         /*consuming = */ row.consuming,
         /*lastDescendedNodeId = */ Integer.valueOf(
-          EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
+          lastDescendantNodes.getOrElse(
+            nodeId,
+            throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
+          )
         ),
         /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
@@ -1632,6 +1697,7 @@ class UpdateHistory(
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
           /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
+          /*paidTrafficCost = */ 0L,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1828,7 +1894,7 @@ class UpdateHistory(
 
   /** Returns the record time range of sequenced events excluding ACS imports after a HDM.
     */
-  def getRecordTimeRange(
+  def getRecordTimeRangeBySynchronizer(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Map[SynchronizerId, DomainRecordTimeRange]] = {
     // This query is rather tricky, there are two parts we need to tackle:
@@ -1876,6 +1942,46 @@ class UpdateHistory(
     } yield {
       rangeTransactions |+| rangeUnassignments |+| rangeAssignments
     }
+  }
+
+  /** Returns the record time range of sequenced events excluding ACS imports after a HDM,
+    * or None if there are no sequenced events for the given migration id.
+    */
+  def getRecordTimeRange(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Option[DomainRecordTimeRange]] = {
+
+    def rangeForTable(table: String): SQLActionBuilder = {
+      sql"""
+        select min(record_time) as min_record_time, max(record_time) as max_record_time
+        from #$table
+        where history_id = $historyId
+        and migration_id = $migrationId
+        and record_time > ${CantonTimestamp.MinValue}
+      """
+    }
+    storage
+      .query(
+        (sql"""
+          select min(min_record_time) as min_record_time, max(max_record_time) as max_record_time
+          from (
+            (""" ++ rangeForTable("update_history_transactions") ++ sql""")
+            union all
+            (""" ++ rangeForTable("update_history_assignments") ++ sql""")
+            union all
+            (""" ++ rangeForTable("update_history_unassignments") ++ sql""")
+          ) all_ranges
+        """).toActionBuilder
+          .as[(Option[CantonTimestamp], Option[CantonTimestamp])]
+          .head
+          .map(row =>
+            for {
+              min <- row._1
+              max <- row._2
+            } yield DomainRecordTimeRange(min, max)
+          ),
+        s"getRecordTimeRange",
+      )
   }
 
   def getLastImportUpdateId(
@@ -2154,7 +2260,7 @@ class UpdateHistory(
         // from before the update history was initialized.
         state <- getBackfillingState()
         previousMigrationId <- getPreviousMigrationId(migrationId)
-        recordTimeRange <- getRecordTimeRange(migrationId)
+        recordTimeRange <- getRecordTimeRangeBySynchronizer(migrationId)
         lastImportUpdateId <- getLastImportUpdateId(migrationId)
       } yield {
         state match {
@@ -2218,7 +2324,7 @@ class UpdateHistory(
       state <- OptionT.liftF(getBackfillingState())
       if state != BackfillingState.NotInitialized
       migrationId <- OptionT(getFirstMigrationId(historyId))
-      recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
+      recordTimeRange <- OptionT.liftF(getRecordTimeRangeBySynchronizer(migrationId))
     } yield DestinationBackfillingInfo(
       migrationId = migrationId,
       backfilledAt = recordTimeRange.view.mapValues(_.min).toMap,

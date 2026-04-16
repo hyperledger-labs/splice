@@ -14,21 +14,20 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
-import scala.annotation.{nowarn, unused}
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
     timeTrackerObservationLatency: NonNegativeFiniteDuration,
-    @unused newSequencerConnectionPool: Boolean,
+    @unused reconnectOnSynchronizerConfigurationChange: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   /** We assume the domain was not register prior to trying to restore the data.
     */
-  @nowarn("cat=unused&msg=synchronizerId")
   def connectDomainAndRestoreData(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
@@ -66,13 +65,14 @@ class DomainDataRestorer(
             )
         _ = logger.info("Importing the ACS")
         _ <- participantAdminConnection.uploadAcsSnapshot(
-          acsSnapshot
+          acsSnapshot,
+          synchronizerId,
         )
         _ = logger.info("Imported the ACS")
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
           // TODO(#3455) re-enable based on config flag once it's fixed
-          newSequencerConnectionPool = false,
+          reconnectOnSynchronizerConfigurationChange = true,
           config => Some(config.copy(manualConnect = false)),
         )
       } yield ()

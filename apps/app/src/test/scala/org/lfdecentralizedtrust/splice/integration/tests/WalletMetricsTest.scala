@@ -25,15 +25,17 @@ class WalletMetricsTest
   "Unlocked coin metrics" should {
     "update when tapping coin" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val before = aliceValidatorBackend.metrics
-        .get(
-          s"$MetricsPrefix.wallet.unlocked-amulet-balance",
-          Map("owner" -> aliceUserParty.toString),
-        )
-        .select[MetricValue.DoublePoint]
-        .value
-        .value
-      before shouldBe 0
+
+      eventually() {
+        aliceValidatorBackend.metrics
+          .get(
+            s"$MetricsPrefix.wallet.unlocked-amulet-balance",
+            Map("owner" -> aliceUserParty.toString),
+          )
+          .select[MetricValue.DoublePoint]
+          .value
+          .value shouldBe 0
+      }
       actAndCheck(
         "alice taps 100 coin",
         aliceWalletClient.tap(100.0),
@@ -58,10 +60,15 @@ class WalletMetricsTest
           tx.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
           tx.date.value
       }
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
       val metrics = aliceValidatorBackend.metrics
         .get(
           s"$MetricsPrefix.store.last-ingested-record-time-ms",
-          Map("store_party" -> aliceUserParty.toString),
+          Map(
+            "store_party" -> aliceUserParty.toString,
+            "synchronizer_id" -> synchronizerId.logical.toString,
+          ),
         )
         .select[MetricValue.LongPoint]
         .value
@@ -71,8 +78,6 @@ class WalletMetricsTest
         BigDecimal(time.toEpochMilli) - recordTimeLedgerTimeTolerance,
         BigDecimal(time.toEpochMilli) + recordTimeLedgerTimeTolerance,
       )
-      val synchronizerId =
-        sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
       metrics.attributes("synchronizer_id") shouldBe synchronizerId.logical.toString
     }
   }
@@ -84,54 +89,56 @@ class WalletMetricsTest
       aliceWalletClient.tap(100.0)
       p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 50.0)
 
-      // Polling triggers
-      // Not exhaustive, only triggers configured to run (e.g., no WalletSweepTrigger)
-      Seq(
-        "AmuletMetricsTrigger",
-        "CollectRewardsAndMergeAmuletsTrigger",
-        "DomainIngestionService",
-        "ExpireAcceptedTransferOfferTrigger",
-        "ExpireAppPaymentRequestsTrigger",
-        "ExpireBuyTrafficRequestsTrigger",
-        "ExpireTransferOfferTrigger",
-        "SubscriptionReadyForPaymentTrigger",
-      ).foreach(triggerName =>
-        clue(s"$triggerName should report polling iterations correctly") {
-          aliceValidatorBackend.metrics
-            .get(
-              s"$MetricsPrefix.trigger.iterations",
-              Map(
-                "trigger_name" -> triggerName,
-                "party" -> aliceUserParty.toString,
-              ),
-            )
-            .select[MetricValue.LongPoint]
-            .value
-            // We always do one iteration right after startup
-            .value should be > 0L
-        }
-      )
+      eventually() {
+        // Polling triggers
+        // Not exhaustive, only triggers configured to run (e.g., no WalletSweepTrigger)
+        Seq(
+          "AmuletMetricsTrigger",
+          "CollectRewardsAndMergeAmuletsTrigger",
+          "DomainIngestionService",
+          "ExpireAcceptedTransferOfferTrigger",
+          "ExpireAppPaymentRequestsTrigger",
+          "ExpireBuyTrafficRequestsTrigger",
+          "ExpireTransferOfferTrigger",
+          "SubscriptionReadyForPaymentTrigger",
+        ).foreach(triggerName =>
+          clue(s"$triggerName should report polling iterations correctly") {
+            aliceValidatorBackend.metrics
+              .get(
+                s"$MetricsPrefix.trigger.iterations",
+                Map(
+                  "trigger_name" -> triggerName,
+                  "party" -> aliceUserParty.toString,
+                ),
+              )
+              .select[MetricValue.LongPoint]
+              .value
+              // We always do one iteration right after startup
+              .value should be > 0L
+          }
+        )
 
-      // Task-based triggers
-      // Not exhaustive, only triggers that are invoked during init and transfers
-      Seq(
-        "AcceptedTransferOfferTrigger",
-        "DomainIngestionService",
-      ).foreach(triggerName =>
-        clue(s"$triggerName should report task completions correctly") {
-          aliceValidatorBackend.metrics
-            .get(
-              s"$MetricsPrefix.trigger.completed",
-              Map(
-                "trigger_name" -> triggerName,
-                "party" -> aliceUserParty.toString,
-              ),
-            )
-            .select[MetricValue.LongPoint]
-            .value
-            .value should be > 0L
-        }
-      )
+        // Task-based triggers
+        // Not exhaustive, only triggers that are invoked during init and transfers
+        Seq(
+          "AcceptedTransferOfferTrigger",
+          "DomainIngestionService",
+        ).foreach(triggerName =>
+          clue(s"$triggerName should report task completions correctly") {
+            aliceValidatorBackend.metrics
+              .get(
+                s"$MetricsPrefix.trigger.completed",
+                Map(
+                  "trigger_name" -> triggerName,
+                  "party" -> aliceUserParty.toString,
+                ),
+              )
+              .select[MetricValue.LongPoint]
+              .value
+              .value should be > 0L
+          }
+        )
+      }
     }
   }
 }

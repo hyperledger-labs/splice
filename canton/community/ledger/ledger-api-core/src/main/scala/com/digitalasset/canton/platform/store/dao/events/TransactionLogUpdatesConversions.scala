@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -39,8 +39,8 @@ import com.digitalasset.canton.platform.{
   TemplatePartiesFilter,
   Value,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContext
 import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
-import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.{IdentifierConverter, NameTypeConRef, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -139,7 +139,6 @@ private[events] object TransactionLogUpdatesConversions {
         transactionAccepted,
         internalTransactionFormat,
         lfValueTranslation,
-        transactionAccepted.traceContext,
       )
         .map(transaction =>
           GetUpdatesResponse(GetUpdatesResponse.Update.Transaction(transaction))
@@ -158,7 +157,6 @@ private[events] object TransactionLogUpdatesConversions {
         reassignmentInternalEventFormat.templatePartiesFilter.allFilterParties,
         reassignmentInternalEventFormat.eventProjectionProperties,
         lfValueTranslation,
-        reassignmentAccepted.traceContext,
       )
         .map(reassignment =>
           GetUpdatesResponse(GetUpdatesResponse.Update.Reassignment(reassignment))
@@ -195,7 +193,6 @@ private[events] object TransactionLogUpdatesConversions {
             transactionAccepted,
             internalTransactionFormat,
             lfValueTranslation,
-            transactionAccepted.traceContext,
           )
             .map(transaction =>
               GetUpdateResponse(GetUpdateResponse.Update.Transaction(transaction))
@@ -214,7 +211,6 @@ private[events] object TransactionLogUpdatesConversions {
             reassignmentInternalEventFormat.templatePartiesFilter.allFilterParties,
             reassignmentInternalEventFormat.eventProjectionProperties,
             lfValueTranslation,
-            reassignmentAccepted.traceContext,
           )
             .map(reassignment =>
               GetUpdateResponse(GetUpdateResponse.Update.Reassignment(reassignment))
@@ -234,11 +230,12 @@ private[events] object TransactionLogUpdatesConversions {
       transactionAccepted: TransactionLogUpdate.TransactionAccepted,
       internalTransactionFormat: InternalTransactionFormat,
       lfValueTranslation: LfValueTranslation,
-      traceContext: TraceContext,
   )(implicit
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
-  ): Future[FlatTransaction] =
+  ): Future[FlatTransaction] = {
+    val requestingParties: Option[Set[Party]] =
+      internalTransactionFormat.internalEventFormat.templatePartiesFilter.allFilterParties
     Future.delegate {
       MonadUtil
         .sequentialTraverse(transactionAccepted.events)(event =>
@@ -257,12 +254,14 @@ private[events] object TransactionLogUpdatesConversions {
             events = events,
             offset = transactionAccepted.offset.unwrap,
             synchronizerId = transactionAccepted.synchronizerId,
-            traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
+            traceContext = SerializableTraceContext(transactionAccepted.traceContext).toDamlProto,
             recordTime = Some(TimestampConversion.fromLf(transactionAccepted.recordTime)),
             externalTransactionHash = transactionAccepted.externalTransactionHash.map(_.unwrap),
+            paidTrafficCost = transactionAccepted.paidTrafficCost(requestingParties),
           )
         )
     }
+  }
 
   private def transactionPredicate(
       transactionFormat: InternalTransactionFormat
@@ -469,6 +468,18 @@ private[events] object TransactionLogUpdatesConversions {
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
   ): Future[apiEvent.CreatedEvent] = {
+    val keyOpt = createdEvent.contractKey
+      .zip(createdEvent.createKeyHash)
+      .zip(createdEvent.createKeyMaintainers)
+      .map { case ((keyVersionedValue, keyHash), maintainers) =>
+        GlobalKeyWithMaintainers.assertBuild(
+          templateId = createdEvent.templateId,
+          value = keyVersionedValue.unversioned,
+          valueHash = keyHash,
+          maintainers = maintainers,
+          packageName = createdEvent.packageName,
+        )
+      }
     val createNode = Node.Create(
       coid = createdEvent.contractId,
       templateId = createdEvent.templateId,
@@ -476,9 +487,7 @@ private[events] object TransactionLogUpdatesConversions {
       arg = createdEvent.createArgument.unversioned,
       signatories = createdEvent.createSignatories,
       stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
-      keyOpt = createdEvent.createKey.flatMap(k =>
-        createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
-      ),
+      keyOpt = keyOpt,
       version = createdEvent.createArgument.version,
     )
     createdToApiCreatedEvent(
@@ -560,7 +569,6 @@ private[events] object TransactionLogUpdatesConversions {
       requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
       lfValueTranslation: LfValueTranslation,
-      traceContext: TraceContext,
   )(implicit
       loggingContext: LoggingContextWithTrace,
       executionContext: ExecutionContext,
@@ -580,7 +588,7 @@ private[events] object TransactionLogUpdatesConversions {
             offset = reassignmentAccepted.offset,
             nodeId = assigned.nodeId,
             authenticationData = assigned.contractAuthenticationData,
-            // TODO(#27872): Use the assignment representative package ID when available
+            // TODO(#28301): Use the assignment representative package ID when available
             representativePackageId = assigned.createNode.templateId.packageId,
             createdEventWitnesses = assigned.createNode.stakeholders,
             flatEventWitnesses = assigned.createNode.stakeholders,
@@ -626,7 +634,7 @@ private[events] object TransactionLogUpdatesConversions {
       .map(events =>
         ApiReassignment(
           updateId = reassignmentAccepted.updateId,
-          commandId = reassignmentAccepted.completionStreamResponse
+          commandId = reassignmentAccepted.completionStreamResponseO
             .flatMap(_.completionResponse.completion)
             .filter(completion => stringRequestingParties.fold(true)(completion.actAs.exists))
             .map(_.commandId)
@@ -634,9 +642,10 @@ private[events] object TransactionLogUpdatesConversions {
           workflowId = reassignmentAccepted.workflowId,
           offset = reassignmentAccepted.offset.unwrap,
           events = events,
-          traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
+          traceContext = SerializableTraceContext(reassignmentAccepted.traceContext).toDamlProto,
           recordTime = Some(TimestampConversion.fromLf(reassignmentAccepted.recordTime)),
           synchronizerId = reassignmentAccepted.synchronizerId,
+          paidTrafficCost = reassignmentAccepted.paidTrafficCost(requestingParties),
         )
       )
   }
@@ -656,7 +665,7 @@ private[events] object TransactionLogUpdatesConversions {
           authorizationEvent = event.authorizationEvent,
         )
       ),
-      traceContext = SerializableTraceContext(topologyTransaction.traceContext).toDamlProtoOpt,
+      traceContext = SerializableTraceContext(topologyTransaction.traceContext).toDamlProto,
     )
   }
 }

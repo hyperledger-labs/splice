@@ -1,0 +1,17 @@
+name: Remind to backport PRs to release branches
+on:
+  pull_request:
+    types: [opened, reopened]
+    paths:
+      - cluster/deployment/**
+      - cluster/configs/**
+      - '**/expected.json'
+
+jobs:
+  add-backport-reminder:
+    runs-on: ubuntu-24.04
+    steps:
+        - uses: hyperledger-labs/splice-shared-gha/actions/backport_reminder@a78684a826be866b199ae7a05471a7fad2c9c76c
+          with:
+            pr_number: ${{ github.event.pull_request.number }}
+            lookup_prod_cluster_configs: false

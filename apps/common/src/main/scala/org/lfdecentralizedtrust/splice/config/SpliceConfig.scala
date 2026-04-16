@@ -70,7 +70,15 @@ final case class CircuitBreakersConfig(
 
 final case class EnabledFeaturesConfig(
     enableNewAcsExport: Boolean = true,
-    newSequencerConnectionPool: Boolean = true,
+    // For now, we always need to do this as Canton does not update the configuration until a reconnect.
+    // On 3.5 we should be able to set it to false.
+    reconnectOnSynchronizerConfigurationChange: Boolean = true,
+    enableUnsupportedDarsUnvetting: Boolean = true,
+)
+
+final case class SpliceCachingConfigs(
+    physicalSynchronizerExpiration: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(15)
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
@@ -118,4 +126,6 @@ case class SharedSpliceAppParameters(
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
 
   def dispatchQueueBackpressureLimit: NonNegativeInt = ???
+
+  override def enableTestingFeatures = false
 }

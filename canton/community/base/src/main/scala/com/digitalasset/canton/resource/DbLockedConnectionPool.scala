@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functorFilter.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -13,6 +12,7 @@ import com.digitalasset.canton.config.{DbConfig, DbLockedConnectionPoolConfig, P
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
@@ -233,7 +233,7 @@ class DbLockedConnectionPool private (
       }
 
       // Run health check scheduling on the direct execution context to avoid rejected execution exceptions
-      result.map(_ => scheduleHealthCheck(clock.now))(DirectExecutionContext(logger))
+      result.map(_ => scheduleHealthCheck(clock.now))(DirectExecutionContext(noTracingLogger))
     }
 
     // Run the health check and becoming active/passive through the queue to ensure there's only one attempt at a time.
@@ -257,14 +257,15 @@ class DbLockedConnectionPool private (
     clock.scheduleAt(runScheduledHealthCheck, now.add(config.healthCheckPeriod.asJava)).discard
 
   private def findActiveConnection(pool: Seq[DbLockedConnection]): Option[KeepAliveConnection] = {
-    val availableConnectionOpt = pool.mapFilter(_.get.toOption).find(_.markInUse())
+    val availableConnectionOpt = pool.find(_.get.exists(_.markInUse()))
 
     if (availableConnectionOpt.isEmpty) {
       logger.debug(s"Did not find any available connection in the pool. Connection states: ${pool
           .map(_.get.map(c => if (c.inUse.get()) "In use" else "Not in use"))
           .mkString(", ")}")(TraceContext.empty)
     }
-    availableConnectionOpt
+
+    availableConnectionOpt.flatMap(_.get.toOption)
   }
 
   // Run and wait for the initial health check
@@ -353,6 +354,7 @@ object DbLockedConnectionPool {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeExecutor: AsyncExecutorWithShutdown,
+      mustStayActive: Boolean = false,
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -418,8 +420,46 @@ object DbLockedConnectionPool {
         mainExecutor,
       )
 
-      // Wait until main connection is either active or passive before returning the connection pool
-      _ = DbLockedConnection.awaitInitialized(mainConnection, 50, 200, tracedLogger)
+      waitInMs = 200L
+
+      _ = if (!mustStayActive) {
+        val maxRetries = {
+          val retries = config.initialLockedConnectionTimeout.asJava.toMillis / waitInMs
+          Math.min(retries, Int.MaxValue).toInt
+        }
+        // Wait until main connection is either active or passive before returning the connection pool
+        DbLockedConnection.awaitInitialized(mainConnection, maxRetries, waitInMs, tracedLogger)
+      } else ()
+
+      _ <-
+        if (mustStayActive) {
+          val maxRetries = {
+            val retries = config.initialMustRemainActiveConnectionTimeout.asJava.toMillis / waitInMs
+            Math.min(retries, Int.MaxValue).toInt
+          }
+          // Wait until main connection is active before returning the connection pool. otherwise crash.
+          // Important that if lock is not acquired, error is propagated to shut down the node.
+          DbLockedConnection
+            .awaitActive(mainConnection, maxRetries, waitInMs, tracedLogger)
+            .value match {
+            case Outcome(result) =>
+              result.leftMap {
+                case DbLockedConnectionError.DbLockNotAcquired =>
+                  DbLockedConnectionPoolError.FailedToAllocateLockId(
+                    DbLockError.FailedToAcquireLock(mainLockId, "failed to acquire lock")
+                  )
+                case DbLockedConnectionError.DbConnectionNotAvailable(_) =>
+                  DbLockedConnectionPoolError.FailedToCreateDataSource(
+                    "db connection not available"
+                  )
+              }
+            case AbortedDueToShutdown =>
+              Left(
+                DbLockedConnectionPoolError.FailedToCreateDataSource("aborted due to shutdown")
+              )
+          }
+        } else Right(())
+
     } yield {
       new DbLockedConnectionPool(
         ds,

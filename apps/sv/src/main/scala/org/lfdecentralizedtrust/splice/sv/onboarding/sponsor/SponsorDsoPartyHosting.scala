@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyResult,
+  TopologySnapshot,
 }
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
@@ -98,7 +99,11 @@ class SponsorDsoPartyHosting(
     SponsorDsoPartyHosting.ValidProposalOrAcceptedState,
   ] = {
     val partyToParticipantAcceptedState =
-      participantAdminConnection.getPartyToParticipant(synchronizerId, dsoParty)
+      participantAdminConnection.getPartyToParticipant(
+        synchronizerId,
+        dsoParty,
+        topologySnapshot = TopologySnapshot.Sequenced,
+      )
     OptionT(
       participantAdminConnection
         .listPartyToParticipant(

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -132,10 +132,10 @@ object SequencerErrors extends SequencerErrorGroup {
   }
 
   @Explanation(
-    """Maximum sequencing time on the submission request is exceeding the maximum allowed interval into the future. Could be result of a concurrent dynamic synchronizer parameter change for sequencerAggregateSubmissionTimeout."""
+    """Maximum sequencing time on the submission request is exceeding the maximum allowed interval into the future."""
   )
   @Resolution(
-    """In case there was a recent concurrent dynamic synchronizer parameter change, simply retry the submission. Otherwise this error code indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
+    """Typically indicates that the sequencer is catching up or could be result of a concurrent dynamic synchronizer parameter change for sequencerAggregateSubmissionTimeout, in that case simply retry the submission. Otherwise this error code indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
   case object MaxSequencingTimeTooFar
       extends SequencerDeliverErrorCode(

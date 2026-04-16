@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.sequencer
@@ -13,6 +13,7 @@ import com.digitalasset.canton.common.sequencer.grpc.GrpcSequencerConnectClient
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.ClientChannelParams
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencing.client.SequencerClient
@@ -20,32 +21,24 @@ import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeR
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnection}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.{Member, ParticipantId, PhysicalSynchronizerId, SequencerId}
-import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContextExecutor
 
 trait SequencerConnectClient extends NamedLogging with AutoCloseable {
 
-  def getSynchronizerClientBootstrapInfo(synchronizerAlias: SynchronizerAlias)(implicit
+  def getSynchronizerClientBootstrapInfo()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, SynchronizerClientBootstrapInfo]
 
   /** @param synchronizerIdentifier
     *   Used for logging purpose
     */
-  def getSynchronizerParameters(synchronizerIdentifier: String)(implicit
+  def getSynchronizerParameters()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, StaticSynchronizerParameters]
 
-  /** @param synchronizerIdentifier
-    *   Used for logging purpose
-    */
-  def getSynchronizerId(synchronizerIdentifier: String)(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, PhysicalSynchronizerId]
-
   def handshake(
-      synchronizerAlias: SynchronizerAlias,
       request: HandshakeRequest,
       dontWarnOnDeprecatedPV: Boolean,
   )(implicit
@@ -54,7 +47,6 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
 
   def isActive(
       participantId: ParticipantId,
-      synchronizerAlias: SynchronizerAlias,
       waitForActive: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -72,7 +64,6 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
   }
 
   def registerOnboardingTopologyTransactions(
-      synchronizerAlias: SynchronizerAlias,
       member: Member,
       topologyTransactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit]
@@ -98,7 +89,7 @@ object SequencerConnectClient {
       synchronizerAlias: SynchronizerAlias,
       sequencerConnection: SequencerConnection,
       timeouts: ProcessingTimeout,
-      traceContextPropagation: TracingConfig.Propagation,
+      params: ClientChannelParams,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContextExecutor
@@ -107,8 +98,9 @@ object SequencerConnectClient {
       case connection: GrpcSequencerConnection =>
         new GrpcSequencerConnectClient(
           connection,
+          synchronizerAlias,
           timeouts,
-          traceContextPropagation,
+          params,
           SequencerClient
             .loggerFactoryWithSequencerAlias(
               loggerFactory.append("synchronizerAlias", synchronizerAlias.toString),

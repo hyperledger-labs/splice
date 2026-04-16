@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output
@@ -8,11 +8,9 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.sequencing.protocol.{
-  AllMembersOfSynchronizer,
-  MaxRequestSizeToDeserialize,
-}
+import com.digitalasset.canton.sequencing.protocol.AllMembersOfSynchronizer
 import com.digitalasset.canton.synchronizer.block.BlockFormat
+import com.digitalasset.canton.synchronizer.block.BlockFormat.Block.TickTopology
 import com.digitalasset.canton.synchronizer.block.BlockFormat.OrderedRequest
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.deserializeSignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
@@ -23,9 +21,9 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
   TopologyActivationTime,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.HasDelayedInit
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultDatabaseReadTimeout
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStoreReader
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.OutputModule.{
+  BlocksRecoveredFromConsensusMessages,
   DefaultRequestInspector,
   PreviousStoredBlock,
   RequestInspector,
@@ -37,7 +35,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   OutputBlockMetadata,
   OutputEpochMetadata,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.LeaderSelectionPolicy
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.{
+  LeaderSelectionInitializer,
+  LeaderSelectionPolicy,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.snapshot.SequencerSnapshotAdditionalInfoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
@@ -45,6 +46,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   BlockNumber,
   EpochNumber,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.BlockMetadata
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.{
   OrderedBlock,
   OrderedBlockForOutput,
@@ -89,13 +91,15 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PureFun,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.SingleUseCell
+import com.digitalasset.canton.util.{MaxBytesToDecompress, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
+import io.opentelemetry.api.trace.{Span, Tracer}
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
+import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Success}
 
 /** A module responsible for calculating the [[time.BftTime]], querying the topology at epoch ends
@@ -109,6 +113,7 @@ import scala.util.{Failure, Success}
 class OutputModule[E <: Env[E]](
     startupState: StartupState[E],
     orderingTopologyProvider: OrderingTopologyProvider[E],
+    leaderSelectionInitializer: LeaderSelectionInitializer[E],
     store: OutputMetadataStore[E],
     epochStoreReader: EpochStoreReader[E],
     blockSubscription: BlockSubscription,
@@ -125,6 +130,7 @@ class OutputModule[E <: Env[E]](
     override val config: BftBlockOrdererConfig,
     synchronizerProtocolVersion: ProtocolVersion,
     mc: MetricsContext,
+    tracer: Tracer,
 ) extends Output[E]
     with HasDelayedInit[Message[E]] {
 
@@ -182,6 +188,7 @@ class OutputModule[E <: Env[E]](
     new SequencerSnapshotAdditionalInfoProvider[E](
       store,
       epochStoreReader,
+      orderingTopologyProvider,
       loggerFactory,
     )
 
@@ -195,7 +202,12 @@ class OutputModule[E <: Env[E]](
   //  onboarding.
   private var processingFetchedBlocksInEpoch: Option[EpochNumber] = None
 
-  private val leaderSelectionPolicy = startupState.initialLeaderSelectionPolicy
+  @VisibleForTesting
+  private[output] var leaderSelectionPolicy = startupState.initialLeaderSelectionPolicy
+
+  private val blockSpanMap: mutable.Map[BlockNumber, (Span, TraceContext)] = mutable.Map()
+
+  private val blocksRecoveredFromConsensus = new BlocksRecoveredFromConsensusMessages[E]
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   override def receiveInternal(message: Message[E])(implicit
@@ -209,13 +221,16 @@ class OutputModule[E <: Env[E]](
           context
             .blockingAwait(
               store.saveOnboardedNodeLowerBound(epochNumber, blockNumber),
-              DefaultDatabaseReadTimeout,
+              config.blockingDbReadTimeout,
             )
             .fold(error => abort(error), _ => ())
         }
 
         val lastStoredOutputBlockMetadata =
-          context.blockingAwait(store.getLastConsecutiveBlock, DefaultDatabaseReadTimeout)
+          context.blockingAwait(
+            store.getLastBlockInLatestCompletedEpoch,
+            config.blockingDbReadTimeout,
+          )
         val lastStoredBlockNumber = lastStoredOutputBlockMetadata.map(_.blockNumber)
 
         // The logic to compute `recoverFromBlockNumber` takes into account the following scenarios:
@@ -248,7 +263,7 @@ class OutputModule[E <: Env[E]](
         //
         // Another reason that we may need to recover is that the leader selection is only snapshotting the state at
         //  epoch boundaries. As such we might need to recover from the start of the epoch.
-        val recoverFromBlockNumber =
+        val recoverFromBlockNumberThatCouldBeInMiddleOfEpoch =
           Seq(
             lastAcknowledgedBlockNumber.getOrElse(BlockNumber.First),
             lastStoredBlockNumber.getOrElse(BlockNumber.First),
@@ -258,6 +273,25 @@ class OutputModule[E <: Env[E]](
             ),
           ).min
 
+        val recoverFromBlockNumber = {
+          val firstBlock = for {
+            blockMetadata <- context.blockingAwait(
+              store.getBlock(recoverFromBlockNumberThatCouldBeInMiddleOfEpoch)
+            )
+            epochInfo <- context.blockingAwait(
+              epochStoreReader.loadEpochInfo(blockMetadata.epochNumber)
+            )
+          } yield {
+            logger.info(
+              s"Output module bootstrap wanted to recover from block $recoverFromBlockNumberThatCouldBeInMiddleOfEpoch " +
+                s"which is in epoch ${blockMetadata.epochNumber} we adjust to first block of that epoch which is${epochInfo.startBlockNumber}"
+            )
+            epochInfo.startBlockNumber
+          }
+
+          firstBlock.getOrElse(recoverFromBlockNumberThatCouldBeInMiddleOfEpoch)
+        }
+
         logger.info(
           s"Output module bootstrap: last acknowledged block number = $lastAcknowledgedBlockNumber, " +
             s"last stored block number = $lastStoredBlockNumber => recover from block number = $recoverFromBlockNumber, " +
@@ -266,26 +300,27 @@ class OutputModule[E <: Env[E]](
 
         // If we are onboarding, rather than an initial node starting or restarting, there will be no actual blocks
         //  stored and the genesis will be returned, but we`ll have a truncated log and we`ll need to start from the
-        //  initial height, which will be set correctly by the sequencer runtime as the first block height that we
-        //  are expected to serve, not from the genesis height.
+        //  initial height, rather than from the genesis height, which will be set correctly by the sequencer
+        //  runtime as the first block height that we are expected to serve.
+        val firstBlockToProcess =
+          if (startupState.previousBftTimeForOnboarding.isDefined) {
+            val initialHeight = startupState.initialHeightToProvide
+            logger.info(
+              s"Output module bootstrap: onboarding, providing blocks from initial height $initialHeight"
+            )
+            initialHeight
+          } else {
+            logger.info(
+              s"Output module bootstrap: [re-]starting, providing blocks from $recoverFromBlockNumber"
+            )
+            recoverFromBlockNumber
+          }
+        // We skip the "is it empty" label for the startup figure of blocks ordered
+        metrics.global.blocksOrdered.mark(Math.max(0L, firstBlockToProcess - 1))
         maybeCompletedBlocksProcessingPeanoQueue
-          .putIfAbsent(
-            new PeanoQueue(
-              if (startupState.previousBftTimeForOnboarding.isDefined) {
-                val initialHeight = startupState.initialHeightToProvide
-                logger.info(
-                  s"Output module bootstrap: onboarding, providing blocks from initial height $initialHeight"
-                )
-                initialHeight
-              } else {
-                logger.info(
-                  s"Output module bootstrap: [re-]starting, providing blocks from $recoverFromBlockNumber"
-                )
-                recoverFromBlockNumber
-              }
-            )(abort)
-          )
+          .putIfAbsent(new PeanoQueue(firstBlockToProcess)(abort))
           .foreach(_ => abort("Completed block processing Peano Queue has already been set"))
+
         if (startupState.previousBftTimeForOnboarding.isEmpty) {
           logger.info(
             s"Output module bootstrap: [re-]starting, [re-]processing blocks from $recoverFromBlockNumber"
@@ -293,15 +328,16 @@ class OutputModule[E <: Env[E]](
           val orderedBlocksToProcess =
             context.blockingAwait(
               epochStoreReader.loadOrderedBlocks(recoverFromBlockNumber),
-              DefaultDatabaseReadTimeout,
+              config.blockingDbReadTimeout,
             )
+          blocksRecoveredFromConsensus.addMessages(orderedBlocksToProcess)
           // Rehydrate the transient local state containing the previous stored block information (if any)
           //  to ensure that the BFT time is computed correctly even when restarting blocks with
           //  adjusted BFT time.
           context
             .blockingAwait(
               store.getBlock(BlockNumber(recoverFromBlockNumber - 1)),
-              DefaultDatabaseReadTimeout,
+              config.blockingDbReadTimeout,
             )
             .foreach { previousBlock =>
               previousStoredBlock.update(
@@ -315,7 +351,7 @@ class OutputModule[E <: Env[E]](
           val epochMetadata =
             context.blockingAwait(
               store.getEpoch(startEpochNumber),
-              DefaultDatabaseReadTimeout,
+              config.blockingDbReadTimeout,
             )
           // If an epoch's metadata was not recorded, then it had default values, so we can safely assume that
           //  the epoch could not alter the ordering topology.
@@ -323,10 +359,38 @@ class OutputModule[E <: Env[E]](
             epochMetadata.exists(_.couldAlterOrderingTopology)
           if (epochMetadata.isDefined)
             setEpochMetadataStoredCache(startEpochNumber)
-          orderedBlocksToProcess.foreach(orderedBlockForOutput =>
-            context.self.asyncSend(BlockOrdered(orderedBlockForOutput))
-          )
+
+          if (startEpochNumber < startupState.initialEpochWeHaveLeaderSelectionStateFor) {
+
+            for {
+              epochInfo <- context.blockingAwait(epochStoreReader.loadEpochInfo(startEpochNumber))
+              (oldOrderingTopology, oldCryptoProvider) <- context.blockingAwait(
+                orderingTopologyProvider.getOrderingTopologyAt(
+                  Some(epochInfo.topologyActivationTime),
+                  checkPendingChanges = true,
+                )
+              )
+              leaderSelectionPolicyState <- context.blockingAwait(
+                store.getLeaderSelectionPolicyState(startEpochNumber)
+              )
+            } {
+              currentEpochOrderingTopology = oldOrderingTopology
+              currentEpochCryptoProvider = oldCryptoProvider
+              currentEpochCouldAlterOrderingTopology =
+                oldOrderingTopology.areTherePendingCantonTopologyChanges.exists(identity)
+              leaderSelectionPolicy = leaderSelectionInitializer
+                .leaderSelectionPolicy(leaderSelectionPolicyState, currentEpochOrderingTopology)
+              logger.info(
+                s"Output module bootstrap is reading blocks from an older epoch $startEpochNumber " +
+                  s"we fetched topology info from ${epochInfo.topologyActivationTime} (could alter ordering topology: $currentEpochCouldAlterOrderingTopology)" +
+                  s"and got the following leader selection state $leaderSelectionPolicyState"
+              )
+            }
+          }
+
+          blocksRecoveredFromConsensus.releaseMessagesForEpoch(startEpochNumber)
         }
+
         initCompleted(receiveInternal)
 
       case _ =>
@@ -343,34 +407,45 @@ class OutputModule[E <: Env[E]](
                   mode,
                 )
               ) =>
-            logger.debug(
-              s"Output received from local consensus ordered block (mode = $mode) with batch IDs ${orderedBlock.batchRefs}"
-            )
-            val blockNumber = orderedBlock.metadata.blockNumber
-            if (completedBlocksPeanoQueue.alreadyInserted(blockNumber)) {
-              // This can happen if we start catching up in the middle of an epoch, as state transfer has epoch granularity.
-              logger.debug(s"Skipping block $blockNumber as it's been provided already")
-            } else if (!blocksBeingFetched.contains(blockNumber)) {
-              leaderSelectionPolicy.addBlock(
-                orderedBlockForOutput.orderedBlock.metadata.epochNumber,
-                blockNumber,
-                orderedBlockForOutput.viewNumber,
+            if (leaderSelectionPolicy.currentEpoch.exists(_ < orderedBlock.metadata.epochNumber)) {
+              // Leader Selection wants us to process epochs in order and this block is from a future one, so we delay it
+              blocksRecoveredFromConsensus.addMessages(Seq(orderedBlockForOutput))
+            } else {
+              val blockNumber = orderedBlock.metadata.blockNumber
+              val newTraceContext: TraceContext = if (orderedBlock.batchRefs.nonEmpty) {
+                val (span, tc) = startSpan(s"BftOrderer.Output")
+                blockSpanMap
+                  .put(blockNumber, (span.setAttribute("block.number", blockNumber), tc))
+                  .discard
+                tc
+              } else traceContext
+
+              logger.debug(
+                s"Output received from local consensus ordered block (mode = $mode) with batch IDs ${orderedBlock.batchRefs}"
               )
-              // Block batches will be fetched by the availability module either from the local store or,
-              //  if unavailable, from remote nodes.
-              //  We need to fetch the batches to provide requests, and their BFT sequencing time,
-              //  to the sequencer runtime, but this also ensures that all batches are stored locally
-              //  when the epoch ends, so that we can provide past block data (e.g. to a re-subscription from
-              //  the sequencer runtime after a crash) even if the topology changes drastically afterward.
-              context.withNewTraceContext { implicit traceContext =>
+              if (completedBlocksPeanoQueue.alreadyInserted(blockNumber)) {
+                // This can happen if we start catching up in the middle of an epoch, as state transfer has epoch granularity.
+                logger.debug(s"Skipping block $blockNumber as it's been provided already")
+              } else if (!blocksBeingFetched.contains(blockNumber)) {
+                leaderSelectionPolicy.addBlock(
+                  orderedBlockForOutput.orderedBlock.metadata.epochNumber,
+                  blockNumber,
+                  orderedBlockForOutput.viewNumber,
+                )
+                // Block batches will be fetched by the availability module either from the local store or,
+                //  if unavailable, from remote nodes.
+                //  We need to fetch the batches to provide requests, and their BFT sequencing time,
+                //  to the sequencer runtime, but this also ensures that all batches are stored locally
+                //  when the epoch ends, so that we can provide past block data (e.g. to a re-subscription from
+                //  the sequencer runtime after a crash) even if the topology changes drastically afterward.
                 logger.debug(s"Fetching data for block $blockNumber through local availability")
                 availability.asyncSend(
                   Availability.LocalOutputFetch.FetchBlockData(orderedBlockForOutput)
-                )
+                )(newTraceContext, mc)
+                blocksBeingFetched.put(blockNumber, Instant.now()).discard
+              } else {
+                logger.debug(s"Block $blockNumber is already being fetched")
               }
-              blocksBeingFetched.put(blockNumber, Instant.now()).discard
-            } else {
-              logger.debug(s"Block $blockNumber is already being fetched")
             }
 
           // From availability
@@ -433,14 +508,23 @@ class OutputModule[E <: Env[E]](
               //  avoiding possible future problems e.g. with pruning and/or BFT onboarding from multiple
               //  sequencer snapshots.
               val tickTopology = isBlockLastInEpoch && epochCouldAlterOrderingTopology
-              // TODO(#23345): there should be no need to log this if we correlate request trace IDs with batches,
-              //  batch trace IDs with blocks and we propagate block trace IDs properly
+
+              val blockTraceContext = blockSpanMap
+                .remove(orderedBlockNumber)
+                .map { case (span, traceContext) =>
+                  span.end()
+                  traceContext
+                }
+                .getOrElse(traceContext)
+
+              // Being able to correlate the trace contexts of submission requests with
+              // the block containing them can be useful for troubleshooting issues.
               val traceIdsString =
                 orderedBlockData.requestsView.flatMap(_.traceContext.traceId).mkString(",")
               logger.debug(
                 s"Block $orderedBlockNumber being output contains requests " +
                   s"with the following trace IDs: [$traceIdsString]"
-              )
+              )(blockTraceContext)
               logger.debug(
                 s"Sending block $orderedBlockNumber " +
                   s"(current epoch = $epochNumber, " +
@@ -450,17 +534,23 @@ class OutputModule[E <: Env[E]](
                   s"could alter sequencing topology = $epochCouldAlterOrderingTopology, " +
                   s"tick topology = $tickTopology) " +
                   "to sequencer subscription"
-              )
+              )(blockTraceContext)
 
               blockSubscription.receiveBlock(
                 BlockFormat.Block(
                   orderedBlockNumber,
+                  orderedBlockBftTime.toMicros,
                   blockDataToOrderedRequests(orderedBlockData, orderedBlockBftTime),
-                  tickTopologyAtMicrosFromEpoch = Option.when(tickTopology)(
-                    BftTime.epochEndBftTime(orderedBlockBftTime, orderedBlockData).toMicros
+                  tickTopology = Option.when(tickTopology)(
+                    TickTopology(
+                      BftTime
+                        .epochEndBftTime(orderedBlockBftTime, orderedBlockData)
+                        .toMicros,
+                      broadcast = false, // Address only to sequencers
+                    )
                   ),
                 )
-              )
+              )(blockTraceContext)
             }
 
           case UpdateLeaderSelection(topologyFetched) =>
@@ -485,7 +575,7 @@ class OutputModule[E <: Env[E]](
             // We only store metadata for an epoch if it may alter the topology, i.e.,
             //  we never insert `false` and then change it; this avoids updates
             //  and allows leveraging idempotency for easier CFT support.
-            if (orderingTopology.areTherePendingCantonTopologyChanges) {
+            if (orderingTopology.areTherePendingCantonTopologyChanges.exists(identity)) {
               val outputEpochMetadata =
                 OutputEpochMetadata(newEpochNumber, couldAlterOrderingTopology = true)
               logger.debug(s"Storing $outputEpochMetadata")
@@ -668,11 +758,13 @@ class OutputModule[E <: Env[E]](
     emitOrderingStageLatency(
       labels.stage.values.output.Inspection,
       () =>
-        orderedBlockData.requestsView.toSeq.findLast {
-          case tracedOrderingRequest @ Traced(orderingRequest) =>
+        orderedBlockData.requestsView.zipWithIndex.toSeq.findLast {
+          case (tracedOrderingRequest @ Traced(orderingRequest), idx) =>
             requestInspector.isRequestToAllMembersOfSynchronizer(
+              orderedBlockData.orderedBlockForOutput.orderedBlock.metadata,
+              idx,
               orderingRequest,
-              currentEpochOrderingTopology.maxRequestSizeToDeserialize,
+              currentEpochOrderingTopology.maxBytesToDecompress,
               logger,
               tracedOrderingRequest.traceContext,
             )
@@ -724,7 +816,8 @@ class OutputModule[E <: Env[E]](
       //  (and successfully processed and applied by the topology processor).
       pipeToSelf(
         orderingTopologyProvider.getOrderingTopologyAt(
-          TopologyActivationTime(epochEndBftTime.immediateSuccessor)
+          Some(TopologyActivationTime(epochEndBftTime.immediateSuccessor)),
+          checkPendingChanges = true,
         ),
         metrics.topology.queryLatency,
       ) {
@@ -768,14 +861,6 @@ class OutputModule[E <: Env[E]](
       traceContext: TraceContext,
   ): Unit = {
 
-    if (startupState.initialEpochWeHaveLeaderSelectionStateFor > newEpochNumber) {
-      // This is epoch is old (we are replaying it due to restart) and as such consensus will not care for the topology
-      // information. Instead of doing an historic read of the leaders (potentially involving the db) we just put the
-      // leaders to be empty. They will not be used anywhere (consensus will drop it, and the code below does not depend
-      // on leaders).
-      return
-    }
-
     val orderingTopology =
       newOrderingTopologyAndCryptoProvider.fold(currentEpochOrderingTopology)(_._1)
     val newEpochLeaders = leaderSelectionPolicy.getLeaders(orderingTopology, newEpochNumber)
@@ -816,12 +901,12 @@ class OutputModule[E <: Env[E]](
       logger.debug(
         s"Pending topology changes in new ordering topology = $pendingTopologyChanges"
       )
-      currentEpochCouldAlterOrderingTopology = pendingTopologyChanges
+      currentEpochCouldAlterOrderingTopology = pendingTopologyChanges.exists(identity)
 
       metrics.topology.validators.updateValue(currentEpochOrderingTopology.nodes.size)
       logger.debug(
         s"Sending topology $currentEpochOrderingTopology of a new epoch $newEpochNumber " +
-          "to a consensus behavior"
+          s"to a consensus behavior (epochLength= ${newEpochTopologyMessage.membership.orderingTopology.epochLength})"
       )
 
       consensus.asyncSend(newEpochTopologyMessage)
@@ -830,6 +915,7 @@ class OutputModule[E <: Env[E]](
         newEpochNumber,
         newEpochTopologyMessage.membership,
       )
+      blocksRecoveredFromConsensus.releaseMessagesForEpoch(newEpochNumber)
 
       processFetchedBlocks()
     }
@@ -840,7 +926,7 @@ class OutputModule[E <: Env[E]](
       blockBftTime: CantonTimestamp,
   ): Seq[Traced[OrderedRequest]] =
     blockData.requestsView.zipWithIndex.map {
-      case (tracedRequest @ Traced(OrderingRequest(tag, body, _)), index) =>
+      case (tracedRequest @ Traced(OrderingRequest(tag, _, body, _)), index) =>
         val timestamp = BftTime.requestBftTime(blockBftTime, index)
         // "You [were supposed to] propose for ordering, you are responsible for the traffic" policy: all
         //  requests in a block are marked, for accounting purposes, as having gone through ordering because of the
@@ -920,8 +1006,10 @@ object OutputModule {
   trait RequestInspector {
 
     def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean
@@ -930,22 +1018,29 @@ object OutputModule {
   object DefaultRequestInspector extends RequestInspector {
 
     override def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean =
       // TODO(#21615) we should avoid a further deserialization downstream, which would also eliminate
       //  a zip bomb vulnerability in the BUG that could be triggered by byzantine sequencers (#26169)
-      deserializeSignedSubmissionRequest(synchronizerProtocolVersion, maxRequestSizeToDeserialize)(
+      deserializeSignedSubmissionRequest(synchronizerProtocolVersion, maxBytesToDecompress)(
         request.payload
       ) match {
         case Right(signedSubmissionRequest) =>
           signedSubmissionRequest.content.batch.allRecipients
             .contains(AllMembersOfSynchronizer)
+            .tap(result =>
+              logger.debug(
+                s"BFT ordering request at index $requestNumber in output block $blockMetadata with message ID ${signedSubmissionRequest.content.messageId} is to all members of synchronizer: $result"
+              )(traceContext)
+            )
         case Left(error) =>
           logger.debug(
-            s"Skipping ordering request while looking for sequencer events as it failed to deserialize: $error"
+            s"Skipping BFT ordering ordering request in output while looking for sequencer events as it failed to deserialize: $error"
           )(traceContext)
           false
       }
@@ -954,11 +1049,43 @@ object OutputModule {
   class FixedResultRequestInspector(result: Boolean) extends RequestInspector {
 
     override def isRequestToAllMembersOfSynchronizer(
+        blockMetadata: BlockMetadata,
+        requestNumber: Int,
         request: OrderingRequest,
-        maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+        maxBytesToDecompress: MaxBytesToDecompress,
         logger: TracedLogger,
         traceContext: TraceContext,
     )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean =
       result
+  }
+
+  class BlocksRecoveredFromConsensusMessages[E <: Env[E]] {
+    private val blocksToRelease = mutable.Map.empty[EpochNumber, Seq[OrderedBlockForOutput]]
+
+    def addMessages(messages: Seq[OrderedBlockForOutput]): Unit = {
+      val epochToMessageMap = messages.groupBy(_.orderedBlock.metadata.epochNumber)
+      epochToMessageMap.foreach { case (epochNumber, orderedBlocks) =>
+        blocksToRelease
+          .updateWith(epochNumber) {
+            case Some(previousBlocks) => Some(orderedBlocks ++ previousBlocks)
+            case None => Some(orderedBlocks)
+          }
+          .discard
+      }
+    }
+
+    def releaseMessagesForEpoch(
+        epochNumber: EpochNumber
+    )(implicit
+        context: E#ActorContextT[Output.Message[E]],
+        traceContext: TraceContext,
+        metricsContext: MetricsContext,
+    ): Unit = {
+      val orderedBlocksToProcess = blocksToRelease.getOrElse(epochNumber, Seq.empty)
+      blocksToRelease.remove(epochNumber).discard
+      orderedBlocksToProcess.foreach(orderedBlockForOutput =>
+        context.self.asyncSend(BlockOrdered(orderedBlockForOutput))
+      )
+    }
   }
 }

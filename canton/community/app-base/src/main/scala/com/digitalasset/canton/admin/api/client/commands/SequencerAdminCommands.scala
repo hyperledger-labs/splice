@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -11,13 +11,19 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   TimeoutType,
 }
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
+import com.digitalasset.canton.admin.api.client.data.{
+  MemberAuthenticationToken,
+  NodeStatus,
+  SequencerStatus,
+}
 import com.digitalasset.canton.admin.pruning.v30 as pruningProto
 import com.digitalasset.canton.admin.sequencer.v30 as sequencerProto
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencer.admin.v30 as proto
-import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.sequencer.admin.v30.SequencerAdministrationServiceGrpc
+import com.digitalasset.canton.sequencing.protocol.{SubmissionRequestType, TrafficState}
+import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.IndividualThroughputCapConfig
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
@@ -25,13 +31,16 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   TimestampSelector,
 }
 import com.digitalasset.canton.synchronizer.sequencer.{SequencerPruningStatus, SequencerSnapshot}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{Member, SequencerId}
-import com.digitalasset.canton.util.GrpcStreamingUtils
+import com.digitalasset.canton.util.{GrpcStreamingUtils, ResourceUtil}
 import com.google.protobuf.ByteString
 import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
 
+import java.io.{ByteArrayInputStream, InputStream}
 import scala.concurrent.Future
 
 object SequencerAdminCommands {
@@ -45,6 +54,51 @@ object SequencerAdminCommands {
         channel: ManagedChannel
     ): proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub =
       proto.SequencerAdministrationServiceGrpc.stub(channel)
+  }
+
+  abstract class BaseSequencerInspectionCommand[Req, Rep, Res]
+      extends GrpcAdminCommand[Req, Rep, Res] {
+    override type Svc =
+      proto.SequencerTrafficInspectionServiceGrpc.SequencerTrafficInspectionServiceStub
+
+    override def createService(
+        channel: ManagedChannel
+    ): proto.SequencerTrafficInspectionServiceGrpc.SequencerTrafficInspectionServiceStub =
+      proto.SequencerTrafficInspectionServiceGrpc.stub(channel)
+  }
+
+  final case class GenerateAuthenticationToken(
+      member: Member,
+      expiresIn: Option[NonNegativeFiniteDuration],
+  ) extends BaseSequencerAdministrationCommand[
+        proto.GenerateAuthenticationTokenRequest,
+        proto.GenerateAuthenticationTokenResponse,
+        MemberAuthenticationToken,
+      ] {
+    override protected def createRequest()
+        : Either[String, proto.GenerateAuthenticationTokenRequest] = Right(
+      proto.GenerateAuthenticationTokenRequest(
+        member.toProtoPrimitive,
+        expiresIn.map(_.toProtoPrimitive),
+      )
+    )
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.GenerateAuthenticationTokenRequest,
+    ): Future[proto.GenerateAuthenticationTokenResponse] =
+      service.generateAuthenticationToken(request)
+    override protected def handleResponse(
+        response: proto.GenerateAuthenticationTokenResponse
+    ): Either[String, MemberAuthenticationToken] = response.expiresAt
+      .toRight("Missing expiration time")
+      .flatMap(CantonTimestamp.fromProtoTimestamp(_).leftMap(_.message))
+      .map {
+        MemberAuthenticationToken(
+          member,
+          response.token,
+          _,
+        )
+      }
   }
 
   final case object GetPruningStatus
@@ -80,11 +134,13 @@ object SequencerAdminCommands {
         proto
           .TrafficControlStateRequest(members.map(_.toProtoPrimitive), timestampSelector.toProtoV30)
       )
+
     override protected def submitRequest(
         service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
         request: proto.TrafficControlStateRequest,
     ): Future[proto.TrafficControlStateResponse] =
       service.trafficControlState(request)
+
     override protected def handleResponse(
         response: proto.TrafficControlStateResponse
     ): Either[String, SequencerTrafficStatus] =
@@ -122,6 +178,71 @@ object SequencerAdminCommands {
     ): Either[String, Unit] = Either.unit
   }
 
+  final case class GetTrafficSummaries(
+      timestamps: Seq[CantonTimestamp]
+  ) extends BaseSequencerInspectionCommand[
+        proto.GetTrafficSummariesRequest,
+        proto.GetTrafficSummariesResponse,
+        Seq[proto.TrafficSummary],
+      ] {
+    override protected def createRequest(): Either[String, proto.GetTrafficSummariesRequest] =
+      Right(
+        proto.GetTrafficSummariesRequest(timestamps.map(_.toProtoTimestamp))
+      )
+
+    override protected def submitRequest(
+        service: proto.SequencerTrafficInspectionServiceGrpc.SequencerTrafficInspectionServiceStub,
+        request: proto.GetTrafficSummariesRequest,
+    ): Future[proto.GetTrafficSummariesResponse] =
+      service.getTrafficSummaries(request)
+
+    override protected def handleResponse(
+        response: proto.GetTrafficSummariesResponse
+    ): Either[String, Seq[proto.TrafficSummary]] = Right(response.summary)
+  }
+
+  final case class GetThroughputCap(requestType: SubmissionRequestType)
+      extends BaseSequencerAdministrationCommand[
+        proto.GetThroughputCapRequest,
+        proto.GetThroughputCapResponse,
+        Option[IndividualThroughputCapConfig],
+      ] {
+
+    override protected def submitRequest(
+        service: SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.GetThroughputCapRequest,
+    ): Future[proto.GetThroughputCapResponse] =
+      service.getThroughputCap(request)
+    override protected def createRequest(): Either[String, proto.GetThroughputCapRequest] =
+      Right(proto.GetThroughputCapRequest(requestType.name))
+    override protected def handleResponse(
+        response: proto.GetThroughputCapResponse
+    ): Either[String, Option[IndividualThroughputCapConfig]] =
+      response.config.traverse(IndividualThroughputCapConfig.fromAdminProto).leftMap(_.message)
+  }
+
+  final case class SetThroughputCap(
+      requestType: SubmissionRequestType,
+      newConfig: Option[IndividualThroughputCapConfig],
+  ) extends BaseSequencerAdministrationCommand[
+        proto.SetThroughputCapRequest,
+        proto.SetThroughputCapResponse,
+        Unit,
+      ] {
+
+    override protected def submitRequest(
+        service: SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.SetThroughputCapRequest,
+    ): Future[proto.SetThroughputCapResponse] =
+      service.setThroughputCap(request)
+    override protected def createRequest(): Either[String, proto.SetThroughputCapRequest] =
+      Right(proto.SetThroughputCapRequest(requestType.name, newConfig.map(_.toAdminProto)))
+    override protected def handleResponse(
+        response: proto.SetThroughputCapResponse
+    ): Either[String, Unit] = Either.unit
+
+  }
+
   final case class InitializeFromOnboardingState(onboardingState: ByteString)
       extends GrpcAdminCommand[
         proto.InitializeSequencerFromOnboardingStateRequest,
@@ -146,7 +267,7 @@ object SequencerAdminCommands {
           proto.InitializeSequencerFromOnboardingStateRequest(
             ByteString.copyFrom(onboardingState)
           ),
-        request.onboardingState,
+        new ByteArrayInputStream(request.onboardingState.toByteArray),
       )
 
     override protected def createRequest()
@@ -185,7 +306,7 @@ object SequencerAdminCommands {
           proto.InitializeSequencerFromOnboardingStateV2Request(
             ByteString.copyFrom(onboardingState)
           ),
-        request.onboardingState,
+        new ByteArrayInputStream(request.onboardingState.toByteArray),
       )
 
     override protected def createRequest()
@@ -229,7 +350,7 @@ object SequencerAdminCommands {
             topologySnapshot = ByteString.copyFrom(topologySnapshot),
             synchronizerParameters = Some(synchronizerParameters.toProtoV30),
           ),
-        request.topologySnapshot,
+        new ByteArrayInputStream(request.topologySnapshot.toByteArray),
       )
 
     override protected def createRequest()
@@ -249,12 +370,13 @@ object SequencerAdminCommands {
     override def timeoutType: TimeoutType = DefaultUnboundedTimeout
   }
 
-  final case class InitializeFromSynchronizerPredecessor(
-      topologySnapshot: ByteString,
+  final case class InitializeFromLsuPredecessor(
+      topologySnapshotStream: InputStream,
       synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
+      ignorePsidCheck: Boolean,
   ) extends GrpcAdminCommand[
-        proto.InitializeSequencerFromPredecessorRequest,
-        proto.InitializeSequencerFromPredecessorResponse,
+        Unit,
+        proto.InitializeSequencerFromLsuPredecessorResponse,
         Unit,
       ] {
     override type Svc =
@@ -267,31 +389,26 @@ object SequencerAdminCommands {
 
     override protected def submitRequest(
         service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
-        request: proto.InitializeSequencerFromPredecessorRequest,
-    ): Future[proto.InitializeSequencerFromPredecessorResponse] =
-      GrpcStreamingUtils.streamToServer(
-        service.initializeSequencerFromPredecessor,
-        (topologySnapshot: Array[Byte]) =>
-          proto.InitializeSequencerFromPredecessorRequest(
-            topologySnapshot = ByteString.copyFrom(topologySnapshot),
-            synchronizerParameters = Some(synchronizerParameters.toProtoV30),
-          ),
-        request.topologySnapshot,
-      )
-
-    override protected def createRequest()
-        : Either[String, proto.InitializeSequencerFromPredecessorRequest] =
-      Right(
-        proto.InitializeSequencerFromPredecessorRequest(
-          topologySnapshot = topologySnapshot,
-          synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+        request: Unit,
+    ): Future[proto.InitializeSequencerFromLsuPredecessorResponse] =
+      ResourceUtil.withResource(topologySnapshotStream) { inputStream =>
+        GrpcStreamingUtils.streamToServer(
+          service.initializeSequencerFromLsuPredecessor,
+          (topologySnapshot: Array[Byte]) =>
+            proto.InitializeSequencerFromLsuPredecessorRequest(
+              topologySnapshot = ByteString.copyFrom(topologySnapshot),
+              synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+              ignorePsidCheck = ignorePsidCheck,
+            ),
+          inputStream,
         )
-      )
+      }
+
+    override protected def createRequest(): Either[String, Unit] = Right(())
 
     override protected def handleResponse(
-        response: proto.InitializeSequencerFromPredecessorResponse
-    ): Either[String, Unit] =
-      Right(())
+        response: proto.InitializeSequencerFromLsuPredecessorResponse
+    ): Either[String, Unit] = Right(())
 
     override def timeoutType: TimeoutType = DefaultUnboundedTimeout
   }
@@ -565,5 +682,67 @@ object SequencerAdminCommands {
       ): Either[String, NodeStatus[SequencerStatus]] =
         SequencerStatus.fromProtoV30(response).leftMap(_.message)
     }
+  }
+
+  final case class GetLsuTrafficControlState(ts: Option[CantonTimestamp])
+      extends BaseSequencerAdministrationCommand[
+        proto.GetLsuTrafficControlStateRequest,
+        proto.GetLsuTrafficControlStateResponse,
+        ByteString,
+      ] {
+    override protected def createRequest(): Either[String, proto.GetLsuTrafficControlStateRequest] =
+      Right(proto.GetLsuTrafficControlStateRequest(ts.map(_.toProtoTimestamp)))
+
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.GetLsuTrafficControlStateRequest,
+    ): Future[proto.GetLsuTrafficControlStateResponse] =
+      service.getLsuTrafficControlState(request)
+
+    override protected def handleResponse(
+        response: proto.GetLsuTrafficControlStateResponse
+    ): Either[String, ByteString] =
+      Right(response.lsuTrafficState)
+  }
+
+  final case class SetLsuTrafficControlState(
+      membersTraffic: ByteString
+  ) extends BaseSequencerAdministrationCommand[
+        proto.SetLsuTrafficControlStateRequest,
+        proto.SetLsuTrafficControlStateResponse,
+        Unit,
+      ] {
+    override protected def createRequest(): Either[String, proto.SetLsuTrafficControlStateRequest] =
+      Right(proto.SetLsuTrafficControlStateRequest(membersTraffic))
+
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.SetLsuTrafficControlStateRequest,
+    ): Future[proto.SetLsuTrafficControlStateResponse] =
+      service.setLsuTrafficControlState(request)
+
+    override protected def handleResponse(
+        response: proto.SetLsuTrafficControlStateResponse
+    ): Either[String, Unit] = Either.unit
+  }
+
+  final case class PerformLsuSequencingTest(recipientMediatorGroup: MediatorGroupIndex)
+      extends BaseSequencerAdministrationCommand[
+        proto.PerformLsuSequencingTestRequest,
+        proto.PerformLsuSequencingTestResponse,
+        Unit,
+      ] {
+    override protected def createRequest(): Either[String, proto.PerformLsuSequencingTestRequest] =
+      Right(proto.PerformLsuSequencingTestRequest(recipientMediatorGroup.unwrap))
+
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.PerformLsuSequencingTestRequest,
+    ): Future[proto.PerformLsuSequencingTestResponse] =
+      service.performLsuSequencingTest(request)
+
+    override protected def handleResponse(
+        response: proto.PerformLsuSequencingTestResponse
+    ): Either[String, Unit] = Either.unit
   }
 }

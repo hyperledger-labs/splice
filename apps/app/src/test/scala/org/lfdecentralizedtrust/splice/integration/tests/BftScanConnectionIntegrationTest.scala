@@ -36,6 +36,7 @@ class BftScanConnectionIntegrationTest
     with HasActorSystem {
 
   override protected def runEventHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -83,16 +84,16 @@ class BftScanConnectionIntegrationTest
         aliceValidatorBackend.startSync()
         aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
       },
-      logs =>
-        (logs
-          .map(_.message)
-          .forall(msg =>
-            msg
-              .contains(s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112).") ||
-              msg.contains("Encountered 4 consecutive transient failures") || msg.contains(
-                "Failed to connect to scan of FAILED Seed URL #0 (http://localhost:5112)."
-              )
-          ) should be(true)).withClue(s"Actual Logs: $logs"),
+      forAll(_)(
+        _.message should (include(
+          s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112)."
+        ) or
+          include("Encountered 4 consecutive transient failures") or include(
+            "Failed to connect to scan of FAILED Seed URL #0 (http://localhost:5112)."
+          ) or include(
+            "Failed to read bft sequencers list from scan http://localhost:5112"
+          ))
+      ),
     )
 
     eventuallySucceeds() {
@@ -246,6 +247,33 @@ class BftScanConnectionIntegrationTest
       }
     }
 
+  }
+
+  "validator reboots when initial bootstrap scan is offline" in { implicit env =>
+    clue("Initialize the DSO") {
+      initDso()
+    }
+
+    clue("Start Alice validator") {
+      aliceValidatorBackend.startSync()
+    }
+
+    clue("Stop SV1 scan") {
+      sv1ScanBackend.stop()
+    }
+
+    clue("Stop Alice validator") {
+      aliceValidatorBackend.stop()
+    }
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        // need to supress due to connection attempts to failed scan of Sv1
+        aliceValidatorBackend.startSync()
+        aliceValidatorBackend.onboardUser("Test")
+      },
+      _ => succeed,
+    )
   }
 
   private val bootstrapsWith1UrlLog =

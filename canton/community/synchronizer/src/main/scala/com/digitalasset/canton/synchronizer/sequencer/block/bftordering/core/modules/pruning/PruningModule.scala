@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.pruning
@@ -63,7 +63,7 @@ final class PruningModule[E <: Env[E]](
       case Pruning.KickstartPruning(retention, minBlocksToKeep, requestPromise) =>
         def kickStartPruning(): Unit = {
           logger.info(s"Kick-starting new pruning operation")
-          pipeToSelfOpt(stores.outputStore.getLastConsecutiveBlock) {
+          pipeToSelfOpt(stores.outputStore.getLastBlockInLatestCompletedEpoch) {
             case Success(Some(block)) =>
               Some(Pruning.ComputePruningPoint(block, retention, minBlocksToKeep))
             case Success(None) =>
@@ -187,7 +187,7 @@ final class PruningModule[E <: Env[E]](
         pipeToSelfOpt(
           context.zipFuture(
             stores.outputStore.getLowerBound(),
-            stores.outputStore.getLastConsecutiveBlock,
+            stores.outputStore.getLastBlockInLatestCompletedEpoch,
           )
         ) { result =>
           (result match {

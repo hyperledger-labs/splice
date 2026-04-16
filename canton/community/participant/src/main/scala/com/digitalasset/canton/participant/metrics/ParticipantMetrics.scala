@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.metrics
@@ -58,6 +58,20 @@ class ParticipantHistograms(val parent: MetricName)(implicit
       MetricQualification.Debug,
     )
 
+  private[metrics] val phase: Item =
+    Item(
+      prefix :+ "phase",
+      summary =
+        "Phase metrics measuring the time for the various command submission processing stages",
+      description =
+        """Time from receipt of command to submission such as interpretation and view computation.""",
+      qualification = MetricQualification.Latency,
+      labelsWithDescription = Map(
+        "synchronizer" -> "synchronizer",
+        "phase" -> "phase",
+      ),
+    )
+
 }
 
 class ParticipantMetrics(
@@ -86,8 +100,9 @@ class ParticipantMetrics(
   override def grpcMetrics: GrpcServerMetricsX = (ledgerApiServer.grpc, ledgerApiServer.requests)
   override def healthMetrics: HealthMetrics = ledgerApiServer.health
   override def storageMetrics: DbStorageMetrics = dbStorage
-
   val dbStorage = new DbStorageMetrics(inventory.dbStorage, openTelemetryMetricsFactory)
+  val kmsMetrics: KmsMetrics = new KmsMetrics(prefix, openTelemetryMetricsFactory)
+  val phase: Timer = openTelemetryMetricsFactory.timer(inventory.phase.info)
 
   // Private constructor to avoid being instantiated multiple times by accident
   final class ConsoleThroughputMetrics private[ParticipantMetrics] {
@@ -176,7 +191,7 @@ class ParticipantMetrics(
     )
 
   def registerMaxInflightValidationRequest(value: () => Option[Int]): Gauge.CloseableGauge =
-    openTelemetryMetricsFactory.gaugeWithSupplier(
+    openTelemetryMetricsFactory.closeableGaugeWithSupplier(
       maxInflightValidationRequestGaugeForDocs.info,
       () => value().getOrElse(-1),
     )
@@ -285,7 +300,7 @@ class ConnectedSynchronizerMetrics private[metrics] (
     )
 
     def taskQueue(size: () => Int): CloseableGauge =
-      factory.gaugeWithSupplier(taskQueueForDoc.info, size)
+      factory.closeableGaugeWithSupplier(taskQueueForDoc.info, size)
   }
 
   // Private constructor to avoid being instantiated multiple times by accident
@@ -309,4 +324,5 @@ class ConnectedSynchronizerMetrics private[metrics] (
 
   val inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTrackerMetrics =
     new InFlightSubmissionSynchronizerTrackerMetrics
+
 }

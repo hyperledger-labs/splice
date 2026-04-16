@@ -7,6 +7,7 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 SCRIPTNAME=${0##*/}
 
@@ -304,6 +305,7 @@ declare -A subcommand_whitelist
 source "${TOOLS_LIB}/pulumi-helpers"
 source "${TOOLS_LIB}/pulumi-commands"
 source "${TOOLS_LIB}/hard-domain-migration-commands"
+source "${TOOLS_LIB}/logical-synchronizer-upgrade-commands"
 source "${TOOLS_LIB}/disaster-recovery-commands"
 
 function _prompt_to_confirm() {
@@ -436,6 +438,10 @@ function subcmd_logs() {
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
     local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
+    local logical_synchronizer_deployment_mode
+    logical_synchronizer_deployment_mode=$( \
+        get_resolved_config | yq ".synchronizerMigration[]? | select(.id == ${domain}) | .enableLogicalSynchronizerDeploymentMode" 2>/dev/null || true \
+    )
 
     # shellcheck disable=SC2076
     # shellcheck disable=SC2053
@@ -443,7 +449,7 @@ function k8s_labels_for_app() {
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ "$app" == $domain_specific_apps ]]; then
+    elif [[ "$app" == $domain_specific_apps && "$logical_synchronizer_deployment_mode" != "true" ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -538,7 +544,7 @@ function subcmd_gcloud_alert_logs_ui() {
 
     base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
     cluster=$(basename "$PWD")
-    expected_file="../../expected/infra/expected-${cluster}.json"
+    expected_file="../../expected/observability/expected-${cluster}.json"
     _info "Using filter from $expected_file"
     query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
     encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
@@ -570,12 +576,21 @@ function subcmd_upgrade() {
 
 function _get_gcloud_secret() {
   local -r secret_name="$1"
-  gcloud secrets versions access latest --secret="$secret_name"
+  local -r project="${2:-}"
+
+  local project_flag=()
+  if [ -n "${project}" ]; then
+      project_flag=(--project "${project}")
+  fi
+
+
+  gcloud secrets versions access latest --secret="$secret_name" "${project_flag[@]}"
 }
 
 function _get_service_account_key_id() {
     local -r secret_name="$1"
-    _get_gcloud_secret "$secret_name" | jq -r '.private_key_id'
+    local -r project="${2:-}"
+    _get_gcloud_secret "$secret_name" "${project}" | jq -r '.private_key_id'
 }
 
 subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
@@ -595,19 +610,24 @@ function subcmd_get_data_export_bucket_key_id() {
 function _install_service_account_key() {
     local -r secret_name="$1"
     local -r iam_account="$2"
+    local -r project="${3:-}"
 
-    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
+    local project_flag=()
+    if [ -n "${project}" ]; then
+        project_flag=(--project "${project}")
+    fi
+
+    SECRET=$(gcloud secrets list --filter "name:\"$secret_name\"" --format 'value(name)' "${project_flag[@]}")
 
     if [ -z "${SECRET}" ]; then
         _info "Allocating service account key and storing as secret."
         gcloud iam service-accounts keys create /tmp/key.json \
                --iam-account "$iam_account"
-
-        gcloud secrets create "$secret_name" --data-file=/tmp/key.json
+        gcloud secrets create "$secret_name" --data-file=/tmp/key.json "${project_flag[@]}"
 
         rm /tmp/key.json
     else
-        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name" "${project}")
 
         _info "Service Account key secret already exists: ${SA_KEY_ID}"
     fi
@@ -628,18 +648,53 @@ function subcmd_install_data_export_bucket_key() {
 
     _install_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
 }
+
+subcommand_whitelist[install_topology_snapshot_bucket_key]='Allocate a topology snapshot SA key for the project and store it in a secret.'
+
+function _read_topology_snapshot_config() {
+    # assumes all topology snapshot bucket keys follow the same pattern, so we just take the first one we find in the config
+    local resolved_config
+    resolved_config=$("${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh")
+    local base=".svs | to_entries | map(select(.value.periodicSnapshots != null)) | .[0].value.periodicSnapshots.topology"
+
+    topologyBucketSAKey=$(echo "${resolved_config}" | yq "${base}.bucketSaKeySecret")
+    topologyBucketIAMAccount=$(echo "${resolved_config}" | yq "${base}.bucketSaIamAccount")
+    topologyBucketProjectId=$(echo "${resolved_config}" | yq "${base}.projectId")
+
+    if [ -z "${topologyBucketSAKey}" ] || [ "${topologyBucketSAKey}" = "null" ]; then
+      _error "svs.*.periodicSnapshots.topology.bucketSaKeySecret is not defined in config"
+    fi
+    if [ -z "${topologyBucketIAMAccount}" ] || [ "${topologyBucketIAMAccount}" = "null" ]; then
+      _error "svs.*.periodicSnapshots.topology.bucketSaIamAccount is not defined in config"
+    fi
+    if [ -z "${topologyBucketProjectId}" ] || [ "${topologyBucketProjectId}" = "null" ]; then
+      _error "svs.*.periodicSnapshots.topology.projectId is not defined in config"
+    fi
+}
+
+function subcmd_install_topology_snapshot_bucket_key() {
+    _prompt_to_confirm --no-lock
+    _read_topology_snapshot_config
+    _install_service_account_key "${topologyBucketSAKey}" "${topologyBucketIAMAccount}" "${topologyBucketProjectId}"
+}
 ###
 
 function _uninstall_service_account_key() {
     local -r secret_name="$1"
     local -r iam_account="$2"
+    local -r project="${3:-}"
 
-    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
+    local project_flag=()
+    if [ -n "${project}" ]; then
+        project_flag=(--project "${project}")
+    fi
+
+    SECRET=$(gcloud secrets list --filter "name:\"$secret_name\"" --format 'value(name)' "${project_flag[@]}")
 
     if [ -z "${SECRET}" ]; then
         _warning "No service account key secret to delete."
     else
-        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name" "${project}")
 
         _info "Deleting SA Key: ${SA_KEY_ID}"
 
@@ -648,7 +703,7 @@ function _uninstall_service_account_key() {
                --quiet \
                "${SA_KEY_ID}" || true
 
-        gcloud secrets delete --quiet "$secret_name"
+        gcloud secrets delete --quiet "$secret_name" "${project_flag[@]}"
 
         _info "Service account key deleted."
     fi
@@ -668,6 +723,14 @@ function subcmd_uninstall_data_export_bucket_key() {
     _prompt_to_confirm --no-lock
 
     _uninstall_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
+}
+
+subcommand_whitelist[uninstall_topology_snapshot_bucket_key]='Delete the topology snapshot SA key for the project and the corresponding secret'
+
+function subcmd_uninstall_topology_snapshot_bucket_key() {
+    _prompt_to_confirm --no-lock
+    _read_topology_snapshot_config
+    _uninstall_service_account_key "${topologyBucketSAKey}" "${topologyBucketIAMAccount}" "${topologyBucketProjectId}"
 }
 ###
 
@@ -779,7 +842,7 @@ function subcmd_create() {
       fi
     fi
 
-    for stack in infra canton-network sv-runbook validator-runbook; do
+    for stack in infra observability canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
 
@@ -806,6 +869,7 @@ function subcmd_delete() {
     _cluster_must_exist
 
     _info "Taking down pulumi infrastructure stack."
+    subcmd_pulumi observability down --yes --skip-preview
     subcmd_pulumi infra down --yes --skip-preview
 
     _info "Deleting GKE cluster."
@@ -1289,7 +1353,6 @@ function subcmd_wait() {
 
     namespace="${1-}"
     app="${2-}"
-    migration_id=${3:-0}
 
     if [ -z "$namespace" ]; then
         _log "Waiting for all pods to become ready"
@@ -1301,8 +1364,8 @@ function subcmd_wait() {
             _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=3s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
-            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app,migration=$migration_id"
-            _log "Pod for app $app ready in namespace $namespace for migration id $migration_id"
+            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app"
+            _log "Pod for app $app ready in namespace $namespace"
         fi
     fi
 }
@@ -2039,6 +2102,9 @@ function subcmd_silence_grafana_alerts() {
     until=$(date -u -d "+${duration}" '+%FT%TZ')
 
     _info "Fetching token"
+    if ! kubectl get secret -n observability grafana-service-account-token-secret &>/dev/null; then
+        _error "Grafana service account token secret not found. Set monitoring.enableGrafanaServiceAccountToken to true in the cluster config and redeploy the observability stack."
+    fi
     token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
 
     shift 1

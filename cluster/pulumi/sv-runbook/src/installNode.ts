@@ -4,7 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   config,
   exactNamespace,
@@ -55,9 +55,13 @@ import {
   approvedSvIdentitiesFile,
   CantonBftSynchronizerNode,
   configForSv,
+  DecentralizedSynchronizerNode,
   getChainIdSuffix,
   installSvLoopback,
+  sv1Config,
   svsConfig,
+  svRunbookConfig,
+  SynchronizerNodes,
   valuesForSvApp,
   valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -70,7 +74,6 @@ import { createHash } from 'node:crypto';
 
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
-import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
 
 if (!isDevNet) {
@@ -190,7 +193,7 @@ type SvConfig = {
   xns: ExactNamespace;
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
@@ -242,9 +245,24 @@ async function installSvAndValidator(
 
   svKeySecret(xns, svKey);
 
-  const canton = installCanton(onboardingName, decentralizedSynchronizerMigrationConfig);
+  const canton = new SynchronizerNodes(
+    decentralizedSynchronizerMigrationConfig,
+    {
+      self: { ...svRunbookConfig.cometBft, nodeName: onboardingName },
+      sv1: { ...sv1Config.cometBft, nodeName: sv1Config.nodeName },
+      peers: [],
+    },
+    svRunbookConfig.ingressName
+  );
 
-  const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
+  const appsPg = installPostgres(
+    xns,
+    'apps-pg',
+    'apps-pg-secret',
+    'postgres-values-apps.yaml',
+    true,
+    svConfig.appsPg?.cloudSql
+  );
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
@@ -258,10 +276,18 @@ async function installSvAndValidator(
     }
   );
 
-  const commonSvAppValues = valuesForSvApp(decentralizedSynchronizerMigrationConfig, {
-    ...svConfig,
-    cometBftGovernanceKey,
-  });
+  const commonSvAppValues = valuesForSvApp(
+    decentralizedSynchronizerMigrationConfig,
+    {
+      ...svConfig,
+      cometBftGovernanceKey,
+      skipInitialization:
+        svsConfig?.synchronizer?.skipInitialization &&
+        !svsConfig?.synchronizer.forceSvRunbookInitialization,
+    },
+    canton,
+    svRunbookConfig.ingressName
+  );
 
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
@@ -275,26 +301,14 @@ async function installSvAndValidator(
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     ...commonSvAppValues,
+    participantAddress: canton.participant.internalClusterAddress,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities: approvedSvIdentities(),
-    domain: {
-      ...(valuesFromYamlFile.domain || {}),
-      ...(commonSvAppValues.domain || {}),
-      skipInitialization:
-        svsConfig?.synchronizer?.skipInitialization &&
-        !svsConfig?.synchronizer.forceSvRunbookInitialization,
-    },
-    cometBFT: {
-      ...(valuesFromYamlFile.cometBFT || {}),
-      ...(commonSvAppValues.cometBFT || {}),
-    },
     migration: {
       ...valuesFromYamlFile.migration,
-      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
-        ? true
-        : valuesFromYamlFile.migration.migrating,
+      ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig().migration,
     },
     metrics: {
       enable: true,
@@ -346,7 +360,7 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat(canton.decentralizedSynchronizer.dependencies)
+        .concat(canton.active.dependencies)
         .concat(svAppSecrets)
         .concat([appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
@@ -363,27 +377,54 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
-  const externalSequencerP2pAddress = (
-    canton.decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
-  ).externalSequencerP2pAddress;
+  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
+    return {
+      bftSequencerConfig: {
+        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
+      },
+    };
+  };
+
+  const synchronizerValues = {
+    synchronizers: {
+      current: {
+        ...defaultScanValues.synchronizers.current,
+        ...(useCantonBft ? bftSequencerConfigFor(canton.active) : {}),
+      },
+      ...(canton.upgrade
+        ? {
+            successor: {
+              sequencer: canton.upgrade.namespaceInternalSequencerAddress,
+              mediator: canton.upgrade.namespaceInternalMediatorAddress,
+              ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                ? bftSequencerConfigFor(canton.upgrade)
+                : {}),
+            },
+          }
+        : {}),
+      ...(canton.legacy
+        ? {
+            legacy: {
+              sequencer: canton.legacy.namespaceInternalSequencerAddress,
+              mediator: canton.legacy.namespaceInternalMediatorAddress,
+              ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                ? bftSequencerConfigFor(canton.legacy)
+                : {}),
+            },
+          }
+        : {}),
+    },
+  };
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },
-    ...(useCantonBft
-      ? {
-          bftSequencers: [
-            {
-              p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
-              sequencerAddress: canton.decentralizedSynchronizer.namespaceInternalSequencerAddress,
-            },
-          ],
-        }
-      : {}),
+    ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
+    ...synchronizerValues,
     resources: svConfig.scanApp?.resources,
   };
 
@@ -424,11 +465,12 @@ async function installSvAndValidator(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
         YOUR_SV_NAME: onboardingName,
         TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
     ),
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },
@@ -497,7 +539,7 @@ function installInfoEndpoint(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`,
     {
       TARGET_CLUSTER: clusterNetwork,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
       MD5_HASH_OF_ALLOWED_IP_RANGES: `"${createHash('md5')
         .update(readFileOrEmptyString(externalIpRangesFile()))
         .digest('hex')}"`,

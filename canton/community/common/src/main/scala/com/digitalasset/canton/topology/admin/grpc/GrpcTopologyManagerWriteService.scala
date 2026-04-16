@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.admin.grpc
@@ -54,7 +54,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class GrpcTopologyManagerWriteService(
     managers: => Seq[TopologyManager[TopologyStoreId, BaseCrypto]],
-    physicalSynchronizerIdLookup: PSIdLookup,
+    physicalSynchronizerIdLookup: PsidLookup,
     temporaryStoreRegistry: TemporaryStoreRegistry,
     nodeParameters: CantonNodeParameters,
     override val loggerFactory: NamedLoggerFactory,
@@ -124,6 +124,8 @@ class GrpcTopologyManagerWriteService(
           forceFlags <- ForceFlags.fromProtoV30(forceChanges)
           validatedMapping <- TopologyMapping.fromProtoV30(mapping)
         } yield {
+          if (mapping.mapping.isPartyToKeyMapping)
+            logger.info("PartyToKeyMapping is deprecated. Please use PartyToParticipant instead.")
           (op, serial, validatedMapping, signingKeys, forceFlags)
         }
 
@@ -142,7 +144,7 @@ class GrpcTopologyManagerWriteService(
           (op, serial, validatedMapping, signingKeys, forceChanges) = mapping
 
           // TODO(#28972) Remove this check once LSU is stable
-          _ <- EitherT.fromEither[FutureUnlessShutdown](ensureLSUPreviewEnabled(validatedMapping))
+          _ <- EitherT.fromEither[FutureUnlessShutdown](ensureLsuPreviewEnabled(validatedMapping))
 
           manager <- targetManagerET(store)
           signedTopoTx <- manager
@@ -163,19 +165,20 @@ class GrpcTopologyManagerWriteService(
   }
 
   // LSU announcement require preview features enabled
-  private def ensureLSUPreviewEnabled(
+  // TODO(#28972) Remove when LSU is stable
+  private def ensureLsuPreviewEnabled(
       mapping: TopologyMapping
-  )(implicit traceContext: TraceContext): Either[RpcError, Unit] = mapping
-    .select[SynchronizerUpgradeAnnouncement]
-    .fold(().asRight[RpcError])(_ =>
-      Either
-        .cond(
-          nodeParameters.enablePreviewFeatures,
-          (),
-          TopologyManagerError.PreviewFeature.Error(operation = "synchronizer upgrade announcement"),
-        )
-        .leftWiden[RpcError]
-    )
+  )(implicit traceContext: TraceContext): Either[RpcError, Unit] = {
+    val isLsuMapping = TopologyMapping.Code.lsuMappings.contains(mapping.code)
+    Either
+      .cond(
+        !isLsuMapping || nodeParameters.enablePreviewFeatures,
+        (),
+        TopologyManagerError.PreviewFeature
+          .Error(operation = "synchronizer upgrade announcement"),
+      )
+      .leftWiden[RpcError]
+  }
 
   override def signTransactions(
       requestP: v30.SignTransactionsRequest
@@ -228,6 +231,9 @@ class GrpcTopologyManagerWriteService(
           .traverse(tx => SignedTopologyTransaction.fromProtoV30(protocolVersionValidation, tx))
           .leftMap(ProtoDeserializationFailure.Wrap(_): RpcError)
       )
+      _ = if (signedTxs.exists(_.selectMapping[PartyToKeyMapping].isDefined)) {
+        logger.info("PartyToKeyMapping is deprecated. Please use PartyToParticipant instead.")
+      }
       waitToBecomeEffectiveO <- EitherT
         .fromEither[FutureUnlessShutdown](
           request.waitToBecomeEffective

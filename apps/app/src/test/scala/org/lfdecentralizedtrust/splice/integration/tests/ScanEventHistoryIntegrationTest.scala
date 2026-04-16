@@ -16,16 +16,15 @@ import definitions.UpdateHistoryItemV2.members.{
 }
 
 import scala.concurrent.duration.*
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
+import monocle.macros.syntax.lens.*
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
     with WalletTestUtil
-    with WalletTxLogTestUtil
-    with TimeTestUtil {
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -33,13 +32,10 @@ class ScanEventHistoryIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
           scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            ),
             // Route mediator admin client via toxiproxy
-            mediatorAdminClient = scanConfig.mediatorAdminClient.copy(
-              port = Port.tryCreate(scanConfig.mediatorAdminClient.port.unwrap + 20000)
-            ),
+            synchronizerNodes = scanConfig.synchronizerNodes
+              .focus(_.current.mediator.port)
+              .modify(p => Port.tryCreate(p.unwrap + 20000))
           )
         )(config)
       )
@@ -50,7 +46,6 @@ class ScanEventHistoryIntegrationTest
   private val pageLimit = 1000
 
   "should provide new events with verdicts" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
@@ -115,19 +110,21 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    initDsoWithSv1Only()
-
-    // Disable mediator admin connectivity via proxy before starting scan
-    toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
-
+    // Apps need to start before disabling mediator connection,
+    // otherwise scan will never become healthy and `startAllSync` will fail.
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    clue("Wait until mediator connectivity is really down") {
-      eventually() {
+    actAndCheck(
+      "Disable mediator admin connectivity via proxy",
+      toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1")),
+    )(
+      "Mediator connectivity is really down",
+      _ => {
         // Check that mediator connection really doesn't work anymore.
         sv1Backend.mediatorClient.health.status.toString should include("UNAVAILABLE")
-      }
-    }
+      },
+    )
+
     // after this point, scan should be unable to ingest any verdicts
 
     val _ = onboardAliceAndBob()
@@ -236,7 +233,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should return event for valid updateId and 404 for missing updateId" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
@@ -287,7 +283,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()

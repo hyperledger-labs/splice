@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.ReassignmentRef
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -13,8 +12,9 @@ import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentPro
 }
 import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId, Stakeholders}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag
+import com.digitalasset.canton.{LfPackageId, LfPartyId}
 
 trait ReassignmentValidationError extends Serializable with Product with PrettyPrinting {
   override protected def pretty: Pretty[ReassignmentValidationError.this.type] =
@@ -57,13 +57,22 @@ object ReassignmentValidationError {
         s"Expected $expectedStakeholders, found $declaredViewStakeholders"
   }
 
-  final case class ContractAuthenticationFailure(
-      reassignmentRef: ReassignmentRef,
-      reason: String,
-      contractId: LfContractId,
+  final case class MultiSynchronizerIsNotEnabled(
+      participants: Set[ParticipantId],
+      synchronizerId: PhysicalSynchronizerId,
   ) extends ReassignmentValidationError {
     override def message: String =
-      s"For `$reassignmentRef`: contract id authentication failure for $contractId"
+      s"Multi-synchronizer feature flag is not enabled for synchronizer $synchronizerId on the following participants: $participants"
+  }
+
+  final case class ContractValidationError(
+      reassignmentRef: ReassignmentRef,
+      contractId: LfContractId,
+      representativePackageId: LfPackageId,
+      reason: String,
+  ) extends ReassignmentValidationError {
+    override def message: String =
+      s"For `$reassignmentRef`: contract authentication failure for $contractId when authenticating against $representativePackageId: $reason"
   }
 
   final case class NotHostedOnParticipant(
@@ -119,7 +128,7 @@ object ReassignmentValidationError {
       declared: Set[ParticipantId],
   ) extends ReassignmentValidationError {
     override def message: String =
-      s"For `$reassignmentRef`: reassigning participants mismatch"
+      s"For `$reassignmentRef`: reassigning participants mismatch (expected: $expected, declared: $declared)"
   }
 
   final case class AbortedDueToShutdownOut(contractId: LfContractId)

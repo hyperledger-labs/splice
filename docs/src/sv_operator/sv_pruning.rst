@@ -10,8 +10,6 @@ Pruning
 
 The sequencer, participant and CometBFT have pruning options that can be used to ensure storage use is kept within reasonable bounds.
 
-Pruning can also be configured for the participant, but we don't currently recommend enabling it for the SVs.
-
 .. _sv-pruning-sequencer:
 
 Sequencer pruning
@@ -62,6 +60,6 @@ To do so, set the following through the ``additionalEnvVars`` on your participan
 .. code-block:: yaml
 
     additionalEnvVars:
-        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
+        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMMITMENTS
           value: |
             canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"

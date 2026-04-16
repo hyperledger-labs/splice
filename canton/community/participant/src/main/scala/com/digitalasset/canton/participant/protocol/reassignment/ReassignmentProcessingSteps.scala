@@ -1,16 +1,16 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.{
   Signature,
   SyncCryptoError,
@@ -25,11 +25,16 @@ import com.digitalasset.canton.data.{
   ViewPosition,
 }
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, SequencedUpdate, Update}
+import com.digitalasset.canton.ledger.participant.state.{
+  CompletionInfo,
+  SequencedEventUpdate,
+  Update,
+}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
+  DecryptedViews,
   ParsedRequest,
   PendingRequestData,
   WrapsProcessorError,
@@ -58,12 +63,12 @@ import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ContractValidator, EitherTUtil, ReassignmentTag}
+import com.digitalasset.canton.util.{ContractValidator, ReassignmentTag}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
 import scala.collection.concurrent
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 
 private[reassignment] trait ReassignmentProcessingSteps[
     SubmissionParam,
@@ -161,15 +166,6 @@ private[reassignment] trait ReassignmentProcessingSteps[
       validationResult: ReassignmentValidationResult,
   ): Option[LocalRejectError]
 
-  override def authenticateInputContracts(
-      parsedRequest: ParsedRequestType
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, ReassignmentProcessorError, Unit] =
-    // this check is implemented in the ReassignmentValidation.checkMetadata as part of the phase 3 and phase 7.
-    // TODO(i12928): Remove this method once the transaction validation has fixed the non-authenticated contract issue.
-    EitherTUtil.unit
-
   protected def performPendingSubmissionMapUpdate(
       pendingSubmissionMap: concurrent.Map[RootHash, PendingReassignmentSubmission],
       reassignmentRef: ReassignmentRef,
@@ -209,7 +205,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, DecryptedViews] = {
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, DecryptedViews[DecryptedView]] = {
     val result = batch.toNEF
       .parTraverse(
         decryptTree(snapshot, sessionKeyStore)(_).value
@@ -265,6 +261,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       mediator: MediatorGroupRecipient,
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       synchronizerParameters: DynamicSynchronizerParametersWithValidity,
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[ParsedReassignmentRequest[FullView]] = {
@@ -299,6 +296,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         snapshot,
         synchronizerParameters,
         reassignmentId(viewTree, ts),
+        trafficCost,
       )
     )
   }
@@ -331,9 +329,10 @@ private[reassignment] trait ReassignmentProcessingSteps[
       rootHash: RootHash,
       freshOwnTimelyTx: Boolean,
       error: TransactionError,
+      trafficCost: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
-  ): (Option[SequencedUpdate], Option[PendingSubmissionId]) = {
+  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId]) = {
     val rejection = Update.CommandRejected.FinalReason(error.rpcStatus())
     val isSubmittingParticipant = submitterMetadata.submittingParticipant == participantId
 
@@ -343,6 +342,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       commandId = submitterMetadata.commandId,
       optDeduplicationPeriod = None,
       submissionId = None,
+      paidTrafficCost = trafficCost,
     )
     val updateO = Option.when(isSubmittingParticipant)(
       Update.SequencedCommandRejected(
@@ -350,6 +350,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         rejection,
         psid.unwrap.logical,
         ts,
+        isTransaction = false,
       )
     )
     (updateO, rootHash.some)
@@ -357,7 +358,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
 
   override def createRejectionEvent(rejectionArgs: RejectionArgs)(implicit
       traceContext: TraceContext
-  ): Either[ReassignmentProcessorError, Option[SequencedUpdate]] = {
+  ): Either[ReassignmentProcessorError, Option[SequencedEventUpdate]] = {
 
     val RejectionArgs(pendingReassignment, errorDetails) = rejectionArgs
     val isSubmittingParticipant =
@@ -370,6 +371,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         commandId = pendingReassignment.submitterMetadata.commandId,
         optDeduplicationPeriod = None,
         submissionId = pendingReassignment.submitterMetadata.submissionId,
+        paidTrafficCost = pendingReassignment.trafficCost,
       )
     )
     errorDetails.logRejection(Map("requestId" -> pendingReassignment.requestId.toString))
@@ -380,6 +382,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         rejection,
         psid.unwrap.logical,
         pendingReassignment.requestId.unwrap,
+        isTransaction = false,
       )
     )
     Right(updateO)
@@ -391,9 +394,9 @@ private[reassignment] trait ReassignmentProcessingSteps[
   case class ReassignmentsSubmission(
       override val batch: Batch[DefaultOpenEnvelope],
       override val pendingSubmissionId: PendingSubmissionId,
+      override val approximateTimestampForSigning: CantonTimestamp,
+      override val maxSequencingTime: CantonTimestamp,
   ) extends UntrackedSubmission {
-
-    override def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp] = OptionT.none
 
     override def embedSubmissionError(
         err: ProtocolProcessor.SubmissionProcessingError
@@ -557,6 +560,8 @@ private[reassignment] trait ReassignmentProcessingSteps[
     *     - Is the submitter a stakeholder?
     *     - Is the submitter hosted on the participant?
     *   - Is the reassignment id consistent with the reassignment data?
+    *   - the multi-synchronizer topology feature flag should be set on all participants hosting a
+    *     stakeholder.
     */
   def checkPhase7Validations(
       reassignmentValidationResult: ReassignmentValidationResult
@@ -588,10 +593,15 @@ private[reassignment] trait ReassignmentProcessingSteps[
             LocalRejectError.ReassignmentRejects.InconsistentReassignmentId.Reject(err.message)
           )
 
+        val multiSynchronizerIsNotEnabled =
+          reassignmentValidationResult.commonValidationResult.multiSynchronizerFeatureFlagCheckResult
+            .map(err => LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message))
+
         modelConformanceRejection
           .orElse(authenticationRejection)
           .orElse(submitterCheckRejection)
           .orElse(reassignmentIdResult)
+          .orElse(multiSynchronizerIsNotEnabled)
     }
 
 }
@@ -621,6 +631,7 @@ object ReassignmentProcessingSteps {
       override val snapshot: SynchronizerSnapshotSyncCryptoApi,
       override val synchronizerParameters: DynamicSynchronizerParametersWithValidity,
       reassignmentId: ReassignmentId,
+      override val trafficCost: NonNegativeLong,
   ) extends ParsedRequest[ReassignmentSubmitterMetadata] {
     override def rootHash: RootHash = fullViewTree.rootHash
   }
@@ -634,7 +645,9 @@ object ReassignmentProcessingSteps {
 
     def submitterMetadata: ReassignmentSubmitterMetadata
 
-    override def isCleanReplay: Boolean = false
+    /** Traffic cost of the (un)assignment event
+      */
+    def trafficCost: NonNegativeLong
   }
 
   final case class RejectionArgs[T <: PendingReassignment](

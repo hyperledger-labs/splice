@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
+  PackageVettingLookupService,
   RetryProvider,
   SpliceLedgerConnection,
 }
@@ -48,6 +49,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,
     packageVersionSupport: PackageVersionSupport,
+    packageVettingService: PackageVettingLookupService,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -100,7 +102,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = Future {
     blocking {
 
-      synchronized {
+      mutex.exclusive {
         val currentEpoch = dsoRules.payload.epoch
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
@@ -139,6 +141,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
         config.delegatelessAutomationExpiredRewardCouponBatchSize,
         config.delegatelessAutomationExpiredRewardCouponNumBatches,
         packageVersionSupport,
+        packageVettingService,
       )
 
     (if (appLevelRetryProvider.isClosing) {

@@ -21,16 +21,73 @@ export IMAGE_TAG
 IMAGE_REPO=""
 export IMAGE_REPO
 
-# the port will be assigned by docker
-TEST_PORT=""
-export TEST_PORT
+# let docker assign a port to postgres. In CI, we have another postgres instance running, so can't use the default 5432
+DB_PORT=""
+export DB_PORT
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "Usage: $SCRIPTNAME <start|stop> [-D]"
+ACTION=""
+MULTI_SYNC_PROFILE=()
+DOWN_COMMAND=( stop )
+ALPHA_PROTOCOL_VERSION_ENV=""
+
+function usage() {
+    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
+    echo ""
+    echo "Options:"
+    echo "  -D                        Completely tear down the localnet (using 'docker compose down') instead of just stopping the containers (using 'docker compose stop')"
+    echo "  -M                        Start the localnet with the 'multi-sync' profile enabled"
+    echo "  -u                        Enable unstable Canton protocol versions. WARNING: This should be used only for temporary test environments that be be reset often."
+    echo "  -p <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
+}
+
+if [[ $# -lt 1 ]]; then
+    usage
     exit 1
 fi
 
-ACTION=$1
+case $1 in
+    start|stop)
+        ACTION=$1
+        ;;
+    *)
+        echo "Invalid action: $1. Use 'start' or 'stop'."
+        usage
+        exit 1
+        ;;
+esac
+shift
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -D)
+            DOWN_COMMAND=( down -v )
+            ;;
+        -M)
+            MULTI_SYNC_PROFILE=( --profile multi-sync )
+            ;;
+        -p)
+            shift
+            if [[ -z "$1" ]]; then
+                echo "Error: -P requires a protocol version argument."
+                usage
+                exit 1
+            fi
+            CANTON_PROTOCOL_VERSION=$1
+            export CANTON_PROTOCOL_VERSION
+            ;;
+        -u)
+            ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+export ALPHA_PROTOCOL_VERSION_ENV
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"
@@ -44,10 +101,6 @@ DOCKER_COMPOSE_CMD=( docker compose
 
 case $ACTION in
     start)
-        if [[ $# -ne 1 ]]; then
-            echo "Usage: $SCRIPTNAME <start|stop> [-D]"
-            exit 1
-        fi
         services_to_log=( canton splice postgres nginx )
         docker system events -f type=container \
                       -f event=start \
@@ -72,21 +125,9 @@ case $ACTION in
               done
           fi
         done >> "${SPLICE_ROOT}/log/compose.log" 2>&1 &
-
-        "${DOCKER_COMPOSE_CMD[@]}" up -d || _error "Failed to start localnet, please check ${SPLICE_ROOT}/log/console.log for details"
+        "${DOCKER_COMPOSE_CMD[@]}" "${MULTI_SYNC_PROFILE[@]}" up -d || _error "Failed to start localnet, please check ${SPLICE_ROOT}/log/console.log for details"
         ;;
     stop)
-        if [[ $# -eq 2 && $2 == "-D" ]]; then
-            "${DOCKER_COMPOSE_CMD[@]}" down -v
-        elif [[ $# -eq 1 ]]; then
-            "${DOCKER_COMPOSE_CMD[@]}" stop
-        else
-            echo "Usage: $SCRIPTNAME <start|stop> [-D]"
-            exit 1
-        fi
-        ;;
-    *)
-        echo "Invalid action: $ACTION. Use 'start' or 'stop'."
-        exit 1
+        "${DOCKER_COMPOSE_CMD[@]}" "${MULTI_SYNC_PROFILE[@]}" "${DOWN_COMMAND[@]}"
         ;;
 esac

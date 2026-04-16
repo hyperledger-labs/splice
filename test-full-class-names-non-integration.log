@@ -1,3 +1,4 @@
+org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
@@ -9,8 +10,13 @@ org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
+org.lfdecentralizedtrust.splice.scan.admin.http.GeneratedScanRouteDropNullsTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
+org.lfdecentralizedtrust.splice.scan.admin.http.UpdateHistoryOmitNullStringComplianceTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
+org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigTest
+org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputationTest
+org.lfdecentralizedtrust.splice.scan.store.DbAppActivityRecordStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProviderTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
@@ -24,9 +30,11 @@ org.lfdecentralizedtrust.splice.store.UpdateHistoryTest
 org.lfdecentralizedtrust.splice.store.db.AcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbExternalPartyWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbScanRewardsReferenceStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbScanStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvSvStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbTcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
@@ -47,3 +55,4 @@ org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobufTest
 org.lfdecentralizedtrust.splice.validator.store.DbValidatorConfigProviderTest
 org.lfdecentralizedtrust.splice.validator.store.DbValidatorStoreTest
 org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParametersTest
+org.lfdecentralizedtrust.splice.wart.ParTraverseTest

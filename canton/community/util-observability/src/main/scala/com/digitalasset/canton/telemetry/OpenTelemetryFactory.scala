@@ -1,14 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.telemetry
 
 import better.files.File
-import com.daml.metrics.HistogramDefinition
+import com.daml.metrics.OnDemandMetricsReader.NoOpOnDemandMetricsReader$
 import com.daml.metrics.api.{HistogramInventory, MetricsInfoFilter}
+import com.daml.metrics.{HistogramDefinition, OpenTelemetryOnDemandMetricsReader}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.metrics.OnDemandMetricsReader.NoOpOnDemandMetricsReader$
-import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.tracing.{NoopSpanExporter, TraceContext, TracingConfig}
 import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
@@ -16,9 +15,7 @@ import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
 import io.opentelemetry.exporter.zipkin.ZipkinSpanExporter
 import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.opentelemetry.sdk.metrics.`export`.MetricReader
-import io.opentelemetry.sdk.metrics.internal.SdkMeterProviderUtil
-import io.opentelemetry.sdk.metrics.internal.`export`.CardinalityLimitSelector
+import io.opentelemetry.sdk.metrics.`export`.{CardinalityLimitSelector, MetricReader}
 import io.opentelemetry.sdk.metrics.{InstrumentType, SdkMeterProvider, SdkMeterProviderBuilder}
 import io.opentelemetry.sdk.trace.`export`.{
   BatchSpanProcessor,
@@ -28,6 +25,7 @@ import io.opentelemetry.sdk.trace.`export`.{
 import io.opentelemetry.sdk.trace.samplers.Sampler
 import io.opentelemetry.sdk.trace.{SdkTracerProvider, SdkTracerProviderBuilder}
 
+import scala.annotation.nowarn
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.ScalaDurationOps
 import scala.util.chaining.scalaUtilChainingOps
@@ -42,13 +40,7 @@ object OpenTelemetryFactory {
     val cardinalityLimit = new CardinalityLimitSelector {
       override def getCardinalityLimit(instrumentType: InstrumentType): Int = cardinality
     }
-    SdkMeterProviderUtil
-      .registerMetricReaderWithCardinalitySelector(
-        builder,
-        reader,
-        cardinalityLimit,
-      )
-    builder
+    builder.registerMetricReader(reader, cardinalityLimit)
   }
 
   def initializeOpenTelemetry(
@@ -136,6 +128,7 @@ object OpenTelemetryFactory {
   private def loadCertificate(tlsCaCert: String): ByteString =
     ByteString.copyFrom(File(tlsCaCert).loadBytes)
 
+  @nowarn("cat=deprecation")
   private def createExporter(config: TracingConfig.Exporter): SpanExporter = config match {
 
     case TracingConfig.Exporter.Zipkin(address, port) =>

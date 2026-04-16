@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -8,7 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
-import com.digitalasset.canton.config.{CachingConfigs, LoggingConfig}
+import com.digitalasset.canton.config.{LoggingConfig, SessionEncryptionKeyCacheConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
 import com.digitalasset.canton.data.*
@@ -34,7 +34,6 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.sequencing.protocol.{
-  MaxRequestSizeToDeserialize,
   MediatorGroupRecipient,
   MemberRecipient,
   OpenEnvelope,
@@ -56,8 +55,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.UUID
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration.*
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.ExecutionContext
 
 class TransactionConfirmationRequestFactoryTest
     extends AsyncWordSpec
@@ -84,7 +82,6 @@ class TransactionConfirmationRequestFactoryTest
   private def createCryptoSnapshot(
       partyToParticipant: Map[ParticipantId, Seq[LfPartyId]],
       permission: ParticipantPermission = Submission,
-      keyPurposes: Set[KeyPurpose] = KeyPurpose.All,
       freshKeys: Boolean = false,
   ): SynchronizerSnapshotSyncCryptoApi = {
 
@@ -92,11 +89,12 @@ class TransactionConfirmationRequestFactoryTest
     TestingTopology()
       .withReversedTopology(map)
       .withSynchronizers(physicalSynchronizerId)
-      .withKeyPurposes(keyPurposes)
+      .withKeyPurposes(KeyPurpose.All)
       .withFreshKeys(freshKeys)
       .build(loggerFactory)
       .forOwnerAndSynchronizer(submittingParticipant, physicalSynchronizerId)
       .currentSnapshotApproximation
+      .futureValueUS
   }
 
   val defaultTopology: Map[ParticipantId, Seq[LfPartyId]] = Map(
@@ -217,13 +215,11 @@ class TransactionConfirmationRequestFactoryTest
 
   // Since the ConfirmationRequestFactory signs the envelopes in parallel,
   // we cannot predict the counter that SymbolicCrypto uses to randomize the signatures.
-  // So we simply replace them with a fixed empty signature. When we are using
-  // EncryptedViewMessage we order the sequence of randomness encryption on both the actual
-  // and expected messages so that they match.
-  private def stripSignatureAndOrderMap(
+  // So we simply replace them with a fixed empty signature.
+  private def stripSignatures(
       request: TransactionConfirmationRequest
-  ): TransactionConfirmationRequest = {
-    val requestNoSignature = request
+  ): TransactionConfirmationRequest =
+    request
       .focus(_.viewEnvelopes)
       .modify(
         _.map(
@@ -231,16 +227,23 @@ class TransactionConfirmationRequestFactoryTest
             .modify(_.map(_ => SymbolicCrypto.emptySignature))
         )
       )
+      .focus(_.informeeMessage.submittingParticipantSignature)
+      .replace(SymbolicCrypto.emptySignature)
 
-    val orderedTvm = requestNoSignature.viewEnvelopes.map(tvm =>
+  // When we are using EncryptedViewMessage we order the sequence of randomness encryption on both the actual
+  // and expected messages so that they match.
+  private def orderMap(
+      request: TransactionConfirmationRequest
+  ): TransactionConfirmationRequest = {
+    val orderedTvm = request.viewEnvelopes.map(tvm =>
       tvm.protocolMessage match {
         case encViewMessage @ EncryptedViewMessage(_, _, _, _, _, _) =>
           val encryptedRandomnessOrdering: Ordering[AsymmetricEncrypted[SecureRandomness]] =
             Ordering.by(_.encryptedFor.unwrap)
           tvm.copy(protocolMessage =
             encViewMessage
-              .copy(sessionKeyRandomness =
-                encViewMessage.sessionKeys
+              .copy(viewEncryptionKeyRandomness =
+                encViewMessage.viewEncryptionKeyRandomness
                   .sorted(encryptedRandomnessOrdering)
               )
           )
@@ -248,7 +251,7 @@ class TransactionConfirmationRequestFactoryTest
       }
     )
 
-    requestNoSignature
+    request
       .focus(_.viewEnvelopes)
       .replace(orderedTvm)
   }
@@ -291,19 +294,8 @@ class TransactionConfirmationRequestFactoryTest
     val expectedTransactionViewMessages = example.transactionViewTreesWithWitnesses.map {
       case (tree, _) =>
         val signature =
-          if (tree.isTopLevel) {
-            Some(
-              Await
-                .result(
-                  cryptoSnapshot
-                    .sign(tree.updateId.unwrap, SigningKeyUsage.ProtocolOnly)
-                    .value,
-                  10.seconds,
-                )
-                .failOnShutdown
-                .valueOr(err => fail(err.toString))
-            )
-          } else None
+          if (tree.isTopLevel) Some(SymbolicCrypto.emptySignature)
+          else None
 
         val (recipients, sessionKeyRandomness) = hashToKeyMap(tree.viewHash)
 
@@ -330,9 +322,7 @@ class TransactionConfirmationRequestFactoryTest
             TransactionViewType,
           )(
             ltvt,
-            MaxRequestSizeToDeserialize.Limit(
-              DynamicSynchronizerParameters.defaultMaxRequestSize.value
-            ),
+            defaultMaxBytesToDecompress,
           )
           .valueOr(err => fail(s"fail to encrypt view tree: $err"))
 
@@ -356,17 +346,10 @@ class TransactionConfirmationRequestFactoryTest
         OpenEnvelope(encryptedViewMessage, recipients)(testedProtocolVersion)
     }
 
-    val signature =
-      cryptoSnapshot
-        .sign(
-          example.fullInformeeTree.updateId.unwrap,
-          SigningKeyUsage.ProtocolOnly,
-        )
-        .failOnShutdown
-        .futureValue
-
     TransactionConfirmationRequest(
-      InformeeMessage(example.fullInformeeTree, signature)(testedProtocolVersion),
+      InformeeMessage(example.fullInformeeTree, SymbolicCrypto.emptySignature)(
+        testedProtocolVersion
+      ),
       expectedTransactionViewMessages,
       testedProtocolVersion,
     )
@@ -419,7 +402,7 @@ class TransactionConfirmationRequestFactoryTest
 
           ResourceUtil.withResourceM(
             new SessionKeyStoreWithInMemoryCache(
-              CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+              SessionEncryptionKeyCacheConfig(),
               timeouts,
               loggerFactory,
             )
@@ -432,6 +415,7 @@ class TransactionConfirmationRequestFactoryTest
                 example.keyResolver,
                 mediator,
                 newCryptoSnapshot,
+                wallClock.now, // not needed for unit tests; session signing keys disabled
                 sessionKeyStore,
                 contractInstanceOfId,
                 maxSequencingTime,
@@ -441,7 +425,7 @@ class TransactionConfirmationRequestFactoryTest
               .failOnShutdown
               .map { res =>
                 val expected = expectedConfirmationRequest(example, newCryptoSnapshot)
-                stripSignatureAndOrderMap(res.value) shouldBe stripSignatureAndOrderMap(expected)
+                orderMap(stripSignatures(res.value)) shouldBe orderMap(expected)
               }(executorService) // parallel executorService to avoid a deadlock
           }
         }
@@ -460,6 +444,7 @@ class TransactionConfirmationRequestFactoryTest
             multipleRoots.keyResolver,
             mediator,
             newCryptoSnapshot,
+            wallClock.now, // not needed for unit tests; session signing keys disabled
             store,
             contractInstanceOfId,
             maxSequencingTime,
@@ -468,7 +453,10 @@ class TransactionConfirmationRequestFactoryTest
           .failOnShutdown
           .map { tcr =>
             tcr.viewEnvelopes.size shouldBe >(1)
-            tcr.viewEnvelopes.map(_.protocolMessage.sessionKeys).distinct.length shouldBe 1
+            tcr.viewEnvelopes
+              .map(_.protocolMessage.viewEncryptionKeyRandomness)
+              .distinct
+              .length shouldBe 1
 
             // cache is disable so session key is not persisted for multiple transactions
             store.convertStore.getSessionKeyInfoIfPresent(defaultRecipientGroup) shouldBe None
@@ -490,6 +478,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               cryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -505,7 +494,7 @@ class TransactionConfirmationRequestFactoryTest
         ResourceUtil.withResourceM(
           // we use the same store for two requests to simulate what would happen in a real scenario
           new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            SessionEncryptionKeyCacheConfig(),
             timeouts,
             loggerFactory,
           )
@@ -541,7 +530,7 @@ class TransactionConfirmationRequestFactoryTest
 
         ResourceUtil.withResourceM(
           new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            SessionEncryptionKeyCacheConfig(),
             timeouts,
             loggerFactory,
           )
@@ -554,6 +543,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               emptyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -584,7 +574,7 @@ class TransactionConfirmationRequestFactoryTest
 
         ResourceUtil.withResourceM(
           new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            SessionEncryptionKeyCacheConfig(),
             timeouts,
             loggerFactory,
           )
@@ -597,6 +587,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               confirmationOnlyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -624,7 +615,7 @@ class TransactionConfirmationRequestFactoryTest
 
         ResourceUtil.withResourceM(
           new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            SessionEncryptionKeyCacheConfig(),
             timeouts,
             loggerFactory,
           )
@@ -637,6 +628,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               newCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -661,7 +653,7 @@ class TransactionConfirmationRequestFactoryTest
 
         ResourceUtil.withResourceM(
           new SessionKeyStoreWithInMemoryCache(
-            CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+            SessionEncryptionKeyCacheConfig(),
             timeouts,
             loggerFactory,
           )
@@ -674,6 +666,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               submitterOnlyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,

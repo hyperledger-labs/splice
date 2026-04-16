@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -49,10 +49,15 @@ class BackgroundRunnerHandler[ProcessInfo](
   }
   private case class Running(name: String, runner: BackgroundRunner, info: ProcessInfo)
       extends ProcessHandle {
+
+    def crashed(): Configured =
+      Configured(name, runner.command, runner.addEnvironment, info)
+
     def kill(force: Boolean = false): Configured = {
       runner.kill(force)
-      Configured(name, runner.command, runner.addEnvironment, info)
+      crashed()
     }
+
     def restart(): Running =
       Running(name, runner.restart(), info)
   }
@@ -80,6 +85,15 @@ class BackgroundRunnerHandler[ProcessInfo](
     external.put(instanceName, if (!manualStart) configured.start() else configured).discard
   }
 
+  def addEnvironmentIfNotStarted(instanceName: String, addEnvironment: Map[String, String]): Unit =
+    external
+      .updateWith(instanceName) {
+        case Some(configured: Configured) =>
+          Some(configured.copy(addEnvironment = configured.addEnvironment ++ addEnvironment))
+        case other => other
+      }
+      .discard
+
   /** Stop and remove a background process. Idempotent as it doesn't require that the background
     * process was previously added.
     */
@@ -98,6 +112,12 @@ class BackgroundRunnerHandler[ProcessInfo](
       case None =>
         ErrorUtil.internalError(new IllegalStateException(s"$instanceName is not registered"))
     }
+
+  def processHasCrashed(instanceName: String): Boolean = external.get(instanceName) match {
+    case Some(r: Running) =>
+      r.runner.processHasCrashed()
+    case _ => false
+  }
 
   def tryStart(instanceName: String): Unit =
     perform(
@@ -126,6 +146,31 @@ class BackgroundRunnerHandler[ProcessInfo](
           )
         )
     }
+
+  /** Mark the process as crashed. This is used when the process is detected to have crashed, but
+    * has not yet been killed and removed from the handler.
+    */
+  def crashed(instanceName: String): Unit =
+    perform(
+      instanceName,
+      {
+        case x: Running =>
+          if (processHasCrashed(instanceName)) {
+            noTracingLogger.info(s"Process $instanceName has crashed")
+            x.crashed()
+          } else {
+            ErrorUtil.internalError(
+              new IllegalStateException(
+                s"can not mark $instanceName as crashed because it has not crashed"
+              )
+            )
+          }
+        case a: Configured =>
+          ErrorUtil.internalError(
+            new IllegalStateException(s"can not crash $instanceName as instance is not running")
+          )
+      },
+    )
 
   def tryKill(instanceName: String, force: Boolean = true): Unit =
     perform(
@@ -282,6 +327,19 @@ class BackgroundRunner(
       noTracingLogger.debug("Shutting down external process")
       rt.destroy()
     }
+
+  /** Return true when the process has exited with non-zero */
+  def processHasCrashed(): Boolean = {
+    noTracingLogger.debug(s"Checking if process $name (PID ${rt.pid()}) has crashed")
+    try {
+      rt.exitValue() != 0
+    } catch {
+      // If the process is still alive, exitValue throws an IllegalThreadStateException. In this case, we can be sure that the process has not crashed.
+      case _: IllegalThreadStateException =>
+        noTracingLogger.debug(s"Process $name is still alive, so it has not crashed")
+        false
+    }
+  }
 
 }
 

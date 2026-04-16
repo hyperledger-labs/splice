@@ -14,7 +14,8 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   TopologyAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
+import TopologyAdminConnection.TopologySnapshot
+import TopologyAdminConnection.TopologyTransactionType.AllProposals
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -25,6 +26,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,12 +39,13 @@ import scala.concurrent.{ExecutionContext, Future}
 class SvOnboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[SvOnboardingPartyToParticipantProposalTrigger.Task] {
+) extends PollingParallelTaskExecutionTrigger[SvOnboardingPartyToParticipantProposalTrigger.Task]
+    with SyncConnectionStalenessCheck {
 
   import SvOnboardingPartyToParticipantProposalTrigger.Task
 
@@ -63,6 +66,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
             currentlyHostingParticipants <- participantAdminConnection.getPartyToParticipant(
               dsoRules.domain,
               dsoParty,
+              topologySnapshot = TopologySnapshot.Sequenced,
             )
             dsoPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
               store = TopologyStoreId.Synchronizer(dsoRules.domain).some,
@@ -140,9 +144,11 @@ class SvOnboardingPartyToParticipantProposalTrigger(
     partyToParticipant <- participantAdminConnection.getPartyToParticipant(
       dsoRules.domain,
       dsoParty,
+      topologySnapshot = TopologySnapshot.Sequenced,
     )
+    notConnected <- isNotConnectedToSync()
   } yield {
-    partyToParticipant.base.serial != task.serial
+    partyToParticipant.base.serial != task.serial || notConnected
   }
 }
 

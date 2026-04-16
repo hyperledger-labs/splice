@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.telemetry
@@ -42,7 +42,15 @@ object OpenTelemetryViews extends LazyLogging {
           histogramSelectorByName("*"),
           View
             .builder()
-            .setAggregation(Aggregation.base2ExponentialBucketHistogram(buckets, scale))
+            .setAggregation(
+              Aggregation.base2ExponentialBucketHistogram(
+                Base2ExponentialHistogramOptions
+                  .builder()
+                  .setMaxBuckets(buckets)
+                  .setMaxScale(scale)
+                  .build()
+              )
+            )
             .build(),
         )
       case _ =>
@@ -138,11 +146,20 @@ object OpenTelemetryViews extends LazyLogging {
       case HistogramDefinition.Buckets(buckets) =>
         if (buckets.nonEmpty)
           Aggregation.explicitBucketHistogram(
-            buckets.map(Double.box).asJava
+            ExplicitBucketHistogramOptions
+              .builder()
+              .setBucketBoundaries(buckets.map(Double.box).asJava)
+              .build()
           )
         else Aggregation.explicitBucketHistogram()
       case HistogramDefinition.Exponential(maxBuckets, maxScale) =>
-        Aggregation.base2ExponentialBucketHistogram(maxBuckets, maxScale)
+        Aggregation.base2ExponentialBucketHistogram(
+          Base2ExponentialHistogramOptions
+            .builder()
+            .setMaxBuckets(maxBuckets)
+            .setMaxScale(maxScale)
+            .build()
+        )
     }
     val tmp = View
       .builder()

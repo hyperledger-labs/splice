@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -29,14 +29,20 @@ final case class ParticipantNodeParameters(
     disableUpgradeValidation: Boolean,
     enableStrictDarValidation: Boolean,
     commandProgressTracking: CommandProgressTrackerConfig,
-    unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig],
-    automaticallyPerformLogicalSynchronizerUpgrade: Boolean,
+    alphaOnlinePartyReplicationSupport: Option[AlphaOnlinePartyReplicationConfig],
+    automaticallyPerformLsu: Boolean,
     reassignmentsConfig: ReassignmentsConfig,
     doNotAwaitOnCheckingIncomingCommitments: Boolean,
     disableOptionalTopologyChecks: Boolean,
+    commitmentAsynchronousInitialization: Boolean,
     commitmentCheckpointInterval: PositiveDurationSeconds,
     commitmentMismatchDebugging: Boolean,
     commitmentProcessorNrAcsChangesBehindToTriggerCatchUp: Option[PositiveInt],
+    commitmentReduceParallelism: NonNegativeInt,
+    commitmentUseDbSnapshotForParticipantLookup: Boolean,
+    autoSyncProtocolFeatureFlags: Boolean,
+    alphaMultiSynchronizerSupport: Boolean,
+    commitAfterFailedActivenessCheck: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -54,6 +60,7 @@ object ParticipantNodeParameters {
       loggingConfig = LoggingConfig(api = ApiLoggingConfig(messagePayloads = true)),
       processingTimeouts = DefaultProcessingTimeouts.testing,
       enablePreviewFeatures = false,
+      enableTestingFeatures = false,
       nonStandardConfig = false,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(
@@ -85,15 +92,21 @@ object ParticipantNodeParameters {
     disableUpgradeValidation = false,
     enableStrictDarValidation = true,
     commandProgressTracking = CommandProgressTrackerConfig(),
-    unsafeOnlinePartyReplication = None,
-    automaticallyPerformLogicalSynchronizerUpgrade = true,
+    alphaOnlinePartyReplicationSupport = None,
+    automaticallyPerformLsu = true,
     reassignmentsConfig = ReassignmentsConfig(
       targetTimestampForwardTolerance = NonNegativeFiniteDuration.ofSeconds(30)
     ),
     doNotAwaitOnCheckingIncomingCommitments = false,
     disableOptionalTopologyChecks = false,
+    commitmentAsynchronousInitialization = true,
     commitmentCheckpointInterval = PositiveDurationSeconds.ofMinutes(1),
     commitmentMismatchDebugging = false,
     commitmentProcessorNrAcsChangesBehindToTriggerCatchUp = None,
+    commitmentReduceParallelism = NonNegativeInt.zero,
+    commitmentUseDbSnapshotForParticipantLookup = false,
+    autoSyncProtocolFeatureFlags = true,
+    alphaMultiSynchronizerSupport = false,
+    commitAfterFailedActivenessCheck = false,
   )
 }

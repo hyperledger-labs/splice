@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
+import * as k8s from '@pulumi/kubernetes';
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 
-import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { configureCloudArmorPolicy } from './cloudArmor';
 import {
@@ -12,21 +13,13 @@ import {
   clusterBasename,
   enableGCReaperJob,
   infraConfig,
-  monitoringConfig,
 } from './config';
 import { installExtraCustomResources } from './extraCustomResources';
-import {
-  getNotificationChannel,
-  installCloudSQLMaintenanceUpdateAlerts,
-  installGcpLoggingAlerts,
-  installClusterMaintenanceUpdateAlerts,
-  installLoggedSecretsAlerts,
-} from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
-import { configureIstio, istioMonitoring } from './istio';
+import { configureIstio, istioVersion } from './istio';
 import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
-import { configureObservability } from './observability';
+import { configureReloader } from './reloader';
 import { configureStorage } from './storage';
 
 const network = configureNetwork(clusterBasename, clusterBaseDomain);
@@ -35,7 +28,10 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
+const cloudArmorSecurityPolicy = configureCloudArmorPolicy(
+  cloudArmorConfig,
+  svsConfig?.scan?.externalRateLimits || {}
+);
 const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
 
 if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
@@ -64,25 +60,9 @@ if (useGKEL7Gateway) {
   });
 }
 
-// Ensures that images required from Quay for observability can be pulled
-const observabilityDependsOn = istio.allResources.concat([network]);
-configureObservability(observabilityDependsOn);
-if (enableAlerts && !clusterIsResetPeriodically) {
-  const notificationChannel = getNotificationChannel();
-  if (notificationChannel) {
-    installGcpLoggingAlerts(notificationChannel);
-    installClusterMaintenanceUpdateAlerts(notificationChannel);
-    if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
-      installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
-    }
-    if (monitoringConfig.alerting.loggedSecretsFilter) {
-      installLoggedSecretsAlerts(notificationChannel);
-    }
-  }
-}
-istioMonitoring(network.ingressNs, []);
-
 configureStorage();
+
+configureReloader();
 
 installExtraCustomResources();
 
@@ -96,3 +76,25 @@ if (config.envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
 }
 
 export const auth0 = configuredAuth0;
+
+export const istioDashboardVersions = istioVersion.dashboards;
+// legacy while we migrate to the new observability project to avoid losing the prometheus data
+const namespaceName = 'observability';
+const namespace = new k8s.core.v1.Namespace(
+  namespaceName,
+  {
+    metadata: {
+      name: namespaceName,
+      // istio really doesn't play well with prometheus
+      // it seems to  modify the scraping calls from prometheus and change labels/include extra time series that make no sense
+      labels: { 'istio-injection': 'disabled' },
+    },
+  },
+  {
+    aliases: [
+      { name: 'observabilty' }, // Legacy typo
+    ],
+    // managed by the observability project
+    retainOnDelete: true,
+  }
+);

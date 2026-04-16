@@ -1,18 +1,17 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.crashrecovery
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.{CommandFailure, RemoteParticipantReference}
 import com.digitalasset.canton.error.TransactionRoutingError.AutomaticReassignmentForTransactionFailure
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
   UseExternalProcess,
   UsePostgres,
   UseProgrammableSequencer,
-  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.SynchronizerRouterIntegrationTestSetup
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentDefinition}
@@ -44,7 +43,7 @@ class AutomaticReassignmentCrashIntegrationTest
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(external)
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"), Set("sequencer3"))
@@ -110,7 +109,7 @@ class AutomaticReassignmentCrashIntegrationTest
 
       seq.setPolicy_("Block assignments") {
         SendPolicy.processTimeProofs_ { r =>
-          if (r.isConfirmationRequest) SendDecision.Reject else SendDecision.Process
+          if (r.isConfirmationRequest) SendDecision.Reject() else SendDecision.Process
         }
       }
 

@@ -64,6 +64,7 @@ trait SvDsoStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
+    with ExternalPartyConfigStateStore
     with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
@@ -132,6 +133,18 @@ trait SvDsoStore
   ] =
     lookupAmuletRulesWithOffset().map(_.value)
 
+  def lookupBootstrapExternalPartyConfigStateInstruction()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction.ContractId,
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction,
+  ]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(
+        splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION
+      )
+      .map(_.value.map(_.contract))
+
   def getAmuletRules()(implicit
       tc: TraceContext
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
@@ -188,6 +201,22 @@ trait SvDsoStore
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
 
+  /** List amulet transfer instructions that are expired */
+  def listExpiredAmuletTransferInstructions(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amulettransferinstruction.AmuletTransferInstruction.ContractId,
+    splice.amulettransferinstruction.AmuletTransferInstruction,
+  ]
+
+  /** List amulet allocations that are expired */
+  def listExpiredAmuletAllocations(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amuletallocation.AmuletAllocation.ContractId,
+    splice.amuletallocation.AmuletAllocation,
+  ]
+
   /** List locked amulets that are expired and can never be used as transfer input. */
   def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
@@ -233,7 +262,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.AppRewardCoupon.ContractId, splice.amulet.AppRewardCoupon]
+  ]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
@@ -257,7 +288,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.ValidatorRewardCoupon.ContractId, splice.amulet.ValidatorRewardCoupon]
+  ]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -299,7 +332,10 @@ trait SvDsoStore
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
+    Seq[SvDsoStore.RoundBatch[Contract[
+      splice.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      splice.validatorlicense.ValidatorFaucetCoupon,
+    ]]]
   ]
 
   def listValidatorLivenessActivityRecordsGroupedByRound(
@@ -310,9 +346,10 @@ trait SvDsoStore
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundBatch[
-      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
-    ]]
+    Seq[SvDsoStore.RoundBatch[Contract[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId,
+      splice.validatorlicense.ValidatorLivenessActivityRecord,
+    ]]]
   ]
 
   def listSvRewardCouponsOnDomain(
@@ -324,6 +361,18 @@ trait SvDsoStore
       splice.amulet.SvRewardCoupon.ContractId,
       splice.amulet.SvRewardCoupon,
     ]]
+  ]
+
+  /** Closed mining rounds that have no reward coupons of any type
+    * (AppRewardCoupon, ValidatorRewardCoupon, SvRewardCoupon, ValidatorLivenessActivityRecord).
+    */
+  protected def listClosedMiningRoundsWithoutCouponsOnDomain(
+      domain: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
   ]
 
   /** Get the closed round contracts associated with the given round numbers.
@@ -349,7 +398,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.SvRewardCoupon.ContractId, splice.amulet.SvRewardCoupon]
+  ]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
@@ -514,56 +565,28 @@ trait SvDsoStore
   ] = {
     for {
       domain <- getDsoRules().map(_.domain)
-      // we limit to the DsoRules domain because this is used by a polling trigger,
+      // We limit to the DsoRules domain because this is used by a polling trigger,
       // which exercises on DsoRules, so all operands must share its domain.
       // There's no harm "missing" closed rounds awaiting reassignment, because
-      // they'll be seen on the next poll
-      closedRounds <- multiDomainAcsStore.listContractsOnDomain(
-        splice.round.ClosedMiningRound.COMPANION,
+      // they'll be seen on the next poll.
+      closedRoundsWithoutCoupons <- listClosedMiningRoundsWithoutCouponsOnDomain(
         domain,
         limit,
       )
-      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRounds)(round => {
-        for {
-          appRewardCoupons <- listAppRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          validatorRewardCoupons <- listValidatorRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          validatorLivenessActivityRecords <- listValidatorLivenessActivityRecordsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          svRewardCoupons <- listSvRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          action = new ARC_AmuletRules(
-            new CRARC_MiningRound_Archive(
-              new AmuletRules_MiningRound_Archive(
-                round.contractId
-              )
+      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRoundsWithoutCoupons)(round => {
+        val action = new ARC_AmuletRules(
+          new CRARC_MiningRound_Archive(
+            new AmuletRules_MiningRound_Archive(
+              round.contractId
             )
           )
+        )
+        for {
           confirmationQueryResult <- lookupConfirmationByActionWithOffset(key.svParty, action)
         } yield {
-          (
-            // archivable if ...
-            if (
-              // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorLivenessActivityRecords.isEmpty && svRewardCoupons.isEmpty &&
-              // ... and a confirmation to archive is not already created by this SV
-              confirmationQueryResult.value.isEmpty
-            ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
-            else None
-          )
+          if (confirmationQueryResult.value.isEmpty)
+            Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
+          else None
         }
       })
     } yield archivableClosedRounds.flatten
@@ -964,6 +987,19 @@ trait SvDsoStore
       splice.amuletrules.TransferPreapproval.COMPANION
     )
 
+  def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]] = lookupExternalPartyAmuletRules().map(
+    _.value.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription("No active ExternalPartyAmuletRules contract")
+        .asRuntimeException()
+    )
+  )
+
   def lookupExternalPartyAmuletRules()(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[ContractWithState[
@@ -979,13 +1015,11 @@ trait SvDsoStore
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
 
-  def listFeaturedAppActivityMarkers(limit: Int)(implicit tc: TraceContext): Future[Seq[Contract[
-    splice.amulet.FeaturedAppActivityMarker.ContractId,
-    splice.amulet.FeaturedAppActivityMarker,
-  ]]] =
-    multiDomainAcsStore
-      .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
-      .map(_.map(_.contract))
+  def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
 
   final def listUnclaimedDevelopmentFundCoupons(
       limit: Limit
@@ -1003,7 +1037,10 @@ trait SvDsoStore
     } yield unclaimedDevelopmentFundCoupon map (_.contract)
 
   /** Whether there are more than the given number of featured app activity markers. */
-  def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+  def featuredAppActivityMarkerCountAboveOrEqualTo(
+      threshold: Int,
+      ignoredParties: Set[PartyId],
+  )(implicit
       tc: TraceContext
   ): Future[Boolean]
 
@@ -1011,6 +1048,7 @@ trait SvDsoStore
       contractIdHashLbIncl: Int,
       contractIdHashUbIncl: Int,
       limit: Int,
+      ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,
@@ -1402,6 +1440,37 @@ object SvDsoStore {
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
       },
+      mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          miningRound = Some(contract.payload.holdingFeesOpenRoundNumber.number),
+        )
+      },
+      mkFilter(splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION)(co =>
+        co.payload.dso == dso
+      ) {
+        DsoAcsStoreRowData(_)
+      },
+      mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>
+        co.payload.transfer.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt =
+            Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+        )
+      },
+      mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION)(co =>
+        co.payload.allocation.transferLeg.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt =
+            Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
+        )
+      },
     )
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -1434,13 +1503,23 @@ object SvDsoStore {
 case class ExpiredRewardCouponsBatch(
     closedRoundCid: splice.round.ClosedMiningRound.ContractId,
     closedRoundNumber: Long,
-    validatorCoupons: Seq[splice.amulet.ValidatorRewardCoupon.ContractId],
-    appCoupons: Seq[splice.amulet.AppRewardCoupon.ContractId],
-    svRewardCoupons: Seq[splice.amulet.SvRewardCoupon.ContractId],
-    validatorFaucets: Seq[splice.validatorlicense.ValidatorFaucetCoupon.ContractId],
-    validatorLivenessActivityRecords: Seq[
-      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
+    validatorCoupons: Seq[
+      Contract[splice.amulet.ValidatorRewardCoupon.ContractId, splice.amulet.ValidatorRewardCoupon]
     ],
+    appCoupons: Seq[
+      Contract[splice.amulet.AppRewardCoupon.ContractId, splice.amulet.AppRewardCoupon]
+    ],
+    svRewardCoupons: Seq[
+      Contract[splice.amulet.SvRewardCoupon.ContractId, splice.amulet.SvRewardCoupon]
+    ],
+    validatorFaucets: Seq[Contract[
+      splice.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      splice.validatorlicense.ValidatorFaucetCoupon,
+    ]],
+    validatorLivenessActivityRecords: Seq[Contract[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId,
+      splice.validatorlicense.ValidatorLivenessActivityRecord,
+    ]],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(

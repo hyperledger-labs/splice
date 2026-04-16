@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -7,7 +7,6 @@ import cats.data.{EitherT, Validated}
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
@@ -22,9 +21,13 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   ExceededMaxSequencingTime,
   PayloadToEventTimeBoundExceeded,
-  SequencedBeforeOrAtLowerBound,
+  SequencingTimeNotAdmissible,
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.*
+import com.digitalasset.canton.synchronizer.sequencer.time.{
+  DisasterRecoverySequencingTimeUpperBound,
+  LsuSequencingBounds,
+}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.BatchTracing.withTracedBatch
@@ -38,7 +41,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.*
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -77,16 +80,6 @@ final case class BatchWritten(
     latestTimestamp: CantonTimestamp,
     events: Seq[NonEmpty[Seq[Sequenced[BytesPayload]]]],
 )
-object BatchWritten {
-
-  /** Assumes events are ordered by timestamp */
-  def apply(events: NonEmpty[Seq[Sequenced[BytesPayload]]]): BatchWritten =
-    BatchWritten(
-      notifies = WriteNotification(events),
-      latestTimestamp = events.last1.timestamp,
-      events = Seq(events),
-    )
-}
 
 /** Base class for exceptions intentionally thrown during Pekko stream to flag errors */
 sealed abstract class SequencerWriterException(message: String) extends RuntimeException(message)
@@ -204,7 +197,8 @@ object SequencerWriterSource {
       protocolVersion: ProtocolVersion,
       metrics: SequencerMetrics,
       blockSequencerMode: Boolean,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      lsuSequencingBounds: Option[LsuSequencingBounds],
+      drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -267,15 +261,14 @@ object SequencerWriterSource {
 
     val eventsSequenced = payloadsWrittenWithKeepAlive
       .mapMaterializedValue(new SequencerWriterQueues(eventGenerator, loggerFactory)(_))
-      .via(
-        AssertMonotonicBlockSequencerTimestampsFlow(loggerFactory)
-      )
+      .via(AssertMonotonicBlockSequencerTimestampsFlow(loggerFactory))
       .via(
         SequenceWritesFlow(
           writerConfig,
           store,
           eventTimestampGenerator,
-          sequencingTimeLowerBoundExclusive,
+          lsuSequencingBounds,
+          drSequencingTimeUpperBound,
           loggerFactory,
           protocolVersion,
           blockSequencerMode,
@@ -349,23 +342,33 @@ class SendEventGenerator(
           )
       )
 
-    def validateRecipient(
-        member: Member
-    ): FutureUnlessShutdown[Validated[Member, SequencerMemberId]] =
-      for {
-        registeredMember <- store.lookupMember(member)
-        memberIdO = registeredMember.map(_.memberId)
-      } yield memberIdO.toRight(member).toValidated
+    def validateMember(
+        member: Member,
+        registeredMember: Option[RegisteredMember],
+    ): Validated[Member, SequencerMemberId] = {
+      val memberIdO = registeredMember.map(_.memberId)
+      memberIdO.toRight(member).toValidated
+    }
 
     def validateRecipients(
-        recipients: Set[Member]
-    ): FutureUnlessShutdown[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
+        recipients: Set[MemberRecipientOrBroadcast]
+    ): FutureUnlessShutdown[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] = {
+      val members = recipients.collect { case MemberRecipient(member) =>
+        member
+      }
+
+      val broadCastOpt =
+        Option.when(recipients.contains(AllMembersOfSynchronizer))(SequencerMemberId.Broadcast)
+
       for {
         // TODO(#12363) Support group addresses in the DB Sequencer
-        validatedSeq <- recipients.toSeq
-          .parTraverse(validateRecipient)
-        validated = validatedSeq.traverse(_.leftMap(NonEmpty(Seq, _)))
-      } yield validated.map(_.toSet)
+        registeredMembers <- store.lookupMembers(members.toSeq)
+        validatedMembers = registeredMembers.map { case (member, registeredMember) =>
+          validateMember(member, registeredMember)
+        }.toSeq
+        validated = validatedMembers.traverse(_.leftMap(NonEmpty(Seq, _)))
+      } yield validated.map(_.toSet ++ broadCastOpt)
+    }
 
     def validateAndGenerateEvent(
         senderId: SequencerMemberId,
@@ -387,12 +390,11 @@ class SendEventGenerator(
         )
       }
 
-      def deliver(recipientIds: Set[SequencerMemberId]): StoreEvent[BytesPayload] = {
-        val finalRecipientIds = if (submission.batch.isBroadcast) {
+      def deliver(sequencerMemberIds: Set[SequencerMemberId]): StoreEvent[BytesPayload] = {
+        val finalRecipientIds: Set[SequencerMemberId] = if (submission.batch.isBroadcast) {
           Set(SequencerMemberId.Broadcast)
-        } else {
-          recipientIds
-        }
+        } else sequencerMemberIds
+
         val payload =
           BytesPayload(
             submissionOrOutcome.fold(
@@ -412,10 +414,11 @@ class SendEventGenerator(
         )
       }
 
-      val recipients = submissionOrOutcome.fold(
-        _.batch.allMembers,
-        _.deliverToMembers,
+      val recipients: Set[MemberRecipientOrBroadcast] = submissionOrOutcome.fold(
+        _.batch.allMembers.map(MemberRecipient.apply),
+        _.recipients,
       )
+
       for {
         validatedRecipients <- validateRecipients(recipients)
       } yield validatedRecipients.fold(unknownRecipientsDeliverError, deliver)
@@ -513,7 +516,8 @@ object SequenceWritesFlow {
       writerConfig: SequencerWriterConfig,
       store: SequencerWriterStore,
       eventTimestampGenerator: PartitionedTimestampGenerator,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      lsuSequencingBounds: Option[LsuSequencingBounds],
+      drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
       loggerFactory: NamedLoggerFactory,
       protocolVersion: ProtocolVersion,
       blockSequencerMode: Boolean,
@@ -537,7 +541,7 @@ object SequenceWritesFlow {
             event
           })
         val notifies =
-          events.fold[WriteNotification](WriteNotification.None)(WriteNotification(_))
+          events.fold[WriteNotification](WriteNotification.NoTarget)(WriteNotification.forEvents(_))
         for {
           // if this write batch had any events then save them
           _ <- events.fold(FutureUnlessShutdown.unit)(eventsWithPayload =>
@@ -605,17 +609,39 @@ object SequenceWritesFlow {
       def checkSequencingTimeLowerBound(
           event: Presequenced[StoreEvent[BytesPayload]]
       ): Either[CantonBaseError, Unit] =
-        sequencingTimeLowerBoundExclusive match {
-          case Some(bound) =>
+        lsuSequencingBounds match {
+          case Some(lsuSequencingBounds) =>
             Either.cond(
               LogicalUpgradeTime.canProcessKnowingPastUpgrade(
-                upgradeTime = Some(bound),
+                /*
+                 On the write side, we consider lowerBoundSequencingTimeExclusive and not upgradeTime.
+                 It allows to perform testing of the new synchronizer before upgrade time. Such messages
+                 are filtered out on the read side for participants.
+                 */
+                upgradeTime = Some(lsuSequencingBounds.lowerBoundSequencingTimeExclusive),
                 sequencingTime = timestamp,
               ),
               (),
-              SequencedBeforeOrAtLowerBound.Error(
-                timestamp,
-                bound,
+              SequencingTimeNotAdmissible.Error.beforeOrAtLowerBound(
+                sequencingTime = timestamp,
+                lowerBound = lsuSequencingBounds.lowerBoundSequencingTimeExclusive,
+                event.event.description,
+              ),
+            )
+          case None => ().asRight
+        }
+
+      def checkDrSequencingTimeUpperBound(
+          event: Presequenced[StoreEvent[BytesPayload]]
+      ): Either[CantonBaseError, Unit] =
+        drSequencingTimeUpperBound match {
+          case Some(drSequencingTimeUpperBound) =>
+            Either.cond(
+              timestamp < drSequencingTimeUpperBound.ts,
+              (),
+              SequencingTimeNotAdmissible.Error.afterOrAtUpperBound(
+                sequencingTime = timestamp,
+                upperBound = drSequencingTimeUpperBound.ts,
                 event.event.description,
               ),
             )
@@ -684,16 +710,16 @@ object SequenceWritesFlow {
                   messageId = deliver.messageId,
                 ),
               )
-          case _ =>
-            Right(())
+          case _ => Right(())
         }
 
       val resultE = for {
         _ <- checkPayloadToEventMargin(presequencedEvent)
         _ <- checkMaxSequencingTime(presequencedEvent)
         _ <- checkSequencingTimeLowerBound(presequencedEvent)
+        _ <- checkDrSequencingTimeUpperBound(presequencedEvent)
         checkedEvent = deliverErrorForInvalidTopologyTimestamp(presequencedEvent)
-      } yield Sequenced(timestamp, checkedEvent.event)
+      } yield Sequenced(timestamp, checkedEvent.event, fromStore = false)
 
       resultE.tapLeft { error =>
         // log here as we don't have the trace context in the error itself
@@ -856,15 +882,24 @@ object UpdateWatermarkFlow {
 }
 
 object NotifyEventSignallerFlow {
-  def apply(eventSignaller: EventSignaller)(implicit
-      executionContext: ExecutionContext
+  def apply(
+      eventSignaller: EventSignaller
   ): Flow[Traced[BatchWritten], Traced[BatchWritten], NotUsed] =
-    Flow[Traced[BatchWritten]]
-      .mapAsync(1)(_.withTraceContext { implicit traceContext => batchWritten =>
-        eventSignaller.notifyOfLocalWrite(batchWritten.notifies) map { _ =>
-          Traced(batchWritten)
-        }
-      })
+    Flow[Traced[BatchWritten]].alsoTo(
+      // `alsoTo` propagates backpressure coming from the sink, but backpressure shouldn't happen
+      // because of the async+conflate construction
+      Flow[Traced[BatchWritten]]
+        // decouple the main sequencer writer flow from the event notification
+        .async
+        .addAttributes(Attributes.inputBuffer(1, 1))
+        .map(_.value.notifies)
+        // combine multiple event signals
+        .conflate(_ union _)
+        // this could also be dispatched in parallel
+        .map(eventSignaller.notifyOfLocalWrite)
+        .to(Sink.ignore)
+    )
+
 }
 
 object RecordWatermarkDelayMetricFlow {

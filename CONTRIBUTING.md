@@ -2,6 +2,7 @@
 
 - [Contributing to the Splice repository](#contributing-to-the-splice-repository)
   - [Testing](#testing)
+  - [Git Hygiene](#git-hygiene)
   - [Branch Naming](#branch-naming)
   - [TODO Comments](#todo-comments)
   - [DB Migrations](#db-migrations)
@@ -11,6 +12,8 @@
     - [Backwards-compatible Daml changes](#backwards-compatible-daml-changes)
     - [Daml Numerics](#daml-numerics)
   - [Message Definitions](#message-definitions)
+  - [OpenAPI / Scan API Changes](#openapi--scan-api-changes)
+    - [Modifying BFT-consensus types](#modifying-bft-consensus-types)
   - [Config Parameters](#config-parameters)
   - [Code Layout](#code-layout)
   - [Domain Specific Naming](#domain-specific-naming)
@@ -49,7 +52,9 @@ Every contribution must be tested in an automated test! For further details see 
 Also note that the splice CI [enforces](https://github.com/cncf/dco2) that all commits on a pull request contain a valid `Signed-off-by: Your Name <your@email.com>` line,
 to confirm adherence to the [DCO](https://developercertificate.org/) requirements.
 
-## Branch Naming
+## Git Hygiene
+
+### Branch Naming
 
 If you are a Splice Contributor and therefore have write permissions to the Splice repo directly,
 please prefix branch names by your name, followed by a slash and a descriptive name:
@@ -59,6 +64,35 @@ please prefix branch names by your name, followed by a slash and a descriptive n
 For example, if Bob is working on issue 4242 to "fix FooTest", he could name his branch:
 
 `bob/fix-footest/4242`.
+
+### Merge Strategy
+
+PRs are merged into `main` using **squash and merge**. This collapses all commits in the PR into a single commit on `main`, keeping the history clean and linear.
+
+### Squash-and-Merge Commit Messages
+
+Because the squash commit is the only record of the change on `main`, its message matters.
+Follow these conventions:
+
+* **Title (first line):** A concise summary of the change, written in imperative mood (e.g., "Add external transaction hash to Scan API", not "Added …" or "Adds …"). GitHub defaults the title to the PR title, so make sure the PR title is descriptive.
+* **Body:** GitHub auto-populates the body with the list of individual commit messages. Clean this up before merging:
+  - Remove noise such as "address review comments", "fixes", "format", "refactor", etc.
+  - Keep a brief summary of *what* the change does and *why*. A few bullet points are fine.
+  - Reference the related GitHub issue, e.g., `Fixes #1234` or `Part of #1234`.
+  - Example of a good squash commit message:
+    ```
+    Add external transaction hash to Scan API (#1234)
+
+    - Store the external transaction hash from the ledger API in the
+      update_history_transactions table.
+    - Expose the hash through the v2/updates and v2/updates/{update_id}
+      Scan endpoints.
+    - Gate hash inclusion behind a configurable threshold record time for BFT-safety.
+
+    Signed-off-by: Git-Hygienic-Dev <ghd@example.com>
+    ```
+* **CI tags:** Post-merge process ignores CI tags (e.g., `[ci]`, `[static]`), so always remove them.
+* **Sign-off:** The squash commit must include a valid `Signed-off-by` line. Ensure it is present in the commit message body.
 
 ## TODO Comments
 
@@ -120,6 +154,42 @@ Overall, please refer to the `wallet.tap` command implementation for the canonic
 * Use a plural name for `repeated` fields
 * Use `string` fields with a suffix `contract_id` to store contract ids
 * Use `string` fields with a suffix `party_id` to store party ids
+
+## OpenAPI / Scan API Changes
+
+### Modifying BFT-consensus types
+
+Update history types served by the Scan API are serialized to JSON and compared across SVs for BFT
+consensus.  **Any** schema change — adding, removing, or renaming a field — will cause JSON
+divergence between SVs running different code versions, breaking consensus.
+
+For any such change you must ensure a coordination mechanism is in place (e.g., a threshold record time
+gate) so that the new schema is not emitted before all SVs have deployed the updated code.
+
+#### Adding or removing required fields
+
+Adding a new required field means new-code SVs emit a key that old-code SVs do not; removing one
+has the opposite effect.  Both break JSON equality.  Gate the change behind a threshold record time or
+equivalent mechanism so that all SVs switch over simultaneously.
+
+#### Adding optional fields
+
+Optional fields are especially easy to add without realizing the consequences: circe emits `null`
+for `Option[_]` fields by default instead of omitting them, so new-code SVs emit `"field": null`
+while old-code SVs omit the key entirely.
+
+If you need to add an optional field to any type in the update history schema:
+
+1. **Prefer making the field required** with a sensible default — this avoids the problem entirely
+   (though you still need a gate for the new key itself).
+2. If the field must be optional, use `Option[OmitNullString]` (via `x-scala-type` in the OpenAPI
+   spec) and wire it into `ScanJsonSupport` using the `omitWhenNone` helper so the key is omitted
+   from JSON when `None`.
+3. Add the new type (if it is a new leaf type) to the compliance check in
+   `UpdateHistoryOmitNullStringComplianceTest` — this test verifies that no `Option[_]` fields
+   exist on BFT-consensus types unless they are `Option[OmitNullString]`.
+
+See `ScanJsonSupport.scala` for the full set of custom encoders and their documentation.
 
 ## Config Parameters
 

@@ -297,8 +297,12 @@ class DevelopmentFundCouponIntegrationTest
             beneficiary,
             Seq(expectedStatus),
           )
-          // Beneficiary cannot view the withdrawn coupon
-          assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+          // As the beneficiary, Bob can view the withdrawn coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            bobWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
         },
       )
     }
@@ -372,7 +376,7 @@ class DevelopmentFundCouponIntegrationTest
       eventually() {
         aliceValidatorWalletClient
           .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
-        val newBalance = 34 // 40 - fees
+        val newBalance = 40
         checkWallet(
           bobParty,
           bobWalletClient,
@@ -395,15 +399,21 @@ class DevelopmentFundCouponIntegrationTest
     }
 
     clue("Collected coupon is listed in listDevelopmentFundCouponHistory as claimed") {
-      val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Claimed -> None
-      // As the fund manager, Alice can view the claimed coupon
-      assertListDevelopmentFundCouponHistoryStatuses(
-        aliceValidatorWalletClient,
-        beneficiary,
-        Seq(expectedStatus),
-      )
-      // Beneficiary cannot view the claimed coupon
-      assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+      eventually() {
+        val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Claimed -> None
+        // As the fund manager, Alice can view the claimed coupon
+        assertListDevelopmentFundCouponHistoryStatuses(
+          aliceValidatorWalletClient,
+          beneficiary,
+          Seq(expectedStatus),
+        )
+        // As the beneficiary, Bob can view the claimed coupon
+        assertListDevelopmentFundCouponHistoryStatuses(
+          bobWalletClient,
+          beneficiary,
+          Seq(expectedStatus),
+        )
+      }
     }
 
     clue("Claimed development fund coupon is included in the transaction history") {
@@ -512,15 +522,21 @@ class DevelopmentFundCouponIntegrationTest
       }
 
       clue("The expired coupon is listed in listDevelopmentFundCouponHistory as expired") {
-        val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Expired -> None
-        // As the fund manager, Alice can view the expired coupon
-        assertListDevelopmentFundCouponHistoryStatuses(
-          aliceValidatorWalletClient,
-          beneficiary,
-          Seq(expectedStatus),
-        )
-        // Beneficiary cannot view the expired coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+        eventually() {
+          val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Expired -> None
+          // As the fund manager, Alice can view the expired coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            aliceValidatorWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
+          // As the beneficiary, Bob can view the expired coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            bobWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
+        }
       }
     }
   }
@@ -602,28 +618,31 @@ class DevelopmentFundCouponIntegrationTest
           )
         },
       )(
-        "The coupon is archived and the total unclaimed development fund coupon amount increases",
+        "The coupon is archived, the total unclaimed development fund coupon amount increases, " +
+          "and the archived coupon is listed in listDevelopmentFundCouponHistory as rejected",
         _ => {
           aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
           getUnclaimedDevelopmentFundCouponTotal(
             sv1ValidatorBackend
           ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeRejection + developmentFundCouponAmount)
+
+          val expectedStatus =
+            httpDef.ArchivedDevelopmentFundCoupon.Status.Rejected -> Some(rejectionReason)
+          // As the fund manager, Alice can view the rejected coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            aliceValidatorWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
+          // As the beneficiary, Bob can view the rejected coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            bobWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
         },
       )
-
-      clue("The rejected coupon is listed in listDevelopmentFundCouponHistory as rejected") {
-        val expectedStatus =
-          httpDef.ArchivedDevelopmentFundCoupon.Status.Rejected -> Some(rejectionReason)
-        // As the fund manager, Alice can view the rejected coupon
-        assertListDevelopmentFundCouponHistoryStatuses(
-          aliceValidatorWalletClient,
-          beneficiary,
-          Seq(expectedStatus),
-        )
-        // Beneficiary cannot view the rejected coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
-      }
     }
   }
 

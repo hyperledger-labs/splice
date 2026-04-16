@@ -72,7 +72,6 @@ import slick.jdbc.canton.SQLActionBuilder
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
-import scala.reflect.ClassTag
 
 class DbSvDsoStore(
     override val key: SvStore.Key,
@@ -365,6 +364,63 @@ class DbSvDsoStore(
   ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] =
     listRewardCouponsOnDomain(SvRewardCoupon.COMPANION, round, synchronizerId, limit)
 
+  override protected def listClosedMiningRoundsWithoutCouponsOnDomain(
+      domain: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
+  ] = {
+    val closedRoundPqn =
+      PackageQualifiedName.fromJavaCodegenCompanion(ClosedMiningRound.COMPANION)
+    val couponPqns = Seq(
+      AppRewardCoupon.COMPANION,
+      ValidatorRewardCoupon.COMPANION,
+      SvRewardCoupon.COMPANION,
+      ValidatorLivenessActivityRecord.COMPANION,
+    ).map(PackageQualifiedName.fromJavaCodegenCompanion)
+
+    // I think `reduce` makes this nicer to read but the wartremover doesn't like it...
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    val notExistsClauses = couponPqns
+      .map { pqn =>
+        sql"""and not exists (
+                select 1 from #${DsoTables.acsTableName} rc
+                where rc.store_id = $acsStoreId
+                  and rc.migration_id = $domainMigrationId
+                  and rc.package_name = ${pqn.packageName}
+                  and rc.template_id_qualified_name = ${pqn.qualifiedName}
+                  and rc.reward_round = cr.mining_round
+                  and rc.reward_party is not null
+                  and rc.assigned_domain = $domain
+              )"""
+      }
+      .reduce((a, b) => (a ++ b).toActionBuilder)
+
+    val opName = "listClosedMiningRoundsWithoutCouponsOnDomain"
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .query(
+            (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("cr.")}
+                   from #${DsoTables.acsTableName} cr
+                   where cr.store_id = $acsStoreId
+                     and cr.migration_id = $domainMigrationId
+                     and cr.package_name = ${closedRoundPqn.packageName}
+                     and cr.template_id_qualified_name = ${closedRoundPqn.qualifiedName}
+                     and cr.assigned_domain = $domain
+                """ ++ notExistsClauses ++ sql"""
+                   order by cr.event_number
+                   limit ${sqlLimit(limit)}
+                """).toActionBuilder.as[SelectFromAcsTableResult],
+            opName,
+          )
+        limited = applyLimit(opName, limit, result)
+      } yield limited.map(contractFromRow(ClosedMiningRound.COMPANION)(_))
+    }
+  }
+
   override def countValidatorFaucetCouponsOnDomain(round: Long, synchronizerId: SynchronizerId)(
       implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
@@ -453,7 +509,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[AppRewardCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]]] =
     listCouponsGroupedByRound(
       AppRewardCoupon.COMPANION,
       domain,
@@ -469,7 +525,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorRewardCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]]] =
     listCouponsGroupedByRound(
       ValidatorRewardCoupon.COMPANION,
       domain,
@@ -485,7 +541,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorFaucetCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]]] =
     listCouponsGroupedByRound(
       ValidatorFaucetCoupon.COMPANION,
       domain,
@@ -501,7 +557,9 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorLivenessActivityRecord.ContractId]]] =
+  ): Future[Seq[RoundBatch[
+    Contract[ValidatorLivenessActivityRecord.ContractId, ValidatorLivenessActivityRecord]
+  ]]] =
     listCouponsGroupedByRound(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
@@ -515,7 +573,9 @@ class DbSvDsoStore(
       batchSize: Limit,
       numBatches: Limit,
       ignoredParties: Set[PartyId],
-  )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[RoundBatch[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]]] =
     listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
@@ -524,7 +584,7 @@ class DbSvDsoStore(
       ignoredParties,
     )
 
-  private def listCouponsGroupedByRound[C, TCId <: ContractId[?]: ClassTag, T](
+  private def listCouponsGroupedByRound[C, TCId <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
       batchSize: Limit,
@@ -533,7 +593,7 @@ class DbSvDsoStore(
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
+  ): Future[Seq[SvDsoStore.RoundBatch[Contract[TCId, T]]]] = {
     val packageQualifiedName = companionClass.packageQualifiedName(companion)
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByRound"
@@ -556,9 +616,9 @@ class DbSvDsoStore(
         result <- storage
           .query(
             (sql"""
-                select sub.reward_round, array_agg(sub.contract_id)
+                select sub.reward_round, #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}
                 from (
-                  select reward_round, contract_id,
+                  select reward_round, #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},
                          row_number() over (partition by reward_round) as rn
                   from dso_acs_store
                   where store_id = $acsStoreId
@@ -571,21 +631,21 @@ class DbSvDsoStore(
                     """ ++ partyFilter ++ sql"""
                 ) sub
                 where sub.rn <= ${sqlLimit(batchSize)}
-                group by sub.reward_round
                 order by sub.reward_round asc
-                limit ${sqlLimit(numBatches)}
-               """).toActionBuilder.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
+                limit ${sqlLimit(numBatches) * sqlLimit(batchSize)}
+               """).toActionBuilder.as[(Long, SelectFromAcsTableResult)],
+            // the limit at the end is not exact but good enough to avoid fetching an unbounded result, the applyLimit below forces us into the actual batch limit.
             opName,
           )
-      } yield applyLimit(opName, numBatches, result)
-        .map { case (round, batch) =>
+      } yield {
+        val groupedResults = applyLimit(opName, numBatches, result.groupBy(_._1))
+        groupedResults.map { case (round, batch) =>
           RoundBatch(
             round,
-            batch
-              .map(cid => companionClass.toContractId(companion, cid.contractId))
-              .toSeq,
+            batch.map { case (_, c) => contractFromRow(companion)(c) }.toSeq,
           )
-        }
+        }.toSeq
+      }
     }
   }
 
@@ -861,7 +921,7 @@ class DbSvDsoStore(
   override def listExpiredAmulets(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
-    val filterClause = if (ignoredParties.nonEmpty) {
+    val filterClause: SQLActionBuilder = if (ignoredParties.nonEmpty) {
       (sql" and " ++ notInClause("create_arguments->>'owner'", ignoredParties)).toActionBuilder
     } else {
       sql""
@@ -882,6 +942,96 @@ class DbSvDsoStore(
     }
     listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION, filterClause)
   }
+
+  override def listExpiredAmuletAllocations(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amuletallocation.AmuletAllocation.ContractId,
+    splice.amuletallocation.AmuletAllocation,
+  ] = (now, limit) =>
+    implicit tc => {
+      val _ = tc
+      val filterClause = if (ignoredParties.nonEmpty) {
+        (sql" and " ++ notInClause(
+          "create_arguments->'allocation'->'transferLeg'->>'sender'",
+          ignoredParties,
+        ) ++ sql" and " ++ notInClause(
+          "create_arguments->'allocation'->'transferLeg'->>'receiver'",
+          ignoredParties,
+        )).toActionBuilder
+      } else {
+        sql""
+      }
+
+      waitUntilAcsIngested {
+        for {
+          synchronizerId <- getDsoRules().map(_.domain)
+          rows <- storage.query(
+            selectFromAcsTableWithState(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              splice.amuletallocation.AmuletAllocation.COMPANION,
+              additionalWhere = (sql"""
+                and assigned_domain = $synchronizerId
+                and acs.contract_expires_at < ${now}
+              """ ++ filterClause).toActionBuilder,
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+            ),
+            "listExpiredAmuletAllocations",
+          )
+        } yield rows.map(
+          assignedContractFromRow(
+            splice.amuletallocation.AmuletAllocation.COMPANION
+          )(_)
+        )
+      }
+    }
+
+  override def listExpiredAmuletTransferInstructions(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amulettransferinstruction.AmuletTransferInstruction.ContractId,
+    splice.amulettransferinstruction.AmuletTransferInstruction,
+  ] = (now, limit) =>
+    implicit tc => {
+      val _ = tc
+      val filterClause = if (ignoredParties.nonEmpty) {
+        (sql" and " ++ notInClause(
+          "create_arguments->'transfer'->>'sender'",
+          ignoredParties,
+        ) ++ sql" and " ++ notInClause(
+          "create_arguments->'transfer'->>'receiver'",
+          ignoredParties,
+        )).toActionBuilder
+      } else {
+        sql""
+      }
+
+      waitUntilAcsIngested {
+        for {
+          synchronizerId <- getDsoRules().map(_.domain)
+          rows <- storage.query(
+            selectFromAcsTableWithState(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
+              additionalWhere = (sql"""
+                and assigned_domain = $synchronizerId
+                and acs.contract_expires_at < ${now}
+              """ ++ filterClause).toActionBuilder,
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+            ),
+            "listExpiredAmuletTransferInstructions",
+          )
+        } yield rows.map(
+          assignedContractFromRow(
+            splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION
+          )(_)
+        )
+      }
+    }
 
   private def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
       companion: Template[Id, T],
@@ -908,8 +1058,19 @@ class DbSvDsoStore(
                     and template_id_qualified_name = ${QualifiedName(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
+                  and mining_round is not null
+                order by mining_round desc limit 1)
+                and coalesce(acs.amulet_round_of_expiry <= (
+                  select mining_round
+                  from dso_acs_store
+                  where store_id = $acsStoreId
+                    and migration_id = $domainMigrationId
+                    and package_name = ${splice.externalpartyconfigstate.ExternalPartyConfigState.PACKAGE_NAME}
+                    and template_id_qualified_name = ${QualifiedName(
+                  splice.externalpartyconfigstate.ExternalPartyConfigState.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                     and mining_round is not null
-                  order by mining_round desc limit 1)""" ++ extraFilter).toActionBuilder,
+                  order by mining_round asc limit 1), true)""" ++ extraFilter).toActionBuilder,
               orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",
@@ -1527,6 +1688,20 @@ class DbSvDsoStore(
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
   }
 
+  override def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] = {
+    val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
+      new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateBootstrapExternalPartyConfigStateInstruction(
+        new splice.dsorules.DsoRules_CreateBootstrapExternalPartyConfigStateInstruction()
+      )
+    )
+    listConfirmationsByActionConfirmer(expectedAction, confirmer)
+  }
+
   override def lookupAmuletConversionRateFeed(
       publisher: PartyId
   )(implicit tc: TraceContext): Future[Option[Contract[
@@ -1555,14 +1730,26 @@ class DbSvDsoStore(
       )
     }
 
-  override def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+  override def featuredAppActivityMarkerCountAboveOrEqualTo(
+      threshold: Int,
+      ignoredParties: Set[PartyId],
+  )(implicit
       tc: TraceContext
-  ): Future[Boolean] =
+  ): Future[Boolean] = {
+    val filterClause: SQLActionBuilder = if (ignoredParties.nonEmpty) {
+      (sql" and " ++ notInClause("create_arguments->>'provider'", ignoredParties) ++
+        sql" and " ++ notInClause(
+          "create_arguments->>'beneficiary'",
+          ignoredParties,
+        )).toActionBuilder
+    } else {
+      sql""
+    }
     waitUntilAcsIngested {
       futureUnlessShutdownToFuture(
         storage
           .query(
-            sql"""
+            (sql"""
             select count(contract_id) as num_markers
               from (
                 select contract_id
@@ -1574,22 +1761,34 @@ class DbSvDsoStore(
                    template_id_qualified_name = ${QualifiedName(
                 FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
+                 """ ++ filterClause ++ sql"""
                  limit $threshold
               ) as markers;
-                   """.toActionBuilder.as[Int],
+                   """).toActionBuilder.as[Int],
             "featuredAppActivityMarkerCountAboveOrEqualTo",
           )
       ).map(results => results.contains(threshold))
     }
+  }
 
   override def listFeaturedAppActivityMarkersByContractIdHash(
       contractIdHashLbIncl: Int,
       contractIdHashUbIncl: Int,
       limit: Int,
+      ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,
-  ]]] =
+  ]]] = {
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and " ++ notInClause("create_arguments->>'provider'", ignoredParties) ++
+        sql" and " ++ notInClause(
+          "create_arguments->>'beneficiary'",
+          ignoredParties,
+        )).toActionBuilder
+    } else {
+      sql""
+    }
     for {
       result <- storage
         .query(
@@ -1598,15 +1797,16 @@ class DbSvDsoStore(
             acsStoreId,
             domainMigrationId,
             FeaturedAppActivityMarker.COMPANION,
-            where = sql"""
+            where = (sql"""
                   $contractIdHashLbIncl <= stable_int32_hash(contract_id)
               AND stable_int32_hash(contract_id) <= $contractIdHashUbIncl
-            """,
+            """ ++ filterClause).toActionBuilder,
             orderLimit = sql"""order by stable_int32_hash(contract_id) limit $limit""",
           ),
           "listFeaturedAppActivityMarkersByContractIdHash",
         )
     } yield result.map(contractFromRow(FeaturedAppActivityMarker.COMPANION)(_))
+  }
 
   override def close(): Unit = {
     dsoStoreMetrics.close()

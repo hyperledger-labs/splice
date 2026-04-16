@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
@@ -62,6 +62,7 @@ sealed trait ReassignmentPruningIntegrationTest
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
         ConfigTransforms.updateMaxDeduplicationDurations(maxDedupDuration),
+        ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
       )
       .withSetup { implicit env =>
         import env.*
@@ -166,7 +167,6 @@ sealed trait ReassignmentPruningIntegrationTest
     val unassignOffsetP1 = participant1.ledger_api.updates
       .reassignments(
         partyIds = Set(alice),
-        filterTemplates = Seq.empty,
         completeAfter = 1,
         beginOffsetExclusive = ledgerEndP1BeforeUnassign,
       )
@@ -192,7 +192,6 @@ sealed trait ReassignmentPruningIntegrationTest
     val assignOffsetP2 = participant2.ledger_api.updates
       .reassignments(
         partyIds = Set(bank),
-        filterTemplates = Seq.empty,
         completeAfter = 1,
         beginOffsetExclusive = ledgerEndP2BeforeAssign,
       )

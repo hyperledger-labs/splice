@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -316,7 +316,7 @@ object InternalConsistencyChecker {
   ): FutureUnlessShutdown[Map[LfPartyId, Option[ParticipantAttributes]]] = {
     val parties =
       rootViewTrees.forgetNE
-        .flatMap(_.view.globalKeyInputs.values.flatMap(_.unversioned.maintainers))
+        .flatMap(_.view.keyMaintainers.values.flatMap(_.unversioned.maintainers))
         .toSet
     ExtractUsedAndCreated.fetchHostedParties(
       parties,

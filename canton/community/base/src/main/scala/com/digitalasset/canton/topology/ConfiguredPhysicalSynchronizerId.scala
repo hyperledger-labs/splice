@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -43,6 +43,6 @@ object ConfiguredPhysicalSynchronizerId {
       : SetParameter[ConfiguredPhysicalSynchronizerId] =
     (psid: ConfiguredPhysicalSynchronizerId, pp: PositionedParameters) => pp >> psid.toOption
 
-  implicit val configuredPSIdOrdering: Ordering[ConfiguredPhysicalSynchronizerId] =
+  implicit val configuredPsidOrdering: Ordering[ConfiguredPhysicalSynchronizerId] =
     Ordering.by(_.toOption)
 }

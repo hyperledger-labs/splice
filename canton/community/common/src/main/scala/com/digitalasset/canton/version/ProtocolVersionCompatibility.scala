@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -9,7 +9,6 @@ import com.digitalasset.base.error.ErrorCategory.SecurityAlert
 import com.digitalasset.base.error.{ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.HandshakeErrorGroup
@@ -43,7 +42,8 @@ object ProtocolVersionCompatibility {
       sys.error(
         s"Please review the supported protocol versions of release version $release in `ReleaseVersionToProtocolVersions.scala`."
       ),
-    ) ++ unstableAndBeta
+    ) ++ unstableAndBeta :+ ProtocolVersion.v35
+    // TODO(i31167): When PV35 is stable, remove the following line
 
     // If the release contains an unstable, alpha or beta protocol version, it is mentioned twice in the result
     supportedPVs.distinct
@@ -71,7 +71,8 @@ object ProtocolVersionCompatibility {
       sys.error(
         s"Please review the supported protocol versions of release version $release in `ReleaseVersionToProtocolVersions.scala`."
       ),
-    ) ++ beta ++ alpha
+    ) ++ beta ++ alpha :+ ProtocolVersion.v35
+    // TODO(i31167): When PV35 is stable, remove the following line
 
     // If the release contains an unstable, alpha or beta protocol version, it is mentioned twice in the result
     supportedPVs.distinct
@@ -221,14 +222,10 @@ object SynchronizerProtocolVersion {
   * [[com.digitalasset.canton.participant.config.ParticipantNodeConfig]] which is supported by the
   * corresponding participant release.
   */
-final case class ParticipantProtocolVersion(version: ProtocolVersion)
-    extends UniformCantonConfigValidation {
+final case class ParticipantProtocolVersion(version: ProtocolVersion) {
   def unwrap: ProtocolVersion = version
 }
 object ParticipantProtocolVersion {
-  implicit val participantProtocolVersionCanontConfigValidator
-      : CantonConfigValidator[ParticipantProtocolVersion] =
-    CantonConfigValidator.validateAll
 
   implicit val participantProtocolVersionWriter: ConfigWriter[ParticipantProtocolVersion] =
     ConfigWriter.toString(_.version.toProtoPrimitiveS)

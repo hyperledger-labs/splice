@@ -64,7 +64,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -420,7 +420,7 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-3",
+      "name": "participant-2",
       "namespace": "validator",
       "timeout": 600,
       "values": {
@@ -443,7 +443,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -472,7 +472,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 3
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -483,7 +483,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -507,7 +507,7 @@
       },
       "version": "0.3.20"
     },
-    "name": "validator-participant-3",
+    "name": "validator-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -534,7 +534,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -552,7 +552,7 @@
           "name": "cn-mocknet"
         },
         "config": {
-          "jsonLedgerApiUrl": "http://participant-3:7575",
+          "jsonLedgerApiUrl": "http://participant-2:7575",
           "keyDirectory": "/keys",
           "maxParties": 1234,
           "parallelism": 321,
@@ -565,8 +565,8 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "pvc": {
-          "name": "party-allocator-keys",
-          "volumeStorageClass": "standard-rwo"
+          "name": "party-allocator-keys-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "tolerations": [
           {
@@ -625,7 +625,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -643,7 +643,9 @@
           "name": "cn-mocknet"
         },
         "db": {
-          "volumeSize": "50Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "200Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -691,122 +693,125 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [
-          {
-            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
-            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
-          }
-        ],
-        "additionalJvmOptions": "-Dparticipantoption",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    },
-                    {
-                      "key": "cn_apps",
-                      "operator": "NotIn",
-                      "values": [
-                        "hyperdisk"
-                      ]
-                    }
-                  ]
-                }
-              ]
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
+              "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
             }
-          }
-        },
-        "auth": {
-          "audience": "https://validator.example.com/api",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
-        },
-        "contactPoint": "sv-support@digitalasset.com",
-        "db": {},
-        "enablePostgresMetrics": true,
-        "enableWallet": true,
-        "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "maxVettingDelay": "1m",
-        "metrics": {
-          "enable": true
-        },
-        "migrateValidatorParty": false,
-        "migration": {
-          "id": "3"
-        },
-        "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-3",
-        "participantIdentitiesDumpPeriodicBackup": {
-          "backupInterval": "10m",
-          "location": {
-            "bucket": {
-              "bucketName": "da-cn-data-dumps",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-devnet",
-              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
-            },
-            "prefix": "mock/validator"
-          }
-        },
-        "participantPruningSchedule": {
-          "cron": "0 /10 * * * ?",
-          "maxDuration": "5m",
-          "retention": "30d"
-        },
-        "persistence": {
-          "host": "postgres",
-          "postgresName": "postgres",
-          "secretName": "postgres-secrets"
-        },
-        "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "scanClient": {
-          "scanType": "bft-custom",
-          "seedUrls": [
-            "https://scan.sv-2-eng.test.network.canton.global",
-            "https://scan.sv-3-eng.test.network.canton.global"
           ],
-          "svNames": [
-            "Digital-Asset-Eng-2",
-            "Digital-Asset-Eng-3"
+          "additionalJvmOptions": "-Dparticipantoption",
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "auth": {
+            "audience": "https://validator.example.com/api",
+            "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          },
+          "contactPoint": "sv-support@digitalasset.com",
+          "db": {},
+          "enablePostgresMetrics": true,
+          "enableWallet": true,
+          "failOnAppVersionMismatch": true,
+          "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "maxVettingDelay": "1m",
+          "metrics": {
+            "enable": true
+          },
+          "migrateValidatorParty": false,
+          "migration": {
+            "id": "2"
+          },
+          "nodeIdentifier": "validator-runbook",
+          "participantAddress": "participant-2",
+          "participantIdentitiesDumpPeriodicBackup": {
+            "backupInterval": "10m",
+            "location": {
+              "bucket": {
+                "bucketName": "da-cn-data-dumps",
+                "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+                "projectId": "da-cn-devnet",
+                "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+              },
+              "prefix": "mock/validator"
+            }
+          },
+          "participantPruningSchedule": {
+            "cron": "0 /10 * * * ?",
+            "maxDuration": "5m",
+            "retention": "30d"
+          },
+          "persistence": {
+            "host": "postgres",
+            "postgresName": "postgres",
+            "secretName": "postgres-secrets"
+          },
+          "pvc": {
+            "volumeName": "domain-migration-validator-hd-pvc",
+            "volumeStorageClass": "hyperdisk-standard-rwo"
+          },
+          "scanClient": {
+            "scanType": "bft-custom",
+            "seedUrls": [
+              "https://scan.sv-2-eng.test.network.canton.global",
+              "https://scan.sv-3-eng.test.network.canton.global"
+            ],
+            "svNames": [
+              "Digital-Asset-Eng-2",
+              "Digital-Asset-Eng-3"
+            ],
+            "threshold": 2
+          },
+          "spliceInstanceNames": {
+            "amuletName": "Amulet",
+            "amuletNameAcronym": "AMT",
+            "nameServiceName": "Amulet Name Service",
+            "nameServiceNameAcronym": "ANS",
+            "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+            "networkName": "Splice"
+          },
+          "svSponsorAddress": "https://sv.sv-2.mock.global.canton.network.digitalasset.com",
+          "synchronizer": {
+            "connectionType": "bft"
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
           ],
-          "threshold": 2
-        },
-        "spliceInstanceNames": {
-          "amuletName": "Amulet",
-          "amuletNameAcronym": "AMT",
-          "nameServiceName": "Amulet Name Service",
-          "nameServiceNameAcronym": "ANS",
-          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-          "networkName": "Splice"
-        },
-        "svSponsorAddress": "https://sv.sv-2.mock.global.canton.network.digitalasset.com",
-        "synchronizer": {
-          "connectionType": "bft"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ],
-        "topup": {
-          "enabled": true,
-          "minTopupInterval": "1m",
-          "targetThroughput": 4500
-        },
-        "validatorPartyHint": "digitalasset-testValidator-1",
-        "validatorWalletUsers": [
-          "auth0|6526fab5214c99a9a8e1e3cc"
-        ]
+          "topup": {
+            "enabled": true,
+            "minTopupInterval": "1m",
+            "targetThroughput": 4500
+          },
+          "validatorPartyHint": "digitalasset-testValidator-1",
+          "validatorWalletUsers": [
+            "auth0|6526fab5214c99a9a8e1e3cc"
+          ]
+        }
       },
       "version": "0.3.20"
     },

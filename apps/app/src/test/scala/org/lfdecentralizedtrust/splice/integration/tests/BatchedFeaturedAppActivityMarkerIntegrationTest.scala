@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.{
   featuredapprightv1,
@@ -8,6 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.util.featuredapp.batchedmarkersproxy
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -17,8 +20,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.FeaturedAppActivityMarkerTrigger
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
+import org.slf4j.event.Level
 import scala.jdk.CollectionConverters.*
-import com.digitalasset.canton.topology.PartyId
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_16
 class BatchedFeaturedAppActivityMarkerIntegrationTest
@@ -123,6 +127,31 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       )
 
   "Batched activity marker creation produces only one view" in { implicit env =>
+    val amuletVersion =
+      sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue.packageConfig.amulet
+    // check that the test actually uses a different version
+    amuletVersion should not be "0.1.15"
+    clue("Bob unvets amulet > 0.1.15") {
+      bobValidatorBackend.validatorAutomation
+        .trigger[ValidatorPackageVettingTrigger]
+        .pause()
+        .futureValue
+      val packagesToUnvet = DarResources.amulet.others.filter(
+        _.metadata.version > DarResources.amulet_0_1_15.metadata.version
+      )
+      logger.info(s"Unvetting ${packagesToUnvet.map(d => (d.metadata.version, d.packageId))}")
+      bobValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
+        bobValidatorBackend.participantClient.id,
+        store = decentralizedSynchronizerId,
+        removes = packagesToUnvet.map(p =>
+          com.digitalasset.daml.lf.data.Ref.PackageId.assertFromString(p.packageId)
+        ),
+        force = ForceFlags(
+          ForceFlag.AllowUnvettedDependencies
+        ),
+      )
+    }
+
     val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val splitwell = onboardWalletUser(splitwellWalletClient, splitwellValidatorBackend)
@@ -184,49 +213,67 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
 
     val scanCursorBeforeConversion = latestEventHistoryCursor(sv1ScanBackend)
 
-    actAndCheck(
-      "Resume the featured app marker conversion",
-      sv1Backend.dsoDelegateBasedAutomation.trigger[FeaturedAppActivityMarkerTrigger].resume(),
+    loggerFactory.assertLogsSeq(
+      SuppressionRule.LevelAndAbove(Level.INFO) && SuppressionRule.LoggerNameContains(
+        "FeaturedAppActivityMarkerTrigger"
+      )
     )(
-      "Check that the conversion produced only a single view",
-      _ => {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(
-            dsoParty
-          ) shouldBe empty withClue "FeaturedAppActivityMarkers"
-        val events =
-          sv1ScanBackend.getEventHistory(1000, Some(scanCursorBeforeConversion), CompactJson)
-        // Note: There may actually be multiple batches in the trigger because we can't easily synchronize on it having ingested all the markers.
-        // We don't care all that much about whether the trigger needs to run multiple time for this test.
-        val conversionEvents = events.filter {
-          _.update match {
-            case Some(definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx)) =>
-              tx.eventsById(tx.rootEventIds.head) match {
-                case definitions.TreeEvent.members.ExercisedEvent(exercised) =>
-                  exercised.choice == "DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers"
-                case _ => false
+      actAndCheck(
+        "Resume the featured app marker conversion",
+        sv1Backend.dsoDelegateBasedAutomation.trigger[FeaturedAppActivityMarkerTrigger].resume(),
+      )(
+        "Check that the conversion produced only a single view except for bob who has not vetted the view reduction",
+        _ => {
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(
+              dsoParty
+            ) shouldBe empty withClue "FeaturedAppActivityMarkers"
+          val events =
+            sv1ScanBackend.getEventHistory(1000, Some(scanCursorBeforeConversion), CompactJson)
+          // Note: There may actually be multiple batches in the trigger because we can't easily synchronize on it having ingested all the markers.
+          // We don't care all that much about whether the trigger needs to run multiple time for this test.
+          val conversionEvents = events.filter {
+            _.update match {
+              case Some(definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(tx)) =>
+                tx.eventsById(tx.rootEventIds.head) match {
+                  case definitions.TreeEvent.members.ExercisedEvent(exercised) =>
+                    exercised.choice == "DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers"
+                  case _ => false
+                }
+              case _ => false
+            }
+          }
+          // Check that we actually got some so the forAll does not become redundant
+          withClue(s"Unfiltered events: $events") {
+            conversionEvents should not be empty withClue "ConvertFeaturedAppActivityMarkers txs"
+          }
+          // Check that each conversion not including bob only produces 2 views, one for the SV and one for validator
+          forAll(conversionEvents) { event =>
+            val views = event.verdict.value.transactionViews.views
+            if (!views.exists(_.informees.contains(bob.toProtoPrimitive))) {
+              views should have size (2) withClue "conversionEvent views"
+              forExactly(1, views) { view =>
+                view.informees should contain theSameElementsAs Seq(
+                  dsoParty.toProtoPrimitive,
+                  sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+                  sv1Backend.participantClient.id.uid.toProtoPrimitive,
+                ) withClue "informees"
               }
-            case _ => false
+              forExactly(1, views) { view =>
+                view.informees should contain atLeastOneOf (alice.toProtoPrimitive, bob.toProtoPrimitive) withClue "informees"
+              }
+            }
           }
+        },
+      ),
+      entries => {
+        forExactly(1, entries) { line =>
+          line.message should (include("vettedAmuletVersion = 0.1.15") and include("Processing"))
         }
-        // Check that we actually got some so the forAll does not become redundant
-        withClue(s"Unfiltered events: $events") {
-          conversionEvents should not be empty withClue "ConvertFeaturedAppActivityMarkers txs"
-        }
-        // Check that each conversion only produces 2 views, one for the SV and one for validator
-        forAll(conversionEvents) { event =>
-          val views = event.verdict.value.transactionViews.views
-          views should have size (2) withClue "conversionEvent views"
-          forExactly(1, views) { view =>
-            view.informees should contain theSameElementsAs Seq(
-              dsoParty.toProtoPrimitive,
-              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-              sv1Backend.participantClient.id.uid.toProtoPrimitive,
-            ) withClue "informees"
-          }
-          forExactly(1, views) { view =>
-            view.informees should contain atLeastOneOf (alice.toProtoPrimitive, bob.toProtoPrimitive) withClue "informees"
-          }
+        forAtLeast(1, entries) { line =>
+          line.message should (include(
+            s"vettedAmuletVersion = ${amuletVersion}"
+          ) and include("Processing"))
         }
       },
     )

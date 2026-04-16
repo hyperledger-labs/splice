@@ -1,0 +1,36 @@
+
+# On merging a PR, automatically backport it to other branches as requested in a comment on that PR
+
+name: Auto-backport PRs to release branches
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  get_backport_branches:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    outputs:
+      branches: ${{ steps.parse_backport_comments.outputs.backport_branches }}
+    steps:
+      - uses: hyperledger-labs/splice-shared-gha/actions/parse_backport_comments@a78684a826be866b199ae7a05471a7fad2c9c76c
+        id: parse_backport_comments
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+
+  backport_prs:
+    needs: get_backport_branches
+    if: needs.get_backport_branches.outputs.branches != '[]' && needs.get_backport_branches.outputs.branches != ''
+    strategy:
+      matrix:
+        branch: ${{ fromJSON(needs.get_backport_branches.outputs.branches) }}
+      fail-fast: false
+    uses: hyperledger-labs/splice-shared-gha/.github/workflows/backport.yml@a78684a826be866b199ae7a05471a7fad2c9c76c
+    secrets:
+      strong_token: ${{ secrets.GH_CREATE_PRS_TOKEN }}
+    with:
+      base_branch: ${{ matrix.branch }}
+      pr_number: ${{ github.event.pull_request.number }}
+      # Request the original PR author to review the backport PR (since this was approved by others
+      # and merged already, we don't need to request review from them)
+      reviewer: ${{ github.event.pull_request.user.login }}

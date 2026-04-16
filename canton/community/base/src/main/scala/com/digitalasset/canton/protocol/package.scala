@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -81,6 +81,10 @@ package object protocol {
   type LfNodeLookupByKey = Node.LookupByKey
   val LfNodeLookupByKey: Node.LookupByKey.type = Node.LookupByKey
 
+  /** Shorthand for query by key nodes. */
+  type LfNodeQueryByKey = Node.QueryByKey
+  val LfNodeQueryByKey: Node.QueryByKey.type = Node.QueryByKey
+
   /** Shorthand for rollback nodes. */
   type LfNodeRollback = Node.Rollback
   val LfNodeRollback: Node.Rollback.type = Node.Rollback
@@ -119,8 +123,8 @@ package object protocol {
   type LfChoiceName = Ref.ChoiceName
   val LfChoiceName: Ref.ChoiceName.type = Ref.ChoiceName
 
-  type RequestProcessor[VT <: ViewType] =
-    Phase37Processor[RequestAndRootHashMessage[OpenEnvelope[EncryptedViewMessage[VT]]]]
+  type RequestProcessor[VT <: ViewType, Event] =
+    Phase37Processor[RequestAndRootHashMessage[OpenEnvelope[EncryptedViewMessage[VT]]], Event]
 
   def maxSerializationVersion(
       versions: NonEmpty[Seq[LfSerializationVersion]]

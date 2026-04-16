@@ -1,9 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
 
-import com.digitalasset.canton.util.{ErrorUtil, ShowUtil}
+import com.digitalasset.canton.util.{ShowUtil, ThrowableUtil}
 import pprint.{PPrinter, Tree}
 
 /** Type class indicating that pretty printing is enabled for type `T`.
@@ -64,7 +64,7 @@ object Pretty extends ShowUtil with PrettyUtil with PrettyInstances {
           if (crashOnPrettyPrintingErrors) {
             throw err
           } else {
-            ErrorUtil.messageWithStacktrace(err)
+            ThrowableUtil.messageWithStacktrace(err)
           }
       }
 

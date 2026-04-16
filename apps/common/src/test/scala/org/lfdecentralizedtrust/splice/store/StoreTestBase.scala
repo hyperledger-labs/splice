@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.InstrumentId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
@@ -79,6 +80,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.history.{AmuletCreate, AppRewardCreate}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.Transfer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
+  AllocationSpecification,
+  SettlementInfo,
+  TransferLeg,
+  Reference,
+}
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
@@ -182,6 +194,7 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      java.util.Optional.empty(), // contractStateSchemaVersion
     )
     contract(
       identifier = templateId,
@@ -253,13 +266,18 @@ abstract class StoreTestBase
 
   protected val holdingFee = BigDecimal(1.0)
 
-  protected def openMiningRound(dso: PartyId, round: Long, amuletPrice: Double) = {
+  protected def openMiningRound(
+      dso: PartyId,
+      round: Long,
+      amuletPrice: Double,
+      opensAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
+  ) = {
     val template = new roundCodegen.OpenMiningRound(
       dso.toProtoPrimitive,
       new Round(round),
       numeric(amuletPrice),
-      Instant.now().truncatedTo(ChronoUnit.MICROS),
-      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
+      opensAt,
+      opensAt.plusSeconds(600),
       new RelTime(1_000_000),
       SpliceUtil.defaultTransferConfig(10, holdingFee),
       SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
@@ -338,6 +356,91 @@ abstract class StoreTestBase
       identifier = templateId,
       contractId = new amuletCodegen.Amulet.ContractId(contractId),
       payload = template,
+    )
+  }
+  protected def amuletTransferInstruction(
+      sender: PartyId,
+      receiver: PartyId,
+      amount: java.math.BigDecimal,
+      requestedAt: Instant,
+      expiresAt: Instant,
+      contractId: String = nextCid(),
+  ): Contract[
+    AmuletTransferInstruction.ContractId,
+    AmuletTransferInstruction,
+  ] = {
+    val instrumentId = new InstrumentId(dsoParty.toProtoPrimitive, "Amulet")
+    val transfer = new Transfer(
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount,
+      instrumentId,
+      requestedAt,
+      expiresAt,
+      java.util.List.of(),
+      new Metadata(java.util.Collections.emptyMap()),
+    )
+
+    val template = new AmuletTransferInstruction(
+      new LockedAmulet.ContractId(nextCid()),
+      transfer,
+    )
+
+    contract(
+      AmuletTransferInstruction.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new AmuletTransferInstruction.ContractId(contractId),
+      template,
+    )
+  }
+
+  protected def amuletAllocation(
+      sender: PartyId,
+      receiver: PartyId,
+      executor: PartyId,
+      amount: java.math.BigDecimal,
+      requestedAt: Instant,
+      allocateBefore: Instant,
+      settleBefore: Instant,
+      contractId: String = nextCid(),
+  ): Contract[
+    AmuletAllocation.ContractId,
+    AmuletAllocation,
+  ] = {
+    val instrumentId = new InstrumentId(dsoParty.toProtoPrimitive, "Amulet")
+    val emptyMeta = new Metadata(java.util.Collections.emptyMap())
+
+    val settlementInfo = new SettlementInfo(
+      executor.toProtoPrimitive,
+      new Reference("test-settlement", Optional.empty()),
+      requestedAt,
+      allocateBefore,
+      settleBefore,
+      emptyMeta,
+    )
+
+    val transferLeg = new TransferLeg(
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount,
+      instrumentId,
+      emptyMeta,
+    )
+
+    val allocationSpec = new AllocationSpecification(
+      settlementInfo,
+      "leg-1",
+      transferLeg,
+    )
+
+    val template = new AmuletAllocation(
+      new LockedAmulet.ContractId(nextCid()),
+      allocationSpec,
+    )
+
+    contract(
+      AmuletAllocation.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new AmuletAllocation.ContractId(contractId),
+      template,
     )
   }
 
@@ -915,6 +1018,7 @@ abstract class StoreTestBase
 
   private var offsetCounter: Long = 0L
 
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   protected def nextOffset(): Long = blocking {
     synchronized {
       val offset = offsetCounter
@@ -933,6 +1037,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -945,6 +1050,7 @@ abstract class StoreTestBase
     recordTime,
     createdEventObservers,
     updateId,
+    externalTxnHash,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -959,6 +1065,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -975,6 +1082,7 @@ abstract class StoreTestBase
     workflowId,
     recordTime = recordTime,
     updateId = updateId,
+    externalTransactionHash = externalTxnHash,
   )
 
   protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
@@ -1164,9 +1272,16 @@ abstract class StoreTestBase
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
         implementedInterfaces: Seq[Identifier] = Seq.empty,
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx =
-        mkTx(nextOffset(), Seq(toArchivedEvent(c, implementedInterfaces)), domain, txEffectiveAt)
+        mkTx(
+          nextOffset(),
+          Seq(toArchivedEvent(c, implementedInterfaces)),
+          domain,
+          txEffectiveAt,
+          recordTime = recordTime,
+        )
       store.testIngestionSink
         .ingestUpdate(
           domain,
@@ -1316,6 +1431,7 @@ abstract class StoreTestBase
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
       externalTransactionHash,
+      0L, // traffic cost
     )
   }
 
@@ -1325,6 +1441,7 @@ abstract class StoreTestBase
       children: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val updateId = nextUpdateId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
@@ -1350,7 +1467,8 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
-      ByteString.EMPTY,
+      externalTransactionHash,
+      0L, // traffic cost
     )
   }
 

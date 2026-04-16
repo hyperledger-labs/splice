@@ -4,8 +4,10 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageVersion}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.util.Contract
 
@@ -31,26 +33,39 @@ object PackageIdResolver {
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
       case TokenStandard.SpliceApiTokenMetadataV1 =>
-        DarResources.TokenStandard.tokenMetadata.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenMetadataV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenHoldingV1 =>
-        DarResources.TokenStandard.tokenHolding.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenHoldingV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenTransferInstructionV1 =>
-        DarResources.TokenStandard.tokenTransferInstruction.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenTransferInstructionV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationV1 =>
-        DarResources.TokenStandard.tokenAllocation.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenAllocationV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationRequestV1 =>
-        DarResources.TokenStandard.tokenAllocationRequest.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenAllocationRequestV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationInstructionV1 =>
-        DarResources.TokenStandard.tokenAllocationInstruction.latest.metadata.version.toString()
+        DarResources.TokenStandard.apiTokenAllocationInstructionV1.latest.metadata.version
+          .toString()
       case TokenStandard.SpliceTokenTestTradingApp =>
         DarResources.TokenStandard.tokenTestTradingApp.latest.metadata.version.toString()
       case SpliceUtilBatchedMarkers =>
-        DarResources.batchedMarkers.latest.metadata.version.toString()
+        DarResources.utilBatchedMarkers.latest.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }
 
-  sealed abstract class Package extends Product with Serializable {
+  def toPackageConfigMap(packageConfig: PackageConfig): Map[PackageName, PackageVersion] = {
+    import Package.*
+    Seq(
+      SpliceAmulet,
+      SpliceAmuletNameService,
+      SpliceDsoGovernance,
+      SpliceValidatorLifecycle,
+      SpliceWallet,
+      SpliceWalletPayments,
+    ).map(pkg => pkg.packageName -> PackageIdResolver.readPackageVersion(packageConfig, pkg)).toMap
+  }
+
+  sealed abstract class Package extends Product with Serializable with PrettyPrinting {
     def packageName: IdString.PackageName = {
       val clsName = this.productPrefix
       // Turn CantonAmulet into canton-amulet
@@ -59,6 +74,9 @@ object PackageIdResolver {
           .replaceAllIn(clsName, m => (if (m.start != 0) "-" else "") + m.matched.toLowerCase())
       )
     }
+
+    override def pretty: Pretty[this.type] =
+      prettyOfString(_.packageName)
   }
 
   object Package {

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -11,10 +11,7 @@ import org.wartremover.test.WartTestTraverser
 import scala.annotation.unused
 import scala.concurrent.Future
 
-class DirectGrpcServiceInvocationTest
-    extends AnyWordSpec
-    with Matchers
-    with org.mockito.MockitoSugar {
+class DirectGrpcServiceInvocationTest extends AnyWordSpec with Matchers {
 
   import DirectGrpcServiceInvocationTest.*
 

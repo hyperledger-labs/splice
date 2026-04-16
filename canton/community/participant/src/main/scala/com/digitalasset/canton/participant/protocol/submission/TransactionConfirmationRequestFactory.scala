@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -11,6 +11,7 @@ import cats.syntax.traverse.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.LoggingConfig
 import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.GenTransactionTree.ViewWithWitnessesAndRecipients
 import com.digitalasset.canton.data.ViewType.TransactionViewType
@@ -87,6 +88,7 @@ class TransactionConfirmationRequestFactory(
       keyResolver: LfKeyResolver,
       mediator: MediatorGroupRecipient,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      approximateTimestampForSigning: CantonTimestamp,
       sessionKeyStore: SessionKeyStore,
       contractInstanceOfId: ContractInstanceOfId,
       maxSequencingTime: CantonTimestamp,
@@ -141,6 +143,12 @@ class TransactionConfirmationRequestFactory(
       confirmationRequest <- createConfirmationRequest(
         transactionTree,
         cryptoSnapshot,
+        Some(
+          SigningTimestampOverrides(
+            approximateTimestampForSigning,
+            Some(maxSequencingTime),
+          )
+        ),
         sessionKeyStore,
         protocolVersion,
       )
@@ -150,6 +158,7 @@ class TransactionConfirmationRequestFactory(
   def createConfirmationRequest(
       transactionTree: GenTransactionTree,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
       sessionKeyStore: SessionKeyStore,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -163,11 +172,16 @@ class TransactionConfirmationRequestFactory(
       transactionViewEnvelopes <- createTransactionViewEnvelopes(
         transactionTree,
         cryptoSnapshot,
+        signingTimestampOverrides,
         sessionKeyStore,
         protocolVersion,
       )
       submittingParticipantSignature <- cryptoSnapshot
-        .sign(transactionTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+        .sign(
+          transactionTree.rootHash.unwrap,
+          SigningKeyUsage.ProtocolOnly,
+          signingTimestampOverrides,
+        )
         .leftMap[TransactionConfirmationRequestCreationError](TransactionSigningError.apply)
     } yield {
       if (loggingConfig.eventDetails) {
@@ -193,7 +207,7 @@ class TransactionConfirmationRequestFactory(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ParticipantAuthorizationError, Unit] = {
     // Signatures have been validated in the Ledger API when the execute request was received.
-    // Therefore we only do authorization checks at this point
+    // Therefore, we only do authorization checks at this point
     val signedAs = externallySignedSubmission.signatures.keySet.map(_.toLf)
     val unauthorized = submitterInfo.actAs.toSet -- signedAs
     for {
@@ -268,6 +282,7 @@ class TransactionConfirmationRequestFactory(
   private def createTransactionViewEnvelopes(
       transactionTree: GenTransactionTree,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
       sessionKeyStore: SessionKeyStore,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -284,7 +299,9 @@ class TransactionConfirmationRequestFactory(
           ViewKeyData,
         ],
         recipients: Recipients,
-    ) = {
+    ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, OpenEnvelope[
+      EncryptedViewMessage[TransactionViewType.type]
+    ]] = {
       val subviewsKeys = vt.subviewHashes
         .map(subviewHash => viewsToKeyMap(subviewHash).viewKeyRandomness)
       for {
@@ -300,6 +317,7 @@ class TransactionConfirmationRequestFactory(
             lvt,
             (viewKey, viewKeyMap),
             cryptoSnapshot,
+            signingTimestampOverrides,
             protocolVersion,
           )
           .leftMap[TransactionConfirmationRequestCreationError](
@@ -368,16 +386,15 @@ object TransactionConfirmationRequestFactory {
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): TransactionConfirmationRequestFactory = {
 
-    val transactionTreeFactory =
-      TransactionTreeFactoryImpl(
-        submitterNode,
-        synchronizerId,
-        // TODO(#23971): Make this dependent on the protocol version when introducing V2 contract IDs
-        AuthenticatedContractIdVersionV12,
-        cryptoOps,
-        hasher,
-        loggerFactory,
-      )
+    val transactionTreeFactory = TransactionTreeFactory(
+      submitterNode,
+      synchronizerId,
+      // TODO(#23971): Make this dependent on the protocol version when introducing V2 contract IDs
+      AuthenticatedContractIdVersionV12,
+      cryptoOps,
+      hasher,
+      loggerFactory,
+    )
 
     new TransactionConfirmationRequestFactory(submitterNode, loggingConfig, loggerFactory)(
       transactionTreeFactory,

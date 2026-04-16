@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
 
+import com.daml.ledger.resources.ResourceOwner
 import com.daml.logging.entries.LoggingEntries
 import com.daml.metrics.DatabaseMetrics
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -12,14 +13,20 @@ import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.participant.ledger.api.LedgerApiStore.LastSynchronizerOffset
 import com.digitalasset.canton.platform.config.ServerRole
-import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SynchronizerOffset
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
+  RawParticipantAuthorization,
+  SequentialIdBatch,
+  SynchronizerOffset,
+}
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterningView
 import com.digitalasset.canton.platform.store.{DbSupport, FlywayMigrations}
 import com.digitalasset.canton.platform.{ResourceCloseable, ResourceOwnerFlagCloseableOps}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{LedgerParticipantId, config}
@@ -112,6 +119,13 @@ class LedgerApiStore(
       parameterStorageBackend.ledgerEnd
     )
 
+  def topologyPartyEventBatch(eventSequentialIds: SequentialIdBatch)(implicit
+      traceContext: TraceContext
+  ): Future[Vector[RawParticipantAuthorization]] =
+    executeSql(metrics.index.db.getTopologyEventOffsetPublishedOnRecordTime)(
+      eventStorageBackend.topologyPartyEventBatch(eventSequentialIds)
+    )
+
   def topologyEventOffsetPublishedOnRecordTime(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
@@ -198,11 +212,36 @@ class LedgerApiStore(
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): FutureUnlessShutdown[Option[SynchronizerOffset]] =
-    executeSqlUS(metrics.index.db.lastSynchronizerOffsetBeforeOrAtRecordTime)(
-      eventStorageBackend.lastSynchronizerOffsetBeforeOrAtRecordTime(
+  ): FutureUnlessShutdown[Option[LastSynchronizerOffset]] =
+    executeSqlUS(metrics.index.db.lastSynchronizerOffsetBeforeOrAtRecordTime)(connection =>
+      for {
+        ledgerEnd <- parameterStorageBackend.ledgerEnd(connection)
+        synchronizerIndex <- parameterStorageBackend.cleanSynchronizerIndex(synchronizerId)(
+          connection
+        )
+        lastSynchronizerOffset = eventStorageBackend.lastSynchronizerOffsetBeforeOrAtRecordTime(
+          synchronizerId,
+          beforeOrAtRecordTimeInclusive.underlying,
+          ledgerEnd.lastOffset,
+        )(connection)
+      } yield LastSynchronizerOffset(
+        ledgerEnd = ledgerEnd,
+        syncrhonizerIndex = synchronizerIndex,
+        lastSynchronizerOffset = lastSynchronizerOffset,
+      )
+    )
+
+  def lastRecordTimeBeforeOrAtSynchronizerOffset(
+      synchronizerId: SynchronizerId,
+      beforeOrAtOffsetInclusive: Offset,
+  )(implicit
+      traceContext: TraceContext,
+      ec: ExecutionContext,
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
+    executeSqlUS(metrics.index.db.lastRecordTimeBeforeOrAtSynchronizerOffset)(
+      eventStorageBackend.lastRecordTimeBeforeOrAtSynchronizerOffset(
         synchronizerId,
-        beforeOrAtRecordTimeInclusive.underlying,
+        beforeOrAtOffsetInclusive,
       )
     )
 
@@ -240,8 +279,9 @@ class LedgerApiStore(
 object LedgerApiStore {
   def initialize(
       storageConfig: StorageConfig,
+      storage: Option[Storage],
       ledgerParticipantId: LedgerParticipantId,
-      legderApiDatabaseConnectionTimeout: config.NonNegativeFiniteDuration,
+      ledgerApiDatabaseConnectionTimeout: config.NonNegativeFiniteDuration,
       ledgerApiPostgresDataSourceConfig: PostgresDataSourceConfig,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
@@ -262,7 +302,7 @@ object LedgerApiStore {
       jdbcUrl = ledgerApiStorage.jdbcUrl,
       connectionPool = DbSupport.ConnectionPoolConfig(
         connectionPoolSize = storageConfig.numConnectionsLedgerApiServer.unwrap,
-        connectionTimeout = legderApiDatabaseConnectionTimeout.underlying,
+        connectionTimeout = ledgerApiDatabaseConnectionTimeout.underlying,
       ),
       postgres = ledgerApiPostgresDataSourceConfig,
     )
@@ -281,27 +321,37 @@ object LedgerApiStore {
           )
         case _ => FutureUnlessShutdown.unit
       }
-      dbSupport = DbSupport
-        .owner(
-          serverRole = ServerRole.ApiServer,
-          metrics = metrics,
-          dbConfig = dbConfig,
-          loggerFactory = loggerFactory,
-        )
-        .map(dbSupport =>
-          new LedgerApiStore(
-            ledgerApiDbSupport = dbSupport,
-            ledgerApiStorage = ledgerApiStorage,
-            ledgerEndCache = MutableLedgerEndCache(),
-            stringInterningView = new StringInterningView(loggerFactory),
-            metrics = metrics,
-            loggerFactory = loggerFactory,
-            timeouts = timeouts,
+      dbSupportOwner = (storageConfig, storage) match {
+        case (_: com.digitalasset.canton.config.DbConfig.H2, Some(h2DbStorage: DbStorage)) =>
+          ResourceOwner.forValue(() =>
+            DbSupport.forH2DbStorage(
+              h2DbStorage = h2DbStorage,
+              metrics = metrics,
+              loggerFactory = loggerFactory,
+            )
           )
+        case _ =>
+          DbSupport.owner(
+            serverRole = ServerRole.ApiServer,
+            metrics = metrics,
+            dbConfig = dbConfig,
+            loggerFactory = loggerFactory,
+          )
+      }
+      ledgerApiStoreOwner = dbSupportOwner.map(dbSupport =>
+        new LedgerApiStore(
+          ledgerApiDbSupport = dbSupport,
+          ledgerApiStorage = ledgerApiStorage,
+          ledgerEndCache = MutableLedgerEndCache(),
+          stringInterningView = new StringInterningView(loggerFactory),
+          metrics = metrics,
+          loggerFactory = loggerFactory,
+          timeouts = timeouts,
         )
+      )
 
       ledgerApiStore <- FutureUnlessShutdown.outcomeF(
-        new ResourceOwnerFlagCloseableOps(dbSupport).acquireFlagCloseable(
+        new ResourceOwnerFlagCloseableOps(ledgerApiStoreOwner).acquireFlagCloseable(
           "Ledger API DB Support"
         )
       )
@@ -310,4 +360,10 @@ object LedgerApiStore {
         else ledgerApiStore.initializeInMemoryState
     } yield ledgerApiStore
   }
+
+  final case class LastSynchronizerOffset(
+      ledgerEnd: LedgerEnd,
+      syncrhonizerIndex: SynchronizerIndex,
+      lastSynchronizerOffset: Option[SynchronizerOffset],
+  )
 }

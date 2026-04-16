@@ -11,7 +11,9 @@ export const LoadTesterAdaptiveScenarioConfigSchema = z.object({
   minVUs: z.number().default(0),
   enabled: z.boolean().default(false),
   scaleDownStep: z.number().default(5),
-  duration: z.string().default('2h'),
+  scaleUpStep: z.number().default(2),
+  windowStartUTC: z.string().default('03:00'),
+  windowDurationMinutes: z.number().default(120),
 });
 
 export const LoadTesterConfigSchema = z.object({
@@ -22,7 +24,9 @@ export const LoadTesterConfigSchema = z.object({
       minRate: z.number().default(0.9),
       iterationsPerMinute: z.number().default(60),
       maxVUs: z.number().optional(),
-      adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.default({}),
+      adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.prefault({}),
+      usersPerValidator: z.number().default(10),
+      featuredUsersPerValidator: z.number().default(1),
       resources: K8sResourceSchema.optional(),
     })
     .optional(),

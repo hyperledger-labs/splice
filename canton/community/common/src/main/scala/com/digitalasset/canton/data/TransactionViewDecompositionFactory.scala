@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -246,10 +246,10 @@ case object TransactionViewDecompositionFactory {
     val itF = informeesParticipantsAndThreshold(node, topologySnapshot, submittingAdminPartyO)
     itF.map { case (i, t) =>
       nodeId -> ActionNodeInfo(
-        i.fmap { case (participants, _) => participants },
-        createQuorum(i, t),
-        childNodeIds,
-        transaction.seedFor(nodeId),
+        informees = i.fmap { case (participants, _) => participants },
+        quorum = createQuorum(i, t),
+        children = childNodeIds,
+        seed = transaction.seedFor(nodeId),
       )
     }
   }
@@ -274,6 +274,7 @@ case object TransactionViewDecompositionFactory {
       confirmingParties.nonEmpty,
       "There must be at least one confirming party, as every node must have at least one signatory.",
     )
+
     val plainInformees = node.informeesOfNode -- confirmingParties
 
     val threshold = NonNegativeInt.tryCreate(confirmingParties.size)

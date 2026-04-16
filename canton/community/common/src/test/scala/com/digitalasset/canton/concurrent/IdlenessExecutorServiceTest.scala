@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
@@ -138,6 +138,7 @@ class ThreadPoolIdlenessExecutorServiceTest
       val pool =
         new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable]())
       new ThreadPoolIdlenessExecutorService(
+        pool,
         pool,
         throwable => logger.error(s"Error: $throwable"),
         loggerFactory.threadName + "-thread-pool-executor",

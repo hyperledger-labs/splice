@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvNamespaceMembershipTrigger.{
   AddToNamespace,
   NamespaceDiff,
@@ -44,6 +45,7 @@ private class NamespaceMembership(
         dsoRules.domain,
         dsoParty.uid.namespace,
         AuthorizedState,
+        topologySnapshot = TopologySnapshot.Sequenced,
       )
       .map { decentralizedNamespace =>
         val dsoRulesSvs = dsoRules.contract.payload.svs
@@ -151,6 +153,7 @@ class SvNamespaceMembershipTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[NamespaceDiff](
       baseContext,
       store,
+      Some(participantAdminConnection),
     ) {
 
   override val reconciler: DsoRulesTopologyStateReconciler[NamespaceDiff] =

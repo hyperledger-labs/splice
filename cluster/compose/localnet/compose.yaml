@@ -17,6 +17,10 @@ x-vars:
     path: ${SV_AUTH_ENV}
     required: false
 
+  alpha-protocol-version-env: &alpha-protocol-version-env
+    path: ${ALPHA_PROTOCOL_VERSION_ENV}
+    required: false
+
 volumes:
   postgres:
   domain-upgrade-dump:
@@ -57,6 +61,7 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   nginx:
     image: "nginx:${NGINX_VERSION}"
@@ -98,6 +103,7 @@ services:
       - *app-provider-auth-env
       - *app-user-auth-env
       - *sv-auth-env
+      - *alpha-protocol-version-env
     container_name: canton
     volumes:
       - ${LOCALNET_DIR}/docker/canton/health-check.sh:/app/health-check.sh
@@ -130,6 +136,7 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   splice:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
@@ -140,6 +147,8 @@ services:
       - *app-provider-auth-env
       - *app-user-auth-env
       - *sv-auth-env
+    environment:
+      - CANTON_PROTOCOL_VERSION
     volumes:
       - ${LOCALNET_DIR}/docker/splice/health-check.sh:/app/health-check.sh
       - ${LOCALNET_DIR}/conf/splice/app.conf:/app/app.conf
@@ -166,12 +175,15 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   console:
     build:
       context: ${LOCALNET_DIR}/docker/console
       args:
         BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
+    environment:
+      - MULTI_SYNC=false
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
@@ -179,6 +191,7 @@ services:
       - *sv-auth-env
     volumes:
       - ${LOCALNET_DIR}/conf/console/app.conf:/app/app.conf
+      - ${LOCALNET_DIR}/conf/console/app-synchronizer.sc:/app/app-synchronizer.sc
       - ${LOCALNET_DIR}/conf/console/app-provider:/app/app-provider/${APP_PROVIDER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/sv:/app/sv/${SV_PROFILE}
@@ -188,6 +201,27 @@ services:
     tty: true
     profiles:
       - console
+
+  multi-sync-startup:
+    extends:
+      service: console
+    container_name: multi-sync-startup
+    environment:
+      - MULTI_SYNC=true
+    depends_on:
+      splice:
+        condition: service_healthy
+    profiles:
+      - multi-sync
+
+  multi-sync-ready:
+    container_name: multi-sync-ready
+    image: busybox:1.37.0
+    depends_on:
+      multi-sync-startup:
+        condition: service_completed_successfully
+    profiles:
+      - multi-sync
 
   swagger-ui:
     image: swaggerapi/swagger-ui

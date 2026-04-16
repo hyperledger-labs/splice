@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
@@ -12,6 +12,7 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 import scala.util.Try
+import scala.util.chaining.scalaUtilChainingOps
 
 class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest {
 
@@ -36,19 +37,42 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     choiceNameAbsent(testee, "ChoiceName")
     interfaceIdAbsent(testee, "pkg:inter:face")
 
-    testee.internize(
-      new DomainStringIterators(
-        parties = List("p1", "p2", "22::same:name").iterator,
-        templateIds = List("#22:t:a", "#22:t:b").iterator,
-        synchronizerIds = List("22::same:name", "x::synchronizer1", "x::synchronizer2").iterator
-          .map(SynchronizerId.tryFromString),
-        packageIds = List("pkg-1", "pkg-2").iterator,
-        userIds = List("usr1", "usr2").iterator,
-        participantIds = List("pn-1", "pn-2").iterator,
-        choiceNames = List("ChoiceName").iterator,
-        interfaceIds = List("pkg:inter:face").iterator,
+    testee
+      .distinctNewRawStrings(
+        List(
+          new StringInterningProvider {
+            override def provideInternedStrings(builder: StringInterningBuilder): Unit = {
+              Iterator("p1", "p2", "22::same:name")
+                .map(Ref.Party.assertFromString)
+                .foreach(builder.addParty)
+              Iterator("#22:t:a", "#22:t:b")
+                .map(Ref.NameTypeConRef.assertFromString)
+                .foreach(builder.addTemplateId)
+              Iterator("22::same:name", "x::synchronizer1", "x::synchronizer2")
+                .map(SynchronizerId.tryFromString)
+                .foreach(builder.addSynchronizerId)
+              Iterator("pkg-1", "pkg-2")
+                .map(Ref.PackageId.assertFromString)
+                .foreach(builder.addPackageId)
+              Iterator("usr1", "usr2")
+                .map(Ref.UserId.assertFromString)
+                .foreach(builder.addUserId)
+              Iterator("pn-1", "pn-2")
+                .map(Ref.ParticipantId.assertFromString)
+                .foreach(builder.addParticipantId)
+              Iterator("ChoiceName")
+                .map(Ref.ChoiceName.assertFromString)
+                .foreach(builder.addChoiceName)
+              Iterator("pkg:inter:face")
+                .map(Ref.Identifier.assertFromString)
+                .foreach(builder.addInterfaceId)
+            }
+          }
+        )
       )
-    ) shouldBe Vector(
+      .pipe(testee.internize)
+      .toSeq
+      .sortBy(_._1) shouldBe Vector(
       1 -> "p|p1",
       2 -> "p|p2",
       3 -> "p|22::same:name",
@@ -108,19 +132,40 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     userIdAbsent(testee, "usr2")
     choiceNameAbsent(testee, "ChoiceName")
     interfaceIdAbsent(testee, "pkg:inter:face")
-    testee.internize(
-      new DomainStringIterators(
-        parties = List("p1", "p2", "22::same:name").iterator,
-        templateIds = List("#22:t:a").iterator,
-        synchronizerIds =
-          List("x::synchronizer1", "x::synchronizer2").iterator.map(SynchronizerId.tryFromString),
-        packageIds = List("pkg-1").iterator,
-        userIds = List("usr1").iterator,
-        participantIds = List("pn-1", "pn-2").iterator,
-        choiceNames = List("ChoiceName").iterator,
-        interfaceIds = List("pkg:inter:face").iterator,
+    testee
+      .distinctNewRawStrings(
+        List(
+          new StringInterningProvider {
+            override def provideInternedStrings(builder: StringInterningBuilder): Unit = {
+              Iterator("p1", "p2", "22::same:name")
+                .map(Ref.Party.assertFromString)
+                .foreach(builder.addParty)
+              Iterator("#22:t:a")
+                .map(Ref.NameTypeConRef.assertFromString)
+                .foreach(builder.addTemplateId)
+              Iterator("x::synchronizer1", "x::synchronizer2")
+                .map(SynchronizerId.tryFromString)
+                .foreach(builder.addSynchronizerId)
+              Iterator("pkg-1")
+                .map(Ref.PackageId.assertFromString)
+                .foreach(builder.addPackageId)
+              Iterator("usr1")
+                .map(Ref.UserId.assertFromString)
+                .foreach(builder.addUserId)
+              Iterator("pn-1", "pn-2")
+                .map(Ref.ParticipantId.assertFromString)
+                .foreach(builder.addParticipantId)
+              Iterator("ChoiceName")
+                .map(Ref.ChoiceName.assertFromString)
+                .foreach(builder.addChoiceName)
+              Iterator("pkg:inter:face")
+                .map(Ref.Identifier.assertFromString)
+                .foreach(builder.addInterfaceId)
+            }
+          }
+        )
       )
-    ) shouldBe Vector(
+      .pipe(testee.internize) shouldBe Vector(
       1 -> "p|p1",
       2 -> "p|p2",
       3 -> "p|22::same:name",
@@ -154,19 +199,40 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     choiceNameAbsent(testee, "CnUnknown")
     interfaceIdPresent(testee, "pkg:inter:face", 12)
     interfaceIdAbsent(testee, "inter:face:unknown")
-    testee.internize(
-      new DomainStringIterators(
-        parties = List("p1", "p2").iterator,
-        templateIds = List("#22:t:a", "#22:t:b").iterator,
-        synchronizerIds = List("22::same:name", "x::synchronizer1", "x::synchronizer3").iterator
-          .map(SynchronizerId.tryFromString),
-        packageIds = List("pkg-1", "pkg-2").iterator,
-        userIds = List("usr1", "usr2").iterator,
-        participantIds = List("pn-1", "pn-2", "pn-3").iterator,
-        choiceNames = List("ChoiceName").iterator,
-        interfaceIds = List("pkg:inter:face", "pkg:inter:face2").iterator,
+    testee
+      .distinctNewRawStrings(
+        List(
+          new StringInterningProvider {
+            override def provideInternedStrings(builder: StringInterningBuilder): Unit = {
+              Iterator("p1", "p2")
+                .map(Ref.Party.assertFromString)
+                .foreach(builder.addParty)
+              Iterator("#22:t:a", "#22:t:b")
+                .map(Ref.NameTypeConRef.assertFromString)
+                .foreach(builder.addTemplateId)
+              Iterator("22::same:name", "x::synchronizer1", "x::synchronizer3")
+                .map(SynchronizerId.tryFromString)
+                .foreach(builder.addSynchronizerId)
+              Iterator("pkg-1", "pkg-2")
+                .map(Ref.PackageId.assertFromString)
+                .foreach(builder.addPackageId)
+              Iterator("usr1", "usr2")
+                .map(Ref.UserId.assertFromString)
+                .foreach(builder.addUserId)
+              Iterator("pn-1", "pn-2", "pn-3")
+                .map(Ref.ParticipantId.assertFromString)
+                .foreach(builder.addParticipantId)
+              Iterator("ChoiceName")
+                .map(Ref.ChoiceName.assertFromString)
+                .foreach(builder.addChoiceName)
+              Iterator("pkg:inter:face", "pkg:inter:face2")
+                .map(Ref.Identifier.assertFromString)
+                .foreach(builder.addInterfaceId)
+            }
+          }
+        )
       )
-    ) shouldBe Vector(
+      .pipe(testee.internize) shouldBe Vector(
       13 -> "t|#22:t:b",
       14 -> "d|22::same:name",
       15 -> "d|x::synchronizer3",
@@ -253,18 +319,25 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "#22:t:b")
     templateAbsent(testee, "#22:same:name")
     packageIdAbsent(testee, "pkg-1")
-    testee.internize(
-      new DomainStringIterators(
-        parties = List("p1", "p2").iterator,
-        templateIds = List().iterator,
-        synchronizerIds = List("x::synchronizer1").iterator.map(SynchronizerId.tryFromString),
-        packageIds = List("pkg-1").iterator,
-        userIds = List().iterator,
-        participantIds = List().iterator,
-        choiceNames = List().iterator,
-        interfaceIds = List().iterator,
+    testee
+      .distinctNewRawStrings(
+        List(
+          new StringInterningProvider {
+            override def provideInternedStrings(builder: StringInterningBuilder): Unit = {
+              Iterator("p1", "p2")
+                .map(Ref.Party.assertFromString)
+                .foreach(builder.addParty)
+              Iterator("x::synchronizer1")
+                .map(SynchronizerId.tryFromString)
+                .foreach(builder.addSynchronizerId)
+              Iterator("pkg-1")
+                .map(Ref.PackageId.assertFromString)
+                .foreach(builder.addPackageId)
+            }
+          }
+        )
       )
-    )
+      .pipe(testee.internize)
     partyPresent(testee, "p1", 1)
     partyPresent(testee, "p2", 2)
     partyAbsent(testee, "22:same:name")
@@ -304,19 +377,28 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
 
   it should "remove entries if lastStringInterningId is greater than lastId" in {
     val testee = new StringInterningView(loggerFactory)
-    testee.internize(
-      new DomainStringIterators(
-        parties = List("p1", "p2", "22::same:name").iterator,
-        templateIds = List("#22:t:a", "#22:t:b").iterator,
-        synchronizerIds = List("22::same:name", "x::synchronizer1", "x::synchronizer2").iterator
-          .map(SynchronizerId.tryFromString),
-        packageIds = List("pkg-1").iterator,
-        userIds = List().iterator,
-        participantIds = List().iterator,
-        choiceNames = List().iterator,
-        interfaceIds = List().iterator,
+    testee
+      .distinctNewRawStrings(
+        List(
+          new StringInterningProvider {
+            override def provideInternedStrings(builder: StringInterningBuilder): Unit = {
+              Iterator("p1", "p2", "22::same:name")
+                .map(Ref.Party.assertFromString)
+                .foreach(builder.addParty)
+              Iterator("#22:t:a", "#22:t:b")
+                .map(Ref.NameTypeConRef.assertFromString)
+                .foreach(builder.addTemplateId)
+              Iterator("22::same:name", "x::synchronizer1", "x::synchronizer2")
+                .map(SynchronizerId.tryFromString)
+                .foreach(builder.addSynchronizerId)
+              Iterator("pkg-1")
+                .map(Ref.PackageId.assertFromString)
+                .foreach(builder.addPackageId)
+            }
+          }
+        )
       )
-    ) shouldBe Vector(
+      .pipe(testee.internize) shouldBe Vector(
       1 -> "p|p1",
       2 -> "p|p2",
       3 -> "p|22::same:name",

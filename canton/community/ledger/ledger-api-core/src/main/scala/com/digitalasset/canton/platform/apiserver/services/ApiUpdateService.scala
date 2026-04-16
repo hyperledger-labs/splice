@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -65,15 +65,16 @@ final class ApiUpdateService(
               logging.startExclusive(req.startExclusive),
               logging.endInclusive(req.endInclusive),
               logging.updateFormat(req.updateFormat),
+              logging.descendingOrder(req.descendingOrder),
             ) { implicit loggingContext =>
               logger.info(
                 s"Received request for updates, ${loggingContext
-                    .serializeFiltered("startExclusive", "endInclusive", "updateFormat")}."
+                    .serializeFiltered("startExclusive", "endInclusive", "updateFormat", "descendingOrder")}."
               )(loggingContext.traceContext)
             }
             logger.trace(s"Update request: $req.")
             updateService
-              .updates(req.startExclusive, req.endInclusive, req.updateFormat)
+              .updates(req.startExclusive, req.endInclusive, req.updateFormat, req.descendingOrder)
               .via(logger.enrichedDebugStream("Responding with updates.", updatesLoggable))
               .via(logger.logErrorsOnStream)
               .via(StreamMetrics.countElements(metrics.lapi.streams.updates))

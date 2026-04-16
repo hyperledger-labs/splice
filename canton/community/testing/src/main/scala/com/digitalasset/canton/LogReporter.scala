@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -41,8 +41,8 @@ class LogReporter extends Reporter {
       val msg =
         s"Test failed: '${event.suiteName}/${event.testName}', message: ${event.message}$locationMsg"
       event.throwable
-        .map(cause => logger.warn(msg, cause))
-        .getOrElse(logger.warn(msg))
+        .map(cause => logger.error(msg, cause))
+        .getOrElse(logger.error(msg))
     case event: TestCanceled =>
       logger.info(s"Test canceled: '${event.suiteName}/${event.testName}'")
     case event: TestIgnored => logger.info(s"Test ignored: '${event.suiteName}/${event.testName}'")

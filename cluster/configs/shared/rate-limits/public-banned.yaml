@@ -1,0 +1,40 @@
+rateLimits:
+  # banned because deprecated
+  /api/scan/v1/updates:
+    name: v1-updates
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/aggregated-rounds:
+    name: aggregated-rounds
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/round-totals:
+    name: round-totals
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/round-party-totals:
+    name: round-party-totals
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/amulet-config-for-round:
+    name: amulet-config-for-round
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/round-of-latest-data:
+    name: round-of-latest-data
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/rewards-collected:
+    name: rewards-collected
+    type: banned
+
+  # banned because deprecated
+  /api/scan/v0/top-providers-by-app-rewards:
+    name: top-providers
+    type: banned
