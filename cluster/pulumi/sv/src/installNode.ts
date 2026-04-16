@@ -42,6 +42,7 @@ export async function installNode(sv: string, auth0Client: Auth0Client): Promise
       participantAdminUserNameFrom: ledgerApiUserSecretSource,
       imagePullServiceAccountName: serviceAccountName,
       migratingDatabaseInstanceName: participantMigrationInfo?.participantDatabaseId,
+      migratingDatabaseSecretName: participantMigrationInfo?.participantDatabaseSecretName,
     },
     { dependsOn: [...imagePullDeps, ledgerApiUserSecret] }
   );
@@ -58,12 +59,17 @@ function findStaticConfigOrFail(sv: string): StaticSvConfig {
   }
 }
 
-async function getParticipantMigrationInfo(sv: string): Promise<{ participantDatabaseId: string }> {
+async function getParticipantMigrationInfo(
+  sv: string
+): Promise<{ participantDatabaseId: string; participantDatabaseSecretName: string }> {
   const svCantonRef = StackReferences.svCanton(
     sv,
     DecentralizedSynchronizerUpgradeConfig.active.id
   );
   return {
     participantDatabaseId: await svCantonRef.getOutputValue('participantDatabaseId'),
+    participantDatabaseSecretName: await svCantonRef.getOutputValue(
+      'participantDatabaseSecretName'
+    ),
   };
 }

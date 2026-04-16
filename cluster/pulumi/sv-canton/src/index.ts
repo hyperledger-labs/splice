@@ -37,3 +37,6 @@ function main(): pulumi.Output<InstalledMigrationSpecificSv | undefined> {
 const output = main();
 
 export const participantDatabaseId = output.apply(node => node?.participant?.databaseId);
+export const participantDatabaseSecretName = output.apply(
+  node => node?.participant?.databaseSecretName
+);

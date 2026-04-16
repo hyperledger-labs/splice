@@ -69,6 +69,7 @@ export class CloudPostgres
       cloudSqlConfig,
       disableProtection = false,
       existingInstanceName,
+      existingSecretName,
       instanceName,
       logicalDecoding = false,
       migrationId,
@@ -87,6 +88,14 @@ export class CloudPostgres
       );
     }
     const zone = zoneFromEnv;
+
+    const databaseInstanceImportOpts =
+      existingInstanceName !== undefined
+        ? {
+            import: existingInstanceName,
+            ignoreChanges: ['userLabels'],
+          }
+        : {};
 
     const databaseInstance = new gcp.sql.DatabaseInstance(
       name,
@@ -149,10 +158,10 @@ export class CloudPostgres
       },
       {
         aliases: opts?.aliases,
-        import: existingInstanceName,
         parent: this,
         protect: !yieldManagement && deletionProtection,
         retainOnDelete: yieldManagement,
+        ...databaseInstanceImportOpts,
       }
     );
 
@@ -179,14 +188,14 @@ export class CloudPostgres
 
     const password = generatePassword(`${name}-passwd`, {
       parent: this,
-      protect: deletionProtection,
+      protect: !yieldManagement && deletionProtection,
       aliases: [{ name: `${namespace.logicalName}-${alias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(
       namespace,
       password,
       secretName,
-      existingInstanceName !== undefined,
+      existingSecretName,
       yieldManagement
     );
 
@@ -257,6 +266,7 @@ type CloudPostgresArgs = {
   cloudSqlConfig: CloudSqlConfig;
   disableProtection?: boolean;
   existingInstanceName?: string;
+  existingSecretName?: string;
   instanceName: string;
   logicalDecoding?: boolean;
   migrationId?: number;
@@ -390,6 +400,7 @@ export async function installPostgres(
     disableProtection?: boolean;
     logicalDecoding?: boolean;
     existingInstanceName?: string;
+    existingSecretName?: string;
     yieldManagement?: boolean;
   } = {}
 ): Promise<Postgres> {
@@ -405,6 +416,7 @@ export async function installPostgres(
           cloudSqlConfig,
           disableProtection: o.disableProtection,
           existingInstanceName: o.existingInstanceName,
+          existingSecretName: o.existingSecretName,
           instanceName,
           logicalDecoding: o.logicalDecoding,
           migrationId: o.migrationId,

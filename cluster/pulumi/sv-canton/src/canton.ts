@@ -169,6 +169,7 @@ export async function installCantonComponents(
               asDependencies: [participant],
               internalClusterAddress: participant.name,
               databaseId: participantDb.databaseId,
+              databaseSecretName: participantDb.secretName,
             }
           : {
               asDependencies: [],

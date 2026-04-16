@@ -50,6 +50,7 @@ export type ParticipantArgs = {
     isStillRunning: boolean;
   };
   migratingDatabaseInstanceName?: string;
+  migratingDatabaseSecretName?: string;
   yieldManagement?: boolean;
 };
 
@@ -65,6 +66,7 @@ async function installParticipantPostgres({
   disableProtection,
   migration,
   migratingDatabaseInstanceName,
+  migratingDatabaseSecretName,
   yieldManagement,
 }: ParticipantArgs): Promise<Postgres> {
   return await installPostgres(
@@ -79,6 +81,7 @@ async function installParticipantPostgres({
       migrationId: migration?.id,
       disableProtection,
       existingInstanceName: migratingDatabaseInstanceName,
+      existingSecretName: migratingDatabaseSecretName,
       yieldManagement,
     }
   );

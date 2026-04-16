@@ -216,16 +216,16 @@ export function installPostgresPasswordSecret(
   ns: ExactNamespace,
   password: pulumi.Input<string>,
   secretName: string,
-  doImport: boolean = false,
+  existingSecretName?: string,
   yieldManagement: boolean = false
 ): k8s.core.v1.Secret {
-  const importOpts = doImport
-    ? {
-        import: `${ns.logicalName}/${secretName}`,
-        ignoreChanges: ['data.postgresPassword'],
-        retainOnDelete: yieldManagement,
-      }
-    : {};
+  const importOpts =
+    existingSecretName !== undefined
+      ? {
+          import: `${ns.logicalName}/${existingSecretName}`,
+          ignoreChanges: ['metadata.name', 'data.postgresPassword'],
+        }
+      : {};
   return new k8s.core.v1.Secret(
     `cn-app-${ns.logicalName}-${secretName}`,
     {
@@ -240,6 +240,7 @@ export function installPostgresPasswordSecret(
     },
     {
       dependsOn: [ns.ns],
+      retainOnDelete: yieldManagement,
       ...importOpts,
     }
   );
