@@ -703,12 +703,6 @@ trait SvDsoStore
       svParty: PartyId
   )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
-  ] = lookupSvOnboardingConfirmedByPartyWithOffset(svParty).map(_.value)
-
-  def lookupSvOnboardingConfirmedByPartyWithOffset(
-      svParty: PartyId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ]
 
   def lookupSvOnboardingConfirmedByName(

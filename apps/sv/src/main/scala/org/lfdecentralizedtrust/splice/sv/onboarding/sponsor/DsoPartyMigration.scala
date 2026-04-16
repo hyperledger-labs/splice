@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
@@ -20,7 +19,9 @@ import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
+import io.grpc.Status
 
+import java.time.Instant
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -45,8 +46,7 @@ class DsoPartyMigration(
   )
 
   def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId,
-      beforeActivationOffset: NonNegativeLong,
+      participantId: ParticipantId
   )(implicit tc: TraceContext): EitherT[Future, DsoPartyMigrationFailure, ByteString] = {
     logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
     for {
@@ -57,13 +57,31 @@ class DsoPartyMigration(
           dsoRules.domain,
           participantId,
         )
+      activationTx <- EitherT.liftF(
+        participantAdminConnection
+          .getDsoPartyToParticipantTransaction(
+            dsoRules.domain,
+            participantId,
+            dsoParty,
+          )
+          .getOrElseF(
+            Future.failed(
+              Status.NOT_FOUND
+                .withDescription(
+                  s"Transaction where the participant $participantId was activated not found."
+                )
+                .asRuntimeException()
+            )
+          )
+      )
+      activationTime = activationTx.base.validFrom
       _ = logger.info(
-        s"DSO party was authorized on $participantId, downloading snapshot at offset $beforeActivationOffset."
+        s"DSO party was authorized on $participantId, downloading snapshot at time $activationTime."
       )
       acsBytes <- EitherT.liftF(
         downloadSnapshotFromTime(
           participantId,
-          beforeActivationOffset,
+          activationTime,
           dsoRules.domain,
         )
       )
@@ -75,7 +93,7 @@ class DsoPartyMigration(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
       targetParticipantId: ParticipantId,
-      beforeActivationOffset: NonNegativeLong,
+      activationTime: Instant,
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     for {
@@ -83,13 +101,13 @@ class DsoPartyMigration(
         retryProvider.retry(
           RetryFor.ClientCalls,
           "download_acs_snapshot",
-          show"Download ACS snapshot for DSO at $beforeActivationOffset",
+          show"Download ACS snapshot for DSO at $activationTime",
           participantAdminConnection
             .exportPartyAcs(
               dsoParty,
               synchronizerId = decentralizedSynchronizer,
               targetParticipantId = targetParticipantId,
-              beforeActivationOffset = beforeActivationOffset,
+              activationTime = activationTime,
             ),
           logger,
         )

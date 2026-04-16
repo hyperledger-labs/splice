@@ -22,7 +22,7 @@ import com.digitalasset.canton.admin.participant.v30.{
   ExportPartyAcsResponse,
   PruningServiceGrpc,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -407,22 +407,24 @@ class ParticipantAdminConnection(
       party: PartyId,
       synchronizerId: SynchronizerId,
       targetParticipantId: ParticipantId,
-      beforeActivationOffset: NonNegativeLong,
+      activationTime: Instant,
   )(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
-    logger.info(
-      show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
-    )
     val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
 
     for {
+      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, true)
+      beforeActivationOffset = activationOffset - 1L
+      _ = logger.info(
+        show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
+      )
       _ <- runCmd(
         ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
           party,
           synchronizerId,
           targetParticipantId,
-          beforeActivationOffset.value,
+          beforeActivationOffset,
           waitForActivationTimeout = None, // i.e., default
           observer,
         )

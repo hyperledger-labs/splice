@@ -7,7 +7,6 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
@@ -459,8 +458,8 @@ class HttpSvPublicHandler(
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
           dsoRules <- dsoStore.getDsoRules()
           isCandidateSv = SvApp.isSvParty(candidateParty, dsoRules)
-          contracts <- dsoStore.lookupSvOnboardingConfirmedByPartyWithOffset(candidateParty)
-          candidateParticipantId = contracts.value
+          contract <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
+          candidateParticipantId = contract
             .getOrElse(
               throw Status.NOT_FOUND
                 .withDescription(errorMessage)
@@ -474,10 +473,7 @@ class HttpSvPublicHandler(
                 )
               )
             else
-              authorizeParticipantForHostingDsoParty(
-                ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId),
-                NonNegativeLong.tryCreate(contracts.offset),
-              )
+              authorizeParticipantForHostingDsoParty(ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId))
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
@@ -485,13 +481,9 @@ class HttpSvPublicHandler(
 
   private def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId,
-      beforeActivationOffset: NonNegativeLong,
   )(implicit tc: TraceContext): Future[r0.OnboardSvPartyMigrationAuthorizeResponse] = {
     dsoPartyMigration
-      .authorizeParticipantForHostingDsoParty(
-        participantId,
-        beforeActivationOffset,
-      )
+      .authorizeParticipantForHostingDsoParty(participantId)
       .fold(
         {
           case DsoPartyHosting
