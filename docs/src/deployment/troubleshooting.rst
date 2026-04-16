@@ -67,15 +67,20 @@ Logback levels: ``TRACE``, ``DEBUG``, ``INFO``, ``WARN``, ``ERROR``, ``OFF``.
     splice-node --config "${CONFIG}" --verbose    # sets Canton logger to DEBUG
     splice-node --config "${CONFIG}" --debug      # sets root, Canton to DEBUG and stdout to INFO
 
-**Docker Compose**: set the ``LOG_LEVEL`` variable in your shell before running ``docker compose up``.
-This sets both ``LOG_LEVEL_STDOUT`` and ``LOG_LEVEL_CANTON``:
+**Docker Compose** (SV and validator deployments): set the ``LOG_LEVEL`` variable in your
+shell before running ``docker compose up``. This sets both ``LOG_LEVEL_STDOUT`` and
+``LOG_LEVEL_CANTON`` for all services in the compose file:
 
 .. code:: bash
 
     export LOG_LEVEL=DEBUG
     docker compose up
 
-**Kubernetes (Helm)**: set the log level in your Helm values:
+    # To also change the API request log level:
+    export LOG_LEVEL_API_REQUEST=DEBUG
+    docker compose up
+
+**Kubernetes (Helm)** (SV and validator deployments): set the log level in your Helm values:
 
 .. code:: yaml
 
