@@ -101,7 +101,7 @@ multiValidator:
     - name: 'MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN'
       value: "canton.participants.participant_INDEX.ledger-api.max-token-lifetime = Inf\n"
   postgresPvcSize: '500Gi'
-  requiresOnboardingSecret: false
+  requiresOnboardingSecret: true
   resources:
     participant:
       limits:
@@ -470,7 +470,7 @@ synchronizerMigration:
       spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: '0.6.0-snapshot.20260409.2552.0.v7b526e34'
+    version: '0.6.0-snapshot.20260415.2501.0.veebc16a5'
   frozenMigrationId: 0
   lsuEnabled: true
 validator1:
