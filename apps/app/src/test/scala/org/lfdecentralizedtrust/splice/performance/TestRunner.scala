@@ -50,7 +50,7 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
       "UpdateHistoryRead" -> (() =>
         UpdateHistoryReadPerformanceTest
           .tryCreate(updateHistoryDumpPath, config, loggerFactory)
-      ),
+      )
     )
 
     val regex = testNames.replace("*", ".*").r
