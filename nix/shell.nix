@@ -4,7 +4,7 @@ let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
-  damlCompilerSources = builtins.fromJSON (builtins.readFile ./daml-compiler-sources.json);
+  damlCompilerSources = builtins.fromJSON (builtins.readFile ./dpm-sdk-sources.json);
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];

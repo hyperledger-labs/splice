@@ -25,10 +25,11 @@
 Before bumping a compiler version, make sure that all API packages are excluded from
 compilation. These are conventionally named `splice-api-*`. See [Maintaining Daml Interfaces](DEVELOPMENT.md#maintaining-daml-interfaces).
 
-1. Update the `version` in `nix/daml-compiler-sources.json` to the new daml compiler version.
-   The compiler version is then used in two places:
+1. Update the `version` in `nix/dpm-sdk-sources.json` to the new daml compiler version.
+   The compiler version is then used in several places:
    1. To build all daml packages using `sbt damlBuild`
    2. To generate daml docs using `cluster/images/docs/gen-daml-docs.sh`
+   3. To generate java code (as part of `sbt damlBuild`) and typescript code (as part of `sbt apps-common-frontend/compile`)
 
 Note that changing the compiler version changes all package ids and should not be done
 without a good reason to do so as changing Daml code requires a governance vote.
