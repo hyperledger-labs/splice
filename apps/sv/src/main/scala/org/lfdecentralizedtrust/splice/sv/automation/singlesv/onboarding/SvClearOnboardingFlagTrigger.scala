@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
 import cats.syntax.option.*
+import com.digitalasset.canton.admin.api.client.data.{FlagNotSet, FlagSet}
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
@@ -216,9 +217,16 @@ class SvClearOnboardingFlagTrigger(
           task.synchronizerId,
           activationTime,
         )
-    } yield TaskSuccess(
-      show"Participant ${task.participantId} was promoted to Submission rights for the DSO party: $result"
-    )
+    } yield result match {
+      case FlagNotSet =>
+        TaskSuccess(
+          show"Participant ${task.participantId} onboarding flag cleared successfully."
+        )
+      case FlagSet(safeToClear) =>
+        TaskFailed(
+          show"Onboarding flag of Participant ${task.participantId} cannot be cleared until $safeToClear."
+        )
+    }
   }
 
   override protected def isStaleTask(
