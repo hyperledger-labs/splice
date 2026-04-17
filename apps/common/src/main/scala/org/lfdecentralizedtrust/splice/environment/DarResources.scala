@@ -2671,61 +2671,10 @@ object DarResources {
   )
   val dsoGovernance_0_1_24 = DarResource(
     "splice-dso-governance-0.1.24.dar",
-    "9f2753692448681cb518956778271de83309c654ac69b8d34a9f966633918669",
+    "540bb6cdfeaf57c2dc518cb28fb669336cd55efe5bc198a059aea7b20efcbe4c",
     PackageMetadata(
       PackageName.assertFromString("splice-dso-governance"),
       PackageVersion.assertFromString("0.1.24"),
-      None,
-    ),
-    Set(
-      "64232089d6dc6ae1eabcebcbe5e8b1aa8f413e9c57e8986d2bca883cc306fde2",
-      "52854220dc199884704958df38befd5492d78384a032fd7558c38f00e3d778a2",
-      "9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69",
-      "d095a2ccf6dd36b2415adc4fa676f9191ba63cd39828dc5207b36892ec350cbc",
-      "7adc4c2d07fa3a51173c843cba36e610c1168b2dbbf53076e20c0092eae8763d",
-      "4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f",
-      "54f85ebfc7dfae18f7d70370015dcc6c6792f60135ab369c44ae52c6fc17c274",
-      "bde4bd30749e99603e5afa354706608601029e225d4983324d617825b634253a",
-      "c280cc3ef501d237efa7b1120ca3ad2d196e089ad596b666bed59a85f3c9a074",
-      "dd22e3e168a8c7fd0313171922dabf1f7a3b131bd9bfc9ff98e606f8c57707ea",
-      "c3bb0c5d04799b3f11bad7c3c102963e115cf53da3e4afcbcfd9f06ebd82b4ff",
-      "0e4a572ab1fb94744abb02243a6bbed6c78fc6e3c8d3f60c655f057692a62816",
-      "ab068e2f920d0e06347975c2a342b71f8b8e3b4be0f02ead9442caac51aa8877",
-      "5a58024e2cc488ca9e0c952ec7ef41da3a1ed0a78ba23bacd819e5b30afb5546",
-      "e7e0adfa881e7dbbb07da065ae54444da7c4bccebcb8872ab0cb5dcf9f3761ce",
-      "7804375fe5e4c6d5afe067bd314c42fe0b7d005a1300019c73154dd939da4dda",
-      "b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946",
-      "93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d",
-      "718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b",
-      "f181cd661f7af3a60bdaae4b0285a2a67beb55d6910fc8431dbae21a5825ec0f",
-      "60c61c542207080e97e378ab447cc355ecc47534b3a3ebbff307c4fb8339bc4d",
-      "fcee8dfc1b81c449b421410edd5041c16ab59c45bbea85bcb094d1b17c3e9df7",
-      "6f8e6085f5769861ae7a40dccd618d6f747297d59b37cab89b93e2fa80b0c024",
-      "fa79192fe1cce03d7d8db36471dde4cf6c96e6d0f07e1c391dd49e355af9b38c",
-      "19f0df5fdaf5a96e137b6ea885fdb378f37bd3166bd9a47ee11518e33fa09a20",
-      "a1fa18133ae48cbb616c4c148e78e661666778c3087d099067c7fe1868cbb3a1",
-      "94bba10a5b3fef448ccd28669359af3b09442a1d1bd6cdbb52c401d7d10075bc",
-      "86d888f34152dae8729900966b44abcb466b9c111699678de58032de601d2b04",
-      "6da1f43a10a179524e840e7288b47bda213339b0552d92e87ae811e52f59fc0e",
-      "3cde94fe9be5c700fc1d9a8ad2277e2c1214609f8c52a5b4db77e466875b8cb7",
-      "9d1a644e686435cf934f2f3f049138a424863b2a800130046dadc0c994ea5df3",
-      "bfda48f9aa2c89c895cde538ec4b4946c7085959e031ad61bde616b9849155d7",
-      "ee33fb70918e7aaa3d3fc44d64a399fb2bf5bcefc54201b1690ecd448551ba88",
-      "275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520",
-      "e5411f3d75f072b944bd88e652112a14a3d409c491fd9a51f5f6eede6d3a3348",
-      "5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4",
-      "6c5802f86709a0ad4784af81f0bab40f3070b2f58128d8843da1e1784c147802",
-      "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
-      "cae345b5500ef6f84645c816f88b9f7a85a9f3c71697984abdf6849f81e80324",
-      "91e167fa7a256f21f990c526a0a0df840e99aeef0e67dc1f5415b0309486de74",
-    ),
-  )
-  val dsoGovernance_0_1_25 = DarResource(
-    "splice-dso-governance-0.1.25.dar",
-    "6aa509f73e26107d771c2a8c3a7b5d002abf5528b91de860d164d08c971fb6a9",
-    PackageMetadata(
-      PackageName.assertFromString("splice-dso-governance"),
-      PackageVersion.assertFromString("0.1.25"),
       None,
     ),
     Set(
@@ -2773,10 +2722,10 @@ object DarResources {
   )
   val dsoGovernance_current = DarResource(
     "splice-dso-governance-current.dar",
-    "6aa509f73e26107d771c2a8c3a7b5d002abf5528b91de860d164d08c971fb6a9",
+    "540bb6cdfeaf57c2dc518cb28fb669336cd55efe5bc198a059aea7b20efcbe4c",
     PackageMetadata(
       PackageName.assertFromString("splice-dso-governance"),
-      PackageVersion.assertFromString("0.1.25"),
+      PackageVersion.assertFromString("0.1.24"),
       None,
     ),
     Set(
@@ -2851,7 +2800,6 @@ object DarResources {
       dsoGovernance_0_1_22,
       dsoGovernance_0_1_23,
       dsoGovernance_0_1_24,
-      dsoGovernance_0_1_25,
     ),
   )
   val utilBatchedMarkers_1_0_0 = DarResource(
