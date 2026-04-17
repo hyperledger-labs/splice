@@ -29,26 +29,43 @@
     },
     {
       "title": "Update Info",
-      "type": "stat",
+      "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "text" }
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false,
+            "axisBorderShow": false
+          }
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Update Size" },
-            "properties": [{ "id": "unit", "value": "decbytes" }]
+            "properties": [
+              { "id": "unit", "value": "decbytes" },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Num Updates" },
+            "properties": [
+              { "id": "unit", "value": "none" },
+              { "id": "custom.axisPlacement", "value": "left" },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
           }
         ]
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "auto",
-        "orientation": "horizontal"
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [
         {
