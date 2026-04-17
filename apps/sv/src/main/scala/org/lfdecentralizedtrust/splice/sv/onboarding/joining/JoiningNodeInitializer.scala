@@ -578,8 +578,8 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission, onboarding)) =>
-            if (permission == ParticipantPermission.Submission && !onboarding)
+          case Some(HostingParticipant(_, permission, _)) =>
+            if (permission == ParticipantPermission.Submission)
               dsoPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
