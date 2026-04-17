@@ -6,6 +6,7 @@ import { rest } from 'msw';
 import { LookupTransferPreapprovalByPartyResponse } from '@lfdecentralizedtrust/scan-openapi';
 import { test, expect, describe } from 'vitest';
 import { vi } from 'vitest';
+import * as jtv from "@mojotech/json-type-validation";
 
 import App from '../App';
 import { WalletConfigProvider } from '../utils/config';
@@ -35,14 +36,19 @@ import {
   ListAllocationRequestsResponse,
   ListAllocationsResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
+import {
+  Contract,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
 import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';
 import { shortenPartyId } from '../utils/partyId';
 import * as damlTypes from '@daml/types';
-import { ContractId } from '@daml/types';
+import { ContractId, Optional, Text } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
+import { json } from 'stream/consumers';
+// import { get } from 'http';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -61,6 +67,22 @@ function featureSupportHandler(
     );
   });
 }
+
+test('parse allocation request', async () => {
+  const ar = getAllocationRequest();
+  const res = mkContract(AllocationRequest, ar)
+  console.log("contract: " + JSON.stringify(res));
+  // const decoded = Contract.decodeOpenAPI(res, AllocationRequest);
+  // console.log("decoded" + JSON.stringify(decoded));
+  AllocationRequest.decoder.runWithException(res.payload);
+});
+
+test.only('daml types support optionals', async () => {
+  const dict = jtv.object({ x: Optional(Text).decoder });
+  expect(dict.runWithException({})).toStrictEqual({ x: null });
+  expect(dict.runWithException({ x: null })).toStrictEqual({ x: null });
+  expect(dict.runWithException({ x: "abc" })).toStrictEqual({ x: "abc" });
+});
 
 test('login screen shows up', async () => {
   render(
