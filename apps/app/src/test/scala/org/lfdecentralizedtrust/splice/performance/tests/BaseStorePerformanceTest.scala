@@ -74,6 +74,12 @@ abstract class BaseStorePerformanceTest(
         case storage: DbStorage => storage
         case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
       }
+    // Suppress Flyway ClassPathScanner warnings about unloadable test jars
+    org.slf4j.LoggerFactory
+      .getLogger("org.flywaydb.core.internal.scanner.classpath.ClassPathScanner")
+      .asInstanceOf[ch.qos.logback.classic.Logger]
+      .setLevel(ch.qos.logback.classic.Level.ERROR)
+
     new DbMigrations(storage.dbConfig, false, timeouts, loggerFactory)
       .migrateDatabase()
       .map(_ => storage)
