@@ -618,13 +618,13 @@ class JoiningNodeInitializer(
         if (participantTrafficState.extraTrafficPurchased != unlimitedTraffic)
           throw Status.FAILED_PRECONDITION
             .withDescription(
-              show"SV participant $participantId does not have unlimited traffic on synchronizer $synchronizerId"
+              show"SV participant $participantId does not have unlimited traffic on synchronizer $synchronizerId, expected ${unlimitedTraffic} but got ${participantTrafficState.extraTrafficPurchased}"
             )
             .asRuntimeException()
         if (mediatorTrafficState.extraTrafficLimit != unlimitedTraffic)
           throw Status.FAILED_PRECONDITION
             .withDescription(
-              show"SV mediator $mediatorId does not have unlimited traffic on synchronizer $synchronizerId"
+              show"SV mediator $mediatorId does not have unlimited traffic on synchronizer $synchronizerId, expected ${unlimitedTraffic} but got ${mediatorTrafficState.state.extraTrafficPurchased}"
             )
             .asRuntimeException()
         ()

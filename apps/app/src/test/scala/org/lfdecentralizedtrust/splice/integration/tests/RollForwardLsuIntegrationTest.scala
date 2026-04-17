@@ -70,7 +70,7 @@ class RollForwardLsuIntegrationTest
                 // TODO(#4682) Make it work with BFT connections.
                 bftSequencerConnection = false,
                 domainMigrationDumpPath = Some(
-                  (DomainMigrationUtil.migrationTestDumpDir(
+                  (SynchronizerUpgradeUtil.migrationTestDumpDir(
                     name
                   ) / "domain_migration_dump.json").path
                 ),
@@ -227,7 +227,7 @@ class RollForwardLsuIntegrationTest
       ),
       participants = false,
       enableBftSequencer = true,
-      logSuffix = "global-synchronizer-upgrade",
+      logSuffix = "roll-forward-lsu",
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {

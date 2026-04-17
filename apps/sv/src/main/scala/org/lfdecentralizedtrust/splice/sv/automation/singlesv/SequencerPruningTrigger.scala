@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.util.{DomainRecordTimeRange, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
@@ -79,12 +79,16 @@ class SequencerPruningTrigger(
     for {
       synchronizerId <- sequencerAdminConnection.getStatus.map(_.trySuccess.synchronizerId)
       scanConnection <- createScanConnection()
+      // while sequencer pruning status does have a `now` timestamp that one is
+      // just wallclock so doesn't work properly with backup/restore and similar stuff.
+      // Therefore we just use the last ingested update as an approximation of the latest time.
+      // TODO(DACH-NY/cn-test-failures#8065) Remove once Canton transfers safe pruning timestamps on LSU.
+      status <- sequencerAdminConnection.getSequencerPruningStatus()
       recordTimeRangeO <- scanConnection
         .getMigrationInfo(migrationId)
         .map(_.flatMap(_.recordTimeRange.get(synchronizerId.logical)))
       _ <- recordTimeRangeO match {
-        case Some(DomainRecordTimeRange(earliest, latest))
-            if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>
+        case Some(range) if (range.max - status.lowerBound).compareTo(retentionPeriod.asJava) > 0 =>
           for {
             rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
             dsoRulesActiveSequencerConfig = rulesAndState.lookupActiveSequencerIdConfigFor(
@@ -108,7 +112,8 @@ class SequencerPruningTrigger(
           } yield ()
         case _ =>
           logger.debug(
-            s"Synchronizer on migration id $migrationId does not yet have $retentionPeriod of data, record time range: $recordTimeRangeO"
+            s"Synchronizer on migration id $migrationId does not yet have $retentionPeriod of data, record time range: ${status.lowerBound}, ${recordTimeRangeO
+                .map(_.max)}"
           )
           Future.unit
       }
