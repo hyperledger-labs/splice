@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   ingestion_performance_tests:
-    needs: read_performance_tests
     # note that we're loading the entirety of mainnet updates (and in the future, the ACS) so as to make sure that that's not the bottleneck.
     # as of 03.03.2026 that seems to be enough, but we might have to increase it as the activity in mainnet does too.
     runs-on: self-hosted-k8s-medium
@@ -97,6 +96,7 @@ jobs:
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
 
   read_performance_tests:
+    needs: ingestion_performance_tests
     runs-on: self-hosted-k8s-medium
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
