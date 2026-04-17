@@ -115,7 +115,8 @@ function installParticipantChart(
       host: db.address,
       secretName: db.secretName,
       // the following will not be needed when the MIGRATION_ID gets removed from defaults
-      databaseName: `participant${migrationSuffix(migration?.id, '_')}`,
+      databaseName:
+        participant?.legacyDatabaseName ?? `participant${migrationSuffix(migration?.id, '_')}`,
     },
     auth: {
       ...defaultValues.auth,
