@@ -11,7 +11,11 @@ import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
 
@@ -21,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Read performance test for UpdateHistory.
   *
   * Ingests tx updates from a JSON dump into UpdateHistory, then benchmarks
-  * reading each update back via `getUpdate(updateId)`.
+  * reading each update back via getUpdate(updateId).
   */
 class UpdateHistoryReadPerformanceTest(
     dsoParty: PartyId,
@@ -31,7 +35,6 @@ class UpdateHistoryReadPerformanceTest(
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     ingestionConfig: IngestionConfig = IngestionConfig(),
-    readIterations: Int = 10,
 )(implicit ec: ExecutionContext, actorSystem: ActorSystem)
     extends StoreReadPerformanceTest(
       updateHistoryDumpPath,
@@ -58,37 +61,54 @@ class UpdateHistoryReadPerformanceTest(
     )
   }
 
-  override protected def readOperations(store: UpdateHistory): Seq[ReadOperation] = {
-    // Collect all update IDs from the ingested data to use for read benchmarks.
-    // These are loaded from the same dump used for ingestion.
-    val updateIds = loadUpdateIds()
-    if (updateIds.isEmpty) {
-      throw new IllegalStateException(
-        "No update IDs found in the dump. Cannot run read benchmarks."
-      )
-    }
-
-    Seq(
-      ReadOperation(
-        name = "getUpdateById",
-        iterations = readIterations * updateIds.size,
-        execute = { implicit tc: TraceContext =>
-          // Read all updates sequentially, repeating `readIterations` times
-          val iterations = (1 to readIterations).flatMap(_ => updateIds)
-          iterations.foldLeft(Future.successful(0L)) { (accF, updateId) =>
-            accF.flatMap { count =>
-              store.getUpdate(updateId).map {
-                case Some(_) => count + 1
-                case None =>
-                  throw new IllegalStateException(
-                    s"Update $updateId was ingested but not found via getUpdate"
-                  )
-              }
-            }
+  override protected def readOperation(
+      store: UpdateHistory,
+      txs: Seq[TreeUpdateWithMigrationId],
+  ): ReadOperation = {
+    val updateIds = txs.map(_.update.update.updateId)
+    ReadOperation(
+      name = "getUpdateById",
+      execute = { implicit tc: TraceContext =>
+        updateIds.foldLeft(Future.successful(())) { (accF, updateId) =>
+          accF.flatMap { _ =>
+            store.getUpdate(updateId).map(_ => ())
           }
-        },
-      )
+        }
+      },
     )
+  }
+
+  override protected def verifyReadResults(
+      store: UpdateHistory,
+      originalTxs: Seq[TreeUpdateWithMigrationId],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    originalTxs.foldLeft(Future.successful(())) { (accF, originalTx) =>
+      accF.flatMap { _ =>
+        val updateId = originalTx.update.update.updateId
+        store.getUpdate(updateId).map {
+          case Some(readBack) =>
+            if (readBack.update.update.updateId != originalTx.update.update.updateId) {
+              throw new AssertionError(
+                s"Update ID mismatch: expected ${originalTx.update.update.updateId}, got ${readBack.update.update.updateId}"
+              )
+            }
+            if (readBack.migrationId != originalTx.migrationId) {
+              throw new AssertionError(
+                s"Migration ID mismatch for update $updateId: expected ${originalTx.migrationId}, got ${readBack.migrationId}"
+              )
+            }
+            if (readBack.update.update.recordTime != originalTx.update.update.recordTime) {
+              throw new AssertionError(
+                s"Record time mismatch for update $updateId: expected ${originalTx.update.update.recordTime}, got ${readBack.update.update.recordTime}"
+              )
+            }
+          case None =>
+            throw new AssertionError(
+              s"Update $updateId was ingested but not found during verification"
+            )
+        }
+      }
+    }
   }
 }
 
@@ -97,7 +117,6 @@ object UpdateHistoryReadPerformanceTest {
   case class UpdateHistoryReadPerformanceTestConfig(
       dsoParty: String,
       migrationId: Long,
-      readIterations: Option[Int],
   )
   private implicit val configReader: ConfigReader[UpdateHistoryReadPerformanceTestConfig] =
     deriveReader[UpdateHistoryReadPerformanceTestConfig]
@@ -129,7 +148,6 @@ object UpdateHistoryReadPerformanceTest {
             spliceConfig.parameters.timeouts.processing,
             loggerFactory,
             sv1Config.automation.ingestion,
-            cfg.readIterations.getOrElse(10),
           ),
       )
   }

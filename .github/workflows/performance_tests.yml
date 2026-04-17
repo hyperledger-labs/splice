@@ -139,10 +139,7 @@ jobs:
               -c 'CREATE DATABASE splice_apps' || (echo "Connection to DB failed" && exit 1)
 
             echo "Downloading updates from mainnet for read performance tests"
-            curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnet_big_update_1220a6a9156f61afd2957bda33c04e1c393504b35adeea21db54875d112e73b88a55.json" -o /tmp/mainnet_big_update_raw.json
-            echo '{"transactions":[' > /tmp/mainnet_big_update.json
-            cat /tmp/mainnet_big_update_raw.json >> /tmp/mainnet_big_update.json
-            echo ']}' >> /tmp/mainnet_big_update.json
+            curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnet_big_update_1220a6a9156f61afd2957bda33c04e1c393504b35adeea21db54875d112e73b88a55.json" -o /tmp/mainnet_big_update.json
             ls -lah /tmp/mainnet_big_update.json
           cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t UpdateHistoryRead -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnet_big_update.json"'
 
