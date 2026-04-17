@@ -7,8 +7,10 @@ import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.performance.tests.{
   ScanStoreIngestionPerformanceTest,
   StoreIngestionPerformanceTest,
+  StoreReadPerformanceTest,
   SvDsoStoreIngestionPerformanceTest,
   UpdateHistoryIngestionPerformanceTest,
+  UpdateHistoryReadPerformanceTest,
 }
 
 import java.nio.file.Path
@@ -27,7 +29,7 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
   def run(): Unit = {
     val config: Config = ConfigFactory.parseFile(configPath.toFile).resolve()
 
-    val allTests: Map[String, () => StoreIngestionPerformanceTest] = Map(
+    val ingestionTests: Map[String, () => StoreIngestionPerformanceTest] = Map(
       "DbSvDsoStore" -> (() =>
         SvDsoStoreIngestionPerformanceTest.tryCreate(updateHistoryDumpPath, config, loggerFactory)
       ),
@@ -44,21 +46,35 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
       ),
     )
 
-    val selectedTests: Map[String, () => StoreIngestionPerformanceTest] = {
-      val regex = testNames.replace("*", ".*").r
-      allTests.filter { case (name, _) => regex.matches(name) }
-    }
+    val readTests: Map[String, () => StoreReadPerformanceTest] = Map(
+      "UpdateHistoryRead" -> (() =>
+        UpdateHistoryReadPerformanceTest
+          .tryCreate(updateHistoryDumpPath, config, loggerFactory)
+      )
+    )
 
-    selectedTests.foreach { case (testName, testBuilder) =>
+    val regex = testNames.replace("*", ".*").r
+
+    val selectedIngestionTests = ingestionTests.filter { case (name, _) => regex.matches(name) }
+    val selectedReadTests = readTests.filter { case (name, _) => regex.matches(name) }
+
+    def runTest(testName: String, runFuture: => scala.concurrent.Future[Unit]): Unit = {
       try {
-        val test = testBuilder()
-        Await.result(test.run(), 1.hour) // surely 1h is enough... right?
+        Await.result(runFuture, 1.hour)
         logger.info(s"Test '$testName' PASSED")
       } catch {
         case NonFatal(ex) =>
           logger.error(s"Test '$testName' FAILED", ex)
           throw ex
       }
+    }
+
+    selectedIngestionTests.foreach { case (testName, testBuilder) =>
+      runTest(testName, testBuilder().run())
+    }
+
+    selectedReadTests.foreach { case (testName, testBuilder) =>
+      runTest(testName, testBuilder().run())
     }
   }
 
