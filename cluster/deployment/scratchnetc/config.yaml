@@ -26,4 +26,4 @@ operatorDeployment:
 svs:
   default:
     participant:
-      legacyDatabaseName: "participant-0"
+      legacyDatabaseName: "participant_0"
