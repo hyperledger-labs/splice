@@ -200,7 +200,9 @@ export const Governance: React.FC = () => {
             fetchNextPage={voteResultsInfiniteQuery.fetchNextPage}
             hasNextPage={voteResultsInfiniteQuery.hasNextPage}
             isFetchingNextPage={voteResultsInfiniteQuery.isFetchingNextPage}
-            pageCount={voteResultsInfiniteQuery.data?.pages.length}
+            pageCount={
+              voteResultsInfiniteQuery.data?.pages.filter(p => p.results.length > 0).length
+            }
           />
         </>
       )}
