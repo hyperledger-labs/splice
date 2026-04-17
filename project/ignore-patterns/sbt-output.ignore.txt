@@ -134,6 +134,7 @@ WARN: InvalidDefaultArgInFrom
 .*api_jwt\.py:153: InsecureKeyLengthWarning:.*
 
 # Temporarily ignore the warnings around deprecated stuff in our daml tests
+# TODO(#5114): stop using the deprecated APIs, and remove this
 Severity: DsWarning
 daml/Splice/Scripts.*warning:
 daml/Splice/Testing.*warning:
