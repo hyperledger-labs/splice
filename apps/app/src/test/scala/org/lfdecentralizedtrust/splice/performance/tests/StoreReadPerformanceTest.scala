@@ -13,12 +13,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final case class StoreReadPerfMetrics(
     totalTimeNs: BigDecimal,
-    processCpuTimeNs: BigDecimal,
     peakHeapBytes: BigDecimal,
-) {
-  def cpuToWallClockRatio: BigDecimal =
-    if (totalTimeNs > 0) processCpuTimeNs / totalTimeNs else BigDecimal(0)
-}
+    cpuToWallClockRatio: BigDecimal,
+    updateSizeBytes: Long,
+    numUpdates: Long,
+)
 
 final case class ReadOperation(
     name: String,
@@ -75,6 +74,7 @@ abstract class StoreReadPerformanceTest(
       tc: TraceContext
   ): Future[StoreReadPerfMetrics] = {
     val op = readOperation(store, txs)
+    val updateSizeBytes = Files.size(updateHistoryDumpPath)
     val wallBefore = System.nanoTime()
     val cpuBefore = getProcessCpuTimeNs
     op.execute(tc).map { _ =>
@@ -83,19 +83,19 @@ abstract class StoreReadPerformanceTest(
       val duration = wallAfter - wallBefore
       val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
       val heapUsed = getHeapUsedBytes
+      val ratio = if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
 
       val msg =
-        f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms"
+        f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
       logger.info(msg)
       println(s"${this.getClass.getName}: $msg")
-      println(
-        f"Process-level metrics: CPU time=${BigDecimal(cpuDeltaNs) / 1e6}%.2f ms, peak heap=$heapUsed bytes"
-      )
 
       StoreReadPerfMetrics(
         totalTimeNs = BigDecimal(duration),
-        processCpuTimeNs = BigDecimal(cpuDeltaNs),
         peakHeapBytes = heapUsed,
+        cpuToWallClockRatio = ratio,
+        updateSizeBytes = updateSizeBytes,
+        numUpdates = txs.size.toLong,
       )
     }
   }
@@ -122,11 +122,6 @@ abstract class StoreReadPerformanceTest(
             BigDecimal(completionEpochSec),
           ),
           metric(
-            "process_cpu_time_ns",
-            "Process-wide CPU time in nanoseconds (all cores combined)",
-            metrics.processCpuTimeNs,
-          ),
-          metric(
             "peak_heap_bytes",
             "Peak JVM heap memory usage in bytes observed during read",
             metrics.peakHeapBytes,
@@ -135,6 +130,16 @@ abstract class StoreReadPerformanceTest(
             "cpu_to_wall_clock_ratio",
             "Ratio of process CPU time to wall-clock time",
             metrics.cpuToWallClockRatio,
+          ),
+          metric(
+            "update_size_bytes",
+            "Size of the update dump file in bytes",
+            BigDecimal(metrics.updateSizeBytes),
+          ),
+          metric(
+            "num_updates",
+            "Number of updates read",
+            BigDecimal(metrics.numUpdates),
           ),
         ),
       )
