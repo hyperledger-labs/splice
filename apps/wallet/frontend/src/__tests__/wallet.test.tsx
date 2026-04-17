@@ -6,7 +6,7 @@ import { rest } from 'msw';
 import { LookupTransferPreapprovalByPartyResponse } from '@lfdecentralizedtrust/scan-openapi';
 import { test, expect, describe } from 'vitest';
 import { vi } from 'vitest';
-import * as jtv from "@mojotech/json-type-validation";
+import * as jtv from '@mojotech/json-type-validation';
 
 import App from '../App';
 import { WalletConfigProvider } from '../utils/config';
@@ -66,7 +66,7 @@ function featureSupportHandler(
 
 test('can parse allocation request', async () => {
   const ar = getAllocationRequest();
-  const res = mkContract(AllocationRequest, ar)
+  const res = mkContract(AllocationRequest, ar);
   const decoded = Contract.decodeOpenAPI(res, AllocationRequest);
   expect(decoded.contractId).toStrictEqual(res.contract_id);
   expect(decoded.createdAt).toStrictEqual(res.created_at);
@@ -79,7 +79,7 @@ test('daml types support optionals', async () => {
   const dict = jtv.object({ x: Optional(Text).decoder });
   expect(dict.runWithException({})).toStrictEqual({ x: null });
   expect(dict.runWithException({ x: null })).toStrictEqual({ x: null });
-  expect(dict.runWithException({ x: "abc" })).toStrictEqual({ x: "abc" });
+  expect(dict.runWithException({ x: 'abc' })).toStrictEqual({ x: 'abc' });
 });
 
 test('login screen shows up', async () => {

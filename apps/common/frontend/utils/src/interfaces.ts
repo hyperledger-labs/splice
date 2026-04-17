@@ -33,7 +33,6 @@ export declare type DisclosedContract = {
   createdEventBlob: string;
 };
 
-
 export const Contract = {
   decodeOpenAPI: <T extends object, K, I extends string>(
     c: OpenAPIContract,

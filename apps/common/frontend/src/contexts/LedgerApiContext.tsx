@@ -5,9 +5,7 @@ import { callWithLogging } from '@lfdecentralizedtrust/splice-common-frontend-ut
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import {
-  DisclosedContract,
-} from '@lfdecentralizedtrust/splice-common-frontend-utils/interfaces';
+import { DisclosedContract } from '@lfdecentralizedtrust/splice-common-frontend-utils/interfaces';
 
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
