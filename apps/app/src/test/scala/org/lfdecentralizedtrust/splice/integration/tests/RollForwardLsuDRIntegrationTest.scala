@@ -97,7 +97,7 @@ class RollForwardLsuDRIntegrationTest
                 bftSequencerConnection = false,
                 domainMigrationDumpPath = Some(
                   (File(
-                    DomainMigrationUtil.migrationTestDumpDir(
+                    SynchronizerUpgradeUtil.migrationTestDumpDir(
                       name
                     )
                   ) / "domain_migration_dump.json").path
