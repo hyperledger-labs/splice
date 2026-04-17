@@ -117,7 +117,7 @@ export class LedgerApiClient {
     contractId: ContractId<T>,
     argument: C,
     domainId?: string,
-    disclosedContracts: DisclosedContract[] = []
+    disclosedContracts: DisclosedContract<unknown>[] = []
   ): Promise<R> {
     const choice = await this.packageIdResolver.resolveChoice(unresolvedChoice);
     console.debug(
