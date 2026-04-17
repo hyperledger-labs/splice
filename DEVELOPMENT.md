@@ -354,24 +354,16 @@ The implementation of the `sbt` plugin can be found in [`/project/DamlPlugin.sca
 
 To edit the files in a particular Daml project, for example, `/apps/wallet/daml`, proceed as follows:
 
-1. As a setup step: install the specific version of the Daml SDK used in the Splice repo by running
-   ```
-   ./build-tools/install-daml-sdk.sh
-   ```
-   TODO(#2722): replace our legacy custom setup with standard Daml SDK installation instructions
-2. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
-3. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
-4. Start `daml studio --replace=always` in the repo root, which starts VS code.
-   Note that we need `--replace=always`, as there's a bug in later versions of the Daml extension
-   which prevents them from working with the Daml SDK version used in this repo
-   ([issue](https://github.com/digital-asset/daml/issues/22398)).
-5. Open and edit the .daml files in `/apps/wallet/daml` in VS code.
+1. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
+2. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
+3. Start `dpm studio` in the repo root, which starts VS code.
+4. Open and edit the .daml files in `/apps/wallet/daml` in VS code.
    You should see them being typechecked on the fly.
-6. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
+5. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
    If you change any of them, then you can propagate these changes across the .dars as follows:
    1. redo Step 2
     3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
-7. When updating a DAR, make sure to run `sbt updateDarResources` before running integration tests. CI enforces that this is always done.
+6. When updating a DAR, make sure to run `sbt updateDarResources` before running integration tests. CI enforces that this is always done.
 
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
