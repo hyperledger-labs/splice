@@ -142,7 +142,7 @@ class DsoPartyMigration(
                         metadata,
                       ) =>
                     logger.info(
-                      s"Requested record time $authorizedAt is not yet clean: $metadata, submitting dummy transaction"
+                      s"Requested record time $activationTime is not yet clean: $metadata, submitting dummy transaction"
                     )
                     submitDummyTransaction()
                   case _ => Future.unit
