@@ -54,3 +54,23 @@
     - LocalNet
 
         - Added support for configuring the protocol version used in LocalNet.
+
+    - Remove use of rollback nodes to support protocol version 35
+
+        - Daml
+
+            - ``AmuletRules``. Replace ``InvalidTransfer`` exceptions with ``failWithStatus``:
+
+                - ``ITR_InsufficientFunds`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/insufficient-funds``
+                - ``ITR_UnknownSynchronizer`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/unknown-synchronizer``
+                - ``ITR_InsufficientTopupAmount`` → `FailureStatus` with error_id = ``splice.lfdecentralizedtrust.org/insufficient-topup-amount``
+                - ``ITR_Other ("More than the maximum number of inputs")`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/maximum-inputs-exceeded``
+                - ``ITR_Other ("More than the maximum number of outputs")`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/maximum-outputs-exceeded``
+
+            - ``WalletAppInstall_ExecuteBatch``. No longer catches exceptions and returns them as ``AmuletOperationOutcome`` / ``COO_Error``. Instead, the transaction is aborted.
+
+            - ``TransferCommand_Send``. No longer catches exceptions and returns them as ``TransferCommandResultFailure``. Instead, the transaction is aborted without merging inputs.
+
+        - Wallet app
+
+            - ``batchSize`` in ``TreasuryConfig`` is set to 1.

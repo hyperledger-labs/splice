@@ -9,6 +9,7 @@ import Daml.Script
 
 import Splice.Amulet
 import Splice.AmuletRules
+import Splice.Testing.Utils
 import Splice.Wallet.Install
 import Splice.Wallet.Payment
 
@@ -47,6 +48,10 @@ testTransferOffers = script do
 
 -- TODO(#2957): remove read-as DSO party.
   let completeTransfer accepted amulet transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.dso] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
+        inputs = [InputAmulet amulet]
+        operations = [CO_CompleteAcceptedTransfer accepted]
+        context = transferContext
+      completeTransferMustFail accepted amulet transferContext check = submitMultiMustFail'' check [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.dso] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
         inputs = [InputAmulet amulet]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext
@@ -97,8 +102,7 @@ testTransferOffers = script do
   let accepted = accept.acceptedTransferOffer
   transferContext <- getPaymentTransferContext app alice
   [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- completeTransfer accepted amulet transferContext
-  [COO_Error _] <- pure outcomes
+  completeTransferMustFail accepted amulet transferContext (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds")
   -- tap more amulet and retry the transfer
   aliceAmuletsBefore <- query @Amulet alice.primaryParty
   tap app alice 100.0  -- chosen such that all amulets of alice are consumed

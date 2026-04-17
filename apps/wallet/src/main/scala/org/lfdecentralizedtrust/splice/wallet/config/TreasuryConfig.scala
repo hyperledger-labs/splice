@@ -20,7 +20,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
   * @param queueSize how many amulet-balance-manipulating operations to queue for creating the next batch.
   */
 case class TreasuryConfig(
-    batchSize: Int = 10,
+    batchSize: Int = 1,
     queueSize: Int = 20,
 
     /** maximum amount of time to wait for grpc calls to complete for wallet operation
