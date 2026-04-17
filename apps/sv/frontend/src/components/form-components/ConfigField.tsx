@@ -107,7 +107,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+              sx={{ mt: 0.5, display: 'block' }}
               data-testid={`config-current-value-${configChange.fieldName}`}
             >
               Current Configuration: {configChange.currentValue}
