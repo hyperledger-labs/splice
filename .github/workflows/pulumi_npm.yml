@@ -15,12 +15,14 @@ jobs:
             cd cluster/pulumi
             npm install
             if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-              echo ":red_circle: Build produced changes:" >> $GITHUB_STEP_SUMMARY
-              git status --short >> $GITHUB_STEP_SUMMARY
-              echo 'Please run `cd $(git rev-parse --show-toplevel)/cluster/pulumi && npm install` and commit the changes in `package-lock.json`' >> $GITHUB_STEP_SUMMARY
+              # shellcheck disable=SC2129
+              echo ":red_circle: Build produced changes:" >> "$GITHUB_STEP_SUMMARY"
+              git status --short >> "$GITHUB_STEP_SUMMARY"
+              # shellcheck disable=SC2016
+              echo 'Please run `cd $(git rev-parse --show-toplevel)/cluster/pulumi && npm install` and commit the changes in `package-lock.json`' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             else
-              echo "package-lock.json is correct :green_circle:" >> $GITHUB_STEP_SUMMARY
+              echo "package-lock.json is correct :green_circle:" >> "$GITHUB_STEP_SUMMARY"
             fi
 
 
