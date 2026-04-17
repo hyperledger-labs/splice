@@ -584,6 +584,13 @@ object SpliceConfig {
               .leftMap(invalidUrl =>
                 ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl")
               )
+            _ <- Either.cond(
+              sequencerConfig.isBftSequencer || sequencerConfig.dabftPruning.isEmpty,
+              (),
+              ConfigValidationFailed(
+                "BFT pruning config must only be set with isBftSequencer=true"
+              ),
+            )
           } yield sequencerConfig
         }
     }

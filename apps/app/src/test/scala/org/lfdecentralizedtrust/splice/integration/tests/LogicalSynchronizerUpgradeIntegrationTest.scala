@@ -4,9 +4,10 @@ import better.files.File.apply
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
+import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -625,6 +626,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         sv1ScanBackend.stop()
         sv1Backend.startSync()
         sv1ScanBackend.startSync()
+      }
+
+      clue("SV1's DABFT node has pruning config set") {
+        sv1Backend.sequencerClient.bft.pruning.get_schedule() shouldBe PruningSchedule(
+          "0 /10 * * * ?",
+          PositiveDurationSeconds.ofMinutes(5),
+          PositiveDurationSeconds.ofDays(30),
+        )
       }
 
       // this also ensures that sv1 ingested verdicts after the restart
