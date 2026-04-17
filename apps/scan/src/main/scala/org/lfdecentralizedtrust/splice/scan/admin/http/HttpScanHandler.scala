@@ -90,13 +90,13 @@ import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanRoll
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
+  AppActivityStore,
   ScanEventStore,
   ScanStore,
   TxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   AcsSnapshotBulkStorage,
-  BulkStorage,
   UpdateHistoryBulkStorage,
 }
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
@@ -117,6 +117,8 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -147,6 +149,8 @@ class HttpScanHandler(
     synchronizerNodeService: SynchronizerNodeService[ScanSynchronizerNode],
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
+    appRewardsStoreO: Option[DbScanAppRewardsStore],
+    appActivityStoreO: Option[AppActivityStore],
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     bulkStorage: BulkStorage,
@@ -2893,6 +2897,159 @@ class HttpScanHandler(
             )
           )
         )
+    }
+  }
+
+  def getRewardAccountingEarliestAvailableRound(
+      respond: ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.type
+  )()(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingEarliestAvailableRoundResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
+      appActivityStoreO match {
+        case Some(appActivityStore) =>
+          appActivityStore.earliestRoundWithCompleteAppActivity().map {
+            case Some(round) =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
+                definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
+              )
+            case None =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+                ErrorResponse("No reward accounting data available yet")
+              )
+          }
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled")
+            )
+          )
+      }
+    }
+  }
+
+  def getRewardAccountingActivityTotals(
+      respond: ScanResource.GetRewardAccountingActivityTotalsResponse.type
+  )(roundNumber: Long)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingActivityTotalsResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          appRewardsStore.getAppActivityRoundTotalByRound(roundNumber).map {
+            case None =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+                ErrorResponse(
+                  s"Activity totals not (yet) computed for round $roundNumber"
+                )
+              )
+            case Some(roundTotal) =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+                definitions.GetRewardAccountingActivityTotalsResponse(
+                  roundNumber = roundTotal.roundNumber,
+                  totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+                  activePartiesCount = roundTotal.activeAppProviderPartiesCount,
+                  activityRecordsCount = roundTotal.activityRecordsCount,
+                )
+              )
+          }
+      }
+    }
+  }
+
+  def getRewardAccountingRootHash(
+      respond: ScanResource.GetRewardAccountingRootHashResponse.type
+  )(roundNumber: Long)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingRootHashResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingRootHash") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingRootHashResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          appRewardsStore.getAppRewardRootHashByRound(roundNumber).map {
+            case None =>
+              ScanResource.GetRewardAccountingRootHashResponse.NotFound(
+                ErrorResponse(
+                  s"Root hash not (yet) computed for round $roundNumber"
+                )
+              )
+            case Some(rootHash) =>
+              ScanResource.GetRewardAccountingRootHashResponse.OK(
+                definitions.GetRewardAccountingRootHashResponse(
+                  roundNumber = rootHash.roundNumber,
+                  rootHash = rootHash.rootHash.toHex,
+                )
+              )
+          }
+      }
+    }
+  }
+
+  def getRewardAccountingBatch(
+      respond: ScanResource.GetRewardAccountingBatchResponse.type
+  )(roundNumber: Long, batchHash: String)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingBatchResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingBatch") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingBatchResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          appRewardsStore
+            .lookupBatchByHash(roundNumber, DbScanAppRewardsStore.RewardHash.fromHex(batchHash))
+            .map {
+              case None =>
+                ScanResource.GetRewardAccountingBatchResponse.NotFound(
+                  ErrorResponse(
+                    s"Batch not (yet) found for round $roundNumber with hash $batchHash"
+                  )
+                )
+              case Some(batch: DbScanAppRewardsStore.BatchOfBatches) =>
+                ScanResource.GetRewardAccountingBatchResponse.OK(
+                  definitions.GetRewardAccountingBatchResponse(
+                    definitions.RewardAccountingBatchOfBatches(
+                      batchType = "BatchOfBatches",
+                      childHashes = batch.childHashes.map(_.toHex).toVector,
+                    )
+                  )
+                )
+              case Some(batch: DbScanAppRewardsStore.BatchOfMintingAllowances) =>
+                ScanResource.GetRewardAccountingBatchResponse.OK(
+                  definitions.GetRewardAccountingBatchResponse(
+                    definitions.RewardAccountingBatchOfMintingAllowances(
+                      batchType = "BatchOfMintingAllowances",
+                      mintingAllowances = batch.allowances
+                        .map(a =>
+                          definitions.RewardAccountingMintingAllowance(
+                            provider = a.provider,
+                            amount = a.amount.toString,
+                          )
+                        )
+                        .toVector,
+                    )
+                  )
+                )
+            }
+      }
     }
   }
 }
