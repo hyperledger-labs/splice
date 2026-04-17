@@ -28,6 +28,7 @@
     "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.19",
     "@daml.js/splice-wallet-payments": "file:common/frontend/daml.js/splice-wallet-payments-0.1.18",
     "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.19",
+    "@daml/types": "^3.4.11",
     "xunit-viewer": "^10.6.1"
   }
 }

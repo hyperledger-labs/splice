@@ -36,9 +36,6 @@ import {
   ListAllocationRequestsResponse,
   ListAllocationsResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
-import {
-  Contract,
-} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
 import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';
@@ -47,7 +44,7 @@ import * as damlTypes from '@daml/types';
 import { ContractId, Optional, Text } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
-import { json } from 'stream/consumers';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 // import { get } from 'http';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
@@ -68,16 +65,18 @@ function featureSupportHandler(
   });
 }
 
-test('parse allocation request', async () => {
+test('can parse allocation request', async () => {
   const ar = getAllocationRequest();
   const res = mkContract(AllocationRequest, ar)
-  console.log("contract: " + JSON.stringify(res));
-  // const decoded = Contract.decodeOpenAPI(res, AllocationRequest);
-  // console.log("decoded" + JSON.stringify(decoded));
-  AllocationRequest.decoder.runWithException(res.payload);
+  const decoded = Contract.decodeOpenAPI(res, AllocationRequest);
+  expect(decoded.contractId).toStrictEqual(res.contract_id);
+  expect(decoded.createdAt).toStrictEqual(res.created_at);
+  expect(decoded.createdEventBlob).toStrictEqual(res.created_event_blob);
+  expect(decoded.templateId).toStrictEqual(res.template_id);
+  expect(decoded.payload).toStrictEqual(res.payload);
 });
 
-test.only('daml types support optionals', async () => {
+test('daml types support optionals', async () => {
   const dict = jtv.object({ x: Optional(Text).decoder });
   expect(dict.runWithException({})).toStrictEqual({ x: null });
   expect(dict.runWithException({ x: null })).toStrictEqual({ x: null });
