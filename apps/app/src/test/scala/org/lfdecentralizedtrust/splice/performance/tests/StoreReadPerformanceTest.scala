@@ -62,6 +62,11 @@ abstract class StoreReadPerformanceTest(
           _ <- store.ingestionSink.initialize()
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)
+
+          /** TODO(#4790): We need to address the temporal locality here,
+            * we just write and read immediately, which is not what we have in production.
+            *  Need to flush the caches(db etc)
+            */
           metrics <- runReadBenchmarks(store, txs)
           _ <- verifyReadResults(store, txs)
           _ = writeMetricsFile(metrics)
@@ -83,7 +88,8 @@ abstract class StoreReadPerformanceTest(
       val duration = wallAfter - wallBefore
       val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
       val heapUsed = getHeapUsedBytes
-      val ratio = if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
+      val cpuToWallClockRatio =
+        if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
 
       val msg =
         f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
@@ -93,7 +99,7 @@ abstract class StoreReadPerformanceTest(
       StoreReadPerfMetrics(
         totalTimeNs = BigDecimal(duration),
         peakHeapBytes = heapUsed,
-        cpuToWallClockRatio = ratio,
+        cpuToWallClockRatio = cpuToWallClockRatio,
         updateSizeBytes = updateSizeBytes,
         numUpdates = txs.size.toLong,
       )

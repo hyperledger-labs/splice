@@ -71,6 +71,8 @@ class UpdateHistoryReadPerformanceTest(
       execute = { implicit tc: TraceContext =>
         updateIds.foldLeft(Future.successful(())) { (accF, updateId) =>
           accF.flatMap { _ =>
+            /** TODO(#4790): Add application level processing (e.g. normalization for SVs using makeConsistentAcrossSvs())
+              */
             store.getUpdate(updateId).map(_ => ())
           }
         }
