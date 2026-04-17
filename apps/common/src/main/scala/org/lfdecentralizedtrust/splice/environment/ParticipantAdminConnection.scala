@@ -24,7 +24,7 @@ import com.digitalasset.canton.admin.participant.v30.{
   PruningServiceGrpc,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
@@ -828,7 +828,9 @@ class ParticipantAdminConnection(
               party,
               synchronizerId,
               NonNegativeLong.tryCreate(beforeActivationOffset),
-              waitForActivationTimeout = None, // i.e., default
+              // The default of 2m makes it hang during shutdown, which produces a log about reader still being active.
+              // Instead, we rely on the trigger to run this repeatedly and shutdown-safe.
+              waitForActivationTimeout = Some(NonNegativeFiniteDuration.ofSeconds(5L)),
             )
         ),
         logger,
