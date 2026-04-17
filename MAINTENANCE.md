@@ -30,6 +30,7 @@ compilation. These are conventionally named `splice-api-*`. See [Maintaining Dam
    1. To build all daml packages using `sbt damlBuild`
    2. To generate daml docs using `cluster/images/docs/gen-daml-docs.sh`
    3. To generate java code (as part of `sbt damlBuild`) and typescript code (as part of `sbt apps-common-frontend/compile`)
+1. Update the version of @daml/types in all package.json files
 
 Note that changing the compiler version changes all package ids and should not be done
 without a good reason to do so as changing Daml code requires a governance vote.
