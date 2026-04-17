@@ -23,8 +23,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodi
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
+import io.circe.Json
 import java.lang.management.ManagementFactory
 import java.nio.file.{Files, Path}
+import java.nio.file.{Paths, StandardOpenOption}
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Shared base class for store ingestion and read performance tests.
@@ -184,4 +186,36 @@ abstract class BaseStorePerformanceTest(
 
   protected def mkParticipantId(name: String): ParticipantId =
     ParticipantId.tryFromProtoPrimitive("PAR::" + name + "::dummy")
+
+  @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
+  protected def writeMetricsFile(
+      metricsJson: Json,
+      metricsDir: String,
+      pertTestType: String,
+  ): Unit = {
+    val json = Json
+      .obj(
+        "test_name" -> Json.fromString(testName),
+        "metrics" -> metricsJson,
+      )
+      .spaces2
+
+    println(s"$pertTestType metrics for $testName:\n$json")
+
+    try {
+      val dir = Paths.get(s"/tmp/$metricsDir")
+      Files.createDirectories(dir)
+      val metricsFile = dir.resolve(s"$testName.json")
+      Files.writeString(
+        metricsFile,
+        json,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING,
+      )
+      println(s"Wrote metrics to $metricsFile")
+    } catch {
+      case e: Exception =>
+        println(s"Failed to write metrics file for $testName: ${e.getMessage}")
+    }
+  }
 }

@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
 import io.circe.Json
-import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import java.nio.file.{Files, Path}
 import scala.concurrent.{ExecutionContext, Future}
 
 final case class StoreReadPerfMetrics(
@@ -69,9 +69,52 @@ abstract class StoreReadPerformanceTest(
             */
           metrics <- runReadBenchmarks(store, txs)
           _ <- verifyReadResults(store, txs)
-          _ = writeMetricsFile(metrics)
+          _ = writeReadMetrics(metrics)
         } yield ()
       }
+  }
+
+  @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
+  private def writeReadMetrics(metrics: StoreReadPerfMetrics): Unit = {
+    val completionEpochSec = java.time.Instant.now().getEpochSecond
+    val jobName = "splice_perf_read"
+
+    def metric(metricName: String, description: String, value: BigDecimal): Json = Json.obj(
+      "name" -> Json.fromString(s"${jobName}_$metricName"),
+      "description" -> Json.fromString(description),
+      "value" -> Json.fromBigDecimal(value),
+    )
+
+    val metricsJson = Json.arr(
+      metric("total_time_ns", "Total read time in nanoseconds", metrics.totalTimeNs),
+      metric(
+        "completion_timestamp_seconds",
+        "Epoch seconds when the test run completed",
+        BigDecimal(completionEpochSec),
+      ),
+      metric(
+        "peak_heap_bytes",
+        "Peak JVM heap memory usage in bytes observed during read",
+        metrics.peakHeapBytes,
+      ),
+      metric(
+        "cpu_to_wall_clock_ratio",
+        "Ratio of process CPU time to wall-clock time (>0.7=CPU-bound, 0.25~0.7=standard, <0.25=I/O-bound)",
+        metrics.cpuToWallClockRatio,
+      ),
+      metric(
+        "update_size_bytes",
+        "Size of the update dump file in bytes",
+        BigDecimal(metrics.updateSizeBytes),
+      ),
+      metric(
+        "num_updates",
+        "Number of updates read",
+        BigDecimal(metrics.numUpdates),
+      ),
+    )
+
+    writeMetricsFile(metricsJson, "store-read-perf-metrics", "Read")
   }
 
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
@@ -106,67 +149,4 @@ abstract class StoreReadPerformanceTest(
     }
   }
 
-  @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
-  private def writeMetricsFile(metrics: StoreReadPerfMetrics): Unit = {
-    val completionEpochSec = java.time.Instant.now().getEpochSecond
-    val jobName = "splice_perf_read"
-
-    def metric(metricName: String, description: String, value: BigDecimal): Json = Json.obj(
-      "name" -> Json.fromString(s"${jobName}_$metricName"),
-      "description" -> Json.fromString(description),
-      "value" -> Json.fromBigDecimal(value),
-    )
-
-    val json = Json
-      .obj(
-        "test_name" -> Json.fromString(testName),
-        "metrics" -> Json.arr(
-          metric("total_time_ns", "Total read time in nanoseconds", metrics.totalTimeNs),
-          metric(
-            "completion_timestamp_seconds",
-            "Epoch seconds when the test run completed",
-            BigDecimal(completionEpochSec),
-          ),
-          metric(
-            "peak_heap_bytes",
-            "Peak JVM heap memory usage in bytes observed during read",
-            metrics.peakHeapBytes,
-          ),
-          metric(
-            "cpu_to_wall_clock_ratio",
-            "Ratio of process CPU time to wall-clock time",
-            metrics.cpuToWallClockRatio,
-          ),
-          metric(
-            "update_size_bytes",
-            "Size of the update dump file in bytes",
-            BigDecimal(metrics.updateSizeBytes),
-          ),
-          metric(
-            "num_updates",
-            "Number of updates read",
-            BigDecimal(metrics.numUpdates),
-          ),
-        ),
-      )
-      .spaces2
-
-    println(s"Read metrics for $testName:\n$json")
-
-    try {
-      val metricsDir = Paths.get("/tmp/store-read-perf-metrics")
-      Files.createDirectories(metricsDir)
-      val metricsFile = metricsDir.resolve(s"$testName.json")
-      Files.writeString(
-        metricsFile,
-        json,
-        StandardOpenOption.CREATE,
-        StandardOpenOption.TRUNCATE_EXISTING,
-      )
-      println(s"Wrote metrics to $metricsFile")
-    } catch {
-      case e: Exception =>
-        println(s"Failed to write metrics file for $testName: ${e.getMessage}")
-    }
-  }
 }
