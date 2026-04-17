@@ -32,7 +32,7 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
         Latency,
         "This metric measures the time taken for the future returned by `signalWhenIngestedOrShutdown` to complete as an indication for how far our transaction ingestion lags behind ledger end. " +
           "Note that this only works for apps that do submissions, i.e., Scan does not have any data for this metric. " +
-          "Use ingestionTimePerEntry to know how fast ingestion is.",
+          "Use ingestionTimePerBatch to know how fast ingestion is.",
       )
     )
 
