@@ -145,52 +145,6 @@ class WalletIntegrationTest
     }
 
     "concurrent amulet-operations" should {
-      "be batched" in { implicit env =>
-        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-        aliceWalletClient.tap(50)
-        val requestIds =
-          (1 to 3).map(_ =>
-            createSelfPaymentRequest(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              aliceWalletClient.config.ledgerApiUser,
-              alice,
-            )
-          )
-        val offsetBefore =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end()
-        // sending three commands in short succession to the idle wallet should lead to two transactions being executed
-        // tx 1: first command that arrived is immediately executed
-        // tx 2: other commands that arrived after the first command was started are executed in one batch
-        requestIds.foreach { case (requestId, _) =>
-          Future(aliceWalletClient.acceptAppPaymentRequest(requestId)).discard
-        }
-
-        // Wait until 2 transactions have been received
-        val txs =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
-            .treesJava(
-              Set(alice),
-              completeAfter = PositiveInt.tryCreate(2),
-              beginOffset = offsetBefore,
-            )
-        val createdAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.Amulet.COMPANION)(_).size)
-        val createdLockedAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.LockedAmulet.COMPANION)(_).size)
-
-        // in rare cases all 3 commands get batched in one transaction,
-        // so we only check if the 3 commands are included in the 2 transactions
-
-        // create change
-        createdAmuletsInTx.sum shouldBe 3
-        // lock amulet
-        createdLockedAmuletsInTx.sum shouldBe 3
-
-        (createdAmuletsInTx zip createdLockedAmuletsInTx).foreach { case (cc, clc) =>
-          cc shouldBe clc
-        }
-      }
-
       "be batched up to `batchSize` concurrent amulet-operations" in { implicit env =>
         val batchSize = aliceValidatorBackend.config.treasury.batchSize
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

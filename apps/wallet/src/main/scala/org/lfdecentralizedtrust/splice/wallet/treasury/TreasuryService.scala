@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferi
   InputValidatorRewardCoupon,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  InvalidTransferReason,
   PaymentTransferContext,
   TransferContext,
   TransferInput,
@@ -61,6 +62,8 @@ import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.config.TreasuryConfig
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.*
+import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails.ErrorInfoDetail
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -79,11 +82,18 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
+import io.grpc.protobuf.StatusProto
+import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.Done
 import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason.{
+  ITR_InsufficientFunds,
+  ITR_InsufficientTopupAmount,
+  ITR_Other,
+  ITR_UnknownSynchronizer,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
@@ -228,7 +238,9 @@ class TreasuryService(
       extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
-    enqueue(EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts))
+    handleAmuletOperationError(
+      enqueue(EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts))
+    )
   }
 
   def enqueueTokenStandardTransferOperation(
@@ -259,6 +271,82 @@ class TreasuryService(
   )(implicit tc: TraceContext): Future[allocationinstructionv1.AllocationInstructionResult] = {
     val p = Promise[allocationinstructionv1.AllocationInstructionResult]()
     enqueue(EnqueuedAmuletAllocationOperation(specification, requestedAt, p, tc, dedup))
+  }
+
+  private def handleAmuletOperationError(
+      future: Future[installCodegen.AmuletOperationOutcome]
+  )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = future.recover {
+    case ex: StatusRuntimeException =>
+      toInvalidTransferReason(ex) match {
+        case Some(reason) => new installCodegen.amuletoperationoutcome.COO_Error(reason)
+        case None => throw ex
+      }
+  }
+
+  private def toInvalidTransferReason(
+      ex: StatusRuntimeException
+  )(implicit tc: TraceContext): Option[InvalidTransferReason] = {
+
+    def parseInt(value: String): Option[Int] =
+      scala.util.Try(value.toInt).toOption
+
+    def parseBigDecimal(value: String): Option[BigDecimal] =
+      scala.util.Try(BigDecimal(value)).toOption
+
+    val errorInfoO = ErrorDetails.from(ex).collectFirst { case info: ErrorInfoDetail => info }
+    val message = StatusProto.fromThrowable(ex).getMessage
+
+    errorInfoO.flatMap { errorInfo =>
+      val metadata = errorInfo.metadata
+      metadata.get("error_id").flatMap {
+        case "splice.lfdecentralizedtrust.org/unknown-synchronizer" =>
+          metadata.get("synchronizerId") match {
+            case Some(id) => Some(new ITR_UnknownSynchronizer(id))
+            case None =>
+              logger.warn(
+                s"Invalid metadata for unknown-synchronizer: missing synchronizerId",
+                ex,
+              )
+              None
+          }
+
+        case "splice.lfdecentralizedtrust.org/insufficient-topup-amount" =>
+          (
+            metadata.get("requestedTopupAmount").flatMap(parseInt),
+            metadata.get("minTopupAmount").flatMap(parseInt),
+          ) match {
+            case (Some(requested), Some(min)) =>
+              Some(new ITR_InsufficientTopupAmount(requested, min))
+            case _ =>
+              logger.warn(
+                s"Invalid metadata for insufficient-topup-amount: requestedTopupAmount/minTopupAmount",
+                ex,
+              )
+              None
+          }
+
+        case "splice.lfdecentralizedtrust.org/insufficient-funds" =>
+          metadata.get("requiredAmount").flatMap(parseBigDecimal) match {
+            case Some(amount) =>
+              Some(new ITR_InsufficientFunds(amount.bigDecimal))
+            case None =>
+              logger.warn(
+                s"Invalid metadata for insufficient-funds: requiredAmount",
+                ex,
+              )
+              None
+          }
+
+        case "splice.lfdecentralizedtrust.org/maximum-inputs-exceeded" =>
+          Some(new ITR_Other(message))
+
+        case "splice.lfdecentralizedtrust.org/maximum-outputs-exceeded" =>
+          Some(new ITR_Other(message))
+
+        case _ =>
+          None
+      }
+    }
   }
 
   private def enqueue(
