@@ -557,7 +557,7 @@ class JoiningNodeInitializer(
       synchronizerId: SynchronizerId,
   ) = {
     val description =
-      show"SV participant $participantId has Submission rights for party $dsoParty"
+      show"SV participant $participantId has Submission rights and is not onboarding for party $dsoParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       "submission_rights",
