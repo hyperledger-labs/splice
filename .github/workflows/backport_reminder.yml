@@ -11,7 +11,7 @@ jobs:
   add-backport-reminder:
     runs-on: ubuntu-24.04
     steps:
-        - uses: hyperledger-labs/splice-shared-gha/actions/backport_reminder@a78684a826be866b199ae7a05471a7fad2c9c76c
+        - uses: hyperledger-labs/splice-shared-gha/actions/backport_reminder@0f9cc5e653fb532bae66f3d9e1ec091b419263b3
           with:
             pr_number: ${{ github.event.pull_request.number }}
             lookup_prod_cluster_configs: false
