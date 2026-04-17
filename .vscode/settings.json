@@ -36,8 +36,5 @@
   "metals.inlayHints.implicitConversions.enable": true,
   "makefile.configureOnOpen": false,
   "deno.enable": true,
-  "deno.enablePaths": [
-    "scripts/"
-  ],
-  "daml.useDPMWhenAvailable": true
+  "deno.enablePaths": ["scripts/"]
 }
