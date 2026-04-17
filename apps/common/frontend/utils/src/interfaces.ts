@@ -27,8 +27,8 @@ export interface ContractWithState<T> {
   domainId?: string;
 }
 
-export declare type DisclosedContract = {
-  contractId: ContractId<any>;
+export declare type DisclosedContract<T> = {
+  contractId: ContractId<T>;
   templateId: string;
   createdEventBlob: string;
 };
@@ -47,7 +47,7 @@ export const Contract = {
   toDisclosedContract: <T extends object, K>(
     _tmpl: Template<T, K>,
     c: Contract<T>
-  ): DisclosedContract => ({
+  ): DisclosedContract<T> => ({
     templateId: c.templateId,
     contractId: c.contractId,
     createdEventBlob: c.createdEventBlob!,
