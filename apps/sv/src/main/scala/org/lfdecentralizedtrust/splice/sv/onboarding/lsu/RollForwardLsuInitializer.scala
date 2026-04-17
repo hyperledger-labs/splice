@@ -25,7 +25,6 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.RollForwardLsuTimestampConfig
 import org.lfdecentralizedtrust.splice.sv.lsu.{LsuNodeInitializer, LsuStateExporter}
 import org.lfdecentralizedtrust.splice.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil}
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
@@ -119,10 +118,15 @@ class RollForwardLsuInitializer(
         rollForwardConfig.newPhysicalSynchronizerSerial,
         rollForwardConfig.newPhysicalSynchronizerProtocolVersion,
       )
-      timestamps <- rollForwardConfig.exportTimes match {
+      (topologyExportTime, trafficExportTime, upgradeTime) <- rollForwardConfig.exportTimes match {
         case Some(config) =>
-          logger.info(s"Using export timestamps from config: $config")
-          Future.successful(config)
+          val resolved = (
+            config.topologyExportTime.getTimestamp(),
+            config.trafficExportTime.getTimestamp(),
+            config.upgradeTime.map(_.getTimestamp()),
+          )
+          logger.info(s"Using export timestamps from config: $config, resolved: $resolved")
+          Future.successful(resolved)
         case None =>
           for {
             announcements <- legacyNode.sequencerAdminConnection.listLsuAnnouncements(
@@ -132,10 +136,10 @@ class RollForwardLsuInitializer(
             announcements match {
               case Seq(announcement) =>
                 logger.info(s"Using export timestamps from announcement: $announcement")
-                RollForwardLsuTimestampConfig(
-                  topologyExportTime =
-                    CantonTimestamp.assertFromInstant(announcement.base.validFrom),
-                  trafficExportTime = announcement.mapping.upgradeTime,
+                (
+                  CantonTimestamp.assertFromInstant(announcement.base.validFrom),
+                  announcement.mapping.upgradeTime,
+                  Some(announcement.mapping.upgradeTime),
                 )
               case _ =>
                 throw new IllegalStateException(
@@ -152,7 +156,8 @@ class RollForwardLsuInitializer(
         } else {
           for {
             state <- exporter.exportLSUState(
-              topologyExportTime = rollForwardConfig.exportTimes.map(_.topologyExportTime)
+              topologyExportTime =
+                rollForwardConfig.exportTimes.map(_.topologyExportTime.getTimestamp())
             )
             _ <- initializer.initializeSynchronizer(
               state,
@@ -162,7 +167,7 @@ class RollForwardLsuInitializer(
               upgradeTime = None,
             )
             trafficState <- legacyNode.sequencerAdminConnection.getLsuTrafficControlState(ts =
-              rollForwardConfig.exportTimes.map(_.trafficExportTime)
+              rollForwardConfig.exportTimes.map(_.trafficExportTime.getTimestamp())
             )
             _ <- currentNode.sequencerAdminConnection.setLsuTrafficControlState(trafficState)
           } yield ()
@@ -183,7 +188,7 @@ class RollForwardLsuInitializer(
             .performManualLsu(
               legacyPhysicalSynchronizerId,
               newPhysicalSynchronizerId,
-              Some(timestamps.trafficExportTime),
+              upgradeTime,
               Map(
                 sequencerId -> initializer.successorConnection
               ),

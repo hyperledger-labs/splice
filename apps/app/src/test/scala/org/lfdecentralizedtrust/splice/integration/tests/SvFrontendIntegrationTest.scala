@@ -1496,8 +1496,12 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Set Dso Rules Configuration" in { implicit env =>
-      assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
+      assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { implicit webDriver =>
+        eventually() {
+          inside(find(testId("config-field-numUnclaimedRewardsThreshold"))) { case Some(element) =>
+            element.underlying.sendKeys("99")
+          }
+        }
       }
     }
 
@@ -1515,8 +1519,12 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
+      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
+        eventually() {
+          inside(find(testId("config-field-transferPreapprovalFee"))) { case Some(element) =>
+            element.underlying.sendKeys("99")
+          }
+        }
       }
     }
 
