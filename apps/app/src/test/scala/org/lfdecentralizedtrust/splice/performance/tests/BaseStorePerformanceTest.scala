@@ -76,7 +76,10 @@ abstract class BaseStorePerformanceTest(
         case storage: DbStorage => storage
         case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
       }
-    // Suppress Flyway ClassPathScanner warnings about unloadable test jars
+
+    /** Suppress Flyway ClassPathScanner warnings about unloadable test jars (apps-app_2.13-0.1.0-SNAPSHOT-tests.jar)
+      * TODO(#4790): This is a temporary workaround, w/o adding ignored logs.
+      */
     org.slf4j.LoggerFactory
       .getLogger("org.flywaydb.core.internal.scanner.classpath.ClassPathScanner")
       .asInstanceOf[ch.qos.logback.classic.Logger]
