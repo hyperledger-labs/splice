@@ -488,6 +488,7 @@ class ParticipantAdminConnection(
             contractImportMode = ContractImportMode.Validation,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
             // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
+            // ...except that only works from protocol version 35+
             party = Some(partyId),
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
