@@ -875,7 +875,7 @@ data InvalidTransferReason
 mkUnknownSynchronizerFailure : Text -> FailureStatus
 mkUnknownSynchronizerFailure synchronizerId =
   mkFailureStatus
-    "splice.lfdecentralizedtrust.org/unknown-synchronizer"
+    (spliceErrorId "unknown-synchronizer")
     InvalidIndependentOfSystemState
     ("Unknown synchronizer provided: " <> synchronizerId)
     (TextMap.fromList [("synchronizerId", synchronizerId)])
@@ -883,7 +883,7 @@ mkUnknownSynchronizerFailure synchronizerId =
 mkInsufficientTopupAmountFailure : Int -> Int -> FailureStatus
 mkInsufficientTopupAmountFailure requestedAmount minAmount =
   mkFailureStatus
-    "splice.lfdecentralizedtrust.org/insufficient-topup-amount"
+    (spliceErrorId "insufficient-topup-amount")
     InvalidGivenCurrentSystemStateOther
     ("The requested top-up amount ("
       <> show requestedAmount
@@ -898,7 +898,7 @@ mkInsufficientTopupAmountFailure requestedAmount minAmount =
 mkMaximumInputsExceededFailure : FailureStatus
 mkMaximumInputsExceededFailure =
   mkFailureStatus
-    "splice.lfdecentralizedtrust.org/maximum-inputs-exceeded"
+    (spliceErrorId "maximum-inputs-exceeded")
     InvalidIndependentOfSystemState
     "More than the maximum number of inputs"
     mempty
@@ -906,7 +906,7 @@ mkMaximumInputsExceededFailure =
 mkMaximumOutputsExceededFailure : FailureStatus
 mkMaximumOutputsExceededFailure =
   mkFailureStatus
-    "splice.lfdecentralizedtrust.org/maximum-outputs-exceeded"
+    (spliceErrorId "maximum-outputs-exceeded")
     InvalidIndependentOfSystemState
     "More than the maximum number of outputs"
     mempty
@@ -915,12 +915,15 @@ mkInsufficientFundsFailure : Decimal -> FailureStatus
 mkInsufficientFundsFailure missingAmount =
   let requiredAmount = show missingAmount
   in mkFailureStatus
-      "splice.lfdecentralizedtrust.org/insufficient-funds"
+      (spliceErrorId "insufficient-funds")
       InvalidGivenCurrentSystemStateOther
       ("Insufficient funds: you are missing "
         <> requiredAmount
         <> " to complete this transfer.")
       (TextMap.fromList [("requiredAmount", requiredAmount)])
+
+spliceErrorId : Text -> Text
+spliceErrorId t = "splice.lfdecentralizedtrust.org/" <> t
 
 mkFailureStatus : Text -> FailureCategory -> Text -> TextMap Text -> FailureStatus
 mkFailureStatus errorId category message' meta = FailureStatus with message = message'; ..
