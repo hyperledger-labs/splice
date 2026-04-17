@@ -335,7 +335,8 @@ class AcsSnapshotStore(
                  create_arguments,
                  signatories,
                  observers,
-                 contract_key
+                 contract_key,
+                 record_time
               from snapshot
               join update_history_creates creates on creates.row_id = snapshot.create_id
               order by snapshot.row_id

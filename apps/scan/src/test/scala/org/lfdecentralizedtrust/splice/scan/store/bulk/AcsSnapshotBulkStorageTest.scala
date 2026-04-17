@@ -131,7 +131,7 @@ class AcsSnapshotBulkStorageTest
         )
         allContracts.map(c =>
           new CompactJsonScanHttpEncodings(identity, identity)
-            .javaToHttpActiveContract(c.eventId, c.event)
+            .javaToHttpActiveContract(c.eventId, c.recordTime, c.event)
         ) should contain theSameElementsInOrderAs allContractsFromS3
 
         /* We hard-code the expected digests to enforce that the persisted data format does not change.
@@ -329,7 +329,11 @@ class AcsSnapshotBulkStorageTest
                       contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
                       version = DarResources.amulet_0_1_17, // ensure packageid determinism
                     )
-                    SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
+                    SpliceCreatedEvent(
+                      s"#event_id_$idx:1",
+                      CantonTimestamp.assertFromInstant(amt.createdAt),
+                      toCreatedEvent(amt),
+                    )
                   }),
                 if (numElems < remaining) Some(after.getOrElse(0L) + numElems) else None,
               )
