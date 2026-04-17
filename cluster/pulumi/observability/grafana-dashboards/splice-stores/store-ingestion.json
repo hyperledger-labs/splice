@@ -109,7 +109,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le, namespace,job,store_name,store_party,synchronizer_id) (rate(splice_store_signal_when_ingested_latency_duration_seconds{namespace=~\"$namespace\", node_name=~\"$node_name\", store_name=~\"$store_name\", store_party=~\"$store_party\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(le, namespace,job,store_name,store_party,synchronizer_id) (rate(splice_store_batch_ingestion_latency_duration_seconds{namespace=~\"$namespace\", node_name=~\"$node_name\", store_name=~\"$store_name\", store_party=~\"$store_party\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "legendFormat": "95% - {{namespace}} {{job}} {{store_name}} {{store_party}} {{synchronizer_id}}",
@@ -124,7 +124,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_avg(rate(splice_store_signal_when_ingested_latency_duration_seconds{namespace=~\"$namespace\", node_name=~\"$node_name\", store_name=~\"$store_name\", store_party=~\"$store_party\"}[$__rate_interval]))",
+          "expr": "histogram_avg(rate(splice_store_batch_ingestion_latency_duration_seconds{namespace=~\"$namespace\", node_name=~\"$node_name\", store_name=~\"$store_name\", store_party=~\"$store_party\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -221,7 +221,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_count(rate(splice_store_signal_when_ingested_latency_duration_seconds{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}[$__rate_interval]))",
+          "expr": "histogram_count(rate(splice_store_batch_ingestion_latency_duration_seconds{namespace=~\"$namespace\",node_name=~\"$node_name\",store_name=~\"$store_name\",store_party=~\"$store_party\"}[$__rate_interval]))",
           "legendFormat": "{{namespace}} {{job}} {{store_name}} {{store_party}} {{synchronizer_id}}",
           "range": true,
           "refId": "A"
