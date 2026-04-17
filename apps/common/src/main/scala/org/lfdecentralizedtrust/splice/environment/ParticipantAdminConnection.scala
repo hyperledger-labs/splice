@@ -473,8 +473,8 @@ class ParticipantAdminConnection(
     )
   }
 
-  def importPartyAcs(acsBytes: ByteString, synchronizerId: SynchronizerId)(implicit
-      tc: TraceContext
+  def importPartyAcs(acsBytes: ByteString, synchronizerId: SynchronizerId, partyId: PartyId)(
+      implicit tc: TraceContext
   ): Future[Unit] = {
     retryProvider.retryForClientCalls(
       "import_party_acs",
@@ -487,7 +487,8 @@ class ParticipantAdminConnection(
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
-            party = None,
+            // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
+            party = Some(partyId),
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
@@ -817,14 +818,19 @@ class ParticipantAdminConnection(
     for {
       activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
       beforeActivationOffset = activationOffset - 1L
-      result <- runCmd(
-        ParticipantAdminCommands.PartyManagement
-          .ClearPartyOnboardingFlag(
-            party,
-            synchronizerId,
-            NonNegativeLong.tryCreate(beforeActivationOffset),
-            waitForActivationTimeout = None, // i.e., default
-          )
+      result <- retryProvider.retryForClientCalls(
+        "clear_onboarding_flag",
+        "Clears the onboarding flag",
+        runCmd(
+          ParticipantAdminCommands.PartyManagement
+            .ClearPartyOnboardingFlag(
+              party,
+              synchronizerId,
+              NonNegativeLong.tryCreate(beforeActivationOffset),
+              waitForActivationTimeout = None, // i.e., default
+            )
+        ),
+        logger,
       )
     } yield result
   }
