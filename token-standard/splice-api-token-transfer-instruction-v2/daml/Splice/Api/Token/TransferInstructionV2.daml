@@ -103,7 +103,7 @@ data TransferInstructionAction
           -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
         meta : Metadata
           -- ^ Additional metadata specific to the action, used for extensibility.
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with

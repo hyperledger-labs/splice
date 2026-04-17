@@ -320,10 +320,10 @@ executeSingletonTSABatch actor batch = do
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
 getHoldingMap actor accountAndInstruments0 = do
   taggedHoldings <- forA (dedupSort accountAndInstruments0) $ \(account, instrumentId) -> do
-    holdings <- listHoldings actor instrumentId
+    holdings <- listVisibleHoldings actor
     let scopedAccount = BatchingUtilityV2.ScopedAccount instrumentId.admin account
     pure [ (scopedAccount, TextMap.fromList [(instrumentId.id, [holdingCid])])
-         | (holdingCid, holding) <- holdings, holding.account == account, isNone holding.lock ]
+         | (holdingCid, holding) <- holdings, holding.account == account, holding.instrumentId == instrumentId, isNone holding.lock ]
   pure $ BatchingUtilityV2.holdingMapFromList (concat taggedHoldings)
 
 

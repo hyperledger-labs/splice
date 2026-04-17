@@ -21,7 +21,6 @@ import Splice.Testing.Tokens.TestTokenV2.AccountConfig qualified as AccountConfi
 import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
-import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
 
 
 
@@ -120,7 +119,7 @@ test_self_transfer_to_account = do
   WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 90.0
   WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 10.0
 
-  -- test transfer to custodied account
+  -- test self-transfer to custodied account
   Some instrCid1 <- WalletClientV2.transfer registries alice V2.TransferFactory_Transfer with
     actors = [alice]
     extraArgs = emptyExtraArgs
@@ -154,24 +153,35 @@ test_self_transfer_to_account = do
       executeBefore
       meta = TSU.reasonToMeta "aliceCustody -> bobSelf - test transfer 3" emptyMetadata
 
-  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
-  let cid = coerceContractId instrCid2 : ContractId TokenV2.TokenTransferCreation
-  -- Hack to get the accountId into this choice
-  registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
-  OpenApiChoiceContext{choiceContext = context; disclosures = Disclosures' ds} <- 
-    V2.getTransferInstruction_AcceptContext registry instrCid2 emptyMetadata
-  result <- submit (actAs [custodian1] <> readAs [env.testTokenV2.admin] <> mconcat (map disclose (Map.values ds))) $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
-    actors = [custodian1]
-    inputHoldingCids = holdingCids
-    tokenRulesCid
-    extraArgs = emptyExtraArgs with context
-  V2.TransferInstructionResult_Pending instrCid3 <- pure result.output
+  Some instrCid3 <-
+    WalletClientV2.acceptTransferOffer registries custodian1 instrCid2
 
   WalletClientV2.acceptTransferOffer registries bob instrCid3
 
   WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 219.0
   WalletClientV2.checkAccountBalance bob bobSelf instrX 1.0
 
+  debug "foo"
+  -- test transfer to custodied account
+  Some instrCid1 <- WalletClientV2.transfer registries bob V2.TransferFactory_Transfer with
+    actors = [bob]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = bobSelf
+      receiver = aliceCustody
+      amount = 0.5
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = TSU.reasonToMeta "bob -> aliceCustody - test transfer 3" emptyMetadata
+
+  Some instrCid2 <- WalletClientV2.acceptTransferOffer registries custodian1 instrCid1
+  WalletClientV2.acceptTransferOffer registries alice instrCid2
+
+  WalletClientV2.checkAccountBalance custodian1 aliceCustody instrX 219.5
+  WalletClientV2.checkAccountBalance bob bobSelf instrX 0.5
+  debug "foo"
   -- test custodian initiating transfer out of custody account to themselves
   Some instrCid4 <- WalletClientV2.transfer registries custodian1 V2.TransferFactory_Transfer with
     actors = [custodian1]
@@ -185,21 +195,10 @@ test_self_transfer_to_account = do
       requestedAt
       executeBefore
       meta = TSU.reasonToMeta "aliceCustody -> aliceSelf2 - test transfer 4" emptyMetadata
-
-  -- once alice acceptss that transfer happens directly
-  holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
-  let cid = coerceContractId instrCid4 : ContractId TokenV2.TokenTransferCreation
-  registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
-  OpenApiChoiceContext{choiceContext = context; disclosures = Disclosures' ds} <- 
-    V2.getTransferInstruction_AcceptContext registry (coerceContractId cid) emptyMetadata
-  result <- submit (actAs [alice] <> readAs [env.testTokenV2.admin] <> mconcat (map disclose (Map.values ds))) $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
-    actors = [alice]
-    inputHoldingCids = holdingCids
-    tokenRulesCid
-    extraArgs = emptyExtraArgs with context
-  V2.TransferInstructionResult_Completed _ <- pure result.output
-
-  WalletClientV2.checkAccountBalance alice aliceCustody instrX 217.0
+  debug "foo"
+  None <- WalletClientV2.acceptTransferOffer registries alice instrCid4
+  debug "foo"
+  WalletClientV2.checkAccountBalance alice aliceCustody instrX 217.5
   WalletClientV2.checkAccountBalance alice aliceSelf1 instrX 70.0  -- unchanged
   WalletClientV2.checkAccountBalance alice aliceSelf2 instrX 12.0
 

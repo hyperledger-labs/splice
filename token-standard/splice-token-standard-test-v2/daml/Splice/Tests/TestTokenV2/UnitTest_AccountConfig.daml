@@ -3,128 +3,247 @@
 
 module Splice.Tests.TestTokenV2.UnitTest_AccountConfig where
 
-import DA.Action (unless)
 import DA.Foldable (forA_)
-import DA.Set qualified as Set
 import DA.Text qualified as T
 
 import Daml.Script
 
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Testing.Tokens.TestTokenV2.AccountConfig
+import DA.Optional (fromSome)
+import qualified DA.Map as Map
+import qualified Splice.Api.Token.TransferInstructionV2 as V2
+import DA.List (dedupSort)
 
-accountConfigFromPartyConfigs : Text -> PartyConfig -> PartyConfig -> AccountConfig
-accountConfigFromPartyConfigs id ownerConfig providerConfig =
+
+ad : Party = fromSome $ partyFromText "admin"
+-- investor parties
+a : Party = fromSome $ partyFromText "a"
+b : Party = fromSome $ partyFromText "b"
+-- provider parties
+v : Party = fromSome $ partyFromText "v"
+w : Party = fromSome $ partyFromText "w"
+
+type MkAccountConfig = Text -> Party -> Party -> AccountConfig
+
+accountConfigs : Party -> Party -> Party -> Party
+  -> MkAccountConfig
+  -> MkAccountConfig
+  -> (AccountConfig, AccountConfig)
+accountConfigs i1 p1 i2 p2 mkac1 mkac2 = (mkac1 "sender" i1 p1, mkac2 "receiver" i2 p2)
+
+accountConfigFromPartyConfigs : Text -> Party -> Party -> PartyConfig -> PartyConfig -> AccountConfig
+accountConfigFromPartyConfigs id owner provider ownerConfig providerConfig =
   AccountConfig with
-    admin
+    admin = ad
     account = V2.Account with
       owner
-      provider = partyFromText "provider"
+      provider = Some provider
       id
     ownerConfig
     providerConfig
-  where
-    Some admin = partyFromText "admin"
-    Some owner = partyFromText "owner"
 
-jointControl : AccountConfig
-jointControl =
-  accountConfigFromPartyConfigs
-    "jointControl"
+-- j for joint control
+j : MkAccountConfig
+j id owner provider =
+  accountConfigFromPartyConfigs id owner provider
     PartyConfig with canInitiate = True; mustApprove = True
     PartyConfig with canInitiate = True; mustApprove = True
-  
 
-providerControl : AccountConfig
-providerControl =
-  accountConfigFromPartyConfigs
-    "providerControl"
+-- p for provider controlled
+p : MkAccountConfig
+p id owner provider =
+  accountConfigFromPartyConfigs id owner provider
     PartyConfig with canInitiate = False; mustApprove = False
     PartyConfig with canInitiate = True; mustApprove = True
 
-providerConfirmation : AccountConfig
-providerConfirmation =
-  accountConfigFromPartyConfigs
-  "providerConfirmation"
-  PartyConfig with canInitiate = True; mustApprove = False
-  PartyConfig with canInitiate = False; mustApprove = True
+-- ic for investor controlled
+ic : MkAccountConfig
+ic id owner provider =
+  accountConfigFromPartyConfigs id owner provider
+    PartyConfig with canInitiate = True; mustApprove = True
+    PartyConfig with canInitiate = False; mustApprove = False
 
-test_nextActors : Script ()
-test_nextActors = do
-  let Some o = partyFromText "owner"
-  let Some p = partyFromText "provider"
-  let testCases =
-        [ ( jointControl
-          , None
-          , [o, p]
-          )
-        , ( jointControl
-          , Some o
-          , [p]
-          )
-        , ( jointControl
-          , Some p
-          , [o]
-          )
-        ] <>
-        [ ( providerControl
-          , None
-          , [p]
-          )
-        , ( providerControl
-          , Some o
-          , [p]
-          )
-        , ( providerControl
-          , Some p
-          , []
-          )
-        ] <>
-        [ ( providerConfirmation
-          , None
-          , [o]
-          )
-        , ( providerConfirmation
-          , Some o
-          , [p]
-          )
-        , ( providerConfirmation
-          , Some p -- this case cannot be reached in practice
-          , [o]
-          )
-        ]
-  forA_ testCases $ \(config, previousAction, expectedActors) -> do
-    let actualActors = nextActors previousAction config
-    unless (actualActors == Set.fromList expectedActors) $
-      error $ T.unlines [
-        "Unexpected next actors with " <> config.account.id,
-        "Previous action: " <> show previousAction,
-        "Actual: " <> show actualActors,
-        "Expected: " <> show expectedActors
+-- pc for provider confirmed
+pc : MkAccountConfig
+pc id owner provider =
+  accountConfigFromPartyConfigs id owner provider
+    PartyConfig with canInitiate = True; mustApprove = False
+    PartyConfig with canInitiate = False; mustApprove = True
+
+-- sc for self-custodual/basic
+sc : MkAccountConfig
+sc id owner provider =
+  let acc = ic id owner provider
+   in acc with account.provider = None
+
+test_availableActions : Script ()
+test_availableActions = do 
+  let
+    test_cases = [
+
+      -- Start with Joint/Joint and all different parties
+      (a, v, b, w, j, j, [], [] ,[], [[a] ,[v], [a,v]], [], []),
+      (a, v, b, w, j, j, [a], [] ,[], [[v]], [[a]], []),
+      (a, v, b, w, j, j, [v], [] ,[], [[a]], [[v]], []),
+      -- Now it's sender-authorized
+      (a, v, b, w, j, j, [a,v], [] ,[], [[b], [w], [b,w]], [[a], [v], [a,v]], [[b], [w], [b,w]]),
+      -- Test withdrawing
+      (a, v, b, w, j, j, [a,v], [a] ,[], [[b], [w], [b,w]], [[v]], [[b], [w], [b,w]]),
+      (a, v, b, w, j, j, [a,v], [v] ,[], [[b], [w], [b,w]], [[a]], [[b], [w], [b,w]]),
+      (a, v, b, w, j, j, [a,v], [a,v] ,[], [[b], [w], [b,w]], [], [[b], [w], [b,w]]),
+      -- Test rejecting
+      (a, v, b, w, j, j, [a,v], [] ,[b], [[b], [w], [b,w]], [[a], [v], [a,v]], [[w]]),
+      (a, v, b, w, j, j, [a,v], [] ,[w], [[b], [w], [b,w]], [[a], [v], [a,v]], [[b]]),
+      (a, v, b, w, j, j, [a,v], [] ,[b, w], [[b], [w], [b,w]], [[a], [v], [a,v]], []),
+      -- Test partial withdrawing/rejecting
+      (a, v, b, w, j, j, [a,v], [a] ,[b], [[b], [w], [b,w]], [[v]], [[w]]),
+      (a, v, b, w, j, j, [a,v], [a] ,[w], [[b], [w], [b,w]], [[v]], [[b]]),
+      (a, v, b, w, j, j, [a,v], [v] ,[b], [[b], [w], [b,w]], [[a]], [[w]]),
+      (a, v, b, w, j, j, [a,v], [v] ,[w], [[b], [w], [b,w]], [[a]], [[b]]),
+      -- Test Accepting
+      (a, v, b, w, j, j, [a,v,b], [] ,[], [[w]], [[a], [v], [a,v]], [[b], [w], [b,w]]),
+      (a, v, b, w, j, j, [a,v,w], [] ,[], [[b]], [[a], [v], [a,v]], [[b], [w], [b,w]]),
+      (a, v, b, w, j, j, [a,v,b,w], [] ,[], [], [[a], [v], [a,v]], [[b], [w], [b,w]]),
+      -- Test Accepting during partial withdraw/reject
+      (a, v, b, w, j, j, [a,v,b], [a] ,[b], [[w]], [[v]], [[w]]),
+      (a, v, b, w, j, j, [a,v,w], [a] ,[b], [[b]], [[v]], [[w]]),
+      (a, v, b, w, j, j, [a,v,b,w], [a] ,[b], [], [[v]], [[w]]),
+      -- Test Reject/Withdraw during partial accept
+      (a, v, b, w, j, j, [a,v,b], [a,v] ,[b], [[w]], [], [[w]]),
+      (a, v, b, w, j, j, [a,v,w], [a,v] ,[b], [[b]], [], [[w]]),
+      (a, v, b, w, j, j, [a,v,b], [a] ,[b, w], [[w]], [[v]], []),
+      (a, v, b, w, j, j, [a,v,w], [a] ,[b, w], [[b]], [[v]], []),
+
+      -- Do the same with provider controlled
+      (a, v, b, w, p, p, [], [] ,[], [[v], [a,v]], [], []),
+      (a, v, b, w, p, p, [a], [] ,[], [[v]], [[a]], []),
+      (a, v, b, w, p, p, [v], [] ,[], [[a]], [[v]], []),
+      -- Now it's sender-authorized
+      (a, v, b, w, p, p, [a,v], [] ,[], [[w], [b,w]], [[v], [a,v]], [[w], [b,w]]),
+      -- Test withdrawing
+      (a, v, b, w, p, p, [a,v], [a] ,[], [[w], [b,w]], [[v]], [[w], [b,w]]),
+      (a, v, b, w, p, p, [a,v], [v] ,[], [[w], [b,w]], [[a]], [[w], [b,w]]),
+      (a, v, b, w, p, p, [a,v], [a,v] ,[], [[w], [b,w]], [], [[w], [b,w]]),
+      -- Test rejecting
+      (a, v, b, w, p, p, [a,v], [] ,[b], [[w], [b,w]], [[v], [a,v]], [[w]]),
+      (a, v, b, w, p, p, [a,v], [] ,[w], [[w], [b,w]], [[v], [a,v]], [[b]]),
+      (a, v, b, w, p, p, [a,v], [] ,[b, w], [[w], [b,w]], [[v], [a,v]], []),
+      -- Test partial withdrawing/rejecting
+      (a, v, b, w, p, p, [a,v], [a] ,[b], [[w], [b,w]], [[v]], [[w]]),
+      (a, v, b, w, p, p, [a,v], [a] ,[w], [[w], [b,w]], [[v]], [[b]]),
+      (a, v, b, w, p, p, [a,v], [v] ,[b], [[w], [b,w]], [[a]], [[w]]),
+      (a, v, b, w, p, p, [a,v], [v] ,[w], [[w], [b,w]], [[a]], [[b]]),
+      -- Test Accepting
+      (a, v, b, w, p, p, [a,v,b], [] ,[], [[w]], [[v], [a,v]], [[w], [b,w]]),
+      (a, v, b, w, p, p, [a,v,w], [] ,[], [[b]], [[v], [a,v]], [[w], [b,w]]),
+      (a, v, b, w, p, p, [a,v,b,w], [] ,[], [], [[v], [a,v]], [[w], [b,w]]),
+      -- Test Accepting during partial withdraw/reject
+      (a, v, b, w, p, p, [a,v,b], [a] ,[b], [[w]], [[v]], [[w]]),
+      (a, v, b, w, p, p, [a,v,w], [a] ,[b], [[b]], [[v]], [[w]]),
+      (a, v, b, w, p, p, [a,v,b,w], [a] ,[b], [], [[v]], [[w]]),
+      -- Test Reject/Withdraw during partial accept
+      (a, v, b, w, p, p, [a,v,b], [a,v] ,[b], [[w]], [], [[w]]),
+      (a, v, b, w, p, p, [a,v,w], [a,v] ,[b], [[b]], [], [[w]]),
+      (a, v, b, w, p, p, [a,v,b], [a] ,[b, w], [[w]], [[v]], []),
+      (a, v, b, w, p, p, [a,v,w], [a] ,[b, w], [[b]], [[v]], [])
       ]
 
-test_requiredApprovers : Script ()
-test_requiredApprovers = do
-  let Some o = partyFromText "owner"
-  let Some p = partyFromText "provider"
-  let testCases =
-        [ ( jointControl
-          , [o, p]
-          )
-        , ( providerControl
-          , [p]
-          )
-        , ( providerConfirmation
-          , [o, p] -- owner approval is indirectly required, as the provider cannot initiate an action on their own
-          )
-        ]
-  forA_ testCases $ \(config, expectedApprovers) -> do
-    let actualApprovers = requiredApprovers config
-    unless (actualApprovers == Set.fromList expectedApprovers) $
-      error $ T.unlines [
-        "Unexpected approvers with " <> config.account.id,
-        "Actual: " <> show actualApprovers,
-        "Expected: " <> show expectedApprovers
+      -- We do not expect a difference between provider confirmed, investor controlled,
+      -- In both cases the investor authorizes first. 
+      -- The second authorization from the provider is needed, but pulled in thorugh
+      -- the accounts
+      <> (mconcat . (flip map) [pc, ic])  (\acc -> [        
+      (a, v, b, w, acc, acc, [], [] ,[], [[a] ,[a,v]], [], []),
+      (a, v, b, w, acc, acc, [a], [] ,[], [[v]], [[a]], []),
+      (a, v, b, w, acc, acc, [v], [] ,[], [[a]], [[v]], []),
+      -- Now it's sender-authorized
+      (a, v, b, w, acc, acc, [a,v], [] ,[], [[b], [b,w]], [[a], [a,v]], [[b], [b,w]]),
+      -- Test withdrawing
+      (a, v, b, w, acc, acc, [a,v], [a] ,[], [[b], [b,w]], [[v]], [[b], [b,w]]),
+      (a, v, b, w, acc, acc, [a,v], [v] ,[], [[b], [b,w]], [[a]], [[b], [b,w]]),
+      (a, v, b, w, acc, acc, [a,v], [a,v] ,[], [[b], [b,w]], [], [[b], [b,w]]),
+      -- Test rejecting
+      (a, v, b, w, acc, acc, [a,v], [] ,[b], [[b], [b,w]], [[a], [a,v]], [[w]]),
+      (a, v, b, w, acc, acc, [a,v], [] ,[w], [[b], [b,w]], [[a], [a,v]], [[b]]),
+      (a, v, b, w, acc, acc, [a,v], [] ,[b, w], [[b], [b,w]], [[a], [a,v]], []),
+      -- Test partial withdrawing/rejecting
+      (a, v, b, w, acc, acc, [a,v], [a] ,[b], [[b], [b,w]], [[v]], [[w]]),
+      (a, v, b, w, acc, acc, [a,v], [a] ,[w], [[b], [b,w]], [[v]], [[b]]),
+      (a, v, b, w, acc, acc, [a,v], [v] ,[b], [[b], [b,w]], [[a]], [[w]]),
+      (a, v, b, w, acc, acc, [a,v], [v] ,[w], [[b], [b,w]], [[a]], [[b]]),
+      -- Test Accepting
+      (a, v, b, w, acc, acc, [a,v,b], [] ,[], [[w]], [[a], [a,v]], [[b], [b,w]]),
+      (a, v, b, w, acc, acc, [a,v,w], [] ,[], [[b]], [[a], [a,v]], [[b], [b,w]]),
+      (a, v, b, w, acc, acc, [a,v,b,w], [] ,[], [], [[a], [a,v]], [[b], [b,w]]),
+      -- Test Accepting during partial withdraw/reject
+      (a, v, b, w, acc, acc, [a,v,b], [a] ,[b], [[w]], [[v]], [[w]]),
+      (a, v, b, w, acc, acc, [a,v,w], [a] ,[b], [[b]], [[v]], [[w]]),
+      (a, v, b, w, acc, acc, [a,v,b,w], [a] ,[b], [], [[v]], [[w]]),
+      -- Test Reject/Withdraw during partial accept
+      (a, v, b, w, acc, acc, [a,v,b], [a,v] ,[b], [[w]], [], [[w]]),
+      (a, v, b, w, acc, acc, [a,v,w], [a,v] ,[b], [[b]], [], [[w]]),
+      (a, v, b, w, acc, acc, [a,v,b], [a] ,[b, w], [[w]], [[v]], []),
+      (a, v, b, w, acc, acc, [a,v,w], [a] ,[b, w], [[b]], [[v]], [])
+      ])
+
+      -- In the self-custodial case, the extra steps fall away. This is equally true
+      -- for other account types if investors are their own providers.
+        <> (mconcat . (flip map) [j, p, pc, ic, sc])  (\acc -> [        
+      (a, a, b, b, acc, acc, [], [] ,[], [[a]], [], []),
+      -- Now it's sender-authorized
+      (a, a, b, b, acc, acc, [a], [] ,[], [[b]], [[a]], [[b]]),
+      -- Test withdrawing
+      (a, a, b, b, acc, acc, [a], [a] ,[], [[b]], [], [[b]]),
+      -- Test rejecting
+      (a, a, b, b, acc, acc, [a], [] ,[b], [[b]], [[a]], []),
+      -- Test Accepting
+      (a, a, b, b, acc, acc, [a,b], [] ,[], [], [[a]], [[b]])
+      ])
+
+      -- Special cases arise if the account providers on both sides are the same
+      -- or indeed if the sender and receiver are the same.
+      <> [
+        -- A self-transfer between self-managed accounts goes straight through.
+        (a, a, a, a, j, j, [], [] ,[], [[a]], [], []),
+        (a, a, a, a, j, j, [a], [] ,[], [], [[a]], [[a]]),
+        -- A transfer within a provider is simplified
+        (a, v, b, v, j, j, [], [] ,[], [[a], [v], [a,v]], [], []),
+        (a, v, b, v, j, j, [a,v], [] ,[], [[b]], [[a], [v], [a,v]], [[b], [v], [b,v]]),
+        (a, v, b, v, j, j, [a,v,b], [] ,[], [], [[a], [v], [a,v]], [[b], [v], [b,v]])
       ]
+      
+  forA_ test_cases (\(s, ps, r, pr, mks, mkr, aa, wa, ra, eaa, ewa, era) ->
+    test_case s ps r pr mks mkr aa wa ra eaa ewa era)
 
 
+
+test_case : Party -> Party -> Party -> Party
+  -> MkAccountConfig -> MkAccountConfig
+  -> [Party] -> [Party] -> [Party]
+  -> [[Party]] -> [[Party]] -> [[Party]]
+  -> Script ()
+test_case sender senderProvider receiver receiverProvider mkacSender mkacReceiver
+  acceptAuthorizers withdrawAuthorizers rejectAuthorizers 
+  expectedAcceptActors expectedWithdrawActors expectedRejectActors = do
+  let
+    senderAccount = mkacSender "sender" sender senderProvider
+    receiverAccount = mkacReceiver "receiver" receiver receiverProvider
+    actionAuthorizers = Map.fromList [(V2.TIA_Accept, acceptAuthorizers), (V2.TIA_Reject, rejectAuthorizers), (V2.TIA_Withdraw, withdrawAuthorizers)]
+    availableActions = mkAvailableTransferActions actionAuthorizers senderAccount receiverAccount
+    reversedAvailableActions = reverseMap availableActions
+    expectedAvailableActions = Map.fromList $
+      filter (\(_, x) -> not (null x)) [(V2.TIA_Accept, dedupSort expectedAcceptActors), (V2.TIA_Reject, dedupSort expectedRejectActors), (V2.TIA_Withdraw, dedupSort expectedWithdrawActors)]
+
+  assertMsg
+    (T.unlines [
+        "Unexpected avaialble actions.",
+        "Sender account: " <> show senderAccount,
+        "Receiver account: " <> show receiverAccount,
+        "Existing authorizations: " <> show actionAuthorizers,
+        "Expected available actions: " <> show expectedAvailableActions,
+        "Actual available actions: " <> show reversedAvailableActions
+    ])
+    (reversedAvailableActions == expectedAvailableActions)
+
+  return ()
