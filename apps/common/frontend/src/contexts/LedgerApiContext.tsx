@@ -5,6 +5,10 @@ import { callWithLogging } from '@lfdecentralizedtrust/splice-common-frontend-ut
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
+import {
+  DisclosedContract,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils/interfaces';
+
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
@@ -18,12 +22,6 @@ interface JsonApiErrorResponse {
   statusText: string;
   body: JsonApiErrorBody;
 }
-
-declare type DisclosedContract = {
-  contractId: ContractId<any>;
-  templateId: string;
-  createdEventBlob: string;
-};
 
 export class JsonApiError extends Error {
   status: number;

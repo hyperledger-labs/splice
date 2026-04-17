@@ -50,9 +50,8 @@ object BuildUtil {
       optError: Option[String] = None,
       optCwd: Option[File] = None,
       extraEnv: Seq[(String, String)] = Seq.empty,
-      streamToStdout: Boolean = false,
   ): String = {
-    runCommandOptionalLog(args, Some(log), optError, optCwd, extraEnv, streamToStdout)
+    runCommandOptionalLog(args, Some(log), optError, optCwd, extraEnv)
   }
 
   def runCommandOptionalLog(
@@ -61,27 +60,13 @@ object BuildUtil {
       optError: Option[String] = None,
       optCwd: Option[File] = None,
       extraEnv: Seq[(String, String)] = Seq.empty,
-      streamToStdout: Boolean = false,
   ): String = {
     import scala.sys.process.Process
     val command = args.mkString(" ")
     val processLogger = new BuildUtil.BufferedLogger
-    val wrappedLogger: ProcessLogger = if (streamToStdout) {
-      new ProcessLogger {
-        override def out(s: => String): Unit = {
-          processLogger.out(s)
-          println(s)
-        }
-        override def err(s: => String): Unit = {
-          processLogger.err(s)
-          System.err.println(s)
-        }
-        override def buffer[T](f: => T): T = f
-      }
-    } else processLogger
     val cwdInfo = optCwd.map(cwd => s" in `$cwd`").getOrElse("")
     if (optLog.isDefined) optLog.map(_.debug(s"Running $command$cwdInfo"))
-    val exitCode = Process(args, optCwd, extraEnv = extraEnv: _*) ! wrappedLogger
+    val exitCode = Process(args, optCwd, extraEnv = extraEnv: _*) ! processLogger
     val output = processLogger.output()
     if (exitCode != 0) {
       val errorMsg =
@@ -90,7 +75,7 @@ object BuildUtil {
       if (optError.isDefined && optLog.isDefined)
         if (optLog.isDefined) optLog.map(_.error(optError.getOrElse("")))
       throw new IllegalStateException(errorMsg)
-    } else if (output != "" && optLog.isDefined && !streamToStdout)
+    } else if (output != "" && optLog.isDefined)
       if (optLog.isDefined) optLog.map(_.info(processLogger.output()))
     output
   }

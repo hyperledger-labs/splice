@@ -45,7 +45,6 @@ import { ContractId, Optional, Text } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-// import { get } from 'http';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 

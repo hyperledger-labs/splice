@@ -27,7 +27,7 @@ export interface ContractWithState<T> {
   domainId?: string;
 }
 
-declare type DisclosedContract = {
+export declare type DisclosedContract = {
   contractId: ContractId<any>;
   templateId: string;
   createdEventBlob: string;
