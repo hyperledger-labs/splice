@@ -135,7 +135,7 @@ abstract class BaseStorePerformanceTest(
     Future.traverse(tablesToSanityCheck) { tableName =>
       storage
         .querySingle(
-          sql"select count(*) from #$tableName".as[Int].headOption,
+          sql"select count(*l) from #$tableName".as[Int].headOption,
           s"sanityCheck-$tableName",
         )
         .value
