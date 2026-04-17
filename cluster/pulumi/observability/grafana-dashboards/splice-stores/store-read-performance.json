@@ -28,44 +28,28 @@
       "type": "row"
     },
     {
-      "title": "Update Info",
+      "title": "Num Updates",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
+          "unit": "none",
+          "color": { "mode": "fixed", "fixedColor": "green" },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
             "pointSize": 6,
             "showPoints": "always",
             "fillOpacity": 5,
-            "spanNulls": false,
-            "axisBorderShow": false
+            "spanNulls": false
           }
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Update Size" },
-            "properties": [
-              { "id": "unit", "value": "decbytes" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Num Updates" },
-            "properties": [
-              { "id": "unit", "value": "none" },
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
-        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
       },
       "targets": [
         {
@@ -74,20 +58,47 @@
           "legendFormat": "Num Updates",
           "range": true,
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Update Size",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "splice_perf_read_update_size_bytes{test=\"${test}\"}",
           "legendFormat": "Update Size",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
       ]
     },
     {
       "title": "Total Read Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -112,7 +123,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "splice_perf_read_total_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "Total Read Time (s)",
+          "legendFormat": "Total Read Time",
           "range": true, "refId": "A"
         }
       ]
@@ -120,7 +131,7 @@
     {
       "title": "CPU-to-Wall-Clock Ratio",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -161,7 +172,7 @@
     {
       "title": "Peak Heap Memory",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
