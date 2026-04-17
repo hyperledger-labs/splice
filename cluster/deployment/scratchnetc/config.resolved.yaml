@@ -375,6 +375,7 @@ svs:
         - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
           value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
       bftSequencerConnection: true
+      legacyDatabaseName: 'participant-0'
       resources:
         limits:
           memory: '18Gi'
@@ -438,8 +439,8 @@ svs:
       walletUser: 'auth0|68c2c41e6470184569e4521e'
 synchronizerMigration:
   active:
+    enableLogicalSynchronizerDeploymentMode: true
     id: 0
-    migrateParticipantsFromSvCantonToSv: true
     releaseReference:
       deploymentDir: 'cluster/deployment'
       gitReference: 'refs/heads/mblaze-da/participant-migration-deployment/4173'
