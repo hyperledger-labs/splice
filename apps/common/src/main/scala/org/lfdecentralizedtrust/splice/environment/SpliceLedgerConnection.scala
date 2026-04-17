@@ -29,13 +29,14 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
+import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.pattern.CircuitBreakerOpenException
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
-import org.apache.pekko.stream.{KillSwitch, KillSwitches}
-import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, RestartSource, Sink, Source}
+import org.apache.pekko.stream.{KillSwitch, KillSwitches, RestartSettings}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   DedupConfig,
   DedupOffset,
@@ -57,6 +58,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.implicitNotFound
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -98,14 +100,27 @@ class BaseLedgerConnection(
   def activeContracts(
       eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
-  )(implicit tc: TraceContext): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] = {
-    val activeContractsRequest = client.activeContracts(
-      lapi.state_service.GetActiveContractsRequest(
-        activeAtOffset = offset,
-        eventFormat = Some(eventFormat),
-        streamContinuationToken = None,
-      )
-    )
+  )(implicit
+      tc: TraceContext
+  ): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] = {
+    // The source can restart due to expired auth, so we have to restart it from where we left off
+    val streamContinuationToken = new AtomicReference(Option.empty[ByteString])
+    val activeContractsRequest = {
+      RestartSource.onFailuresWithBackoff(RestartSettings(0.5.seconds, 1.second, 0.5))(() => {
+        client
+          .activeContracts(
+            lapi.state_service.GetActiveContractsRequest(
+              activeAtOffset = offset,
+              eventFormat = Some(eventFormat),
+              streamContinuationToken = streamContinuationToken.get(),
+            )
+          )
+          .map { item =>
+            streamContinuationToken.set(Some(item.streamContinuationToken))
+            item
+          }
+      })
+    }
     activeContractsRequest
       .map(_.contractEntry)
       .map[Option[BaseLedgerConnection.ActiveContractsItem]] {
@@ -138,7 +153,9 @@ class BaseLedgerConnection(
   def activeContracts(
       filter: IngestionFilter,
       offset: Long,
-  )(implicit tc: TraceContext): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] =
+  )(implicit
+      tc: TraceContext
+  ): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] =
     activeContracts(filter.toEventFormat, offset)
 
   def getContract(
