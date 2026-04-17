@@ -116,6 +116,7 @@ class SequencerAdminConnection(
   ): Future[Unit] = {
     Future {
       blocking {
+        logger.info(s"Writing LSU dump to $file")
         file.createFileIfNotExists(createParents = true)
         new OutputFileStreamObserver[SequencerLsuStateResponse](
           file,
@@ -130,8 +131,7 @@ class SequencerAdminConnection(
             ts = ts,
             observer = observer,
           )
-      ).map(_ => ())
-
+      ).flatMap(_ => observer.result).map(_ => logger.info("Finished writing LSU dump"))
     }
   }
 
