@@ -153,3 +153,7 @@ Failed to connect to scan of FAILED Seed URL.*RollForwardLsu.*IntegrationTest
 Found roll forward config.*but available sequencers.*is less than the trust threshold in the configuration.*RollForwardLsuIntegrationTest
 
 Ryuk has been disabled
+
+# Flyway ClassPathScanner warns about unloadable test jars during DB migrations in performance tests
+Skipping unloadable jar file.*ClassPathScanner
+
