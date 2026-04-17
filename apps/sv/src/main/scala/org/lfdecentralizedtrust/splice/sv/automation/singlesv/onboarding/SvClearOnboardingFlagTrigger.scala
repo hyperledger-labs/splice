@@ -40,7 +40,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
   * Updating the threshold only after the SV party has been added to the DsoRules guarantees that
   * its participant has reconnected to the domain and is ready to confirm transactions on behalf of the DSO party.
   */
-class SvOnboardingPromoteParticipantToSubmitterTrigger(
+class SvClearOnboardingFlagTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
     val participantAdminConnection: ParticipantAdminConnection,
@@ -50,7 +50,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
-      SvOnboardingPromoteParticipantToSubmitterTrigger.Task
+      SvClearOnboardingFlagTrigger.Task
     ]
     with SyncConnectionStalenessCheck {
 
@@ -58,7 +58,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
+  ): Future[Seq[SvClearOnboardingFlagTrigger.Task]] = {
     logger.info(
       s"Retrieving tasks with the onboarding participant promotion delay ${if (withPromotionDelay) "enabled"
         else "disabled"}"
@@ -78,7 +78,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
             participant.permission == ParticipantPermission.Submission && !participant.onboarding
           )
         ) {
-          Future.successful(Seq.empty[SvOnboardingPromoteParticipantToSubmitterTrigger.Task])
+          Future.successful(Seq.empty[SvClearOnboardingFlagTrigger.Task])
         } else if (withPromotionDelay) {
           retrieveTasksWithPromotionDelay(dsoRules)
         } else {
@@ -92,7 +92,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
+  ): Future[Seq[SvClearOnboardingFlagTrigger.Task]] = {
     for {
       svParticipants <- getSvParticipants(dsoRules)
     } yield {
@@ -102,9 +102,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       val svParticipantIds = svParticipants.map(_.participantId)
       observingParticipantIds
         .filter(participantId => svParticipantIds.contains(participantId))
-        .map(participantId =>
-          SvOnboardingPromoteParticipantToSubmitterTrigger.Task(dsoRules.domain, participantId)
-        )
+        .map(participantId => SvClearOnboardingFlagTrigger.Task(dsoRules.domain, participantId))
     }
   }
 
@@ -112,7 +110,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules]
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
+  ): Future[Seq[SvClearOnboardingFlagTrigger.Task]] = {
     for {
       synchronizerParametersState <- participantAdminConnection.getSynchronizerParametersState(
         dsoRules.domain
@@ -162,7 +160,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
           }
         )
         .map(participantId =>
-          SvOnboardingPromoteParticipantToSubmitterTrigger
+          SvClearOnboardingFlagTrigger
             .Task(dsoRules.domain, participantId)
         )
     }
@@ -189,7 +187,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
   }
 
   override protected def completeTask(
-      task: SvOnboardingPromoteParticipantToSubmitterTrigger.Task
+      task: SvClearOnboardingFlagTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     logger.info(
       s"Proposing participant ${task.participantId} be promoted to Submission rights for the DSO party, will wait for it to take effect."
@@ -203,13 +201,13 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       )
       .map(_ =>
         TaskSuccess(
-          show"Participant ${task.participantId} was promoted to Submission rights for the DSO party"
+          show"Onboarding flag cleared for Participant ${task.participantId} for the DSO party"
         )
       )
   }
 
   override protected def isStaleTask(
-      task: SvOnboardingPromoteParticipantToSubmitterTrigger.Task
+      task: SvClearOnboardingFlagTrigger.Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
       dsoRules <- dsoStore.getDsoRules()
@@ -235,7 +233,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
 
 }
 
-object SvOnboardingPromoteParticipantToSubmitterTrigger {
+object SvClearOnboardingFlagTrigger {
   case class Task(synchronizerId: SynchronizerId, participantId: ParticipantId)
       extends PrettyPrinting {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
