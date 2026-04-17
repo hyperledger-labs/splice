@@ -491,7 +491,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -523,7 +524,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(rate(splice_scan_verdict_ingestion_latency{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "histogram_avg(rate(splice_scan_verdict_ingestion_latency_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval]))",
           "legendFormat": "{{namespace}} avg",
           "range": true,
           "refId": "A"
@@ -534,7 +535,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, rate(splice_scan_verdict_ingestion_latency{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "histogram_quantile(0.99, rate(splice_scan_verdict_ingestion_latency_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval]))",
           "legendFormat": "{{namespace}} 99th",
           "range": true,
           "refId": "B"
