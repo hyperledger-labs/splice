@@ -13,55 +13,46 @@ import Daml.Script
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Testing.Tokens.TestTokenV2.AccountConfig
 
-test_accountConfig : Script ()
-test_accountConfig = do
-  let partyConfigs = do
-        canInitiate <- [False, True]
-        mustApprove <- [False, True]
-        pure $ PartyConfig with canInitiate; mustApprove
-  let testCases = do
-        ownerConfig <- partyConfigs
-        providerConfig <- partyConfigs
-        pure $ AccountConfig with ownerConfig; providerConfig
+accountConfigFromPartyConfigs : Text -> PartyConfig -> PartyConfig -> AccountConfig
+accountConfigFromPartyConfigs id ownerConfig providerConfig =
+  AccountConfig with
+    admin
+    account = V2.Account with
+      owner
+      provider = partyFromText "provider"
+      id
+    ownerConfig
+    providerConfig
+  where
+    Some admin = partyFromText "admin"
+    Some owner = partyFromText "owner"
 
-  forA_ testCases $ \config -> do
-    let accountId = accountConfigToString config <> "/"
-        parsedConfig = accountConfigFromId accountId
-    unless (config == parsedConfig) $
-      error $ "Parsed config does not match original config for account id: " <> show accountId <>
-              "\nOriginal config: " <> show config <>
-              "\nParsed config: " <> show parsedConfig
-
-
-jointControl : (Text, AccountConfig)
+jointControl : AccountConfig
 jointControl =
-  ( "jointControl"
-  , AccountConfig with
-      ownerConfig = PartyConfig with canInitiate = True; mustApprove = True
-      providerConfig = PartyConfig with canInitiate = True; mustApprove = True
-  )
+  accountConfigFromPartyConfigs
+    "jointControl"
+    PartyConfig with canInitiate = True; mustApprove = True
+    PartyConfig with canInitiate = True; mustApprove = True
+  
 
-providerControl : (Text, AccountConfig)
+providerControl : AccountConfig
 providerControl =
-  ( "providerControl"
-  , AccountConfig with
-      ownerConfig = PartyConfig with canInitiate = False; mustApprove = False
-      providerConfig = PartyConfig with canInitiate = True; mustApprove = True
-  )
+  accountConfigFromPartyConfigs
+    "providerControl"
+    PartyConfig with canInitiate = False; mustApprove = False
+    PartyConfig with canInitiate = True; mustApprove = True
 
-providerConfirmation : (Text, AccountConfig)
+providerConfirmation : AccountConfig
 providerConfirmation =
-  ( "providerConfirmation"
-  , AccountConfig with
-      ownerConfig = PartyConfig with canInitiate = True; mustApprove = False
-      providerConfig = PartyConfig with canInitiate = False; mustApprove = True
-  )
+  accountConfigFromPartyConfigs
+  "providerConfirmation"
+  PartyConfig with canInitiate = True; mustApprove = False
+  PartyConfig with canInitiate = False; mustApprove = True
 
 test_nextActors : Script ()
 test_nextActors = do
   let Some o = partyFromText "owner"
   let Some p = partyFromText "provider"
-  let account = V2.Account with owner = o; provider = Some p; id = "dummy-id"
   let testCases =
         [ ( jointControl
           , None
@@ -102,11 +93,11 @@ test_nextActors = do
           , [o]
           )
         ]
-  forA_ testCases $ \((name, config), previousAction, expectedActors) -> do
-    let actualActors = nextActors previousAction config account
+  forA_ testCases $ \(config, previousAction, expectedActors) -> do
+    let actualActors = nextActors previousAction config
     unless (actualActors == Set.fromList expectedActors) $
       error $ T.unlines [
-        "Unexpected next actors with " <> name,
+        "Unexpected next actors with " <> config.account.id,
         "Previous action: " <> show previousAction,
         "Actual: " <> show actualActors,
         "Expected: " <> show expectedActors
@@ -116,7 +107,6 @@ test_requiredApprovers : Script ()
 test_requiredApprovers = do
   let Some o = partyFromText "owner"
   let Some p = partyFromText "provider"
-  let account = V2.Account with owner = o; provider = Some p; id = "dummy-id"
   let testCases =
         [ ( jointControl
           , [o, p]
@@ -128,11 +118,11 @@ test_requiredApprovers = do
           , [o, p] -- owner approval is indirectly required, as the provider cannot initiate an action on their own
           )
         ]
-  forA_ testCases $ \((name, config), expectedApprovers) -> do
-    let actualApprovers = requiredApprovers config account
+  forA_ testCases $ \(config, expectedApprovers) -> do
+    let actualApprovers = requiredApprovers config
     unless (actualApprovers == Set.fromList expectedApprovers) $
       error $ T.unlines [
-        "Unexpected approvers with " <> name,
+        "Unexpected approvers with " <> config.account.id,
         "Actual: " <> show actualApprovers,
         "Expected: " <> show expectedApprovers
       ]

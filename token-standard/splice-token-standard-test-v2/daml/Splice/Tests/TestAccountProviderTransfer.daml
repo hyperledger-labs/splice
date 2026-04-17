@@ -17,9 +17,12 @@ import Splice.TokenStandard.Utils as TSU
 
 import Splice.Testing.Utils
 import Splice.Testing.Tokens.TestTokenV2 qualified as TokenV2
+import Splice.Testing.Tokens.TestTokenV2.AccountConfig qualified as AccountConfig
 import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
+
 
 
 -- Shared test setup
@@ -55,20 +58,33 @@ test_self_transfer_to_account = do
   let bobSelf = V2.Account with
         owner = bob
         provider = None
-        id = "oiap/default"
+        id = "default"
   let aliceSelf1 = V2.Account with
         owner = alice
         provider = None
-        id = "oiap/acc1"
+        id = "acc1"
   let aliceSelf2 = V2.Account with
         owner = alice
         provider = None
-        id = "oiap/acc2"
-  let aliceCustody = V2.Account with
-        owner = alice
-        provider = Some custodian1
-        id = "oiapia/acc2"
-        -- FIXME: consider again ruling out the empty account-id by removing the 'Optional' from the account ID field
+        id = "acc2"
+  let aliceCustodyConfig = AccountConfig.AccountConfig with
+        admin = env.testTokenV2.admin
+        account = V2.Account with
+          owner = alice
+          provider = Some custodian1
+          id = "acc2"
+        ownerConfig = AccountConfig.PartyConfig True True
+        providerConfig = AccountConfig.PartyConfig True True
+  let aliceCustody = aliceCustodyConfig.account
+  -- FIXME: consider again ruling out the empty account-id by removing the 'Optional' from the account ID field
+
+  -- Set up Alice's account
+  accountProposalCid <- submit custodian1 do
+    createCmd AccountConfig.AccountProposal with
+      config = aliceCustodyConfig
+
+  submit alice do
+    exerciseCmd accountProposalCid AccountConfig.AccountProposal_Accept
 
   -- mint funds
   TestTokenRegistryV2.mint env.testTokenV2 aliceSelf1 instrX.id 100.0
@@ -140,10 +156,15 @@ test_self_transfer_to_account = do
 
   holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
   let cid = coerceContractId instrCid2 : ContractId TokenV2.TokenTransferCreation
-  result <- submitMulti [custodian1] [env.testTokenV2.admin] $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+  -- Hack to get the accountId into this choice
+  registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
+  OpenApiChoiceContext{choiceContext = context; disclosures = Disclosures' ds} <- 
+    V2.getTransferInstruction_AcceptContext registry instrCid2 emptyMetadata
+  result <- submit (actAs [custodian1] <> readAs [env.testTokenV2.admin] <> mconcat (map disclose (Map.values ds))) $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
     actors = [custodian1]
     inputHoldingCids = holdingCids
     tokenRulesCid
+    extraArgs = emptyExtraArgs with context
   V2.TransferInstructionResult_Pending instrCid3 <- pure result.output
 
   WalletClientV2.acceptTransferOffer registries bob instrCid3
@@ -168,10 +189,14 @@ test_self_transfer_to_account = do
   -- once alice acceptss that transfer happens directly
   holdingCids <- WalletClientV2.listUnlockedHoldingCidsFor aliceCustody custodian1 instrX
   let cid = coerceContractId instrCid4 : ContractId TokenV2.TokenTransferCreation
-  result <- submitMulti [alice] [env.testTokenV2.admin] $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
+  registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
+  OpenApiChoiceContext{choiceContext = context; disclosures = Disclosures' ds} <- 
+    V2.getTransferInstruction_AcceptContext registry (coerceContractId cid) emptyMetadata
+  result <- submit (actAs [alice] <> readAs [env.testTokenV2.admin] <> mconcat (map disclose (Map.values ds))) $ exerciseCmd cid TokenV2.TokenTransferCreation_ConfirmCreation with
     actors = [alice]
     inputHoldingCids = holdingCids
     tokenRulesCid
+    extraArgs = emptyExtraArgs with context
   V2.TransferInstructionResult_Completed _ <- pure result.output
 
   WalletClientV2.checkAccountBalance alice aliceCustody instrX 217.0

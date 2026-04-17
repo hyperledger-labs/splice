@@ -4,10 +4,10 @@
 -- | A mock implementation of a test token for the purpose of testing V2 token standard workflows.
 module Splice.Testing.Tokens.TestTokenV2 where
 
-import DA.Action (when)
+import DA.Action (foldlA, when)
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.List (dedupSort)
+import DA.List (dedup, dedupSort)
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Set qualified as Set
@@ -144,12 +144,11 @@ template TokenAllocationV2 with
 template TokenTransferOffer with
     existingRequests : Map.Map V2.TransferInstructionAction Party
       -- ^ A map from requests for particular actions to happen to the requestor.
+    availableActions : Map.Map [Party] [V2.TransferInstructionAction]
     transfer : V2.Transfer
     originalInstructionCid : Optional (ContractId V2.TransferInstruction)
   where
-    ensure isValidTransferV2 transfer &&
-      hasValidAccountId transfer.sender &&
-      hasValidAccountId transfer.receiver
+    ensure isValidTransferV2 transfer
 
     signatory jointAuthorizers transfer.sender, transfer.instrumentId.admin
     observer accountParties transfer.receiver
@@ -158,9 +157,7 @@ template TokenTransferOffer with
       view = V2.TransferInstructionView with
         originalInstructionCid = None
         transfer
-        availableActions =
-          let extract account = (account, accountConfigFromId account.id) in
-          mkAvailableTransferActions existingRequests (extract transfer.sender) (extract transfer.receiver)
+        availableActions
         meta = emptyMetadata
 
       transferInstruction_acceptExtraObservers = transferInstruction_acceptDefaultExtraObservers this
@@ -168,7 +165,8 @@ template TokenTransferOffer with
       transferInstruction_withdrawExtraObservers = transferInstruction_withdrawDefaultExtraObservers this
 
       transferInstruction_withdrawImpl self arg = do
-        let actionWithConfig = (V2.TIA_Withdraw, transfer.sender, accountConfigFromId transfer.sender.id)
+        accountConfig <- extractAccountConfig transfer.instrumentId.admin arg.extraArgs transfer.sender
+        let actionWithConfig = (V2.TIA_Withdraw, accountConfig)
         executeOrRecordRequest this self arg.actors actionWithConfig $ do
           archiveLockedHoldingsForTransfer transfer
           tokenCid <- create Token with
@@ -179,7 +177,8 @@ template TokenTransferOffer with
             meta = emptyMetadata
 
       transferInstruction_rejectImpl self arg = do
-        let actionWithConfig = (V2.TIA_Reject, transfer.receiver, accountConfigFromId transfer.receiver.id)
+        accountConfig <- extractAccountConfig transfer.instrumentId.admin arg.extraArgs transfer.receiver
+        let actionWithConfig = (V2.TIA_Reject, accountConfig)
         executeOrRecordRequest this self arg.actors actionWithConfig $ do
           archiveLockedHoldingsForTransfer transfer
           tokenCid <- create Token with
@@ -190,7 +189,8 @@ template TokenTransferOffer with
             meta = emptyMetadata
 
       transferInstruction_acceptImpl self arg = do
-        let actionWithConfig = (V2.TIA_Accept, transfer.receiver, accountConfigFromId transfer.receiver.id)
+        accountConfig <- extractAccountConfig transfer.instrumentId.admin arg.extraArgs transfer.receiver
+        let actionWithConfig = (V2.TIA_Accept, accountConfig)
         executeOrRecordRequest this self arg.actors actionWithConfig $ do
           archiveLockedHoldingsForTransfer transfer
           tokenCid <- create Token with
@@ -202,16 +202,57 @@ template TokenTransferOffer with
               receiverHoldingCids = [toInterfaceContractId tokenCid]
             meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
 
+extractAccountConfigMap
+  : Party -> ExtraArgs -> [V2.Account] -> Update (Map.Map V2.Account AccountConfig)
+extractAccountConfigMap admin extraArgs as = do
+  let
+    cids = case TextMap.lookup "testTokenV2/accountConfigs" extraArgs.context.values of
+      Some (AV_List cs) -> map (\(AV_ContractId cid) -> cid) cs
+      None -> []
+      _ -> error "unexpected value in testTokenV2/accountConfigs"
+  
+  suppliedMap <- Map.fromList <$>
+    mapA (\cid -> do
+        config <- fetch @AccountConfig (coerceContractId cid)
+        return (config.account, config)
+      )
+      cids
+  
+  let
+    basicConfig account = AccountConfig with
+      admin
+      account
+      ownerConfig = PartyConfig True True
+      providerConfig = PartyConfig False False
+    addBasicValidated accountMap account = do
+      case account.provider of
+        None -> do
+          assertMsg "Not expecting account contract for self-custodial account" (isNone (Map.lookup account accountMap))
+          return (Map.insert account (basicConfig account) accountMap)
+        Some _ -> do
+          assertMsg ("No account config supplies for account " <> (show account)) (isSome (Map.lookup account accountMap))
+          return accountMap
+
+  foldlA addBasicValidated suppliedMap (dedup as)
+
+extractAccountConfig
+  : Party -> ExtraArgs -> V2.Account -> Update AccountConfig
+extractAccountConfig admin eargs account = do
+  accountConfigMap <- extractAccountConfigMap admin eargs [account]
+  case Map.lookup account accountConfigMap of
+    Some config -> return config
+    None -> abort ("Missing config for account " <> show account)
+
 executeOrRecordRequest
   : TokenTransferOffer -> ContractId V2.TransferInstruction -> [Party]
-  -> (V2.TransferInstructionAction, V2.Account, AccountConfig)
+  -> (V2.TransferInstructionAction, AccountConfig)
   -> Update V2.TransferInstructionResult
   -> Update V2.TransferInstructionResult
-executeOrRecordRequest this self actors (action, account, config) execute = do
-    archiveAndCheckActors self actors (nextActorsFor action this.existingRequests config account)
+executeOrRecordRequest this self actors (action, config) execute = do
+    archiveAndCheckActors self actors (nextActorsFor action this.existingRequests config)
     let previousActor = Map.lookup action this.existingRequests
     let currentApprovers = Set.fromList $ actors <> optionalToList previousActor
-    let expectedApprovers = requiredApprovers config account
+    let expectedApprovers = requiredApprovers config
     if currentApprovers == expectedApprovers
       then execute
       else do
@@ -255,11 +296,13 @@ template TokenTransferCreation with
         actors : [Party]
         -- FIXME: extraArgs
         tokenRulesCid : ContractId TokenRules -- FIXME: hack
+        extraArgs : ExtraArgs
       controller actors
       do
         let origId = Some (toInterfaceContractId self)
+        accountConfigMap <- extractAccountConfigMap transfer.instrumentId.admin extraArgs [transfer.sender, transfer.receiver]
         token_transferFactory_transferImpl transfer.instrumentId.admin (toInterfaceContractId tokenRulesCid) origId actors missingConfirmers
-          (transfer with inputHoldingCids)
+          (transfer with inputHoldingCids) accountConfigMap
 
     interface instance V2.TransferInstruction for TokenTransferCreation where
       view = V2.TransferInstructionView with
@@ -312,7 +355,8 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = do
         let missingConfirmers = jointAuthorizers arg.transfer.sender
-        token_transferFactory_transferImpl admin (coerceContractId self) None arg.actors missingConfirmers arg.transfer
+        accountConfigMap <- extractAccountConfigMap admin arg.extraArgs [arg.transfer.sender, arg.transfer.receiver]
+        token_transferFactory_transferImpl admin (coerceContractId self) None arg.actors missingConfirmers arg.transfer accountConfigMap
 
     -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for TokenRules where
@@ -366,8 +410,9 @@ token_transferFactory_transferImpl
   -> [Party]
   -> [Party]
   -> V2.Transfer
+  -> Map.Map V2.Account AccountConfig
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl admin eventLogCid originalInstructionCid actors missingConfirmers transfer = do
+token_transferFactory_transferImpl admin eventLogCid originalInstructionCid actors missingConfirmers transfer accountConfigMap = do
   -- FIXME: the code below disregards the account config ==> fix that by
   -- switching to the same action-approval workflow as in the transfer offer.
   require' ("actors", actors) isSubsetOfR ("missingConfirmers", missingConfirmers)
@@ -375,7 +420,7 @@ token_transferFactory_transferImpl admin eventLogCid originalInstructionCid acto
   require' ("transfer.instrumentId.admin", transfer.instrumentId.admin) isEqualR ("transferFactory.admin", admin)
   let newMissingConfirmers = Set.fromList missingConfirmers `Set.difference` Set.fromList actors
   if Set.null newMissingConfirmers
-    then token_transferFactory_transferImplCore eventLogCid originalInstructionCid transfer
+    then token_transferFactory_transferImplCore eventLogCid originalInstructionCid transfer accountConfigMap
     else do
       -- initate workflow to get the missing confirmation from the other party
       instrCid <- create TokenTransferCreation with
@@ -392,8 +437,9 @@ token_transferFactory_transferImplCore
   : ContractId TransferEventsV2.EventLog
   -> Optional (ContractId V2.TransferInstruction)
   -> V2.Transfer
+  -> Map.Map V2.Account AccountConfig
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImplCore eventLogCid originalInstructionCid transfer = do
+token_transferFactory_transferImplCore eventLogCid originalInstructionCid transfer accountConfigMap = do
   -- consume all inputs
   inputAmounts <- forA transfer.inputHoldingCids $ \cid -> do
     let tokenCid = coerceContractId cid : ContractId Token
@@ -416,8 +462,18 @@ token_transferFactory_transferImplCore eventLogCid originalInstructionCid transf
         pure [toInterfaceContractId cid]
 
   -- execute transfer if the senderApprovers cover the receiverApprovers, otherwise create transfer offer
-  let senderApprovers = requiredApprovers (accountConfigFromId transfer.sender.id) transfer.sender
-  let receiverApprovers = requiredApprovers (accountConfigFromId transfer.receiver.id) transfer.receiver
+  let 
+    senderAccountConfig = 
+      case Map.lookup transfer.sender accountConfigMap of
+        None -> error ("No account config found found for account " <> (show transfer.sender))
+        Some ac -> ac
+  let 
+    receiverAccountConfig = 
+      case Map.lookup transfer.receiver accountConfigMap of
+        None -> error ("No account config found found for account " <> (show transfer.receiver))
+        Some ac -> ac
+  let senderApprovers = requiredApprovers senderAccountConfig
+  let receiverApprovers = requiredApprovers receiverAccountConfig
   if receiverApprovers `Set.isSubsetOf` senderApprovers
     then do
       -- report v2 event
@@ -439,14 +495,19 @@ token_transferFactory_transferImplCore eventLogCid originalInstructionCid transf
             expiresAt = Some transfer.executeBefore
             expiresAfter = None
             context = Some $ "transfer to " <> show transfer.receiver
-      -- create transfer offer
-      transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+      
+      let
         existingRequests = Map.fromList
           -- the sender approvers already approved the accept
           [ (V2.TIA_Accept, p) | p <- Set.toList $ receiverApprovers `Set.intersection` senderApprovers ]
+        availableActions = mkAvailableTransferActions existingRequests senderAccountConfig receiverAccountConfig
+      -- create transfer offer
+      transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+        existingRequests
         originalInstructionCid
         transfer = transfer with
           inputHoldingCids = [toInterfaceContractId lockedCid]
+        availableActions
       pure V2.TransferInstructionResult with
         senderChangeCids
         -- Note: we skip over explaining the change in locked holdings to V1 history parsers,

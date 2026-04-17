@@ -23,56 +23,50 @@ data PartyConfig = PartyConfig with
 -- Note: this is but one possible way to configure account authorization rules.
 -- It was built to demonstrate a non-trivial rule-set and test that the `V2.TransferInstruction` APIs
 -- are sufficient for wallets to interact with the assets.
-data AccountConfig = AccountConfig with
+template AccountConfig
+  with
+    admin : Party
+    account : V2.Account
     ownerConfig : PartyConfig
     providerConfig : PartyConfig
+  where
+    signatory account.owner, account.provider
+    observer admin
+    ensure isValidAccountConfig this
+
+data AccountProposal_Accept_Result = AccountProposal_Accept_Result with
+    accountConfig : ContractId AccountConfig
   deriving (Eq, Show)
 
+data AccountProposal_Reject_Result = AccountProposal_Reject_Result with
+  deriving (Eq, Show)
 
--- String conversion
---------------------
+data AccountProposal_Withdraw_Result = AccountProposal_Withdraw_Result with
+  deriving (Eq, Show)
 
--- | Account configs are encoded in the account id as a string with the format:
--- "o{ownerConfig}p{providerConfig}/"
--- where {ownerConfig} and {providerConfig} are strings with the following format:
--- "{i}{a}"
--- where "i" is present if the party can initiate an action and "a" is present if the party must approve an action.
---
--- Note: storing the config in the account id is a convenient option, but not a requirement.
--- It could also be stored on-ledger and looked up when needed with the drawback that the available actions
--- on an allocation or transfer instruction view will have to over-approximate
--- the actually available actions to cater for the case where the config changes
--- after the instruction is created.
-accountConfigFromId : Text -> AccountConfig
-accountConfigFromId str
-  | "/" `T.isPrefixOf` str'' = AccountConfig with ..
-  | otherwise = error $ "Expected '/' after account config prefixes in: " <> show str
-
-  -- | FIXME: share parsing code per party config
+template AccountProposal
+  with
+    config : AccountConfig
   where
-    (ownerInitiate, ownerApproval, len)
-      | "oia" `T.isPrefixOf` str = (True, True, 3)
-      | "oi" `T.isPrefixOf` str = (True, False, 2)
-      | "oa" `T.isPrefixOf` str = (False, True, 2)
-      | "o" `T.isPrefixOf` str = (False, False, 1)
-      | otherwise = error $ "Invalid owner account config prefix: " <> show str
-    ownerConfig = PartyConfig with canInitiate = ownerInitiate, mustApprove = ownerApproval
-    str' = T.drop len str
-    (providerInitiate, providerApproval, len')
-      | "pia" `T.isPrefixOf` str' = (True, True, 3)
-      | "pi" `T.isPrefixOf` str' = (True, False, 2)
-      | "pa" `T.isPrefixOf` str' = (False, True, 2)
-      | "p" `T.isPrefixOf` str' = (False, False, 1)
-      | otherwise = error $ "Invalid provider account config prefix: " <> show str'
-    providerConfig = PartyConfig with canInitiate = providerInitiate, mustApprove = providerApproval
-    str'' = T.drop len' str'
+    signatory (config.account.provider)
+    observer config.account.owner
 
+    choice AccountProposal_Accept : AccountProposal_Accept_Result
+      controller config.account.owner
+      do AccountProposal_Accept_Result <$> create config
+
+    choice AccountProposal_Reject : AccountProposal_Reject_Result
+      controller config.account.owner
+      do return AccountProposal_Reject_Result
+    
+    choice AccountProposal_Withdraw : AccountProposal_Withdraw_Result
+      controller (signatory this)
+      do return AccountProposal_Withdraw_Result
 
 -- | Valid accounts must have at least one party that can initiate an action and
 -- at least one party that must approve an action.
-hasValidAccountId : V2.Account -> Bool
-hasValidAccountId account =
-  let config = accountConfigFromId account.id in
+isValidAccountConfig : AccountConfig -> Bool
+isValidAccountConfig config =
   (config.ownerConfig.canInitiate || config.providerConfig.canInitiate) &&
   (config.ownerConfig.mustApprove || config.providerConfig.mustApprove)
 
@@ -92,11 +86,11 @@ accountConfigToString config = T.implode $
 
 -- | The parties that can acct next on an account given the previous actor and the account config.
 -- This function encodes the core of the state machine for who needs to act when.
-nextActors : Optional Party -> AccountConfig -> V2.Account -> Set.Set Party
-nextActors previousActor config account =
+nextActors : Optional Party -> AccountConfig -> Set.Set Party
+nextActors previousActor config =
     Set.fromList $
-      [ account.owner | canAct config.ownerConfig account.owner ] <>
-      [ p | Some p <- [account.provider], canAct config.providerConfig p ]
+      [ config.account.owner | canAct config.ownerConfig config.account.owner ] <>
+      [ p | Some p <- [config.account.provider], canAct config.providerConfig p ]
   where
     hasNotActed p = Some p /= previousActor
     canAct (PartyConfig with canInitiate; mustApprove) p =
@@ -104,8 +98,8 @@ nextActors previousActor config account =
       (canInitiate || isSome previousActor && mustApprove)
 
 -- | Parties that must approve an action on the account.
-requiredApprovers : AccountConfig -> V2.Account -> Set.Set Party
-requiredApprovers (AccountConfig with ownerConfig = owner, providerConfig = provider) account =
+requiredApprovers : AccountConfig -> Set.Set Party
+requiredApprovers (AccountConfig with ownerConfig = owner, providerConfig = provider, account) =
   Set.fromList $
     [ account.owner | ownerApproval ] <>
     [ p | providerApproval, Some p <- [account.provider] ]
@@ -118,23 +112,23 @@ requiredApprovers (AccountConfig with ownerConfig = owner, providerConfig = prov
 -- FIXME: invert the Map of actions in a separate PR to simplify this code.
 mkAvailableTransferActions
   : Map.Map V2.TransferInstructionAction Party
-  -> (V2.Account, AccountConfig) -> (V2.Account, AccountConfig) -> Map.Map [Party] [V2.TransferInstructionAction]
+  -> AccountConfig -> AccountConfig -> Map.Map [Party] [V2.TransferInstructionAction]
 mkAvailableTransferActions existingRequests sender receiver =
     Map.fromListWithR (++) $
       actionsFor V2.TIA_Accept receiver <>
       actionsFor V2.TIA_Reject receiver <>
       actionsFor V2.TIA_Withdraw sender
   where
-    actionsFor action (account, config) =
-      [ (actors, [action]) | actors <- nextActorsFor action existingRequests config account ]
+    actionsFor action config =
+      [ (actors, [action]) | actors <- nextActorsFor action existingRequests config ]
 
 -- | Next actors for a particular action.
 --
 -- Used both for computing the available actions, as well as the actors that are allowed to exercise a particular action.
-nextActorsFor : V2.TransferInstructionAction -> Map.Map V2.TransferInstructionAction Party -> AccountConfig -> V2.Account -> [[Party]]
-nextActorsFor action existingRequests config account =
-  Set.toList (requiredApprovers config account) ::
-  [ [actor] | actor <- Set.toList (nextActors (Map.lookup action existingRequests) config account) ]
+nextActorsFor : V2.TransferInstructionAction -> Map.Map V2.TransferInstructionAction Party -> AccountConfig -> [[Party]]
+nextActorsFor action existingRequests config  =
+  Set.toList (requiredApprovers config) ::
+  [ [actor] | actor <- Set.toList (nextActors (Map.lookup action existingRequests) config) ]
 
 -- FIXME: move to the definition of V2.TransferInstructionAction
 deriving instance Ord V2.TransferInstructionAction
