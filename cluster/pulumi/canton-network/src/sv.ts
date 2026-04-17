@@ -128,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installSvLoopback(xns);
+  const loopback = installSvLoopback(xns, decentralizedSynchronizerUpgradeConfig.usesCometbft());
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
