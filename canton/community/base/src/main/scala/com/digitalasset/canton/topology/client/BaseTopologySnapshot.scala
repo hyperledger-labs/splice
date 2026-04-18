@@ -5,6 +5,7 @@ package com.digitalasset.canton.topology.client
 
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SigningKeysWithThreshold
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
