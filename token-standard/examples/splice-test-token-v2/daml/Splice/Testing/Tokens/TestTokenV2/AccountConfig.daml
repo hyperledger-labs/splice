@@ -9,11 +9,12 @@ import DA.Map qualified as Map
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.TokenStandard.Utils (accountParties)
-import Splice.Api.Token.MetadataV1 (ExtraArgs)
-import DA.List (dedup, (\\), sort)
+import Splice.Api.Token.MetadataV1 (AnyValue(..), ExtraArgs)
+import DA.List (dedupSort, dedup, (\\))
 import DA.Assert ((===))
-import DA.List.BuiltinOrder (dedupSort)
-import DA.Optional (fromOptional)
+import DA.Optional (fromSome, isSome, isNone, fromOptional)
+import qualified DA.TextMap as TextMap
+import DA.Action (foldlA)
 
 
 data PartyConfig = PartyConfig with
@@ -160,4 +161,103 @@ authorizationTransfers config = case config.account.provider of
   Some provider ->
     let cs = [(config.account.owner, config.ownerConfig), (provider, config.providerConfig)]
      in [(p, q) | (p, pConfig) <- cs, (q, qConfig) <- cs, q /= p, not qConfig.mustApprove, pConfig.canInitiate]
+
+-- Utility function to use sender/receiver accounts to transfer authority between owner and provider
+-- via AuthorizeTransferInstructionAction
+tryUseAccountAuthority : 
+  [Party] 
+  -> [[Party]]
+  -> V2.TransferInstructionAction
+  -> (AccountConfig, Optional (ContractId AccountConfig))
+  -> (AccountConfig, Optional (ContractId AccountConfig))
+  -> ContractId V2.TransferInstruction
+  -> ExtraArgs
+  -> Update (Optional V2.TransferInstructionResult)
+tryUseAccountAuthority actors neededActors action (senderConfig, oSenderCid) (receiverConfig, oReceiverCid) instrCid extraArgs = do
+  let senderAuthorizationTransfers = 
+        filter (\(actor, authorizer) -> actor `elem` actors && [authorizer] `elem` neededActors) 
+        (authorizationTransfers senderConfig)
+  let receiverAuthorizationTransfers = 
+        filter (\(actor,authorizer) -> actor `elem` actors && [authorizer] `elem` neededActors) 
+        (authorizationTransfers receiverConfig)
+
+  let transferAuthority actor authorizer accountCid =
+        exercise accountCid AuthorizeTransferInstructionAction with
+          actor
+          authorizer
+          extraArgs
+          transferInstructionCid = instrCid
+          action
+
+  -- Deal with a special case where the authorizer is a party on both accounts.
+  -- In that case, we only want to transfer authority if it's allowed on _both_
+  -- accounts.
+  let
+    authorizerOnBothAccounts authorizer = 
+      authorizer `elem` accountParties senderConfig.account && 
+      authorizer `elem` accountParties receiverConfig.account
+    transferAllowedByBothAccounts actor authorizer =
+      (actor, authorizer) `elem` senderAuthorizationTransfers &&
+      (actor, authorizer) `elem` receiverAuthorizationTransfers
+    acceptTransferAllowed actor authorizer = 
+      not (authorizerOnBothAccounts authorizer) ||
+      transferAllowedByBothAccounts actor authorizer
+
+  case (senderAuthorizationTransfers, receiverAuthorizationTransfers, oSenderCid, oReceiverCid, action) of
+    ((actor, authorizer)::_, _, Some accountCid, _, V2.TIA_Withdraw) -> Some <$> transferAuthority actor authorizer accountCid
+    (_, (actor, authorizer)::_, _, Some accountCid, V2.TIA_Reject) -> Some <$> transferAuthority actor authorizer accountCid
+    ((actor, authorizer)::_, _, Some accountCid, _, V2.TIA_Accept) -> 
+      if acceptTransferAllowed actor authorizer 
+        then Some <$> transferAuthority actor authorizer accountCid
+        else pure None
+    (_, (actor, authorizer)::_, _, Some accountCid, V2.TIA_Accept) ->
+      if acceptTransferAllowed actor authorizer 
+        then Some <$> transferAuthority actor authorizer accountCid
+        else pure None
+
+    _ -> pure None
+
+
+-- Parsing Choice Context
+-------------------------
+
+extractAccountConfigMap
+  : Party -> ExtraArgs -> [V2.Account] -> Update (Map.Map V2.Account (AccountConfig, Optional (ContractId AccountConfig)))
+extractAccountConfigMap admin extraArgs as = do
+  let
+    cids = case TextMap.lookup "testTokenV2/accountConfigs" extraArgs.context.values of
+      Some (AV_List cs) -> map (\(AV_ContractId cid) -> cid) cs
+      None -> []
+      _ -> error "unexpected value in testTokenV2/accountConfigs"
+  
+  suppliedMap <- Map.fromList <$>
+    mapA (\cid -> do
+        config <- fetch @AccountConfig (coerceContractId cid)
+        return (config.account, (config, Some (coerceContractId cid)))
+      )
+      cids
+  
+  let
+    basicConfig account = AccountConfig with
+      admin
+      account
+      ownerConfig = PartyConfig True True
+      providerConfig = PartyConfig False False
+    addBasicValidated accountMap account = do
+      case account.provider of
+        None -> do
+          assertMsg "Not expecting account contract for self-custodial account" (isNone (Map.lookup account accountMap))
+          return (Map.insert account (basicConfig account, None) accountMap)
+        Some _ -> do
+          assertMsg ("No account config supplies for account " <> (show account)) (isSome (Map.lookup account accountMap))
+          return accountMap
+
+  foldlA addBasicValidated suppliedMap (dedup as)
+
+-- Convenience to get account configs as a list.
+extractAccountConfigs
+  : Party -> ExtraArgs -> [V2.Account] -> Update [(AccountConfig, Optional (ContractId AccountConfig))]
+extractAccountConfigs admin extraArgs as = do
+  accountConfigsMap <- extractAccountConfigMap admin extraArgs as
+  return $ map (\a -> fromSome (Map.lookup a accountConfigsMap)) as
 
