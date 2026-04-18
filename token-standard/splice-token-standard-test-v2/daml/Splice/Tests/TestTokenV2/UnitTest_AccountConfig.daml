@@ -15,7 +15,6 @@ import qualified DA.Map as Map
 import qualified Splice.Api.Token.TransferInstructionV2 as V2
 import DA.List (dedupSort)
 
-
 ad : Party = fromSome $ partyFromText "admin"
 -- investor parties
 a : Party = fromSome $ partyFromText "a"
@@ -24,57 +23,57 @@ b : Party = fromSome $ partyFromText "b"
 v : Party = fromSome $ partyFromText "v"
 w : Party = fromSome $ partyFromText "w"
 
-type MkAccountConfig = Text -> Party -> Party -> AccountConfig
+type MkAccountConfig = Text -> Party -> Party -> Party -> AccountConfig
 
-accountConfigs : Party -> Party -> Party -> Party
+accountConfigs : Party -> Party -> Party -> Party -> Party
   -> MkAccountConfig
   -> MkAccountConfig
   -> (AccountConfig, AccountConfig)
-accountConfigs i1 p1 i2 p2 mkac1 mkac2 = (mkac1 "sender" i1 p1, mkac2 "receiver" i2 p2)
+accountConfigs admin i1 p1 i2 p2 mkac1 mkac2 = (mkac1 "sender" admin i1 p1, mkac2 "receiver" admin i2 p2)
 
-accountConfigFromPartyConfigs : Text -> Party -> Party -> PartyConfig -> PartyConfig -> AccountConfig
-accountConfigFromPartyConfigs id owner provider ownerConfig providerConfig =
+accountConfigFromPartyConfigs : Text -> Party -> Party -> Party -> PartyConfig -> PartyConfig -> AccountConfig
+accountConfigFromPartyConfigs id admin owner provider ownerConfig providerConfig =
   AccountConfig with
-    admin = ad
+    admin
     account = V2.Account with
       owner
       provider = Some provider
-      id
+      id = (id <> "/" <> show owner <> "/" <> show provider)
     ownerConfig
     providerConfig
 
 -- j for joint control
 j : MkAccountConfig
-j id owner provider =
-  accountConfigFromPartyConfigs id owner provider
+j id admin owner provider =
+  accountConfigFromPartyConfigs (id <> "/j/") admin owner provider
     PartyConfig with canInitiate = True; mustApprove = True
     PartyConfig with canInitiate = True; mustApprove = True
 
 -- p for provider controlled
 p : MkAccountConfig
-p id owner provider =
-  accountConfigFromPartyConfigs id owner provider
+p id admin owner provider =
+  accountConfigFromPartyConfigs (id <> "/p/") admin owner provider
     PartyConfig with canInitiate = False; mustApprove = False
     PartyConfig with canInitiate = True; mustApprove = True
 
 -- ic for investor controlled
 ic : MkAccountConfig
-ic id owner provider =
-  accountConfigFromPartyConfigs id owner provider
+ic id admin owner provider =
+  accountConfigFromPartyConfigs (id <> "/ic/") admin owner provider
     PartyConfig with canInitiate = True; mustApprove = True
     PartyConfig with canInitiate = False; mustApprove = False
 
 -- pc for provider confirmed
 pc : MkAccountConfig
-pc id owner provider =
-  accountConfigFromPartyConfigs id owner provider
+pc id admin owner provider =
+  accountConfigFromPartyConfigs (id <> "/pc/") admin owner provider
     PartyConfig with canInitiate = True; mustApprove = False
     PartyConfig with canInitiate = False; mustApprove = True
 
 -- sc for self-custodual/basic
 sc : MkAccountConfig
-sc id owner provider =
-  let acc = ic id owner provider
+sc id admin owner provider =
+  let acc = ic id admin owner provider
    in acc with account.provider = None
 
 test_availableActions : Script ()
@@ -216,8 +215,6 @@ test_availableActions = do
   forA_ test_cases (\(s, ps, r, pr, mks, mkr, aa, wa, ra, eaa, ewa, era) ->
     test_case s ps r pr mks mkr aa wa ra eaa ewa era)
 
-
-
 test_case : Party -> Party -> Party -> Party
   -> MkAccountConfig -> MkAccountConfig
   -> [Party] -> [Party] -> [Party]
@@ -227,8 +224,8 @@ test_case sender senderProvider receiver receiverProvider mkacSender mkacReceive
   acceptAuthorizers withdrawAuthorizers rejectAuthorizers 
   expectedAcceptActors expectedWithdrawActors expectedRejectActors = do
   let
-    senderAccount = mkacSender "sender" sender senderProvider
-    receiverAccount = mkacReceiver "receiver" receiver receiverProvider
+    senderAccount = mkacSender "sender" ad sender senderProvider
+    receiverAccount = mkacReceiver "receiver" ad receiver receiverProvider
     actionAuthorizers = Map.fromList [(V2.TIA_Accept, acceptAuthorizers), (V2.TIA_Reject, rejectAuthorizers), (V2.TIA_Withdraw, withdrawAuthorizers)]
     availableActions = mkAvailableTransferActions actionAuthorizers senderAccount receiverAccount
     reversedAvailableActions = reverseMap availableActions

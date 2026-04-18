@@ -19,6 +19,7 @@ module Splice.Testing.TokenStandard.MultiRegistry
 
   -- * Default setup
   , Config(..)
+  , Env(..)
   , defaultConfig
   , initialize
   ) where

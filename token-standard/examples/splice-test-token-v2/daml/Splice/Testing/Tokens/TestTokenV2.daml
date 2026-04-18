@@ -168,12 +168,18 @@ template TokenTransferOffer with
 
       transferInstruction_withdrawImpl self arg = do
         authorizeTransferOfferAction this (Some self) arg.actors V2.TIA_Withdraw arg.extraArgs $ do
-          sumAndArchiveHoldings transfer
-          tokenCid <- create Token with
-            holding = senderHoldingFromTransfer transfer
+          -- Only try to unlock the inputs if fully
+          -- sender authorized.
+          senderChangeCids <- case (accountParties this.transfer.sender \\ (signatory this)) of
+            [] -> do
+              sumAndArchiveHoldings transfer
+              tokenCid <- create Token with
+                holding = senderHoldingFromTransfer transfer
+              return [toInterfaceContractId tokenCid]
+            _ -> return this.transfer.inputHoldingCids
           pure V2.TransferInstructionResult with
             output = V2.TransferInstructionResult_Failed
-            senderChangeCids = [toInterfaceContractId tokenCid]
+            senderChangeCids
             meta = emptyMetadata
 
       transferInstruction_rejectImpl self arg = do
@@ -233,10 +239,6 @@ authorizeTransferOfferAction
   execute
     -- | A continuation to execute when fully authorized. 
   = do
-    
-    -- Archive old TransferOffer
-    whenSome oSelf archive
-
     -- Extract account info.
     [(senderConfig, oSenderCid), (receiverConfig, oReceiverCid)] <- extractAccountConfigs 
       this.transfer.instrumentId.admin 
@@ -287,7 +289,7 @@ authorizeTransferOfferAction
 
     -- If the action is fully authrozed, execute the continuation.
     -- Otherwise create a pending instruction and try continuing on that.
-    if fullyAuthorized
+    res <- if fullyAuthorized
       then execute
       else do
         -- record the request for this actor
@@ -310,6 +312,13 @@ authorizeTransferOfferAction
                 transferInstructionCid = toInterfaceContractId pendingInstrCid
               senderChangeCids
               meta = emptyMetadata
+
+    -- Archive old TransferOffer
+    -- Do this last to be able to use the TransferOffer as event
+    -- factory
+    whenSome oSelf archive
+
+    return res
 
 -- | Template providing all the rules for how the tokens can be changed.
 --

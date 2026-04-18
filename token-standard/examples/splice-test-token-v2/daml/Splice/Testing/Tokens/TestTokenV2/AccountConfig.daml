@@ -39,7 +39,7 @@ template AccountConfig
     -- provider. They are an observer in order to be able to serve account
     -- configs as choice context.
     observer admin
-    ensure isValidAccountConfig this
+    ensure isValidAccountConfig this && isSome account.provider
 
     nonconsuming choice AuthorizeTransferInstructionAction : V2.TransferInstructionResult
      -- ^ This choice allos one of the two account parties to get authority from the other

@@ -16,16 +16,284 @@ import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.TokenStandard.Utils as TSU
 
 import Splice.Testing.Utils
-import Splice.Testing.Tokens.TestTokenV2 qualified as TokenV2
 import Splice.Testing.Tokens.TestTokenV2.AccountConfig qualified as AccountConfig
 import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
-
+import Splice.Tests.TestTokenV2.UnitTest_AccountConfig
+import Splice.Testing.Tokens.TestTokenV2.AccountConfig (AccountConfig)
+import DA.Action (foldlA, when)
+import DA.Functor (void)
+import DA.Optional (isNone)
+import DA.Foldable (forA_)
 
 -- Shared test setup
 --------------------
+
+make_account_if_missing : MultiRegistry.Env -> AccountConfig -> Script ()
+make_account_if_missing env config = do
+  -- Make sure the account is funded.
+  let instrX = V2.InstrumentId with
+        id = "X"
+        admin = env.testTokenV2.admin
+
+  cids <- WalletClientV2.listUnlockedHoldingCidsFor config.account config.account.owner instrX
+  when (null cids) (void $ TestTokenRegistryV2.mint env.testTokenV2 config.account instrX.id 100.0)
+
+  -- Create an AccountConfig contract as needed.
+  case config.account.provider of
+    None -> return ()
+    Some provider -> do
+      oAccount <- queryFilter @AccountConfig config.account.owner (\ac -> ac.account == config.account)
+      case oAccount of
+        [(_, config')] -> assertMsg ("Account already exists with different config: " <> show config) (config' == config)
+        [] -> do
+          accountProposalCid <- submit provider do
+            createCmd AccountConfig.AccountProposal with
+              config 
+
+          submit config.account.owner do
+            exerciseCmd accountProposalCid AccountConfig.AccountProposal_Accept
+          
+          return ()
+        _ -> abort ("Multiple accounts found for config: " <> show config)
+
+test_transfer_flows : Script ()
+test_transfer_flows = do
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let mkParty name = do
+        party <- allocatePartyExact name
+        WalletClientV2.createBatchingUtility party
+        pure party
+  
+  -- Same party names as in UnitTest_AccountConfig
+  a <- mkParty "a"
+  b <- mkParty "b"
+  v <- mkParty "v"
+  w <- mkParty "w"
+
+  -- Shorthands
+  let
+    aa = (a, V2.TIA_Accept)
+    ba = (b, V2.TIA_Accept)
+    va = (v, V2.TIA_Accept)
+    wa = (w, V2.TIA_Accept)
+
+    br = (b, V2.TIA_Reject)
+    wr = (w, V2.TIA_Reject)
+
+    aw = (a, V2.TIA_Withdraw)
+    vw = (v, V2.TIA_Withdraw)
+
+  let test_cases = [
+        -- Happy flows
+        (a, v, b, w, j, j, a, [va, ba, wa], True),
+        (a, v, b, w, j, j, v, [aa, ba, wa], True),
+        (a, v, b, w, j, j, a, [va, wa, ba], True),
+        (a, v, b, w, j, j, v, [aa, wa, ba], True),
+        -- Partial withdrawals/rejects mixed in
+        (a, v, b, w, j, j, a, [va, aw, br, ba, wa], True),
+        (a, v, b, w, j, j, v, [aa, ba, vw, wa], True),
+        (a, v, b, w, j, j, a, [va, wa, wr, ba], True),
+        (a, v, b, w, j, j, v, [aa, br, aw, wa, ba], True),
+        -- Withdrawals early, late, mixed, with partial rejects mixed in
+        (a, v, b, w, j, j, a, [aw], False),
+        (a, v, b, w, j, j, v, [aa, vw, aw], False),
+        (a, v, b, w, j, j, a, [va, vw, wr, wa, aw], False),
+        (a, v, b, w, j, j, v, [aa, wa, br, aw, vw], False),
+        -- Rejects
+        (a, v, b, w, j, j, a, [va, br, wr], False),
+        (a, v, b, w, j, j, v, [aa, ba, wr, br], False),
+        (a, v, b, w, j, j, a, [va, wr, wa, br], False),
+
+        -- Now we test provider controlled flows
+        -- Happy flow
+        (a, v, b, w, p, p, v, [wa], True),
+        -- Withdrawals early & late
+        (a, v, b, w, p, p, v, [vw], False),
+        (a, v, b, w, p, j, v, [ba, vw], False),
+        -- Rejects
+        (a, v, b, w, p, p, v, [wr], False),
+
+        -- Now we test investor controlled flows
+        -- Happy flow
+        (a, v, b, w, ic, ic, a, [ba], True),
+        -- Withdrawals early & late
+        (a, v, b, w, ic, ic, a, [aw], False),
+        (a, v, b, w, ic, j, a, [ba, aw], False),
+        -- Rejects
+        (a, v, b, w, ic, ic, a, [br], False),
+        
+        -- In provider confirmed, those flows work 
+        -- where the investors initiate
+        -- Happy flows
+        (a, v, b, w, pc, pc, a, [va, ba, wa], True),
+        -- Partial withdrawals/rejects mixed in
+        (a, v, b, w, pc, pc, a, [va, aw, ba, wa], True),
+        (a, v, b, w, pc, pc, a, [va, br, ba, wa], True),
+        (a, v, b, w, pc, pc, a, [va, ba, aw, br, wa], True),
+        (a, v, b, w, pc, pc, a, [va, aw, ba, br, wa], True),
+        -- Withdrawals early, late, mixed, with partial rejects mixed in
+        (a, v, b, w, pc, pc, a, [aw], False),
+        (a, v, b, w, pc, pc, a, [va, aw, br, ba, vw], False),
+        -- Rejects
+        (a, v, b, w, pc, pc, a, [va, br, wr], False),
+        (a, v, b, w, pc, pc, a, [va, ba, br, wr], False),
+        (a, v, b, w, pc, pc, a, [va, br, ba, wr], False)
+        ]
+
+  forA_ test_cases (\(i1, p1, i2, p2, mkacc1, mkacc2, init, acts, succ) ->
+    test_transfer_flow env i1 p1 i2 p2 mkacc1 mkacc2 init acts succ
+    )
+
+-- Split the test as the script otherwise gets too large.
+test_transfer_flows_2 : Script ()
+test_transfer_flows_2 = do
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let mkParty name = do
+        party <- allocatePartyExact name
+        WalletClientV2.createBatchingUtility party
+        pure party
+  
+  -- Same party names as in UnitTest_AccountConfig
+  a <- mkParty "a"
+  b <- mkParty "b"
+  v <- mkParty "v"
+  w <- mkParty "w"
+
+  -- Shorthands
+  let
+    aa = (a, V2.TIA_Accept)
+    ba = (b, V2.TIA_Accept)
+    va = (v, V2.TIA_Accept)
+    wa = (w, V2.TIA_Accept)
+
+    ar = (a, V2.TIA_Reject)
+    br = (b, V2.TIA_Reject)
+    vr = (v, V2.TIA_Reject)
+    wr = (w, V2.TIA_Reject)
+
+    aw = (a, V2.TIA_Withdraw)
+    vw = (v, V2.TIA_Withdraw)
+
+  let test_cases = 
+        -- First test self-custodial setups.
+        (mconcat . (flip map) [j, p, pc, ic, sc])  (\acc -> [        
+            -- Happy flows
+            (a, a, b, b, acc, acc, a, [ba], True),
+            (a, v, b, b, j, acc, v, [aa, ba], True),
+            (a, a, b, w, acc, j, a, [wa, ba], True),
+            -- Partial withdrawals/rejects mixed in
+            (a, a, b, w, acc, j, a, [br, ba, wa], True),
+            (a, a, b, w, acc, j, a, [ba, br, wa], True),
+            (a, v, b, b, j, acc, v, [aa, ba], True),
+            (a, v, b, b, j, acc, v, [aa, aw, ba], True),
+            -- Withdrawals early, late, mixed, with partial rejects mixed in
+            (a, a, b, b, acc, acc, a, [aw], False),
+            (a, a, b, w, acc, j, a, [aw], False),
+            (a, a, b, w, acc, j, a, [ba, br, aw], False),
+            (a, v, b, b, j, acc, a, [va, vw, aw], False),
+            -- Rejects
+            (a, a, b, b, acc, acc, a, [br], False),
+            (a, a, b, w, acc, j, a, [wr, br], False),
+            (a, v, b, b, j, acc, a, [va, br], False)
+          ])
+          -- Special cases arise if the account providers on both sides are the same
+          -- or indeed if the sender and receiver are the same.
+          <> [
+            -- A self-transfer between self-managed accounts goes straight through.
+            (a, a, a, a, j, sc, a, [], True),
+            -- A transfer within a provider is simplified
+            (a, v, b, v, j, j, a, [va, ba], True),
+            (a, v, b, v, j, j, a, [va, vw, vr, aw], False),
+            (a, v, b, v, j, j, a, [va, vw, vr, br], False),
+            -- Even simpler if it's between two accounts of the same owner
+            (a, v, a, v, j, pc, a, [va], True),
+            (a, a, a, v, sc, pc, a, [va], True),
+            (a, v, a, a, ic, sc, a, [], True),
+            (a, v, a, v, ic, ic, a, [], True),
+            -- Transfers across providers are also simplified
+            (a, v, a, w, j, j, a, [va, wa], True),
+            (a, v, a, w, j, j, a, [va, vw, wr, aw], False),
+            (a, v, b, w, j, j, a, [va, vw, wr, br], False),
+            -- Patholological cases can arise where a party switches between
+            -- investor and provider slots
+            -- FIXME: In this first case, b's authority could be taken from the
+            -- AccountConfig. But the check in `tryUseAccountAuthority` is too
+            -- strict.
+            (a, v, b, a, j, p, a, [va, ba], True),
+            (a, v, b, a, j, j, a, [va, ba], True),
+            (a, v, b, a, j, p, a, [va, aw, ba], True),
+            (a, v, b, a, j, p, a, [va, ar], False)
+          ]
+  forA_ test_cases (\(i1, p1, i2, p2, mkacc1, mkacc2, init, acts, succ) ->
+    test_transfer_flow env i1 p1 i2 p2 mkacc1 mkacc2 init acts succ
+    )
+
+test_transfer_flow : MultiRegistry.Env
+  -> Party -> Party -> Party -> Party
+  -> MkAccountConfig -> MkAccountConfig
+  -> Party
+  -> [(Party, V2.TransferInstructionAction)]
+  -> Bool
+  -> Script ()
+test_transfer_flow env sender senderProvider receiver receiverProvider mkacSender mkacReceiver initiator actions expectSuccess = do
+  let registries = env.registries
+  let instrX = V2.InstrumentId with
+        id = "X"
+        admin = env.testTokenV2.admin
+  let
+    senderConfig = mkacSender "sender" env.testTokenV2.admin sender senderProvider
+    receiverConfig = mkacReceiver "receiver" env.testTokenV2.admin receiver receiverProvider
+  make_account_if_missing env senderConfig
+  make_account_if_missing env receiverConfig
+
+  senderBalanceBefore <- WalletClientV2.getAccountBalance sender senderConfig.account instrX
+  receiverBalanceBefore <- WalletClientV2.getAccountBalance receiver receiverConfig.account instrX
+  
+  -- shared transfer params
+  now <- getTime
+  let requestedAt = now
+  let executeBefore = now `addRelTime` days 1
+
+  -- Initiate transfer
+  oInstrCid <- WalletClientV2.transfer registries initiator V2.TransferFactory_Transfer with
+    actors = [initiator]
+    extraArgs = emptyExtraArgs
+    transfer = V2.Transfer with
+      sender = senderConfig.account
+      receiver = receiverConfig.account
+      amount = 1.0
+      instrumentId = instrX
+      inputHoldingCids = []
+      requestedAt
+      executeBefore
+      meta = emptyMetadata
+
+  -- Now fold through actions
+  endResult <- foldlA (\(Some instrCid) (actor, action) -> do
+      case action of
+        V2.TIA_Accept -> WalletClientV2.acceptTransferOffer registries actor instrCid
+        V2.TIA_Withdraw -> WalletClientV2.withdrawTransferOffer registries actor instrCid
+        V2.TIA_Reject -> WalletClientV2.rejectTransferOffer registries actor instrCid
+        _ -> abort "Custom actions are not supported."
+    )
+    oInstrCid
+    actions
+
+  senderBalanceAfter <- WalletClientV2.getAccountBalance sender senderConfig.account instrX
+  receiverBalanceAfter <- WalletClientV2.getAccountBalance receiver receiverConfig.account instrX
+
+  assertMsg "There should be no instruction left at the end. " (isNone endResult)
+  if expectSuccess
+    then do
+      assertMsg "Sender balance should have decreased by 1.0." (senderBalanceBefore - senderBalanceAfter == 1.0)
+      assertMsg "Receiver balance should have increased by 1.0." (receiverBalanceAfter - receiverBalanceBefore == 1.0)
+    else do
+      assertMsg "Sender balance should not have changed." (senderBalanceBefore == senderBalanceAfter)
+      assertMsg "Receiver balance should not have changed." (receiverBalanceAfter == receiverBalanceBefore)
+  
 
 -- TODO(#4813): add and test missing transfer instruction actions; test v2 transfers; test preapproved transfers
 -- TODO(#4540): test with multiple accounts, and acting as an account provider
@@ -45,8 +313,6 @@ test_self_transfer_to_account = do
         party <- allocatePartyExact name
         WalletClientV2.createBatchingUtility party
         pure party
-
-  [(tokenRulesCid, _)] <- query @TokenV2.TokenRules env.testTokenV2.admin
 
   -- party setup
   alice <- mkParty "alice"

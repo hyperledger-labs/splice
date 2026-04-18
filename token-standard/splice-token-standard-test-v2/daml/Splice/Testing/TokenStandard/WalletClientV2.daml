@@ -22,12 +22,16 @@ module Splice.Testing.TokenStandard.WalletClientV2
     checkHoldingBounds,
     checkHoldingApprox,
 
+    getAccountBalance,
+
     -- * Managing transfer offers
     listTransferOffers,
     listTransferOffersV2,
 
     transfer,
     acceptTransferOffer,
+    rejectTransferOffer,
+    withdrawTransferOffer,
 
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
@@ -181,11 +185,7 @@ checkBalance p instrumentId balance =
 
 checkAccountBalance : Party -> V2.Account -> V2.InstrumentId -> Decimal -> Script ()
 checkAccountBalance actor account instrumentId balance = do
-  holdings <- listVisibleHoldings actor
-  let totalAmount = sum $ do
-        (_, holding) <- holdings
-        guard (holding.account == account && holding.instrumentId == instrumentId)
-        pure holding.amount
+  totalAmount <- getAccountBalance actor account instrumentId
   unless (totalAmount == balance) $ fail $ T.unlines
     [ "Unexpected account balance:"
     , "Account: " <> show account
@@ -194,6 +194,13 @@ checkAccountBalance actor account instrumentId balance = do
     , "Actual balance: " <> show totalAmount
     ]
 
+getAccountBalance : Party -> V2.Account -> V2.InstrumentId -> Script Decimal
+getAccountBalance actor account instrumentId = do
+  holdings <- listVisibleHoldings actor
+  return . sum $ do
+    (_, holding) <- holdings
+    guard (holding.account == account && holding.instrumentId == instrumentId)
+    pure holding.amount
 
 -- Transfer offers
 ------------------
@@ -234,6 +241,40 @@ acceptTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.Tran
 acceptTransferOffer registries actor instrCid = do
   batch <- mkTransferInstruction_AcceptV2 registries actor instrCid
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch actor batch
+
+-- TODO: Switch to batching
+rejectTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
+rejectTransferOffer registries actor instrCid = do
+  Some instrView <- queryInterfaceContractId @V2.TransferInstruction actor instrCid
+  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.transfer.instrumentId.admin)
+  context <- V2.getTransferInstruction_RejectContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.TransferInstruction_Reject with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.TransferInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
+
+-- TODO: Switch to batching
+withdrawTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
+withdrawTransferOffer registries actor instrCid = do
+  Some instrView <- queryInterfaceContractId @V2.TransferInstruction actor instrCid
+  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.transfer.instrumentId.admin)
+  context <- V2.getTransferInstruction_WithdrawContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.TransferInstruction_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.TransferInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
 
 extractPendingTransferInstructionV2 : BatchingUtilityV2.TokenStandardActionResult -> Optional (ContractId V2.TransferInstruction)
 extractPendingTransferInstructionV2 (BatchingUtilityV2.TSAR_TransferInstructionResultV2 result) =
