@@ -59,6 +59,7 @@ message Enums {
     TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING = 18;
     TOPOLOGY_MAPPING_CODE_LSU_ANNOUNCEMENT = 19;
     TOPOLOGY_MAPPING_CODE_SEQUENCER_CONNECTION_SUCCESSOR = 20;
+    TOPOLOGY_MAPPING_CODE_TEMPLATE_BOUND_PARTY = 21;
   }
 
   enum ParticipantFeatureFlag {
@@ -398,6 +399,20 @@ message LsuSequencerConnectionSuccessor {
   }
 }
 
+// A template-bound party constrained to act only through whitelisted templates.
+// Two modes:
+//   - Trustless (key destroyed): auto-confirmation only, no human authority.
+//   - Regulated (key retained): operator can sign/freeze, but can't drain.
+//
+// UNIQUE(party)
+message TemplateBoundParty {
+  string party = 1;
+  repeated string hosting_participant_uids = 2;
+  repeated string allowed_template_ids = 3;
+  bytes signing_key_hash = 4;
+  bool key_destruction_allowed = 5;
+}
+
 // [docs-entry-start: topology mapping]
 message TopologyMapping {
   oneof mapping {
@@ -423,6 +438,8 @@ message TopologyMapping {
 
     LsuAnnouncement synchronizer_upgrade_announcement = 17;
     LsuSequencerConnectionSuccessor sequencer_connection_successor = 18;
+
+    TemplateBoundParty template_bound_party = 19;
   }
   reserved 2; // was identifier_delegation
   reserved 10; // was authority_of

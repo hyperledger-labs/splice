@@ -123,6 +123,7 @@ class TransactionProcessor(
         futureSupervisor,
         ephemeral.ledgerApiIndexer.onlyForTestingTransactionInMemoryStore,
         participantNodeParameters,
+        new validation.TemplateBoundAutoConfirmer(loggerFactory),
       ),
       inFlightSubmissionSynchronizerTracker,
       ephemeral,
