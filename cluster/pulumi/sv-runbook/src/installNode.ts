@@ -120,7 +120,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installSvLoopback(xns);
+  const loopback = installSvLoopback(xns, decentralizedSynchronizerMigrationConfig.usesCometbft());
 
   const imagePullDeps = imagePullSecret(xns);
 

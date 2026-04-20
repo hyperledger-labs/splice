@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.automation.{Trigger, UpdateIngestionServi
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition.sv1Backend
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictIngestionService
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   UpdateExternalPartyConfigStateTrigger,
@@ -51,14 +52,25 @@ trait TriggerTestUtil { self: BaseTest =>
     }
   }
 
-  def pauseScanIngestionWithin[T](scan: ScanAppBackendReference)(codeBlock: => T): T = {
+  def pauseScanUpdateIngestionWithin[T](scan: ScanAppBackendReference)(codeBlock: => T): T = {
     try {
-      logger.info(s"Pausing ingestion for ${scan.name}")
+      logger.info(s"Pausing update ingestion for ${scan.name}")
       scan.automation.services[UpdateIngestionService].foreach(_.pause().futureValue)
       codeBlock
     } finally {
-      logger.info(s"Resuming ingestion for ${scan.name}")
+      logger.info(s"Resuming update ingestion for ${scan.name}")
       scan.automation.services[UpdateIngestionService].foreach(_.resume())
+    }
+  }
+
+  def pauseScanVerdictIngestionWithin[T](scan: ScanAppBackendReference)(codeBlock: => T): T = {
+    try {
+      logger.info(s"Pausing verdict ingestion for ${scan.name}")
+      scan.automation.services[ScanVerdictIngestionService].foreach(_.pause().futureValue)
+      codeBlock
+    } finally {
+      logger.info(s"Resuming verdict ingestion for ${scan.name}")
+      scan.automation.services[ScanVerdictIngestionService].foreach(_.resume())
     }
   }
 }

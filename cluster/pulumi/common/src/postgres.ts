@@ -5,6 +5,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import * as _ from 'lodash';
 import { Resource } from '@pulumi/pulumi';
+import { th } from 'zod/v4/locales';
 
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
@@ -41,6 +42,11 @@ export function generatePassword(
   );
 }
 
+export interface PostgresUser {
+  readonly userName: string;
+  readonly secretName: pulumi.Output<string>;
+}
+
 export interface Postgres extends pulumi.Resource {
   readonly instanceName: string;
   readonly namespace: ExactNamespace;
@@ -48,6 +54,10 @@ export interface Postgres extends pulumi.Resource {
   readonly address: pulumi.Output<string>;
   readonly secretName: pulumi.Output<string>;
   readonly databaseId?: pulumi.Output<string>;
+
+  readonly userName: string;
+
+  addUser(userName: string): PostgresUser;
 }
 
 export class CloudPostgres
@@ -61,27 +71,35 @@ export class CloudPostgres
   namespace!: ExactNamespace;
   secretName!: pulumi.Output<string>;
   user!: gcp.sql.User;
+  userName!: string;
   zone!: string;
 
+  private name!: string;
+  private args!: CloudPostgresResolvedArgs;
+  private deletionProtection!: boolean;
+
   protected async initialize(
-    {
-      active = true,
-      alias,
-      cloudSqlConfig,
-      disableProtection = false,
-      existingInstanceName,
-      existingSecretName,
-      instanceName,
-      logicalDecoding = false,
-      migrationId,
-      namespace,
-      secretName,
-      yieldManagement = false,
-    }: CloudPostgresArgs,
+    args: CloudPostgresResolvedArgs,
     opts: pulumi.ComponentResourceOptions | undefined,
     name: string
   ): Promise<CloudPostgresOutput> {
-    const deletionProtection = disableProtection ? false : cloudSqlConfig.protected;
+    this.name = name;
+    this.args = args;
+    const {
+      active,
+      alias,
+      cloudSqlConfig,
+      deletionProtection,
+      existingInstanceName,
+      existingSecretName,
+      instanceName,
+      logicalDecoding,
+      migrationId,
+      namespace,
+      secretName,
+      defaultUserName,
+      yieldManagement = false,
+    } = args;
     const zoneFromEnv = config.optionalEnv('DB_CLOUDSDK_COMPUTE_ZONE') || GCP_ZONE;
     if (!zoneFromEnv) {
       throw new Error(
@@ -187,52 +205,16 @@ export class CloudPostgres
       }
     );
 
-    const password = generatePassword(`${name}-passwd`, {
-      parent: this,
-      protect: !yieldManagement && deletionProtection,
-      aliases: [{ name: `${namespace.logicalName}-${alias}-passwd` }],
-    }).result;
-    const passwordSecret = installPostgresPasswordSecret(
-      namespace,
-      password,
-      secretName,
-      existingSecretName,
-      yieldManagement
-    );
-
-    const userImportOpts =
-      existingInstanceName !== undefined
-        ? {
-            import: `${GcpProject}/${existingInstanceName}/cnadmin`,
-            ignoreChanges: ['password'],
-          }
-        : {};
-
-    const user = new gcp.sql.User(
-      `user-${name}`,
-      {
-        instance: databaseInstance.name,
-        name: 'cnadmin',
-        password: password,
-      },
-      {
-        parent: this,
-        deletedWith: databaseInstance,
-        dependsOn: [passwordSecret],
-        protect: !yieldManagement && deletionProtection,
-        retainOnDelete: yieldManagement,
-        aliases: [{ name: `user-${namespace.logicalName}-${alias}` }],
-        ...userImportOpts,
-      }
-    );
+    const defaultUser = this.addInternalUser(defaultUserName, databaseInstance);
 
     this.address = databaseInstance.privateIpAddress;
     this.databaseId = databaseInstance.name;
     this.databaseInstance = databaseInstance;
     this.instanceName = instanceName;
     this.namespace = namespace;
-    this.secretName = passwordSecret.metadata.name;
-    this.user = user;
+    this.secretName = defaultUser.secretName;
+    this.user = defaultUser.sqlUser;
+    this.userName = defaultUser.userName;
     this.zone = zone;
 
     return {
@@ -242,12 +224,99 @@ export class CloudPostgres
     };
   }
 
+  addUser(userName: string): PostgresUser {
+    return this.addInternalUser(userName, this.databaseInstance);
+  }
+
+  private addInternalUser(
+    userName: string,
+    databaseInstance: gcp.sql.DatabaseInstance
+  ): PostgresUser & { sqlUser: gcp.sql.User } {
+    const {
+      alias,
+      defaultUserName,
+      deletionProtection,
+      existingInstanceName,
+      existingSecretName,
+      instanceName,
+      namespace,
+      secretName,
+      yieldManagement,
+    } = this.args;
+    const isDefaultUser = userName === defaultUserName;
+    const resourceName = `${namespace.logicalName}-${instanceName}-${userName}`;
+    const password = generatePassword(`${resourceName}-passwd`, {
+      parent: this,
+      protect: !yieldManagement && this.deletionProtection,
+      //   aliases: [{ name: `${namespace.logicalName}-${alias}-passwd` }],
+      aliases: isDefaultUser
+        ? [{ name: `${this.name}-passwd` }, { name: `${namespace.logicalName}-${alias}-passwd` }]
+        : undefined,
+    }).result;
+    const k8sSecretName = isDefaultUser ? secretName : `pg-${instanceName}-${userName}-secrets`;
+    const passwordSecret = installPostgresPasswordSecret(
+      namespace,
+      password,
+      k8sSecretName,
+      existingSecretName,
+      yieldManagement
+    );
+
+    const defaultUserOpts = isDefaultUser
+      ? {
+          aliases: [
+            { name: `user-${this.name}` },
+            { name: `user-${namespace.logicalName}-${alias}` },
+          ],
+        }
+      : {};
+    const userImportOpts =
+      existingInstanceName !== undefined && isDefaultUser
+        ? {
+            import: `${GcpProject}/${existingInstanceName}/${userName}`,
+            ignoreChanges: ['password'],
+          }
+        : {};
+
+    const sqlUser = new gcp.sql.User(
+      `user-${resourceName}`,
+      {
+        instance: databaseInstance.name,
+        name: userName,
+        password: password,
+      },
+      {
+        parent: this,
+        deletedWith: databaseInstance,
+        dependsOn: [passwordSecret],
+        protect: !yieldManagement && deletionProtection,
+        retainOnDelete: yieldManagement,
+        ...defaultUserOpts,
+        ...userImportOpts,
+      }
+    );
+
+    return {
+      userName,
+      secretName: passwordSecret.metadata.name,
+      sqlUser,
+    };
+  }
+
   private constructor(
     name: string,
     args: CloudPostgresArgs,
     opts?: pulumi.ComponentResourceOptions
   ) {
-    super('canton:cloud:postgres', name, args, opts);
+    const resolvedArgs: CloudPostgresResolvedArgs = {
+      ...args,
+      active: args.active ?? true,
+      deletionProtection: (args.disableProtection ?? false) ? false : args.cloudSqlConfig.protected,
+      logicalDecoding: args.logicalDecoding ?? false,
+      defaultUserName: args.userName ?? 'cnadmin',
+      yieldManagement: args.yieldManagement ?? false,
+    };
+    super('canton:cloud:postgres', name, resolvedArgs, opts);
   }
 
   static async install(
@@ -261,7 +330,7 @@ export class CloudPostgres
   }
 }
 
-type CloudPostgresArgs = {
+export type CloudPostgresArgs = {
   active?: boolean;
   alias: string;
   cloudSqlConfig: CloudSqlConfig;
@@ -273,7 +342,24 @@ type CloudPostgresArgs = {
   migrationId?: number;
   namespace: ExactNamespace;
   secretName: string;
+  userName?: string;
   yieldManagement?: boolean;
+};
+
+type CloudPostgresResolvedArgs = {
+  active: boolean;
+  alias: string;
+  cloudSqlConfig: CloudSqlConfig;
+  deletionProtection: boolean;
+  existingInstanceName?: string;
+  existingSecretName?: string;
+  instanceName: string;
+  logicalDecoding?: boolean;
+  migrationId?: number;
+  namespace: ExactNamespace;
+  secretName: string;
+  defaultUserName: string;
+  yieldManagement: boolean;
 };
 
 type CloudPostgresOutput = {
@@ -288,6 +374,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
   address: pulumi.Output<string>;
   pg: Resource;
   secretName: pulumi.Output<string>;
+  userName: string;
 
   constructor(
     xns: ExactNamespace,
@@ -309,6 +396,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
 
     this.instanceName = instanceName;
     this.namespace = xns;
+    this.userName = 'cnadmin';
     this.address = pulumi.output(
       `${this.instanceName}.${this.namespace.logicalName}.svc.cluster.local`
     );
@@ -384,6 +472,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       secretName: this.secretName,
     });
   }
+
+  addUser(_userName: string): PostgresUser {
+    return {
+      userName: 'cnadmin',
+      secretName: this.secretName,
+    };
+  }
 }
 
 // toplevel
@@ -400,13 +495,13 @@ export async function installPostgres(
     migrationId?: number;
     disableProtection?: boolean;
     logicalDecoding?: boolean;
+    userName?: string;
     existingInstanceName?: string;
     existingSecretName?: string;
     yieldManagement?: boolean;
   } = {}
 ): Promise<Postgres> {
   const o = { isActive: true, ...opts };
-  let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
   return cloudSqlConfig.enabled
     ? await CloudPostgres.install(
@@ -423,6 +518,7 @@ export async function installPostgres(
           migrationId: o.migrationId,
           namespace: xns,
           secretName,
+          userName: o.userName,
           yieldManagement: o.yieldManagement,
         },
         {

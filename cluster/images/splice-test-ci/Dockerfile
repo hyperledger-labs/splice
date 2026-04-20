@@ -3,7 +3,9 @@ FROM --platform=$BUILDPLATFORM ubuntu:24.04@sha256:440dcf6a5640b2ae5c77724e68787
 
 LABEL org.opencontainers.image.base.name="ubuntu:24.04"
 # TODO(#495): consider whether we can move some of the things installed here (and with pip below) into nix
-RUN apt-get update && \
+RUN sed -i 's/archive.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/security.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt-get update && \
     apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip && \
     rm -rf /var/lib/apt/lists/*
 

@@ -631,7 +631,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-participant-pg-passwd",
+    "name": "splitwell-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -655,7 +655,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "splitwell",
         "ns": {
@@ -676,7 +679,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets"
+      "secretName": "participant-pg-secrets",
+      "yieldManagement": false
     },
     "name": "splitwell-participant-pg",
     "provider": "",
@@ -812,7 +816,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-sw-pg-passwd",
+    "name": "splitwell-sw-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -836,7 +840,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sw-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "splitwell",
         "ns": {
@@ -857,7 +864,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sw-pg-secrets"
+      "secretName": "sw-pg-secrets",
+      "yieldManagement": false
     },
     "name": "splitwell-sw-pg",
     "provider": "",
@@ -921,7 +929,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-validator-pg-passwd",
+    "name": "splitwell-validator-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -945,7 +953,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "validator-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "splitwell",
         "ns": {
@@ -966,7 +977,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "validator-pg-secrets"
+      "secretName": "validator-pg-secrets",
+      "yieldManagement": false
     },
     "name": "splitwell-validator-pg",
     "provider": "",
@@ -1202,7 +1214,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-participant-pg",
+    "name": "user-splitwell-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1216,7 +1228,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-sw-pg",
+    "name": "user-splitwell-sw-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1230,7 +1242,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-validator-pg",
+    "name": "user-splitwell-validator-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

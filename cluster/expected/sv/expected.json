@@ -256,7 +256,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-pg-passwd",
+    "name": "sv-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -264,6 +264,7 @@
     "custom": false,
     "id": "",
     "inputs": {
+      "active": true,
       "alias": "participant-pg",
       "cloudSqlConfig": {
         "enabled": true,
@@ -279,8 +280,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "disableProtection": false,
       "instanceName": "participant-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "sv-1",
         "ns": {
@@ -301,7 +305,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets"
+      "secretName": "participant-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-participant-pg",
     "provider": "",
@@ -535,7 +540,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-pg-passwd",
+    "name": "sv-da-1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -543,6 +548,7 @@
     "custom": false,
     "id": "",
     "inputs": {
+      "active": true,
       "alias": "participant-pg",
       "cloudSqlConfig": {
         "enabled": true,
@@ -558,8 +564,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "disableProtection": false,
       "instanceName": "participant-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "sv-da-1",
         "ns": {
@@ -580,7 +589,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets"
+      "secretName": "participant-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-participant-pg",
     "provider": "",
@@ -851,7 +861,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-pg-passwd",
+    "name": "sv-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -859,6 +869,7 @@
     "custom": false,
     "id": "",
     "inputs": {
+      "active": true,
       "alias": "participant-pg",
       "cloudSqlConfig": {
         "enabled": true,
@@ -874,8 +885,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "participant-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "sv",
         "ns": {
@@ -896,7 +910,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets"
+      "secretName": "participant-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1167,7 +1182,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-pg",
+    "name": "user-sv-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1181,7 +1196,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-pg",
+    "name": "user-sv-da-1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1195,7 +1210,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-pg",
+    "name": "user-sv-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

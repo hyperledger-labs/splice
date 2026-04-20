@@ -36,12 +36,24 @@ export class DecentralizedSynchronizerMigrationConfig {
     if (this.lsuEnabled && this.frozenMigrationId == undefined) {
       throw new Error('frozen migration must be defined when LSU is enabled');
     }
+    if (
+      (this.legacy?.sequencer.enableBftSequencer ||
+        this.active.sequencer.enableBftSequencer ||
+        this.upgrade?.sequencer.enableBftSequencer) &&
+      !this.lsuEnabled
+    ) {
+      throw new Error('LSU must be enabled when using DABFT');
+    }
   }
 
   runningMigrations(): MigrationInfo[] {
     return [this.active]
       .concat(this.legacy ? [this.legacy] : [])
       .concat(this.upgrade ? [this.upgrade] : []);
+  }
+
+  usesCometbft(): boolean {
+    return !this.runningMigrations().every(x => x.sequencer.enableBftSequencer);
   }
 
   isStillRunning(id: DomainMigrationIndex): boolean {

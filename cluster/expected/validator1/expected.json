@@ -418,7 +418,7 @@
         "value": null
       }
     },
-    "name": "user-validator1-participant-pg",
+    "name": "user-validator1-participant-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -432,7 +432,7 @@
         "value": null
       }
     },
-    "name": "user-validator1-validator-pg",
+    "name": "user-validator1-validator-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -695,7 +695,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-participant-pg-passwd",
+    "name": "validator1-participant-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -719,7 +719,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "validator1",
         "ns": {
@@ -740,7 +743,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets"
+      "secretName": "participant-pg-secrets",
+      "yieldManagement": false
     },
     "name": "validator1-participant-pg",
     "provider": "",
@@ -871,7 +875,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-validator-pg-passwd",
+    "name": "validator1-validator-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -895,7 +899,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "validator-pg",
+      "logicalDecoding": false,
       "namespace": {
         "logicalName": "validator1",
         "ns": {
@@ -916,7 +923,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "validator-pg-secrets"
+      "secretName": "validator-pg-secrets",
+      "yieldManagement": false
     },
     "name": "validator1-validator-pg",
     "provider": "",

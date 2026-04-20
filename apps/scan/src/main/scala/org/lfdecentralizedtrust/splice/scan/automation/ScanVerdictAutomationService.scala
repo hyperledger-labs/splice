@@ -3,34 +3,32 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.SynchronizerId
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
-import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  TriggerClass,
-  aTrigger,
-}
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
+import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.TriggerClass
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
+import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
-import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
-import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
-import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 class ScanVerdictAutomationService(
     config: ScanAppBackendConfig,
+    synchronizerNodes: LocalSynchronizerNodes[ScanSynchronizerNode],
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -39,7 +37,6 @@ class ScanVerdictAutomationService(
     migrationId: Long,
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
-    sequencerTrafficClientO: Option[SequencerTrafficClient],
     rewardsReferenceStoreO: Option[ScanRewardsReferenceStore],
 )(implicit
     ec: ExecutionContextExecutor,
@@ -61,22 +58,24 @@ class ScanVerdictAutomationService(
       new AppActivityComputation(store, loggerFactory)
     }
 
-  registerTrigger(
-    new ScanVerdictStoreIngestion(
-      triggerContext,
-      config,
-      grpcClientMetrics,
-      store,
-      migrationId,
-      synchronizerId,
-      ingestionMetrics,
-      sequencerTrafficClientO,
-      appActivityComputationO,
+  registerService(
+    new ScanVerdictIngestionService(
+      config = config,
+      synchronizerNodes = synchronizerNodes,
+      grpcClientMetrics = grpcClientMetrics,
+      store = store,
+      migrationId = migrationId,
+      synchronizerId = synchronizerId,
+      ingestionMetrics = ingestionMetrics,
+      appActivityComputationO = appActivityComputationO,
+      backoffClock = triggerContext.pollingClock,
+      retryProvider = triggerContext.retryProvider,
+      loggerFactory = triggerContext.loggerFactory,
     )
   )
 }
 
 object ScanVerdictAutomationService extends AutomationServiceCompanion {
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
-    Seq(aTrigger[ScanVerdictStoreIngestion])
+    Seq.empty
 }

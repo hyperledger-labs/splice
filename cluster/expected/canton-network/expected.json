@@ -1387,6 +1387,10 @@
           "name": "open-and-issuing-mining-rounds",
           "type": "unlimited"
         },
+        "/api/scan/v0/reward-accounting-process": {
+          "name": "reward-accounting-process",
+          "type": "unlimited"
+        },
         "/api/scan/v0/rewards-collected": {
           "name": "rewards-collected",
           "type": "banned"
@@ -1650,6 +1654,10 @@
           "name": "open-and-issuing-mining-rounds",
           "type": "unlimited"
         },
+        "/api/scan/v0/reward-accounting-process": {
+          "name": "reward-accounting-process",
+          "type": "unlimited"
+        },
         "/api/scan/v0/rewards-collected": {
           "name": "rewards-collected",
           "type": "banned"
@@ -1784,7 +1792,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-cn-apps-pg-passwd",
+    "name": "sv-1-cn-apps-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1808,6 +1816,8 @@
         "protected": true,
         "tier": "apps-pg-override-tier-sv-1"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "cn-apps-pg",
       "logicalDecoding": false,
       "namespace": {
@@ -1830,7 +1840,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "cn-apps-pg-secrets"
+      "secretName": "cn-apps-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-cn-apps-pg",
     "provider": "",
@@ -2800,7 +2811,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-cn-apps-pg-passwd",
+    "name": "sv-da-1-cn-apps-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2824,6 +2835,8 @@
         "protected": true,
         "tier": "apps-pg-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "cn-apps-pg",
       "logicalDecoding": false,
       "namespace": {
@@ -2846,7 +2859,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "cn-apps-pg-secrets"
+      "secretName": "cn-apps-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-cn-apps-pg",
     "provider": "",
@@ -3791,7 +3805,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-cn-apps-pg",
+    "name": "user-sv-1-cn-apps-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -3805,7 +3819,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-cn-apps-pg",
+    "name": "user-sv-da-1-cn-apps-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

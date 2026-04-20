@@ -1651,6 +1651,9 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_4_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -1692,7 +1695,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-1-pg-passwd",
+    "name": "sv-1-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1716,7 +1719,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-1",
@@ -1738,7 +1744,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets"
+      "secretName": "mediator-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-mediator-1-pg",
     "provider": "",
@@ -1803,7 +1810,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-2-pg-passwd",
+    "name": "sv-1-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1827,7 +1834,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-1",
@@ -1849,7 +1859,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets"
+      "secretName": "mediator-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-mediator-2-pg",
     "provider": "",
@@ -1914,7 +1925,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-3-pg-passwd",
+    "name": "sv-1-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1938,7 +1949,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-1",
@@ -1960,7 +1974,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets"
+      "secretName": "mediator-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-mediator-3-pg",
     "provider": "",
@@ -2025,7 +2040,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-4-pg-passwd",
+    "name": "sv-1-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2049,7 +2064,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv-1",
@@ -2071,7 +2089,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets"
+      "secretName": "mediator-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-mediator-4-pg",
     "provider": "",
@@ -2136,7 +2155,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-1-pg-passwd",
+    "name": "sv-1-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2160,7 +2179,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-1",
@@ -2248,7 +2270,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-2-pg-passwd",
+    "name": "sv-1-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2272,7 +2294,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-1",
@@ -2360,7 +2385,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-participant-3-pg-passwd",
+    "name": "sv-1-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2384,7 +2409,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-1",
@@ -2576,7 +2604,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-1-pg-passwd",
+    "name": "sv-1-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2600,7 +2628,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-1",
@@ -2622,7 +2653,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets"
+      "secretName": "sequencer-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-sequencer-1-pg",
     "provider": "",
@@ -2687,7 +2719,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-2-pg-passwd",
+    "name": "sv-1-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2711,7 +2743,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-1",
@@ -2733,7 +2768,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets"
+      "secretName": "sequencer-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-sequencer-2-pg",
     "provider": "",
@@ -2798,7 +2834,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-3-pg-passwd",
+    "name": "sv-1-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2822,7 +2858,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-1",
@@ -2844,7 +2883,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets"
+      "secretName": "sequencer-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-sequencer-3-pg",
     "provider": "",
@@ -2909,7 +2949,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-4-pg-passwd",
+    "name": "sv-1-sequencer-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2933,7 +2973,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv-1",
@@ -2955,7 +2998,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets"
+      "secretName": "sequencer-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-1-sequencer-4-pg",
     "provider": "",
@@ -3988,6 +4032,9 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_4_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -4029,7 +4076,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-1-pg-passwd",
+    "name": "sv-da-1-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4053,7 +4100,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4075,7 +4125,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets"
+      "secretName": "mediator-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-mediator-1-pg",
     "provider": "",
@@ -4140,7 +4191,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-2-pg-passwd",
+    "name": "sv-da-1-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4164,7 +4215,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4186,7 +4240,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets"
+      "secretName": "mediator-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-mediator-2-pg",
     "provider": "",
@@ -4251,7 +4306,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-3-pg-passwd",
+    "name": "sv-da-1-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4275,7 +4330,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4297,7 +4355,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets"
+      "secretName": "mediator-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-mediator-3-pg",
     "provider": "",
@@ -4362,7 +4421,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-mediator-4-pg-passwd",
+    "name": "sv-da-1-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4386,7 +4445,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "mediator-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4408,7 +4470,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets"
+      "secretName": "mediator-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-mediator-4-pg",
     "provider": "",
@@ -4473,7 +4536,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-1-pg-passwd",
+    "name": "sv-da-1-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4497,7 +4560,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4585,7 +4651,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-2-pg-passwd",
+    "name": "sv-da-1-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4609,7 +4675,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4697,7 +4766,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-participant-3-pg-passwd",
+    "name": "sv-da-1-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4721,7 +4790,10 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "participant-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4938,7 +5010,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-1-pg-passwd",
+    "name": "sv-da-1-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4962,7 +5034,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -4984,7 +5059,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets"
+      "secretName": "sequencer-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-sequencer-1-pg",
     "provider": "",
@@ -5049,7 +5125,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-2-pg-passwd",
+    "name": "sv-da-1-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5073,7 +5149,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -5095,7 +5174,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets"
+      "secretName": "sequencer-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-sequencer-2-pg",
     "provider": "",
@@ -5160,7 +5240,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-3-pg-passwd",
+    "name": "sv-da-1-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5184,7 +5264,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -5206,7 +5289,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets"
+      "secretName": "sequencer-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-sequencer-3-pg",
     "provider": "",
@@ -5271,7 +5355,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-da-1-sequencer-4-pg-passwd",
+    "name": "sv-da-1-sequencer-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -5295,7 +5379,10 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
       "instanceName": "sequencer-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv-da-1",
@@ -5317,7 +5404,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets"
+      "secretName": "sequencer-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-da-1-sequencer-4-pg",
     "provider": "",
@@ -5961,6 +6049,9 @@
           "driver": {
             "externalAddress": "sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com",
             "externalPort": 443,
+            "persistence": {
+              "databaseName": "sequencer_4_dabft"
+            },
             "type": "cantonbft"
           },
           "persistence": {
@@ -6002,7 +6093,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-1-pg-passwd",
+    "name": "sv-mediator-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6026,8 +6117,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "mediator-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv",
@@ -6049,7 +6143,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets"
+      "secretName": "mediator-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-mediator-1-pg",
     "provider": "",
@@ -6114,7 +6209,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-2-pg-passwd",
+    "name": "sv-mediator-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6138,8 +6233,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "mediator-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv",
@@ -6161,7 +6259,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets"
+      "secretName": "mediator-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-mediator-2-pg",
     "provider": "",
@@ -6226,7 +6325,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-3-pg-passwd",
+    "name": "sv-mediator-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6250,8 +6349,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "mediator-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv",
@@ -6273,7 +6375,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets"
+      "secretName": "mediator-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-mediator-3-pg",
     "provider": "",
@@ -6338,7 +6441,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-4-pg-passwd",
+    "name": "sv-mediator-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6362,8 +6465,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "mediator-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv",
@@ -6385,7 +6491,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets"
+      "secretName": "mediator-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-mediator-4-pg",
     "provider": "",
@@ -6450,7 +6557,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-1-pg-passwd",
+    "name": "sv-participant-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6474,8 +6581,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "participant-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv",
@@ -6563,7 +6673,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-2-pg-passwd",
+    "name": "sv-participant-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6587,8 +6697,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "participant-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv",
@@ -6676,7 +6789,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-3-pg-passwd",
+    "name": "sv-participant-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6700,8 +6813,11 @@
         "protected": true,
         "tier": "db-custom-2-7680"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "participant-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv",
@@ -6893,7 +7009,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-1-pg-passwd",
+    "name": "sv-sequencer-1-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6917,8 +7033,11 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "sequencer-1-pg",
+      "logicalDecoding": false,
       "migrationId": 1,
       "namespace": {
         "logicalName": "sv",
@@ -6940,7 +7059,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets"
+      "secretName": "sequencer-1-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-sequencer-1-pg",
     "provider": "",
@@ -7005,7 +7125,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-2-pg-passwd",
+    "name": "sv-sequencer-2-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -7029,8 +7149,11 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "sequencer-2-pg",
+      "logicalDecoding": false,
       "migrationId": 2,
       "namespace": {
         "logicalName": "sv",
@@ -7052,7 +7175,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets"
+      "secretName": "sequencer-2-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-sequencer-2-pg",
     "provider": "",
@@ -7117,7 +7241,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-3-pg-passwd",
+    "name": "sv-sequencer-3-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -7141,8 +7265,11 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "sequencer-3-pg",
+      "logicalDecoding": false,
       "migrationId": 3,
       "namespace": {
         "logicalName": "sv",
@@ -7164,7 +7291,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets"
+      "secretName": "sequencer-3-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-sequencer-3-pg",
     "provider": "",
@@ -7229,7 +7357,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-4-pg-passwd",
+    "name": "sv-sequencer-4-pg-cnadmin-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -7253,8 +7381,11 @@
         "protected": true,
         "tier": "sequencer-override-tier"
       },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": false,
       "disableProtection": true,
       "instanceName": "sequencer-4-pg",
+      "logicalDecoding": false,
       "migrationId": 4,
       "namespace": {
         "logicalName": "sv",
@@ -7276,7 +7407,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets"
+      "secretName": "sequencer-4-pg-secrets",
+      "yieldManagement": false
     },
     "name": "sv-sequencer-4-pg",
     "provider": "",
@@ -7579,7 +7711,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-1-pg",
+    "name": "user-sv-1-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7593,7 +7725,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-2-pg",
+    "name": "user-sv-1-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7607,7 +7739,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-3-pg",
+    "name": "user-sv-1-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7621,7 +7753,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-4-pg",
+    "name": "user-sv-1-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7635,7 +7767,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-1-pg",
+    "name": "user-sv-1-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7649,7 +7781,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-2-pg",
+    "name": "user-sv-1-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7663,7 +7795,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-3-pg",
+    "name": "user-sv-1-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7677,7 +7809,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-1-pg",
+    "name": "user-sv-1-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7691,7 +7823,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-2-pg",
+    "name": "user-sv-1-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7705,7 +7837,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-3-pg",
+    "name": "user-sv-1-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7719,7 +7851,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-4-pg",
+    "name": "user-sv-1-sequencer-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7733,7 +7865,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-1-pg",
+    "name": "user-sv-da-1-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7747,7 +7879,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-2-pg",
+    "name": "user-sv-da-1-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7761,7 +7893,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-3-pg",
+    "name": "user-sv-da-1-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7775,7 +7907,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-mediator-4-pg",
+    "name": "user-sv-da-1-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7789,7 +7921,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-1-pg",
+    "name": "user-sv-da-1-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7803,7 +7935,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-2-pg",
+    "name": "user-sv-da-1-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7817,7 +7949,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-participant-3-pg",
+    "name": "user-sv-da-1-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7831,7 +7963,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-1-pg",
+    "name": "user-sv-da-1-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7845,7 +7977,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-2-pg",
+    "name": "user-sv-da-1-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7859,7 +7991,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-3-pg",
+    "name": "user-sv-da-1-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7873,7 +8005,7 @@
         "value": null
       }
     },
-    "name": "user-sv-da-1-sequencer-4-pg",
+    "name": "user-sv-da-1-sequencer-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7887,7 +8019,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-1-pg",
+    "name": "user-sv-mediator-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7901,7 +8033,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-2-pg",
+    "name": "user-sv-mediator-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7915,7 +8047,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-3-pg",
+    "name": "user-sv-mediator-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7929,7 +8061,7 @@
         "value": null
       }
     },
-    "name": "user-sv-mediator-4-pg",
+    "name": "user-sv-mediator-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7943,7 +8075,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-1-pg",
+    "name": "user-sv-participant-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7957,7 +8089,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-2-pg",
+    "name": "user-sv-participant-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7971,7 +8103,7 @@
         "value": null
       }
     },
-    "name": "user-sv-participant-3-pg",
+    "name": "user-sv-participant-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7985,7 +8117,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-1-pg",
+    "name": "user-sv-sequencer-1-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -7999,7 +8131,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-2-pg",
+    "name": "user-sv-sequencer-2-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -8013,7 +8145,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-3-pg",
+    "name": "user-sv-sequencer-3-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -8027,7 +8159,7 @@
         "value": null
       }
     },
-    "name": "user-sv-sequencer-4-pg",
+    "name": "user-sv-sequencer-4-pg-cnadmin",
     "provider": "",
     "type": "gcp:sql/user:User"
   }

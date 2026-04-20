@@ -115,4 +115,26 @@ object PartyManagementServiceError extends PartyManagementServiceErrorGroup {
         with PartyManagementServiceError
   }
 
+  @Explanation(
+    "The requested timestamp is in the future relative to the fully processed synchronizer index."
+  )
+  @Resolution(
+    "Wait for the indexer to process events up to the requested timestamp, or set the 'force' flag to true to retrieve the highest available offset."
+  )
+  object UnprocessedRequestedTimestamp
+      extends ErrorCode(
+        id = "UNPROCESSED_REQUESTED_TIMESTAMP",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(
+        synchronizerId: SynchronizerId,
+        requestedTimestamp: CantonTimestamp,
+        cleanSynchronizerTimestamp: CantonTimestamp,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"Requested timestamp $requestedTimestamp exceeds the clean synchronizer timestamp $cleanSynchronizerTimestamp."
+        )
+        with PartyManagementServiceError
+  }
 }
