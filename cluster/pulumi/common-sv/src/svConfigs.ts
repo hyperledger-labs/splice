@@ -20,8 +20,6 @@ import {
   svRunbookConfigBasic,
 } from './svConfigsBasic';
 
-const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
-
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
   ? [svCometBftKeysFromSecret('sv1-cometbft-keys')]
   : [
@@ -71,9 +69,6 @@ const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): Static
     },
     svIdKeySecretName: config.svApp?.svIdKeyGcpSecret,
     cometBftGovernanceKeySecretName: config.svApp?.cometBftGovernanceKeyGcpSecret,
-    ...(config.scanApp?.bigQuery
-      ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } }
-      : {}),
   };
 };
 
@@ -94,10 +89,7 @@ export const standardSvConfigs: StaticSvConfig[] = (
               privateKey: svCometBftSecrets[0].validatorPrivateKey,
               publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
             },
-          },
-          ...(sv1ScanBigQuery
-            ? { scanBigQuery: { dataset: 'mainnet_da2_scan', prefix: 'da2' } }
-            : {}),
+        },
         },
       ]
     : [
@@ -116,10 +108,7 @@ export const standardSvConfigs: StaticSvConfig[] = (
               privateKey: svCometBftSecrets[0].validatorPrivateKey,
               publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
             },
-          },
-          ...(sv1ScanBigQuery
-            ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } }
-            : {}),
+        },
         },
         {
           auth0ValidatorAppName: 'sv2_validator',
