@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.scan.metrics.RewardComputationMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.RewardComputationInputs
-import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore, ScanRewardsReferenceStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -29,11 +29,11 @@ import scala.concurrent.{ExecutionContext, Future}
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
-  * TODO(#4383): use ScanRewardsReferenceStore for synchronization
   */
 class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
     appActivityStore: AppActivityStore,
+    private val rewardsReferenceStore: ScanRewardsReferenceStore,
     updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit
