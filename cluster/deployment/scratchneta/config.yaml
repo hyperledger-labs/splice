@@ -1,15 +1,1 @@
-!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
-pulumiProjectConfig:
-  default:
-    cloudSql:
-      enabled: true
-svs:
-  default:
-    participant:
-      cloudSql:
-        enabled: true
-  sv-1:
-    scanApp:
-      bigQuery:
-        dataset: scratchneta_da2_scan
-        prefix: da2
+!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml) {}
