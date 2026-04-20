@@ -5,9 +5,7 @@ module Splice.Scripts.TestSynchronizerMigration where
 
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
-import qualified DA.Set as Set
 import Daml.Script
-import DA.Time
 import DA.List
 
 import Splice.AmuletConfig
@@ -75,39 +73,6 @@ testSynchronizerMigration = do
     in  config with
           decentralizedSynchronizer = newDecentralizedSynchronizerConfig
 
-  -- once the SVs are confident about the working of the new synchronizer they announce it to their users
-  -- choosing a 30 day headroom until the active synchronizer switches.
-  now <- getTime
-  executeAddAmuletConfigSchedule app $ \configSchedule ->
-    let config = configSchedule.initialValue
-        decentralizedSynchronizerConfig = config.decentralizedSynchronizer
-        newSynchronizerId = "decentralized-synchronizer-id-1"
-        newDecentralizedSynchronizerConfigAnnounce = decentralizedSynchronizerConfig with
-          requiredSynchronizers = Set.insert newSynchronizerId decentralizedSynchronizerConfig.requiredSynchronizers
-        newDecentralizedSynchronizerConfigSwitched = newDecentralizedSynchronizerConfigAnnounce with
-          activeSynchronizer = newSynchronizerId
-    in  Schedule with
-          initialValue = config
-          futureValues = [
-            (addRelTime now (days 30), config with decentralizedSynchronizer = newDecentralizedSynchronizerConfigSwitched
-            )]
-
-  -- At this point we expect the validator apps to start connecting to the newly announced synchronizer,
-  -- and create synchronizer connectivity proof contracts
-  -- TODO(#4894): create synchronizer connectivity proof contracts
-
-
-  -- Once the SV's are confident enough that the switch is not leaving too many users behind they
-  -- can change the switching date.
-
-
-
-  passTime (days 30)
-
-  -- The new synchronizer becomes active, which implies that:
-  -- 1. The SV apps change the synchronizer topology information to allow transferring all of its contracts.
-  --    (once synchronizers support transfer permissions)
-  -- 2. The stakeholders of Amulet and DSO governance contracts transfer them to the new active synchronizer.
   pure ()
 
 executeDsoRulesConfigChange : AmuletApp -> (DsoRulesConfig -> DsoRulesConfig) -> Script ()
