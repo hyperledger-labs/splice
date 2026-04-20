@@ -44,18 +44,14 @@ that has the *same major and minor version* as the Canton version used in this S
 
 Follow these steps to install a recent, compatible OSS Daml SDK version:
 
-#. Select a release with the same major and minor version as the Canton version used in this Splice release
-   from the `Github releases of the Daml SDK <https://github.com/digital-asset/daml/releases>`__.
-   For example, the `3.3.0-snapshot.20250603.0 <https://github.com/digital-asset/daml/releases/tag/v3.3.0-snapshot.20250603.0>`__ release.
+#. Select the most recent stable 3.4 release
 #. Install that release using
 
    .. code-block:: bash
 
-      curl -sSL https://get.daml.com/ | sh -s 3.3.0-snapshot.20250603.0
-
-   while replacing ``3.3.0-snapshot.20250603.0`` with the version you selected in the first step.
+      curl -sSL https://get.digitalasset.com/ | sh
 
 For more information about installing the Daml SDK, see the
-`Daml assistant installation guide <https://docs.digitalasset.com/build/3.4/component-howtos/smart-contracts/assistant.html#install>`__.
+`DPM installation guide <https://docs.digitalasset.com/build/3.4/dpm/dpm.html?>`__.
 
 
