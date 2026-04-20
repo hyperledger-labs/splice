@@ -36,7 +36,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
     appActivityStore: AppActivityStore,
-    private val rewardsReferenceStore: ScanRewardsReferenceStore,
+    rewardsReferenceStore: ScanRewardsReferenceStore,
     updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit
