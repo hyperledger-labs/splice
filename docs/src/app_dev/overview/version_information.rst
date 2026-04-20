@@ -18,16 +18,6 @@ The following versions of Canton and the Daml SDK were used to build this Splice
    * - Daml SDK version used for Java and TS codegens
      - |daml_sdk_tooling_version|
 
-.. TODO(#472): remove this note once we are using official SDK releases
-
-.. note::
-  The SDK version numbers do not match the
-  `Github releases of the Daml SDK <https://github.com/digital-asset/daml/releases>`__,
-  but instead refer to the artifact versions used inside a Daml SDK release.
-  A potential source of confusion that we expect to resolve in the future,
-  https://github.com/hyperledger-labs/splice/issues/472.
-
-
 
 Installing a Compatible Daml SDK
 --------------------------------
@@ -44,7 +34,7 @@ that has the *same major and minor version* as the Canton version used in this S
 
 Follow these steps to install a recent, compatible OSS Daml SDK version:
 
-#. Select the most recent stable 3.4 release
+#. Select the most recent stable release with the same major and minor version as above.
 #. Install that release using
 
    .. code-block:: bash

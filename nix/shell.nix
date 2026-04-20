@@ -4,7 +4,7 @@ let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
-  damlCompilerSources = builtins.fromJSON (builtins.readFile ./dpm-sdk-sources.json);
+  dpmSdkSources = builtins.fromJSON (builtins.readFile ./dpm-sdk-sources.json);
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
@@ -146,9 +146,8 @@ in pkgs.mkShell {
   CANTON_PARTICIPANT_IMAGE_SHA256 = "${sources.canton_participant_image_sha256}";
   CANTON_SEQUENCER_IMAGE_SHA256 = "${sources.canton_sequencer_image_sha256}";
   CANTON_MEDIATOR_IMAGE_SHA256 = "${sources.canton_mediator_image_sha256}";
-  DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
-  DAML_VERSION = "${damlCompilerSources.version}";
-  SDK_VERSION = "${sources.tooling_sdk_version}";
+  DPM_SDK_VERSION = "${dpmSdkSources.version}";
+  DAML_COMPILER_VERSION = "${dpmSdkSources.version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";
   COMETBFT_DRIVER = if use_enterprise then "${pkgs.cometbft_driver}" else "";

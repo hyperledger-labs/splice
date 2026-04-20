@@ -450,22 +450,12 @@ object DamlPlugin extends AutoPlugin {
     if (damlCodegenUseProject) {
       val damlYaml = readDamlYaml(projectDir / "daml.yaml")
       // We don't have a JSON library easily accessible in SBT code so we opt for the rather hacky option here to drill down fields.
-      val codegenConfig = Try(
-        damlYaml
+      val (codegenDir, packagePrefix, decoderClass) = Try {
+        val codegenConfig = damlYaml
           .get("codegen")
           .asInstanceOf[JMap[String, Object]]
           .get("java")
           .asInstanceOf[JMap[String, Object]]
-      ) match {
-        case Success(config) => config
-        case Failure(e) =>
-          log.error(
-            s"Failed to parse codegen config in daml.yaml file: $damlYaml." +
-              s"Did you forget to specify codegen.java in $projectDir/daml.yaml?"
-          )
-          throw e
-      }
-      val (codegenDir, packagePrefix, decoderClass) = Try {
         val outputDir = codegenConfig
           .get("output-directory")
           .asInstanceOf[String]
@@ -477,11 +467,11 @@ object DamlPlugin extends AutoPlugin {
           .asInstanceOf[String]
         (outputDir, packagePrefix, decoderClass)
       } match {
-        case Success(dir) => dir
+        case Success(configs) => configs
         case Failure(e) =>
           log.error(
             s"Failed to parse codegen config in daml.yaml file: $damlYaml." +
-              s"Missing one of the required fields output-directory, package-prefix or decoderClass in codegen.java config in $projectDir/daml.yaml?"
+              s"Missing codegen.java, or one of the required fields output-directory, package-prefix or decoderClass in codegen.java config in $projectDir/daml.yaml?"
           )
           throw e
       }
