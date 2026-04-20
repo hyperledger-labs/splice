@@ -89,7 +89,7 @@ export const standardSvConfigs: StaticSvConfig[] = (
               privateKey: svCometBftSecrets[0].validatorPrivateKey,
               publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
             },
-        },
+          },
         },
       ]
     : [
@@ -108,7 +108,7 @@ export const standardSvConfigs: StaticSvConfig[] = (
               privateKey: svCometBftSecrets[0].validatorPrivateKey,
               publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
             },
-        },
+          },
         },
         {
           auth0ValidatorAppName: 'sv2_validator',
