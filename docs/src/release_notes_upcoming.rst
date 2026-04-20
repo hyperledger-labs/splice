@@ -74,3 +74,19 @@
         - Wallet app
 
             - ``batchSize`` in ``TreasuryConfig`` is set to 1.
+
+    - Daml
+
+        - The Daml SDK in Splice has been upgraded to 3.4.11. All Daml packages have been recompiled to new Dars, with versions:
+
+            ================== =======
+            name               version
+            ================== =======
+            amulet             0.1.18
+            amuletNameService  0.1.19
+            dsoGovernance      0.1.24
+            validatorLifecycle 0.1.7
+            wallet             0.1.19
+            walletPayments     0.1.18
+            ================== =======
+
