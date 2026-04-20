@@ -150,26 +150,4 @@ object RewardComputationTrigger {
       case _ => None
     }
 
-  // TODO(#4383): Remove this once it is obtained from the appropriate Contract
-  private[scan] val placeholderBatchSize: Int = 100
-
-  // TODO(#4383): Remove this once the values are obtained from the appropriate Contract
-  // These placeholder values are from MainNet DSO config:
-  //
-  // (Round 89782: Checked in RewardComputationInputsTest).
-  private[scan] val placeholderInputs: RewardComputationInputs = {
-    import RewardComputationInputs.{fromBigDecimal as n}
-    val tickDurationMicros: Long = 600L * 1000000L
-    RewardComputationInputs(
-      amuletToIssuePerYear = n(BigDecimal("10000000000")),
-      appRewardPercentage = n(BigDecimal("0.62")),
-      featuredAppRewardCap = n(BigDecimal("1.5")),
-      unfeaturedAppRewardCap = n(BigDecimal("0.6")),
-      developmentFundPercentage = n(BigDecimal("0.05")),
-      tickDurationMicros = tickDurationMicros,
-      amuletPrice = n(BigDecimal("0.14877")),
-      trafficPrice = n(BigDecimal("60")),
-      appRewardCouponThreshold = n(BigDecimal("0.5")),
-    )
-  }
 }

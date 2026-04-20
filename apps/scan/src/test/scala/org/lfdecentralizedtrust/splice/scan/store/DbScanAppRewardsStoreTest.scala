@@ -5,7 +5,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTrigger
 import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
@@ -529,7 +528,7 @@ class DbScanAppRewardsStoreTest
         summary <- store.computeAndStoreRewards(
           roundNumber,
           batchSize = 100,
-          RewardComputationTrigger.placeholderInputs,
+          testInputs,
         )
       } yield {
         summary.activePartiesCount shouldBe 2L
@@ -546,7 +545,7 @@ class DbScanAppRewardsStoreTest
         summary <- store.computeAndStoreRewards(
           roundNumber,
           batchSize = 100,
-          RewardComputationTrigger.placeholderInputs,
+          testInputs,
         )
       } yield {
         summary.activePartiesCount shouldBe 0L
