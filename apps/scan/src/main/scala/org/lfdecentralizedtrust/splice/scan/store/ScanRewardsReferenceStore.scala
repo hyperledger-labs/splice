@@ -11,13 +11,14 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -59,6 +60,16 @@ trait ScanRewardsReferenceStore extends AppStore {
   def lookupFeaturedAppPartiesAsOf(
       asOf: CantonTimestamp
   )(implicit tc: TraceContext): Future[Set[String]]
+
+  /** Look up an OpenMiningRound contract by its round number.
+    * Checks both the active ACS table and the archive table,
+    * since the round may have already been closed by the time the trigger runs.
+    */
+  def lookupOpenMiningRoundByNumber(
+      roundNumber: Long
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]]
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     ScanRewardsReferenceStoreRowData,

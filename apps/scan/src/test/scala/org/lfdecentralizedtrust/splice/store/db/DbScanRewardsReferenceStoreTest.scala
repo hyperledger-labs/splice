@@ -180,6 +180,48 @@ class DbScanRewardsReferenceStoreTest
       } yield succeed
     }
 
+    "lookupOpenMiningRoundByNumber returns the correct contract" in {
+      val store = mkStore()
+      val omr3 = openMiningRound(dsoParty, round = 3, amuletPrice = 1.0)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
+      val omr4 = openMiningRound(dsoParty, round = 4, amuletPrice = 1.5)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
+      val omr5 = openMiningRound(dsoParty, round = 5, amuletPrice = 2.0)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
+      for {
+        _ <- initWithAcs()(store.multiDomainAcsStore)
+        _ <- sync1.create(omr3, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+          store.multiDomainAcsStore
+        )
+        _ <- sync1.create(omr4, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+          store.multiDomainAcsStore
+        )
+        _ <- sync1.create(omr5, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.multiDomainAcsStore
+        )
+        // Archive round 3 — it should still be found in the archive table
+        _ <- sync1.archive(omr3, recordTime = CantonTimestamp.ofEpochSecond(350).toInstant)(
+          store.multiDomainAcsStore
+        )
+
+        // Round 3: archived — found via archive table
+        result3 <- store.lookupOpenMiningRoundByNumber(3)
+        _ = result3 shouldBe Some(omr3)
+
+        // Round 4: still active — found via active table
+        result4 <- store.lookupOpenMiningRoundByNumber(4)
+        _ = result4 shouldBe Some(omr4)
+
+        // Round 5: still active
+        result5 <- store.lookupOpenMiningRoundByNumber(5)
+        _ = result5 shouldBe Some(omr5)
+
+        // Round 99: never existed
+        resultMissing <- store.lookupOpenMiningRoundByNumber(99)
+        _ = resultMissing shouldBe None
+      } yield succeed
+    }
+
     "lookupActiveOpenMiningRounds" in {
       val store = mkStore()
       // Timeline (ingestion start = 250, earliest archived_at):

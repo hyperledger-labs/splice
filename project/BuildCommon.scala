@@ -250,8 +250,8 @@ object BuildCommon {
             "splice-util-token-standard-wallet-test-daml/clean",
             "splice-util-batched-markers-daml/clean",
             "splice-util-batched-markers-test-daml/clean",
-            "splice-featured-app-api-v1-daml/clean",
-            "splice-featured-app-api-v2-daml/clean",
+            "splice-api-featured-app-v1-daml/clean",
+            "splice-api-featured-app-v2-daml/clean",
           ).map(";" + _).mkString(""),
         ) ++
         addCommandAlias("splice-clean", "; clean-splice") ++
