@@ -154,6 +154,15 @@ class DbScanRewardsReferenceStore(
       roundNumber: Long
   )(implicit
       tc: TraceContext
+  ): Future[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
+    waitUntilInitialized.flatMap { _ =>
+      lookupOpenMiningRoundByNumberQuery(roundNumber)
+    }
+
+  private def lookupOpenMiningRoundByNumberQuery(
+      roundNumber: Long
+  )(implicit
+      tc: TraceContext
   ): Future[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
     val storeId = multiDomainAcsStore.acsStoreId
     val migrationId = multiDomainAcsStore.domainMigrationId
