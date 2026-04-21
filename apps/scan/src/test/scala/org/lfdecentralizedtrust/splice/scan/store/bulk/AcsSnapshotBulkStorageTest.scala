@@ -141,13 +141,13 @@ class AcsSnapshotBulkStorageTest
           .getChecksums(objectKeys.toSeq)
           .futureValue
           .map(_.checksum) should contain theSameElementsInOrderAs Seq(
-          "ViKwAawccbUGu7VOF9K+w1fwXOJL82x8KtlPR8fE5QQ=",
-          "0JsYpCrjL3Iesxvba4mq6JazsAq3iIAKWPjViQhQDd0=",
-          "uGbENvaUVHMbZ5aVwR0iezkR1tpO0plZPXs79Rg2Kx0=",
-          "ecGsxj9T8BgMPgaguPcKJK9tomTEPuSv216vqvGrtVE=",
-          "CVECMUsWmg4hN0gdI2mOhXPZabJjxYNft/J0e3Yo/JU=",
-          "EGexqBExmi9b6H+kjsD+4aizbR6pBP3qQ6LXmMfiXMY=",
-          "ciCi6myO535U0y+eeZS90agy4QwBueeWGAZnnbr2zvM=",
+          "n6CV6dF9zpleq66YiXmCG96hw1BBakp1I8JjC5lf5n0=",
+          "bJDalSmiVKCk9QSc6sAWdahJNZQqVn51WmkFbQI6wkA=",
+          "noZU+He8HnCM38MujtpEle4NNGwnE7wN8z96V+HTdK0=",
+          "rwak+Y4JcInTiEa2yUKf8rjO3RD7ay/D2hmQG4BAa54=",
+          "YM7SNxHrU3xYyNOjgEqowitAvgsiX1f7tq0pCaD/OhQ=",
+          "Mb3D2ZOVQclMwuYEqLuTKhGqnUHCio6K61FBTXgt5Vs=",
+          "+5iW2M9Vz5y9sCtEWyrS3m+EUqnD50dXRVIMQAMSgBY=",
         )
       }
     }

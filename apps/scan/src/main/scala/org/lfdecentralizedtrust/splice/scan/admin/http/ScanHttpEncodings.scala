@@ -238,7 +238,8 @@ sealed trait ScanHttpEncodings {
              across SVs (and also not useful for users). */
           None
         } else {
-          Some(eventId.split(":")(0))
+          // We strip the `#` prefix if it exists, because it does not consistently exist across SVs.
+          Some(eventId.split(":")(0).stripPrefix("#"))
         },
         createdEvent.getContractId,
         templateIdString(createdEvent.getTemplateId),
