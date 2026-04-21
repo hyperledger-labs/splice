@@ -702,7 +702,50 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "active": true,
+      "alias": "participant-pg",
+      "cloudSqlConfig": {
+        "enabled": true,
+        "enterprisePlus": false,
+        "flags": {
+          "random_page_cost": "1.1",
+          "temp_file_limit": "2147483647"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "protected": true,
+        "tier": "db-custom-2-7680"
+      },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
+      "instanceName": "participant-pg",
+      "logicalDecoding": false,
+      "namespace": {
+        "logicalName": "validator1",
+        "ns": {
+          "__aliases": [],
+          "__name": "validator1",
+          "__providers": {},
+          "__pulumiCustomResource": true,
+          "__pulumiResource": true,
+          "__pulumiType": "kubernetes:core/v1:Namespace",
+          "__transformations": [],
+          "__version": "4.28.0",
+          "apiVersion": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "id": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "kind": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "metadata": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "spec": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "status": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
+        }
+      },
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-pg-secrets"
+    },
     "name": "validator1-participant-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
@@ -839,7 +882,50 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "active": true,
+      "alias": "validator-pg",
+      "cloudSqlConfig": {
+        "enabled": true,
+        "enterprisePlus": false,
+        "flags": {
+          "random_page_cost": "1.1",
+          "temp_file_limit": "2147483647"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "protected": true,
+        "tier": "db-custom-2-7680"
+      },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
+      "instanceName": "validator-pg",
+      "logicalDecoding": false,
+      "namespace": {
+        "logicalName": "validator1",
+        "ns": {
+          "__aliases": [],
+          "__name": "validator1",
+          "__providers": {},
+          "__pulumiCustomResource": true,
+          "__pulumiResource": true,
+          "__pulumiType": "kubernetes:core/v1:Namespace",
+          "__transformations": [],
+          "__version": "4.28.0",
+          "apiVersion": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "id": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "kind": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "metadata": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "spec": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "status": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
+        }
+      },
+      "retainDbResourcesOnDelete": false,
+      "secretName": "validator-pg-secrets"
+    },
     "name": "validator1-validator-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
