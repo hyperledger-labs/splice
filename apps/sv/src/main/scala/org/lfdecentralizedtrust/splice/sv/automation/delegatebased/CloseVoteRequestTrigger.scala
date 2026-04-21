@@ -42,7 +42,7 @@ class CloseVoteRequestTrigger(
     val request = task.work
     val voteRequestCid = request.contractId
 
-    (for {
+    for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       amuletRulesId = amuletRules.contractId
@@ -73,10 +73,6 @@ class CloseVoteRequestTrigger(
           s"closing VoteRequest (voteRequestCid: ${request.contractId}) and outcome: ${result.exerciseResult.outcome.toJson}."
         )
       }
-    }).recover { case ex =>
-      TaskFailed(
-        s"failed to close VoteRequest. (voteRequestCid: ${request.contractId}): ${ex.getMessage}"
-      )
     }
   }
 
