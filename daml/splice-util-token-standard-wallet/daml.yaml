@@ -9,6 +9,7 @@ data-dependencies:
   - ../dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../dars/splice-api-token-holding-v1-1.0.0.dar
   - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
+  - ../dars/splice-api-token-allocation-instruction-v1-1.0.0.dar
   - ../dars/splice-api-featured-app-v1-1.0.0.dar
   - ../../token-standard/splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
   - ../../token-standard/splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
@@ -20,7 +21,6 @@ data-dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - -Wno-ledger-time-is-alpha
   - --target=2.1
 codegen:
   java:

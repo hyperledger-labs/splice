@@ -9,6 +9,7 @@ import DA.Time
 import Daml.Script
 import DA.List
 import DA.Optional
+import DA.TextMap as TextMap
 
 import Splice.Amulet
 import Splice.AmuletRules
@@ -25,6 +26,7 @@ import Splice.Wallet.TransferPreapproval
 import Splice.Scripts.Wallet.TestSubscriptions
 import Splice.Fees
 import Splice.Scripts.Util
+import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 

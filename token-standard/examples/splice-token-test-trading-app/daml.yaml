@@ -7,7 +7,7 @@ description: |
   A trading app PoC built on top of the allocation APIs of the Canton Network Token Standard.
 
   Serves both as an example as well as a test suite for the token standard APIs.
-version: 1.0.1
+version: 1.0.2
 source: daml
 dependencies:
   - daml-prim
