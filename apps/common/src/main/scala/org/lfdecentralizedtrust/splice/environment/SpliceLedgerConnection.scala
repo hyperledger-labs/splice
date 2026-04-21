@@ -107,12 +107,16 @@ class BaseLedgerConnection(
     val streamContinuationToken = new AtomicReference(Option.empty[ByteString])
     val activeContractsRequest = {
       RestartSource.onFailuresWithBackoff(RestartSettings(0.5.seconds, 1.second, 0.5))(() => {
+        val streamContinuationTokenValue = streamContinuationToken.get()
+        logger.info(
+          s"Starting active contracts stream with continuation token $streamContinuationTokenValue"
+        )
         client
           .activeContracts(
             lapi.state_service.GetActiveContractsRequest(
               activeAtOffset = offset,
               eventFormat = Some(eventFormat),
-              streamContinuationToken = streamContinuationToken.get(),
+              streamContinuationToken = streamContinuationTokenValue,
             )
           )
           .map { item =>
