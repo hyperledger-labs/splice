@@ -88,7 +88,7 @@ splice-test-token-v1 1.0.0 b2bfdb83e758706121412168ef3c7670ebfede3f32138841d0444
 splice-test-token-v2 1.0.0 20662faef188a5ec607d639abca8fa4b6e91623866b3aef39e925b9397863a5a
 splice-token-standard-test-v1 1.0.11 21e4b69eaa4fa4d20c7d0eb28295a7cadf1a8b428b6da4cf53f93f0b57c008cb
 splice-token-standard-test-v1 1.0.12 76523af1a872ddd6cb2a9a37caa789918d1332285397d695eab7fd397a30d775
-splice-token-standard-test-v2 1.0.0 970102e3d23be211b2b17857779ace8196155af26c18a43df47b11d10f3258d0
+splice-token-standard-test-v2 1.0.0 879a5499d538fbcaf855867674dc0e5c9fd0f307e33c6bfcf95d727aa723d021
 splice-token-standard-utils 2.0.0 9a436eaf5630c602d8e4eb0a30c7a3f65fe270f83afc98e297e76b03ff502b89
 splice-token-test-dummy-holding 0.0.1 1cd171c6c42ab46dc9cf12d80c6111369e00cea5cdf054924b4f26ce94b1ef5b
 splice-token-test-dummy-holding 0.0.2 4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d
@@ -117,9 +117,8 @@ splice-util-featured-app-proxies 1.2.3 677ed3473e7d412c06520843790ff27e21aaa7c29
 splice-util-featured-app-proxies-test 1.0.11 7db5cf7c29354367ae9a2d72e161fc40a08eabfde637edf205a26cf8a95e1589
 splice-util-token-standard-wallet 1.0.0 1da198cb7968fa478cfa12aba9fdf128a63a8af6ab284ea6be238cf92a3733ac
 splice-util-token-standard-wallet 1.0.1 182892381e4245c39d3126082ec0b41a089edb61e63af518f61eae1f5c9e135a
-splice-util-token-standard-wallet 1.1.0 297834d575400c2bc2ffc4f002a7041117a214cc42f393dffc038b607ce5aa7b
-splice-util-token-standard-wallet 1.1.1 94dfe01d96d3836d70c43414bfc8856775ef7d26edfaad313d5a98d0aa33ce65
-splice-util-token-standard-wallet-test 1.0.6 721fbe318c954ffb0d7b8a69c8f8fa980fce48122d699125fbbec9c80f4873a6
+splice-util-token-standard-wallet 1.1.0 269682e9e593a36a513153d27cb4d004f3eb7759fcee72c67a54ef73d5428a90
+splice-util-token-standard-wallet-test 1.0.6 b6f2be93a87e7d15071c2e520e74e50607628c4624ae12605688afc11f0a1459
 splice-validator-lifecycle 0.1.0 cef96fac957362f1fc097120bd13686cac7f84fbc8053afa994a1f9214d9570c
 splice-validator-lifecycle 0.1.1 1ddf05c96002914593c929848b786f34c753fb0be07717d1786be177a564aada
 splice-validator-lifecycle 0.1.2 57e2f15f9755db1f00e51c52c319294264a21ad71c6bc1e7cd70db4b164c0aaa
@@ -170,7 +169,7 @@ splice-wallet-payments 0.1.6 6124379528eeb6fa17ecdab15577c29abb33d0c0d34dc5f2680
 splice-wallet-payments 0.1.7 4e3e0d9cdadf80f4bf8f3cd3660d5287c084c9a29f23c901aabce597d72fd467
 splice-wallet-payments 0.1.8 e48ea337ee3335c8bb3206a2501ce947ac1a7bdb1825cee8f28bad64f5a7bc4b
 splice-wallet-payments 0.1.9 7f4e081ad96f2ccded0c053b0cf5ddddae1139dfc3bb89cefcf77ea70f2cecb7
-splice-wallet-test 0.1.23 01d8330765644d2e3ce7163a69f6c65ca6b0e00815e82704565aca950ef5cad3
+splice-wallet-test 0.1.23 c3840ffac7f2df6bfc1e91e2b7bee88ce1558cdc44e71e78840ee5e7ab27a7b0
 splitwell 0.1.0 075c76de553ab88383a7c69de134afa82aacfdf8ea8fcfe8852c4b199c3b2669
 splitwell 0.1.1 ccb1a0215053062202052e1a052f9214da3fdae5253a6d43e2e155ff4f57fe75
 splitwell 0.1.10 d42676a366f7ca7a2409974dd3054aa4d83ab29baa3b2086ad021407b0a1a295
@@ -192,4 +191,4 @@ splitwell 0.1.6 872da0dd7986fd768930f85d6a7310a94a0ef924e7fbb7bb7a4e149f2b5feb74
 splitwell 0.1.7 841d1c9c86b5c8f3a39059459ecd8febedf7703e18f117300bb0ebf4423db096
 splitwell 0.1.8 63b8153a08ceb4bf40d807acc5712372c3eac548c266be4d5e92470b4f655515
 splitwell 0.1.9 b6267905698d2798b9ef171e27d49fb88e052ec0ec0e0675a3a1b275c7d037d4
-splitwell-test 0.1.23 bde0d4c1e1a4ae758017dbde831872d27890449a70bdb5c48f657b7d13aceb24
+splitwell-test 0.1.23 eb10dea8eb21612d92ef47807b3e033a4452ad3884134b5df51f89b00102e1ed
