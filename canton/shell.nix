@@ -26,6 +26,7 @@ pkgs.mkShell {
     gnugrep
     gnupg
     google-cloud-sdk
+    grpcurl
     grpc-client-cli
     haproxy
     jo
