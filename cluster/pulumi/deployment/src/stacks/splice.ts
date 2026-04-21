@@ -69,7 +69,8 @@ export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   }
   if (
     deploymentConf.projectsToDeploy.has('sv') &&
-    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
+    (DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode ||
+      DecentralizedSynchronizerUpgradeConfig.active.migrateParticipantsFromSvCantonToSv)
   ) {
     for (const sv of allSvNamesToDeploy) {
       yield { project: 'sv', stack: `sv.${sv}.${CLUSTER_BASENAME}` };
@@ -152,7 +153,8 @@ function installSvStacks(
 ): void {
   if (
     deploymentConf.projectsToDeploy.has('sv') &&
-    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
+    (DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode ||
+      DecentralizedSynchronizerUpgradeConfig.active.migrateParticipantsFromSvCantonToSv)
   ) {
     for (const sv of allSvNamesToDeploy) {
       createStackCR(

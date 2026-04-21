@@ -1479,7 +1479,8 @@ class UpdateHistory(
         create_arguments,
         signatories,
         observers,
-        contract_key
+        contract_key,
+        record_time
 
       from update_history_creates
       where """ ++ inClause("update_row_id", transactionRowIds)).toActionBuilder
@@ -1514,7 +1515,8 @@ class UpdateHistory(
               signatories,
               observers,
               contract_key,
-              history_id
+              history_id,
+              record_time
             from update_history_creates
             where contract_id = $contractId)
             select * from unfiltered_contracts where history_id = $historyId""".toActionBuilder
@@ -2563,6 +2565,7 @@ object UpdateHistory {
       signatories: Option[Seq[String]],
       observers: Option[Seq[String]],
       contractKey: Option[String],
+      recordTime: CantonTimestamp,
   ) {
 
     def toContract[TCId <: ContractId[?], T <: DamlRecord[?]](
@@ -2580,6 +2583,7 @@ object UpdateHistory {
     def toCreatedEvent: SpliceCreatedEvent = {
       SpliceCreatedEvent(
         eventId,
+        recordTime,
         new CreatedEvent(
           /*witnessParties = */ java.util.Collections.emptyList(),
           /*offset = */ 0, // not populated
@@ -2626,6 +2630,7 @@ object UpdateHistory {
             <<[Option[Seq[String]]],
             <<[Option[Seq[String]]],
             <<[Option[String]],
+            <<[CantonTimestamp],
           )
         )
       }

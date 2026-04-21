@@ -20,15 +20,17 @@
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
 
-## Bumping Daml Compiler version
+## Bumping Daml Compiler & SDK version
 
 Before bumping a compiler version, make sure that all API packages are excluded from
 compilation. These are conventionally named `splice-api-*`. See [Maintaining Daml Interfaces](DEVELOPMENT.md#maintaining-daml-interfaces).
 
-1. Update the `version` in `nix/daml-compiler-sources.json` to the new daml compiler version.
-   The compiler version is then used in two places:
+1. Update the `version` in `nix/dpm-sdk-sources.json` to the new daml compiler version.
+   The compiler version is then used in several places:
    1. To build all daml packages using `sbt damlBuild`
    2. To generate daml docs using `cluster/images/docs/gen-daml-docs.sh`
+   3. To generate java code (as part of `sbt damlBuild`) and typescript code (as part of `sbt apps-common-frontend/compile`)
+1. Update the version of @daml/types in all package.json files
 
 Note that changing the compiler version changes all package ids and should not be done
 without a good reason to do so as changing Daml code requires a governance vote.
@@ -60,16 +62,7 @@ Current Canton commit: `c2c5d1fc2420600ca85c3a08b87ccc9efa182862`
    4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -s -m"Reapply our changes" --no-verify`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
-      2. If we're also updating the sdk version (this can lead to dar changes so we might skip it)
-        1. Set `version` in `CantonDependencies.scala` to the SDK version from Step 3.1
-        2. Set `tooling_sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 3.1.
-        3. Find in [Daml releases](https://github.com/digital-asset/daml/releases) the daml release that is "based on SDK" with the SDK from Step 3.1.
-           Set `daml_release` in `nix/cantno-sources.json` to that release.
-        4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
-        5. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
-           and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
-           Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
-   6. Create another commit, `git add -A && git reset '*.rej' && git commit -s -m"Bump Canton commit and Canton/SDK versions" --no-verify`
+   6. Create another commit, `git add -A && git reset '*.rej' && git commit -s -m"Bump Canton commit" --no-verify`
 6. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
    - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.
 7. Test whether things compile using `sbt Test/compile`.
