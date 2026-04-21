@@ -465,10 +465,10 @@ class RollForwardLsuDRIntegrationTest
         }
 
         clue("sv and scan app can be restarted") {
-          sv1Backend.stop()
-          sv1ScanBackend.stop()
-          sv1Backend.startSync()
-          sv1ScanBackend.startSync()
+          sv1LocalBackend.stop()
+          sv1ScanLocalBackend.stop()
+          sv1LocalBackend.startSync()
+          sv1ScanLocalBackend.startSync()
         }
 
         clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
