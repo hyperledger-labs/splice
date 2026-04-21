@@ -4,13 +4,14 @@
 module Splice.Scripts.TestSynchronizerMigration where
 
 import DA.Foldable (forA_)
+import DA.Functor (void)
 import qualified DA.Map as Map
+import qualified DA.Set as Set
 import Daml.Script
-import DA.List
+import DA.Time
 
 import Splice.AmuletConfig
 import Splice.AmuletRules
-import Splice.Schedule
 import Splice.Scripts.Util
 
 import Splice.CometBft
@@ -73,6 +74,37 @@ testSynchronizerMigration = do
     in  config with
           decentralizedSynchronizer = newDecentralizedSynchronizerConfig
 
+  -- once the SVs are confident about the working of the new synchronizer they announce it to their users
+  -- choosing a 30 day headroom until the active synchronizer switches.
+  now <- getTime
+  let targetEffectiveAt = addRelTime now (days 30)
+  void $ initiateAndCastAmuletRulesConfigChange app targetEffectiveAt $ \config ->
+    let decentralizedSynchronizerConfig = config.decentralizedSynchronizer -- TODOV: config = config.initialValue
+        newSynchronizerId = "decentralized-synchronizer-id-1"
+        newDecentralizedSynchronizerConfigAnnounce = decentralizedSynchronizerConfig with
+          requiredSynchronizers = Set.insert newSynchronizerId decentralizedSynchronizerConfig.requiredSynchronizers
+        newDecentralizedSynchronizerConfigSwitched = newDecentralizedSynchronizerConfigAnnounce with
+          activeSynchronizer = newSynchronizerId
+    in config with decentralizedSynchronizer = newDecentralizedSynchronizerConfigSwitched
+
+
+  -- At this point we expect the validator apps to start connecting to the newly announced synchronizer,
+  -- and create synchronizer connectivity proof contracts
+  -- TODO(#4894): create synchronizer connectivity proof contracts
+
+
+  -- Once the SV's are confident enough that the switch is not leaving too many users behind they
+  -- can change the switching date.
+
+
+  setTime targetEffectiveAt
+  executeAllDefinitiveVotes app
+
+
+  -- The new synchronizer becomes active, which implies that:
+  -- 1. The SV apps change the synchronizer topology information to allow transferring all of its contracts.
+  --    (once synchronizers support transfer permissions)
+  -- 2. The stakeholders of Amulet and DSO governance contracts transfer them to the new active synchronizer.
   pure ()
 
 executeDsoRulesConfigChange : AmuletApp -> (DsoRulesConfig -> DsoRulesConfig) -> Script ()
@@ -85,14 +117,18 @@ executeDsoRulesConfigChange app updateConfig = do
                                       newConfig = newConfig
                                       baseConfig = Some dsoRules.config
 
-
-executeAddAmuletConfigSchedule
-  : AmuletApp -> (Schedule Time (AmuletConfig USD) -> Schedule Time (AmuletConfig USD)) -> Script ()
-executeAddAmuletConfigSchedule app updateConfig = do
+initiateAndCastAmuletRulesConfigChange
+  : AmuletApp -> Time -> (AmuletConfig USD -> AmuletConfig USD) -> Script (ContractId VoteRequest)
+initiateAndCastAmuletRulesConfigChange app targetEffectiveAt updateConfig = do
   [(_, dsoRules)] <- query @DsoRules app.dso
   [(_, amuletRules)] <- query @AmuletRules app.dso
-  let newSchedule = updateConfig amuletRules.configSchedule
-  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+  -- let newSchedule = updateConfig amuletRules.configSchedule -- TODOV
+  let
+    baseConfig = amuletRules.configSchedule.initialValue
+    newConfig = updateConfig baseConfig -- TODOV effecttive date missing
+  initiateAndCastVote app (Map.keys dsoRules.svs) (Some targetEffectiveAt) $
     ARC_AmuletRules with
-      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
-        newScheduleItem = head newSchedule.futureValues
+      amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
+        newConfig
+        baseConfig
+        -- newScheduleItem = head newSchedule.futureValues
