@@ -12,11 +12,13 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.Mutex
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 abstract class ServiceWithShutdown {
   def initiateShutdown(): Unit
@@ -146,7 +148,40 @@ abstract class RetryingService(
     // Healthy if there's an active instance
     currentServiceInstance.get().exists(_.isActive)
 
-  final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  @volatile
+  private var waitForResumePromise = Promise.successful(())
+  private val mutex = Mutex()
+
+  /** Completes when the service is unpaused */
+  protected def waitForResume(): Future[Unit] = waitForResumePromise.future
+
+  /** Note that any in-flight data being processed when `pause` is called might still be processed.
+    */
+  @VisibleForTesting
+  final def pause(): Future[Unit] = blocking {
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info(s"Pausing $description.")
+      mutex.exclusive {
+        if (waitForResumePromise.isCompleted) {
+          waitForResumePromise = Promise()
+        }
+        Future.successful(())
+      }
+    }
+  }
+
+  @VisibleForTesting
+  final def resume(): Unit = blocking {
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info(s"Resuming $description.")
+      mutex.exclusive {
+        val _ = waitForResumePromise.trySuccess(())
+      }
+    }
+  }
+
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty
     Seq(
       AsyncCloseable(

@@ -5,7 +5,10 @@
 
 """Push store performance metrics to the Prometheus Pushgateway.
 Usage:
-  python3 push_store_ingestion_perf_metrics.py
+  python3 push_store_ingestion_perf_metrics.py [metrics_dir]
+
+  metrics_dir: Path to the directory containing metric JSON files.
+               Defaults to /tmp/store-ingestion-perf-metrics.
 """
 
 import json
@@ -14,7 +17,7 @@ from pathlib import Path
 
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
-METRICS_DIR = Path("/tmp/store-ingestion-perf-metrics")
+DEFAULT_METRICS_DIR = Path("/tmp/store-ingestion-perf-metrics")
 PUSHGATEWAY_URL = "http://prometheus-pushgateway.observability.svc.cluster.local:9091"
 JOB_NAME = "splice_store_ingest_perf"
 
@@ -44,14 +47,14 @@ def _push_metrics_for_test(test_name: str, data: dict) -> None:
     print(f"Pushed {len(data['metrics'])} metric(s) for '{test_name}'")
 
 
-def push_metrics() -> None:
-    if not METRICS_DIR.is_dir():
-        print(f"No metrics directory found at {METRICS_DIR}, nothing to push.")
+def push_metrics(metrics_dir: Path) -> None:
+    if not metrics_dir.is_dir():
+        print(f"No metrics directory found at {metrics_dir}, nothing to push.")
         return
 
-    json_files = sorted(METRICS_DIR.glob("*.json"))
+    json_files = sorted(metrics_dir.glob("*.json"))
     if not json_files:
-        print(f"No metric files found in {METRICS_DIR}, nothing to push.")
+        print(f"No metric files found in {metrics_dir}, nothing to push.")
         return
 
     error_files = 0
@@ -70,8 +73,9 @@ def push_metrics() -> None:
 
 
 def main() -> None:
-    print("Starting metrics push...")
-    push_metrics()
+    metrics_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_METRICS_DIR
+    print(f"Starting metrics push from {metrics_dir}...")
+    push_metrics(metrics_dir)
     print("Metrics push done.")
 
 

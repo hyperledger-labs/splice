@@ -16,7 +16,6 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
@@ -43,6 +42,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
   PackageVettingLookupService,
 }
+import org.lfdecentralizedtrust.splice.lsu.LsuRollForwardTimestamp
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
@@ -226,8 +226,12 @@ object SvOnboardingConfig {
   }
 
   final case class RollForwardLsuTimestampConfig(
-      topologyExportTime: CantonTimestamp,
-      trafficExportTime: CantonTimestamp,
+      topologyExportTime: LsuRollForwardTimestamp,
+      trafficExportTime: LsuRollForwardTimestamp,
+      // If upgradeTime is not set, performManualLsu is called without a timestamp
+      // which means it uses ledger end. Only use this after confirming that your node has caught up as far as it can
+      // e.g. wait for not observing new events for several minutes.
+      upgradeTime: Option[LsuRollForwardTimestamp],
   )
 
   final case class RollForwardLsu(
@@ -485,6 +489,13 @@ final case class SvSequencerConfig(
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
     isBftSequencer: Boolean = false,
+    dabftPruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
   def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
     adminApi,

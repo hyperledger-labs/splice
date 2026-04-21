@@ -128,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installSvLoopback(xns);
+  const loopback = installSvLoopback(xns, decentralizedSynchronizerUpgradeConfig.usesCometbft());
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
@@ -223,7 +223,7 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(
+    : await postgres.installPostgres(
         xns,
         'postgres',
         'postgres',
@@ -237,7 +237,7 @@ export async function installSvNode(
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       `cn-apps-pg`,
       `cn-apps-pg`,
@@ -247,7 +247,7 @@ export async function installSvNode(
       {
         logicalDecoding: !!baseConfig.scanBigQuery,
       }
-    );
+    ));
 
   const canton = new SynchronizerNodes(
     decentralizedSynchronizerUpgradeConfig,

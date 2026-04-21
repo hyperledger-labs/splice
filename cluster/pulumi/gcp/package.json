@@ -6,7 +6,7 @@
     "@kubernetes/client-node": "^1.4.0",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@types/auth0": "^3.3.11",
-    "auth0": "^5.5.0"
+    "auth0": "^5.6.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -20,6 +20,6 @@
   },
   "devDependencies": {
     "@types/sinon": "^21.0.1",
-    "sinon": "^21.0.3"
+    "sinon": "^21.1.2"
   }
 }

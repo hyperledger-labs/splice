@@ -8,7 +8,6 @@ import Prelude hiding (all)
 import DA.Action (void, unless)
 import DA.Assert
 import DA.Either (partitionEithers)
-import DA.Exception
 import DA.Foldable (forA_, all)
 import DA.List as List hiding (all)
 import DA.Optional (isNone, fromSome, fromOptional, isSome)
@@ -421,7 +420,7 @@ data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
 data DsoRules_BootstrapExternalPartyConfigStateResult = DsoRules_BootstrapExternalPartyConfigStateResult
 
 data VoteRequestOutcome
-  = VRO_AcceptedButActionFailed with
+  = VRO_AcceptedButActionFailed with -- No longer used after removing try/catch in DsoRules_CloseVoteRequest.
       description : Text -- ^ Description of the failure.
   | VRO_Accepted with -- The action was accepted by a super-majority.
       effectiveAt : Time -- ^ Time when the action will be effective.
@@ -851,13 +850,10 @@ template DsoRules with
                       pure $ VRO_Expired
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
-                      try do
+                      do
                         executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
-                      catch
-                        (ex : AnyException) ->
-                          pure $ VRO_AcceptedButActionFailed with description = message ex
 
                     Some effectiveTime | now >= effectiveTime ->
                       pure $ VRO_Rejected
@@ -869,16 +865,13 @@ template DsoRules with
                       pure $ VRO_Rejected
 
                     None | numYays >= s.requiredNumVotes ->
-                      try do
+                      do
                         executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
                             effectiveAt = fromOptional now $
                               actionRequiringConfirmationEffectiveAt request.action
-                      catch
-                        (ex : AnyException) ->
-                          pure $ VRO_AcceptedButActionFailed with description = message ex
 
                     None | now >= request.voteBefore ->
                       pure $ VRO_Expired
@@ -993,7 +986,7 @@ template DsoRules with
     -- CIP-0105 Phase 2: Lock-derived weight evaluation
     ----------------------------------------------------
 
-    -- | Compute SV weight from on-chain lock state per CIP-0105 §5.
+    -- Compute SV weight from on-chain lock state per CIP-0105 §5.
     -- Reads SVLockState (aggregate locked amulet, lifetime rewards, base weight) and
     -- SVLockConfig (tier schedule, activation/expiry dates), then updates
     -- svRewardWeight with the computed effective weight.

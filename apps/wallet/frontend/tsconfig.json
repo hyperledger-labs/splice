@@ -5,7 +5,12 @@
     "outDir": "build",
     "types": ["node", "vite/client"],
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "baseUrl": ".",
+    "paths": {
+      "@daml/types": ["../../common/frontend/node_modules/@daml/types"],
+      "@daml/types/*": ["../../common/frontend/node_modules/@daml/types/*"]
+    }
   },
   "include": ["src"]
 }

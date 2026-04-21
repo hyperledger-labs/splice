@@ -5,7 +5,8 @@ import { callWithLogging } from '@lfdecentralizedtrust/splice-common-frontend-ut
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { DisclosedContract } from '@daml/ledger';
+import { DisclosedContract } from '@lfdecentralizedtrust/splice-common-frontend-utils/interfaces';
+
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
@@ -65,7 +66,7 @@ export abstract class PackageIdResolver {
   }
 }
 
-// Uses the JSON API (via @daml/ledger) to connect to the ledger.
+// Uses the JSON API to connect to the ledger.
 export class LedgerApiClient {
   private jsonApiUrl: string;
   private userId: string;
@@ -116,7 +117,7 @@ export class LedgerApiClient {
     contractId: ContractId<T>,
     argument: C,
     domainId?: string,
-    disclosedContracts: DisclosedContract[] = []
+    disclosedContracts: DisclosedContract<unknown>[] = []
   ): Promise<R> {
     const choice = await this.packageIdResolver.resolveChoice(unresolvedChoice);
     console.debug(

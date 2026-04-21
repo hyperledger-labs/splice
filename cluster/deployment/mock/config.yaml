@@ -114,6 +114,19 @@ monitoring:
         -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
       missingConfiguredCardinality: |
         -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
+    muteTimeIntervals:
+      - name: sv1-mute
+        objectMatchers:
+          - [ 'namespace', '=', 'sv1' ]
+        startTime: '04:00'
+        endTime: '07:00'
+        weekdays:
+          - saturday:sunday
+      - name: sv-runbook-mute
+        objectMatchers:
+          - [ 'namespace', '=', 'sv' ]
+        startTime: '06:00'
+        endTime: '10:00'
 operatorDeployment:
   reference:
     gitReference: refs/heads/main

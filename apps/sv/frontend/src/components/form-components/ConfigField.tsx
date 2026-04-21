@@ -75,9 +75,19 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
           alignItems: 'center',
         }}
       >
-        <Typography variant="body1" data-testid={`config-label-${configChange.fieldName}`}>
-          {configChange.label}
-        </Typography>
+        <Box>
+          <Typography variant="body1" data-testid={`config-label-${configChange.fieldName}`}>
+            {configChange.label}
+          </Typography>
+          <Typography
+            fontFamily="'Source Code Pro', monospace"
+            color="colors.neutral.70"
+            sx={{ mt: 1 }}
+            data-testid={`config-field-name-${configChange.fieldName}`}
+          >
+            {configChange.fieldName}
+          </Typography>
+        </Box>
 
         <Box sx={{ width: 250 }}>
           <MuiTextField
@@ -97,7 +107,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
+              sx={{ mt: 0.5, display: 'block' }}
               data-testid={`config-current-value-${configChange.fieldName}`}
             >
               Current Configuration: {configChange.currentValue}

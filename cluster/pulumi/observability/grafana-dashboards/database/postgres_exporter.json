@@ -3204,7 +3204,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "pg_stat_user_tables_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\", instance=~\"$instance\", service=~\"$service\"} > 0",
+          "expr": "pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\", instance=~\"$instance\", service=~\"$service\"} > 0",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "{{relname}}",
@@ -4549,14 +4549,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(pg_stat_user_tables_size_bytes{namespace=\"$namespace\", datname=~\"$datname\"},server)",
+        "definition": "label_values(pg_stat_user_tables_table_size_bytes{namespace=\"$namespace\", datname=~\"$datname\"},server)",
         "includeAll": false,
         "label": "Server",
         "name": "server",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(pg_stat_user_tables_size_bytes{namespace=\"$namespace\", datname=~\"$datname\"},server)",
+          "query": "label_values(pg_stat_user_tables_table_size_bytes{namespace=\"$namespace\", datname=~\"$datname\"},server)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

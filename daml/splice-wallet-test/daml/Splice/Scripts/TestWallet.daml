@@ -490,14 +490,19 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 3.0 AmuletUnit)]
   -- trying to fulfill the request for 10,000 Amulet will fail
   context <- getPaymentTransferContext app alice
+  -- first command errors, second command is not executed as WalletAppInstall_ExecuteBatch does not catch exceptions
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds")
+    [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet]
+      operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
+      context
+  -- execute the second command alone
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
-    operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
+    operations = [CO_AppPayment transferRequest4]
     context
 
-  -- first command errors, second command is still executed
-  debug outcomes
-  let [COO_Error _, COO_AcceptedAppPayment payment3Cid] = outcomes
+  let [COO_AcceptedAppPayment payment3Cid] = outcomes
   Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
 
   -- Only one command executed, so there's only one locked amulet
@@ -723,18 +728,23 @@ testBuyMemberTraffic = script do
     createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId synchronizerId)
 
   -- test that buying less extra traffic than the configured min topup amount fails
-  let minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
-  outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
-  outcome === COO_Error (ITR_InsufficientTopupAmount (minTopupAmount-1) minTopupAmount)
+  let
+    minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
+  executeAmuletOperationMustFail app aliceValidator
+    (CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid))
+    (expectFailureStatus \fs ->
+      fs.errorId == "splice.lfdecentralizedtrust.org/insufficient-topup-amount" &&
+        fs.meta == TextMap.fromList [("minTopupAmount", show minTopupAmount), ("requestedTopupAmount", show (minTopupAmount-1))])
 
   -- test that providing an invalid decentralized synchronizer ID fails
   let invalidSynchronizerId = synchronizerId <> "_invalid"
   invalidTopupStateCid <- submit aliceValidator.primaryParty $
     createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidSynchronizerId)
-  outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidSynchronizerId migrationId (minutes 1) (Some invalidTopupStateCid)
-  outcome === COO_Error (ITR_UnknownSynchronizer invalidSynchronizerId)
+  executeAmuletOperationMustFail app aliceValidator
+    (CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidSynchronizerId migrationId (minutes 1) (Some invalidTopupStateCid))
+    (expectFailureStatus \fs ->
+      fs.errorId == "splice.lfdecentralizedtrust.org/unknown-synchronizer" &&
+        fs.meta == TextMap.fromList [("synchronizerId", invalidSynchronizerId)])
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works
@@ -770,9 +780,9 @@ testBuyMemberTraffic = script do
     user = aliceValidator.primaryParty
 
   -- topping up too soon fails
-  outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2)
-  outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
+  executeAmuletOperationMustFail app aliceValidator
+    (CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2))
+    (expectMessageContains "The requirement 'enough time has elapsed since the last topup' was not met.")
 
   -- once a minute has passed, the same topup succeeds
   passTime (minutes 1)
@@ -843,8 +853,9 @@ testBuyMemberTraffic = script do
   now <- getTime
   -- time-expired traffic requests cannot be completed or cancelled, only archived
   request1 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request1" now
-  COO_Error (ITR_Other ("The requirement 'Contract has not expired' was not met.")) <- executeAmuletOperation app provider2 $
-    CO_CompleteBuyTrafficRequest request1
+  executeAmuletOperationMustFail app provider2
+    (CO_CompleteBuyTrafficRequest request1)
+    (expectMessageContains "The requirement 'Contract has not expired' was not met.")
   submitMustFail provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Cancel with reason = "not required"
   result <- submit provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Expire
   let trackingInfo = result.trackingInfo
@@ -926,12 +937,11 @@ testInsufficientFundsBatchSubscriptions = script do
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
   -- TODO(#2957): remove read-as DSO party.
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [InputAmulet amulet]
-    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
-    context
-
-  outcomes === [COO_Error (ITR_InsufficientFunds 5.0)]
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds") [alice.primaryParty, validator] [app.dso] $
+    exerciseCmd install WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet]
+      operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+      context
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
@@ -949,11 +959,11 @@ testInsufficientFundsBatchSubscriptions = script do
   runNextIssuance app
   amulet <- tap app alice 5.0
   -- TODO(#2957): remove read-as DSO party.
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [InputAmulet amulet]
-    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
-    context
-  outcomes === [COO_Error (ITR_InsufficientFunds 5.0)]
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds") [alice.primaryParty, validator] [app.dso] $
+    exerciseCmd install WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet]
+      operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+      context
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
@@ -1165,6 +1175,18 @@ executeAmuletOperation app user op = do
       context
   let [outcome] = result.outcomes
   pure outcome
+
+executeAmuletOperationMustFail : AmuletApp -> AmuletUser -> AmuletOperation -> FailureStatusCheck -> Script ()
+executeAmuletOperationMustFail app user op check = do
+  [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
+  context <- getPaymentTransferContext app user
+  amulets <- queryFilter @Amulet user.primaryParty (\amulet -> amulet.owner == user.primaryParty)
+  -- TODO(#2957): remove read-as DSO party.
+  submitMultiMustFail'' check [install.validatorParty] [install.endUserParty, install.validatorParty, app.dso] $
+    exerciseCmd installCid WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet._1 | amulet <- amulets]
+      operations = [op]
+      context
 
 calculateSynchronizerFees : AmuletApp -> Int -> Script (Decimal, Decimal)
 calculateSynchronizerFees app trafficAmount = do
