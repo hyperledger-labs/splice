@@ -7,7 +7,6 @@ import {
 } from '@lfdecentralizedtrust/splitwell-openapi';
 import { z } from 'zod';
 
-import { DisclosedContract } from '@daml/ledger';
 import { ContractId, ContractTypeCompanion, Serializable, Template } from '@daml/types';
 
 export interface Contract<T> {
@@ -28,6 +27,12 @@ export interface ContractWithState<T> {
   domainId?: string;
 }
 
+export declare type DisclosedContract<T> = {
+  contractId: ContractId<T>;
+  templateId: string;
+  createdEventBlob: string;
+};
+
 export const Contract = {
   decodeOpenAPI: <T extends object, K, I extends string>(
     c: OpenAPIContract,
@@ -42,7 +47,7 @@ export const Contract = {
   toDisclosedContract: <T extends object, K>(
     _tmpl: Template<T, K>,
     c: Contract<T>
-  ): DisclosedContract => ({
+  ): DisclosedContract<T> => ({
     templateId: c.templateId,
     contractId: c.contractId,
     createdEventBlob: c.createdEventBlob!,

@@ -9,7 +9,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_DsoRules,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
+  SRARC_OffboardSv,
+  SRARC_SetConfig,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
@@ -1492,8 +1496,12 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Set Dso Rules Configuration" in { implicit env =>
-      assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
+      assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { implicit webDriver =>
+        eventually() {
+          inside(find(testId("config-field-numUnclaimedRewardsThreshold"))) { case Some(element) =>
+            element.underlying.sendKeys("99")
+          }
+        }
       }
     }
 
@@ -1511,8 +1519,12 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
+      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
+        eventually() {
+          inside(find(testId("config-field-transferPreapprovalFee"))) { case Some(element) =>
+            element.underlying.sendKeys("99")
+          }
+        }
       }
     }
 
@@ -1524,6 +1536,134 @@ class SvFrontendIntegrationTest
         implicit webDriver =>
           selectMuiOptionByValue("update-sv-reward-weight-member-dropdown", sv3PartyId)
           fillOutTextField("update-sv-reward-weight-weight", newWeight)
+      }
+    }
+
+    "Vote history is ordered by completion time and supports pagination" in { implicit env =>
+      val sv4Party = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
+      val offboardSv4Action: ActionRequiringConfirmation = new ARC_DsoRules(
+        new SRARC_OffboardSv(new DsoRules_OffboardSv(sv4Party))
+      )
+
+      // Create and reject first vote request
+      val (_, voteRequest1) = actAndCheck(
+        "sv1 creates first vote request",
+        sv1Backend.createVoteRequest(
+          sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+          offboardSv4Action,
+          "url",
+          "first request",
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+          None,
+        ),
+      )(
+        "first vote request has been created",
+        _ =>
+          sv1Backend.listVoteRequests().filter(_.payload.reason.body == "first request").loneElement,
+      )
+
+      actAndCheck(
+        "majority rejects first request",
+        Seq(sv1Backend, sv2Backend, sv3Backend).foreach(
+          _.castVote(getTrackingId(voteRequest1), false, "url", "reject first")
+        ),
+      )(
+        "first request is rejected",
+        _ => {
+          sv1Backend
+            .listVoteRequests()
+            .filter(_.payload.reason.body == "first request") shouldBe empty
+          sv1Backend
+            .listVoteRequestResults(None, Some(false), None, None, None, 10)
+            ._1
+            .exists(_.request.reason.body == "first request") shouldBe true
+        },
+      )
+
+      // Create and reject second vote request
+      val (_, voteRequest2) = actAndCheck(
+        "sv1 creates second vote request",
+        sv1Backend.createVoteRequest(
+          sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+          offboardSv4Action,
+          "url",
+          "second request",
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+          None,
+        ),
+      )(
+        "second vote request has been created",
+        _ =>
+          sv1Backend
+            .listVoteRequests()
+            .filter(_.payload.reason.body == "second request")
+            .loneElement,
+      )
+
+      actAndCheck(
+        "majority rejects second request",
+        Seq(sv1Backend, sv2Backend, sv3Backend).foreach(
+          _.castVote(getTrackingId(voteRequest2), false, "url", "reject second")
+        ),
+      )(
+        "second request is rejected",
+        _ => {
+          sv1Backend
+            .listVoteRequests()
+            .filter(_.payload.reason.body == "second request") shouldBe empty
+          sv1Backend
+            .listVoteRequestResults(None, Some(false), None, None, None, 10)
+            ._1
+            .count(r =>
+              r.request.reason.body == "first request" || r.request.reason.body == "second request"
+            ) shouldBe 2
+        },
+      )
+
+      // Verify ordering via backend API: most recently completed first
+      clue("vote results are ordered by completion time descending") {
+        val (results, _) = sv1Backend.listVoteRequestResults(None, None, None, None, None, 10)
+        val ourResults = results.filter(r =>
+          r.request.reason.body == "first request" || r.request.reason.body == "second request"
+        )
+        ourResults.size shouldBe 2
+        ourResults.head.request.reason.body shouldBe "second request"
+        ourResults.last.request.reason.body shouldBe "first request"
+      }
+
+      // Verify cursor-based pagination via backend API with limit=1
+      clue("pagination returns correct pages") {
+        val (firstPage, firstPageToken) =
+          sv1Backend.listVoteRequestResults(None, None, None, None, None, 1)
+        firstPage.size shouldBe 1
+        firstPage.head.request.reason.body shouldBe "second request"
+        firstPageToken shouldBe defined
+
+        val (secondPage, _) =
+          sv1Backend.listVoteRequestResults(None, None, None, None, None, 1, firstPageToken)
+        secondPage.size shouldBe 1
+        secondPage.head.request.reason.body shouldBe "first request"
+      }
+
+      // Verify ordering on the governance UI
+      withFrontEnd("sv1") { implicit webDriver =>
+        loginToGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
+
+        eventually() {
+          val rows = webDriver.findElements(By.cssSelector("[data-testid='vote-history-row']"))
+          rows.size should be >= 2
+          val firstRowDescription = rows
+            .get(0)
+            .findElement(By.cssSelector("[data-testid='vote-history-row-description']"))
+            .getText
+          val secondRowDescription = rows
+            .get(1)
+            .findElement(By.cssSelector("[data-testid='vote-history-row-description']"))
+            .getText
+          // Most recently completed (second request) should appear first
+          firstRowDescription shouldBe "second request"
+          secondRowDescription shouldBe "first request"
+        }
       }
     }
   }

@@ -123,10 +123,14 @@ export const validateMintBeforeAndEffectiveDate = (value: {
       effectiveDate: z.string(),
       mintBefore: z.string(),
     })
-    .refine(({ effectiveDate, mintBefore }) => dayjs(effectiveDate).isBefore(dayjs(mintBefore)), {
-      message: 'Mint Before date must be after Effective Date',
-      path: ['mintBefore'],
-    });
+    .refine(
+      ({ effectiveDate, mintBefore }) =>
+        dayjs(mintBefore).isAfter(dayjs(effectiveDate).add(2, 'hour')),
+      {
+        message: 'Mint Before date must be at least 2 hours after Effective Date',
+        path: ['mintBefore'],
+      }
+    );
 
   const result = schema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;

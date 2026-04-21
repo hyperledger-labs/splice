@@ -1,31 +1,17 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
-import cats.data.NonEmptyList
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
-import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
-import com.digitalasset.canton.resource.{DbMigrations, DbStorage, StorageSingleFactory}
-import com.digitalasset.canton.time.WallClock
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  UpdateHistoryItemV2,
-  UpdateHistoryResponseV2,
-}
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
+import cats.data.NonEmptyList
 import io.circe.Json
-import java.lang.management.ManagementFactory
-import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
 final case class StoreIngestionPerfMetrics(
@@ -51,22 +37,17 @@ final case class StoreIngestionPerfMetrics(
 abstract class StoreIngestionPerformanceTest(
     updateHistoryDumpPath: Path,
     storageConfig: StorageConfig,
-    override protected val timeouts: ProcessingTimeout,
+    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     ingestionConfig: IngestionConfig = IngestionConfig(),
 )(implicit ec: ExecutionContext, actorSystem: ActorSystem)
-    extends FlagCloseable {
-
-  override protected[this] val logger: TracedLogger =
-    loggerFactory.getTracedLogger(this.getClass)
-
-  protected implicit val closeContext: CloseContext = CloseContext(this)
-
-  type Store <: HasIngestionSink
-  protected def mkStore(storage: DbStorage): Store
-
-  /** A short name for this test, used as the metrics file name and Pushgateway label. */
-  protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")
+    extends BaseStorePerformanceTest(
+      updateHistoryDumpPath,
+      storageConfig,
+      timeouts,
+      loggerFactory,
+      ingestionConfig,
+    ) {
 
   def run(): Future[Unit] = {
     val storage = initializeStorage()
@@ -81,68 +62,20 @@ abstract class StoreIngestionPerformanceTest(
             )
           }
           txs = loadTxsFromDump()
-          metrics <- ingestAll(store, txs)
+          metrics <- ingestWithMetrics(store, txs)
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count == 0)(
               s"Expected table to be non-empty after ingestion, but no rows were inserted."
             )
           }
-          _ = writeMetricsFile(metrics, success = true)
+          _ = writeIngestionMetrics(metrics, success = true)
         } yield ())
       }
   }
 
-  private def initializeStorage(): DbStorage = {
-    val storageFactory = new StorageSingleFactory(storageConfig)
-    val storage =
-      storageFactory.tryCreate(
-        connectionPoolForParticipant = false,
-        None,
-        new WallClock(timeouts, loggerFactory),
-        None,
-        new DbStorageMetrics(
-          new DbStorageHistograms(MetricName("store", "perftest"))(new HistogramInventory),
-          NoOpMetricsFactory,
-        )(MetricsContext()),
-        timeouts,
-        loggerFactory,
-      )(
-        ec,
-        TraceContext.empty,
-        closeContext,
-      ) match {
-        case storage: DbStorage => storage
-        case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-      }
-    new DbMigrations(storage.dbConfig, false, timeouts, loggerFactory)
-      .migrateDatabase()
-      .map(_ => storage)
-      .getOrElse(throw new RuntimeException("Failed to run migrations."))
-      .onShutdown(throw new IllegalStateException("Shutdown should not be happening here"))
-  }
-
-  /** Load and parse all transactions in memory so that reading doesn't bottleneck.
-    */
-  private def loadTxsFromDump(): Seq[TreeUpdateWithMigrationId] = {
-    val dump = (for {
-      json <- io.circe.parser.parse(Files.readString(updateHistoryDumpPath))
-      decoded <- UpdateHistoryResponseV2.decodeUpdateHistoryResponseV2.decodeJson(json)
-    } yield decoded)
-      .getOrElse(
-        throw new IllegalArgumentException(
-          s"Failed to parse the update history from $updateHistoryDumpPath. It should have the structure of UpdateHistoryResponseV2."
-        )
-      )
-    dump.transactions.zipWithIndex.collect {
-      // deliberately ignoring reassignments
-      case (UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(update), index) =>
-        CompactJsonScanHttpEncodings().httpToLapiTransaction(update, index.toLong)
-    }
-  }
-
   // Ensuring that it's logged also on GHA console, as opposed to only in log files (which are not uploaded on success)
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
-  private def ingestAll(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
+  private def ingestWithMetrics(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
   ): Future[StoreIngestionPerfMetrics] = {
     var totalTimeNs = BigDecimal(0)
@@ -201,26 +134,10 @@ abstract class StoreIngestionPerformanceTest(
       }
   }
 
-  /** Process-wide CPU time in nanoseconds.
-    * Returns -1 if not supported (treated as 0 by the caller via math.max).
-    */
-  private def getProcessCpuTimeNs: Long = {
-    ManagementFactory.getOperatingSystemMXBean match {
-      case osBean: com.sun.management.OperatingSystemMXBean => osBean.getProcessCpuTime
-      case _ => -1L
-    }
-  }
-
-  /** Process-wide current heap memory usage in bytes (point-in-time snapshot). */
-  private def getHeapUsedBytes: BigDecimal = {
-    BigDecimal(ManagementFactory.getMemoryMXBean.getHeapMemoryUsage.getUsed)
-  }
-
   /** A separate Python script pushes the metrics to Prometheus Pushgateway.
     * We structure JSON file making the python side mostly readonly, enabling to add new metrics to JSON without changing python script.
     */
-  @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
-  private def writeMetricsFile(metrics: StoreIngestionPerfMetrics, success: Boolean): Unit = {
+  private def writeIngestionMetrics(metrics: StoreIngestionPerfMetrics, success: Boolean): Unit = {
     val completionEpochSec = java.time.Instant.now().getEpochSecond
     val successInt = if (success) 1 else 0
     val jobName = "splice_perf_ingestion"
@@ -231,102 +148,42 @@ abstract class StoreIngestionPerformanceTest(
       "value" -> Json.fromBigDecimal(value),
     )
 
-    val json = Json
-      .obj(
-        "test_name" -> Json.fromString(testName),
-        "metrics" -> Json.arr(
-          metric(
-            "avg_item_time_ns",
-            "Average nanoseconds per ingested item",
-            metrics.avgItemTimeNs,
-          ),
-          metric("total_items", "Total number of items ingested", BigDecimal(metrics.totalItems)),
-          metric("total_time_ns", "Total ingestion time in nanoseconds", metrics.totalTimeNs),
-          metric(
-            "total_batches",
-            "Total number of batches ingested",
-            BigDecimal(metrics.totalBatches),
-          ),
-          metric(
-            "completion_timestamp_seconds",
-            "Epoch seconds when the test run completed",
-            BigDecimal(completionEpochSec),
-          ),
-          metric("success", "Test run succeeded (1) or failed (0)", BigDecimal(successInt)),
-          metric(
-            "process_cpu_time_ns",
-            "Process-wide CPU time in nanoseconds (all cores combined)",
-            metrics.processCpuTimeNs,
-          ),
-          metric(
-            "peak_heap_bytes",
-            "Peak JVM heap memory usage in bytes observed across all ingestion batches",
-            metrics.peakHeapBytes,
-          ),
-          metric(
-            "cpu_to_wall_clock_ratio",
-            "Ratio of process CPU time to wall-clock time (>0.7=CPU-bound, 0.25~0.7=standard, <0.25=I/O-bound)",
-            metrics.cpuToWallClockRatio,
-          ),
-        ),
-      )
-      .spaces2
+    val metricsJson = Json.arr(
+      metric(
+        "avg_item_time_ns",
+        "Average nanoseconds per ingested item",
+        metrics.avgItemTimeNs,
+      ),
+      metric("total_items", "Total number of items ingested", BigDecimal(metrics.totalItems)),
+      metric("total_time_ns", "Total ingestion time in nanoseconds", metrics.totalTimeNs),
+      metric(
+        "total_batches",
+        "Total number of batches ingested",
+        BigDecimal(metrics.totalBatches),
+      ),
+      metric(
+        "completion_timestamp_seconds",
+        "Epoch seconds when the test run completed",
+        BigDecimal(completionEpochSec),
+      ),
+      metric("success", "Test run succeeded (1) or failed (0)", BigDecimal(successInt)),
+      metric(
+        "process_cpu_time_ns",
+        "Process-wide CPU time in nanoseconds (all cores combined)",
+        metrics.processCpuTimeNs,
+      ),
+      metric(
+        "peak_heap_bytes",
+        "Peak JVM heap memory usage in bytes observed across all ingestion batches",
+        metrics.peakHeapBytes,
+      ),
+      metric(
+        "cpu_to_wall_clock_ratio",
+        "Ratio of process CPU time to wall-clock time (>0.7=CPU-bound, 0.25~0.7=standard, <0.25=I/O-bound)",
+        metrics.cpuToWallClockRatio,
+      ),
+    )
 
-    println(s"Ingestion metrics for $testName:\n$json")
-
-    try {
-      val metricsDir = Paths.get("/tmp/store-ingestion-perf-metrics")
-      Files.createDirectories(metricsDir)
-      val metricsFile = metricsDir.resolve(s"$testName.json")
-      Files.writeString(
-        metricsFile,
-        json,
-        StandardOpenOption.CREATE,
-        StandardOpenOption.TRUNCATE_EXISTING,
-      )
-      println(s"Wrote metrics to $metricsFile")
-    } catch {
-      case e: Exception =>
-        println(s"Failed to write metrics file for $testName: ${e.getMessage}")
-    }
+    writeMetricsFile(metricsJson, "store-ingestion-perf-metrics", "Ingestion")
   }
-
-  protected val tablesToSanityCheck: Seq[String]
-  private type ErrorMessage = String
-
-  private def sanityCheckTables(
-      storage: DbStorage
-  )(check: Int => Option[ErrorMessage])(implicit tc: TraceContext) = {
-    import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-    Future.traverse(tablesToSanityCheck) { tableName =>
-      storage
-        .querySingle(
-          sql"select count(*) from #$tableName".as[Int].headOption,
-          s"sanityCheck-$tableName",
-        )
-        .value
-        .failOnShutdownToAbortException("Should not be shutting down.")
-        .flatMap {
-          case Some(count) =>
-            check(count).fold {
-              Future.successful(
-                logger.info(s"Sanity check passed for table $tableName with count $count.")
-              )
-            } { errMsg =>
-              Future.failed(
-                new IllegalStateException(s"Sanity check failed for table $tableName: $errMsg")
-              )
-            }
-          case None =>
-            Future.failed(
-              new IllegalStateException(
-                s"Sanity check failed for table $tableName. Row Count was None."
-              )
-            )
-        }
-    }
-  }
-
-  protected def mkParticipantId(name: String): ParticipantId =
-    ParticipantId.tryFromProtoPrimitive("PAR::" + name + "::dummy")
 }

@@ -303,10 +303,11 @@ trait ScanConnection
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
+      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
+  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])]
 
   def listUnclaimedDevelopmentFundCoupons()(implicit
       ec: ExecutionContext,

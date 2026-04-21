@@ -104,6 +104,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
           s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
           s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
           s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
+          s"SV${i}_SEQUENCER_BFT_PORT" -> (range * 1000 + i * 100 + 10).toString,
         )
       )
     )

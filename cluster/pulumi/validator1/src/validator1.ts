@@ -54,7 +54,7 @@ export async function installValidator1(
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(
+    ? await postgres.installPostgres(
         xns,
         'postgres',
         'postgres',
@@ -66,19 +66,19 @@ export async function installValidator1(
 
   const validatorPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       `validator-pg`,
       `validator-pg`,
       activeVersion,
       spliceConfig.pulumiProjectConfig.cloudSql,
       true
-    );
+    ));
   const validatorDbName = `validator1`;
 
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
-  const participant = installParticipant(
+  const participant = await installParticipant(
     validator1Config,
     decentralizedSynchronizerMigrationConfig.activeMigrationId,
     xns,

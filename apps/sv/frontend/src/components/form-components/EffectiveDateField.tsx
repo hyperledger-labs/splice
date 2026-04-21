@@ -75,6 +75,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
               <DesktopDateTimePicker
                 value={dayjs(field.state.value.effectiveDate)}
                 format={dateTimeFormatISO}
+                ampm={false}
                 onChange={newDate => {
                   field.handleChange({
                     type: 'custom',

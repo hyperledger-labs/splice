@@ -376,6 +376,37 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons())
     }
 
+  @Help.Summary("Get the earliest round with CIP-0104 reward accounting data")
+  def getRewardAccountingEarliestAvailableRound(): Option[Long] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingEarliestAvailableRound())
+    }
+
+  @Help.Summary("Get CIP-0104 activity totals for a specific round")
+  def getRewardAccountingActivityTotals(
+      roundNumber: Long
+  ): Option[definitions.GetRewardAccountingActivityTotalsResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingActivityTotals(roundNumber))
+    }
+
+  @Help.Summary("Get CIP-0104 root hash for a specific round")
+  def getRewardAccountingRootHash(
+      roundNumber: Long
+  ): Option[definitions.GetRewardAccountingRootHashResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingRootHash(roundNumber))
+    }
+
+  @Help.Summary("Get CIP-0104 batch contents by hash for a specific round")
+  def getRewardAccountingBatch(
+      roundNumber: Long,
+      batchHash: String,
+  ): Option[definitions.GetRewardAccountingBatchResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingBatch(roundNumber, batchHash))
+    }
+
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 
@@ -816,7 +847,8 @@ abstract class ScanAppReference(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  ): Seq[DsoRules_CloseVoteRequestResult] = {
+      pageToken: Option[BigInt] = None,
+  ): (Seq[DsoRules_CloseVoteRequestResult], Option[BigInt]) = {
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.ListVoteRequestResults(
@@ -826,6 +858,7 @@ abstract class ScanAppReference(
           effectiveFrom,
           effectiveTo,
           limit,
+          pageToken,
         )
       )
     }
