@@ -629,7 +629,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       clue("SV1's DABFT node has pruning config set") {
-        sv1Backend.sequencerClient.bft.pruning.get_schedule() shouldBe PruningSchedule(
+        sv1Backend.sequencerClientSuccessor.bft.pruning.get_schedule() shouldBe PruningSchedule(
           "0 /10 * * * ?",
           PositiveDurationSeconds.ofMinutes(5),
           PositiveDurationSeconds.ofDays(30),
