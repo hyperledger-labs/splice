@@ -5,7 +5,6 @@
 module Splice.ExternalPartyAmuletRules where
 
 import DA.Assert
-import DA.Exception
 import DA.Foldable (forA_)
 import DA.Optional
 import qualified DA.TextMap as TextMap
