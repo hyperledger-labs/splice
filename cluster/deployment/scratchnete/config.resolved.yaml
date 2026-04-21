@@ -156,7 +156,7 @@ splitwell:
   participant:
     additionalEnvVars:
       - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
 sv:
   scan:
     externalRateLimits:
@@ -377,7 +377,7 @@ svs:
     participant:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -460,7 +460,7 @@ validator1:
   participant:
     additionalEnvVars:
       - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
   participantPruningSchedule:
     cron: '0 /10 * * * ?'
     maxDuration: '5m'
