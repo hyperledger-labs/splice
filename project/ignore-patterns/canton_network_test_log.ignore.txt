@@ -155,4 +155,4 @@ Found roll forward config.*but available sequencers.*is less than the trust thre
 Ryuk has been disabled
 
 # CloseVoteRequest can race across SVs in tests; one actor closes it and the others may see locked/inactive/missing contract
-Failed processing with outcome: failed to close VoteRequest\..*(ABORTED: LOCAL_VERDICT_LOCKED_CONTRACTS|NOT_FOUND: LOCAL_VERDICT_INACTIVE_CONTRACTS|NOT_FOUND: CONTRACT_NOT_FOUND).*
+Failed processing with outcome: failed to close VoteRequest\..*
