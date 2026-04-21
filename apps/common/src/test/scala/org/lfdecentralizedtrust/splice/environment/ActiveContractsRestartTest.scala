@@ -11,6 +11,7 @@ import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.ActiveContractsItem
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.test.HasRetryProvider
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -18,7 +19,6 @@ import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 
 class ActiveContractsRestartTest
     extends BaseTest
@@ -67,13 +67,20 @@ class ActiveContractsRestartTest
             case 1 =>
               request.streamContinuationToken shouldBe None
               // return two items and then make it fail, which will cause the stream to restart
-              Source(List(makeResponse(1), makeResponse(2), makeResponse(3), makeResponse(4)))
-                .concat(
-                  Source
-                    .lazyFuture(() => Future.failed(new RuntimeException("stream failure")))
-                    .delay(FiniteDuration.apply(500, "millis"))
-                )
+              Source(List(makeResponse(1), makeResponse(2), makeResponse(3)))
+                .mapAsync(parallelism = 1) { item =>
+                  if (
+                    item.contractEntry.activeContract
+                      .flatMap(_.createdEvent)
+                      .exists(_.contractId == "3")
+                  ) {
+                    Future.failed(new RuntimeException("Stream failure on purpose"))
+                  } else {
+                    Future.successful(item)
+                  }
+                }
             case 2 =>
+              // The continuation token is properly passed
               request.streamContinuationToken shouldBe Some(
                 ByteString.copyFromUtf8("token-2")
               )
@@ -88,22 +95,30 @@ class ActiveContractsRestartTest
         testRetryProvider,
       )
 
-      val result = loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
-        connection
-          .activeContracts(EventFormat.defaultInstance, 0L)
-          .runWith(Sink.seq)
-          .futureValue,
-        lines => {
-          forExactly(1, lines) { line =>
-            line.message should include(
-              "Starting active contracts stream with continuation token Some(token-2)"
-            )
-          }
-        },
-      )
+      val result: Seq[BaseLedgerConnection.ActiveContractsItem] =
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+          connection
+            .activeContracts(EventFormat.defaultInstance, 0L)
+            .runWith(Sink.seq)
+            .futureValue,
+          lines => {
+            forExactly(1, lines) { line =>
+              line.message should include(
+                "Starting active contracts stream with continuation token Some(token-2)"
+              )
+            }
+            // TODO: this doesn't actually get suppressed
+            forExactly(1, lines) { line =>
+              line.warningMessage should include("Stream failure on purpose")
+            }
+          },
+        )
 
       callCount.get() shouldBe 2
-      result should be(Seq())
+      result
+        .collect { case ActiveContractsItem.ActiveContract(contract) =>
+          contract.createdEvent.getContractId
+        } should be(List("1", "2", "3"))
     }
   }
 }

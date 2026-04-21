@@ -109,7 +109,8 @@ class BaseLedgerConnection(
       RestartSource.onFailuresWithBackoff(RestartSettings(0.5.seconds, 1.second, 0.5))(() => {
         val streamContinuationTokenValue = streamContinuationToken.get()
         logger.info(
-          s"Starting active contracts stream with continuation token $streamContinuationTokenValue"
+          s"Starting active contracts stream with continuation token ${streamContinuationTokenValue
+              .map(_.toStringUtf8)}"
         )
         client
           .activeContracts(
@@ -120,7 +121,6 @@ class BaseLedgerConnection(
             )
           )
           .map { item =>
-            println(s"Processing ${item}")
             streamContinuationToken.set(Some(item.streamContinuationToken))
             item
           }
