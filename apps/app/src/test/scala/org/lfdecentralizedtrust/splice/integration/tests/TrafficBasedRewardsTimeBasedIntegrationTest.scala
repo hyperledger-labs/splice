@@ -7,18 +7,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   metadatav1,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
-  AmuletConfig,
-  RewardConfig,
-  RewardVersion,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.sv.config.InitialRewardConfig
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -26,17 +22,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTrigger
 import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
-  AmuletConfigUtil,
   ChoiceContextWithDisclosures,
-  SpliceUtil,
   TimeTestUtil,
   TriggerTestUtil,
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-
-import java.util.Optional
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -53,8 +44,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     with TriggerTestUtil
     with TimeTestUtil
     with ExternallySignedPartyTestUtil
-    with TokenStandardTest
-    with AmuletConfigUtil {
+    with TokenStandardTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -74,29 +64,17 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
           _.withPausedTrigger[RewardComputationTrigger]
         )(config)
       )
-
-  import TrafficBasedRewardsTimeBasedIntegrationTest.*
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.withRewardConfig(
+          InitialRewardConfig(
+            mintingVersion = TrafficBasedRewardsTimeBasedIntegrationTest.trafficBasedAppRewards,
+            appRewardCouponThreshold =
+              TrafficBasedRewardsTimeBasedIntegrationTest.appRewardCouponThreshold,
+          )
+        )(config)
+      )
 
   "App activity records are created for featured app parties" in { implicit env =>
-    clue("Set rewardConfig on AmuletConfig so OpenMiningRounds have CIP-104 fields") {
-      val amuletRules = sv1ScanBackend.getAmuletRules()
-      val currentConfig =
-        AmuletConfigSchedule(amuletRules).getConfigAsOf(env.environment.clock.now)
-      val newConfig = new AmuletConfig(
-        currentConfig.transferConfig,
-        currentConfig.issuanceCurve,
-        currentConfig.decentralizedSynchronizer,
-        currentConfig.tickDuration,
-        currentConfig.packageConfig,
-        currentConfig.transferPreapprovalFee,
-        currentConfig.featuredAppActivityMarkerAmount,
-        currentConfig.optDevelopmentFundManager,
-        currentConfig.externalPartyConfigStateTickDuration,
-        Optional.of(testRewardConfig),
-      )
-      setAmuletConfig(Seq((None, newConfig, currentConfig)))
-    }
-
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val venuePartyHint = s"venue-party-${Random.nextInt()}"
@@ -433,24 +411,9 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
 object TrafficBasedRewardsTimeBasedIntegrationTest {
 
   // Use traffic-based app rewards (CIP-0104), not on-ledger coupon counting.
-  private val rewardMintingVersion = RewardVersion.REWARDVERSION_TRAFFICBASEDAPPREWARDS
-
-  // Number of minting allowances per leaf node in the Merkle tree.
-  private val rewardBatchSize = 100L
-
-  // Reward coupons expire after 36 hours, supporting batched collection
-  // across 12-hour windows with a 24-hour prepare-submission delay.
-  private val rewardCouponTimeToLive = new RelTime(36L * 3600L * 1000000L)
+  val trafficBasedAppRewards = "RewardVersion_TrafficBasedAppRewards"
 
   // Set to zero so no rewards are filtered out in this test.
   // In production this would be a small USD amount (e.g. 0.5).
-  private val appRewardCouponThreshold = SpliceUtil.damlDecimal(0.0)
-
-  private val testRewardConfig = new RewardConfig(
-    rewardMintingVersion,
-    Optional.empty(), // dryRunVersion — no dry-run in tests
-    rewardBatchSize,
-    rewardCouponTimeToLive,
-    appRewardCouponThreshold,
-  )
+  val appRewardCouponThreshold = BigDecimal(0.0)
 }
