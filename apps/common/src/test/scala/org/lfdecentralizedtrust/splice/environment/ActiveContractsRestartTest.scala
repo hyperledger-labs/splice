@@ -9,6 +9,7 @@ import com.daml.ledger.api.v2.transaction_filter.EventFormat
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
+import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.ActiveContractsItem
@@ -99,6 +100,11 @@ class ActiveContractsRestartTest
         loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           connection
             .activeContracts(EventFormat.defaultInstance, 0L)
+            // Disable akka's debugging which escapes the suppression
+            .addAttributes(
+              Attributes
+                .logLevels(Attributes.logLevelOff, Attributes.logLevelOff, Attributes.logLevelOff)
+            )
             .runWith(Sink.seq)
             .futureValue,
           lines => {
@@ -106,10 +112,6 @@ class ActiveContractsRestartTest
               line.message should include(
                 "Starting active contracts stream with continuation token Some(token-2)"
               )
-            }
-            // TODO: this doesn't actually get suppressed
-            forExactly(1, lines) { line =>
-              line.warningMessage should include("Stream failure on purpose")
             }
           },
         )
