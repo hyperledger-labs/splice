@@ -120,6 +120,7 @@ class BaseLedgerConnection(
             )
           )
           .map { item =>
+            println(s"Processing ${item}")
             streamContinuationToken.set(Some(item.streamContinuationToken))
             item
           }
