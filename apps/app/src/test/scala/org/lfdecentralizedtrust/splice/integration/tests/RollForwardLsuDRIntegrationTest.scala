@@ -55,6 +55,8 @@ class RollForwardLsuDRIntegrationTest
 
   override protected def runEventHistorySanityCheck: Boolean = false
   override protected lazy val resetRequiredTopologyState: Boolean = false
+  // Doesn't work with both sv1Scan and sv1ScanLocal
+  override protected lazy val runUpdateHistorySanityCheck = false
 
   override def dbsSuffix = "lsu_dr"
   override def usesDbs = super.usesDbs ++ super.usesDbs.map(_ + "beforedr")
