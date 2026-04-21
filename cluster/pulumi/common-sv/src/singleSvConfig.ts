@@ -72,7 +72,6 @@ const SvParticipantConfigSchema = z
     additionalJvmOptions: z.string().optional(),
     cloudSql: CloudSqlWithOverrideConfigSchema,
     resources: K8sResourceSchema,
-    legacyDatabaseName: z.string().optional(),
   })
   .strict();
 const Auth0ConfigSchema = z

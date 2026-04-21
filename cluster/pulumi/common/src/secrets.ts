@@ -217,7 +217,7 @@ export function installPostgresPasswordSecret(
   password: pulumi.Input<string>,
   secretName: string,
   existingSecretName?: string,
-  yieldManagement: boolean = false
+  retainDbResourcesOnDelete: boolean = false
 ): k8s.core.v1.Secret {
   const importOpts =
     existingSecretName !== undefined
@@ -240,7 +240,7 @@ export function installPostgresPasswordSecret(
     },
     {
       dependsOn: [ns.ns],
-      retainOnDelete: yieldManagement,
+      retainOnDelete: retainDbResourcesOnDelete,
       ...importOpts,
     }
   );

@@ -305,8 +305,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-pg-secrets"
     },
     "name": "sv-1-participant-pg",
     "provider": "",
@@ -434,7 +434,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
@@ -589,8 +589,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-pg-secrets"
     },
     "name": "sv-da-1-participant-pg",
     "provider": "",
@@ -743,7 +743,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
@@ -910,8 +910,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-pg-secrets"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1039,7 +1039,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",

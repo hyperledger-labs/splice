@@ -98,7 +98,7 @@ export class CloudPostgres
       namespace,
       secretName,
       defaultUserName,
-      yieldManagement = false,
+      retainDbResourcesOnDelete = false,
     } = args;
     const zoneFromEnv = config.optionalEnv('DB_CLOUDSDK_COMPUTE_ZONE') || GCP_ZONE;
     if (!zoneFromEnv) {
@@ -178,8 +178,8 @@ export class CloudPostgres
       {
         aliases: opts?.aliases,
         parent: this,
-        protect: !yieldManagement && deletionProtection,
-        retainOnDelete: yieldManagement,
+        protect: !retainDbResourcesOnDelete && deletionProtection,
+        retainOnDelete: retainDbResourcesOnDelete,
         ...databaseInstanceImportOpts,
       }
     );
@@ -198,8 +198,8 @@ export class CloudPostgres
       {
         parent: this,
         deletedWith: databaseInstance,
-        protect: !yieldManagement && deletionProtection,
-        retainOnDelete: yieldManagement,
+        protect: !retainDbResourcesOnDelete && deletionProtection,
+        retainOnDelete: retainDbResourcesOnDelete,
         aliases: [{ name: `${namespace.logicalName}-db-${alias}-cantonnet` }],
         import: existingDatabase?.id,
       }
@@ -241,13 +241,13 @@ export class CloudPostgres
       instanceName,
       namespace,
       secretName,
-      yieldManagement,
+      retainDbResourcesOnDelete,
     } = this.args;
     const isDefaultUser = userName === defaultUserName;
     const resourceName = `${namespace.logicalName}-${instanceName}-${userName}`;
     const password = generatePassword(`${resourceName}-passwd`, {
       parent: this,
-      protect: !yieldManagement && this.deletionProtection,
+      protect: !retainDbResourcesOnDelete && this.deletionProtection,
       //   aliases: [{ name: `${namespace.logicalName}-${alias}-passwd` }],
       aliases: isDefaultUser
         ? [{ name: `${this.name}-passwd` }, { name: `${namespace.logicalName}-${alias}-passwd` }]
@@ -259,7 +259,7 @@ export class CloudPostgres
       password,
       k8sSecretName,
       existingSecretName,
-      yieldManagement
+      retainDbResourcesOnDelete
     );
 
     const defaultUserOpts = isDefaultUser
@@ -289,8 +289,8 @@ export class CloudPostgres
         parent: this,
         deletedWith: databaseInstance,
         dependsOn: [passwordSecret],
-        protect: !yieldManagement && deletionProtection,
-        retainOnDelete: yieldManagement,
+        protect: !retainDbResourcesOnDelete && deletionProtection,
+        retainOnDelete: retainDbResourcesOnDelete,
         ...defaultUserOpts,
         ...userImportOpts,
       }
@@ -314,7 +314,7 @@ export class CloudPostgres
       deletionProtection: (args.disableProtection ?? false) ? false : args.cloudSqlConfig.protected,
       logicalDecoding: args.logicalDecoding ?? false,
       defaultUserName: args.userName ?? 'cnadmin',
-      yieldManagement: args.yieldManagement ?? false,
+      retainDbResourcesOnDelete: args.retainDbResourcesOnDelete ?? false,
     };
     super('canton:cloud:postgres', name, resolvedArgs, opts);
   }
@@ -343,7 +343,7 @@ export type CloudPostgresArgs = {
   namespace: ExactNamespace;
   secretName: string;
   userName?: string;
-  yieldManagement?: boolean;
+  retainDbResourcesOnDelete?: boolean;
 };
 
 type CloudPostgresResolvedArgs = {
@@ -359,7 +359,7 @@ type CloudPostgresResolvedArgs = {
   namespace: ExactNamespace;
   secretName: string;
   defaultUserName: string;
-  yieldManagement: boolean;
+  retainDbResourcesOnDelete: boolean;
 };
 
 type CloudPostgresOutput = {
@@ -498,7 +498,7 @@ export async function installPostgres(
     userName?: string;
     existingInstanceName?: string;
     existingSecretName?: string;
-    yieldManagement?: boolean;
+    retainDbResourcesOnDelete?: boolean;
   } = {}
 ): Promise<Postgres> {
   const o = { isActive: true, ...opts };
@@ -519,7 +519,7 @@ export async function installPostgres(
           namespace: xns,
           secretName,
           userName: o.userName,
-          yieldManagement: o.yieldManagement,
+          retainDbResourcesOnDelete: o.retainDbResourcesOnDelete,
         },
         {
           aliases: [{ name: `${xns.logicalName}-${alias}` }],

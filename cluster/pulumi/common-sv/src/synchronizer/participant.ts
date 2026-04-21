@@ -5,6 +5,7 @@ import {
   Auth0Config,
   ChartValues,
   CnChartVersion,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
@@ -51,7 +52,7 @@ export type ParticipantArgs = {
   };
   migratingDatabaseInstanceName?: string;
   migratingDatabaseSecretName?: string;
-  yieldManagement?: boolean;
+  retainDbResourcesOnDelete?: boolean;
 };
 
 export type ParticipantOutput = {
@@ -67,7 +68,7 @@ async function installParticipantPostgres({
   migration,
   migratingDatabaseInstanceName,
   migratingDatabaseSecretName,
-  yieldManagement,
+  retainDbResourcesOnDelete,
 }: ParticipantArgs): Promise<Postgres> {
   return await installPostgres(
     xns,
@@ -82,7 +83,7 @@ async function installParticipantPostgres({
       disableProtection,
       existingInstanceName: migratingDatabaseInstanceName,
       existingSecretName: migratingDatabaseSecretName,
-      yieldManagement,
+      retainDbResourcesOnDelete,
     }
   );
 }
@@ -115,8 +116,7 @@ function installParticipantChart(
       host: db.address,
       secretName: db.secretName,
       // the following will not be needed when the MIGRATION_ID gets removed from defaults
-      databaseName:
-        participant?.legacyDatabaseName ?? `participant${migrationSuffix(migration?.id, '_')}`,
+      databaseName: `participant${migrationSuffix(DecentralizedSynchronizerUpgradeConfig.frozenMigrationId ?? migration?.id, '_')}`,
     },
     auth: {
       ...defaultValues.auth,

@@ -1744,8 +1744,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-1-pg-secrets"
     },
     "name": "sv-1-mediator-1-pg",
     "provider": "",
@@ -1859,8 +1859,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-2-pg-secrets"
     },
     "name": "sv-1-mediator-2-pg",
     "provider": "",
@@ -1974,8 +1974,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-3-pg-secrets"
     },
     "name": "sv-1-mediator-3-pg",
     "provider": "",
@@ -2089,8 +2089,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-4-pg-secrets"
     },
     "name": "sv-1-mediator-4-pg",
     "provider": "",
@@ -2204,8 +2204,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-1-pg-secrets"
     },
     "name": "sv-1-participant-1-pg",
     "provider": "",
@@ -2319,8 +2319,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-2-pg-secrets"
     },
     "name": "sv-1-participant-2-pg",
     "provider": "",
@@ -2434,8 +2434,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-3-pg-secrets"
     },
     "name": "sv-1-participant-3-pg",
     "provider": "",
@@ -2567,7 +2567,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-3-pg",
           "schema": "participant",
@@ -2653,8 +2653,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-1-pg-secrets"
     },
     "name": "sv-1-sequencer-1-pg",
     "provider": "",
@@ -2768,8 +2768,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-2-pg-secrets"
     },
     "name": "sv-1-sequencer-2-pg",
     "provider": "",
@@ -2883,8 +2883,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-3-pg-secrets"
     },
     "name": "sv-1-sequencer-3-pg",
     "provider": "",
@@ -2998,8 +2998,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-4-pg-secrets"
     },
     "name": "sv-1-sequencer-4-pg",
     "provider": "",
@@ -4125,8 +4125,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-1-pg-secrets"
     },
     "name": "sv-da-1-mediator-1-pg",
     "provider": "",
@@ -4240,8 +4240,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-2-pg-secrets"
     },
     "name": "sv-da-1-mediator-2-pg",
     "provider": "",
@@ -4355,8 +4355,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-3-pg-secrets"
     },
     "name": "sv-da-1-mediator-3-pg",
     "provider": "",
@@ -4470,8 +4470,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-4-pg-secrets"
     },
     "name": "sv-da-1-mediator-4-pg",
     "provider": "",
@@ -4585,8 +4585,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-1-pg-secrets"
     },
     "name": "sv-da-1-participant-1-pg",
     "provider": "",
@@ -4700,8 +4700,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-2-pg-secrets"
     },
     "name": "sv-da-1-participant-2-pg",
     "provider": "",
@@ -4815,8 +4815,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-3-pg-secrets"
     },
     "name": "sv-da-1-participant-3-pg",
     "provider": "",
@@ -4973,7 +4973,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-3-pg",
           "schema": "participant",
@@ -5059,8 +5059,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-1-pg-secrets"
     },
     "name": "sv-da-1-sequencer-1-pg",
     "provider": "",
@@ -5174,8 +5174,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-2-pg-secrets"
     },
     "name": "sv-da-1-sequencer-2-pg",
     "provider": "",
@@ -5289,8 +5289,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-3-pg-secrets"
     },
     "name": "sv-da-1-sequencer-3-pg",
     "provider": "",
@@ -5404,8 +5404,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-4-pg-secrets"
     },
     "name": "sv-da-1-sequencer-4-pg",
     "provider": "",
@@ -6143,8 +6143,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-1-pg-secrets"
     },
     "name": "sv-mediator-1-pg",
     "provider": "",
@@ -6259,8 +6259,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-2-pg-secrets"
     },
     "name": "sv-mediator-2-pg",
     "provider": "",
@@ -6375,8 +6375,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-3-pg-secrets"
     },
     "name": "sv-mediator-3-pg",
     "provider": "",
@@ -6491,8 +6491,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "mediator-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "mediator-4-pg-secrets"
     },
     "name": "sv-mediator-4-pg",
     "provider": "",
@@ -6607,8 +6607,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-1-pg-secrets"
     },
     "name": "sv-participant-1-pg",
     "provider": "",
@@ -6723,8 +6723,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-2-pg-secrets"
     },
     "name": "sv-participant-2-pg",
     "provider": "",
@@ -6839,8 +6839,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "participant-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "participant-3-pg-secrets"
     },
     "name": "sv-participant-3-pg",
     "provider": "",
@@ -6972,7 +6972,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_2",
           "port": 5432,
           "postgresName": "participant-3-pg",
           "schema": "participant",
@@ -7059,8 +7059,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-1-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-1-pg-secrets"
     },
     "name": "sv-sequencer-1-pg",
     "provider": "",
@@ -7175,8 +7175,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-2-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-2-pg-secrets"
     },
     "name": "sv-sequencer-2-pg",
     "provider": "",
@@ -7291,8 +7291,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-3-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-3-pg-secrets"
     },
     "name": "sv-sequencer-3-pg",
     "provider": "",
@@ -7407,8 +7407,8 @@
           "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
         }
       },
-      "secretName": "sequencer-4-pg-secrets",
-      "yieldManagement": false
+      "retainDbResourcesOnDelete": false,
+      "secretName": "sequencer-4-pg-secrets"
     },
     "name": "sv-sequencer-4-pg",
     "provider": "",
