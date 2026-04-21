@@ -7,6 +7,7 @@ import cats.data.OptionT
 import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple6Semigroupal, toTraverseOps}
 import cats.instances.future.*
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -485,6 +486,7 @@ class SvApp(
                 node.ensureMediatorPruningSchedule()
               }
               _ <- node.ensureDABFTPruningSchedule()
+              _ <- localSynchronizerNodes.successor.traverse_(_.ensureDABFTPruningSchedule())
             } yield ()
           } else {
             logger.info(
