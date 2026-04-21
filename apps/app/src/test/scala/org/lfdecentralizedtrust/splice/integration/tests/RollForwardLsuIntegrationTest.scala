@@ -379,10 +379,12 @@ class RollForwardLsuIntegrationTest
       }
 
       clue("SV1's DABFT node has pruning config set") {
-        sv1LocalBackend.sequencerClient.bft.pruning.get_schedule() shouldBe PruningSchedule(
-          "0 /10 * * * ?",
-          PositiveDurationSeconds.ofMinutes(5),
-          PositiveDurationSeconds.ofDays(30),
+        sv1LocalBackend.sequencerClient.bft.pruning.get_schedule() shouldBe Some(
+          PruningSchedule(
+            "0 /10 * * * ?",
+            PositiveDurationSeconds.ofMinutes(5),
+            PositiveDurationSeconds.ofDays(30),
+          )
         )
       }
 
