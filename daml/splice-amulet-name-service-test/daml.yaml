@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-amulet-name-service-test
 source: daml
-version: 0.1.22
+version: 0.1.23
 dependencies:
   - daml-prim
   - daml-stdlib
