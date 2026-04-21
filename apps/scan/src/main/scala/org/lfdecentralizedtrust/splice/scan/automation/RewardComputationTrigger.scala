@@ -67,9 +67,12 @@ class RewardComputationTrigger(
           latestCompleteO,
           latestComputedO,
         )
-        // Returns Seq.empty (not a failing task) when data is unavailable, so
-        // the trigger retries on the next poll without producing alert-worthy
-        // log warnings. This handles two cases:
+        // Returns Seq.empty (no task created) when data is unavailable.
+        // This skips the round for this poll cycle — the trigger will poll
+        // again on its next interval. Unlike a failing task, this does not
+        // consume one of the trigger's limited task retries (which, once
+        // exhausted, cause the task to be abandoned with a log warning).
+        // Two cases:
         //   - The reference store hasn't ingested the round yet (scan catching up)
         //   - The round is pre-CIP-104 (rewardConfig/trafficPrice absent)
         task <- candidateRoundO match {
