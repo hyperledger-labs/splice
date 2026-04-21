@@ -153,6 +153,3 @@ Failed to connect to scan of FAILED Seed URL.*RollForwardLsu.*IntegrationTest
 Found roll forward config.*but available sequencers.*is less than the trust threshold in the configuration.*RollForwardLsuIntegrationTest
 
 Ryuk has been disabled
-
-# CloseVoteRequest can race across SVs in tests; one actor closes it and the others may see locked/inactive/missing contract
-Failed processing with outcome: failed to close VoteRequest\..*
