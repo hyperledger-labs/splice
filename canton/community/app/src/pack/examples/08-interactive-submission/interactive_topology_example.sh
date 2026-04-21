@@ -63,7 +63,7 @@ fingerprint=$(compute_canton_fingerprint < namespace_public_key.der)
 echo "Fingerprint: $fingerprint"
 
 # [start create mapping]
-# Base64 encoded public key: grpcurl expects protobuf bytes value to be Base64 encoded in the JSON representation
+# Base64 encoded public key: grpc-client-cli expects protobuf bytes value to be Base64 encoded in the JSON representation
 public_key_base64=$(openssl enc -base64 -A -in namespace_public_key.der)
 # This is a root delegation and therefore can sign all mappings
 mapping=$(build_namespace_mapping "$fingerprint" "CRYPTO_KEY_FORMAT_DER_X509_SUBJECT_PUBLIC_KEY_INFO" "$public_key_base64" "SIGNING_KEY_SPEC_EC_P256" '"can_sign_all_mappings": {}')

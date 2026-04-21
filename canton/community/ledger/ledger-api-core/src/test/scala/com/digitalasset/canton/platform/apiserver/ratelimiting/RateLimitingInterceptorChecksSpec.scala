@@ -63,7 +63,7 @@ final class RateLimitingInterceptorChecksSpec
 
   behavior of "RateLimitingInterceptor"
 
-  /** Allowing metadata requests allows grpcurl to be used to debug problems */
+  /** Allowing metadata requests allows grpc-client-cli to be used to debug problems */
   it should "allow metadata requests even when over limit" in {
     metrics.openTelemetryMetricsFactory
       .meter(

@@ -204,7 +204,7 @@ and even before a synchronizer upgrade has been formally scheduled:
    including setting up the ingress for the new sequencer.
    Note that these components are only initialized by the SV app once the synchronizer migration has started.
    Ensure that all pods report as healthy.
-   Note that when using ``grpcurl`` to check that the ingress rule for the new sequencer is set up correctly
+   Note that when using ``grpc-client-cli`` to check that the ingress rule for the new sequencer is set up correctly
    (as described in :ref:`helm-sv-ingress`), you will get a ``rpc error: code = Unavailable`` error as the sequencer is not yet initialized
    (and its public gRPC endpoint is therefore not yet available).
    If the rpc error details include a ``delayed connect error: 111`` message,

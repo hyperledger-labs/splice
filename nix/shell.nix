@@ -32,6 +32,7 @@ let
     git-lfs
     git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
+    grpc-client-cli
     grpcurl
     hub # Github CLI for todo checker
     jq
