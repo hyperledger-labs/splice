@@ -9,11 +9,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
+import org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTrigger
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   TimeTestUtil,
@@ -53,6 +58,11 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
           backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
         }
       })
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.withPausedTrigger[RewardComputationTrigger]
+        )(config)
+      )
 
   "App activity records are created for featured app parties" in { implicit env =>
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -71,6 +81,11 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     bobWalletClient.tap(1000)
 
     assertOldestOpenRound(0)
+
+    clue("Reward accounting endpoints return 404 before any data is available") {
+      sv1ScanBackend.getRewardAccountingEarliestAvailableRound() shouldBe None
+      sv1ScanBackend.getRewardAccountingActivityTotals(0L) shouldBe None
+    }
 
     // Here we perform all settlements with verdict ingestion paused just to
     // confirm that activity record computations does happen properly even when
@@ -169,6 +184,48 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
       val event = fetchEvent(updateId4, "updateId4")
       assertTrafficSummary(event, "updateId4")
       assertAppActivity(event, "updateId4", Set(aliceParty), expectedRound = 7)
+    }
+
+    // -- Reward pipeline endpoint checks --------------------------------------
+    // ScanAggregationTrigger runs unpaused throughout the test and has already
+    // aggregated completed rounds. Run the paused RewardComputationTrigger to
+    // compute rewards, then verify the reward accounting HTTP endpoints.
+
+    clue("Run the reward computation trigger") {
+      sv1ScanBackend.automation
+        .trigger[RewardComputationTrigger]
+        .runOnce()
+        .futureValue
+    }
+
+    val earliest = clue("Verify earliest available round is returned") {
+      val e = sv1ScanBackend.getRewardAccountingEarliestAvailableRound()
+      e shouldBe defined
+      e.value
+    }
+
+    clue("Verify activity totals for the computed round") {
+      val totals = sv1ScanBackend.getRewardAccountingActivityTotals(earliest)
+      totals.value.roundNumber shouldBe earliest
+      totals.value.activityRecordsCount should be > 0L
+    }
+
+    clue("Verify root hash is available") {
+      val rootHash = sv1ScanBackend.getRewardAccountingRootHash(earliest)
+      rootHash shouldBe defined
+      rootHash.value.roundNumber shouldBe earliest
+      rootHash.value.rootHash should have length 64 // hex-encoded SHA-256
+    }
+
+    clue("Verify batch lookup for root hash returns batch contents") {
+      val rootHashHex = sv1ScanBackend.getRewardAccountingRootHash(earliest).value.rootHash
+      sv1ScanBackend.getRewardAccountingBatch(earliest, rootHashHex) shouldBe defined
+    }
+
+    clue("Verify 404 for non-existent data") {
+      sv1ScanBackend.getRewardAccountingActivityTotals(earliest + 100) shouldBe None
+      sv1ScanBackend.getRewardAccountingRootHash(earliest + 100) shouldBe None
+      sv1ScanBackend.getRewardAccountingBatch(earliest, "0" * 64) shouldBe None
     }
   }
 

@@ -196,7 +196,7 @@ describe('Create Unallocated Unclaimed Activity Record Form', () => {
     });
   });
 
-  test('mint before date must be after effective date', async () => {
+  test('mint before date must be at least 2 hours after effective date', async () => {
     render(
       <Wrapper>
         <CreateUnallocatedUnclaimedActivityRecordForm />
@@ -225,7 +225,7 @@ describe('Create Unallocated Unclaimed Activity Record Form', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByText('Mint Before date must be after Effective Date')
+        screen.queryByText('Mint Before date must be at least 2 hours after Effective Date')
       ).not.toBeInTheDocument();
     });
 
@@ -235,7 +235,17 @@ describe('Create Unallocated Unclaimed Activity Record Form', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByText('Mint Before date must be after Effective Date')
+        screen.queryByText('Mint Before date must be at least 2 hours after Effective Date')
+      ).toBeInTheDocument();
+    });
+
+    // Set a mint before date that is after effective date but less than 2 hours
+    const tooCloseMintBeforeDate = dayjs(effectiveDate).add(1, 'hour').format(dateTimeFormatISO);
+    fireEvent.change(mintBeforeInput, { target: { value: tooCloseMintBeforeDate } });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Mint Before date must be at least 2 hours after Effective Date')
       ).toBeInTheDocument();
     });
   });

@@ -51,7 +51,10 @@ object DarResources {
     lazy val tokenTestTradingApp = PackageResource(
       DarResource(s"splice-token-test-trading-app-current.dar"),
       DarResource(s"splice-token-test-trading-app-1.0.0.dar"),
-      Seq(DarResource(s"splice-token-test-trading-app-1.0.0.dar")),
+      Seq(
+        DarResource(s"splice-token-test-trading-app-1.0.0.dar"),
+        DarResource(s"splice-token-test-trading-app-1.0.1.dar"),
+      ),
     )
     lazy val allProductionPackageResources = tokenMetadata +: (for {
       version <- Seq(1, 2)
@@ -368,6 +371,7 @@ object DarResources {
   lazy val validatorLifecycle_0_1_4 = DarResource("splice-validator-lifecycle-0.1.4.dar")
   lazy val validatorLifecycle_0_1_5 = DarResource("splice-validator-lifecycle-0.1.5.dar")
   lazy val validatorLifecycle_0_1_6 = DarResource("splice-validator-lifecycle-0.1.6.dar")
+  lazy val validatorLifecycle_0_1_7 = DarResource("splice-validator-lifecycle-0.1.7.dar")
   lazy val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   lazy val validatorLifecycle = PackageResource(
     validatorLifecycle_current,
@@ -380,11 +384,13 @@ object DarResources {
       validatorLifecycle_0_1_4,
       validatorLifecycle_0_1_5,
       validatorLifecycle_0_1_6,
+      validatorLifecycle_0_1_7,
     ),
   )
 
   lazy val batchedMarkers_1_0_0 = DarResource("splice-util-batched-markers-1.0.0.dar")
   lazy val batchedMarkers_1_0_1 = DarResource("splice-util-batched-markers-1.0.1.dar")
+  lazy val batchedMarkers_1_0_2 = DarResource("splice-util-batched-markers-1.0.2.dar")
   lazy val batchedMarkers_current = DarResource("splice-util-batched-markers-current.dar")
   lazy val batchedMarkers = PackageResource(
     batchedMarkers_current,
@@ -392,6 +398,7 @@ object DarResources {
     Seq(
       batchedMarkers_1_0_0,
       batchedMarkers_1_0_1,
+      batchedMarkers_1_0_2,
     ),
   )
 

@@ -401,13 +401,14 @@ class ParticipantTestingGroup(
   def fetch_synchronizer_time(
       synchronizer: Synchronizer,
       timeout: config.NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
+      freshnessBound: config.NonNegativeFiniteDuration = config.NonNegativeFiniteDuration.Zero,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
         adminCommand(
           SynchronizerTimeCommands.FetchTime(
             synchronizer.some,
-            NonNegativeFiniteDuration.Zero,
+            freshnessBound.toInternal,
             timeout,
           )
         )

@@ -171,6 +171,38 @@ describe('Set DSO Config Rules Form', () => {
     });
   });
 
+  test('should show error when submitting without configuration changes', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+    await user.click(actionInput);
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(() => {
+      expect(submitButton.getAttribute('disabled')).not.toBeInTheDocument();
+    });
+
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Cannot submit a proposal with no configuration changes')
+      ).toBeInTheDocument();
+    });
+  });
+
   test('changing config fields should render the current value', async () => {
     const user = userEvent.setup();
 

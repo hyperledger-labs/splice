@@ -14,8 +14,8 @@ import {
 import { allSvsToDeploy, coreSvsToDeploy } from './svConfigs';
 import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
 
-export function installSvLoopback(namespace: ExactNamespace): pulumi.Resource[] {
-  return installLoopback(namespace, true);
+export function installSvLoopback(namespace: ExactNamespace, cometbft: boolean): pulumi.Resource[] {
+  return installLoopback(namespace, cometbft);
 }
 
 export function installLoopback(

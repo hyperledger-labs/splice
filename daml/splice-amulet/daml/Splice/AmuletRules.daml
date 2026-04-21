@@ -8,7 +8,7 @@ import Prelude hiding (forA)
 
 import DA.Action (filterA, foldlA, when, unless, void)
 import DA.Assert
-import DA.Exception
+import DA.Fail
 import DA.Foldable (forA_)
 import DA.List (dedupSort, maximumOn)
 import DA.Map (Map)
@@ -16,6 +16,7 @@ import qualified DA.Map as Map
 import DA.Optional (fromOptional, isNone, optionalToList)
 import DA.Set (Set)
 import qualified DA.Set as Set
+import DA.TextMap (TextMap)
 import qualified DA.TextMap as TextMap
 import DA.Traversable (forA)
 import qualified DA.Text as T
@@ -247,7 +248,7 @@ template AmuletRules
         -- validate choice parameters
         configUsd <- getValueAsOfLedgerTime configSchedule
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
-          Left err -> throw (InvalidTransfer err)
+          Left failureStatus -> failWithStatus failureStatus
           Right _ -> pure ()
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
         (transferResult, meta) <- splitAndBurn provider trafficCostAmulet inputs context dso "traffic purchase"
@@ -871,19 +872,71 @@ data InvalidTransferReason
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
-exception InvalidTransfer
-  with
-    reason : InvalidTransferReason
-  where
-    message show reason
+mkUnknownSynchronizerFailure : Text -> FailureStatus
+mkUnknownSynchronizerFailure synchronizerId =
+  mkFailureStatus
+    (spliceErrorId "unknown-synchronizer")
+    InvalidIndependentOfSystemState
+    ("Unknown synchronizer provided: " <> synchronizerId)
+    (TextMap.fromList [("synchronizerId", synchronizerId)])
 
-checkTransferConstraints: Transfer -> TransferSummary -> TransferConfigV2 unit -> Either InvalidTransferReason ()
+mkInsufficientTopupAmountFailure : Int -> Int -> FailureStatus
+mkInsufficientTopupAmountFailure requestedAmount minAmount =
+  mkFailureStatus
+    (spliceErrorId "insufficient-topup-amount")
+    InvalidGivenCurrentSystemStateOther
+    ("The requested top-up amount ("
+      <> show requestedAmount
+      <> ") is below the minimum allowed ("
+      <> show minAmount
+      <> "). Please increase the amount.")
+    (TextMap.fromList
+      [ ("requestedTopupAmount", show requestedAmount)
+      , ("minTopupAmount", show minAmount)
+      ])
+
+mkMaximumInputsExceededFailure : FailureStatus
+mkMaximumInputsExceededFailure =
+  mkFailureStatus
+    (spliceErrorId "maximum-inputs-exceeded")
+    InvalidIndependentOfSystemState
+    "More than the maximum number of inputs"
+    mempty
+
+mkMaximumOutputsExceededFailure : FailureStatus
+mkMaximumOutputsExceededFailure =
+  mkFailureStatus
+    (spliceErrorId "maximum-outputs-exceeded")
+    InvalidIndependentOfSystemState
+    "More than the maximum number of outputs"
+    mempty
+
+mkInsufficientFundsFailure : Decimal -> FailureStatus
+mkInsufficientFundsFailure missingAmount =
+  let requiredAmount = show missingAmount
+  in mkFailureStatus
+      (spliceErrorId "insufficient-funds")
+      InvalidGivenCurrentSystemStateOther
+      ("Insufficient funds: you are missing "
+        <> requiredAmount
+        <> " to complete this transfer.")
+      (TextMap.fromList [("requiredAmount", requiredAmount)])
+
+spliceErrorId : Text -> Text
+spliceErrorId t = "splice.lfdecentralizedtrust.org/" <> t
+
+mkFailureStatus : Text -> FailureCategory -> Text -> TextMap Text -> FailureStatus
+mkFailureStatus errorId category message' meta = FailureStatus with message = message'; ..
+
+checkTransferConstraints: Transfer -> TransferSummary -> TransferConfigV2 unit -> Either FailureStatus ()
 checkTransferConstraints transfer summary transferConfigAmulet
-    | length transfer.inputs > transferConfigAmulet.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
-    | length transfer.outputs > transferConfigAmulet.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
-    | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
+    | length transfer.inputs > transferConfigAmulet.maxNumInputs =
+        Left $ mkMaximumInputsExceededFailure
+    | length transfer.outputs > transferConfigAmulet.maxNumOutputs =
+        Left $ mkMaximumOutputsExceededFailure
+    | summary.senderChangeFee < 0.0 =
+        Left $ mkInsufficientFundsFailure (summary.senderChangeFee * (-1.0))
     | otherwise = Right ()
-
 
 -- | An easy way to configure `exucuteTransfer` wrt what rewards to issue.
 -- We currently only use two configurations: but all of the options in here make sense, so we keep them.
@@ -915,7 +968,7 @@ executeTransfer' config csum dso t = do
   summary <- summarizeTransfer t.sender csum.openRoundNumber csum.amuletPrice csum.config isum osum
   -- check that overall transfer constraints are satisfied
   case checkTransferConstraints t summary csum.config of
-    Left err -> throw (InvalidTransfer err)
+    Left failureStatus -> failWithStatus failureStatus
     Right _ -> pure ()
 
   -- issue rewards for burns
@@ -1382,12 +1435,12 @@ transferConfigAmuletFromExternalPartyConfigState : ExternalPartyConfigState -> T
 transferConfigAmuletFromExternalPartyConfigState externalPartyConfigState =
   scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) externalPartyConfigState.transferConfig
 
-validateBuyMemberTrafficInputs : AmuletConfig Unit.USD -> Text -> Int -> Either InvalidTransferReason ()
+validateBuyMemberTrafficInputs : AmuletConfig Unit.USD -> Text -> Int -> Either FailureStatus ()
 validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
-  | not (synchronizerId `Set.member` configUsd.decentralizedSynchronizer.requiredSynchronizers) = Left $ ITR_UnknownSynchronizer with synchronizerId
-  | trafficAmount < configUsd.decentralizedSynchronizer.fees.minTopupAmount = Left $ ITR_InsufficientTopupAmount with
-      requestedTopupAmount = trafficAmount
-      minTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
+  | not (synchronizerId `Set.member` configUsd.decentralizedSynchronizer.requiredSynchronizers) =
+      Left $ mkUnknownSynchronizerFailure synchronizerId
+  | trafficAmount < configUsd.decentralizedSynchronizer.fees.minTopupAmount =
+      Left $ mkInsufficientTopupAmountFailure trafficAmount configUsd.decentralizedSynchronizer.fees.minTopupAmount
   | otherwise = Right ()
 
 -- | Computing synchronizer fees

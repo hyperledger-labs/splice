@@ -3,6 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as assert from 'assert/strict';
 import {
   allSvsToDeployBasic,
   coreSvsToDeployBasic,
@@ -99,6 +100,33 @@ function configureIstiod(
       // taken from https://github.com/istio/istio/issues/37682
       accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
       accessLogEncoding: 'JSON',
+      // Changing istio access log default format to include trace_id:
+      // - envoy access log configuration: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#config-access-log
+      // - w3c docs for trace context: https://www.w3.org/TR/trace-context/#header-name
+      accessLogFormat: JSON.stringify({
+        trace_id: '%REQ(traceparent)%',
+        authority: '%REQ(:AUTHORITY)%',
+        bytes_received: '%BYTES_RECEIVED%',
+        bytes_sent: '%BYTES_SENT%',
+        downstream_local_address: '%DOWNSTREAM_LOCAL_ADDRESS%',
+        downstream_remote_address: '%DOWNSTREAM_REMOTE_ADDRESS%',
+        duration: '%DURATION%',
+        method: '%REQ(:METHOD)%',
+        path: '%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%',
+        protocol: '%PROTOCOL%',
+        request_id: '%REQ(X-REQUEST-ID)%',
+        requested_server_name: '%REQUESTED_SERVER_NAME%',
+        response_code: '%RESPONSE_CODE%',
+        response_code_details: '%RESPONSE_CODE_DETAILS%',
+        response_flags: '%RESPONSE_FLAGS%',
+        start_time: '%START_TIME%',
+        upstream_cluster: '%UPSTREAM_CLUSTER%',
+        upstream_host: '%UPSTREAM_HOST%',
+        upstream_local_address: '%UPSTREAM_LOCAL_ADDRESS%',
+        upstream_service_time: '%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%',
+        user_agent: '%REQ(USER-AGENT)%',
+        x_forwarded_for: '%REQ(X-FORWARDED-FOR)%',
+      }),
       // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
       enablePrometheusMerge: false,
       defaultConfig: {
@@ -273,6 +301,32 @@ function configureCometBFTGatewayService(
   );
 }
 
+/**
+ * There doesn't seem to be an istio-level limit on number of IP lists but at
+ * some point we probably hit some k8s limits on the size of a definition so we
+ * split it into 100-500 IP ranges per policy.
+ *
+ * For 100k IPs, the difference between a chunk size of 100 vs 500 from scratch
+ * is 20min in pulumi vs 130min in pulumi. But we're still concerned about k8s
+ * limits on definition size. So if we break 10000 we'll gradually increase
+ * the chunk size, 20 IPs at a time, until reaching 500 chunk size for 50k IPs,
+ * which at least is tested for up to 100k IPs.
+ *
+ * Why 20? Too small jumps makes much noisier Pulumi previews. Too large, and we
+ * might jump right into a limit only revealed after extensive testing without
+ * really knowing where that limit is. 20 is a compromise: only jumps every 200
+ * IPs so realignment updates are rare.
+ */
+function istioAccessPolicyChunkSize(ipRangesLength: number) {
+  assert.ok(ipRangesLength >= 0, 'nonsense');
+  assert.ok(
+    ipRangesLength < 250000,
+    `${ipRangesLength} IPs untested, consider testing & increasing maximum chunk size`
+  );
+  const stepSize = 20;
+  return Math.max(100, Math.min(500, Math.ceil(ipRangesLength / (stepSize * 100)) * stepSize));
+}
+
 const istioApiVersion = 'security.istio.io/v1beta1';
 
 function istioAccessPolicies(
@@ -299,8 +353,7 @@ function istioAccessPolicies(
     }
   );
   return externalIPRanges.apply(ipRanges => {
-    // There doesn't seem to be an istio-level limit on number of IP lists but at some point we probably hit some k8s limits on the size of a definition so we split it into 100 IP ranges per policy.
-    const chunkSize = 100;
+    const chunkSize = istioAccessPolicyChunkSize(ipRanges.length);
     const chunks = Array.from({ length: Math.ceil(ipRanges.length / chunkSize) }, (_, i) =>
       ipRanges.slice(i * chunkSize, i * chunkSize + chunkSize)
     );
