@@ -2198,7 +2198,7 @@
         "additionalEnvVars": [
           {
             "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
-            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
           },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
@@ -4099,7 +4099,7 @@
           },
           {
             "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
-            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
           },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
@@ -5628,7 +5628,7 @@
         "additionalEnvVars": [
           {
             "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
-            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+            "value": "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
           },
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
