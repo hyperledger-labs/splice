@@ -1,6 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_Error
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -40,12 +43,32 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
 
       actAndCheck(
         "Fail to purchase extra traffic for SV1", {
-          loggerFactory.assertThrowsAndLogs[CommandFailure](
-            buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now),
-            _.errorMessage should include(
-              "splice.lfdecentralizedtrust.org/insufficient-topup-amount"
-            ),
-          )
+          if (
+            PackageVersion.assertFromString(
+              sv1ScanBackend
+                .getAmuletRules()
+                .payload
+                .configSchedule
+                .initialValue
+                .packageConfig
+                .amulet
+            ) >= DarResources.amulet_0_1_18.metadata.version
+          ) {
+            loggerFactory.assertThrowsAndLogs[CommandFailure](
+              buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now),
+              _.errorMessage should include(
+                "splice.lfdecentralizedtrust.org/insufficient-topup-amount"
+              ),
+            )
+          } else {
+            inside(
+              buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now)
+            ) { case coo: COO_Error =>
+              coo.invalidTransferReasonValue.toString should startWith(
+                "ITR_InsufficientTopupAmount"
+              )
+            }
+          }
         },
       )(
         "The failure was ignored by the tx log parser",
