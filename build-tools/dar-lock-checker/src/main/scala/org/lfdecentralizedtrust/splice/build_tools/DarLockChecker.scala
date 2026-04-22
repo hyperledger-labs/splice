@@ -132,6 +132,28 @@ object DarLockChecker {
             val checkedInDarMap = getCheckedInDarMap()
             val lockStr = getLockStr(checkedInDarMap ++ darMap)
             val _ = File(outputFilename).overwrite(lockStr)
+          case "bump" =>
+            val mainDars = fetchMainDarsLock()
+            val targets = detectBumps(darMap, mainDars)
+            if (targets.isEmpty) {
+              println("[damlBumpPackageVersions] No Daml package version bumps needed.")
+            } else {
+              targets.foreach { t =>
+                println(
+                  s"[damlBumpPackageVersions] Bumping ${t.name} ${t.fromVersion} -> ${t.toVersion}"
+                )
+              }
+              targets.foreach { t =>
+                val yamlFile = findDamlYaml(t.name)
+                val updated = rewriteDamlYamlVersion(yamlFile.contentAsString, t.toVersion)
+                val _ = yamlFile.overwrite(updated)
+              }
+              val packageJson = File("apps/package.json")
+              val updatedJson = targets.foldLeft(packageJson.contentAsString) { (acc, t) =>
+                rewritePackageJson(acc, t.name, t.toVersion)
+              }
+              val _ = packageJson.overwrite(updatedJson)
+            }
           case _ =>
             printHelpAndError(s"unknown command '$cmd'")
         }
@@ -280,5 +302,29 @@ object DarLockChecker {
         }
       }
       .toMap
+  }
+
+  private def findDamlYaml(packageName: PackageName): File = {
+    val candidates = Seq(
+      File(s"daml/${packageName}/daml.yaml"),
+      File(s"token-standard/${packageName}/daml.yaml"),
+      File(s"token-standard/examples/${packageName}/daml.yaml"),
+    )
+    candidates.find(_.exists).getOrElse(
+      sys.error(
+        s"Could not locate daml.yaml for $packageName; checked: ${candidates.map(_.toString).mkString(", ")}"
+      )
+    )
+  }
+
+  private def fetchMainDarsLock(): Map[(PackageName, PackageVersion), String] = {
+    val result = Try("git show origin/main:daml/dars.lock".!!)
+    result match {
+      case Success(content) => parseDarsLock(content)
+      case Failure(e) =>
+        sys.error(
+          s"Failed to read daml/dars.lock from origin/main. Run `git fetch origin main` first. Underlying error: ${e.getMessage}"
+        )
+    }
   }
 }
