@@ -4,11 +4,13 @@
 package org.lfdecentralizedtrust.splice.store.events
 
 import com.daml.ledger.javaapi.data.CreatedEvent
+import com.digitalasset.canton.data.CantonTimestamp
 
 /*
 Wrapper around the created event to include the event id.
  */
 case class SpliceCreatedEvent(
     eventId: String,
+    recordTime: CantonTimestamp,
     event: CreatedEvent,
 )

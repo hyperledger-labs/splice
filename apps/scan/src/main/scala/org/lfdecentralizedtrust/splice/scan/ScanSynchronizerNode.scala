@@ -4,9 +4,11 @@
 package org.lfdecentralizedtrust.splice.scan
 
 import org.lfdecentralizedtrust.splice.environment.{SequencerAdminConnection, SynchronizerNode}
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 
 final class ScanSynchronizerNode(
-    override val sequencerAdminConnection: SequencerAdminConnection
+    override val sequencerAdminConnection: SequencerAdminConnection,
+    val sequencerTrafficClient: Option[SequencerTrafficClient],
 ) extends SynchronizerNode(sequencerAdminConnection)
     with AutoCloseable {
   override def close(): Unit = {

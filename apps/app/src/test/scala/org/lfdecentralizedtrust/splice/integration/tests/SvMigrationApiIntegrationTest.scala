@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrati
   directoryForDump,
   migrationDumpPathForSv,
 }
-import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.migrationTestDumpDir
+import org.lfdecentralizedtrust.splice.util.SynchronizerUpgradeUtil.migrationTestDumpDir
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit

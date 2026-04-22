@@ -264,6 +264,53 @@ To tune to your needs, you can set environment variables, for example:
 
 .. include:: ../common/traffic_topups.rst
 
+.. _compose_auto_sweeps:
+
+Configuring sweeps and auto-accepts of transfer offers
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. include:: ../common/wallet_sweeps.rst
+
+To do so, fill the following section and add the following additional config to your validator environment:
+
+.. code-block:: yaml
+
+   # sweep by transferring directly through the transfer preapproval of the receiver,
+   # if set to false sweeping creates transfer offers that need to be accepted on the receiver side.
+   # Note that this refers to the preapprovals described in https://docs.dev.sync.global/background/preapprovals.html
+   # and not to auto accepting transfers. Auto accept transfers does not setup preapproval contracts that allow
+   # for a direct transfer but just automates the acceptance of the transfer offer so in that case
+   # useTransferPreapproval should be set to false.
+   services:
+     validator:
+       environment:
+          - |
+             ADDITIONAL_CONFIG_WALLET_SWEEP=
+               canton.validator-apps.validator_backend.wallet-sweep {
+                 "<senderPartyId1>" {
+                   max-balance-usd = 1000
+                   min-balance-usd = 100
+                   receiver = "<receiverPartyId>"
+                   use-transfer-preapproval = false
+                 }
+               }
+
+Similarly, you can configure the validator to automatically accept transfer offers
+from certain parties on the network. To do so, add the following additional config:
+
+.. code-block:: yaml
+
+   services:
+     validator:
+       environment:
+          - |
+             ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS=
+               canton.validator-apps.validator_backend.auto-accept-transfers {
+                 "<receiverPartyId>" {
+                   from-parties = ["<senderPartyId1>", "<senderPartyId2>"]
+                 }
+               }
+
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++
 

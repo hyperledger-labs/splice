@@ -1,6 +1,6 @@
 # Token Standard V2 DevNet
 
-Splice version: `0.6.0-snapshot.20260407.2423.0.v98974cc3`
+Splice version: `0.6.0-snapshot.20260415.2530.0.v13acc4fb`
 
 Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev`
 
@@ -32,12 +32,13 @@ using the [guide for DevNet](https://hyperledger-labs.github.io/splice/validator
      - to get an onboarding secret: `curl -X POST https://sv.sv-2.token-std-v2-dev.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare`
      - as the URL of your onboarding SV
    - Scan URL: https://scan.sv-2.token-std-v2-dev.global.canton.network.digitalasset.com/
-4. Configure the protocol version to DEV in your participant by using the following environment variable (see [docs for ad-hoc configuration](https://hyperledger-labs.github.io/splice/deployment/configuration.html#adding-ad-hoc-configuration)):
+4. Configure your participant to use protocol version 35 and support Non-Unique Contract Keys by using the following environment variable (see [docs for ad-hoc configuration](https://hyperledger-labs.github.io/splice/deployment/configuration.html#adding-ad-hoc-configuration)):
    ```
-   - name: ADDITIONAL_CONFIG_PV_DEV
+   - name: ADDITIONAL_CONFIG_TOKEN_STANDARD_V2_DEVNET
      value: |
        canton.parameters.alpha-version-support=true
        canton.parameters.non-standard-config=true
        canton.participants.participant.parameters.alpha-version-support=true
-       canton.participants.participant.parameters.initial-protocol-version=dev
+       canton.participants.participant.parameters.initial-protocol-version=35
+       canton.participants.participant.parameters.engine.contract-state-mode=NUCK
      ```

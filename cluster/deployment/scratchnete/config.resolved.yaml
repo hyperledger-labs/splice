@@ -90,6 +90,7 @@ monitoring:
         tolerance: 1.5
     enableNoDataAlerts: false
     loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
+    muteTimeIntervals: []
   enableGrafanaServiceAccountToken: true
 multiValidator:
   postgresPvcSize: '100Gi'
@@ -156,7 +157,7 @@ splitwell:
   participant:
     additionalEnvVars:
       - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
 sv:
   scan:
     externalRateLimits:
@@ -258,6 +259,9 @@ sv:
           type: 'unlimited'
         /api/scan/v0/open-and-issuing-mining-rounds:
           name: 'open-and-issuing-mining-rounds'
+          type: 'unlimited'
+        /api/scan/v0/reward-accounting-process:
+          name: 'reward-accounting-process'
           type: 'unlimited'
         /api/scan/v0/rewards-collected:
           name: 'rewards-collected'
@@ -374,7 +378,7 @@ svs:
     participant:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -457,7 +461,7 @@ validator1:
   participant:
     additionalEnvVars:
       - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
-        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n# Bump batch size to speed up pruning, going too high seems to trigger the 65k postgres query param limit.\ncanton.participants.participant.parameters.batching.max-pruning-batch-size = 50000\n"
+        value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
   participantPruningSchedule:
     cron: '0 /10 * * * ?'
     maxDuration: '5m'

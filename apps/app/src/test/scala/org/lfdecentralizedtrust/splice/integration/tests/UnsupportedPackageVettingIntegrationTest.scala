@@ -43,6 +43,8 @@ class UnsupportedPackageVettingIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      // if other tests run before, packages that break this test might already be vetted
+      .withNoVettedPackages(implicit env => env.validators.local.map(_.participantClient))
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[SvPackageVettingTrigger]
@@ -56,8 +58,14 @@ class UnsupportedPackageVettingIntegrationTest
 
   "Unsupported vetted packages are automatically removed by the package vetting trigger for SV and validator" in {
     implicit env =>
-      val unsupportedDarsToVet = Seq(
+      val unsupportedDarsToVetSv = Seq(
         DarResources.dsoGovernance_0_1_0,
+        DarResources.walletPayments_0_1_0,
+        DarResources.amuletNameService_0_1_0,
+        DarResources.amulet_0_1_0,
+      )
+      // TODO(DACH-NY/cn-test-failures#8034) Consider vetting DSO governance again once the Canton issue is fixed
+      val unsupportedDarsToVetValidator = Seq(
         DarResources.walletPayments_0_1_0,
         DarResources.amuletNameService_0_1_0,
         DarResources.amulet_0_1_0,
@@ -67,22 +75,22 @@ class UnsupportedPackageVettingIntegrationTest
       test(
         sv1Backend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDarsToVet,
-        unsupportedDarsToVet,
+        unsupportedDarsToVetSv,
+        unsupportedDarsToVetSv,
         sv1Backend.dsoAutomation.trigger[SvPackageVettingTrigger],
       )
       test(
         sv1ValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDarsToVet,
-        unsupportedDarsToVet,
+        unsupportedDarsToVetSv,
+        unsupportedDarsToVetSv,
         sv1ValidatorBackend.validatorAutomation.trigger[ValidatorPackageVettingTrigger],
       )
       // See https://github.com/DACH-NY/canton/issues/29834: set darsUnvettedByAutomation when unvetting works on non-sv validators
       test(
         aliceValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDarsToVet,
+        unsupportedDarsToVetValidator,
         Seq.empty,
         aliceValidatorBackend.validatorAutomation.trigger[ValidatorPackageVettingTrigger],
       )
@@ -195,7 +203,9 @@ class UnsupportedPackageVettingIntegrationTest
             synchronizerId,
           ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
         }
-        alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
+        eventually() {
+          alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
+        }
       }
   }
 }

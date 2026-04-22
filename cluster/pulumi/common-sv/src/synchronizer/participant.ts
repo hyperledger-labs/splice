@@ -5,6 +5,7 @@ import {
   Auth0Config,
   ChartValues,
   CnChartVersion,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
@@ -21,14 +22,15 @@ import {
 import { SingleSvConfiguration } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installPostgres, Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
-export function installParticipant(
+export async function installParticipant(
   args: ParticipantArgs,
   customOptions?: SpliceCustomResourceOptions
-): ParticipantOutput {
-  const { existingDb, migration } = args;
-  const db = existingDb ?? installParticipantPostgres(args);
+): Promise<ParticipantOutput> {
+  const { existingDb, migration, migratingDatabaseInstanceName } = args;
+  const db = existingDb ?? (await installParticipantPostgres(args));
   const chart =
-    migration === undefined || migration.isStillRunning
+    (migration === undefined || migration.isStillRunning) &&
+    migratingDatabaseInstanceName === undefined
       ? installParticipantChart(args, db, customOptions)
       : undefined;
   return { db, chart };
@@ -48,6 +50,9 @@ export type ParticipantArgs = {
     id: DomainMigrationIndex;
     isStillRunning: boolean;
   };
+  migratingDatabaseInstanceName?: string;
+  migratingDatabaseSecretName?: string;
+  retainDbResourcesOnDelete?: boolean;
 };
 
 export type ParticipantOutput = {
@@ -55,21 +60,31 @@ export type ParticipantOutput = {
   chart?: InstalledHelmChart;
 };
 
-function installParticipantPostgres({
+async function installParticipantPostgres({
   xns,
   participant,
   version,
   disableProtection,
   migration,
-}: ParticipantArgs): Postgres {
-  return installPostgres(
+  migratingDatabaseInstanceName,
+  migratingDatabaseSecretName,
+  retainDbResourcesOnDelete,
+}: ParticipantArgs): Promise<Postgres> {
+  return await installPostgres(
     xns,
     `participant${migrationSuffix(migration?.id)}-pg`,
     'participant-pg',
     version,
     participant?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
     true,
-    { isActive: migration?.isStillRunning, migrationId: migration?.id, disableProtection }
+    {
+      isActive: migration?.isStillRunning,
+      migrationId: migration?.id,
+      disableProtection,
+      existingInstanceName: migratingDatabaseInstanceName,
+      existingSecretName: migratingDatabaseSecretName,
+      retainDbResourcesOnDelete,
+    }
   );
 }
 
@@ -101,7 +116,7 @@ function installParticipantChart(
       host: db.address,
       secretName: db.secretName,
       // the following will not be needed when the MIGRATION_ID gets removed from defaults
-      databaseName: `participant${migrationSuffix(migration?.id, '_')}`,
+      databaseName: `participant${migrationSuffix(DecentralizedSynchronizerUpgradeConfig.frozenMigrationId ?? migration?.id, '_')}`,
     },
     auth: {
       ...defaultValues.auth,

@@ -10,16 +10,10 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import org.lfdecentralizedtrust.splice.wallet.store.{
-  NotificationTxLogEntry,
-  TxLogEntry as walletLogEntry,
-}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.scalatest.Assertion
 
 import java.time.Duration
-import java.util.UUID
-import scala.collection.parallel.immutable.ParVector
 import scala.jdk.OptionConverters.*
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -239,7 +233,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
       val bobEntryName = perTestCaseName("bob")
       waitForWalletUser(bobValidatorWalletClient)
 
-      val transferAmounts = ParVector.range(1, 20)
+      val transferAmounts = Vector.range(1, 20)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -310,60 +304,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
-      }
-    }
-
-    "show notification transactions" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val validatorTxLogBefore =
-        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
-
-      val (offerCid, _) =
-        actAndCheck(
-          "Alice creates transfer offer",
-          aliceWalletClient.createTransferOffer(
-            bobUserParty,
-            1000.0,
-            "direct transfer test",
-            CantonTimestamp.now().plus(Duration.ofMinutes(1)),
-            UUID.randomUUID.toString,
-          ),
-        )(
-          "Bob sees transfer offer",
-          _ => bobWalletClient.listTransferOffers() should have length 1,
-        )
-
-      clue("Bob accepts transfer offer") {
-        bobWalletClient.acceptTransferOffer(offerCid)
-        // At this point, Alice's automation fails to complete the accepted offer
-      }
-
-      checkTxHistory(
-        aliceWalletClient,
-        Seq({ case logEntry: NotificationTxLogEntry =>
-          logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto
-          logEntry.details should startWith("ITR_InsufficientFunds")
-        }),
-      )
-
-      // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter =
-        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
-      validatorTxLogBefore should be(validatorTxLogAfter)
-      checkTxHistory(bobWalletClient, Seq.empty)
-
-      withFrontEnd("alice") { implicit webDriver =>
-        browseToAliceWallet(aliceWalletClient.config.ledgerApiUser)
-        val notifications = find(className("tx-row-notification"))
-        notifications.fold(fail("Unable to find notifiation transaction row")) { notification =>
-          notification.childElement(className("tx-action")).text shouldBe "Notification"
-          notification
-            .childElement(className("tx-subtype"))
-            .text
-            .replaceAll("[()]", "") shouldBe "P2P Payment Failed"
-          notification.findChildElement(className("update-id")) shouldBe None
-        }
       }
     }
 
