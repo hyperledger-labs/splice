@@ -20,6 +20,72 @@ object DarLockChecker {
       filename: String,
   )
 
+  final case class BumpTarget(
+      name: PackageName,
+      fromVersion: PackageVersion,
+      toVersion: PackageVersion,
+  )
+
+  def detectBumps(
+      branchDars: Map[(PackageName, PackageVersion), String],
+      mainDars: Map[(PackageName, PackageVersion), String],
+  ): Seq[BumpTarget] = {
+    val mismatched: Seq[(PackageName, PackageVersion)] =
+      branchDars.toSeq.flatMap { case ((name, version), branchHash) =>
+        mainDars.get((name, version)) match {
+          case Some(mainHash) if mainHash != branchHash => Some((name, version))
+          case _ => None
+        }
+      }
+    val mainMaxByName: Map[PackageName, PackageVersion] =
+      mainDars.keys.foldLeft(Map.empty[PackageName, PackageVersion]) {
+        case (acc, (name, version)) =>
+          acc.updatedWith(name) {
+            case Some(current) if current >= version => Some(current)
+            case _ => Some(version)
+          }
+      }
+    mismatched
+      .map { case (name, fromVersion) =>
+        val mainMax = mainMaxByName.getOrElse(
+          name,
+          sys.error(s"Detected mismatch for $name but main has no entries"),
+        )
+        BumpTarget(name, fromVersion, bumpPatch(mainMax))
+      }
+      .sortBy(_.name.toString)
+  }
+
+  private def bumpPatch(v: PackageVersion): PackageVersion = {
+    val parts = v.toString.split('.').map(_.toInt)
+    require(parts.length == 3, s"Expected semver X.Y.Z, got $v")
+    PackageVersion.assertFromString(s"${parts(0)}.${parts(1)}.${parts(2) + 1}")
+  }
+
+  def rewriteDamlYamlVersion(content: String, newVersion: PackageVersion): String = {
+    // Matches only the top-level `version: X.Y.Z` line.
+    // Uses (?m) multiline so ^ anchors each line.
+    val pattern = """(?m)^version:\s+[0-9]+\.[0-9]+\.[0-9]+$""".r
+    pattern.findFirstIn(content) match {
+      case Some(_) => pattern.replaceFirstIn(content, s"version: $newVersion")
+      case None => sys.error(s"No top-level `version: X.Y.Z` line in daml.yaml content")
+    }
+  }
+
+  def rewritePackageJson(
+      content: String,
+      packageName: PackageName,
+      newVersion: PackageVersion,
+  ): String = {
+    val escapedName = java.util.regex.Pattern.quote(packageName.toString)
+    val pattern =
+      ("""("file:common/frontend/daml\.js/""" + escapedName + """)-[0-9]+\.[0-9]+\.[0-9]+(")""").r
+    pattern.replaceAllIn(
+      content,
+      m => java.util.regex.Matcher.quoteReplacement(s"${m.group(1)}-$newVersion${m.group(2)}"),
+    )
+  }
+
   def main(args: Array[String]): Unit = {
     args.toSeq match {
       case cmd +: outputFilename +: inputFilenames =>

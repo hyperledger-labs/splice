@@ -190,6 +190,7 @@ lazy val `build-tools-dar-lock-checker` = project
     libraryDependencies ++= Seq(
       Dependencies.better_files,
       CantonDependencies.daml_lf_archive_reader,
+      Dependencies.scalatest % Test,
     ),
     Headers.ApacheDAHeaderSettings,
   )
