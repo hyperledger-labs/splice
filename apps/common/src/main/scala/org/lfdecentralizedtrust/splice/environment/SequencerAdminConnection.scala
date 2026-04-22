@@ -318,7 +318,7 @@ class SequencerAdminConnection(
         PekkoByteString(proto.asReadOnlyByteBuffer())
       }
       .via(
-        ZstdGroupedWeight(compressionLevel = 3, minSize = chunkSize)
+        ZstdGroupedWeight(compressionLevel = 3, minSize = chunkSize.toLong)
       ) // 3 is the default zstd compression level
     val storageObject = source.runWith(sink)
     storageObject.onComplete { _ =>
