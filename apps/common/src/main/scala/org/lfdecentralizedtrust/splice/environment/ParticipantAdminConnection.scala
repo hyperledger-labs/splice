@@ -15,7 +15,6 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
-  PartyOnboardingFlagStatus,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{
@@ -23,8 +22,8 @@ import com.digitalasset.canton.admin.participant.v30.{
   ExportPartyAcsResponse,
   PruningServiceGrpc,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
