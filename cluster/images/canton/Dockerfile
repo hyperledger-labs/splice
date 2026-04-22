@@ -8,5 +8,6 @@ FROM europe-docker.pkg.dev/da-images/public-all/docker/canton-base:${canton_vers
 
 COPY additional-config.conf /app/
 USER root
+RUN rm -f /bin/grpcurl
 RUN chown -R nonroot:nonroot /app/additional-config.conf
 USER nonroot
