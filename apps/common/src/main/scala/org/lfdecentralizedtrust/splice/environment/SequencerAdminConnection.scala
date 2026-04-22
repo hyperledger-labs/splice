@@ -68,6 +68,7 @@ import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import org.apache.pekko.stream.scaladsl.Compression
 
 /** Connection to the subset of the Canton sequencer admin API that we rely
   * on in our own applications.
@@ -316,6 +317,7 @@ class SequencerAdminConnection(
         val proto: ByteString = response.onboardingStateForSequencer
         PekkoByteString(proto.asReadOnlyByteBuffer())
       }
+      .via(Compression.gzip)
     val storageObject = source.runWith(sink)
     storageObject.onComplete { _ =>
       channel.close()
