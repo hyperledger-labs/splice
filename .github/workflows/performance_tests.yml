@@ -1,4 +1,4 @@
-name: Daily store ingestion performance tests
+name: Daily store performance tests
 on:
   # allow manual running on PRs that you expect might affect store performance
   workflow_dispatch:
@@ -14,13 +14,13 @@ permissions:
   contents: read
 
 jobs:
-  performance_tests:
+  ingestion_performance_tests:
     # note that we're loading the entirety of mainnet updates (and in the future, the ACS) so as to make sure that that's not the bottleneck.
     # as of 03.03.2026 that seems to be enough, but we might have to increase it as the activity in mainnet does too.
     runs-on: self-hosted-k8s-medium
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
-    name: Performance Tests
+    name: Ingestion Performance Tests
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
       - name: Check out repository code
@@ -38,7 +38,7 @@ jobs:
           test_name: oss
           target: 'oss'
 
-      - name: Run performance tests
+      - name: Run ingestion performance tests
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         env:
           PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
@@ -62,9 +62,9 @@ jobs:
             echo "Downloading updates from mainnet for performance tests"
             curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
-          cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
+          cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbSvDsoStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbScanStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t UpdateHistory -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
 
-      - name: Push metrics to Prometheus Pushgateway
+      - name: Push ingestion metrics to Prometheus Pushgateway
         if: ${{ success() }}
         run: |
           python3 scripts/performance/push_store_ingestion_perf_metrics.py
@@ -83,7 +83,7 @@ jobs:
         if: ${{ !success() }}
         uses: ./splice-shared-gha/.github/actions/sbt/upload_logs
         with:
-          name: "logs-performance-tests"
+          name: "logs-ingestion-performance-tests"
 
       - name: Report Failures on Slack & Github
         if: failure() && github.event_name == 'schedule'
@@ -94,3 +94,81 @@ jobs:
           service_account: "${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}"
           notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
+
+  read_performance_tests:
+    needs: ingestion_performance_tests
+    runs-on: self-hosted-k8s-medium
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    name: Read Performance Tests
+    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ''
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup
+        id: setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
+        with:
+          cache_version: 8
+          test_name: oss
+          target: 'oss'
+
+      - name: Run read performance tests
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
+        env:
+          PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
+          PERFORMANCE_TESTS_DB_HOST: ${{ secrets.PERFORMANCE_TESTS_DB_HOST }}
+          PERFORMANCE_TESTS_DB_USER: ${{ secrets.PERFORMANCE_TESTS_DB_USER }}
+        with:
+          additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
+          extra_env_vars: 'POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST" POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER" POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"'
+          pre_sbt_cmd: |
+            echo "Clearing stale metrics files"
+            rm -rf /tmp/store-read-perf-metrics
+
+            echo "Clearing database for read tests"
+            PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql \
+              -h"$PERFORMANCE_TESTS_DB_HOST" \
+              -U"$PERFORMANCE_TESTS_DB_USER" \
+              -dcantonnet \
+              -c 'DROP DATABASE IF EXISTS splice_apps' \
+              -c 'CREATE DATABASE splice_apps' || (echo "Connection to DB failed" && exit 1)
+
+            echo "Downloading mainnet updates from storage bucket for read performance tests"
+            curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnet_big_update.json" -o /tmp/mainnet_big_update.json
+            ls -lah /tmp/mainnet_big_update.json
+          cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t UpdateHistoryRead -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnet_big_update.json"'
+
+      - name: Push read metrics to Prometheus Pushgateway
+        if: ${{ success() }}
+        run: |
+          python3 scripts/performance/push_store_ingestion_perf_metrics.py /tmp/store-read-perf-metrics
+
+      # sanity check
+      - name: Check logs for errors
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
+        with:
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: checkErrors
+
+      - name: Upload logs
+        if: ${{ !success() }}
+        uses: ./splice-shared-gha/.github/actions/sbt/upload_logs
+        with:
+          name: "logs-read-performance-tests"
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'schedule'
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
+        with:
+          job_subname: "Daily Store Read Performance Tests"
+          workload_identity_provider: "${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}"
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
+

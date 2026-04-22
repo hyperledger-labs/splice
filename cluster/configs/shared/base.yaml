@@ -172,6 +172,7 @@ monitoring:
         jsonPayload.message=~"eyJhbGc[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}" OR
         jsonPayload.message=~"Bearer\s+eyJ[A-Za-z0-9_-]{2,}"
       )
+    muteTimeIntervals: []
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true

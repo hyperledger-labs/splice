@@ -74,7 +74,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    DomainMigrationUtil.migrationDumpDir.delete()
+    SynchronizerUpgradeUtil.migrationDumpDir.delete()
   }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -88,7 +88,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
               localSynchronizerNodes = config.localSynchronizerNodes
                 .copy(successor = config.localSynchronizerNodes.current.some),
               domainMigrationDumpPath = Some(
-                (DomainMigrationUtil.migrationTestDumpDir(name) / "domain_migration_dump.json").path
+                (SynchronizerUpgradeUtil.migrationTestDumpDir(
+                  name
+                ) / "domain_migration_dump.json").path
               ),
               parameters = config.parameters.copy(
                 spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(

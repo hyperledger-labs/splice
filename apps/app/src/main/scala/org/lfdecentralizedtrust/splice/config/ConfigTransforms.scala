@@ -440,6 +440,27 @@ object ConfigTransforms {
     )
   }
 
+  def bumpCantonSyncLegacyPortsBy(bump: Int) = {
+    updateAllSvAppConfigs((_, conf) =>
+      conf
+        .focus(_.localSynchronizerNodes.legacy)
+        .some
+        .modify(portTransform(bump, _))
+    ).andThen(
+      updateAllScanAppConfigs((_, conf) =>
+        conf
+          .focus(_.synchronizerNodes.legacy)
+          .some
+          .modify(
+            portTransform(bump, _)
+              .focus(_.bftSequencerConfig)
+              .some
+              .modify(_.focus(_.p2pUrl).modify(bumpUrl(bump, _)))
+          )
+      )
+    )
+  }
+
   def bumpCantonSyncPortsBy(
       bump: Int,
       predicate: String => Boolean = _ => true,

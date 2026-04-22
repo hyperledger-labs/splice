@@ -9,6 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
+  PruningSchedulerCommands,
   SequencerAdminCommands,
   TopologyAdminCommands,
 }
@@ -25,6 +26,7 @@ import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.admin.v30.{
   OnboardingStateV2Request,
   OnboardingStateV2Response,
+  SequencerBftPruningAdministrationServiceGrpc,
 }
 import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
@@ -85,11 +87,26 @@ class SequencerAdminConnection(
       retryProvider,
     )
     with StatusAdminConnection
-    with SequencerBftAdminConnection {
+    with SequencerBftAdminConnection
+    with PruningAdminConnection {
 
   override val serviceName = "Canton Sequencer Admin API"
 
   override type Status = SequencerStatus
+
+  override val pruningCommands: PruningSchedulerCommands[
+    SequencerBftPruningAdministrationServiceGrpc.SequencerBftPruningAdministrationServiceStub
+  ] = new PruningSchedulerCommands[
+    SequencerBftPruningAdministrationServiceGrpc.SequencerBftPruningAdministrationServiceStub
+  ](
+    SequencerBftPruningAdministrationServiceGrpc.stub,
+    _.setSchedule(_),
+    _.clearSchedule(_),
+    _.setCron(_),
+    _.setMaxDuration(_),
+    _.setRetention(_),
+    _.getSchedule(_),
+  )
 
   override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[SequencerStatus]] =
     SequencerAdminCommands.Health.SequencerStatusCommand()
@@ -116,6 +133,7 @@ class SequencerAdminConnection(
   ): Future[Unit] = {
     Future {
       blocking {
+        logger.info(s"Writing LSU dump to $file")
         file.createFileIfNotExists(createParents = true)
         new OutputFileStreamObserver[SequencerLsuStateResponse](
           file,
@@ -130,8 +148,7 @@ class SequencerAdminConnection(
             ts = ts,
             observer = observer,
           )
-      ).map(_ => ())
-
+      ).flatMap(_ => observer.result).map(_ => logger.info("Finished writing LSU dump"))
     }
   }
 

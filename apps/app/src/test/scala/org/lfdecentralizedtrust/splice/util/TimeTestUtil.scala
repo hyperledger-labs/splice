@@ -127,7 +127,7 @@ trait TimeTestUtil extends TestCommon {
       .map(_.data.targetArchiveAfter)
       .min
     val advanceWith = Duration.between(now, nextTargetArchive.plusSeconds(10))
-    advanceTimeAndWaitForExternalPartyConfigStateAutomation(advanceWith)
+    advanceTimeAndWaitForExternalPartyConfigStateAutomation(configStates, advanceWith)
   }
 
   def waitForUpdateExternalPartyConfigStatesAutomation(implicit
@@ -239,11 +239,9 @@ trait TimeTestUtil extends TestCommon {
   }
 
   def advanceTimeAndWaitForExternalPartyConfigStateAutomation(
-      duration: Duration
+      configStates: Seq[ExternalPartyConfigState.Contract],
+      duration: Duration,
   )(implicit env: SpliceTestConsoleEnvironment) = {
-    val configStates = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(ExternalPartyConfigState.COMPANION)(dsoParty, _ => true)
-
     actAndCheck("advancing time", advanceTime(duration))(
       s"waiting for automation to update ExternalPartyConfigState",
       _ => {

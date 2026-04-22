@@ -272,7 +272,8 @@ lazy val docs = project
       val srcDir = sourceDirectory.value
       val outDir = baseDirectory.value / "html"
       val log = streams.value.log
-      val version = BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"))
+      val version =
+        BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"), Some(log))
       val cacheDir = streams.value.cacheDirectory
       val cache = FileFunction.cached(cacheDir) { _ =>
         runCommand(
@@ -2117,7 +2118,6 @@ updateTestConfigForParallelRuns := {
   def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
-  def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
   // These are tests that are particularly resource intensive and need larger runners.
   // Usually that is because they need to spin up an additional Canton instance within the test.
@@ -2236,11 +2236,6 @@ updateTestConfigForParallelRuns := {
       "Non-DevNet Preflight tests against runbook validator",
       "test-full-class-names-validator-preflight-non-devnet.log",
       (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && isNonDevNetTest(t),
-    ),
-    (
-      "disaster recovery tests",
-      "test-full-class-names-disaster-recovery.log",
-      (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
     ),
     (
       "app upgrade tests",

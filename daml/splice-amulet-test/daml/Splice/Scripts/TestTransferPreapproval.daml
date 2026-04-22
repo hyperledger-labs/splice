@@ -16,6 +16,7 @@ import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.Types
 import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
+import Splice.Testing.Utils
 
 
 createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
@@ -268,21 +269,18 @@ testTransferCommand = script do
   assert (length allAmulets > 1)
 
   -- fails with out of funds
-  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso]  $ exerciseCmd transferCmd TransferCommand_Send
+  let expect = expectFailureStatus \fs ->
+        fs.errorId == "splice.lfdecentralizedtrust.org/insufficient-funds" && fs.meta == TextMap.fromList [("requiredAmount", "33.0")]
+  submitMultiMustFail'' expect [aliceValidator.primaryParty] [alice.primaryParty, app.dso]  $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = map (InputAmulet . fst) allAmulets
       transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
-  reason === ITR_InsufficientFunds 33.0
-
-  -- amulets get merged even on failed transfers
-  [(amulet, _)] <- query @Amulet alice.primaryParty
-
   [(transferCounterCid, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
-  -- counter increases even on failed transfers
-  transferCounter.nextNonce === 2
+  -- counter does not increase on failed transfers
+  transferCounter.nextNonce === 1
 
   -- sender can withdraw
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
@@ -333,14 +331,15 @@ testTransferCommand = script do
       description = Some "test-transfer-command"
       expectedDso = Some app.dso
 
-  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
-    with
-      context = context
-      inputs = [InputAmulet amulet]
-      transferPreapprovalCidO = Some transferPreapprovalCid
-      transferCounterCid
+  amulets <- fmap fst <$> query @Amulet alice.primaryParty
 
-  reason === ITR_Other "Expected nonce 1 is smaller than current counter 2"
+  submitMultiMustFail'' (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-funds") [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $
+    exerciseCmd transferCmd TransferCommand_Send
+      with
+        context = context
+        inputs = InputAmulet <$> amulets
+        transferPreapprovalCidO = Some transferPreapprovalCid
+        transferCounterCid
 
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmdFuture <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
@@ -349,7 +348,7 @@ testTransferCommand = script do
       delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
-      nonce = 3
+      nonce = 2
       description = Some "test-transfer-command"
       expectedDso = Some app.dso
 
@@ -362,7 +361,7 @@ testTransferCommand = script do
       transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
-  -- Sequence another transfer with nonce 2
+  -- Sequence another transfer with nonce 1
 
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
@@ -371,7 +370,7 @@ testTransferCommand = script do
       delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
-      nonce = 2
+      nonce = 1
       description = Some "test-transfer-command"
       expectedDso = Some app.dso
 
@@ -397,7 +396,7 @@ testTransferCommand = script do
       transferCounterCid
 
   [(transferCounterCid, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
-  transferCounter.nextNonce === 4
+  transferCounter.nextNonce === 3
 
   receiverNoPreapproval <- allocateParty "receiver-no-preapproval"
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
@@ -407,7 +406,7 @@ testTransferCommand = script do
       receiver = receiverNoPreapproval
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
-      nonce = 4
+      nonce = 3
       description = Some "test-transfer-command"
       expectedDso = Some app.dso
 
@@ -422,7 +421,7 @@ testTransferCommand = script do
   msg === ITR_Other ("No TransferPreapproval for receiver " <> show receiverNoPreapproval)
 
   [(_, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
-  transferCounter.nextNonce === 5
+  transferCounter.nextNonce === 4
   None <- queryContractId app.dso transferCmd
 
   pure ()

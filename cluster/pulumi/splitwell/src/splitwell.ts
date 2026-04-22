@@ -44,7 +44,7 @@ export async function installSplitwell(
   const xns = exactNamespace('splitwell', true);
   const sharedPostgres = splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(
+    : await postgres.installPostgres(
         xns,
         'splitwell-pg',
         'splitwell-pg',
@@ -59,7 +59,7 @@ export async function installSplitwell(
 
   installIngress(xns, imagePullDeps);
 
-  const participant = installParticipant(
+  const participant = await installParticipant(
     splitwellConfig,
     decentralizedSynchronizerMigrationConfig.activeMigrationId,
     xns,
@@ -74,14 +74,14 @@ export async function installSplitwell(
 
   const swPostgres =
     sharedPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       'sw-pg',
       'sw-pg',
       activeVersion,
       spliceConfig.pulumiProjectConfig.cloudSql,
       true
-    );
+    ));
   const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
@@ -119,14 +119,14 @@ export async function installSplitwell(
 
   const validatorPostgres =
     sharedPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       'validator-pg',
       'validator-pg',
       activeVersion,
       spliceConfig.pulumiProjectConfig.cloudSql,
       true
-    );
+    ));
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps.concat(

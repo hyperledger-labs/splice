@@ -58,7 +58,6 @@ export interface StaticSvConfig extends StaticSvConfigBasic {
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
-  scanBigQuery?: ScanBigQueryConfig;
   svIdKeySecretName?: string;
   cometBftGovernanceKeySecretName?: string;
 }

@@ -2839,4 +2839,91 @@ object HttpScanAppClient {
       param("upgradeTime", _.upgradeTime),
     )
   }
+  case class GetRewardAccountingEarliestAvailableRound()
+      extends InternalBaseCommand[
+        http.GetRewardAccountingEarliestAvailableRoundResponse,
+        Option[Long],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingEarliestAvailableRoundResponse] =
+      client.getRewardAccountingEarliestAvailableRound(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingEarliestAvailableRoundResponse.OK(response) =>
+        Right(Some(response.earliestRound))
+      case http.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetRewardAccountingActivityTotals(roundNumber: Long)
+      extends InternalBaseCommand[
+        http.GetRewardAccountingActivityTotalsResponse,
+        Option[definitions.GetRewardAccountingActivityTotalsResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingActivityTotalsResponse] =
+      client.getRewardAccountingActivityTotals(roundNumber, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingActivityTotalsResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetRewardAccountingActivityTotalsResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetRewardAccountingRootHash(roundNumber: Long)
+      extends InternalBaseCommand[
+        http.GetRewardAccountingRootHashResponse,
+        Option[definitions.GetRewardAccountingRootHashResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingRootHashResponse] =
+      client.getRewardAccountingRootHash(roundNumber, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingRootHashResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetRewardAccountingRootHashResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetRewardAccountingBatch(roundNumber: Long, batchHash: String)
+      extends InternalBaseCommand[
+        http.GetRewardAccountingBatchResponse,
+        Option[definitions.GetRewardAccountingBatchResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingBatchResponse] =
+      client.getRewardAccountingBatch(roundNumber, batchHash, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingBatchResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetRewardAccountingBatchResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
 }

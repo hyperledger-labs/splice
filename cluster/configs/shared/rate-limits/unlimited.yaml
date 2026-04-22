@@ -205,6 +205,10 @@ rateLimits:
     name: rollForwardLsu
     type: unlimited
 
+  /api/scan/v0/reward-accounting-process:
+    name: reward-accounting-process
+    type: unlimited
+
   # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",
   #              because the endpoint is in scan-stream-server.yaml, not in scan.yaml
   # /api/scan/v0/history/bulk/download:

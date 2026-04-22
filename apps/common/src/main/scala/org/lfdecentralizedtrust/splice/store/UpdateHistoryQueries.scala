@@ -41,7 +41,8 @@ trait UpdateHistoryQueries extends AcsJdbcTypes {
               create_arguments,
               signatories,
               observers,
-              contract_key
+              contract_key,
+              record_time
        from update_history_creates
        where history_id = $historyId and """ ++ where ++
       sql"""
