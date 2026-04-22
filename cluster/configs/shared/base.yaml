@@ -164,6 +164,9 @@ monitoring:
         # range in PromQL queries and as the alignmentPeriod for the exceeded
         # threshold alert. Prometheus duration format (e.g. "60s", "5m").
         rollingWindow: "1m"
+        # How long the condition must be continuously true before firing.
+        # Must be >= rollingWindow. Prometheus duration format.
+        retestWindow: "5m"
       trafficBasedRewards:
         # Alert if we have more than this many featured app rights,
         # as too many rights may cause performance problems in computing app activity records.

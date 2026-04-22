@@ -12,13 +12,32 @@ const prometheusDurationSchema = z
   .string()
   .regex(/^\d+[smh]$/, 'Prometheus duration (e.g. "60s", "5m", "1h")');
 
-const GcpQuotasConfigSchema = z.object({
-  // so existing overrides don't break
-  enabled: z.literal(true).optional(),
-  excludedMetrics: z.array(quotaMetricNameSchema),
-  excludedApproachingMetrics: z.array(quotaMetricNameSchema),
-  rollingWindow: prometheusDurationSchema,
-});
+export function parseDurationToSeconds(d: string): number {
+  const match = d.match(/^(\d+)([smh])$/);
+  if (!match) {
+    throw new Error(`Invalid duration: ${d}`);
+  }
+  const [, n, unit] = match;
+  const multiplier = unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
+  return parseInt(n) * multiplier;
+}
+
+const GcpQuotasConfigSchema = z
+  .object({
+    // so existing overrides don't break
+    enabled: z.literal(true).optional(),
+    excludedMetrics: z.array(quotaMetricNameSchema),
+    excludedApproachingMetrics: z.array(quotaMetricNameSchema),
+    rollingWindow: prometheusDurationSchema,
+    retestWindow: prometheusDurationSchema,
+  })
+  .refine(
+    data => parseDurationToSeconds(data.retestWindow) >= parseDurationToSeconds(data.rollingWindow),
+    {
+      message: 'retestWindow must be >= rollingWindow',
+      path: ['retestWindow'],
+    }
+  );
 
 const MonitoringConfigSchema = z
   .object({

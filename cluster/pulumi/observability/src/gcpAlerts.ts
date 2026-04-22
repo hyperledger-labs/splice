@@ -10,7 +10,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { slackAlertNotificationChannel, slackToken } from './alertings';
-import { type GcpQuotaAlertsConfig, monitoringConfig } from './config';
+import { type GcpQuotaAlertsConfig, monitoringConfig, parseDurationToSeconds } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
@@ -321,17 +321,10 @@ export function installGcpQuotaAlerts(
   const promqlExclusion =
     approachingExclusionRegex !== null ? `, quota_metric!~"${approachingExclusionRegex}"` : '';
 
-  const rollingWindow = gcpQuotasConfig.rollingWindow;
+  const { rollingWindow, retestWindow } = gcpQuotasConfig;
   // Convert Prometheus duration to seconds for the threshold alignmentPeriod
-  const rollingWindowSeconds = (() => {
-    const match = rollingWindow.match(/^(\d+)([smh])$/);
-    if (!match) {
-      throw new Error(`Invalid rollingWindow: ${rollingWindow}`);
-    }
-    const [, n, unit] = match;
-    const multiplier = unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
-    return `${parseInt(n) * multiplier}s`;
-  })();
+  const rollingWindowSeconds = `${parseDurationToSeconds(rollingWindow)}s`;
+  const retestWindowSeconds = `${parseDurationToSeconds(retestWindow)}s`;
 
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,
@@ -366,7 +359,7 @@ export function installGcpQuotaAlerts(
             },
           ],
           comparison: 'COMPARISON_GT',
-          duration: '60s', // "Retest window"
+          duration: retestWindowSeconds, // "Retest window"
           filter: assertFilterLength(
             `resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"${thresholdExclusion}`
           ),
@@ -387,7 +380,7 @@ export function installGcpQuotaAlerts(
     gcp.types.input.monitoring.AlertPolicyConditionConditionPrometheusQueryLanguage,
     'duration' | 'evaluationInterval'
   > = {
-    duration: '300s', // "Retest window"
+    duration: retestWindowSeconds, // "Retest window"
     evaluationInterval: '30s', // "Evaluation interval"
   };
 
