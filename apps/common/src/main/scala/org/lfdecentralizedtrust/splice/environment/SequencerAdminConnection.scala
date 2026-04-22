@@ -240,13 +240,13 @@ class SequencerAdminConnection(
           .withDescription("Stream genesis state works only with GCP buckets.")
           .asRuntimeException()
     }
-
+    val chunkSize = 256 * 1024 // Upload it in 256KB chunks
     val sink = GCStorage
       .resumableUpload(
         bucketConfig.bucketName,
         s"$prefix$fileName",
         contentType = ContentTypes.`application/octet-stream`,
-        chunkSize = 256 * 1024, // Upload it in 256KB chunks
+        chunkSize = chunkSize,
       )
       .withAttributes(
         GoogleAttributes.settings(
@@ -317,7 +317,9 @@ class SequencerAdminConnection(
         val proto: ByteString = response.onboardingStateForSequencer
         PekkoByteString(proto.asReadOnlyByteBuffer())
       }
-      .via(ZstdGroupedWeight(compressionLevel = 3, minSize = 256 * 1024))
+      .via(
+        ZstdGroupedWeight(compressionLevel = 3, minSize = chunkSize)
+      ) // 3 is the default zstd compression level
     val storageObject = source.runWith(sink)
     storageObject.onComplete { _ =>
       channel.close()
