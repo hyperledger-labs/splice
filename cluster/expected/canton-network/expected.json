@@ -2673,7 +2673,7 @@
       "defaultUserName": "cnadmin",
       "deletionProtection": true,
       "instanceName": "cn-apps-pg",
-      "logicalDecoding": false,
+      "logicalDecoding": true,
       "namespace": {
         "logicalName": "sv-1",
         "ns": {
