@@ -16,30 +16,23 @@ import scala.util.Using
 
 object DarResourcesGenerator {
 
-  // The minimum DarResource for each package. Value is (package-owning-the-DAR, version)
-  // — for most packages this is just (self, version), but a few historical entries
-  // point at a different package's DAR (e.g. splice-api-token-allocation-request-v1
-  // points at splice-api-token-allocation-v1-1.0.0.dar). Preserved verbatim from the
-  // prior hand-maintained DarResources.scala.
-  // TODO(tech-debt): move these stub maps into a dedicated config file
-  // (e.g. daml/dar-resources.yaml) once they need to be touched by
-  // non-Scala tooling or grow unwieldy. See hyperledger-labs/splice#3667.
-  private val minimumInitializations: Map[String, (String, String)] = Map(
-    "splice-amulet" -> ("splice-amulet", "0.1.14"),
-    "splice-amulet-name-service" -> ("splice-amulet-name-service", "0.1.14"),
-    "splice-dso-governance" -> ("splice-dso-governance", "0.1.19"),
-    "splice-wallet" -> ("splice-wallet", "0.1.14"),
-    "splice-wallet-payments" -> ("splice-wallet-payments", "0.1.14"),
-    "splitwell" -> ("splitwell", "0.1.14"),
-    "splice-validator-lifecycle" -> ("splice-validator-lifecycle", "0.1.5"),
-    "splice-util-batched-markers" -> ("splice-util-batched-markers", "1.0.0"),
-    "splice-api-token-metadata-v1" -> ("splice-api-token-metadata-v1", "1.0.0"),
-    "splice-api-token-holding-v1" -> ("splice-api-token-holding-v1", "1.0.0"),
-    "splice-api-token-transfer-instruction-v1" -> ("splice-api-token-transfer-instruction-v1", "1.0.0"),
-    "splice-api-token-allocation-v1" -> ("splice-api-token-allocation-v1", "1.0.0"),
-    "splice-api-token-allocation-request-v1" -> ("splice-api-token-allocation-v1", "1.0.0"),
-    "splice-api-token-allocation-instruction-v1" -> ("splice-api-token-allocation-instruction-v1", "1.0.0"),
-    "splice-token-test-trading-app" -> ("splice-token-test-trading-app", "1.0.0"),
+  // TODO(tech-debt): consider moving this to a dedicated config file if it bugs us here
+  private val minimumInitializations: Map[String, String] = Map(
+    "splice-amulet" -> "0.1.14",
+    "splice-amulet-name-service" -> "0.1.14",
+    "splice-dso-governance" -> "0.1.19",
+    "splice-wallet" -> "0.1.14",
+    "splice-wallet-payments" -> "0.1.14",
+    "splitwell" -> "0.1.14",
+    "splice-validator-lifecycle" -> "0.1.5",
+    "splice-util-batched-markers" -> "1.0.0",
+    "splice-api-token-metadata-v1" -> "1.0.0",
+    "splice-api-token-holding-v1" -> "1.0.0",
+    "splice-api-token-transfer-instruction-v1" -> "1.0.0",
+    "splice-api-token-allocation-v1" -> "1.0.0",
+    "splice-api-token-allocation-request-v1" -> "1.0.0",
+    "splice-api-token-allocation-instruction-v1" -> "1.0.0",
+    "splice-token-test-trading-app" -> "1.0.0",
   )
 
   // Order matters: a package whose `minimumInitializations` value points at a
@@ -209,7 +202,7 @@ object DarResourcesGenerator {
       dars: Seq[DarEntry],
       grouped: Map[String, Seq[DarEntry]],
   ): Seq[String] = {
-    val (minPkgName, minVersion) = minimumInitializations.getOrElse(
+    val minVersion = minimumInitializations.getOrElse(
       name,
       sys.error(s"No minimumInitialization configured for package $name"),
     )
@@ -218,10 +211,10 @@ object DarResourcesGenerator {
       sys.error(s"No DARs found for package $name in daml/dars/")
     )
     val minimumDar = grouped
-      .getOrElse(minPkgName, Nil)
+      .getOrElse(name, Nil)
       .find(_.metadata.version.toString == minVersion)
       .getOrElse(
-        sys.error(s"Minimum version $minVersion for $minPkgName (required by $name) not found in daml/dars/")
+        sys.error(s"Minimum version $minVersion for $name not found in daml/dars/")
       )
 
     others.flatMap(dar => renderDarResource(varSuffix(dar), dar)) ++
@@ -229,7 +222,7 @@ object DarResourcesGenerator {
       Seq(
         s"val ${camel(name)} = PackageResource(",
         s"  ${camel(name)}_current,",
-        s"  ${camel(minPkgName)}_${varSuffix(minimumDar)},",
+        s"  ${camel(name)}_${varSuffix(minimumDar)},",
         s"  Seq(${others.map(dar => s"${camel(name)}_${varSuffix(dar)}").mkString(", ")})",
         ")",
       )

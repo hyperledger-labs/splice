@@ -448,7 +448,7 @@ object DarResources {
     )
     val apiTokenAllocationRequestV1 = PackageResource(
       apiTokenAllocationRequestV1_current,
-      apiTokenAllocationV1_1_0_0,
+      apiTokenAllocationRequestV1_1_0_0,
       Seq(apiTokenAllocationRequestV1_1_0_0),
     )
     val apiTokenAllocationInstructionV1_1_0_0 = DarResource(
