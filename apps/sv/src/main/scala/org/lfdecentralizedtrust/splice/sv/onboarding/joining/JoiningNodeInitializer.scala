@@ -423,7 +423,7 @@ class JoiningNodeInitializer(
       currentNode <- synchronizerNodeService.activeSynchronizerNode()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
-      // submission rights.
+      // not being onboarding.
       _ <- (
         waitForSvParticipantToBeOnboarded(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),

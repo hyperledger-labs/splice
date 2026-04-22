@@ -415,6 +415,11 @@ class ParticipantAdminConnection(
     val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
 
     for {
+      // The current ExportPartyAcs requires us to pass an offset that is right before the topology tx
+      // in which the participant started hosing `partyId`.
+      // Unfortunately, for this code to be fault-tolerant we'd need to store said offset somewhere and then use it.
+      // We instead just get the time of the transaction (`activationTime`), resolve its offset,
+      // and subtract one so that we have an offset that is guaranteed to be before the activation transaction.
       activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
       beforeActivationOffset = activationOffset - 1L
       _ = logger.info(
@@ -811,31 +816,6 @@ class ParticipantAdminConnection(
       isProposal = true,
       waitForAuthorization = false,
     )
-  }
-
-  def clearOnboardingFlag(party: PartyId, synchronizerId: SynchronizerId, activationTime: Instant)(
-      implicit tranceContext: TraceContext
-  ): Future[PartyOnboardingFlagStatus] = {
-    for {
-      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
-      beforeActivationOffset = activationOffset - 1L
-      result <- retryProvider.retryForClientCalls(
-        "clear_onboarding_flag",
-        "Clears the onboarding flag",
-        runCmd(
-          ParticipantAdminCommands.PartyManagement
-            .ClearPartyOnboardingFlag(
-              party,
-              synchronizerId,
-              NonNegativeLong.tryCreate(beforeActivationOffset),
-              // The default of 2m makes it hang during shutdown, which produces a log about reader still being active.
-              // Instead, we rely on the trigger to run this repeatedly and shutdown-safe.
-              waitForActivationTimeout = Some(NonNegativeFiniteDuration.ofSeconds(5L)),
-            )
-        ),
-        logger,
-      )
-    } yield result
   }
 
   def ensureHostingParticipantIsPromotedToSubmitterAndIsNotOnboarding(

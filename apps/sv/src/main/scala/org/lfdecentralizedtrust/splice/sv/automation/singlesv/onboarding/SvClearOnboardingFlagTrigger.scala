@@ -40,6 +40,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
   * Updating the threshold only after the SV party has been added to the DsoRules guarantees that
   * its participant has reconnected to the domain and is ready to confirm transactions on behalf of the DSO party.
   */
+// TODO (#5164): adjust so the onboarding flag is only force-cleared in tests once we're using pv=35
 class SvClearOnboardingFlagTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
