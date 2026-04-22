@@ -28,8 +28,12 @@ const GcpQuotasConfigSchema = z
     enabled: z.literal(true).optional(),
     excludedMetrics: z.array(quotaMetricNameSchema),
     excludedApproachingMetrics: z.array(quotaMetricNameSchema),
-    rollingWindow: prometheusDurationSchema,
-    retestWindow: prometheusDurationSchema,
+    rollingWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) >= 60, {
+      message: 'must be at least 60s',
+    }),
+    retestWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) % 60 === 0, {
+      message: 'must be a multiple of 1m',
+    }),
   })
   .refine(
     data => parseDurationToSeconds(data.retestWindow) >= parseDurationToSeconds(data.rollingWindow),
