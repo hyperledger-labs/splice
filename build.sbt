@@ -174,6 +174,11 @@ lazy val root: Project = (project in file("."))
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
+    damlBumpPackageVersionsMutate :=
+      Def.taskDyn {
+        (`build-tools-dar-lock-checker` / Compile / run)
+          .toTask(" bump" + damlDarsLockCheckerFileArg.value)
+      }.value,
     Headers.OtherHeaderSettings,
     // Disable assembly for all submodules as we want to assemble just the splice-node jar from the apps module
     assembly / aggregate := false,
@@ -181,6 +186,8 @@ lazy val root: Project = (project in file("."))
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
 val damlDarsLockFileUpdate = taskKey[Unit]("Update the daml/dars.lock file")
+val damlBumpPackageVersionsMutate =
+  taskKey[Unit]("Edit daml.yaml and apps/package.json based on origin/main comparison")
 val damlDarsLockCheckerFileArg =
   taskKey[String]("Argument line for updating the daml/dars.lock file")
 

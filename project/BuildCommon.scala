@@ -258,6 +258,10 @@ object BuildCommon {
         addCommandAlias(
           "updateDarResources",
           "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala daml/dars; apps-common/scalafmt; apps-common/headerCreate",
+        ) ++
+        addCommandAlias(
+          "damlBumpPackageVersions",
+          "; damlBumpPackageVersionsMutate ; damlDarsLockFileUpdate ; updateDarResources ; npmInstall",
         )
     val buildSettings = inThisBuild(
       Seq(
