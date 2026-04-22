@@ -321,6 +321,18 @@ export function installGcpQuotaAlerts(
   const promqlExclusion =
     approachingExclusionRegex !== null ? `, quota_metric!~"${approachingExclusionRegex}"` : '';
 
+  const rollingWindow = gcpQuotasConfig.rollingWindow;
+  // Convert Prometheus duration to seconds for the threshold alignmentPeriod
+  const rollingWindowSeconds = (() => {
+    const match = rollingWindow.match(/^(\d+)([smh])$/);
+    if (!match) {
+      throw new Error(`Invalid rollingWindow: ${rollingWindow}`);
+    }
+    const [, n, unit] = match;
+    const multiplier = unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
+    return `${parseInt(n) * multiplier}s`;
+  })();
+
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,
     'alertStrategy' | 'combiner' | 'notificationChannels' | 'userLabels'
@@ -347,7 +359,7 @@ export function installGcpQuotaAlerts(
         conditionThreshold: {
           aggregations: [
             {
-              alignmentPeriod: '60s', // "Rolling window"
+              alignmentPeriod: rollingWindowSeconds, // "Rolling window"
               crossSeriesReducer: 'REDUCE_SUM',
               groupByFields: ['metric.label.quota_metric'],
               perSeriesAligner: 'ALIGN_COUNT_TRUE',
@@ -388,7 +400,7 @@ export function installGcpQuotaAlerts(
         displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"${promqlExclusion}}
+            avg_over_time(serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"${promqlExclusion}}[${rollingWindow}])
             / ignoring(limit_name) group_right()
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
@@ -417,7 +429,7 @@ export function installGcpQuotaAlerts(
         displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"${promqlExclusion}}
+            avg_over_time(serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"${promqlExclusion}}[${rollingWindow}])
             / ignoring(limit_name) group_right()
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}

@@ -7,11 +7,17 @@ const quotaMetricNameSchema = z
   .string()
   .regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z0-9-]+\/[a-zA-Z0-9_./-]+$/, 'full GCP quota metric name');
 
+// Prometheus duration format, e.g. "60s", "5m", "1h"
+const prometheusDurationSchema = z
+  .string()
+  .regex(/^\d+[smh]$/, 'Prometheus duration (e.g. "60s", "5m", "1h")');
+
 const GcpQuotasConfigSchema = z.object({
   // so existing overrides don't break
   enabled: z.literal(true).optional(),
   excludedMetrics: z.array(quotaMetricNameSchema),
   excludedApproachingMetrics: z.array(quotaMetricNameSchema),
+  rollingWindow: prometheusDurationSchema,
 });
 
 const MonitoringConfigSchema = z
