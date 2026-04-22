@@ -16,8 +16,7 @@ RUN sed -i 's/archive.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.li
    && apt-get update \
    && DEBIAN_FRONTEND=noninteractive apt-get install -y screen tini libjemalloc2 \
    && apt-get clean \
-   && rm -rf /var/lib/apt/lists/* \
-   && curl -L https://github.com/vadimi/grpc-client-cli/releases/download/v1.24.3/grpc-client-cli_linux_x86_64.tar.gz | tar -C /usr/local/bin -xz
+   && rm -rf /var/lib/apt/lists/*
 
 # create and switch to a working directory
 RUN mkdir /app

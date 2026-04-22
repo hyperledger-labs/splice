@@ -8,4 +8,8 @@ FROM splice-app:${base_version}
 ARG base_version
 LABEL org.opencontainers.image.base.name="splice-app:${base_version}"
 
+USER root
+RUN curl -L https://github.com/vadimi/grpc-client-cli/releases/download/v1.24.3/grpc-client-cli_linux_x86_64.tar.gz | tar -C /usr/local/bin -xz
+USER nonroot
+
 COPY --chown=nonroot:nonroot app.conf pre-bootstrap.sh health-check.sh /app/
