@@ -119,17 +119,17 @@ Apart from connectivity to Scan, your validator must also be able to connect to 
 If you are encountering issues related to connecting to the synchronizer,
 you can use the following snippet to confirm that you are able to reach those endpoints
 (i.e., that SVs have whitelisted your IP for those endpoints as well).
-Note that the following snippet requires installing `jq <https://jqlang.org/>`_ and `grpcurl <https://github.com/fullstorydev/grpcurl>`_.
+Note that the following snippet requires installing `jq <https://jqlang.org/>`_ and `grpc-client-cli <https://github.com/vadimi/grpc-client-cli>`_.
 
 .. parsed-literal::
 
    (set -o pipefail
    for url in $(curl -fsS -m 5 --connect-timeout 5 |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers[].sequencers[].url | sub("https://"; "")'); do
      echo -n "$url: "
-     grpcurl --max-time 10 "$url":443 grpc.health.v1.Health/Check
+     grpc-client-cli health --deadline 10 "$url":443
    done)
 
-Sequencers that are functional and have whitelisted your IP correctly will return ``"status": "SERVING"`` in the ``grpcurl`` output.
+Sequencers that are functional and have whitelisted your IP correctly will return ``"status": "SERVING"`` in the ``grpc-client-cli`` output.
 
 .. code-block:: bash
 

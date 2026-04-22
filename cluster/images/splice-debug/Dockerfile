@@ -17,6 +17,6 @@ RUN sed -i 's/archive.ubuntu.com/azure.archive.ubuntu.com/g' /etc/apt/sources.li
     jq
 
 RUN curl -fL -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-RUN curl -sSLO https://github.com/fullstorydev/grpcurl/releases/download/v1.9.2/grpcurl_1.9.2_linux_amd64.deb && dpkg -i grpcurl_1.9.2_linux_amd64.deb && rm grpcurl_1.9.2_linux_amd64.deb
+RUN curl -L https://github.com/vadimi/grpc-client-cli/releases/download/v1.24.3/grpc-client-cli_linux_x86_64.tar.gz | tar -C /usr/local/bin -xz
 
 COPY target/LICENSE .

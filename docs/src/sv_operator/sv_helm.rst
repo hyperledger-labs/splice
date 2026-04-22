@@ -823,11 +823,11 @@ provided a Helm chart that configures the above cluster according to the routes 
 Your SV node should be configured with a url to your ``global-domain-sequencer`` so that other validators can subscribe to it.
 
 Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
-To check whether the sequencer is accessible, we can use the command below with the `grpcurl tool <https://github.com/fullstorydev/grpcurl>`_ :
+To check whether the sequencer is accessible, we can use the command below with the `grpc-client-cli tool <https://github.com/vadimi/grpc-client-cli>`_ :
 
 .. code-block:: bash
 
-    grpcurl <sequencer host>:<sequencer port> grpc.health.v1.Health/Check
+    grpc-client-cli health <sequencer host>:<sequencer port>
 
 If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME:443``
 Please replace ``YOUR_HOSTNAME`` with your host name and ``MIGRATION_ID`` with the migration ID of the synchronizer that the sequencer is part of.
