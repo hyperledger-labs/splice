@@ -3,10 +3,15 @@ FROM azul/zulu-openjdk-debian:17
 # Clean up remaining python3 installs from the base image
 RUN dpkg --purge python3 python3.9-minimal libpython3.9-minimal
 
-# Install screen for running the console in a headless server
+# Install screen for running the console in a headless server, grpcurl and jq to perform gRPC healthchecks with Docker Compose
 RUN export DEBIAN_FRONTEND=noninteractive \
  && apt-get update \
- && apt-get install --no-install-recommends -y ca-certificates screen curl
+ && apt-get install --no-install-recommends -y ca-certificates screen curl jq \
+ && curl -fsSLO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz \
+ && curl -fsSLO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_checksums.txt \
+ && sha256sum --check --ignore-missing grpcurl_1.8.7_checksums.txt \
+ && tar -xvf grpcurl_1.8.7_linux_x86_64.tar.gz -C /usr/local/bin --totals grpcurl \
+ && rm grpcurl_1.8.7*
 
 # Install grpc_health_probe (verifying checksums)
 RUN GHP_VERSION="0.4.15" && \

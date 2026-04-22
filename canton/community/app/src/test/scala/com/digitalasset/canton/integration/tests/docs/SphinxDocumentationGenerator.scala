@@ -91,7 +91,7 @@ import scala.util.{Failure, Success, Using}
   * when users copy-paste the documented snippet into the console, they face a compilation error.
   *
   * The `shell` command runs the command in a shell environment (as opposed to within the canton
-  * console) This can be useful to document direct interactions with the API (using grpc-client-cli for
+  * console) This can be useful to document direct interactions with the API (using grpcurl for
   * instance) or to document flows that require steps outside of the node's control (e.g. external
   * party allocation / signing)
   *

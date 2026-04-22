@@ -78,6 +78,13 @@ services:
       - ./canton:/canton/config
       # Logs
       - logs:/var/log/promtail
+    healthcheck:
+      # Requires grpcurl and jq in image
+      test: "grpcurl --plaintext localhost:10012 com.digitalasset.canton.health.admin.v0.StatusService.Status | jq -e '.success | select(.active)'"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,6 +120,13 @@ services:
       - ./canton:/canton/config
       # Logs
       - logs:/var/log/promtail
+    healthcheck:
+      # Requires grpcurl and jq in image
+      test: "grpcurl --plaintext localhost:10012 com.digitalasset.canton.health.admin.v0.StatusService.Status | jq -e '.success | select(.active)'"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,6 +159,13 @@ services:
       - ./canton:/canton/config
       # Logs
       - logs:/var/log/promtail
+    healthcheck:
+      # Requires grpcurl and jq in image
+      test: "grpcurl --plaintext localhost:10012 com.digitalasset.canton.health.admin.v0.StatusService.Status | jq -e '.success | select(.active)'"
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
