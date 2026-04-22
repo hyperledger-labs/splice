@@ -70,13 +70,13 @@ updates:
       - "krzysztofczyz-da"
       - "pawelperek-da"
       - "martinflorian-da"
-    labels:
-      - "static"
     cooldown:
       default-days: 5
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
+    commit-message:
+      prefix: "[ci] "
     # minor and patch version upgrades get pulled into a single PR
     # major versions create PRs one by one (for easier resolution)
     groups:
@@ -93,7 +93,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "npm"
-    directory: "/token-standard/cli"
+    directory: "/token-standard"
     schedule:
       interval: "daily"
     assignees:
@@ -107,36 +107,8 @@ updates:
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
-    # minor and patch version upgrades get pulled into a single PR
-    # major versions create PRs one by one (for easier resolution)
-    groups:
-      production-dependencies:
-        dependency-type: "production"
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-      development-dependencies:
-        dependency-type: "development"
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "npm"
-    directory: "/apps/common/frontend"
-    schedule:
-      interval: "daily"
-    assignees:
-      - "krzysztofczyz-da"
-      - "pawelperek-da"
-      - "martinflorian-da"
-    labels:
-      - "static"
-    cooldown:
-      default-days: 5
-      semver-major-days: 30
-      semver-minor-days: 7
-      semver-patch-days: 3
+    commit-message:
+      prefix: "[ci] "
     # minor and patch version upgrades get pulled into a single PR
     # major versions create PRs one by one (for easier resolution)
     groups:
@@ -160,13 +132,13 @@ updates:
       - "krzysztofczyz-da"
       - "pawelperek-da"
       - "martinflorian-da"
-    labels:
-      - "static"
     cooldown:
       default-days: 5
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
+    commit-message:
+      prefix: "[ci] "
     # minor and patch version upgrades get pulled into a single PR
     # major versions create PRs one by one (for easier resolution)
     groups:
