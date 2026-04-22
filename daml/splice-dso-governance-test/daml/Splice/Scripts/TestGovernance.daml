@@ -28,6 +28,7 @@ import Splice.DecentralizedSynchronizer
 
 import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Utils
 
 
 -- Vote Requests
@@ -453,15 +454,11 @@ testRacingSvRemoval = do
 
   -- and it eagerly accepts its other vote request as well
   [(dsoRulesCid, _)] <- query @DsoRules dso
-  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
-    requestCid = req2
-    amuletRulesCid = None
-    sv = Some sv1
-
-  result.completedAt === now
-  result.offboardedVoters === ["sv2"]
-  result.abstainingSvs === []
-  result.outcome === VRO_AcceptedButActionFailed with description = "Not a sv"
+  submitMultiMustFail'' (expectMessageContains "Not a sv")
+    [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+      requestCid = req2
+      amuletRulesCid = None
+      sv = Some sv1
 
   -- sv3 refuses and sv4 accepts request 4 with effectivity 8 days before the expiration.
   req4 <- castVote app sv3 req4 False

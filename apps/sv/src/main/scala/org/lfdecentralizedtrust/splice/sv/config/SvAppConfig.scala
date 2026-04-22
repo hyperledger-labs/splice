@@ -489,6 +489,13 @@ final case class SvSequencerConfig(
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
     isBftSequencer: Boolean = false,
+    dabftPruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
   def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
     adminApi,

@@ -93,12 +93,23 @@ canton.participants.participant_$index = {
     }
 
     parameters {
-        # tune the synchronisation protocols contract store cache
         caching {
-            contract-store {
+          # tune the synchronisation protocols contract store cache
+          contract-store {
             maximum-size = 1000 # default 1e6
             expire-after-access = 120s # default 10 minutes
+          }
+          # we bump encryption key caching defaults to reduce KMS costs
+          session-encryption-key-cache {
+            sender-cache {
+              maximum-size = 100000 # default is 10000
+              expire-after-timeout = 3600s # default is 10s
             }
+            receiver-cache {
+              maximum-size = 100000 # default is 10000
+              expire-after-timeout = 3600s # default is 10s
+            }
+          }
         }
     }
 
