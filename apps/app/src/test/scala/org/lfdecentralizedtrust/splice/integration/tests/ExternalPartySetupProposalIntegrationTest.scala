@@ -641,7 +641,7 @@ class ExternalPartySetupProposalIntegrationTest
     ) {
       val (proposalCid, _) = actAndCheck(
         s"Create a proposal to setup an external party with a soon-to-expire transfer preapproval",
-        createExternalPartyProposalViaLedgerApi(externalParty, Instant.now().plusSeconds(2)),
+        createExternalPartyProposalViaLedgerApi(externalParty, Instant.now().plusSeconds(5)),
       )(
         s"External party setup proposal for $externalParty was created",
         { proposalCid =>
