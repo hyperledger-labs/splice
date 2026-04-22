@@ -17,7 +17,7 @@ async function main() {
     await auth0Fetch.loadAuth0Cache();
 
     // defining resources in an apply callback is wrong...
-    installNode(sv, auth0Fetch);
+    await installNode(sv, auth0Fetch);
 
     await auth0Fetch.saveAuth0Cache();
   });

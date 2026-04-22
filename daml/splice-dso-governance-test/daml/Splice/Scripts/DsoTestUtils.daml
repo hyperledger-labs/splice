@@ -339,6 +339,28 @@ executeAllDefinitiveVotes app = do
         amuletRulesCid = Some amuletRulesCid
         sv = Some s.dsoDelegate
 
+initiateAndCastVote : AmuletApp -> [Party] -> Optional Time -> ActionRequiringConfirmation -> Script (ContractId VoteRequest)
+initiateAndCastVote _ [] _ _ = error "initiateVote: require at least one party"
+initiateAndCastVote app (initiator::others) targetEffectiveAt action = do
+    [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    requestCid <- submitMulti [initiator] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+      requester = initiator
+      action
+      reason = Reason with url = ""; body = "let's get it done"
+      targetEffectiveAt
+      voteRequestTimeout = None
+    foldlA (castVote dsoRulesCid) requestCid.voteRequest others
+  where
+    castVote dsoRulesCid requestCid sv = do
+      result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+          requestCid
+          vote = Vote with
+            sv
+            accept = True
+            reason = Reason with url = ""; body = "✓"
+            optCastAt = None
+      return result.voteRequest
+
 initiateAndAcceptVote : AmuletApp -> [Party] -> ActionRequiringConfirmation -> Script ()
 initiateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
 initiateAndAcceptVote app (initiator::others) action = do

@@ -33,6 +33,7 @@ export const MigrationInfoSchema = z
     version: CnChartVersionSchema,
     releaseReference: GitReferenceSchema.optional(),
     enableLogicalSynchronizerDeploymentMode: z.boolean().default(false),
+    migrateParticipantsFromSvCantonToSv: z.boolean().default(false),
     sequencer: z
       .object({
         enableBftSequencer: z.boolean().default(false),

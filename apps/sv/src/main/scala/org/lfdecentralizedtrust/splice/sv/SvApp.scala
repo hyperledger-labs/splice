@@ -484,6 +484,7 @@ class SvApp(
               ) {
                 node.ensureMediatorPruningSchedule()
               }
+              _ <- node.ensureDABFTPruningSchedule()
             } yield ()
           } else {
             logger.info(

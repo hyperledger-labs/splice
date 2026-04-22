@@ -54,3 +54,42 @@
     - LocalNet
 
         - Added support for configuring the protocol version used in LocalNet.
+
+    - Remove use of rollback nodes to support protocol version 35
+
+        - Daml
+
+            - ``AmuletRules``. Replace ``InvalidTransfer`` exceptions with ``failWithStatus``:
+
+                - ``ITR_InsufficientFunds`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/insufficient-funds``
+                - ``ITR_UnknownSynchronizer`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/unknown-synchronizer``
+                - ``ITR_InsufficientTopupAmount`` → `FailureStatus` with error_id = ``splice.lfdecentralizedtrust.org/insufficient-topup-amount``
+                - ``ITR_Other ("More than the maximum number of inputs")`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/maximum-inputs-exceeded``
+                - ``ITR_Other ("More than the maximum number of outputs")`` → ``FailureStatus`` with error_id = ``splice.lfdecentralizedtrust.org/maximum-outputs-exceeded``
+
+            - ``WalletAppInstall_ExecuteBatch``. No longer catches exceptions and returns them as ``AmuletOperationOutcome`` / ``COO_Error``. Instead, the transaction is aborted.
+
+            - ``TransferCommand_Send``. No longer catches exceptions and returns them as ``TransferCommandResultFailure``. Instead, the transaction is aborted without merging inputs.
+
+            - ``DsoRules_CloseVoteRequest`` no longer catches exceptions. Previously, it would close the vote request with outcome ``VRO_AcceptedButActionFailed``.
+              The transaction will now abort on failure.
+
+        - Wallet app
+
+            - ``batchSize`` in ``TreasuryConfig`` is set to 1.
+
+    - Daml
+
+        - The Daml SDK in Splice has been upgraded to 3.4.11. All Daml packages have been recompiled to new Dars, with versions:
+
+            ================== =======
+            name               version
+            ================== =======
+            amulet             0.1.18
+            amuletNameService  0.1.19
+            dsoGovernance      0.1.24
+            validatorLifecycle 0.1.7
+            wallet             0.1.19
+            walletPayments     0.1.18
+            ================== =======
+

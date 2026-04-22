@@ -127,11 +127,11 @@ SPLICE_ROOT = os.getenv("SPLICE_ROOT")
 with open(SPLICE_ROOT + "/nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_version = obj["version"]
-    daml_sdk_tooling_version = obj["tooling_sdk_version"]
 
-with open(SPLICE_ROOT + "/daml.yaml") as f:
-    obj = yaml.safe_load(f)
-    daml_sdk_version = obj["sdk-version"]
+with open(SPLICE_ROOT + "/nix/dpm-sdk-sources.json") as f:
+    obj = json.load(f)
+    daml_sdk_tooling_version = obj["version"]
+    daml_sdk_version = obj["version"]
 
 with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
     canton_subdir = f.readline()

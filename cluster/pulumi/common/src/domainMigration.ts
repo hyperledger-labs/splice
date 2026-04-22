@@ -52,6 +52,10 @@ export class DecentralizedSynchronizerMigrationConfig {
       .concat(this.upgrade ? [this.upgrade] : []);
   }
 
+  usesCometbft(): boolean {
+    return !this.runningMigrations().every(x => x.sequencer.enableBftSequencer);
+  }
+
   isStillRunning(id: DomainMigrationIndex): boolean {
     return this.runningMigrations().some(info => info.id == id);
   }

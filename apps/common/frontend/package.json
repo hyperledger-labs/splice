@@ -14,8 +14,7 @@
     ]
   },
   "dependencies": {
-    "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
-    "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
+    "@daml/types": "^3.4.11",
     "@js-temporal/polyfill": "^0.4.4",
     "@lfdecentralizedtrust/splice-common-frontend-utils": "0.1.0",
     "@lfdecentralizedtrust/splice-common-typeface-termina": "1.0.0",
