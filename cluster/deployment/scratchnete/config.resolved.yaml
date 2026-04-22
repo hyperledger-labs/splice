@@ -131,6 +131,7 @@ operatorDeployment:
     pulumiStacksDir: 'cluster/stacks/scratchnets'
     repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
     spliceRoot: 'splice'
+persistentHeapDumps: true
 pulumiProjectConfig:
   default:
     allowDowngrade: true
@@ -463,6 +464,7 @@ svs:
 synchronizerMigration:
   active:
     id: 0
+    migrateParticipantsFromSvCantonToSv: true
     releaseReference:
       deploymentDir: 'splice/cluster/deployment'
       gitReference: 'refs/heads/tom-da/basicScratch'

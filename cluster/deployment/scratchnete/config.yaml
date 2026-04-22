@@ -34,3 +34,4 @@ synchronizerMigration:
       spliceRoot: "splice"
       privateConfigsDir: "cluster/configs/configs-private"
       publicConfigsDir: "cluster/configs/configs"
+    migrateParticipantsFromSvCantonToSv: true
