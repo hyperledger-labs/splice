@@ -3,6 +3,242 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"JSON\"}",
+          "name": "tr_json"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    STRUCT(\n      `undefined.functions.daml_record_numeric`(tr_json, [0]) AS appRewardAmount,\n      `undefined.functions.daml_record_numeric`(tr_json, [1]) AS validatorRewardAmount,\n      `undefined.functions.daml_record_numeric`(tr_json, [2]) AS svRewardAmount,\n      IFNULL(\n        PARSE_BIGNUMERIC(JSON_VALUE(tr_json,\n          `undefined.functions.daml_record_path`([11], 'optional_numeric'))), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)\n    )\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"STRUCT\",\"structType\":{\"fields\":[{\"name\":\"appRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"validatorRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"svRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unclaimedActivityRecordAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}}]}}",
+      "routineId": "TransferSummary_minted",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "TransferSummary_minted",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    SELECT\n      as_of_record_time,\n      migration_id,\n      `undefined.functions.locked`(as_of_record_time, migration_id) as locked,\n      `undefined.functions.unlocked`(as_of_record_time, migration_id) as unlocked,\n      `undefined.functions.locked`(as_of_record_time, migration_id) + `undefined.functions.unlocked`(as_of_record_time, migration_id) as current_supply_total,\n      `undefined.functions.unminted`(as_of_record_time, migration_id) as unminted,\n      `undefined.functions.minted`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).appRewardAmount\n          AS daily_mint_app_rewards,\n      `undefined.functions.minted`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).validatorRewardAmount\n          AS daily_mint_validator_rewards,\n      `undefined.functions.minted`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time, migration_id).svRewardAmount\n          AS daily_mint_sv_rewards,\n      `undefined.functions.minted`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).unclaimedActivityRecordAmount\n          AS daily_mint_unclaimed_activity_records,\n      IFNULL(\n        `undefined.functions.burned`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id),\n        0) AS daily_burn,\n      `undefined.functions.num_amulet_holders`(as_of_record_time, migration_id) as num_amulet_holders,\n      `undefined.functions.num_active_validators`(as_of_record_time, migration_id) as num_active_validators,\n      IFNULL(`undefined.functions.average_tps`(as_of_record_time, migration_id), 0.0) as average_tps,\n      IFNULL(`undefined.functions.peak_tps`(as_of_record_time, migration_id), 0.0) as peak_tps,\n      `undefined.functions.coin_price`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).minPrice\n          AS daily_min_coin_price,\n      `undefined.functions.coin_price`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).maxPrice\n          AS daily_max_coin_price,\n      `undefined.functions.coin_price`(\n            TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR),\n            `undefined.functions.migration_id_at_time`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR)),\n            as_of_record_time,\n            migration_id).avgPrice\n          AS daily_avg_coin_price\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"as_of_record_time\",\"type\":{\"typeKind\":\"TIMESTAMP\"}},{\"name\":\"migration_id\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"locked\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unlocked\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"current_supply_total\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unminted\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_mint_app_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_mint_validator_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_mint_sv_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_mint_unclaimed_activity_records\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_burn\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"num_amulet_holders\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"num_active_validators\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"average_tps\",\"type\":{\"typeKind\":\"FLOAT64\"}},{\"name\":\"peak_tps\",\"type\":{\"typeKind\":\"FLOAT64\"}},{\"name\":\"daily_min_coin_price\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_max_coin_price\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"daily_avg_coin_price\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}}]}",
+      "routineId": "all_dashboard_stats",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "all_dashboard_stats",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "dashboards",
+      "deletionProtection": false,
+      "tableId": "all_data",
+      "view": {
+        "query": "\n    SELECT\n      *,\n      DATE_SUB(DATE(computed.as_of_record_time), INTERVAL 1 DAY) AS up_to_date\n    FROM\n        `undefined.dashboards.dashboards-data` computed\n        JOIN `undefined.dashboards.monthly_burn` monthly_burn\n          ON computed.as_of_record_time = monthly_burn.monthly_as_of_record_time\n        JOIN `undefined.dashboards.daily_unminted` daily_unminted\n          ON computed.as_of_record_time = daily_unminted.daily_as_of_record_time\n  ",
+        "useLegacySql": false
+      }
+    },
+    "name": "all_data",
+    "provider": "",
+    "type": "gcp:bigquery/table:Table"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [],
+      "datasetId": "dashboards",
+      "definitionBody": "\n    -- Generate all days since genesis (first record time in the scan dataset) until today.\n    SELECT\n      TIMESTAMP(day) as as_of_record_time\n    FROM\n      UNNEST(\n        GENERATE_DATE_ARRAY(\n          -- DATE(\n          --   TIMESTAMP_MICROS((SELECT MIN(record_time) FROM `undefined.mock_da2_scan.scan_sv_1_update_history_exercises`))\n          --),\n          -- TODO(DACH-NY/canton-network-internal#1461): for now we compute only last 60 days until we confirm costs, and will\n          -- backfill to genesis later.\n          DATE(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)),\n          CURRENT_DATE\n        )\n      ) as day\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"as_of_record_time\",\"type\":{\"typeKind\":\"TIMESTAMP\"}}]}",
+      "routineId": "all_days_since_genesis",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "all_days_since_genesis",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    SELECT\n      as_of_record_time,\n      migration_id,\n      `undefined.functions.locked`(as_of_record_time, migration_id) as locked,\n      `undefined.functions.unlocked`(as_of_record_time, migration_id) as unlocked,\n      `undefined.functions.locked`(as_of_record_time, migration_id) + `undefined.functions.unlocked`(as_of_record_time, migration_id) as current_supply_total,\n      `undefined.functions.unminted`(as_of_record_time, migration_id) as unminted,\n      `undefined.functions.minted`(\n            NULL,\n            NULL,\n            as_of_record_time,\n            migration_id).appRewardAmount\n          AS total_mint_app_rewards,\n      `undefined.functions.minted`(\n            NULL,\n            NULL,\n            as_of_record_time,\n            migration_id).validatorRewardAmount\n          AS total_mint_validator_rewards,\n      `undefined.functions.minted`(\n            NULL,\n            NULL,\n            as_of_record_time, migration_id).svRewardAmount\n          AS total_mint_sv_rewards,\n      `undefined.functions.minted`(\n            NULL,\n            NULL,\n            as_of_record_time,\n            migration_id).unclaimedActivityRecordAmount\n          AS total_mint_unclaimed_activity_records,\n      IFNULL(\n        `undefined.functions.burned`(\n            NULL,\n            NULL,\n            as_of_record_time,\n            migration_id),\n        0) AS total_burn,\n      `undefined.functions.num_amulet_holders`(as_of_record_time, migration_id) as num_amulet_holders,\n      `undefined.functions.num_active_validators`(as_of_record_time, migration_id) as num_active_validators,\n      `undefined.functions.latest_round`(as_of_record_time, migration_id) as latest_round\n\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"as_of_record_time\",\"type\":{\"typeKind\":\"TIMESTAMP\"}},{\"name\":\"migration_id\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"locked\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unlocked\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"current_supply_total\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unminted\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"total_mint_app_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"total_mint_validator_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"total_mint_sv_rewards\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"total_mint_unclaimed_activity_records\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"total_burn\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"num_amulet_holders\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"num_active_validators\",\"type\":{\"typeKind\":\"INT64\"}},{\"name\":\"latest_round\",\"type\":{\"typeKind\":\"INT64\"}}]}",
+      "routineId": "all_finance_stats",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "all_finance_stats",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    SELECT DISTINCT\n        JSON_VALUE(create_arguments, `undefined.functions.daml_record_path`([0], 'party')) as validator_operator_party,\n        TIMESTAMP_MICROS(MAX(created_at) OVER (PARTITION BY JSON_VALUE(create_arguments, `undefined.functions.daml_record_path`([0], 'party')))) AS latest_validator_license,\n        TIMESTAMP_MICROS(MIN(created_at) OVER (PARTITION BY JSON_VALUE(create_arguments, `undefined.functions.daml_record_path`([0], 'party')))) AS first_validator_license\n      FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n      WHERE c.package_name = \"splice-amulet\"\n        AND c.template_id_module_name = \"Splice.ValidatorLicense\"\n        AND c.template_id_entity_name = \"ValidatorLicense\"\n        AND `undefined.functions.up_to_time`(as_of_record_time, migration_id, c.record_time, c.migration_id)\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"validator_operator_party\",\"type\":{\"typeKind\":\"STRING\"}},{\"name\":\"latest_validator_license\",\"type\":{\"typeKind\":\"TIMESTAMP\"}},{\"name\":\"first_validator_license\",\"type\":{\"typeKind\":\"TIMESTAMP\"}}]}",
+      "routineId": "all_validators",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "all_validators",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    SELECT\n      JSON_VALUE(create_arguments, `undefined.functions.daml_record_path`([1], 'party')) as owner,\n      TIMESTAMP_MICROS(created_at) as latest_amulet_created\n      FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n      WHERE c.package_name = \"splice-amulet\"\n        AND c.template_id_module_name = \"Splice.Amulet\"\n        AND c.template_id_entity_name = \"Amulet\"\n        AND `undefined.functions.up_to_time`(as_of_record_time, migration_id, c.record_time, c.migration_id)\n      QUALIFY ROW_NUMBER() OVER (PARTITION BY owner ORDER BY created_at DESC) = 1\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"owner\",\"type\":{\"typeKind\":\"STRING\"}},{\"name\":\"latest_amulet_created\",\"type\":{\"typeKind\":\"TIMESTAMP\"}}]}",
+      "routineId": "amulet_holders",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "amulet_holders",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT COUNT(*) / 86400.0\n      FROM `undefined.functions.one_day_updates`(as_of_record_time, migration_id)\n    )\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"FLOAT64\"}",
+      "routineId": "average_tps",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "average_tps",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "start_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "start_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "up_to_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "up_to_migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT SUM(fees)\n      FROM ((\n                SELECT\n                    SUM(`undefined.functions.result_burn`(e.choice,\n                                              e.result)) fees\n                FROM\n                    `undefined.mock_da2_scan.scan_sv_1_update_history_exercises` e\n                WHERE\n                    ((e.choice IN ('AmuletRules_BuyMemberTraffic',\n                                  'AmuletRules_Transfer',\n                                  'AmuletRules_CreateTransferPreapproval',\n                                  'AmuletRules_CreateExternalPartySetupProposal')\n                        AND e.template_id_entity_name = 'AmuletRules')\n                        OR (e.choice = 'TransferPreapproval_Renew'\n                            AND e.template_id_entity_name = 'TransferPreapproval'))\n                  AND e.template_id_module_name = 'Splice.AmuletRules'\n                  AND `undefined.functions.in_time_window`(\n                          start_record_time, start_migration_id,\n                          up_to_record_time, up_to_migration_id,\n                          e.record_time, e.migration_id))\n            UNION ALL (-- Purchasing ANS Entries\n                SELECT\n                    SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, `undefined.functions.daml_record_path`([2, 0], 'numeric')))) fees -- .amount.initialAmount\n                FROM\n                    `undefined.mock_da2_scan.scan_sv_1_update_history_exercises` e,\n                    `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n                WHERE\n                    ((e.choice = 'SubscriptionInitialPayment_Collect'\n                        AND e.template_id_entity_name = 'SubscriptionInitialPayment'\n                        AND c.contract_id = JSON_VALUE(e.result, `undefined.functions.daml_record_path`([2], 'contractId'))) -- .amulet\n                        OR (e.choice = 'SubscriptionPayment_Collect'\n                            AND e.template_id_entity_name = 'SubscriptionPayment'\n                            AND c.contract_id = JSON_VALUE(e.result, `undefined.functions.daml_record_path`([1], 'contractId')))) -- .amulet\n                  AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'\n                  AND c.template_id_module_name = 'Splice.Amulet'\n                  AND c.template_id_entity_name = 'Amulet'\n                  AND `undefined.functions.in_time_window`(\n                          start_record_time, start_migration_id,\n                          up_to_record_time, up_to_migration_id,\n                          e.record_time, e.migration_id)\n                  AND c.record_time != -62135596800000000)))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "burned",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "burned",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "choice"
+        },
+        {
+          "dataType": "{\"typeKind\":\"JSON\"}",
+          "name": "result"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    CASE choice\n      WHEN 'AmuletRules_CreateExternalPartySetupProposal'\n        -- .transferResult.summary\n        THEN JSON_QUERY(result, `undefined.functions.daml_record_path`([3, 1], 'record'))\n      WHEN 'AmuletRules_CreateTransferPreapproval'\n        -- .transferResult.summary\n        THEN JSON_QUERY(result, `undefined.functions.daml_record_path`([1, 1], 'record'))\n      WHEN 'AmuletRules_BuyMemberTraffic'\n        -- .summary\n        THEN JSON_QUERY(result, `undefined.functions.daml_record_path`([1], 'record'))\n      WHEN 'AmuletRules_Transfer'\n        -- .summary\n        THEN JSON_QUERY(result, `undefined.functions.daml_record_path`([1], 'record'))\n      WHEN 'TransferPreapproval_Renew'\n        -- .transferResult.summary\n        THEN JSON_QUERY(result, `undefined.functions.daml_record_path`([1, 1], 'record'))\n      ELSE ERROR('no TransferSummary for this choice: ' || choice)\n    END\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"JSON\"}",
+      "routineId": "choice_result_TransferSummary",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "choice_result_TransferSummary",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -78,6 +314,28 @@
       },
       "kind": "Secret",
       "metadata": {
+        "name": "sv-1-bqdatastream-passwd",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-sv-1-bqdatastream-passwd",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
         "name": "cn-apps-pg-secrets",
         "namespace": "sv-da-1"
       },
@@ -131,6 +389,183 @@
     "name": "cn-app-sv-da-1-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "cn-apps-pg-bqdatastream-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "start_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "start_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "up_to_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "up_to_migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT AS\n      STRUCT\n        MIN(`undefined.functions.daml_record_numeric`(c.create_arguments, [2])),\n        MAX(`undefined.functions.daml_record_numeric`(c.create_arguments, [2])),\n        AVG(`undefined.functions.daml_record_numeric`(c.create_arguments, [2]))\n    FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n      WHERE template_id_entity_name = 'SummarizingMiningRound'\n      AND c.template_id_module_name = 'Splice.Round'\n      AND package_name = 'splice-amulet'\n      AND `undefined.functions.in_time_window`(\n        start_record_time, start_migration_id,\n        up_to_record_time, up_to_migration_id,\n        c.record_time, c.migration_id\n    ))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"STRUCT\",\"structType\":{\"fields\":[{\"name\":\"minPrice\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"maxPrice\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"avgPrice\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}}]}}",
+      "routineId": "coin_price",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "coin_price",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "dashboards",
+      "deletionProtection": false,
+      "tableId": "daily_unminted",
+      "view": {
+        "query": "\n    SELECT\n        as_of_record_time as daily_as_of_record_time,\n        unminted - LAG(unminted) OVER (\n            ORDER BY as_of_record_time\n        ) AS daily_unminted\n    FROM\n        `undefined.dashboards.dashboards-data`\n  ",
+        "useLegacySql": false
+      }
+    },
+    "name": "daily_unminted",
+    "provider": "",
+    "type": "gcp:bigquery/table:Table"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "selector"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n      CASE selector\n        WHEN 'optional_numeric' THEN '.optional.value.numeric'\n        WHEN 'numeric' THEN '.numeric'\n        WHEN 'contractId' THEN '.contractId'\n        WHEN 'list' THEN '.list.elements'\n        WHEN 'party' THEN '.party'\n        WHEN 'int64' THEN '.int64'\n        -- we treat records just like outer layer;\n        -- see how paths start with '$.record'\n        WHEN 'record' THEN ''\n        ELSE ERROR('Unknown Daml primitive case: ' || selector)\n      END\n    ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"STRING\"}",
+      "routineId": "daml_prim_path",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "daml_prim_path",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"JSON\"}",
+          "name": "daml_record"
+        },
+        {
+          "dataType": "{\"typeKind\":\"ARRAY\",\"arrayElementType\":{\"typeKind\":\"INT64\"}}",
+          "name": "path"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "PARSE_BIGNUMERIC(JSON_VALUE(daml_record,\n        `undefined.functions.daml_record_path`(path, 'numeric')))",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "daml_record_numeric",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "daml_record_numeric",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"ARRAY\",\"arrayElementType\":{\"typeKind\":\"INT64\"}}",
+          "name": "field_indices"
+        },
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "prim_selector"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    -- Return a full JSON path to a nested Daml record field.  A field lookup like\n    -- `.x.y.z` can be accessed as follows:\n    -- 1. Find the record that defines `x`.\n    -- 2. Find the 0-based index of `x` in that record, in order of its fields.\n    --    For example, consider it the fourth field (index 3) for this example.\n    -- 3. Next, move to the type of the `x` field, which should have `y`.\n    -- 4. Repeat step (2) for `y` to find the next index.\n    --    In this example, suppose it is the first field (index 0).\n    -- 5. Repeat steps (3) and (4) for `z`.\n    --    In this example, suppose it is the second field (index 1).\n    -- 6. The first argument here is `[3, 0, 1]` for this example.\n    -- 7. Finally, check the type of `z`; see `daml_prim_path` for a matching\n    --    selector to pass here.\n\n    CONCAT('$',\n          -- you cannot use SELECT in a BigQuery JSONPath, even indirectly\n          CASE ARRAY_LENGTH(field_indices)\n            WHEN 0 THEN ''\n            WHEN 1 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value')\n            WHEN 2 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value',\n                              '.record.fields[', CAST(field_indices[1] AS STRING), '].value')\n            WHEN 3 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value',\n                              '.record.fields[', CAST(field_indices[1] AS STRING), '].value',\n                              '.record.fields[', CAST(field_indices[2] AS STRING), '].value')\n            ELSE ERROR('Unsupported number of field indices: ' || ARRAY_LENGTH(field_indices))\n          END,\n          `undefined.functions.daml_prim_path`(prim_selector))\n\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"STRING\"}",
+      "routineId": "daml_record_path",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "daml_record_path",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "dashboards",
+      "deletionProtection": false,
+      "schema": "[{\"name\":\"as_of_record_time\",\"type\":\"TIMESTAMP\"},{\"name\":\"migration_id\",\"type\":\"INT64\"},{\"name\":\"locked\",\"type\":\"BIGNUMERIC\"},{\"name\":\"unlocked\",\"type\":\"BIGNUMERIC\"},{\"name\":\"current_supply_total\",\"type\":\"BIGNUMERIC\"},{\"name\":\"unminted\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_app_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_validator_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_sv_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_unclaimed_activity_records\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_burn\",\"type\":\"BIGNUMERIC\"},{\"name\":\"num_amulet_holders\",\"type\":\"INT64\"},{\"name\":\"num_active_validators\",\"type\":\"INT64\"},{\"name\":\"average_tps\",\"type\":\"FLOAT64\"},{\"name\":\"peak_tps\",\"type\":\"FLOAT64\"},{\"name\":\"daily_min_coin_price\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_max_coin_price\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_avg_coin_price\",\"type\":\"BIGNUMERIC\"}]",
+      "tableId": "dashboards-data"
+    },
+    "name": "dashboards-data",
+    "provider": "",
+    "type": "gcp:bigquery/table:Table"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "dashboards",
+      "deleteContentsOnDestroy": true,
+      "friendlyName": "dashboards Dataset",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "dashboards",
+    "provider": "",
+    "type": "gcp:bigquery/dataset:Dataset"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [],
+      "datasetId": "dashboards",
+      "definitionBody": "\n    -- Find all days since genesis for which we do not have a stats entry at all, or its lacking some fields.\n    SELECT as_of_record_time\n      FROM `undefined.dashboards.all_days_since_genesis`()\n      EXCEPT DISTINCT\n        SELECT\n          as_of_record_time\n          FROM `undefined.dashboards.dashboards-data`\n          WHERE\n            locked IS NOT NULL\n            AND unlocked IS NOT NULL\n            AND current_supply_total IS NOT NULL\n            AND unminted IS NOT NULL\n            AND daily_mint_app_rewards IS NOT NULL\n            AND daily_mint_validator_rewards IS NOT NULL\n            AND daily_mint_sv_rewards IS NOT NULL\n            AND daily_mint_unclaimed_activity_records IS NOT NULL\n            AND daily_burn IS NOT NULL\n            AND num_amulet_holders IS NOT NULL\n            AND num_active_validators IS NOT NULL\n            AND average_tps IS NOT NULL\n            AND peak_tps IS NOT NULL\n            AND daily_min_coin_price IS NOT NULL\n            AND daily_max_coin_price IS NOT NULL\n            AND daily_avg_coin_price IS NOT NULL\n    ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"as_of_record_time\",\"type\":{\"typeKind\":\"TIMESTAMP\"}}]}",
+      "routineId": "days_with_missing_stats",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "days_with_missing_stats",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
   },
   {
     "custom": true,
@@ -255,6 +690,7 @@
         "active": {
           "enableLogicalSynchronizerDeploymentMode": false,
           "id": 3,
+          "migrateParticipantsFromSvCantonToSv": false,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
             "gitReference": "refs/heads/release-line-0.3.20",
@@ -277,6 +713,7 @@
           {
             "enableLogicalSynchronizerDeploymentMode": false,
             "id": 1,
+            "migrateParticipantsFromSvCantonToSv": false,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
               "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
@@ -296,6 +733,7 @@
           {
             "enableLogicalSynchronizerDeploymentMode": false,
             "id": 2,
+            "migrateParticipantsFromSvCantonToSv": false,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
               "gitReference": "refs/heads/release-line-0.3.19",
@@ -318,6 +756,7 @@
         "upgrade": {
           "enableLogicalSynchronizerDeploymentMode": true,
           "id": 4,
+          "migrateParticipantsFromSvCantonToSv": false,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
             "gitReference": "refs/heads/release-line-0.3.21",
@@ -390,6 +829,99 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "arguments": [],
+      "datasetId": "dashboards",
+      "definitionBody": "\n    FOR t IN\n      (SELECT * FROM `undefined.dashboards.days_with_missing_stats`())\n    DO\n      DELETE FROM `undefined.dashboards.dashboards-data` WHERE as_of_record_time = t.as_of_record_time;\n\n      INSERT INTO `undefined.dashboards.dashboards-data`\n        SELECT * FROM `undefined.functions.all_dashboard_stats`(t.as_of_record_time, `undefined.functions.migration_id_at_time`(t.as_of_record_time));\n\n    END FOR;\n  ",
+      "language": "SQL",
+      "routineId": "fill_all_stats",
+      "routineType": "PROCEDURE"
+    },
+    "name": "fill_all_stats",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "functions",
+      "deleteContentsOnDestroy": true,
+      "friendlyName": "functions Dataset",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "functions",
+    "provider": "",
+    "type": "gcp:bigquery/dataset:Dataset"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "start_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "start_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "up_to_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "up_to_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    CASE\n      WHEN start_record_time IS NULL AND start_migration_id IS NULL THEN\n        (migration_id < up_to_migration_id\n            OR (migration_id = up_to_migration_id\n              AND record_time <= UNIX_MICROS(up_to_record_time)))\n          AND record_time != -62135596800000000\n      WHEN start_record_time IS NOT NULL AND start_migration_id IS NOT NULL THEN\n        (migration_id > start_migration_id\n            OR (migration_id = start_migration_id\n              AND record_time > UNIX_MICROS(start_record_time)))\n          AND (migration_id < up_to_migration_id\n            OR (migration_id = up_to_migration_id\n              AND record_time <= UNIX_MICROS(up_to_record_time)))\n          AND record_time != -62135596800000000\n      ELSE ERROR('in_time_window: start_record_time and start_migration_id must be both NULL or both NOT NULL')\n    END\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BOOL\"}",
+      "routineId": "in_time_window",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "in_time_window",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "iso8601_string"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "PARSE_TIMESTAMP('%FT%TZ', iso8601_string)",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"TIMESTAMP\"}",
+      "routineId": "iso_timestamp",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "iso_timestamp",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s-imgpull-docs-default",
@@ -415,6 +947,56 @@
     "name": "k8s-imgpull-sv-da-1-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT\n        CAST(JSON_VALUE(c.create_arguments, `undefined.functions.daml_record_path`([1,0], 'int64')) AS INT64)\n      FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n          WHERE template_id_entity_name = 'SummarizingMiningRound'\n          AND c.template_id_module_name = 'Splice.Round'\n          AND package_name = 'splice-amulet'\n          AND `undefined.functions.up_to_time`(\n            as_of_record_time, migration_id,\n            c.record_time, c.migration_id)\n          ORDER BY c.record_time DESC LIMIT 1)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"INT64\"}",
+      "routineId": "latest_round",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "latest_round",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    `undefined.functions.sum_bignumeric_acs`(\n      -- (LockedAmulet) .amulet.amount.initialAmount\n      [0, 2, 0],\n      'Splice.Amulet',\n      'LockedAmulet',\n      as_of_record_time,\n      migration_id)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "locked",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "locked",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
   },
   {
     "custom": true,
@@ -916,6 +1498,167 @@
   },
   {
     "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    -- Given a record time, find the latest migration ID that was active at that time. Takes the lowest ID that has updates\n    -- after the given time, therefore if the timestamp is during a migration, it will return the older migration ID.\n    -- If no updates exist after the given time, returns the migration id of the last update.\n    IFNULL\n    (\n      -- Try to find the lowest migration ID that has updates after the given time.\n      (SELECT\n        MIN(migration_id)\n      FROM\n        ((SELECT record_time, migration_id FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates`) UNION ALL\n         (SELECT record_time, migration_id FROM `undefined.mock_da2_scan.scan_sv_1_update_history_exercises`))\n      WHERE record_time > UNIX_MICROS(as_of_record_time)),\n      -- If none exists, return the migration ID of the last update.\n      (SELECT migration_id FROM\n        (\n          (SELECT record_time, migration_id FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates`) UNION ALL\n          (SELECT record_time, migration_id FROM `undefined.mock_da2_scan.scan_sv_1_update_history_exercises`)\n        ) ORDER BY record_time DESC LIMIT 1)\n    )\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"INT64\"}",
+      "routineId": "migration_id_at_time",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "migration_id_at_time",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "start_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "start_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "up_to_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "up_to_migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT\n        STRUCT(\n          COALESCE(SUM(`undefined.functions.TransferSummary_minted`(\n                    `undefined.functions.choice_result_TransferSummary`(e.choice, e.result)).appRewardAmount),\n                  0) AS appRewardAmount,\n          COALESCE(SUM(`undefined.functions.TransferSummary_minted`(\n                    `undefined.functions.choice_result_TransferSummary`(e.choice, e.result)).validatorRewardAmount),\n                  0) AS validatorRewardAmount,\n          COALESCE(SUM(`undefined.functions.TransferSummary_minted`(\n                    `undefined.functions.choice_result_TransferSummary`(e.choice, e.result)).svRewardAmount),\n                  0) AS svRewardAmount,\n          COALESCE(SUM(`undefined.functions.TransferSummary_minted`(\n                    `undefined.functions.choice_result_TransferSummary`(e.choice, e.result)).unclaimedActivityRecordAmount),\n                  0) AS unclaimedActivityRecordAmount\n        )\n      FROM\n        `undefined.mock_da2_scan.scan_sv_1_update_history_exercises` e\n      WHERE\n        -- all the choices that can take coupons as input, and thus mint amulets based on them.\n        ((e.choice IN ('AmuletRules_BuyMemberTraffic',\n                      'AmuletRules_Transfer',\n                      'AmuletRules_CreateTransferPreapproval',\n                      'AmuletRules_CreateExternalPartySetupProposal')\n            AND e.template_id_entity_name = 'AmuletRules')\n            OR (e.choice = 'TransferPreapproval_Renew'\n                AND e.template_id_entity_name = 'TransferPreapproval'))\n        AND e.template_id_module_name = 'Splice.AmuletRules'\n        AND `undefined.functions.in_time_window`(\n              start_record_time, start_migration_id,\n              up_to_record_time, up_to_migration_id,\n              e.record_time, e.migration_id))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"STRUCT\",\"structType\":{\"fields\":[{\"name\":\"appRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"validatorRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"svRewardAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}},{\"name\":\"unclaimedActivityRecordAmount\",\"type\":{\"typeKind\":\"BIGNUMERIC\"}}]}}",
+      "routineId": "minted",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "minted",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "mock_da2_scan",
+      "deleteContentsOnDestroy": true,
+      "friendlyName": "mock_da2_scan Dataset",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "mock_da2_scan",
+    "provider": "",
+    "type": "gcp:bigquery/dataset:Dataset"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "datasetId": "dashboards",
+      "deletionProtection": false,
+      "tableId": "monthly_burn",
+      "view": {
+        "query": "\n    SELECT\n        as_of_record_time as monthly_as_of_record_time,\n        SUM(daily_burn) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn,\n        SUM(daily_burn * daily_avg_coin_price) OVER (ORDER BY as_of_record_time ROWS BETWEEN 30 PRECEDING AND CURRENT ROW) as monthly_burn_usd\n      FROM\n        `undefined.dashboards.dashboards-data`\n  ",
+        "useLegacySql": false
+      }
+    },
+    "name": "monthly_burn",
+    "provider": "",
+    "type": "gcp:bigquery/table:Table"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT COUNT(*) as num_active_validators\n      FROM `undefined.functions.all_validators`(as_of_record_time, migration_id) v\n      WHERE v.latest_validator_license > TIMESTAMP_SUB(as_of_record_time, INTERVAL 24 HOUR))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"INT64\"}",
+      "routineId": "num_active_validators",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "num_active_validators",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT COUNT(*) as num_amulet_holders FROM `undefined.functions.amulet_holders`(as_of_record_time, migration_id))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"INT64\"}",
+      "routineId": "num_amulet_holders",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "num_amulet_holders",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    -- All update IDs over a period of 24 hours. Since the data might be up to 4 hours stale, we take a window of 4-28 hours ago.\n    SELECT DISTINCT(update_id), record_time FROM (\n        SELECT\n          update_id,\n          record_time\n        FROM `undefined.mock_da2_scan.scan_sv_1_update_history_exercises` e\n        WHERE `undefined.functions.in_time_window`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, e.record_time, e.migration_id)\n      UNION ALL\n        SELECT\n          update_id,\n          record_time\n        FROM `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n        WHERE `undefined.functions.in_time_window`(TIMESTAMP_SUB(as_of_record_time, INTERVAL 28 HOUR), migration_id, TIMESTAMP_SUB(as_of_record_time, INTERVAL 4 HOUR), migration_id, c.record_time, c.migration_id)\n    )\n  ",
+      "language": "SQL",
+      "returnTableType": "{\"columns\":[{\"name\":\"update_id\",\"type\":{\"typeKind\":\"STRING\"}},{\"name\":\"record_time\",\"type\":{\"typeKind\":\"INT64\"}}]}",
+      "routineId": "one_day_updates",
+      "routineType": "TABLE_VALUED_FUNCTION"
+    },
+    "name": "one_day_updates",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
     "id": "organization/infra/infra.mock",
     "inputs": {
       "name": "organization/infra/infra.mock"
@@ -923,6 +1666,73 @@
     "name": "organization/infra/infra.mock",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    (SELECT\n      MAX(events_per_minute) / 60.0\n    FROM (\n      SELECT\n        COUNT(*) as events_per_minute\n      FROM `undefined.functions.one_day_updates`(as_of_record_time, migration_id)\n      GROUP BY TIMESTAMP_TRUNC(TIMESTAMP_MICROS(record_time), MINUTE)\n    )\n  )\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"FLOAT64\"}",
+      "routineId": "peak_tps",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "peak_tps",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "choice"
+        },
+        {
+          "dataType": "{\"typeKind\":\"JSON\"}",
+          "name": "result"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    CASE choice\n      WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer\n        -- AmuletRules_BuyMemberTrafficResult\n        PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([2], 'numeric'))) -- .amuletPaid\n        + PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([1, 5], 'numeric'))) -- .summary.holdingFees\n        + PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([1, 7], 'numeric'))) -- .summary.senderChangeFee\n      WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers\n        -- TransferResult\n        `undefined.functions.transferresult_fees`(result)\n      WHEN 'AmuletRules_CreateTransferPreapproval' THEN\n        PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([2], 'numeric'))) -- .amuletPaid\n        + `undefined.functions.transferresult_fees`(JSON_QUERY(result, `undefined.functions.daml_record_path`([1], 'record'))) -- .transferResult\n      WHEN 'AmuletRules_CreateExternalPartySetupProposal' THEN\n        PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([4], 'numeric'))) -- .amuletPaid\n        + `undefined.functions.transferresult_fees`(JSON_QUERY(result, `undefined.functions.daml_record_path`([3], 'record'))) -- .transferResult\n      WHEN 'TransferPreapproval_Renew' THEN\n        PARSE_BIGNUMERIC(JSON_VALUE(result, `undefined.functions.daml_record_path`([4], 'numeric'))) -- .amuletPaid\n        + `undefined.functions.transferresult_fees`(JSON_QUERY(result, `undefined.functions.daml_record_path`([1], 'record'))) -- .transferResult\n      ELSE ERROR('Unknown choice for result_burn: ' || choice)\n    END\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "result_burn",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "result_burn",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "dataSourceId": "scheduled_query",
+      "displayName": "scheduled_dashboard_update",
+      "location": "europe-west6",
+      "params": {
+        "query": "CALL `undefined.dashboards.fill_all_stats`();"
+      },
+      "schedule": "every day 13:00",
+      "serviceAccountName": "bigquery@undefined.iam.gserviceaccount.com"
+    },
+    "name": "scheduled_dashboard_update",
+    "provider": "",
+    "type": "gcp:bigquery/dataTransferConfig:DataTransferConfig"
   },
   {
     "custom": true,
@@ -1784,6 +2594,54 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"ARRAY\",\"arrayElementType\":{\"typeKind\":\"INT64\"}}",
+          "name": "path"
+        },
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "module_name"
+        },
+        {
+          "dataType": "{\"typeKind\":\"STRING\"}",
+          "name": "entity_name"
+        },
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    -- Find the ACS as of given time and sum bignumerics at path in the payload.\n    (SELECT\n      COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments,\n        `undefined.functions.daml_record_path`(path, 'numeric')))), 0)\n    FROM\n      `undefined.mock_da2_scan.scan_sv_1_update_history_creates` c\n    WHERE\n      NOT EXISTS (\n      SELECT\n        TRUE\n      FROM\n        `undefined.mock_da2_scan.scan_sv_1_update_history_exercises` e\n      WHERE\n        (e.migration_id < migration_id\n          OR (e.migration_id = migration_id\n            AND e.record_time <= UNIX_MICROS(as_of_record_time)))\n        AND e.consuming\n        AND e.template_id_module_name = module_name\n        AND e.template_id_entity_name = entity_name\n        AND e.contract_id = c.contract_id)\n      AND c.template_id_module_name = module_name\n      AND c.template_id_entity_name = entity_name\n      AND `undefined.functions.up_to_time`(as_of_record_time, migration_id,\n            c.record_time, c.migration_id))\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "sum_bignumeric_acs",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "sum_bignumeric_acs",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' create-pub-rep-slot \\\n      --private-network-project=\"test-project\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises, scan_verdict_store, scan_verdict_transaction_view_store\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\" \\\n      --flyway-migration-to-wait-for=\"V047__verdict_history_id.sql\" \\\n      ",
+      "delete": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' delete-pub-rep-slot \\\n      --private-network-project=\"test-project\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises, scan_verdict_store, scan_verdict_transaction_view_store\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\" \\\n      --flyway-migration-to-wait-for=\"V047__verdict_history_id.sql\" \\\n      "
+    },
+    "name": "sv-1-bqdatastream-pub-replicate-slots",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
@@ -1795,7 +2653,50 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "active": true,
+      "alias": "cn-apps-pg",
+      "cloudSqlConfig": {
+        "enabled": true,
+        "enterprisePlus": false,
+        "flags": {
+          "random_page_cost": "1.1",
+          "temp_file_limit": "2147483647"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "protected": true,
+        "tier": "apps-pg-override-tier-sv-1"
+      },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
+      "instanceName": "cn-apps-pg",
+      "logicalDecoding": false,
+      "namespace": {
+        "logicalName": "sv-1",
+        "ns": {
+          "__aliases": [],
+          "__name": "sv-1",
+          "__providers": {},
+          "__pulumiCustomResource": true,
+          "__pulumiResource": true,
+          "__pulumiType": "kubernetes:core/v1:Namespace",
+          "__transformations": [],
+          "__version": "4.28.0",
+          "apiVersion": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "id": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "kind": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "metadata": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "spec": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "status": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
+        }
+      },
+      "retainDbResourcesOnDelete": false,
+      "secretName": "cn-apps-pg-secrets"
+    },
     "name": "sv-1-cn-apps-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
@@ -1821,6 +2722,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "cloudsql.logical_decoding",
+            "value": "on"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -1849,6 +2754,33 @@
     "name": "sv-1-cn-apps-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allows": [
+        {
+          "ports": [
+            "5432"
+          ],
+          "protocol": "tcp"
+        }
+      ],
+      "destinationRanges": [
+        null
+      ],
+      "direction": "INGRESS",
+      "name": "sv-1-datastream-to-nat",
+      "network": "default",
+      "priority": 42,
+      "sourceRanges": [
+        "1.2.3.16/29"
+      ]
+    },
+    "name": "sv-1-datastream-to-nat",
+    "provider": "",
+    "type": "gcp:compute/firewall:Firewall"
   },
   {
     "custom": true,
@@ -2071,6 +3003,38 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "bootDisk": {
+        "initializeParams": {
+          "image": "debian-cloud/debian-12"
+        }
+      },
+      "labels": {
+        "cluster": "mock"
+      },
+      "machineType": "e2-micro",
+      "metadata": {
+        "enable-osconfig": "TRUE",
+        "enable-oslogin": "true",
+        "startup-script": "#! /bin/bash\n\nexport DB_ADDR=undefined\nexport DB_PORT=5432\n\n# Enable the VM to receive packets whose destinations do\n# not match any running process local to the VM\necho 1 > /proc/sys/net/ipv4/ip_forward\n\n# Ask the Metadata server for the IP address of the VM nic0\n# network interface:\nmd_url_prefix=\"http://169.254.169.254/computeMetadata/v1/instance\"\nvm_nic_ip=\"$(curl -H \"Metadata-Flavor: Google\" $md_url_prefix/network-interfaces/0/ip)\"\n\n# Clear any existing iptables NAT table entries (all chains):\niptables -t nat -F\n\n# Create a NAT table entry in the prerouting chain, matching\n# any packets with destination database port, changing the destination\n# IP address of the packet to the SQL instance IP address:\niptables -t nat -A PREROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j DNAT \\\n     --to-destination $DB_ADDR\n\n# Create a NAT table entry in the postrouting chain, matching\n# any packets with destination database port, changing the source IP\n# address of the packet to the NAT VM's primary internal IPv4 address:\niptables -t nat -A POSTROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j SNAT \\\n     --to-source $vm_nic_ip\n\n# Save iptables configuration:\niptables-save\n"
+      },
+      "networkInterfaces": [
+        {
+          "accessConfigs": [
+            {}
+          ],
+          "network": "default"
+        }
+      ],
+      "zone": "europe-west6-a"
+    },
+    "name": "sv-1-nat-vm",
+    "provider": "",
+    "type": "gcp:compute/instance:Instance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "EnvoyFilter",
       "metadata": {
@@ -2219,6 +3183,114 @@
     "name": "sv-1-scan-app-rate-limit",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:EnvoyFilter"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "bigqueryProfile": {},
+      "connectionProfileId": "sv-1-scan-bq-cxn",
+      "displayName": "sv-1-scan-bq-cxn",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6"
+    },
+    "name": "sv-1-scan-bq-cxn",
+    "provider": "",
+    "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "connectionProfileId": "sv-1-scan-update-history-cxn",
+      "displayName": "sv-1-scan-update-history-cxn",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "postgresqlProfile": {
+        "database": "scan_sv_1",
+        "port": 5432,
+        "username": "bqdatastream"
+      },
+      "privateConnectivity": {}
+    },
+    "name": "sv-1-scan-update-history-cxn",
+    "provider": "",
+    "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "displayName": "sv-1-scan-update-history-datastream-vpc",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "privateConnectionId": "sv-1-scan-update-history-datastream-vpc",
+      "vpcPeeringConfig": {
+        "subnet": "1.2.3.16/29",
+        "vpc": "projects/test-project/global/networks/default"
+      }
+    },
+    "name": "sv-1-scan-update-history-datastream-vpc",
+    "provider": "",
+    "type": "gcp:datastream/privateConnection:PrivateConnection"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "backfillAll": {},
+      "desiredState": "RUNNING",
+      "destinationConfig": {
+        "bigqueryDestinationConfig": {
+          "dataFreshness": "14400s",
+          "singleTargetDataset": {
+            "datasetId": "projects/undefined/datasets/mock_da2_scan"
+          }
+        }
+      },
+      "displayName": "sv-1-scan-update-history",
+      "labels": {
+        "cluster": "mock"
+      },
+      "location": "europe-west6",
+      "sourceConfig": {
+        "postgresqlSourceConfig": {
+          "includeObjects": {
+            "postgresqlSchemas": [
+              {
+                "postgresqlTables": [
+                  {
+                    "table": "update_history_creates"
+                  },
+                  {
+                    "table": "update_history_exercises"
+                  },
+                  {
+                    "table": "scan_verdict_store"
+                  },
+                  {
+                    "table": "scan_verdict_transaction_view_store"
+                  }
+                ],
+                "schema": "scan_sv_1"
+              }
+            ]
+          },
+          "publication": "update_history_datastream_pub",
+          "replicationSlot": "update_history_datastream_r_slot"
+        }
+      },
+      "streamId": "sv-1-scan-update-history"
+    },
+    "name": "sv-1-scan-update-history",
+    "provider": "",
+    "type": "gcp:datastream/stream:Stream"
   },
   {
     "custom": true,
@@ -2592,6 +3664,20 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "name": "bqdatastream",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "sv-1-user-bqdatastream",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
@@ -2771,7 +3857,50 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "active": true,
+      "alias": "cn-apps-pg",
+      "cloudSqlConfig": {
+        "enabled": true,
+        "enterprisePlus": false,
+        "flags": {
+          "random_page_cost": "1.1",
+          "temp_file_limit": "2147483647"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "protected": true,
+        "tier": "apps-pg-override-tier"
+      },
+      "defaultUserName": "cnadmin",
+      "deletionProtection": true,
+      "instanceName": "cn-apps-pg",
+      "logicalDecoding": false,
+      "namespace": {
+        "logicalName": "sv-da-1",
+        "ns": {
+          "__aliases": [],
+          "__name": "sv-da-1",
+          "__providers": {},
+          "__pulumiCustomResource": true,
+          "__pulumiResource": true,
+          "__pulumiType": "kubernetes:core/v1:Namespace",
+          "__transformations": [],
+          "__version": "4.28.0",
+          "apiVersion": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "id": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "kind": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "metadata": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "spec": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "status": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi.",
+          "urn": "Calling [toJSON] on an [Output<T>] is not supported.\n\nTo get the value of an Output as a JSON value or JSON string consider either:\n    1: o.apply(v => v.toJSON())\n    2: o.apply(v => JSON.stringify(v))\n\nSee https://www.pulumi.com/docs/concepts/inputs-outputs for more details.\nThis function may throw in a future version of @pulumi/pulumi."
+        }
+      },
+      "retainDbResourcesOnDelete": false,
+      "secretName": "cn-apps-pg-secrets"
+    },
     "name": "sv-da-1-cn-apps-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
@@ -3704,6 +4833,110 @@
     "name": "sv-da-1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"JSON\"}",
+          "name": "tr_json"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    -- .summary.holdingFees\n    PARSE_BIGNUMERIC(JSON_VALUE(tr_json, `undefined.functions.daml_record_path`([1, 5], 'numeric')))\n    -- .summary.senderChangeFee\n    + PARSE_BIGNUMERIC(JSON_VALUE(tr_json, `undefined.functions.daml_record_path`([1, 7], 'numeric')))\n    + (SELECT COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)\n      FROM\n        UNNEST(JSON_QUERY_ARRAY(tr_json,\n                  -- .summary.outputFees\n                  `undefined.functions.daml_record_path`([1, 6], 'list'))) AS x)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "transferresult_fees",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "transferresult_fees",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    `undefined.functions.sum_bignumeric_acs`(\n      -- (Amulet) .amount.initialAmount\n      [2, 0],\n      'Splice.Amulet',\n      'Amulet',\n      as_of_record_time,\n      migration_id)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "unlocked",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "unlocked",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "as_of_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    `undefined.functions.sum_bignumeric_acs`(\n      -- (UnclaimedReward) .amount\n      [1],\n      'Splice.Amulet',\n      'UnclaimedReward',\n      as_of_record_time,\n      migration_id)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BIGNUMERIC\"}",
+      "routineId": "unminted",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "unminted",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "arguments": [
+        {
+          "dataType": "{\"typeKind\":\"TIMESTAMP\"}",
+          "name": "up_to_record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "up_to_migration_id"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "record_time"
+        },
+        {
+          "dataType": "{\"typeKind\":\"INT64\"}",
+          "name": "migration_id"
+        }
+      ],
+      "datasetId": "functions",
+      "definitionBody": "\n    `undefined.functions.in_time_window`(NULL, NULL, up_to_record_time, up_to_migration_id, record_time, migration_id)\n  ",
+      "language": "SQL",
+      "returnType": "{\"typeKind\":\"BOOL\"}",
+      "routineId": "up_to_time",
+      "routineType": "SCALAR_FUNCTION"
+    },
+    "name": "up_to_time",
+    "provider": "",
+    "type": "gcp:bigquery/routine:Routine"
   },
   {
     "custom": true,

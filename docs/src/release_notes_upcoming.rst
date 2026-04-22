@@ -71,6 +71,9 @@
 
             - ``TransferCommand_Send``. No longer catches exceptions and returns them as ``TransferCommandResultFailure``. Instead, the transaction is aborted without merging inputs.
 
+            - ``DsoRules_CloseVoteRequest`` no longer catches exceptions. Previously, it would close the vote request with outcome ``VRO_AcceptedButActionFailed``.
+              The transaction will now abort on failure.
+
         - Wallet app
 
             - ``batchSize`` in ``TreasuryConfig`` is set to 1.

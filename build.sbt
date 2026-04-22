@@ -289,7 +289,8 @@ lazy val docs = project
       val srcDir = sourceDirectory.value
       val outDir = baseDirectory.value / "html"
       val log = streams.value.log
-      val version = BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"))
+      val version =
+        BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"), Some(log))
       val cacheDir = streams.value.cacheDirectory
       val cache = FileFunction.cached(cacheDir) { _ =>
         runCommand(

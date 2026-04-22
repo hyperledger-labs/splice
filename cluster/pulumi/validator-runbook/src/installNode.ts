@@ -178,17 +178,19 @@ async function installValidator(
     supportsValidatorRunbookReset,
     validatorVersion
   );
-  const participantAddress = installParticipant(
-    validatorConfig,
-    DecentralizedSynchronizerUpgradeConfig.activeMigrationId,
-    xns,
-    auth0Client.getCfg(),
-    false, // We don't currently support non-auth for validator-runbook
-    validatorVersion,
-    postgres,
-    {
-      dependsOn: imagePullDeps.concat([postgres]),
-    }
+  const participantAddress = (
+    await installParticipant(
+      validatorConfig,
+      DecentralizedSynchronizerUpgradeConfig.activeMigrationId,
+      xns,
+      auth0Client.getCfg(),
+      false, // We don't currently support non-auth for validator-runbook
+      validatorVersion,
+      postgres,
+      {
+        dependsOn: imagePullDeps.concat([postgres]),
+      }
+    )
   ).participantAddress;
 
   const fixedTokensValue: ChartValues = {

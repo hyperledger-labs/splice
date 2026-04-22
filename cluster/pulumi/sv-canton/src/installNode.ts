@@ -19,11 +19,11 @@ import {
 
 import { installCantonComponents } from './canton';
 
-export function installNode(
+export async function installNode(
   migrationId: DomainMigrationIndex,
   sv: string,
   auth0Client: Auth0Client
-): InstalledMigrationSpecificSv | undefined {
+): Promise<InstalledMigrationSpecificSv | undefined> {
   const svConfig = svConfigs.concat([svRunbookConfig]).find(config => {
     return config.nodeName === sv;
   });
@@ -41,7 +41,7 @@ export function installNode(
   const serviceAccountName = `sv-canton-migration-${migrationId}`;
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
 
-  return installCantonComponents(
+  return await installCantonComponents(
     xns,
     migrationId,
     auth0Client,

@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.*
 import cats.implicits.catsSyntaxOptionId
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
@@ -11,6 +12,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
+import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
@@ -53,6 +55,10 @@ class RollForwardLsuDRIntegrationTest
 
   override protected def runEventHistorySanityCheck: Boolean = false
   override protected lazy val resetRequiredTopologyState: Boolean = false
+  // Doesn't work with both sv1Scan and sv1ScanLocal
+  override protected lazy val runUpdateHistorySanityCheck = false
+  // Doesn't work after disconnecting the participants and killing the synchronizer.
+  override protected lazy val runTokenStandardCliSanityCheck = false
 
   override def dbsSuffix = "lsu_dr"
   override def usesDbs = super.usesDbs ++ super.usesDbs.map(_ + "beforedr")
@@ -210,7 +216,7 @@ class RollForwardLsuDRIntegrationTest
       )
 
       clue("Start nodes before DR") {
-        startAllSync(allNodes*)
+        startAllSync((aliceValidatorBackend +: allNodes)*)
       }
       clue("SVs are connected to their own sequencer") {
         forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
@@ -410,10 +416,68 @@ class RollForwardLsuDRIntegrationTest
           }
         }
 
+        clue("Initiate roll-forward on alice validator") {
+          // We can't automate this type of roll-forward through scan
+          // as validators need to catch up first and we can't just
+          // wait until the time is >= upgrade time as there is no
+          // time proof. So in practice, this means each node has to
+          // check that they're reasonable close to upgradeTime and
+          // don't receive new events for some time before initiating
+          // this.
+          aliceValidatorBackend.participantClient.synchronizers.perform_manual_lsu(
+            aliceValidatorBackend.participantClient.synchronizers
+              .list_connected()
+              .loneElement
+              .physicalSynchronizerId,
+            sv1Backend.participantClient.synchronizers
+              .list_connected()
+              .loneElement
+              .physicalSynchronizerId,
+            upgradeTime = None, // use ledger end
+            sequencerSuccessors = allSvLocalBackends
+              .map(sv =>
+                sv.sequencerClient.id -> new GrpcConnection(
+                  NonEmpty.mk(
+                    Set,
+                    Endpoint(
+                      "localhost",
+                      sv.config.localSynchronizerNodes.current.sequencer.internalApi.port,
+                    ),
+                  ),
+                  transportSecurity = false,
+                  customTrustCertificates = None,
+                )
+              )
+              .toMap,
+          )
+        }
+
+        clue("Alice is connected to new physical synchronizer") {
+          eventually() {
+            aliceValidatorBackend.participantClient.synchronizers
+              .list_connected()
+              .loneElement
+              .physicalSynchronizerId
+              .serial shouldBe newSynchronizerSerial
+          }
+        }
+
+        clue("Alice can tap") {
+          aliceValidatorWalletClient.tap(100.0)
+        }
+
+        clue("sv and scan app can be restarted") {
+          sv1LocalBackend.stop()
+          sv1ScanLocalBackend.stop()
+          sv1LocalBackend.startSync()
+          sv1ScanLocalBackend.startSync()
+        }
+
         clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
           allSvLocalBackends.par.foreach(
             _.participantClient.synchronizers.disconnect_all()
           )
+          aliceValidatorBackend.participantClient.synchronizers.disconnect_all()
         }
       }
     }
