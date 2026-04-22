@@ -51,6 +51,14 @@
           The update ID will be omitted for contracts created in a prior migration ID, or potentially in the
           future in extreme cases of disaster recovery.
 
+    - Validator
+
+        - The HTTP client used by the CN apps (Validator, Scan, SV, Wallet) now honours the
+          standard ``http.nonProxyHosts`` Java system property to bypass a configured HTTP
+          forward proxy for specific hosts. This matches the JDK's own default ``ProxySelector``
+          behaviour, so the same property also applies to other JVM egress components.
+          See :ref:`validator-http-proxy-compose` and :ref:`validator-http-proxy-helm` for configuration examples.
+
     - LocalNet
 
         - Added support for configuring the protocol version used in LocalNet.

@@ -100,7 +100,6 @@ class HttpClientProxyTest
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
               // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
-              .set("https.nonProxyHosts", "")
 
           withProperties(props) {
             val jwksUrl = new URI(
@@ -131,7 +130,6 @@ class HttpClientProxyTest
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
               // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
-              .set("https.nonProxyHosts", "")
           withProperties(props) {
             val jwksUrl = new URI(
               s"http://localhost:${serverPort}/.well-known/jwks.json"
@@ -163,7 +161,6 @@ class HttpClientProxyTest
               // localhost and tcp loopback addresses are not proxied by default in gRPC and Java URL connections
               // so we need to override the nonProxyHosts to ensure our proxy is used for all connections
               .set("http.nonProxyHosts", "")
-              .set("https.nonProxyHosts", "")
 
           withProperties(props) {
             val wellKnownUrlString =
@@ -254,6 +251,155 @@ class HttpClientProxyTest
         }
       }
     }
+    "sanity-check: assertDirectGetRequest must fail in a fully proxied setup" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+          withProperties(props) {
+            intercept[org.scalatest.exceptions.TestFailedException] {
+              assertDirectGetRequest(proxy, serverBinding)
+            }
+            succeed
+          }
+        }
+      }
+    }
+  }
+
+  "HttpClient nonProxyHosts settings" should {
+    "bypass the proxy for hosts matched by http.nonProxyHosts (system-property proxy)" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("http.nonProxyHosts", "localhost")
+          withProperties(props) {
+            assertDirectGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "bypass the proxy for hosts matched by a wildcard in http.nonProxyHosts" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            // suffix wildcard — `localhost` ends with `host`
+            .set("http.nonProxyHosts", "*host")
+          withProperties(props) {
+            assertDirectGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "ignore https.nonProxyHosts (not a JDK property)" in {
+      // Setting only `https.nonProxyHosts` must NOT bypass the proxy: we
+      // only honour the standard `http.nonProxyHosts`.
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("https.nonProxyHosts", "localhost")
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "proxy hosts not matched by http.nonProxyHosts" in {
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            // pattern does not match `localhost`
+            .set("http.nonProxyHosts", "example.com|*.internal")
+          withProperties(props) {
+            assertProxiedGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "bypass the proxy when any pattern in a pipe-separated list matches" in {
+      // Confirms `|` parsing and that matching is any-of, not all-of.
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("http.nonProxyHosts", "example.com|localhost|*.internal")
+          withProperties(props) {
+            assertDirectGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "match http.nonProxyHosts patterns case-insensitively" in {
+      // The host here is `localhost` (lowercase), the pattern is uppercase.
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val props = SystemProperties()
+            .set("http.proxyHost", "localhost")
+            .set("http.proxyPort", proxy.port.toString)
+            .set("http.nonProxyHosts", "LOCALHOST")
+          withProperties(props) {
+            assertDirectGetRequest(proxy, serverBinding)
+          }
+        }
+      }
+    }
+    "have no effect when no proxy is configured" in {
+      // nonProxyHosts is meaningless without a proxy — request must still
+      // succeed and go direct.
+      withProxy() { proxy =>
+        withHttpServer(Routes.respondWithOK) { serverBinding =>
+          val serverPort = serverBinding.localAddress.getPort
+          val host = "localhost"
+          val props = SystemProperties()
+            .set("http.nonProxyHosts", "localhost")
+          withProperties(props) {
+            val response = executeRequest(serverBinding).futureValue
+            response.status shouldBe StatusCodes.OK
+            proxy.process.hasNoErrors shouldBe true
+            proxy.proxiedConnectRequest(host, serverPort) shouldBe false
+          }
+        }
+      }
+    }
+    "bypass the proxy for hosts matched by http.nonProxyHosts (pekko-config proxy)" in {
+      // The pekko-config proxy branch reads nonProxyHosts from system
+      // properties — there is no pekko config key for it.
+      withProxy() { proxy =>
+        val sys = ActorSystem(
+          "HttpClientProxyTest",
+          ConfigFactory.parseString(s"""
+          pekko.http.client.proxy {
+            https {
+              host = "localhost"
+              port = ${proxy.port.toString}
+            }
+          }
+          """),
+        )
+        val ec = sys.dispatcher
+        val props = SystemProperties()
+          .set("http.nonProxyHosts", "localhost")
+        try {
+          withProperties(props) {
+            withHttpServer(Routes.respondWithOK) { serverBinding =>
+              assertDirectGetRequest(proxy, serverBinding)(sys, ec)
+            }(sys, ec)
+          }
+        } finally {
+          sys.terminate().futureValue
+        }
+      }
+    }
   }
   private val metricsFactoryProvider = new ScopedInMemoryMetricsFactory()
   private val metricsFactory: InMemoryMetricsFactory =
@@ -287,6 +433,22 @@ class HttpClientProxyTest
     response.status shouldBe StatusCodes.OK
     proxy.process.hasNoErrors shouldBe true
     proxy.proxiedConnectRequest(host, serverPort) shouldBe true
+  }
+
+  /** Assert that a request succeeds and that it did NOT go through `proxy` —
+    * i.e. the target host was matched by `nonProxyHosts` and the connection
+    * was made directly.
+    */
+  private def assertDirectGetRequest(proxy: HttpProxy, serverBinding: ServerBinding)(implicit
+      ac: ActorSystem,
+      ec: ExecutionContext,
+  ) = {
+    val serverPort = serverBinding.localAddress.getPort
+    val host = "localhost"
+    val response = executeRequest(serverBinding)(ac, ec).futureValue
+    response.status shouldBe StatusCodes.OK
+    proxy.process.hasNoErrors shouldBe true
+    proxy.proxiedConnectRequest(host, serverPort) shouldBe false
   }
 }
 
