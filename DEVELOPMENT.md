@@ -373,15 +373,39 @@ from the repo root to delete all `.daml` build directories.
 
 ## Daml Version Bump
 
-Whenever you update a .dar file, you need to bump the version of the corresponding daml package,
-and the version of daml packages that (recursively) depend on it. For that,
+Whenever you update a .dar file, the version of the corresponding daml package — and of every daml package that (recursively) depends on it — must be bumped.
 
-1. Bump the version inside the `daml.yaml` file inside the updated module, and in all modules that (recursively) depend on it.
-2. Run `sbt damlBuild; sbt damlDarsLockFileUpdate` to compile the `.dar` files.
-3. Manually update the relevant daml package versions inside `apps/dar-resources-generator/src/main/scala/org/lfdecentralizedtrust/splice/darutils/DarResources.scala`.
-4. Run `sbt updateDarResources` to update DarResources.
-5. Manually update `apps/package.json` to update the versions of the daml packages that were updated in step 1.
-6. Run `sbt npmInstall ; sbt compile`
+The one-command path:
+
+```bash
+git fetch origin main       # needed so the tool can compare against main
+sbt damlBumpPackageVersions
+```
+
+This chains `damlBumpPackageVersionsMutate` (which rebuilds DARs and
+mutates `daml.yaml` plus `apps/package.json` entries based on hash
+differences against `origin/main`), `damlDarsLockFileUpdate` (which
+rebuilds the DARs at the new versions and refreshes `daml/dars.lock`),
+`updateDarResources`, and `npmInstall`. The bump target is always
+`max(origin/main version) + 1`, so feature branches stay at `main+1`
+instead of ratcheting against an old release.
+
+If the auto-bumper can't help (e.g. you want a minor/major bump, or
+need to compare against a release line rather than `origin/main`), fall
+back to the manual steps:
+
+1. Bump the `version:` field inside the `daml.yaml` of the updated
+   module, and in all modules that (recursively) depend on it.
+2. `sbt damlBuild; sbt damlDarsLockFileUpdate`
+3. `sbt updateDarResources` (regenerates `DarResources.scala` from
+   `daml/dars/`; no manual edits needed).
+4. Manually update `apps/package.json` entries.
+5. `sbt npmInstall; sbt compile`
+
+The `minimumInitialization` version per package lives in
+`apps/dar-resources-generator/.../DarResourcesGenerator.scala` as a
+small stub map (`minimumInitializations`). Edit it there when
+dropping support for older Daml versions.
 
 ## Daml Version Guards in Integration Tests
 
