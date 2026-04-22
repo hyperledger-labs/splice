@@ -329,6 +329,7 @@ export function installGcpQuotaAlerts(
     combiner: 'OR',
     notificationChannels: [notificationChannel.name],
     userLabels: { cluster: CLUSTER_BASENAME },
+    // severity: 'SEVERITY_UNSPECIFIED', // "Policy Severity Level"
   };
 
   new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
@@ -346,14 +347,14 @@ export function installGcpQuotaAlerts(
         conditionThreshold: {
           aggregations: [
             {
-              alignmentPeriod: '60s',
+              alignmentPeriod: '60s', // "Rolling window"
               crossSeriesReducer: 'REDUCE_SUM',
               groupByFields: ['metric.label.quota_metric'],
               perSeriesAligner: 'ALIGN_COUNT_TRUE',
             },
           ],
           comparison: 'COMPARISON_GT',
-          duration: '60s',
+          duration: '60s', // "Retest window"
           filter: assertFilterLength(
             `resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"${thresholdExclusion}`
           ),
@@ -392,7 +393,8 @@ export function installGcpQuotaAlerts(
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
-          duration: '300s',
+          duration: '300s', // "Retest window"
+          evaluationInterval: '30s', // "Evaluation interval"
         },
       },
     ],
@@ -420,7 +422,8 @@ export function installGcpQuotaAlerts(
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
-          duration: '300s',
+          duration: '300s', // "Retest window"
+          evaluationInterval: '30s', // "Evaluation interval"
         },
       },
     ],
