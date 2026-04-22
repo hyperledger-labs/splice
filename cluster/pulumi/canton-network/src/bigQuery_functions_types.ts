@@ -3,6 +3,9 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 
+// TODO(XXX): Remove this whole file. For now, we kept it just to not have to reimplement computedDataTable
+// without it. Once that dataset moves to internal, this file should be removed.
+
 abstract class BQType {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract toPulumi(): any;

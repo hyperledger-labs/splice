@@ -23,7 +23,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
 import { spliceConfig } from '../../common/src/config/config';
-import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
+import { computedDataTable } from './bigQuery_functions';
+import { BIGNUMERIC, BQColumn, BQTable, FLOAT64, INT64, TIMESTAMP } from './bigQuery_functions_types';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -194,6 +195,27 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
+const computedDataTable = new BQTable('dashboards-data', [
+  new BQColumn('as_of_record_time', TIMESTAMP),
+  new BQColumn('migration_id', INT64),
+  new BQColumn('locked', BIGNUMERIC),
+  new BQColumn('unlocked', BIGNUMERIC),
+  new BQColumn('current_supply_total', BIGNUMERIC),
+  new BQColumn('unminted', BIGNUMERIC),
+  new BQColumn('daily_mint_app_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_validator_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_sv_rewards', BIGNUMERIC),
+  new BQColumn('daily_mint_unclaimed_activity_records', BIGNUMERIC),
+  new BQColumn('daily_burn', BIGNUMERIC),
+  new BQColumn('num_amulet_holders', INT64),
+  new BQColumn('num_active_validators', INT64),
+  new BQColumn('average_tps', FLOAT64),
+  new BQColumn('peak_tps', FLOAT64),
+  new BQColumn('daily_min_coin_price', BIGNUMERIC),
+  new BQColumn('daily_max_coin_price', BIGNUMERIC),
+  new BQColumn('daily_avg_coin_price', BIGNUMERIC),
+]);
+
 function installDashboardsDataset(): gcp.bigquery.Dataset {
   const datasetName = 'dashboards';
   const dataset = new gcp.bigquery.Dataset(datasetName, {
@@ -213,80 +235,6 @@ function installDashboardsDataset(): gcp.bigquery.Dataset {
   );
 
   return dataset;
-}
-
-function installFunctions(
-  scanDataset: gcp.bigquery.Dataset,
-  dashboardsDataset: gcp.bigquery.Dataset,
-  dependsOn: pulumi.Resource[]
-): gcp.bigquery.Dataset {
-  const datasetName = 'functions';
-  const functionsDataset = new gcp.bigquery.Dataset(datasetName, {
-    datasetId: datasetName,
-    friendlyName: `${datasetName} Dataset`,
-    location: cloudsdkComputeRegion(),
-    deleteContentsOnDestroy: true,
-    labels: {
-      cluster: CLUSTER_BASENAME,
-    },
-  });
-
-  scanDataset.project.apply(project => {
-    // We don't just run allFunctions.map() because we want to sequence the creation, since every function
-    // might depend on those before it.
-    let lastResource: pulumi.Resource | undefined = undefined;
-    for (const f in allScanFunctions) {
-      lastResource = allScanFunctions[f].toPulumi(
-        project,
-        functionsDataset,
-        functionsDataset,
-        scanDataset,
-        dashboardsDataset,
-        lastResource
-          ? [lastResource]
-          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
-      );
-    }
-
-    for (const f in allDashboardFunctions) {
-      lastResource = allDashboardFunctions[f].toPulumi(
-        project,
-        dashboardsDataset,
-        functionsDataset,
-        scanDataset,
-        dashboardsDataset,
-        lastResource
-          ? [lastResource]
-          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
-      );
-    }
-  });
-
-  return functionsDataset;
-}
-
-function installScheduledTasks(
-  dashboardsDataset: gcp.bigquery.Dataset,
-  dependsOn: pulumi.Resource[]
-): void {
-  pulumi
-    .all([dashboardsDataset.project, dashboardsDataset.datasetId])
-    .apply(([project, dataset]) => {
-      new gcp.bigquery.DataTransferConfig(
-        'scheduled_dashboard_update',
-        {
-          displayName: 'scheduled_dashboard_update',
-          dataSourceId: 'scheduled_query',
-          schedule: 'every day 13:00', // UTC
-          location: cloudsdkComputeRegion(),
-          serviceAccountName: `bigquery@${project}.iam.gserviceaccount.com`,
-          params: {
-            query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
-          },
-        },
-        { dependsOn: dependsOn }
-      );
-    });
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -509,15 +457,20 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  const stream = installDatastream(
+  installDatastream(
     postgres,
     sourceProfile,
     destinationProfile,
     dataset,
     pubRepSlots
   );
-  const dashboardsDataset = installDashboardsDataset();
-  const functionsDataset = installFunctions(dataset, dashboardsDataset, [stream]);
-  installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
+
+  // We installed the dashboards dataset, which consists of all the processed data,
+  // from the canton-network stack initially, so for now we keep it here just to avoid
+  // recreating it (or messing with pulumi export-import to move it to the cn-internal
+  // pulumi stack)
+  // TODO(XXX): move it (perhaps the easiest is: create a new one from the internal stack first,
+  // just copy the data, then destroy the old one)
+  installDashboardsDataset();
   return;
 }
