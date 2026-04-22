@@ -383,6 +383,14 @@ export function installGcpQuotaAlerts(
   // windows (for example API calls per minute). These are tracked separately so
   // we have separate alerts for them
 
+  const windowSettings: Pick<
+    gcp.types.input.monitoring.AlertPolicyConditionConditionPrometheusQueryLanguage,
+    'duration' | 'evaluationInterval'
+  > = {
+    duration: '300s', // "Retest window"
+    evaluationInterval: '30s', // "Evaluation interval"
+  };
+
   new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
     ...baseArgs,
     displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
@@ -405,8 +413,7 @@ export function installGcpQuotaAlerts(
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
-          duration: '300s', // "Retest window"
-          evaluationInterval: '30s', // "Evaluation interval"
+          ...windowSettings,
         },
       },
     ],
@@ -434,8 +441,7 @@ export function installGcpQuotaAlerts(
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
-          duration: '300s', // "Retest window"
-          evaluationInterval: '30s', // "Evaluation interval"
+          ...windowSettings,
         },
       },
     ],
