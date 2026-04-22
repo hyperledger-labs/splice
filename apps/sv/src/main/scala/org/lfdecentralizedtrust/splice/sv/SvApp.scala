@@ -484,6 +484,7 @@ class SvApp(
               ) {
                 node.ensureMediatorPruningSchedule()
               }
+              _ <- node.ensureDABFTPruningSchedule()
             } yield ()
           } else {
             logger.info(
@@ -536,6 +537,7 @@ class SvApp(
         synchronizerNodeService,
         retryProvider,
         new DsoPartyMigration(
+          svAutomation,
           dsoAutomation,
           participantAdminConnection,
           retryProvider,

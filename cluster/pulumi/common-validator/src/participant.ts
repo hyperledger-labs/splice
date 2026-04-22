@@ -22,7 +22,7 @@ import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Output } from '@pulumi/pulumi';
 
-export function installParticipant(
+export async function installParticipant(
   validatorConfig: ValidatorNodeConfig,
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
@@ -31,7 +31,7 @@ export function installParticipant(
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   customOptions?: SpliceCustomResourceOptions
-): { participantAddress: Output<string> } {
+): Promise<{ participantAddress: Output<string> }> {
   const kmsConfig = validatorConfig.kms;
   const { kmsValues, kmsDependencies } = kmsConfig
     ? getParticipantKmsHelmResources(xns, kmsConfig)
@@ -39,14 +39,14 @@ export function installParticipant(
 
   const participantPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       `participant-pg`,
       `participant-pg`,
       activeVersion,
       spliceConfig.pulumiProjectConfig.cloudSql,
       true
-    );
+    ));
   const participantValues: ChartValues = {
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,

@@ -9,7 +9,7 @@ import {
 import { ContractId } from '@daml/types';
 import { ChevronLeft, Edit } from '@mui/icons-material';
 import { Box, Button, Divider, Stack, Tab, Tabs, Typography } from '@mui/material';
-import React, { PropsWithChildren, useMemo, useState } from 'react';
+import React, { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
@@ -115,6 +115,13 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
   const [editFormKey, setEditFormKey] = useState(0);
   const [voteSubmitted, setVoteSubmitted] = useState(false);
+  const yourVoteSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editFormKey > 0) {
+      yourVoteSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editFormKey]);
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
@@ -418,7 +425,13 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
         </VoteSection>
 
         {showVoteForm && (
-          <VoteSection title="Your Vote" data-testid="proposal-details-your-vote" bordered centered>
+          <VoteSection
+            title="Your Vote"
+            data-testid="proposal-details-your-vote"
+            bordered
+            centered
+            ref={yourVoteSectionRef}
+          >
             <ProposalVoteForm
               key={editFormKey}
               voteRequestContractId={contractId}
@@ -440,34 +453,31 @@ interface VoteSectionProps extends PropsWithChildren {
   centered?: boolean;
 }
 
-const VoteSection: React.FC<VoteSectionProps> = ({
-  title,
-  children,
-  'data-testid': testId,
-  bordered = false,
-  centered = false,
-}) => (
-  <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId}>
-    <Typography component="h2" fontSize={18} fontWeight={700} mb={3}>
-      {title}
-    </Typography>
-    <Box
-      sx={{
-        ...(bordered && {
-          border: '2px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-          py: 5,
-          px: 12,
-        }),
-      }}
-    >
-      <Stack gap={3} alignItems={centered ? 'center' : undefined}>
-        {children}
-      </Stack>
+const VoteSection = React.forwardRef<HTMLDivElement, VoteSectionProps>(
+  ({ title, children, 'data-testid': testId, bordered = false, centered = false }, ref) => (
+    <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId} ref={ref}>
+      <Typography component="h2" fontSize={18} fontWeight={700} mb={3}>
+        {title}
+      </Typography>
+      <Box
+        sx={{
+          ...(bordered && {
+            border: '2px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            py: 5,
+            px: 12,
+          }),
+        }}
+      >
+        <Stack gap={3} alignItems={centered ? 'center' : undefined}>
+          {children}
+        </Stack>
+      </Box>
     </Box>
-  </Box>
+  )
 );
+VoteSection.displayName = 'VoteSection';
 
 interface VoteItemProps {
   voter: string;

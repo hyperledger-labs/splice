@@ -289,7 +289,8 @@ lazy val docs = project
       val srcDir = sourceDirectory.value
       val outDir = baseDirectory.value / "html"
       val log = streams.value.log
-      val version = BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"))
+      val version =
+        BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"), Some(log))
       val cacheDir = streams.value.cacheDirectory
       val cache = FileFunction.cached(cacheDir) { _ =>
         runCommand(
@@ -332,6 +333,10 @@ lazy val `splice-api-token-metadata-v1-daml`: Project =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlPrebuiltDar :=
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-metadata-v1-1.0.0.dar"
+        ),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
@@ -367,8 +372,10 @@ lazy val `splice-api-token-holding-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar :=
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-holding-v1-1.0.0.dar"
+        ),
     )
 
 lazy val `splice-api-token-holding-v2-daml` =
@@ -387,9 +394,10 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar :=
+        Some(
+          (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-transfer-instruction-v1-1.0.0.dar"
+        ),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       Compile / sourceGenerators +=
         Def.taskDyn {
@@ -439,9 +447,9 @@ lazy val `splice-api-token-allocation-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-v1-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-api-token-allocation-v2-daml` =
@@ -461,10 +469,9 @@ lazy val `splice-api-token-allocation-request-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-request-v1-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-api-token-allocation-request-v2-daml` =
@@ -485,10 +492,9 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-allocation-instruction-v1-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-api-token-allocation-instruction-v2-daml` =
@@ -509,9 +515,9 @@ lazy val `splice-api-token-burn-mint-v1-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-token-burn-mint-v1-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-test-token-v1-daml` =
@@ -811,7 +817,10 @@ lazy val `splice-featured-app-api-v1-daml` =
     .in(file("daml/splice-api-featured-app-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v1-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-featured-app-api-v2-daml` =
@@ -819,7 +828,10 @@ lazy val `splice-featured-app-api-v2-daml` =
     .in(file("daml/splice-api-featured-app-v2"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      Compile / damlPrebuiltDar := Some(
+        (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v2-1.0.0.dar"
+      ),
     )
 
 lazy val `splice-amulet-daml` =
@@ -2065,7 +2077,19 @@ illegalDamlReferencesCheck := {
 lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-amulet`")
 cleanCnDars := {
   val log = streams.value.log
-  runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
+  runCommand(
+    Seq(
+      "find",
+      "apps",
+      "-name",
+      "*.dar",
+      "-not",
+      "-path",
+      "apps/app/src/test/resources/*",
+      "-delete",
+    ),
+    log,
+  )
   // daml/dars contains the versions of all dars that we want to keep committed, so we don't delete them
   runCommand(
     Seq(
@@ -2312,7 +2336,6 @@ updateTestConfigForParallelRuns := {
   def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
-  def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
   // These are tests that are particularly resource intensive and need larger runners.
   // Usually that is because they need to spin up an additional Canton instance within the test.
@@ -2431,11 +2454,6 @@ updateTestConfigForParallelRuns := {
       "Non-DevNet Preflight tests against runbook validator",
       "test-full-class-names-validator-preflight-non-devnet.log",
       (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && isNonDevNetTest(t),
-    ),
-    (
-      "disaster recovery tests",
-      "test-full-class-names-disaster-recovery.log",
-      (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
     ),
     (
       "app upgrade tests",

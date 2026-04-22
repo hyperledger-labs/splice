@@ -120,6 +120,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
 
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
+          ._1
           .loneElement
           .outcome shouldBe a[VRO_Rejected]
       },
@@ -160,6 +161,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
+          ._1
           .loneElement
           .outcome shouldBe a[VRO_Expired]
       },
@@ -200,6 +202,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
+          ._1
           .loneElement
           .outcome shouldBe a[VRO_Rejected]
       },
@@ -581,6 +584,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         val voteResult =
           sv1Backend
             .listVoteRequestResults(None, Some(true), None, None, None, 1)
+            ._1
             .headOption
             .value
         voteResult.outcome shouldBe a[VRO_Accepted]

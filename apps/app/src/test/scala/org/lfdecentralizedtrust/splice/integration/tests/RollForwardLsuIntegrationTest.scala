@@ -4,9 +4,10 @@ import better.files.File.apply
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
+import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
@@ -70,7 +71,7 @@ class RollForwardLsuIntegrationTest
                 // TODO(#4682) Make it work with BFT connections.
                 bftSequencerConnection = false,
                 domainMigrationDumpPath = Some(
-                  (DomainMigrationUtil.migrationTestDumpDir(
+                  (SynchronizerUpgradeUtil.migrationTestDumpDir(
                     name
                   ) / "domain_migration_dump.json").path
                 ),
@@ -227,7 +228,7 @@ class RollForwardLsuIntegrationTest
       ),
       participants = false,
       enableBftSequencer = true,
-      logSuffix = "global-synchronizer-upgrade",
+      logSuffix = "roll-forward-lsu",
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {
@@ -375,6 +376,16 @@ class RollForwardLsuIntegrationTest
 
       clue("Alice can tap") {
         aliceValidatorWalletClient.tap(100.0)
+      }
+
+      clue("SV1's DABFT node has pruning config set") {
+        sv1LocalBackend.sequencerClient.bft.pruning.get_schedule() shouldBe Some(
+          PruningSchedule(
+            "0 /10 * * * ?",
+            PositiveDurationSeconds.ofMinutes(5),
+            PositiveDurationSeconds.ofDays(30),
+          )
+        )
       }
 
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {

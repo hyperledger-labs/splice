@@ -94,7 +94,7 @@ If you want to run the integration tests with the new Canton bft, you can do so 
 ### Managing Canton for Tests
 
 To speed up our tests run against a long-running Canton instance.
-To start the instance run `./start-canton.sh` for backend test and `./start-canton.sh -m` for frontend test.
+To start the instance run `./start-canton.sh`.
 It can be stopped via `./stop-canton.sh`.
 
 > **NOTICE**: If you face bundling issues while setting up your local development environment, refer to the [TROUBLESHOOTING](./TROUBLESHOOTING.md) file for guidance.
@@ -147,7 +147,13 @@ Frontend integration tests are either run with _sbt_ against local canton and Sp
 
 or done with _vitest_ against mock data from the corresponding UI frontend directory using:
 - `npm test` to run the tests,
-- `npm run dev` to start the frontend and navigate the UI against mock handlers.
+- `npm run dev` to start the frontend and navigate the UI against mock handlers. The mock handlers
+  are specified in the argument to `setupServer()` in the corresponding `__tests__/mocks/server.ts`
+
+Tips for using vitest:
+- `npm test` can also take a filename, i.e. `npm test <filename>` to run only tests from that file.
+- To run only some of the tests in the file, in the test.tsx file you can change `test(..)` or `describe(..)`
+  to `test.only(..)` or `describe.only(..)` to run only them and skip all other tests in that file.
 
 ### Manual Frontend Testing
 
@@ -156,9 +162,9 @@ with the frontends locally.
 
 you first need to start Canton and the Splice apps. Here we use the topology from our tests:
 
-1. Start Canton with minimal topology for front-end test.
+1. Start Canton.
 ```
-./start-canton.sh -m
+./start-canton.sh
 ```
 
 2. Start the Splice apps and run the bootstrap script to

@@ -128,7 +128,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installSvLoopback(xns);
+  const loopback = installSvLoopback(xns, decentralizedSynchronizerUpgradeConfig.usesCometbft());
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
@@ -223,7 +223,7 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(
+    : await postgres.installPostgres(
         xns,
         'postgres',
         'postgres',
@@ -231,13 +231,13 @@ export async function installSvNode(
         spliceConfig.pulumiProjectConfig.cloudSql,
         false,
         {
-          logicalDecoding: !!baseConfig.scanBigQuery,
+          logicalDecoding: !!baseConfig.scanApp?.bigQuery,
         }
       );
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(
+    (await postgres.installPostgres(
       xns,
       `cn-apps-pg`,
       `cn-apps-pg`,
@@ -245,9 +245,9 @@ export async function installSvNode(
       svConfig.appsPg?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
-        logicalDecoding: !!baseConfig.scanBigQuery,
+        logicalDecoding: !!baseConfig.scanApp?.bigQuery,
       }
-    );
+    ));
 
   const canton = new SynchronizerNodes(
     decentralizedSynchronizerUpgradeConfig,
@@ -287,8 +287,8 @@ export async function installSvNode(
     config.version
   );
 
-  if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
-    configureScanBigQuery(appsPostgres, baseConfig.scanBigQuery, scan);
+  if (baseConfig.scanApp?.bigQuery && appsPostgres instanceof postgres.CloudPostgres) {
+    configureScanBigQuery(appsPostgres, baseConfig.scanApp!.bigQuery, scan);
   }
 
   const validatorApp = await installValidator(

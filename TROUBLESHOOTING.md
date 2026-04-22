@@ -19,7 +19,7 @@ This guide outlines steps to resolve common issues that a contributor might enco
     direnv allow
     ```
 
-- Verify: `echo $DAML_COMPILER_VERSION` should match the value in [daml-compiler-sources.json](./nix/daml-compiler-sources.json).
+- Verify: `echo $DAML_COMPILER_VERSION` should match the value in [dpm-sdk-sources.json](./nix/dpm-sdk-sources.json).
 
 ### 2. Clean Build Artifacts
 

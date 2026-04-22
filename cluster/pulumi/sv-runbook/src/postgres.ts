@@ -15,18 +15,24 @@ import {
   SplicePostgres,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
-export function installPostgres(
+export async function installPostgres(
   xns: ExactNamespace,
   name: string,
   secretName: string,
   selfHostedValuesFile: string,
   isActive: boolean = true,
   cloudSqlConfigOverride?: CloudSqlConfig
-): SplicePostgres | CloudPostgres {
+): Promise<SplicePostgres | CloudPostgres> {
   const cloudSqlConfig = cloudSqlConfigOverride ?? spliceConfig.pulumiProjectConfig.cloudSql;
   if (cloudSqlConfig.enabled) {
-    return new CloudPostgres(xns, name, name, secretName, cloudSqlConfig, isActive, {
+    return CloudPostgres.install(`${xns.logicalName}-${name}`, {
+      active: isActive,
+      alias: name,
+      cloudSqlConfig,
       disableProtection: supportsSvRunbookReset,
+      instanceName: name,
+      namespace: xns,
+      secretName,
     });
   } else {
     const valuesFromFile = loadYamlFromFile(
