@@ -68,7 +68,7 @@ updates:
       interval: "daily"
     assignees:
       - "krzysztofczyz-da"
-      - "mblaze-da"
+      - "pawelperek-da"
       - "martinflorian-da"
     labels:
       - "static"
@@ -98,7 +98,7 @@ updates:
       interval: "daily"
     assignees:
       - "krzysztofczyz-da"
-      - "mblaze-da"
+      - "pawelperek-da"
       - "martinflorian-da"
     labels:
       - "static"
@@ -128,7 +128,7 @@ updates:
       interval: "daily"
     assignees:
       - "krzysztofczyz-da"
-      - "mblaze-da"
+      - "pawelperek-da"
       - "martinflorian-da"
     labels:
       - "static"
@@ -158,7 +158,7 @@ updates:
       interval: "daily"
     assignees:
       - "krzysztofczyz-da"
-      - "mblaze-da"
+      - "pawelperek-da"
       - "martinflorian-da"
     labels:
       - "static"
