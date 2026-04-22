@@ -35,11 +35,8 @@ object DarResourcesGenerator {
     "splice-token-test-trading-app" -> "1.0.0",
   )
 
-  // Order matters: a package whose `minimumInitializations` value points at a
-  // different package (e.g. `splice-api-token-allocation-request-v1` →
-  // `splice-api-token-allocation-v1`) must be emitted AFTER the package it
-  // references, otherwise the generated Scala will have forward references to
-  // undefined vals and fail to compile.
+  // fix the order to reduce the diff to the existing status quo
+  // TODO(tech-debt): simplify / remove explicit ordering if this bugs us
   private val topLevelPackageOrder: Seq[String] = Seq(
     "splice-amulet",
     "splice-dso-governance",
@@ -50,8 +47,6 @@ object DarResourcesGenerator {
     "splitwell",
     "splice-validator-lifecycle",
   )
-
-  // See the ordering note on `topLevelPackageOrder`.
   private val tokenStandardProductionPackageOrder: Seq[String] = Seq(
     "splice-api-token-metadata-v1",
     "splice-api-token-holding-v1",
@@ -60,7 +55,6 @@ object DarResourcesGenerator {
     "splice-api-token-allocation-request-v1",
     "splice-api-token-allocation-instruction-v1",
   )
-
   private val tokenStandardTestPackage: String = "splice-token-test-trading-app"
 
   final case class DarEntry(
@@ -146,26 +140,7 @@ object DarResourcesGenerator {
     lines.mkString("\n")
   }
 
-  // Emission order here is intentionally independent of `topLevelPackageOrder`
-  // (which is source-order-constrained; see note there). The `require` prevents
-  // either list from silently drifting: if a package is added to one but not
-  // the other, the generator fails loudly.
-  private val packageResourcesRenderOrder: Seq[String] = Seq(
-    "splice-amulet",
-    "splice-amulet-name-service",
-    "splice-util-batched-markers",
-    "splice-dso-governance",
-    "splitwell",
-    "splice-validator-lifecycle",
-    "splice-wallet",
-    "splice-wallet-payments",
-  )
-  require(
-    packageResourcesRenderOrder.toSet == topLevelPackageOrder.toSet,
-    s"packageResourcesRenderOrder and topLevelPackageOrder must contain the same packages; " +
-      s"only-in-render=${packageResourcesRenderOrder.toSet -- topLevelPackageOrder.toSet}, " +
-      s"only-in-emit=${topLevelPackageOrder.toSet -- packageResourcesRenderOrder.toSet}",
-  )
+  private val packageResourcesRenderOrder = topLevelPackageOrder.sorted
 
   private def renderPackageResources(): Seq[String] =
     Seq(
@@ -206,7 +181,6 @@ object DarResourcesGenerator {
       name,
       sys.error(s"No minimumInitialization configured for package $name"),
     )
-    val others = dars
     val latest = dars.lastOption.getOrElse(
       sys.error(s"No DARs found for package $name in daml/dars/")
     )
@@ -217,13 +191,13 @@ object DarResourcesGenerator {
         sys.error(s"Minimum version $minVersion for $name not found in daml/dars/")
       )
 
-    others.flatMap(dar => renderDarResource(varSuffix(dar), dar)) ++
+    dars.flatMap(dar => renderDarResource(varSuffix(dar), dar)) ++
       renderDarResource("current", latest.copy(path = s"$name-current.dar")) ++
       Seq(
         s"val ${camel(name)} = PackageResource(",
         s"  ${camel(name)}_current,",
         s"  ${camel(name)}_${varSuffix(minimumDar)},",
-        s"  Seq(${others.map(dar => s"${camel(name)}_${varSuffix(dar)}").mkString(", ")})",
+        s"  Seq(${dars.map(dar => s"${camel(name)}_${varSuffix(dar)}").mkString(", ")})",
         ")",
       )
   }

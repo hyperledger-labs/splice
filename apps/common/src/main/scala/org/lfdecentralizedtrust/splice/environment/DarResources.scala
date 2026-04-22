@@ -7348,12 +7348,12 @@ object DarResources {
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
-      DarResources.utilBatchedMarkers,
       DarResources.dsoGovernance,
-      DarResources.splitwell,
+      DarResources.utilBatchedMarkers,
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,
+      DarResources.splitwell,
     )
 
   lazy val pkgIdToDarResource: Map[String, DarResource] =
