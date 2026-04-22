@@ -72,7 +72,7 @@ class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig]
           StandardCharsets.UTF_8,
         ) should include("SEQ::sv1") // the sequencerId change through ci runs
         dumps.exists(_.getName.endsWith("authorized")) shouldBe true
-        dumps.exists(_.getName.endsWith("onboarding-state")) shouldBe true
+        dumps.exists(_.getName.endsWith("onboarding-state.gz")) shouldBe true
       })
     }
   }
