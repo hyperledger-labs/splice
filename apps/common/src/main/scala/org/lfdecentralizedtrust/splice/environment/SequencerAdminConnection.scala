@@ -66,9 +66,9 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 
 import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
-import org.apache.pekko.stream.scaladsl.Compression
+import org.lfdecentralizedtrust.splice.store.bulk.ZstdGroupedWeight
 
 /** Connection to the subset of the Canton sequencer admin API that we rely
   * on in our own applications.
@@ -317,7 +317,7 @@ class SequencerAdminConnection(
         val proto: ByteString = response.onboardingStateForSequencer
         PekkoByteString(proto.asReadOnlyByteBuffer())
       }
-      .via(Compression.gzip)
+      .via(ZstdGroupedWeight(compressionLevel = 3, minSize = 256 * 1024))
     val storageObject = source.runWith(sink)
     storageObject.onComplete { _ =>
       channel.close()

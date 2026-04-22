@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.scan.store.bulk
+package org.lfdecentralizedtrust.splice.store.bulk
 
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
-import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
+import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.util.ByteString
 
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
