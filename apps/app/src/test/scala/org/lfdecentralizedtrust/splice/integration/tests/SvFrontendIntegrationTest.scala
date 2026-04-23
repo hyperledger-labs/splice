@@ -130,12 +130,6 @@ class SvFrontendIntegrationTest
               }
             }
 
-            clue("wait for the create button to become enabled") {
-              eventually() {
-                find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
-              }
-            }
-
             clue("click the create validator onboarding secret button") {
               eventuallyClickOn(id("create-validator-onboarding-secret"))
             }
@@ -267,55 +261,35 @@ class SvFrontendIntegrationTest
         )
 
         actAndCheck(
-          "sv2 set the desired price", {
-            eventuallySucceeds() {
-              sv2Backend.updateAmuletPriceVote(BigDecimal(15.55))
-            }
-          },
+          "sv2 set the desired price",
+          sv2Backend.updateAmuletPriceVote(BigDecimal(15.55)),
         )(
           "median amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55))
-          },
+          _ => testDesiredPriceChange(10, Seq(15.55)),
         )
 
         actAndCheck(
-          "sv3 set the desired price", {
-            eventuallySucceeds() {
-              sv3Backend.updateAmuletPriceVote(BigDecimal(5))
-            }
-          },
+          "sv3 set the desired price",
+          sv3Backend.updateAmuletPriceVote(BigDecimal(5)),
         )(
           "median amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55, 5))
-          },
+          _ => testDesiredPriceChange(10, Seq(15.55, 5)),
         )
 
         actAndCheck(
-          "sv4 set the desired price", {
-            eventuallySucceeds() {
-              sv4Backend.updateAmuletPriceVote(BigDecimal(9.0))
-            }
-          },
+          "sv4 set the desired price",
+          sv4Backend.updateAmuletPriceVote(BigDecimal(9.0)),
         )(
           "median amulet price changed and amulet price updated on the row for sv4",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55, 5, 9))
-          },
+          _ => testDesiredPriceChange(10, Seq(15.55, 5, 9)),
         )
 
         actAndCheck(
-          "sv1 update the desired price", {
-            eventuallySucceeds() {
-              sv1Backend.updateAmuletPriceVote(BigDecimal(1.0))
-            }
-          },
+          "sv1 update the desired price",
+          sv1Backend.updateAmuletPriceVote(BigDecimal(1.0)),
         )(
           "median amulet price changed",
-          _ => {
-            testDesiredPriceChange(1, Seq(15.55, 5, 9))
-          },
+          _ => testDesiredPriceChange(1, Seq(15.55, 5, 9)),
         )
       }
     }
@@ -354,20 +328,9 @@ class SvFrontendIntegrationTest
           click on id("initiate-proposal-button")
 
           clue("select action and click next") {
-            eventually() {
-              val actionDropdown = webDriver.findElement(By.id("select-action"))
-              actionDropdown.click()
-            }
-
-            eventually() {
-              val actionOption =
-                webDriver.findElement(By.cssSelector(s"[data-testid='$action']"))
-              actionOption.click()
-            }
-
-            eventually() {
-              click on id("next-button")
-            }
+            eventuallyClickOn(id("select-action"))
+            eventuallyClickOn(cssSelector(s"[data-testid='$action']"))
+            eventuallyClickOn(id("next-button"))
           }
         },
       )(
@@ -388,41 +351,22 @@ class SvFrontendIntegrationTest
       actAndCheck(
         "sv1 operator can create a new proposal", {
           if (effectiveAtThreshold) {
-            eventually() {
-              val effectiveAtThresholdRadio =
-                webDriver.findElement(By.id("effective-at-threshold-radio"))
-              effectiveAtThresholdRadio.click()
-            }
+            eventuallyClickOn(id("effective-at-threshold-radio"))
           }
 
           extraFormOps(webDriver)
 
-          eventually() {
-            inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
-              element.underlying.sendKeys(requestReasonBody)
-            }
-          }
+          waitForQuery(id(s"$formPrefix-summary"))
+          find(id(s"$formPrefix-summary")).value.underlying.sendKeys(requestReasonBody)
 
-          eventually() {
-            inside(find(id(s"$formPrefix-url"))) { case Some(element) =>
-              element.underlying.sendKeys(requestReasonUrl)
-            }
-          }
+          waitForQuery(id(s"$formPrefix-url"))
+          find(id(s"$formPrefix-url")).value.underlying.sendKeys(requestReasonUrl)
 
+          eventuallyClickOn(id("submit-button"))
           eventually() {
-            val submitButton = webDriver.findElement(By.id("submit-button"))
-            submitButton.click()
+            find(id("submit-button")).value.text shouldBe "Submit Proposal"
           }
-
-          eventually() {
-            val submitButton = webDriver.findElement(By.id("submit-button"))
-            submitButton.getText shouldBe "Submit Proposal"
-          }
-
-          eventually() {
-            val submitButton = webDriver.findElement(By.id("submit-button"))
-            submitButton.click()
-          }
+          eventuallyClickOn(id("submit-button"))
         },
       )(
         "sv1 is redirected to the governance page after successful submission",
@@ -862,11 +806,10 @@ class SvFrontendIntegrationTest
       implicit env =>
         val newWeight = "1234"
         val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-        testCreateAndVoteDsoRulesAction("SRARC_UpdateSvRewardWeight") { webDriver =>
-          eventuallySucceeds() {
-            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-            dropDownMember.selectByValue(sv3PartyId)
-          }
+        testCreateAndVoteDsoRulesAction("SRARC_UpdateSvRewardWeight") { implicit webDriver =>
+          waitForQuery(id("display-members"))
+          val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+          dropDownMember.selectByValue(sv3PartyId)
 
           val weightInput = webDriver.findElement(By.id("reward-weight"))
 
@@ -1481,11 +1424,8 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Set Dso Rules Configuration" in { implicit env =>
       assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { implicit webDriver =>
-        eventually() {
-          inside(find(testId("config-field-numUnclaimedRewardsThreshold"))) { case Some(element) =>
-            element.underlying.sendKeys("99")
-          }
-        }
+        waitForQuery(testId("config-field-numUnclaimedRewardsThreshold"))
+        find(testId("config-field-numUnclaimedRewardsThreshold")).value.underlying.sendKeys("99")
       }
     }
 
@@ -1504,11 +1444,8 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
       assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
-        eventually() {
-          inside(find(testId("config-field-transferPreapprovalFee"))) { case Some(element) =>
-            element.underlying.sendKeys("99")
-          }
-        }
+        waitForQuery(testId("config-field-transferPreapprovalFee"))
+        find(testId("config-field-transferPreapprovalFee")).value.underlying.sendKeys("99")
       }
     }
 
@@ -1653,11 +1590,7 @@ class SvFrontendIntegrationTest
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    eventually() {
-      find(
-        id("display-actions")
-      ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-    }
+    waitForQuery(id("display-actions"))
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
     val existingAction: String = dropDownAction.getFirstSelectedOption().getAttribute("value")
     dropDownAction.selectByValue(actionName)
