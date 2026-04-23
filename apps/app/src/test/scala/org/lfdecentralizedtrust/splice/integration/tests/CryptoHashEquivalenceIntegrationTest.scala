@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.{
   ExerciseCommand,
   ExercisedEvent,
   Identifier,
+  Numeric,
   Party,
   Text,
   Value,
@@ -158,6 +159,7 @@ object CryptoHashEquivalenceIntegrationTest {
   case class HashMintingAllowance(provider: String, amount: String) extends HashOp
   case class HashBatchOfMintingAllowances(hashes: Seq[HashRef]) extends HashOp
   case class HashBatchOfBatches(hashes: Seq[HashRef]) extends HashOp
+  case class HashDecimal(value: String) extends HashOp
 
   case class TestCaseDef(description: String, op: HashOp)
 
@@ -191,6 +193,8 @@ object CryptoHashEquivalenceIntegrationTest {
       )
     case HashBatchOfBatches(hashes) =>
       ("CryptoHashProxy_HashBatchOfBatches", record("childHashes" -> textList(hashes.map(r))))
+    case HashDecimal(v) =>
+      ("CryptoHashProxy_HashDecimal", record("input" -> new Numeric(new java.math.BigDecimal(v))))
   }
 
   // -- Derive SQL expression from HashOp -------------------------------------
@@ -212,6 +216,8 @@ object CryptoHashEquivalenceIntegrationTest {
       s"hash_batch_of_minting_allowances(${sqlArray(hashes.map(r))})"
     case HashBatchOfBatches(hashes) =>
       s"hash_batch_of_batches(${sqlArray(hashes.map(r))})"
+    case HashDecimal(v) =>
+      s"daml_crypto_hash_text(daml_numeric_to_text(${escapeSql(v)}::decimal(38,10)))"
   }
 
   // -- Test case definitions (fully static) -----------------------------------
@@ -221,7 +227,15 @@ object CryptoHashEquivalenceIntegrationTest {
   // a shared map populated progressively as earlier tests run.
   //
   // Order matters: intermediates must precede composites that reference them.
+  val decimalFormatCases: Seq[String] = Seq(
+    "10.0000000000", "0.0000000000", "5.0", "3.14", "0", "100",
+    "-3.14", "-0.0", "0.0000000001", "99999999999.0", "1.10",
+  )
+
   val allTestCaseDefs: Seq[TestCaseDef] = Seq(
+    // Decimal format equivalence: Daml show on Decimal vs Postgres decimal(38,10)::text
+  ) ++ decimalFormatCases.map(v => TestCaseDef(s"decimal $v", HashDecimal(v))) ++ Seq(
+
     // Primitive text hashes — used as intermediates by composite cases
     TestCaseDef("hAlice", HashText("alice::provider")),
     TestCaseDef("h10", HashText("10.0")),

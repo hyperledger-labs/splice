@@ -893,7 +893,7 @@ class DbScanAppRewardsStore(
             min(seq_num), max(seq_num) + 1,
             decode(hash_batch_of_minting_allowances(
               array_agg(
-                hash_minting_allowance(party, amount::text)
+                hash_minting_allowance(party, daml_numeric_to_text(amount))
                 order by seq_num
               )
             ), 'hex')

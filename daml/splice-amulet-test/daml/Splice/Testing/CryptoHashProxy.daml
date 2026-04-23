@@ -65,3 +65,10 @@ template CryptoHashProxy with
         childHashes : [Text]
       controller owner
       do pure (hashBatchOfBatches (map Hash childHashes)).value
+
+    nonconsuming choice CryptoHashProxy_HashDecimal : Text
+      with
+        input : Decimal
+      controller owner
+      do pure (hash (show input)).value
+
