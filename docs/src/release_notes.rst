@@ -30,6 +30,10 @@
 
         - Package versions *newer* than the version specified in the AmuletRules configuration are now automatically unvetted by the SV app after a successful downgrade vote.
 
+    - SV UI
+
+        - Various improvements to the SV UI
+
     - Deployment
 
         - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
