@@ -810,16 +810,28 @@ object ScanHttpEncodings {
       .getLocalEventIndices(tree)
     // Cache it once and reuse.
     val eventsById = tree.getEventsById.asScala
-    val nodesWithChildren = eventsById.map {
-      case (nodeId, exercised: data.ExercisedEvent) =>
-        mapping(nodeId.intValue()) -> tree
-          .getChildNodeIds(exercised)
-          .asScala
-          .toSeq
-          .map(_.intValue())
-          .map(mapping)
-      case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
-    }.toMap
+    // Build `nodesWithChildren` with a pre-sized mutable HashMap and a
+    // single-pass, lazy child-id translation, then freeze to an immutable
+    // map at the end. The previous `eventsById.map { ... }.toMap` form
+    // built an immutable HAMT one entry at a time, and the per-event
+    // `.asScala.toSeq.map(_.intValue()).map(mapping)` chain allocated
+    // three intermediate Seqs per exercised event.
+    val nodesWithChildren: Map[Int, Seq[Int]] = {
+      val m = new scala.collection.mutable.HashMap[Int, Seq[Int]](eventsById.size, 0.75)
+      eventsById.foreach {
+        case (nodeId, exercised: data.ExercisedEvent) =>
+          val translated = tree
+            .getChildNodeIds(exercised)
+            .asScala
+            .iterator
+            .map(ci => mapping(ci.intValue()))
+            .toVector
+          m.update(mapping(nodeId.intValue()), translated)
+        case (nodeId, _) =>
+          m.update(mapping(nodeId.intValue()), Seq.empty)
+      }
+      m.toMap
+    }
     val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
       eventsById.collect { case (_, exercised: javaApi.ExercisedEvent) =>
         mapping(exercised.getNodeId)
