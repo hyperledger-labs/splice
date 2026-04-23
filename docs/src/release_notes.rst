@@ -36,7 +36,7 @@
 
     - Deployment
 
-        - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
+        - SV apps now support a ``copy-votes-from`` setting that automatically mirrors governance votes
           from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.
 
         - The SV helm chart now supports a new ``synchronizers`` value that replaces the previous ``domain`` value.
