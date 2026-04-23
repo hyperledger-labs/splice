@@ -63,6 +63,11 @@
 
         - Added support for configuring the protocol version used in LocalNet.
 
+    - Participant
+
+        - Set ``commitment-use-db-snapshot-for-participant-lookup = true`` by default. If you manually set this, you can
+          remove your overwrite.
+
     - Remove use of rollback nodes to support protocol version 35
 
         - Daml
@@ -100,4 +105,3 @@
             wallet             0.1.19
             walletPayments     0.1.18
             ================== =======
-
