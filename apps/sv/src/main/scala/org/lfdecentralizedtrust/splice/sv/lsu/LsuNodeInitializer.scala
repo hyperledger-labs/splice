@@ -74,6 +74,7 @@ class LsuNodeInitializer(
       successorSynchronizerId: PhysicalSynchronizerId,
       now: CantonTimestamp,
       upgradeTime: Option[CantonTimestamp],
+      ignorePsidCheck: Boolean,
   )(implicit tc: TraceContext): Future[StaticSynchronizerParameters] = {
     logger.info("Initializing sequencer and mediators from the data of the old nodes")
     for {
@@ -102,6 +103,7 @@ class LsuNodeInitializer(
             parameters.copy(
               protocolVersion = successorSynchronizerId.protocolVersion
             ),
+            ignorePsidCheck,
           )
         },
         logger,
