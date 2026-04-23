@@ -146,6 +146,7 @@ lazy val root: Project = (project in file("."))
     `canton-json-api-v2-openapi-ts-client`,
     `token-standard-cli`,
     `party-allocator`,
+    `amulet-drip`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -577,6 +578,75 @@ lazy val `token-standard-cli` =
 lazy val `party-allocator` =
   project
     .in(file("party-allocator"))
+    .dependsOn(
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `canton-json-api-v2-openapi-ts-client`,
+    )
+    .settings(
+      Headers.TsHeaderSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
+        (
+          (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
+          (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
+          false,
+        ),
+      ),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`token-standard-cli` / Compile / npmInstall).value,
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value,
+      npmTest := {
+        val log = streams.value.log
+        (Test / compile).value
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "test:sbt"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmFix := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "fix"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmLint := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "check"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmBuild := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "build"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+    )
+
+lazy val `amulet-drip` =
+  project
+    .in(file("amulet-drip"))
     .dependsOn(
       `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
