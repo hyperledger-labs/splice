@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Transaction, Event}
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -41,35 +40,46 @@ object Trees {
   }
 
   /** Returns a map that maps event ids to consecutive numbers, assigned by in-order traversing the transaction tree */
+  @SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.Var"))
   def getLocalEventIndices(
       tree: Transaction
   ): Map[Int, Int] = {
-    val eventsById = tree.getEventsById.asScala
-    @tailrec
-    def makeEventIdToNumber(
-        pending: List[Event],
-        acc: Map[Int, Int],
-    ): Map[Int, Int] = {
-      pending match {
-        case Nil =>
-          acc
-        case head :: tail =>
-          head match {
-            case created: CreatedEvent =>
-              makeEventIdToNumber(tail, acc + (created.getNodeId.intValue() -> acc.size))
-            case exercised: ExercisedEvent =>
-              makeEventIdToNumber(
-                tree.getChildNodeIds(exercised).asScala.map(eventsById).toList ++ tail,
-                acc + (exercised.getNodeId.intValue() -> acc.size),
-              )
-            case _ => sys.error(s"Unexpected event type: $head")
+    val eventsById = tree.getEventsById
+    val size = eventsById.size
+    // Iterative in-order traversal using a pre-sized array-backed stack.
+    // The previous `@tailrec` version rebuilt an immutable Map per step
+    // (`acc + (... -> acc.size)`) and allocated a fresh List per exercised
+    // node via `children.toList ++ tail`, both on the hot path.
+    val out = new mutable.HashMap[Int, Int](size, 0.75)
+    val stack = new mutable.ArrayDeque[Event](math.max(16, size))
+    // Push roots in reverse so the leftmost root is popped first.
+    val roots = tree.getRootNodeIds
+    var i = roots.size() - 1
+    while (i >= 0) {
+      stack.append(eventsById.get(roots.get(i)))
+      i -= 1
+    }
+    var next = 0
+    while (stack.nonEmpty) {
+      val node = stack.removeLast()
+      node match {
+        case created: CreatedEvent =>
+          out.update(created.getNodeId.intValue(), next)
+          next += 1
+        case exercised: ExercisedEvent =>
+          out.update(exercised.getNodeId.intValue(), next)
+          next += 1
+          // Push children in reverse to preserve left-to-right in-order traversal.
+          val children = tree.getChildNodeIds(exercised)
+          var j = children.size() - 1
+          while (j >= 0) {
+            stack.append(eventsById.get(children.get(j)))
+            j -= 1
           }
+        case other => sys.error(s"Unexpected event type: $other")
       }
     }
-    makeEventIdToNumber(
-      tree.getRootNodeIds.asScala.map(eventsById).toList,
-      Map.empty,
-    )
+    out.toMap
   }
 
 }
