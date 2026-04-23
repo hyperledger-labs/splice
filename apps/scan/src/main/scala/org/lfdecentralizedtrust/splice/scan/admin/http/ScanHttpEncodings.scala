@@ -812,10 +812,7 @@ object ScanHttpEncodings {
     val eventsById = tree.getEventsById.asScala
     // Build `nodesWithChildren` with a pre-sized mutable HashMap and a
     // single-pass, lazy child-id translation, then freeze to an immutable
-    // map at the end. The previous `eventsById.map { ... }.toMap` form
-    // built an immutable HAMT one entry at a time, and the per-event
-    // `.asScala.toSeq.map(_.intValue()).map(mapping)` chain allocated
-    // three intermediate Seqs per exercised event.
+    // map at the end.
     val nodesWithChildren: Map[Int, Seq[Int]] = {
       val m = new scala.collection.mutable.HashMap[Int, Seq[Int]](eventsById.size, 0.75)
       eventsById.foreach {
@@ -841,10 +838,7 @@ object ScanHttpEncodings {
     // `Trees.getLocalEventIndices` assigns dense new node ids in `0..n-1`,
     // so we can place remapped events directly at their target position in a
     // pre-sized array and wrap it as a Java list for the Transaction
-    // constructor. This avoids the previous
-    // `eventsById.map(...).toList.sortBy(_._1).map(_._2).asJava` pipeline,
-    // which allocated a tuple per event, a List, a tim-sorted copy, a
-    // second mapped List, and a Java wrapper.
+    // constructor.
     val size = eventsById.size
     val remappedEventsArr = new Array[javaApi.Event](size)
     eventsById.foreach {
@@ -891,9 +885,7 @@ object ScanHttpEncodings {
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
-    // `List.of(elems*)` returns a truly unmodifiable list and does not leak
-    // the backing array, unlike `Arrays.asList` which is fixed-size but
-    // permits in-place `set(i, _)` and aliases its input array.
+
     val remappedEventsJava: java.util.List[javaApi.Event] =
       java.util.List.of(remappedEventsArr*)
 

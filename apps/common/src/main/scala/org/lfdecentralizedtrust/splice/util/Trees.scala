@@ -47,9 +47,6 @@ object Trees {
     val eventsById = tree.getEventsById
     val size = eventsById.size
     // Iterative in-order traversal using a pre-sized array-backed stack.
-    // The previous `@tailrec` version rebuilt an immutable Map per step
-    // (`acc + (... -> acc.size)`) and allocated a fresh List per exercised
-    // node via `children.toList ++ tail`, both on the hot path.
     val out = new mutable.HashMap[Int, Int](size, 0.75)
     val stack = new mutable.ArrayDeque[Event](math.max(16, size))
     // Push roots in reverse so the leftmost root is popped first.
