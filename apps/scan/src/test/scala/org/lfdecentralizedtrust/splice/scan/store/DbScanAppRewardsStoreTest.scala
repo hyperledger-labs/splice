@@ -525,10 +525,13 @@ class DbScanAppRewardsStoreTest
           Seq("bob::provider"),
           Seq(500000L),
         )
+        zeroThresholdInputs = testInputs.copy(
+          appRewardCouponThreshold = RewardComputationInputs.zero
+        )
         summary <- store.computeAndStoreRewards(
           roundNumber,
           batchSize = 100,
-          testInputs,
+          zeroThresholdInputs,
         )
       } yield {
         summary.activePartiesCount shouldBe 2L

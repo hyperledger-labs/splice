@@ -96,7 +96,7 @@ final case class RewardComputationInputs(
 
 object RewardComputationInputs {
   private val scale: Numeric.Scale = Numeric.Scale.assertFromInt(10)
-  private[rewards] val zero: Numeric = fromLong(0L)
+  private[scan] val zero: Numeric = fromLong(0L)
   private val defaultDevelopmentFundPercentage: BigDecimal = BigDecimal("0.05")
 
   private[rewards] def fromLong(x: Long): Numeric =
