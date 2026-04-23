@@ -4,16 +4,15 @@
 
 set -eou pipefail
 
-exit 0; # pretend that this is okay
 if [ "$APP_USER_PROFILE" = "on" ]; then
   echo "Checking 2${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
-  grpcurl -plaintext "localhost:2${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}" grpc.health.v1.Health/Check
+  grpc-client-cli health "localhost:2${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
 fi
 if [ "$APP_PROVIDER_PROFILE" = "on" ]; then
   echo "Checking 3${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
-  grpcurl -plaintext "localhost:3${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}" grpc.health.v1.Health/Check
+  grpc-client-cli health "localhost:3${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
 fi
 if [ "$SV_PROFILE" = "on" ]; then
   echo "Checking 4${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
-  grpcurl -plaintext "localhost:4${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}" grpc.health.v1.Health/Check
+  grpc-client-cli health "localhost:4${CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX}"
 fi
