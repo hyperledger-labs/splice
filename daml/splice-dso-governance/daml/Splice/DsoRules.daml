@@ -8,7 +8,6 @@ import Prelude hiding (all)
 import DA.Action (void, unless)
 import DA.Assert
 import DA.Either (partitionEithers)
-import DA.Exception
 import DA.Foldable (maximum, forA_, all)
 import DA.List as List hiding (all)
 import DA.Optional (mapOptional, isNone, fromSome, fromOptional, isSome)
