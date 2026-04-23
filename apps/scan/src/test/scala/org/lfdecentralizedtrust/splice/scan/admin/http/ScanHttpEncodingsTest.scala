@@ -419,8 +419,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         /*events = */ sortedEvents.asJava,
         /*offset = */ 42L,
         /*synchronizerId = */ dummyDomain.toProtoPrimitive,
-        /*traceContext = */ com.daml.ledger.api.v2.TraceContextOuterClass.TraceContext
-          .getDefaultInstance,
+        /*traceContext = */ com.daml.ledger.api.v2.TraceContextOuterClass.TraceContext.getDefaultInstance,
         /*recordTime = */ recordTime,
         /*externalTransactionHash = */ externalTransactionHash,
         /*trafficCost = */ 0L,
@@ -472,12 +471,10 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
       // New node ids are dense (no gaps) 0..6 in the order described above.
       def byCid(cid: String): javaApi.Event =
-        out.getEvents.asScala
-          .collectFirst {
-            case c: javaApi.CreatedEvent if c.getContractId == cid => c: javaApi.Event
-            case e: javaApi.ExercisedEvent if e.getContractId == cid => e: javaApi.Event
-          }
-          .value
+        out.getEvents.asScala.collectFirst {
+          case c: javaApi.CreatedEvent if c.getContractId == cid => c: javaApi.Event
+          case e: javaApi.ExercisedEvent if e.getContractId == cid => e: javaApi.Event
+        }.value
 
       byCid("cid:root").getNodeId shouldBe 0
       byCid("cid:childA").getNodeId shouldBe 1
@@ -521,7 +518,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       // Re-materialising the input in a different iteration order (the
       // Transaction ctor sorts internally by nodeId, so downstream behaviour
       // must not depend on input order) still yields the same result.
-      val rng = new Random(0xC0FFEE)
+      val rng = new Random(0xc0ffee)
       val shuffles = (1 to 20).map(_ => rng.shuffle(allEvents))
       forAll(shuffles) { shuffled =>
         normalise(wrapTx(shuffled)) shouldBe canonical
@@ -544,8 +541,8 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       out.getEvents.asScala.map(_.getNodeId.intValue()).toVector shouldBe (0 until depth).toVector
 
       // Every exercise's lastDescendantNodeId points at the terminal create.
-      val exercises = out.getEvents.asScala.toVector.collect {
-        case e: javaApi.ExercisedEvent => e
+      val exercises = out.getEvents.asScala.toVector.collect { case e: javaApi.ExercisedEvent =>
+        e
       }
       forAll(exercises)(_.getLastDescendantNodeId shouldBe depth - 1)
     }
