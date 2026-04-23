@@ -1,6 +1,6 @@
 # AI Policy
 
-This policy applies to all contributions — code, issues, reviews, comments — to this repository, regardless of whether you are a maintainer, a Digital Asset employee, or an external contributor.
+This policy applies to all contributions — code, issues, reviews, comments — to this repository, regardless of whether you are a maintainer or an external contributor.
 
 Using AI tools is allowed and often useful. The rules below exist to protect the quality of the codebase and the time of reviewers and other contributors.
 
@@ -23,19 +23,19 @@ Aggressively self-review AI output before asking anyone else to look at it. If y
 
 **Issues and PRs that appear to be unreviewed AI output — overlong and padded, referencing functions or docs that do not exist, plausible-sounding but wrong, or filled with bot-style prose — may be closed without further discussion.** Maintainers are not obligated to explain, respond to, or debate the merits of such submissions. Repeated submissions of this kind may lead to being blocked from the repository.
 
-If your contribution is closed under this clause and you believe it was in error, open a new issue stating your case briefly and concretely.
+If your contribution is closed under this clause and you believe it was in error, leave a comment on the closed issue or PR stating your case briefly and concretely. We may reopen it if convinced.
 
 ## Do not leak information through AI tools
 
 Do not paste private, security-sensitive, or proprietary information into AI tools outside of your control — including secrets, customer data, and non-public designs or code.
 
-Prefer running agentic AI tools (Claude Code, Copilot CLI, Cursor agents, and similar) inside a sandbox — a VM, container, or dedicated workstation — so that a compromised or misbehaving tool cannot reach credentials, other repositories, or systems it was not meant to touch.
+Prefer running agentic AI tools (Claude Code, Copilot CLI, Cursor agents, and similar) inside a sandbox — a VM, container, or dedicated workstation — to limit the blast radius if the tool is compromised or misbehaves.
 
 ## PRs opened autonomously by AI require two human reviews
 
 A PR opened directly by an AI tool, bot, or automated AI workflow must receive approvals from **two** human reviewers before it is merged. A PR that a human opens manually after reviewing AI-generated changes counts as human-authored; the normal review rules apply.
 
-Fully deterministic automated workflows (dependency bumps, generated-code refresh, and the like) are not subject to this rule.
+Fully deterministic automated workflows (dependency bumps, submodule bumps, and the like) are not subject to this rule.
 
 ## Attribution
 
