@@ -62,8 +62,14 @@ class RewardComputationTrigger(
         earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
         latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
         latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
+        // While no rewards have been computed yet, skip pre-CIP-104 rounds
+        // by finding the earliest round with rewardConfig set.
+        earliestComputableO <- latestComputedO match {
+          case Some(_) => Future.successful(earliestCompleteO)
+          case None => earliestRoundWithRewardConfig(earliestCompleteO, latestCompleteO)
+        }
         candidateRoundO = RewardComputationTrigger.nextRound(
-          earliestCompleteO,
+          earliestComputableO,
           latestCompleteO,
           latestComputedO,
         )
@@ -72,9 +78,6 @@ class RewardComputationTrigger(
         // again on its next interval. Unlike a failing task, this does not
         // consume one of the trigger's limited task retries (which, once
         // exhausted, cause the task to be abandoned with a log warning).
-        // Two cases:
-        //   - The reference store hasn't ingested the round yet (scan catching up)
-        //   - The round is pre-CIP-104 (rewardConfig/trafficPrice absent)
         task <- candidateRoundO match {
           case None => Future.successful(Seq.empty)
           case Some(roundNumber) =>
@@ -88,7 +91,7 @@ class RewardComputationTrigger(
                 RewardComputationInputs.fromOpenMiningRound(contract.payload) match {
                   case None =>
                     logger.debug(
-                      s"Round $roundNumber is a pre-CIP-104 round (missing rewardConfig or trafficPrice), skipping."
+                      s"Round $roundNumber missing rewardConfig or trafficPrice, skipping."
                     )
                     Seq.empty
                   case Some((inputs, batchSize)) =>
@@ -121,6 +124,49 @@ class RewardComputationTrigger(
     appRewardsStore
       .lookupLatestRoundWithRewardComputation()
       .map(_.exists(_ >= task.roundNumber))
+
+  /** Gate + linear search for the earliest round with rewardConfig.
+    * First checks that the latest complete round has rewardConfig (i.e. CIP-104
+    * is active). If not, returns None to skip entirely. If yes, searches backward
+    * from latestComplete to find the earliest contiguous round with rewardConfig.
+    *
+    * Called each poll cycle until a reward is successfully computed.
+    * Before CIP-104 activates, only the gate check runs (one indexed lookup
+    * on the latest complete round), so repeated polling is cheap.
+    */
+  private def earliestRoundWithRewardConfig(
+      earliestCompleteO: Option[Long],
+      latestCompleteO: Option[Long],
+  )(implicit tc: TraceContext): Future[Option[Long]] =
+    (earliestCompleteO, latestCompleteO) match {
+      case (Some(from), Some(to)) =>
+        rewardsReferenceStore.lookupOpenMiningRoundByNumber(to).flatMap {
+          case Some(c) if c.payload.rewardConfig.isPresent =>
+            searchBackward(from, to).map { result =>
+              logger.debug(s"Earliest round with rewardConfig: $result")
+              Some(result)
+            }
+          case _ =>
+            logger.debug(
+              "CIP-104 not yet active (latest complete round has no rewardConfig), skipping."
+            )
+            Future.successful(None)
+        }
+      case _ => Future.successful(None)
+    }
+
+  private def searchBackward(
+      from: Long,
+      candidate: Long,
+  )(implicit tc: TraceContext): Future[Long] =
+    if (candidate <= from) Future.successful(candidate)
+    else
+      rewardsReferenceStore.lookupOpenMiningRoundByNumber(candidate - 1).flatMap {
+        case Some(c) if c.payload.rewardConfig.isPresent =>
+          searchBackward(from, candidate - 1)
+        case _ =>
+          Future.successful(candidate)
+      }
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     super.closeAsync() :+
