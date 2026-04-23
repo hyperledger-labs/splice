@@ -110,8 +110,52 @@ You need to do this for both the validator and the participant services:
           -Dhttps.proxyPort=your_proxy_port
 
 Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
-You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
 Proxy authentication is currently not supported.
+
+Bypassing the proxy for specific hosts
+++++++++++++++++++++++++++++++++++++++
+
+.. note::
+
+   Setting ``http.nonProxyHosts`` affects:
+
+   - The HTTP client used by the CN apps (Validator, Scan, SV, Wallet).
+   - JDK-level HTTP clients in the same JVM (via the default ``ProxySelector``).
+     This includes the Auth0 JWK library used by the CN apps **and** by the
+     Canton participant for JWKS / OIDC discovery, as well as file downloads
+     that use ``java.net.HttpURLConnection``.
+   - gRPC egress from other components, because gRPC's Netty transport delegates proxy
+     decisions to the default JDK ``ProxySelector``.
+
+You can set ``http.nonProxyHosts`` to bypass the proxy for specific target
+hosts. Matching hosts will be contacted directly rather than through the
+configured proxy. This is useful for services that are reachable on the local
+network, such as an in-cluster Scan instance or internal monitoring endpoints.
+
+The value is a ``|``-separated list of patterns that follows the standard Java ``nonProxyHosts``
+grammar:
+
+- Patterns match the request host name case-insensitively.
+- ``*`` is a wildcard. Conventionally it is used at the start (``*.internal``) or end (``10.*``)
+  of a pattern.
+- Matching is performed on the raw host string from the request URI. No DNS resolution is performed,
+  so ``localhost`` and ``127.0.0.1`` are treated as different names unless you list both.
+- An empty value (e.g. ``-Dhttp.nonProxyHosts=``) means "no bypass patterns".
+
+
+Example that proxies external traffic from the ``validator`` service but bypasses the proxy for
+``localhost`` / ``127.0.0.1``, any host in the ``.internal`` domain, and any IPv4 address whose
+literal string representation starts with ``10.``:
+
+.. code-block:: yaml
+
+  services:
+    validator:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+          -Dhttp.nonProxyHosts=localhost|127.0.0.1|*.internal|10.*
 
 Deployment
 ++++++++++
@@ -263,6 +307,53 @@ To tune to your needs, you can set environment variables, for example:
    export MIN_TRAFFIC_TOPUP_INTERVAL="1m" # minimum interval between top-ups
 
 .. include:: ../common/traffic_topups.rst
+
+.. _compose_auto_sweeps:
+
+Configuring sweeps and auto-accepts of transfer offers
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. include:: ../common/wallet_sweeps.rst
+
+To do so, fill the following section and add the following additional config to your validator environment:
+
+.. code-block:: yaml
+
+   # sweep by transferring directly through the transfer preapproval of the receiver,
+   # if set to false sweeping creates transfer offers that need to be accepted on the receiver side.
+   # Note that this refers to the preapprovals described in https://docs.dev.sync.global/background/preapprovals.html
+   # and not to auto accepting transfers. Auto accept transfers does not setup preapproval contracts that allow
+   # for a direct transfer but just automates the acceptance of the transfer offer so in that case
+   # useTransferPreapproval should be set to false.
+   services:
+     validator:
+       environment:
+          - |
+             ADDITIONAL_CONFIG_WALLET_SWEEP=
+               canton.validator-apps.validator_backend.wallet-sweep {
+                 "<senderPartyId1>" {
+                   max-balance-usd = 1000
+                   min-balance-usd = 100
+                   receiver = "<receiverPartyId>"
+                   use-transfer-preapproval = false
+                 }
+               }
+
+Similarly, you can configure the validator to automatically accept transfer offers
+from certain parties on the network. To do so, add the following additional config:
+
+.. code-block:: yaml
+
+   services:
+     validator:
+       environment:
+          - |
+             ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS=
+               canton.validator-apps.validator_backend.auto-accept-transfers {
+                 "<receiverPartyId>" {
+                   from-parties = ["<senderPartyId1>", "<senderPartyId2>"]
+                 }
+               }
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

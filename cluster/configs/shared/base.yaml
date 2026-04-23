@@ -87,6 +87,7 @@ initialRound: 0
 #  canton-network:
 #    installDataOnly: true
 monitoring:
+  enableGrafanaServiceAccountToken: false
   alerting:
     enableNoDataAlerts: false
     alerts:
@@ -159,6 +160,10 @@ monitoring:
         # These metrics will still trigger the "quota exceeded" alert.
         # GCP is more forgiving of larger sets in this value.
         excludedApproachingMetrics: []
+      trafficBasedRewards:
+        # Alert if we have more than this many featured app rights,
+        # as too many rights may cause performance problems in computing app activity records.
+        featuredAppRightsLimit: 10000
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
@@ -171,6 +176,7 @@ monitoring:
         jsonPayload.message=~"eyJhbGc[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}" OR
         jsonPayload.message=~"Bearer\s+eyJ[A-Za-z0-9_-]{2,}"
       )
+    muteTimeIntervals: []
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true

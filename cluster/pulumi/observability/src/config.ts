@@ -16,6 +16,7 @@ const GcpQuotasConfigSchema = z.object({
 
 const MonitoringConfigSchema = z
   .object({
+    enableGrafanaServiceAccountToken: z.boolean(),
     alerting: z.object({
       enableNoDataAlerts: z.boolean(),
       alerts: z.object({
@@ -83,9 +84,23 @@ const MonitoringConfigSchema = z
           tolerance: z.number(),
         }),
         gcpQuotas: GcpQuotasConfigSchema,
+        trafficBasedRewards: z.object({
+          featuredAppRightsLimit: z.number(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
+      muteTimeIntervals: z
+        .array(
+          z.object({
+            name: z.string(),
+            objectMatchers: z.array(z.tuple([z.string(), z.string(), z.string()])),
+            startTime: z.string(), // UTC
+            endTime: z.string(), // UTC
+            weekdays: z.array(z.string()).optional(), // e.g. ['monday', 'tuesday:friday']
+          })
+        )
+        .default([]),
     }),
   })
   .strict();

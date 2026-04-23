@@ -257,7 +257,7 @@ object BuildCommon {
         addCommandAlias("splice-clean", "; clean-splice") ++
         addCommandAlias(
           "updateDarResources",
-          "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala; apps-common/scalafmt; apps-common/headerCreate",
+          "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala daml/dars; apps-common/scalafmt; apps-common/headerCreate",
         )
     val buildSettings = inThisBuild(
       Seq(
@@ -1459,7 +1459,7 @@ object BuildCommon {
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         damlTsCodegenDir.value.delete()
-        BuildUtil.runCommand("daml2js" +: args, log)
+        BuildUtil.runCommand("dpm" +: "codegen-js" +: args, log)
         (baseDirectory.value / "daml.js" ** "*").get.toSet
       }
     cache(dars.toSet).toSeq

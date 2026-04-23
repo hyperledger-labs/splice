@@ -9,13 +9,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
-import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion
+import org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTrigger
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   TimeTestUtil,
@@ -23,7 +26,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -56,12 +58,8 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
         }
       })
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
-          scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            )
-          )
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.withPausedTrigger[RewardComputationTrigger]
         )(config)
       )
 
@@ -83,13 +81,16 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
 
     assertOldestOpenRound(0)
 
+    clue("Reward accounting endpoints return 404 before any data is available") {
+      sv1ScanBackend.getRewardAccountingEarliestAvailableRound() shouldBe None
+      sv1ScanBackend.getRewardAccountingActivityTotals(0L) shouldBe None
+    }
+
     // Here we perform all settlements with verdict ingestion paused just to
     // confirm that activity record computations does happen properly even when
     // the ingestion is catching up, by reading the Tcs store data for the
-    // archived rounds. ie pausing is not necessary, it merely improves test coverage.
-    val verdictIngestion =
-      sv1ScanBackend.appState.verdictAutomation.trigger[ScanVerdictStoreIngestion]
-
+    // archived rounds. I.e., pausing is not necessary, it merely improves test coverage.
+    //
     // Sequence of actions
     //   Open rounds | Action
     //   ------------+--------------------------------------
@@ -99,7 +100,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
     //   6, 7        | settle id3
     //   7, 8        | settle id4
     val (updateId0, updateId1, updateId2, updateId3, updateId4) =
-      setTriggersWithin(triggersToPauseAtStart = Seq(verdictIngestion)) {
+      pauseScanVerdictIngestionWithin(sv1ScanBackend) {
 
         // 3 initial advances to get open rounds with staggered opensAt
         for (round <- 1 to 3) {
@@ -182,6 +183,48 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
       val event = fetchEvent(updateId4, "updateId4")
       assertTrafficSummary(event, "updateId4")
       assertAppActivity(event, "updateId4", Set(aliceParty), expectedRound = 7)
+    }
+
+    // -- Reward pipeline endpoint checks --------------------------------------
+    // ScanAggregationTrigger runs unpaused throughout the test and has already
+    // aggregated completed rounds. Run the paused RewardComputationTrigger to
+    // compute rewards, then verify the reward accounting HTTP endpoints.
+
+    clue("Run the reward computation trigger") {
+      sv1ScanBackend.automation
+        .trigger[RewardComputationTrigger]
+        .runOnce()
+        .futureValue
+    }
+
+    val earliest = clue("Verify earliest available round is returned") {
+      val e = sv1ScanBackend.getRewardAccountingEarliestAvailableRound()
+      e shouldBe defined
+      e.value
+    }
+
+    clue("Verify activity totals for the computed round") {
+      val totals = sv1ScanBackend.getRewardAccountingActivityTotals(earliest)
+      totals.value.roundNumber shouldBe earliest
+      totals.value.activityRecordsCount should be > 0L
+    }
+
+    clue("Verify root hash is available") {
+      val rootHash = sv1ScanBackend.getRewardAccountingRootHash(earliest)
+      rootHash shouldBe defined
+      rootHash.value.roundNumber shouldBe earliest
+      rootHash.value.rootHash should have length 64 // hex-encoded SHA-256
+    }
+
+    clue("Verify batch lookup for root hash returns batch contents") {
+      val rootHashHex = sv1ScanBackend.getRewardAccountingRootHash(earliest).value.rootHash
+      sv1ScanBackend.getRewardAccountingBatch(earliest, rootHashHex) shouldBe defined
+    }
+
+    clue("Verify 404 for non-existent data") {
+      sv1ScanBackend.getRewardAccountingActivityTotals(earliest + 100) shouldBe None
+      sv1ScanBackend.getRewardAccountingRootHash(earliest + 100) shouldBe None
+      sv1ScanBackend.getRewardAccountingBatch(earliest, "0" * 64) shouldBe None
     }
   }
 

@@ -254,7 +254,8 @@ abstract class SvAppReference(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  ): Seq[DsoRules_CloseVoteRequestResult] = {
+      pageToken: Option[BigInt] = None,
+  ): (Seq[DsoRules_CloseVoteRequestResult], Option[BigInt]) = {
     consoleEnvironment.run {
       httpCommand(
         HttpSvOperatorAppClient.ListVoteRequestResults(
@@ -264,6 +265,7 @@ abstract class SvAppReference(
           effectiveFrom,
           effectiveTo,
           limit,
+          pageToken,
         )
       )
     }
@@ -452,6 +454,11 @@ class SvAppBackendReference(
 
   lazy val sequencerClient: SequencerClientReference =
     sequencerClientFor(_.current)
+
+  lazy val sequencerClientSuccessor: SequencerClientReference =
+    sequencerClientFor(
+      _.successor.getOrElse(throw new IllegalStateException("successor not configured"))
+    )
 
   def sequencerClientFor(
       node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig

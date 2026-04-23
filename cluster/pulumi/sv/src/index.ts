@@ -3,6 +3,7 @@
 import {
   Auth0ClientType,
   config,
+  DecentralizedSynchronizerUpgradeConfig,
   getAuth0Config,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
@@ -17,11 +18,16 @@ async function main() {
     await auth0Fetch.loadAuth0Cache();
 
     // defining resources in an apply callback is wrong...
-    installNode(sv, auth0Fetch);
+    await installNode(sv, auth0Fetch);
 
     await auth0Fetch.saveAuth0Cache();
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-main();
+if (
+  DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode ||
+  DecentralizedSynchronizerUpgradeConfig.active.migrateParticipantsFromSvCantonToSv
+) {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  main();
+}

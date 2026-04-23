@@ -22,10 +22,6 @@ import Splice.Types
 import Splice.Util
 
 
-
-import DA.Exception
-
-
 data ExternalPartyAmuletRules_ExpireAmuletAllocationInput = ExternalPartyAmuletRules_ExpireAmuletAllocationInput
   with
     allocationCid : ContractId AmuletAllocation
@@ -172,19 +168,6 @@ template TransferCommand
         transferCounterCid : ContractId TransferCommandCounter
       controller delegate
       do transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
-
-         let mergeInputsAndReportError error = do
-             -- In the absence of automatic merging of inputs for external parties, it is possible for
-             -- a user to accumulate tons of small amulet holdings and be unable to do a transfer.
-             -- We do a self-transfer to merge inputs even in case of a failed transfer to guard against this.
-             _ <- exercisePaymentTransfer dso context Transfer with
-               sender
-               provider = delegate
-               inputs = inputs
-               outputs = []
-               beneficiaries = None -- No beneficiaries for self-transfer merge.
-             pure (TransferCommandResultFailure error)
-
          if | transferCounter.nextNonce > nonce ->
               -- Fail but archive the TransferCommand
               pure TransferCommand_SendResult with
@@ -216,12 +199,9 @@ template TransferCommand
                   _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
                   assertWithinDeadline "TransferCommand.expiresAt" expiresAt
                   result <-
-                    try do
+                    do
                       TransferPreapproval_SendResult result _meta <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender description)
                       pure (TransferCommandResultSuccess result)
-                    catch
-                      (ex : InvalidTransfer) -> mergeInputsAndReportError ex.reason
-                      (ex : AnyException) -> mergeInputsAndReportError (ITR_Other $ message ex)
                   pure TransferCommand_SendResult with
                     result
                     sender

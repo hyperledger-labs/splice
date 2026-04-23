@@ -184,6 +184,38 @@ describe('Set Amulet Config Rules Form', () => {
     });
   });
 
+  test('should show error when submitting without configuration changes', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
+    await user.click(actionInput);
+
+    const submitButton = screen.getByTestId('submit-button');
+    await waitFor(() => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Cannot submit a proposal with no configuration changes')
+      ).toBeInTheDocument();
+    });
+  });
+
   test('changing config fields should render the current value', async () => {
     const user = userEvent.setup();
 

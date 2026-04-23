@@ -10,6 +10,8 @@ module Splice.Testing.Utils
     submitWithDisclosures',
     submitWithDisclosuresMustFail',
 
+    FailureStatusCheck(..),
+    submitMultiMustFail'',
     submitWithDisclosuresMustFail'',
     expectErrorId,
     expectMessageContains,
@@ -107,8 +109,29 @@ allocatePartyExact name = allocatePartyByHint (PartyIdHint name)
 -- | Use this to check that commands fail with the expected 'FailureStatus'.
 submitWithDisclosuresMustFail''
   : Show a => FailureStatusCheck -> Party -> Disclosures' -> Commands a -> Script ()
-submitWithDisclosuresMustFail'' check p (Disclosures' ds) cmds =  do
+submitWithDisclosuresMustFail'' check p (Disclosures' ds) cmds = do
   result <- trySubmit (actAs p <> discloseMany (Map.values ds)) cmds
+  checkSubmitFailure check result
+
+
+-- Version of 'submitMultiMustFail' that checks expected errors
+----------------------------------------------------------------------------
+
+-- | Use this to check that multi-party submission fails with the expected 'FailureStatus'.
+submitMultiMustFail''
+  : Show a
+  => FailureStatusCheck
+  -> [Party]
+  -> [Party]
+  -> Commands a
+  -> Script ()
+submitMultiMustFail'' check actAsParties readAsParties cmds = do
+  result <- trySubmit (actAs actAsParties <> readAs readAsParties) cmds
+  checkSubmitFailure check result
+
+-- | Internal helper to validate that a submission failed with the expected 'FailureStatus'.
+checkSubmitFailure : Show a => FailureStatusCheck -> Either SubmitError a -> Script ()
+checkSubmitFailure check result = do
   case result of
     Left (FailureStatusError err) ->
       case check.check err of
@@ -116,7 +139,7 @@ submitWithDisclosuresMustFail'' check p (Disclosures' ds) cmds =  do
         None -> pure ()
     Left err -> fail $ "Unexpected non-failure status error: " <> show err
     Right val -> fail $ "Expected failure but command succeeded with value: " <> show val
-  pure ()
+
 
 -- TODO(#3241): polish this approach and use it in all our `xyzMustFail` tests
 
