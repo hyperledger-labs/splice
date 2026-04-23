@@ -22,7 +22,7 @@
 
     - Canton
 
-        - Upgrade to Canton 3.5.0. Note that unlike the upgrade to 3.4.0 this is still just applied like any other upgrade through a helm upgrade or upgrade of the compose files.
+        - Upgrade to Canton 3.5. Note that unlike the upgrade to 3.4 this is still just applied like any other upgrade through a helm upgrade or upgrade of the compose files.
           Reference `UNRELEASED.md <https://github.com/digital-asset/canton/blob/release-line-3.5/UNRELEASED.md>`_ for release notes.
           More polished release notes will be made available later.
 
