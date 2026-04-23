@@ -23,6 +23,12 @@ template LockingDeclaration with
     dso : Party
     info : LockingInfo
   where
+    ensure
+      info.lockedAmount > 0.0
+        && isDefinedRound info.declaredRound
+        && info.walletPartyId /= ""
+        && info.svName /= ""
+
     signatory dso
 
 -- | A proposal from a non-SV party (lender) to lock CC on behalf of an SV.
@@ -37,6 +43,11 @@ template DelegatedLockProposal with
     lockedAmount : Decimal
     walletPartyId : Text
   where
+    ensure
+      lockedAmount > 0.0
+        && walletPartyId /= ""
+        && svName /= ""
+
     signatory lender
     observer dso, svParty
 
@@ -63,5 +74,11 @@ template DelegatedLockingPosition with
     walletPartyId : Text
     acceptedRound : Round
   where
+    ensure
+      lockedAmount > 0.0
+        && isDefinedRound acceptedRound
+        && walletPartyId /= ""
+        && svName /= ""
+
     signatory dso
     observer lender
