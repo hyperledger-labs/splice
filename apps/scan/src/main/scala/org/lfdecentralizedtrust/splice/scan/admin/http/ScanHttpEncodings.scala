@@ -838,9 +838,18 @@ object ScanHttpEncodings {
       }.toSeq,
       nodesWithChildren,
     )
-    val remappedEventsById: Iterable[(Int, javaApi.Event)] = eventsById.map {
+    // `Trees.getLocalEventIndices` assigns dense new node ids in `0..n-1`,
+    // so we can place remapped events directly at their target position in a
+    // pre-sized array and wrap it as a Java list for the Transaction
+    // constructor. This avoids the previous
+    // `eventsById.map(...).toList.sortBy(_._1).map(_._2).asJava` pipeline,
+    // which allocated a tuple per event, a List, a tim-sorted copy, a
+    // second mapped List, and a Java wrapper.
+    val size = eventsById.size
+    val remappedEventsArr = new Array[javaApi.Event](size)
+    eventsById.foreach {
       case (nodeId, created: javaApi.CreatedEvent) =>
-        mapping(nodeId) -> new javaApi.CreatedEvent(
+        remappedEventsArr(mapping(nodeId)) = new javaApi.CreatedEvent(
           created.getWitnessParties,
           created.getOffset,
           mapping(created.getNodeId),
@@ -860,7 +869,7 @@ object ScanHttpEncodings {
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)
-        mapping(nodeId) -> new javaApi.ExercisedEvent(
+        remappedEventsArr(mapping(nodeId)) = new javaApi.ExercisedEvent(
           exercised.getWitnessParties,
           exercised.getOffset,
           newNodeId,
@@ -882,6 +891,11 @@ object ScanHttpEncodings {
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
+    // `List.of(elems*)` returns a truly unmodifiable list and does not leak
+    // the backing array, unlike `Arrays.asList` which is fixed-size but
+    // permits in-place `set(i, _)` and aliases its input array.
+    val remappedEventsJava: java.util.List[javaApi.Event] =
+      java.util.List.of(remappedEventsArr*)
 
     // Include the external transaction hash based on the hash inclusion policy.
     val externalTransactionHash: ByteString =
@@ -902,7 +916,7 @@ object ScanHttpEncodings {
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      remappedEventsById.toList.sortBy(_._1).map(_._2).asJava,
+      remappedEventsJava,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
       tree.getSynchronizerId,
       tree.getTraceContext,
