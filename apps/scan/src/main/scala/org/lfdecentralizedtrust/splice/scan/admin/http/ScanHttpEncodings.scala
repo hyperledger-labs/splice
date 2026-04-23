@@ -808,7 +808,9 @@ object ScanHttpEncodings {
   ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
-    val nodesWithChildren = tree.getEventsById.asScala.map {
+    // Cache it once and reuse.
+    val eventsById = tree.getEventsById.asScala
+    val nodesWithChildren = eventsById.map {
       case (nodeId, exercised: data.ExercisedEvent) =>
         mapping(nodeId.intValue()) -> tree
           .getChildNodeIds(exercised)
@@ -819,12 +821,12 @@ object ScanHttpEncodings {
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
     }.toMap
     val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      tree.getEventsById.asScala.collect { case (_, exercised: javaApi.ExercisedEvent) =>
+      eventsById.collect { case (_, exercised: javaApi.ExercisedEvent) =>
         mapping(exercised.getNodeId)
       }.toSeq,
       nodesWithChildren,
     )
-    val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
+    val remappedEventsById: Iterable[(Int, javaApi.Event)] = eventsById.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
           created.getWitnessParties,
@@ -888,7 +890,7 @@ object ScanHttpEncodings {
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      eventsById.toList.sortBy(_._1).map(_._2).asJava,
+      remappedEventsById.toList.sortBy(_._1).map(_._2).asJava,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
       tree.getSynchronizerId,
       tree.getTraceContext,
