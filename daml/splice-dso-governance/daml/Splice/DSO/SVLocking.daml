@@ -1,0 +1,158 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | CIP-0105 Phase 2: SV locking configuration and weight evaluation.
+--
+-- Provides tier schedule configuration, per-SV aggregate lock state,
+-- and pure functions to compute lock-derived SV weight per CIP-0105 §5.
+--
+-- This module is independent of how locks are created (direct amulet, delegated,
+-- or any future lock mechanism). It consumes aggregate lock state and produces
+-- a weight evaluation result.
+module Splice.DSO.SVLocking where
+
+import DA.Time
+
+
+-- Data types
+--------------
+
+-- | Annual tier thresholds per CIP-0105 §5.
+-- Lock percentage thresholds decline annually from activation.
+-- None means the tier is unavailable that year.
+data AnnualTierThresholds = AnnualTierThresholds with
+    yearOffset : Int
+    tier1Threshold : Optional Decimal
+    tier2Threshold : Optional Decimal
+    tier3Threshold : Optional Decimal
+  deriving (Eq, Show)
+
+-- | Result of weight evaluation for an SV.
+data SVWeightResult = SVWeightResult with
+    lockPercentage : Decimal
+    tierMultiplier : Decimal
+    effectiveWeight : Int
+  deriving (Eq, Show)
+
+
+-- Default configuration
+-------------------------
+
+-- | Default tier schedule per CIP-0105 §5.
+-- Year 0: 70%/45%/35%, Year 1: 65%/50%/removed, Year 2: 60%/removed/removed, Year 3: 55%/removed/removed
+defaultTierSchedule : [AnnualTierThresholds]
+defaultTierSchedule =
+  [ AnnualTierThresholds 0 (Some 0.70) (Some 0.45) (Some 0.35)
+  , AnnualTierThresholds 1 (Some 0.65) (Some 0.50) None
+  , AnnualTierThresholds 2 (Some 0.60) None        None
+  , AnnualTierThresholds 3 (Some 0.55) None        None
+  ]
+
+
+-- Templates
+--------------
+
+-- | CIP-0105 locking configuration singleton.
+-- Governs tier schedule, vesting parameters, and enforcement windows.
+template SVLockConfig with
+    dso : Party
+    activationDate : Time
+    tierSchedule : [AnnualTierThresholds]
+    vestingPeriodDays : Decimal
+    weightLossGracePeriodDays : Int
+    permanentLossWindowDays : Int
+    lockExpiryDate : Time
+  where
+    ensure
+      vestingPeriodDays > 0.0
+        && weightLossGracePeriodDays >= 0
+        && permanentLossWindowDays >= 0
+        && not (null tierSchedule)
+        && lockExpiryDate > activationDate
+    signatory dso
+
+-- | Per-SV aggregate lock state for weight evaluation.
+-- Captures the inputs needed to compute lock-derived SV weight.
+-- Created and updated by lock lifecycle operations; consumed by weight evaluation.
+template SVLockState with
+    dso : Party
+    svParty : Party
+    svName : Text
+    totalLockedAmulet : Decimal
+    lifetimeRewards : Decimal
+    baseWeight : Int
+    permanentlyRemovedWeight : Int
+  where
+    ensure
+      totalLockedAmulet >= 0.0
+        && lifetimeRewards >= 0.0
+        && baseWeight >= 0
+        && permanentlyRemovedWeight >= 0
+        && svName /= ""
+    signatory dso
+    observer svParty
+
+
+-- Pure computation
+--------------------
+
+-- | Resolve the applicable tier thresholds for the current time.
+-- Selects the schedule entry with the highest yearOffset that does not exceed
+-- the number of full years elapsed since activation.
+getCurrentThresholds : Time -> SVLockConfig -> AnnualTierThresholds
+getCurrentThresholds now config =
+  let diff = subTime now config.activationDate
+      microsDiff = convertRelTimeToMicroseconds diff
+      microsPerYear = 365 * 24 * 3600 * 1000000
+      yearsSince = truncate (intToDecimal microsDiff / intToDecimal microsPerYear)
+      fallback = AnnualTierThresholds 0 None None None
+  in foldl
+       (\best t ->
+         if t.yearOffset <= yearsSince && t.yearOffset >= best.yearOffset
+         then t else best)
+       fallback
+       config.tierSchedule
+
+-- | Map a lock percentage to its tier multiplier per CIP-0105 §5.
+-- Tier 1 = 1.0 (100%), Tier 2 = 0.6 (60%), Tier 3 = 0.4 (40%), No tier = 0.0.
+calculateTierMultiplier : Decimal -> AnnualTierThresholds -> Decimal
+calculateTierMultiplier lockPct thresholds =
+  let meetsT1 = case thresholds.tier1Threshold of
+        Some t -> lockPct >= t
+        None -> False
+      meetsT2 = case thresholds.tier2Threshold of
+        Some t -> lockPct >= t
+        None -> False
+      meetsT3 = case thresholds.tier3Threshold of
+        Some t -> lockPct >= t
+        None -> False
+  in if meetsT1 then 1.0
+     else if meetsT2 then 0.6
+     else if meetsT3 then 0.4
+     else 0.0
+
+-- | Compute effective SV weight from lock state and configuration.
+-- Formula: effectiveWeight = max(0, baseWeight - permanentlyRemovedWeight) × tierMultiplier
+--
+-- Special cases:
+--   - Before activationDate: full weight (lock requirement not yet active)
+--   - After lockExpiryDate: full weight (lock requirement terminated)
+--   - Zero lifetimeRewards: lockPercentage = 0 → below all tiers
+computeEffectiveWeight : SVLockState -> SVLockConfig -> Time -> SVWeightResult
+computeEffectiveWeight lockState config now =
+  let expired = now >= config.lockExpiryDate
+      notYetActive = now < config.activationDate
+      lockPct =
+        if lockState.lifetimeRewards <= 0.0 then 0.0
+        else lockState.totalLockedAmulet / lockState.lifetimeRewards
+      tierMult =
+        if expired || notYetActive then 1.0
+        else
+          let thresholds = getCurrentThresholds now config
+          in calculateTierMultiplier lockPct thresholds
+      effectiveBase = max 0 (lockState.baseWeight - lockState.permanentlyRemovedWeight)
+      newWeight = truncate (intToDecimal effectiveBase * tierMult)
+  in SVWeightResult with
+       lockPercentage = lockPct
+       tierMultiplier = tierMult
+       effectiveWeight = newWeight
