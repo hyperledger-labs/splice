@@ -36,14 +36,10 @@ Fully deterministic automated workflows (dependency bumps, submodule bumps, and 
 
 ## Attribution
 
-There is no requirement to mark AI-assisted contributions as such. Using AI to help you work is not cheating.
+There is no requirement to mark AI-assisted contributions as such.
 
 That said, do not hide it if asked. If a reviewer asks how a piece of code came about, answer honestly.
 
 ## A note for new contributors
 
-If you are picking up a `good first issue` or similar onboarding-oriented task, the task exists partly so that *you* learn the codebase. Using AI to shortcut it is allowed but largely defeats the purpose — for yourself and for the maintainers trying to onboard you. Engage with the code.
-
----
-
-*This is a living document; we expect to extend it as we gain more experience with AI tools. The first draft was informed by Mozilla's [Firefox AI coding policy](https://firefox-source-docs.mozilla.org/contributing/ai-coding.html).*
+If you are picking up a `good first issue` or similar onboarding-oriented task, the task exists partly so that *you* learn the codebase. Using AI to speed up completion of the task may defeat the purpose — for yourself and for the maintainers trying to onboard you. Engage with the code.
