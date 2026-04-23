@@ -84,8 +84,50 @@ in ``additionalJvmOptions`` in the validator and participant helm charts to use 
     -Dhttps.proxyPort=your_proxy_port
 
 Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
-You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
 Proxy authentication is currently not supported.
+
+Bypassing the proxy for specific hosts
+++++++++++++++++++++++++++++++++++++++
+
+.. note::
+
+   Setting ``http.nonProxyHosts`` affects:
+
+   - The HTTP client used by the CN apps (Validator, Scan, SV, Wallet).
+   - JDK-level HTTP clients in the same JVM (via the default ``ProxySelector``).
+     This includes the Auth0 JWK library used by the CN apps **and** by the
+     Canton participant for JWKS / OIDC discovery, as well as file downloads
+     that use ``java.net.HttpURLConnection``.
+   - gRPC egress from other components, because gRPC's Netty transport delegates proxy
+     decisions to the default JDK ``ProxySelector``.
+
+You can set ``http.nonProxyHosts`` to bypass the proxy for specific target
+hosts. Matching hosts will be contacted directly rather than through the
+configured proxy. This is useful for services that are reachable on the local
+network, such as an in-cluster Scan instance or internal monitoring endpoints.
+
+The value is a ``|``-separated list of patterns that follows the standard Java
+``nonProxyHosts`` grammar:
+
+- Patterns match the request host name case-insensitively.
+- ``*`` is a wildcard. Conventionally it is used at the start (``*.internal``)
+  or end (``10.*``) of a pattern.
+- Matching is performed on the raw host string from the request URI. No DNS
+  resolution is performed, so ``localhost`` and ``127.0.0.1`` are treated as
+  different names unless you list both.
+- An empty value (e.g. ``-Dhttp.nonProxyHosts=``) means "no bypass patterns".
+
+Example ``additionalJvmOptions`` for the validator helm chart that proxies
+external traffic but bypasses the proxy for ``localhost`` / ``127.0.0.1``, any
+host in the ``.internal`` domain, and any IPv4 address whose literal string
+representation starts with ``10.``:
+
+.. code-block:: yaml
+
+  additionalJvmOptions: |
+    -Dhttps.proxyHost=your.proxy.host
+    -Dhttps.proxyPort=your_proxy_port
+    -Dhttp.nonProxyHosts=localhost|127.0.0.1|*.internal|10.*
 
 .. _validator-postgres-auth:
 

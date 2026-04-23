@@ -4,9 +4,10 @@ import better.files.File.apply
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
+import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
@@ -197,12 +198,19 @@ class RollForwardLsuIntegrationTest
       }
     }
 
+    // This is what is announced but then fails
+    val announcementNewSynchronizerSerial =
+      decentralizedSynchronizerPSId.serial + NonNegativeInt.one
+    // This is the synchronizer we roll forward two
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
-    val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
+    val successorPsid = decentralizedSynchronizerPSId.copy(
+      serial = newSynchronizerSerial,
+      protocolVersion = ProtocolVersion.v34,
+    )
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
+      scheduleLsu(topologyFreezeTime, upgradeTime, announcementNewSynchronizerSerial.value.toLong)
     }
     clue("Topology state contains LSU announcement") {
       eventually(3.minutes) {
@@ -228,6 +236,10 @@ class RollForwardLsuIntegrationTest
       participants = false,
       enableBftSequencer = true,
       logSuffix = "roll-forward-lsu",
+      extraSequencerConfig = Seq(
+        s"parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=${upgradeTime}",
+        s"parameters.lsu-repair.lsu-sequencing-bounds-override.upgrade-time=${upgradeTime}",
+      ),
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {
@@ -375,6 +387,16 @@ class RollForwardLsuIntegrationTest
 
       clue("Alice can tap") {
         aliceValidatorWalletClient.tap(100.0)
+      }
+
+      clue("SV1's DABFT node has pruning config set") {
+        sv1LocalBackend.sequencerClient.bft.pruning.get_schedule() shouldBe Some(
+          PruningSchedule(
+            "0 /10 * * * ?",
+            PositiveDurationSeconds.ofMinutes(5),
+            PositiveDurationSeconds.ofDays(30),
+          )
+        )
       }
 
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {

@@ -309,13 +309,11 @@ class SpliceConsoleEnvironment(
         ),
         splitwells.remote,
         Seq("App References"),
-      ) :++ scans.local.headOption
-        .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
-        .toList :++ scans.remote.headOption
-        .map(scan =>
-          TopLevelValue(scan.name, helpText("scan app client", scan.name), scan, Seq("Scan"))
-        )
-        .toList :+ TopLevelValue(
+      ) :++ scans.local.map(scan =>
+        TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan"))
+      ) :++ scans.remote.map(scan =>
+        TopLevelValue(scan.name, helpText("scan app client", scan.name), scan, Seq("Scan"))
+      ) :+ TopLevelValue(
         "fullDsoApps",
         helpText("All local apps hosted by the DSO" + genericNodeReferencesDoc, "fullDsoApps"),
         fullDsoApps,

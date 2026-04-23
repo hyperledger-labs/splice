@@ -529,6 +529,14 @@ class LocalSynchronizerNode(
       config.mediator.pruning
     )
 
+  def ensureDABFTPruningSchedule()(implicit tc: TraceContext): Future[Unit] = {
+    if (config.sequencer.isBftSequencer) {
+      sequencerAdminConnection.ensurePruningSchedule(
+        config.sequencer.dabftPruning
+      )
+    } else Future.unit
+  }
+
   override protected def onClosed(): Unit = {
     LifeCycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
     super.onClosed()

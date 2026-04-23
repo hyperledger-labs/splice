@@ -51,9 +51,22 @@
           The update ID will be omitted for contracts created in a prior migration ID, or potentially in the
           future in extreme cases of disaster recovery.
 
+    - Validator
+
+        - The HTTP client used by the CN apps (Validator, Scan, SV, Wallet) now honours the
+          standard ``http.nonProxyHosts`` Java system property to bypass a configured HTTP
+          forward proxy for specific hosts. This matches the JDK's own default ``ProxySelector``
+          behaviour, so the same property also applies to other JVM egress components.
+          See :ref:`validator-http-proxy-compose` and :ref:`validator-http-proxy-helm` for configuration examples.
+
     - LocalNet
 
         - Added support for configuring the protocol version used in LocalNet.
+
+    - Participant
+
+        - Set ``commitment-use-db-snapshot-for-participant-lookup = true`` by default. If you manually set this, you can
+          remove your overwrite.
 
     - Remove use of rollback nodes to support protocol version 35
 
@@ -70,6 +83,9 @@
             - ``WalletAppInstall_ExecuteBatch``. No longer catches exceptions and returns them as ``AmuletOperationOutcome`` / ``COO_Error``. Instead, the transaction is aborted.
 
             - ``TransferCommand_Send``. No longer catches exceptions and returns them as ``TransferCommandResultFailure``. Instead, the transaction is aborted without merging inputs.
+
+            - ``DsoRules_CloseVoteRequest`` no longer catches exceptions. Previously, it would close the vote request with outcome ``VRO_AcceptedButActionFailed``.
+              The transaction will now abort on failure.
 
         - Wallet app
 
@@ -89,4 +105,3 @@
             wallet             0.1.19
             walletPayments     0.1.18
             ================== =======
-

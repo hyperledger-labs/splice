@@ -40,48 +40,39 @@ class CloseVoteRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val store = svTaskContext.dsoStore
     val request = task.work
-    val voteRequestCid = task.work.contractId
+    val voteRequestCid = request.contractId
+
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       amuletRulesId = amuletRules.contractId
-      res <- for {
-        outcome <- svTaskContext
-          .connection(SpliceLedgerConnectionPriority.High)
-          .submit(
-            Seq(store.key.svParty),
-            Seq(store.key.dsoParty),
-            dsoRules.exercise(
-              _.exerciseDsoRules_CloseVoteRequest(
-                new DsoRules_CloseVoteRequest(
-                  voteRequestCid,
-                  java.util.Optional.of(amuletRulesId),
-                  Optional.of(controller),
-                )
+      result <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.High)
+        .submit(
+          Seq(store.key.svParty),
+          Seq(store.key.dsoParty),
+          dsoRules.exercise(
+            _.exerciseDsoRules_CloseVoteRequest(
+              new DsoRules_CloseVoteRequest(
+                voteRequestCid,
+                java.util.Optional.of(amuletRulesId),
+                Optional.of(controller),
               )
-            ),
-          )
-          .noDedup
-          .yieldResult()
-      } yield Some(outcome)
-    } yield {
-      res
-        .map(result => {
-          if (result.exerciseResult.outcome.toJson.contains("VRO_AcceptedButActionFailed")) {
-            TaskFailed(
-              s"request ${request.contractId} was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
             )
-          } else {
-            TaskSuccess(
-              s"closing VoteRequest (voteRequestCid: ${request.contractId}) and outcome: ${result.exerciseResult.outcome.toJson}."
-            )
-          }
-        })
-        .getOrElse(
-          TaskFailed(
-            s"failed to close VoteRequest. (voteRequestCid: ${request.contractId})"
-          )
+          ),
         )
+        .noDedup
+        .yieldResult()
+    } yield {
+      if (result.exerciseResult.outcome.toJson.contains("VRO_AcceptedButActionFailed")) {
+        TaskFailed(
+          s"request ${request.contractId} was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
+        )
+      } else {
+        TaskSuccess(
+          s"closing VoteRequest (voteRequestCid: ${request.contractId}) and outcome: ${result.exerciseResult.outcome.toJson}."
+        )
+      }
     }
   }
 

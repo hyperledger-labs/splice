@@ -774,6 +774,24 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 'notification_policies.yaml': grafanaAlertNotificationPolicies(),
               }
             : {}),
+          ...(enableAlerts && monitoringConfig.alerting.muteTimeIntervals.length > 0
+            ? {
+                'mute_time_intervals.yaml': yaml.dump({
+                  apiVersion: 1,
+                  muteTimes: monitoringConfig.alerting.muteTimeIntervals.map(interval => ({
+                    orgId: 1,
+                    name: interval.name,
+                    time_intervals: [
+                      {
+                        times: [{ start_time: interval.startTime, end_time: interval.endTime }],
+                        ...(interval.weekdays ? { weekdays: interval.weekdays } : {}),
+                        location: 'UTC',
+                      },
+                    ],
+                  })),
+                }),
+              }
+            : {}),
           ...{
             'acs-stores_alerts.yaml': readGrafanaAlertingFile('acs-stores_alerts.yaml').replaceAll(
               '$NODATA',
@@ -937,6 +955,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
             ),
             'traffic_based_rewards_alerts.yaml': readGrafanaAlertingFile(
               'traffic_based_rewards_alerts.yaml'
+            ).replace(
+              '$FEATURED_APP_RIGHTS_LIVE_ROW_LIMIT',
+              monitoringConfig.alerting.alerts.trafficBasedRewards.featuredAppRightsLimit.toString()
             ),
           },
         }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])
@@ -954,6 +975,13 @@ function grafanaAlertNotificationPolicies() {
   const defaultPolicy = yaml.load(
     readGrafanaAlertingFile('notification_policies/default_slack.yaml')
   ) as Record<string, unknown>;
+  for (const interval of monitoringConfig.alerting.muteTimeIntervals) {
+    notificationPolicies.push({
+      receiver: 'cn-ci-channel-notification',
+      object_matchers: interval.objectMatchers,
+      mute_time_intervals: [interval.name],
+    });
+  }
   if (enableAlertEmailToSupportTeam) {
     notificationPolicies.push(
       yaml.load(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
