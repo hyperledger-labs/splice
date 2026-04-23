@@ -834,7 +834,7 @@ class DbScanAppRewardsStore(
     * Level 1+: hash batches of batches until a single root remains.
     * All levels run in a single transaction.
     */
-  private[store] def computeRewardHashes(
+  private[splice] def computeRewardHashes(
       roundNumber: Long,
       batchSize: Int,
   )(implicit tc: TraceContext): Future[Unit] = {

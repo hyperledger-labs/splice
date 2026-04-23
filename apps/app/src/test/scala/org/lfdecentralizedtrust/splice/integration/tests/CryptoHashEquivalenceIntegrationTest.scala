@@ -13,11 +13,32 @@ import com.daml.ledger.javaapi.data.{
   Text,
   Value,
 }
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.daml.lf.data.Ref
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.cryptohash.{Hash as DamlHash}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.{
+  Batch,
+  MintingAllowance,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.batch.{
+  BatchOfBatches,
+  BatchOfMintingAllowances,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
+  DbScanAppRewardsStore,
+}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.{
+  AppActivityPartyTotalT,
+  AppRewardPartyTotalT,
+}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.util.{DarUtil, WalletTestUtil}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -86,6 +107,144 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
     }
   }
 
+  "Batch hash equivalence (DB Merkle tree == Daml)" should {
+
+    "set up rewards store and allocate parties" in { implicit env =>
+      import env.executionContext
+      val storage = sv1Backend.appState.storage match {
+        case db: DbStorage => db
+        case other => fail(s"Expected DbStorage but got ${other.getClass.getSimpleName}")
+      }
+      val participantId =
+        ParticipantId.tryFromProtoPrimitive("PAR::batch-hash-test::dummy")
+      val updateHistory = new UpdateHistory(
+        storage,
+        new DomainMigrationInfo(0L, None),
+        "batch_hash_equiv_test",
+        participantId,
+        svParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        loggerFactory,
+        enableissue12777Workaround = true,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, 0L),
+      )
+      updateHistory.ingestionSink.initialize().futureValue
+      val appActivityRecordStore = new DbAppActivityRecordStore(
+        storage,
+        updateHistory,
+        loggerFactory,
+      )
+      rewardsStore = new DbScanAppRewardsStore(
+        storage,
+        updateHistory,
+        appActivityRecordStore,
+        loggerFactory,
+      )
+      rewardsHistoryId = updateHistory.historyId
+
+      // Allocate real ledger parties for batch tests
+      testParties = (0 until MaxTestParties).map { i =>
+        sv1Backend.participantClient.ledger_api.parties
+          .allocate(s"batch-test-$i")
+          .party
+      }
+    }
+
+    batchTestCases.foreach { tc =>
+      tc.description in { implicit env =>
+        val parties = tc.partyAmounts.zipWithIndex.map { case (amount, i) =>
+          (i, testParties(i), amount)
+        }
+
+        clue("Insert test data") {
+          rewardsStore
+            .insertAppActivityPartyTotals(parties.map { case (_, party, _) =>
+              AppActivityPartyTotalT(
+                rewardsHistoryId,
+                tc.roundNumber,
+                1000L,
+                party.toProtoPrimitive,
+                1L,
+              )
+            })
+            .futureValue
+          rewardsStore
+            .insertAppRewardPartyTotals(parties.map { case (seq, party, amount) =>
+              AppRewardPartyTotalT(
+                rewardsHistoryId,
+                tc.roundNumber,
+                seq,
+                party.toProtoPrimitive,
+                BigDecimal(amount),
+              )
+            })
+            .futureValue
+        }
+
+        clue("Build Merkle tree in DB") {
+          rewardsStore.computeRewardHashes(tc.roundNumber, tc.batchSize).futureValue
+        }
+
+        val dbHashes = clue("Read DB hashes") {
+          val batches = rewardsStore.getAppRewardBatchHashesByRound(tc.roundNumber).futureValue
+          batches.groupBy(_.batchLevel).map { case (lvl, bs) =>
+            lvl -> bs.map(_.batchHash.toHex)
+          }
+        }
+
+        val leafBatches = mkLeafBatches(parties, tc.batchSize)
+
+        clue("Leaf hashes match") {
+          val damlLeaves = leafBatches.map(b => exerciseDaml(HashBatch(b.toValue)))
+          damlLeaves shouldBe dbHashes(0)
+        }
+
+        clue("Root hash matches") {
+          val dbRoot = rewardsStore.getAppRewardRootHashByRound(tc.roundNumber).futureValue
+          dbRoot shouldBe defined
+          val damlRoot = exerciseDaml(HashBatch(mkRootBatch(leafBatches, tc.batchSize).toValue))
+          damlRoot shouldBe dbRoot.value.rootHash.toHex
+        }
+      }
+    }
+  }
+
+  /** Build the leaf Batch values from parties and amounts — pure data, no Daml calls. */
+  private def mkLeafBatches(
+      parties: Seq[(Int, PartyId, String)],
+      batchSize: Int,
+  ): Seq[BatchOfMintingAllowances] =
+    if (parties.isEmpty) Seq(new BatchOfMintingAllowances(java.util.List.of()))
+    else
+      parties.sortBy(_._1).grouped(batchSize).toSeq.map { group =>
+        val allowances = group.map { case (_, party, amount) =>
+          new MintingAllowance(party.toProtoPrimitive, new java.math.BigDecimal(amount))
+        }
+        new BatchOfMintingAllowances(allowances.asJava)
+      }
+
+  /** Build the root Batch by hashing leaves and nesting into BatchOfBatches.
+    * For a single leaf, the leaf itself is the root.
+    */
+  private def mkRootBatch(
+      leaves: Seq[BatchOfMintingAllowances],
+      batchSize: Int,
+  )(implicit env: FixtureParam): Batch = {
+    @annotation.tailrec
+    def go(batches: Seq[Batch]): Batch =
+      if (batches.size <= 1) batches.head
+      else {
+        val next: Seq[Batch] = batches.grouped(batchSize).toSeq.map { group =>
+          val hashes = group.map(b => new DamlHash(exerciseDaml(HashBatch(b.toValue))))
+          new BatchOfBatches(hashes.asJava): Batch
+        }
+        go(next)
+      }
+
+    go(leaves.map(l => l: Batch))
+  }
+
   /** Exercise a Daml choice and return the Text result. */
   private def exerciseDaml(op: HashOp)(implicit env: FixtureParam): String = {
     val (choiceName, choiceArg) = toDamlChoiceAndArg(op, resolveRef)
@@ -123,6 +282,9 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
   private var svParty: PartyId = _
   private var proxyContractId: String = _
   private var svDb: DbStorage = _
+  private var rewardsStore: DbScanAppRewardsStore = _
+  private var rewardsHistoryId: Long = _
+  private var testParties: Seq[PartyId] = _
 
 }
 
@@ -160,6 +322,7 @@ object CryptoHashEquivalenceIntegrationTest {
   case class HashBatchOfMintingAllowances(hashes: Seq[HashRef]) extends HashOp
   case class HashBatchOfBatches(hashes: Seq[HashRef]) extends HashOp
   case class HashDecimal(value: String) extends HashOp
+  case class HashBatch(batch: Value) extends HashOp
 
   case class TestCaseDef(description: String, op: HashOp)
 
@@ -195,6 +358,8 @@ object CryptoHashEquivalenceIntegrationTest {
       ("CryptoHashProxy_HashBatchOfBatches", record("childHashes" -> textList(hashes.map(r))))
     case HashDecimal(v) =>
       ("CryptoHashProxy_HashDecimal", record("input" -> new Numeric(new java.math.BigDecimal(v))))
+    case HashBatch(batchValue) =>
+      ("CryptoHashProxy_HashBatch", record("batch" -> batchValue))
   }
 
   // -- Derive SQL expression from HashOp -------------------------------------
@@ -218,70 +383,111 @@ object CryptoHashEquivalenceIntegrationTest {
       s"hash_batch_of_batches(${sqlArray(hashes.map(r))})"
     case HashDecimal(v) =>
       s"daml_crypto_hash_text(daml_numeric_to_text(${escapeSql(v)}::decimal(38,10)))"
+    case HashBatch(_) =>
+      throw new UnsupportedOperationException("HashBatch is not used in SQL expression tests")
   }
 
   // -- Test case definitions (fully static) -----------------------------------
+
+  // Decimal values to test format equivalence between Daml's show on Decimal
+  // and Postgres daml_numeric_to_text. Covers trailing zeros, negatives,
+  // small fractions, and integers.
+  val decimalFormatCases: Seq[String] = Seq(
+    "10.0000000000",
+    "0.0000000000",
+    "5.0",
+    "3.14",
+    "0",
+    "100",
+    "-3.14",
+    "-0.0",
+    "0.0000000001",
+    "99999999999.0",
+    "1.10",
+  )
 
   // Test cases are defined statically using HashRef (Lit/IntermediateRef) to
   // reference intermediate hashes by name. Each test resolves its refs from
   // a shared map populated progressively as earlier tests run.
   //
   // Order matters: intermediates must precede composites that reference them.
-  val decimalFormatCases: Seq[String] = Seq(
-    "10.0000000000", "0.0000000000", "5.0", "3.14", "0", "100",
-    "-3.14", "-0.0", "0.0000000001", "99999999999.0", "1.10",
+  val allTestCaseDefs: Seq[TestCaseDef] =
+    decimalFormatCases.map(v => TestCaseDef(s"decimal $v", HashDecimal(v))) ++ Seq(
+      // Primitive text hashes — used as intermediates by composite cases
+      TestCaseDef("hAlice", HashText("alice::provider")),
+      TestCaseDef("h10", HashText("10.0")),
+      TestCaseDef("hOnly", HashText("only")),
+      TestCaseDef("h1", HashText("1")),
+      TestCaseDef("hx", HashText("x")),
+
+      // Minting allowance hashes — used as intermediates by batch cases
+      TestCaseDef("maAlice", HashMintingAllowance("alice::provider", "10.0000000000")),
+      TestCaseDef("maBob", HashMintingAllowance("bob::provider", "0")),
+      TestCaseDef("maAlice5", HashMintingAllowance("alice::provider", "5.0")),
+      TestCaseDef("maBob3", HashMintingAllowance("bob::provider", "3.0")),
+      // Batch hashes — used as intermediates by batch-of-batches
+      TestCaseDef("leaf1", HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice5")))),
+      TestCaseDef("leaf2", HashBatchOfMintingAllowances(Seq(IntermediateRef("maBob3")))),
+
+      // Independent cases (no intermediate references)
+      TestCaseDef("hash of 'hello'", HashText("hello")),
+      TestCaseDef("hash of empty string", HashText("")),
+      TestCaseDef("hashList on empty array", HashList(Seq.empty)),
+
+      // Composite cases using intermediate hashes
+      TestCaseDef(
+        "hashList with two elements",
+        HashList(Seq(IntermediateRef("hAlice"), IntermediateRef("h10"))),
+      ),
+      TestCaseDef("hashList on single element", HashList(Seq(IntermediateRef("hOnly")))),
+      TestCaseDef(
+        "hashVariant with tag and one field",
+        HashVariant("TestTag", Seq(IntermediateRef("hAlice"))),
+      ),
+      TestCaseDef(
+        "hashRecord [hash 1, hash 'x']",
+        HashList(Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
+      ),
+      TestCaseDef(
+        "hashVariant 'V1' [hash 1, hash 'x']",
+        HashVariant("V1", Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
+      ),
+      TestCaseDef(
+        "hash_batch_of_minting_allowances with two",
+        HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice"), IntermediateRef("maBob"))),
+      ),
+      TestCaseDef(
+        "hash_batch_of_batches with two leaves",
+        HashBatchOfBatches(Seq(IntermediateRef("leaf1"), IntermediateRef("leaf2"))),
+      ),
+    )
+
+  // -- Batch tree equivalence test data ----------------------------------------
+
+  val MaxTestParties = 5
+
+  case class BatchTestCase(
+      description: String,
+      roundNumber: Long,
+      batchSize: Int,
+      partyAmounts: Seq[String],
   )
 
-  val allTestCaseDefs: Seq[TestCaseDef] = Seq(
-    // Decimal format equivalence: Daml show on Decimal vs Postgres decimal(38,10)::text
-  ) ++ decimalFormatCases.map(v => TestCaseDef(s"decimal $v", HashDecimal(v))) ++ Seq(
-
-    // Primitive text hashes — used as intermediates by composite cases
-    TestCaseDef("hAlice", HashText("alice::provider")),
-    TestCaseDef("h10", HashText("10.0")),
-    TestCaseDef("hOnly", HashText("only")),
-    TestCaseDef("h1", HashText("1")),
-    TestCaseDef("hx", HashText("x")),
-
-    // Minting allowance hashes — used as intermediates by batch cases
-    TestCaseDef("maAlice", HashMintingAllowance("alice::provider", "10.0000000000")),
-    TestCaseDef("maBob", HashMintingAllowance("bob::provider", "0")),
-    TestCaseDef("maAlice5", HashMintingAllowance("alice::provider", "5.0")),
-    TestCaseDef("maBob3", HashMintingAllowance("bob::provider", "3.0")),
-    // Batch hashes — used as intermediates by batch-of-batches
-    TestCaseDef("leaf1", HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice5")))),
-    TestCaseDef("leaf2", HashBatchOfMintingAllowances(Seq(IntermediateRef("maBob3")))),
-
-    // Independent cases (no intermediate references)
-    TestCaseDef("hash of 'hello'", HashText("hello")),
-    TestCaseDef("hash of empty string", HashText("")),
-    TestCaseDef("hashList on empty array", HashList(Seq.empty)),
-
-    // Composite cases using intermediate hashes
-    TestCaseDef(
-      "hashList with two elements",
-      HashList(Seq(IntermediateRef("hAlice"), IntermediateRef("h10"))),
+  val batchTestCases: Seq[BatchTestCase] = Seq(
+    BatchTestCase("single party", 9001, 2, Seq("10.0000000000")),
+    BatchTestCase("two parties one batch", 9002, 2, Seq("10.0000000000", "5.0000000000")),
+    BatchTestCase(
+      "three parties two batches",
+      9003,
+      2,
+      Seq("10.0000000000", "5.0000000000", "3.0000000000"),
     ),
-    TestCaseDef("hashList on single element", HashList(Seq(IntermediateRef("hOnly")))),
-    TestCaseDef(
-      "hashVariant with tag and one field",
-      HashVariant("TestTag", Seq(IntermediateRef("hAlice"))),
+    BatchTestCase(
+      "five parties multi-level",
+      9004,
+      2,
+      Seq("10.0000000000", "5.0000000000", "3.0000000000", "7.0000000000", "1.0000000000"),
     ),
-    TestCaseDef(
-      "hashRecord [hash 1, hash 'x']",
-      HashList(Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
-    ),
-    TestCaseDef(
-      "hashVariant 'V1' [hash 1, hash 'x']",
-      HashVariant("V1", Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
-    ),
-    TestCaseDef(
-      "hash_batch_of_minting_allowances with two",
-      HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice"), IntermediateRef("maBob"))),
-    ),
-    TestCaseDef(
-      "hash_batch_of_batches with two leaves",
-      HashBatchOfBatches(Seq(IntermediateRef("leaf1"), IntermediateRef("leaf2"))),
-    ),
+    BatchTestCase("empty round", 9005, 2, Seq.empty),
   )
 }
