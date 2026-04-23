@@ -28,7 +28,7 @@
 
     - SV App
 
-        - Package versions newer than the version specified in the AmuletRules configuration are now automatically unvetted by the SV app after a successful downgrade vote.
+        - Package versions *newer* than the version specified in the AmuletRules configuration are now automatically unvetted by the SV app after a successful downgrade vote.
 
     - Deployment
 
