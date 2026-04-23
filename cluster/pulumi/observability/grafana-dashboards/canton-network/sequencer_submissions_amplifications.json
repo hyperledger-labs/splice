@@ -496,7 +496,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by(namespace) (histogram_count(rate(daml_sequencer_client_submissions_amplification_duration_seconds{namespace=~\"$namespace\"})[$__rate_interval]))",
+          "expr": "sum by(namespace, sequencerAlias) (histogram_count(rate(daml_sequencer_client_submissions_amplification_duration_seconds{namespace=~\"$namespace\",sequencerAlias=~\"$sequencerAlias\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -508,7 +508,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by(namespace) (histogram_count(rate(daml_sequencer_client_submissions_sends_duration_seconds{namespace=~\"$namespace\"})[$__rate_interval]))",
+          "expr": "sum by(namespace, sequencerAlias) (histogram_count(rate(daml_sequencer_client_submissions_sends_duration_seconds{namespace=~\"$namespace\",sequencerAlias=~\"$sequencerAlias\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -520,14 +520,14 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "B/C",
+          "expr": "A/B",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Percentage of amplified submission over total submissions",
+      "title": "Percentage of amplified submissions over total submissions",
       "type": "timeseries"
     },
     {
@@ -581,10 +581,14 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
+          "editorMode": "code",
+          "expr": "daml_sequencer_client_submissions_amplified_attempts_total{namespace=~\"$namespace\",sequencerAlias=~\"$sequencerAlias\", container=~\"$container\"}",
+          "legendFormat": "__auto",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Amplification requests",
+      "title": "Amplification request attempts",
       "type": "table"
     }
   ],
@@ -596,9 +600,7 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -626,7 +628,9 @@
         "allowCustomValue": false,
         "current": {
           "text": "All",
-          "value": "$__all"
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -650,9 +654,7 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -690,11 +692,9 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "Sequencer 'SEQ::DA-Helm-Test-Node::1220e5c9debbb1e996f9334bc59be35d1a07069f443f4b14d11c11333e9c0a56f2e7-0'"
-          ],
+          "text": "All",
           "value": [
-            "Sequencer 'SEQ::DA-Helm-Test-Node::1220e5c9debbb1e996f9334bc59be35d1a07069f443f4b14d11c11333e9c0a56f2e7-0'"
+            "$__all"
           ]
         },
         "datasource": {
@@ -719,13 +719,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "UTC",
-  "title": "Submission requests amplification",
+  "title": "Submission Request Amplifications",
   "uid": "cn4rg75",
-  "version": 8,
+  "version": 12,
   "weekStart": ""
 }
