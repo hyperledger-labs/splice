@@ -3,48 +3,22 @@
 
 module Splice.Testing.CryptoHashProxy where
 
-import DA.Text (intercalate, sha256)
-
--- TODO(#4749): When Splice.Amulet.CryptoHash is merged, remove these
--- test-only copies and import from the real module instead.
-
--- | Hash a text scalar: sha256(value).
--- Matches: instance Hashable Text where hash = hashText . id
-hashText : Text -> Text
-hashText = sha256
-
--- | Hash a list of already-hashed elements.
--- Matches: hashListInternal ts = sha256(intercalate "|" (show(length ts) :: ts))
-hashList : [Text] -> Text
-hashList elems =
-  let parts = show (length elems) :: elems
-  in sha256 (intercalate "|" parts)
-
--- | Hash a variant with a tag and field hashes.
--- Matches: hashVariant tag fields = sha256(intercalate "|" (tag :: show(length fields) :: fields))
-hashVariant : Text -> [Text] -> Text
-hashVariant tag fieldHashes =
-  let parts = tag :: show (length fieldHashes) :: fieldHashes
-  in sha256 (intercalate "|" parts)
-
--- | Hash a record as a list of field hashes.
-hashRecord : [Text] -> Text
-hashRecord = hashList
+import Splice.Amulet.CryptoHash (Hash(..), Hashable(..), hashRecord, hashVariant)
 
 -- | Hash a MintingAllowance{provider, amount}.
-hashMintingAllowance : Text -> Text -> Text
+hashMintingAllowance : Text -> Text -> Hash
 hashMintingAllowance provider amount =
-  hashRecord [hashText provider, hashText amount]
+  hashRecord [hash provider, hash amount]
 
 -- | Hash a BatchOfMintingAllowances variant.
-hashBatchOfMintingAllowances : [Text] -> Text
+hashBatchOfMintingAllowances : [Hash] -> Hash
 hashBatchOfMintingAllowances allowanceHashes =
-  hashVariant "BatchOfMintingAllowances" [hashList allowanceHashes]
+  hashVariant "BatchOfMintingAllowances" [hash allowanceHashes]
 
 -- | Hash a BatchOfBatches variant.
-hashBatchOfBatches : [Text] -> Text
+hashBatchOfBatches : [Hash] -> Hash
 hashBatchOfBatches childHashes =
-  hashVariant "BatchOfBatches" [hashList childHashes]
+  hashVariant "BatchOfBatches" [hash childHashes]
 
 -- | Proxy template exposing hash functions as exercisable choices.
 -- Allows Scala integration tests to call Daml hash functions via the
@@ -58,36 +32,36 @@ template CryptoHashProxy with
       with
         input : Text
       controller owner
-      do pure (hashText input)
+      do pure (hash input).value
 
     nonconsuming choice CryptoHashProxy_HashList : Text
       with
         elems : [Text]
       controller owner
-      do pure (hashList elems)
+      do pure (hash (map Hash elems)).value
 
     nonconsuming choice CryptoHashProxy_HashVariant : Text
       with
         tag : Text
         fields : [Text]
       controller owner
-      do pure (hashVariant tag fields)
+      do pure (hashVariant tag (map Hash fields)).value
 
     nonconsuming choice CryptoHashProxy_HashMintingAllowance : Text
       with
         provider : Text
         amount : Text
       controller owner
-      do pure (hashMintingAllowance provider amount)
+      do pure (hashMintingAllowance provider amount).value
 
     nonconsuming choice CryptoHashProxy_HashBatchOfMintingAllowances : Text
       with
         allowanceHashes : [Text]
       controller owner
-      do pure (hashBatchOfMintingAllowances allowanceHashes)
+      do pure (hashBatchOfMintingAllowances (map Hash allowanceHashes)).value
 
     nonconsuming choice CryptoHashProxy_HashBatchOfBatches : Text
       with
         childHashes : [Text]
       controller owner
-      do pure (hashBatchOfBatches childHashes)
+      do pure (hashBatchOfBatches (map Hash childHashes)).value
