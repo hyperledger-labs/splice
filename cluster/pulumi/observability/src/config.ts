@@ -30,8 +30,11 @@ const GcpQuotasConfigSchema = z.object({
   rollingWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) >= 60, {
     message: 'must be at least 60s',
   }),
-  retestWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) % 60 === 0, {
-    message: 'must be a multiple of 1m',
+  retestWindow: prometheusDurationSchema.refine(v => {
+    const seconds = parseDurationToSeconds(v);
+    return seconds >= 60 && seconds % 60 === 0;
+  }, {
+    message: 'must be at least 60s and a multiple of 1m',
   }),
 });
 
