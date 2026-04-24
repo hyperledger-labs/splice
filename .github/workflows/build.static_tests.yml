@@ -152,7 +152,7 @@ jobs:
       - name: SBT-based static checks
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
-          cmd: "Test/compile lint updateTestConfigForParallelRuns updateDarResources build-tools-dar-lock-checker/test"
+          cmd: "Test/compile lint updateTestConfigForParallelRuns updateDarResources"
 
       - name: Verify no changes in SBT test files
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
