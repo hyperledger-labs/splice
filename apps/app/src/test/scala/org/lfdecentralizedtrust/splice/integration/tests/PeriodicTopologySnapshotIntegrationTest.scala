@@ -63,7 +63,7 @@ class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig]
 
       clue("the 3 files created from the topology snapshot exist in gcp.")({
         val dumps = listDump(utcDate).filter(_.getSize > 0L)
-        dumps.size shouldBe 3
+        dumps should have size 3
         new String(
           dumps
             .find(_.getName.endsWith("metadata"))
@@ -71,8 +71,8 @@ class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig]
             .getContent(),
           StandardCharsets.UTF_8,
         ) should include("SEQ::sv1") // the sequencerId change through ci runs
-        dumps.exists(_.getName.endsWith("authorized")) shouldBe true
-        dumps.exists(_.getName.endsWith("onboarding-state")) shouldBe true
+        forExactly(1, dumps) { dump => dump.getName should include("authorized") }
+        forExactly(1, dumps) { dump => dump.getName should include("onboarding-state") }
       })
     }
   }

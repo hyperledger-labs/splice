@@ -82,6 +82,8 @@ monitoring:
       sequencerRateLimits:
         circuitBreakerStateThreshold: 0.5
         rejectionRateThreshold: 0
+      trafficBasedRewards:
+        featuredAppRightsLimit: 10000
       trafficWaste:
         kilobytes: 1
         overMinutes: 5

@@ -955,6 +955,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
             ),
             'traffic_based_rewards_alerts.yaml': readGrafanaAlertingFile(
               'traffic_based_rewards_alerts.yaml'
+            ).replace(
+              '$FEATURED_APP_RIGHTS_LIVE_ROW_LIMIT',
+              monitoringConfig.alerting.alerts.trafficBasedRewards.featuredAppRightsLimit.toString()
             ),
           },
         }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])

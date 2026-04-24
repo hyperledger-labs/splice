@@ -51,7 +51,15 @@ class BootstrapTest extends IntegrationTestWithIsolatedEnvironment {
         forAll(lines) { line =>
           line.message should (include("Entry with name")
             .and(include("not found")))
+            // Failures that are retried or eventually succeed so we can safely ignore
             .or(include("Encountered 4 consecutive transient failures"))
+            // Warnings because of things being slow
+            .or(
+              include(
+                "Waiting for domain Synchronizer 'splitwell' to be connected has not completed after"
+              )
+            )
+            .or(include("Supervised futures for the following trace IDs have not completed"))
         }
       },
     )
