@@ -40,11 +40,12 @@ cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/.daml/
 sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/testResources/include/validators/splitwell-validator.conf
 
 # Rebuild the patched DARs (produces daml/<pkg>/.daml/dist/<pkg>-<version>.123.dar).
-# apps-dar-resources-generator dependsOn all daml projects, so compiling it triggers their damlBuild.
 sbt damlBuild
 
 # Stage the patched DARs in daml/dars/ so DarResourcesGenerator picks them up as the
 # latest version of each package when it scans that directory.
+# (damlDarsLockFileUpdate doesn't work here because some hashes change without version changes,
+# and that tool is picky about that)
 find daml -type f -name '*.123.dar' -not -path 'daml/dars/*' -exec cp -n {} daml/dars/ \;
 
 sbt updateDarResources
