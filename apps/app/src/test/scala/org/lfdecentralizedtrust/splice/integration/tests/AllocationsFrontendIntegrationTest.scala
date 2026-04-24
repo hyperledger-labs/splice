@@ -2,15 +2,15 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
-  AllocationSpecification,
-  SettlementInfo,
-  TransferLeg as TransferLegV1,
-  Reference as SettlementReference,
+  TransferLeg as TransferLegV1
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2.{
-  TransferLeg as TransferLegV2
+  AllocationSpecification,
+  SettlementInfo,
+  TransferLeg as TransferLegV2,
+  Reference as SettlementReference,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.InstrumentId
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv2.InstrumentId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -56,7 +56,7 @@ class AllocationsFrontendIntegrationTest
         }
       })
 
-  private def createAllocation(sender: PartyId)(implicit
+  private def createAllocationV2ViaFrontendForm(sender: PartyId)(implicit
       ev: SpliceTestConsoleEnvironment,
       webDriver: WebDriverType,
   ) = {
@@ -70,57 +70,61 @@ class AllocationsFrontendIntegrationTest
     val allocateBefore = now.plusSeconds(3600)
     val settleBefore = now.plusSeconds(3600 * 2)
 
-    // TODO: this pretends that v1 is created, but it's actually v2
     val wantedAllocation = new AllocationSpecification(
       new SettlementInfo(
-        validatorPartyId.toProtoPrimitive,
+        java.util.List.of(validatorPartyId.toProtoPrimitive),
         new SettlementReference("some_reference", Optional.empty),
         requestedAt,
         allocateBefore,
-        settleBefore,
+        java.util.Optional.of(settleBefore),
         new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
       ),
-      "some_transfer_leg_id",
-      new TransferLegV1(
-        sender.toProtoPrimitive,
-        validatorPartyId.toProtoPrimitive,
-        BigDecimal(12).bigDecimal.setScale(10),
-        new InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-        new Metadata(java.util.Map.of("k3", "v3")),
+      java.util.List.of(
+        new TransferLegV2(
+          "some_transfer_leg_id",
+          basicAccount(sender),
+          basicAccount(receiver),
+          BigDecimal(12).bigDecimal.setScale(10),
+          new InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+          new Metadata(java.util.Map.of("k3", "v3")),
+        )
       ),
+      basicAccount(sender),
     )
 
     browseToAllocationsPage()
 
     actAndCheck(
       "create allocation", {
-        textField("create-allocation-transfer-leg-id-0").underlying
-          .sendKeys(wantedAllocation.transferLegId)
         textField("create-allocation-settlement-ref-id").underlying
           .sendKeys(wantedAllocation.settlement.settlementRef.id)
-        eventuallyClickOn(id("create-allocation-transfer-leg-sender-0"))
-        setAnsField(
-          textField("create-allocation-transfer-leg-sender-0"),
-          sender.toProtoPrimitive,
-          sender.toProtoPrimitive,
-        )
-        eventuallyClickOn(id("create-allocation-transfer-leg-receiver-0"))
-        setAnsField(
-          textField("create-allocation-transfer-leg-receiver-0"),
-          receiver.toProtoPrimitive,
-          receiver.toProtoPrimitive,
-        )
-        eventuallyClickOn(id("create-allocation-settlement-executor-0"))
-        setAnsField(
-          textField("create-allocation-settlement-executor-0"),
-          validatorPartyId.toProtoPrimitive,
-          validatorPartyId.toProtoPrimitive,
-        )
-        eventuallyClickOn(id("create-allocation-0-amulet-amount"))
-        numberField("create-allocation-0-amulet-amount").value = ""
-        numberField("create-allocation-0-amulet-amount").underlying.sendKeys(
-          wantedAllocation.transferLeg.amount.toString
-        )
+        wantedAllocation.transferLegs.asScala.zipWithIndex.foreach { case (transferLeg, index) =>
+          textField(s"create-allocation-transfer-leg-id-$index").underlying
+            .sendKeys(transferLeg.transferLegId)
+          eventuallyClickOn(id(s"create-allocation-transfer-leg-sender-$index"))
+          setAnsField(
+            textField(s"create-allocation-transfer-leg-sender-$index"),
+            transferLeg.sender.owner,
+            transferLeg.sender.owner,
+          )
+          eventuallyClickOn(id(s"create-allocation-transfer-leg-receiver-$index"))
+          setAnsField(
+            textField(s"create-allocation-transfer-leg-receiver-$index"),
+            transferLeg.receiver.owner,
+            transferLeg.receiver.owner,
+          )
+          eventuallyClickOn(id(s"create-allocation-settlement-executor-$index"))
+          setAnsField(
+            textField(s"create-allocation-settlement-executor-$index"),
+            validatorPartyId.toProtoPrimitive,
+            validatorPartyId.toProtoPrimitive,
+          )
+          eventuallyClickOn(id("create-allocation-0-amulet-amount"))
+          numberField(s"create-allocation-$index-amulet-amount").value = ""
+          numberField(s"create-allocation-$index-amulet-amount").underlying.sendKeys(
+            transferLeg.amount.toString
+          )
+        }
 
         val allocationTimestampFormat =
           DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
@@ -133,7 +137,7 @@ class AllocationsFrontendIntegrationTest
         textField("create-allocation-settlement-settle-at").underlying
           .sendKeys(
             allocationTimestampFormat.format(
-              wantedAllocation.settlement.settleBefore.atOffset(ZoneOffset.UTC)
+              wantedAllocation.settlement.settleAt.atOffset(ZoneOffset.UTC)
             )
           )
 
@@ -148,14 +152,12 @@ class AllocationsFrontendIntegrationTest
           allocation,
           wantedAllocation.settlement.settlementRef.id,
           wantedAllocation.settlement.settlementRef.cid.map(_.contractId).toScala,
-          Seq(wantedAllocation.settlement.executor),
+          wantedAllocation.settlement.executors.asScala.toSeq,
         )
 
-        checkTransferLegs(
+        checkTransferLegsV2(
           allocation,
-          Map(
-            wantedAllocation.transferLegId -> wantedAllocation.transferLeg
-          ),
+          wantedAllocation.transferLegs.asScala.toSeq,
         )
       },
     )
@@ -367,7 +369,7 @@ class AllocationsFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
 
-        createAllocation(aliceUserParty)
+        createAllocationV2ViaFrontendForm(aliceUserParty)
       }
     }
 
