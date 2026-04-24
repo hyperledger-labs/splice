@@ -76,7 +76,13 @@ import { AmuletAllocationV2 } from '@daml.js/splice-amulet/lib/Splice/AmuletAllo
 import { ContractId } from '@daml/types';
 
 export type AllocationRequest = AllocationRequestV1 | AllocationRequestV2;
+export function isV2AllocationRequest(payload: AllocationRequest): payload is AllocationRequestV2 {
+    return 'authorizer' in payload;
+}
 export type AmuletAllocation = AmuletAllocationV1 | AmuletAllocationV2;
+export function isV2Allocation(payload: AmuletAllocation): payload is AmuletAllocationV2 {
+    return 'dso' in payload;
+}
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
