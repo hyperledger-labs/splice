@@ -4,8 +4,11 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
   AllocationSpecification,
   SettlementInfo,
-  TransferLeg,
+  TransferLeg as TransferLegV1,
   Reference as SettlementReference,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2.{
+  TransferLeg as TransferLegV2
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.InstrumentId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
@@ -32,7 +35,8 @@ class AllocationsFrontendIntegrationTest
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil
-    with TokenStandardTest {
+    with TokenStandardTest
+    with TokenStandardV2TestUtil {
 
   private val amuletPrice = 2
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
@@ -48,6 +52,7 @@ class AllocationsFrontendIntegrationTest
           splitwellValidatorBackend,
         ).foreach { backend =>
           backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
+          backend.participantClient.upload_dar_unless_exists(tokenStandardV2TestDarPath)
         }
       })
 
@@ -65,6 +70,7 @@ class AllocationsFrontendIntegrationTest
     val allocateBefore = now.plusSeconds(3600)
     val settleBefore = now.plusSeconds(3600 * 2)
 
+    // TODO: this pretends that v1 is created, but it's actually v2
     val wantedAllocation = new AllocationSpecification(
       new SettlementInfo(
         validatorPartyId.toProtoPrimitive,
@@ -75,7 +81,7 @@ class AllocationsFrontendIntegrationTest
         new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
       ),
       "some_transfer_leg_id",
-      new TransferLeg(
+      new TransferLegV1(
         sender.toProtoPrimitive,
         validatorPartyId.toProtoPrimitive,
         BigDecimal(12).bigDecimal.setScale(10),
@@ -157,7 +163,90 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "see, accept and withdraw allocation requests" in { implicit env =>
+    "see, accept and withdraw allocation requests v2" in { implicit env =>
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceTransferAmount = BigDecimal(5)
+
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      val bobTransferAmount = BigDecimal(6)
+
+      val venuePartyHint = s"venue-party-${Random.nextInt()}"
+      val venueParty = splitwellValidatorBackend.onboardUser(
+        splitwellWalletClient.config.ledgerApiUser,
+        Some(
+          PartyId.tryFromProtoPrimitive(
+            s"$venuePartyHint::${splitwellValidatorBackend.participantClient.id.namespace.toProtoPrimitive}"
+          )
+        ),
+      )
+
+      aliceWalletClient.tap(1000)
+      bobWalletClient.tap(1000)
+
+      val otcTrade = createAllocationRequestV2ViaOTCTrade(
+        aliceParty,
+        aliceTransferAmount,
+        bobParty,
+        bobTransferAmount,
+        venueParty,
+      ).trade
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        browseToAllocationsPage()
+
+        clue("check that the allocation request is shown") {
+          eventually() {
+            val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
+
+            checkSettlementInfo(
+              allocationRequest,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.id.contractId),
+              Seq(venueParty.toProtoPrimitive),
+            )
+
+            checkTransferLegsV2(allocationRequest, otcTrade.data.transferLegs.asScala.toSeq)
+
+            allocationRequest
+          }
+        }
+
+        clue("sanity check: alice has no allocations yet") {
+          aliceWalletClient
+            .listAmuletAllocations() shouldBe empty withClue "alice AmuletAllocations"
+        }
+
+        actAndCheck(
+          "click on accepting the allocation request", {
+            eventuallyClickOn(
+              className(s"allocation-request-accept")
+            )
+          },
+        )(
+          "the allocation is shown",
+          { _ =>
+            val allocation = findAll(className("allocation")).toSeq.loneElement
+
+            checkSettlementInfo(
+              allocation,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.id.contractId),
+              Seq(venueParty.toProtoPrimitive),
+            )
+
+            checkTransferLegsV2(allocation, otcTrade.data.transferLegs.asScala.toSeq)
+
+            allocation
+          },
+        )
+
+      // TODO (#4915): test withdraw and reject like in the test below
+      }
+    }
+
+    "see, accept and withdraw allocation requests v1" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceTransferAmount = BigDecimal(5)
@@ -321,25 +410,58 @@ class AllocationsFrontendIntegrationTest
 
   private def checkTransferLegs(
       parent: Element,
-      transferLegs: Map[String, TransferLeg],
+      transferLegs: Map[String, TransferLegV1],
   ) = {
     val rows =
       parent.findAllChildElements(className("allocation-row")).toSeq
     rows.zip(transferLegs.toSeq.sortBy(_._1)).foreach { case (row, (legId, transferLeg)) =>
-      seleniumText(
-        row.childElement(className("allocation-legid"))
-      ) should matchText(legId)
-      seleniumText(
-        row.childElement(className("allocation-amount-instrument"))
-      ) should matchText(
-        s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+      checkTransferLeg(
+        row = row,
+        legId = legId,
+        instrumentId = transferLeg.instrumentId.id,
+        amount = transferLeg.amount,
+        sender = transferLeg.sender,
+        receiver = transferLeg.receiver,
       )
-      seleniumText(
-        row.childElement(className("allocation-sender"))
-      ) should matchText(transferLeg.sender)
-      seleniumText(
-        row.childElement(className("allocation-receiver"))
-      ) should matchText(transferLeg.receiver)
     }
+  }
+
+  private def checkTransferLegsV2(parent: Element, transferLegs: Seq[TransferLegV2]) = {
+    val rows =
+      parent.findAllChildElements(className("allocation-row")).toSeq
+    rows.zip(transferLegs).foreach { case (row, transferLeg) =>
+      checkTransferLeg(
+        row = row,
+        legId = transferLeg.transferLegId,
+        instrumentId = transferLeg.instrumentId.id,
+        amount = transferLeg.amount,
+        sender = transferLeg.sender.owner,
+        receiver = transferLeg.receiver.owner,
+      )
+    }
+  }
+
+  private def checkTransferLeg(
+      row: Element,
+      legId: String,
+      instrumentId: String,
+      amount: BigDecimal,
+      sender: String,
+      receiver: String,
+  ) = {
+    seleniumText(
+      row.childElement(className("allocation-legid"))
+    ) should matchText(legId)
+    seleniumText(
+      row.childElement(className("allocation-amount-instrument"))
+    ) should matchText(
+      s"${amount.intValue} ${instrumentId}"
+    )
+    seleniumText(
+      row.childElement(className("allocation-sender"))
+    ) should matchText(sender)
+    seleniumText(
+      row.childElement(className("allocation-receiver"))
+    ) should matchText(receiver)
   }
 }

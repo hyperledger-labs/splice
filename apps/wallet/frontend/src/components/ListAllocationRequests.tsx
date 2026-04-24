@@ -212,6 +212,7 @@ const V2AllocationRequestActionButton: React.FC<{
       <Button
         variant="pill"
         size="small"
+        id={`allocation-request-${allocationRequest.contractId}-accept`}
         className="allocation-request-accept"
         onClick={() => createAllocationV2Mutation.mutate()}
       >
