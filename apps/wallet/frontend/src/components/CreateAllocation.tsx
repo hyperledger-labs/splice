@@ -8,7 +8,16 @@ import {
   AllocateAmuletRequestSettlementSettlementRef,
   TransferLegV2,
 } from '@lfdecentralizedtrust/wallet-openapi';
-import { Alert, Button, Card, CardContent, Divider, Stack, TextField, Typography } from '@mui/material';
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
 import AmountInput from './AmountInput';
@@ -83,7 +92,10 @@ const CreateAllocation: React.FC = () => {
 
   const removeLeg = (idx: number) => {
     const newLegs = allocation.transfer_legs.filter((_, i) => i !== idx);
-    setAllocation({ ...allocation, transfer_legs: newLegs.length > 0 ? newLegs : [emptyTransferLeg()] });
+    setAllocation({
+      ...allocation,
+      transfer_legs: newLegs.length > 0 ? newLegs : [emptyTransferLeg()],
+    });
   };
 
   return (
@@ -188,7 +200,9 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Settlement deadline (optional, {DAML_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">
+              Settlement deadline (optional, {DAML_TIMESTAMP_FORMAT})
+            </Typography>
             <TextField
               id="create-allocation-settlement-deadline"
               placeholder={DAML_TIMESTAMP_FORMAT}
@@ -257,7 +271,7 @@ const CreateAllocation: React.FC = () => {
                 </Stack>
               </Card>
             ))}
-            <Button startIcon={<Add />} onClick={addLeg}>
+            <Button id="add-transfer-leg" startIcon={<Add />} onClick={addLeg}>
               Add Transfer Leg
             </Button>
 
@@ -293,75 +307,75 @@ const CreateAllocation: React.FC = () => {
 export default CreateAllocation;
 
 interface PartialTransferLeg {
-    transfer_leg_id: string;
-    sender: string;
-    receiver: string;
-    amount: string;
+  transfer_leg_id: string;
+  sender: string;
+  receiver: string;
+  amount: string;
 }
 
 interface PartialAllocateAmuletV2Request {
-    settlement: {
-        executors: string[];
-        settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
-        requested_at: string;
-        settle_at: string;
-        settlement_deadline?: string;
-    };
-    transfer_legs: PartialTransferLeg[];
+  settlement: {
+    executors: string[];
+    settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
+    requested_at: string;
+    settle_at: string;
+    settlement_deadline?: string;
+  };
+  transfer_legs: PartialTransferLeg[];
 }
 
 function emptyTransferLeg(): PartialTransferLeg {
-    return { transfer_leg_id: '', sender: '', receiver: '', amount: '1' };
+  return { transfer_leg_id: '', sender: '', receiver: '', amount: '1' };
 }
 
 function emptyForm(): PartialAllocateAmuletV2Request {
-    return {
-        settlement: {
-            executors: [''],
-            requested_at: '',
-            settle_at: '',
-            settlement_deadline: undefined,
-            settlement_ref: { id: '', cid: undefined },
-        },
-        transfer_legs: [emptyTransferLeg()],
-    };
+  return {
+    settlement: {
+      executors: [''],
+      requested_at: '',
+      settle_at: '',
+      settlement_deadline: undefined,
+      settlement_ref: { id: '', cid: undefined },
+    },
+    transfer_legs: [emptyTransferLeg()],
+  };
 }
 
 function validatedForm(partial: PartialAllocateAmuletV2Request): AllocateAmuletV2Request | null {
-    if (
-        !partial.settlement.executors.length ||
-        partial.settlement.executors.some(e => !e) ||
-        !partial.settlement.settlement_ref?.id ||
-        ![partial.settlement.requested_at, partial.settlement.settle_at].every(isValidDamlTimestamp) ||
-        (partial.settlement.settlement_deadline &&
-            !isValidDamlTimestamp(partial.settlement.settlement_deadline))
-    ) {
-        return null;
-    }
-    const validLegs: TransferLegV2[] = [];
-    for (const leg of partial.transfer_legs) {
-        if (!leg.transfer_leg_id || !leg.sender || !leg.receiver || !leg.amount) return null;
-        validLegs.push({
-            transfer_leg_id: leg.transfer_leg_id,
-            sender: leg.sender,
-            receiver: leg.receiver,
-            amount: leg.amount,
-        });
-    }
-    if (validLegs.length === 0) return null;
-    return {
-        settlement: {
-            executors: partial.settlement.executors,
-            requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
-            settle_at: damlTimestampToOpenApiTimestamp(partial.settlement.settle_at),
-            settlement_deadline: partial.settlement.settlement_deadline
-                ? damlTimestampToOpenApiTimestamp(partial.settlement.settlement_deadline)
-                : undefined,
-            settlement_ref: {
-                id: partial.settlement.settlement_ref.id,
-                cid: partial.settlement.settlement_ref.cid,
-            },
-        },
-        transfer_legs: validLegs,
-    };
+  if (
+    !partial.settlement.executors.length ||
+    partial.settlement.executors.some(e => !e) ||
+    !partial.settlement.settlement_ref?.id ||
+    ![partial.settlement.requested_at, partial.settlement.settle_at].every(isValidDamlTimestamp) ||
+    (partial.settlement.settlement_deadline &&
+      !isValidDamlTimestamp(partial.settlement.settlement_deadline))
+  ) {
+    return null;
+  }
+  const validLegs: TransferLegV2[] = [];
+  for (const leg of partial.transfer_legs) {
+    if (!leg.transfer_leg_id || !leg.sender || !leg.receiver || !leg.amount) return null;
+    validLegs.push({
+      transfer_leg_id: leg.transfer_leg_id,
+      sender: leg.sender,
+      receiver: leg.receiver,
+      amount: leg.amount,
+    });
+  }
+  if (validLegs.length === 0) return null;
+  return {
+    settlement: {
+      executors: partial.settlement.executors,
+      requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
+      settle_at: damlTimestampToOpenApiTimestamp(partial.settlement.settle_at),
+      settlement_deadline: partial.settlement.settlement_deadline
+        ? damlTimestampToOpenApiTimestamp(partial.settlement.settlement_deadline)
+        : undefined,
+      settlement_ref: {
+        id: partial.settlement.settlement_ref.id,
+        cid: partial.settlement.settlement_ref.cid,
+      },
+    },
+    transfer_legs: validLegs,
+  };
 }

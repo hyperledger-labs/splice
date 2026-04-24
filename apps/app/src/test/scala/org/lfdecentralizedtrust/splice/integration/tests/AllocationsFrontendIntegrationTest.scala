@@ -81,13 +81,21 @@ class AllocationsFrontendIntegrationTest
       ),
       java.util.List.of(
         new TransferLegV2(
-          "some_transfer_leg_id",
+          "oneway",
           basicAccount(sender),
           basicAccount(receiver),
           BigDecimal(12).bigDecimal.setScale(10),
           new InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
           new Metadata(java.util.Map.of("k3", "v3")),
-        )
+        ),
+        new TransferLegV2(
+          "waybackbutless",
+          basicAccount(receiver),
+          basicAccount(sender),
+          BigDecimal(6).bigDecimal.setScale(10),
+          new InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+          new Metadata(java.util.Map.of("k3", "v3")),
+        ),
       ),
       basicAccount(sender),
     )
@@ -98,6 +106,16 @@ class AllocationsFrontendIntegrationTest
       "create allocation", {
         textField("create-allocation-settlement-ref-id").underlying
           .sendKeys(wantedAllocation.settlement.settlementRef.id)
+        eventuallyClickOn(id(s"create-allocation-settlement-executor-0"))
+        setAnsField(
+          textField(s"create-allocation-settlement-executor-0"),
+          validatorPartyId.toProtoPrimitive,
+          validatorPartyId.toProtoPrimitive,
+        )
+        // Add n (-1 because one is already there) forms for transfer legs
+        wantedAllocation.transferLegs.asScala.drop(1).foreach { _ =>
+          eventuallyClickOn(id("add-transfer-leg"))
+        }
         wantedAllocation.transferLegs.asScala.zipWithIndex.foreach { case (transferLeg, index) =>
           textField(s"create-allocation-transfer-leg-id-$index").underlying
             .sendKeys(transferLeg.transferLegId)
@@ -112,12 +130,6 @@ class AllocationsFrontendIntegrationTest
             textField(s"create-allocation-transfer-leg-receiver-$index"),
             transferLeg.receiver.owner,
             transferLeg.receiver.owner,
-          )
-          eventuallyClickOn(id(s"create-allocation-settlement-executor-$index"))
-          setAnsField(
-            textField(s"create-allocation-settlement-executor-$index"),
-            validatorPartyId.toProtoPrimitive,
-            validatorPartyId.toProtoPrimitive,
           )
           eventuallyClickOn(id("create-allocation-0-amulet-amount"))
           numberField(s"create-allocation-$index-amulet-amount").value = ""
