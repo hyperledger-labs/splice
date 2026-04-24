@@ -145,6 +145,8 @@ spec:
           - name: participant-volume
             mountPath: /persistent-data
         {{- end }}
+          - name: tmp-volume
+            mountPath: /tmp
         {{- end }}
       {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
       initContainers:
@@ -205,6 +207,8 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-participant-pvc
         {{- end }}
+        - name: tmp-volume
+          emptyDir: {}
       {{- end }}
 ---
 {{-  if .Values.pvc }}
