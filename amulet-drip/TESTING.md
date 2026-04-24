@@ -70,7 +70,7 @@ make status
 | Service | Port | Usage |
 |---------|------|-------|
 | Canton JSON API (App User) | `2975` | `PARTICIPANT_LEDGER_API` |
-| Validator Admin API (App User) | `2903` | `VALIDATOR_API_URL` |
+| Validator Scan-Proxy (App User) | `2903` | `VALIDATOR_API_URL` (base: `.../api/validator/v0/scan-proxy`) |
 | Canton JSON API (App Provider) | `3975` | Alternative participant |
 | Scan UI | `scan.localhost:4000` | Verify transactions in browser |
 
@@ -173,7 +173,7 @@ Create a `.env` file using the values obtained above:
 cat > .env << EOF
 PARTICIPANT_LEDGER_API=http://localhost:2975
 LEDGER_ACCESS_TOKEN=$TOKEN
-VALIDATOR_API_URL=http://localhost:2903/api/validator
+VALIDATOR_API_URL=http://localhost:2903/api/validator/v0/scan-proxy
 VALIDATOR_ACCESS_TOKEN=$TOKEN
 ADMIN_USER=ledger-api-user
 SYNCHRONIZER_ID=$SYNCHRONIZER_ID
@@ -295,11 +295,9 @@ This takes significant time on first run. Subsequent builds are incremental.
 ### B.4. Start Canton
 
 ```bash
-# Start Canton in detached mode
-./start-canton.sh -d
-
-# Wait for it to be ready
-./wait-for-canton.sh
+# Start Canton in detached mode (wall clock only — saves memory)
+# Note: start-canton.sh calls wait-for-canton.sh internally, no need to run it separately
+./start-canton.sh -d -w
 ```
 
 Canton starts in a tmux session with:
@@ -307,30 +305,63 @@ Canton starts in a tmux session with:
 - Sequencers and mediators
 - PostgreSQL (via Docker)
 
+> **Troubleshooting:** If Canton fails to start, check for shell aliases shadowing the `canton` binary (`alias | grep canton`). Canton needs a clean database — if restarting after a failed run, stop and recreate Postgres first: `./scripts/postgres.sh docker stop && ./start-canton.sh -d -w`.
+
+Once Canton is healthy, it generates `canton.tokens` and `canton.participants` in the repo root.
+
 ### B.5. Start Splice backend applications
 
 ```bash
 ./scripts/start-backends-for-local-frontend-testing.sh
 ```
 
-This starts the Splice validator, scan, wallet, and other backend services.
+This starts the Splice validator, scan, wallet, and other backend services. It reads `canton.tokens` to configure auth, so Canton must be running first.
 
 ### B.6. Get access tokens
 
-Canton writes admin tokens to `canton.tokens` in the repo root:
+The Splice backend services use **self-signed HMAC256 JWTs** for authentication — not the raw hex tokens from `canton.tokens`. The JWT secret is `"test"` and the audience is set by the `OIDC_AUTHORITY_LEDGER_API_AUDIENCE` environment variable (typically `https://canton.network.global` in the Nix dev shell).
+
+There are two types of tokens:
+
+| Token type | Used for | How to obtain |
+|-----------|----------|---------------|
+| **Canton admin token** (raw hex) | Canton admin gRPC API (ports 5x01) | Read from `canton.tokens` |
+| **Self-signed JWT** | Ledger JSON API (ports 6x01) and Validator/Scan APIs (ports 5x03, 5012) | Generate with HMAC256 |
+
+Generate a self-signed JWT for Alice's validator user:
 
 ```bash
-# Format: <port> <token>
-cat canton.tokens
+# Auth parameters for the local dev environment
+AUTH_SECRET="test"
+AUTH_AUDIENCE="https://canton.network.global"
+AUTH_USER="alice_validator_user"
 
-# Extract the token for a specific participant (e.g., Alice on port 5501)
-TOKEN=$(grep 5501 canton.tokens | awk '{print $2}')
+# Generate HMAC256-signed JWT
+HEADER=$(printf '{"alg":"HS256","typ":"JWT"}' | base64 | tr '+/' '-_' | tr -d '=\n')
+PAYLOAD=$(printf '{"sub":"%s","aud":"%s","scope":"daml_ledger_api"}' \
+  "$AUTH_USER" "$AUTH_AUDIENCE" | base64 | tr '+/' '-_' | tr -d '=\n')
+SIGNATURE=$(printf '%s.%s' "$HEADER" "$PAYLOAD" \
+  | openssl dgst -sha256 -hmac "$AUTH_SECRET" -binary \
+  | base64 | tr '+/' '-_' | tr -d '=\n')
+TOKEN="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+echo "JWT Token: $TOKEN"
+```
+
+This token works for both the Ledger JSON API and the Validator scan-proxy API.
+
+Verify the token works:
+
+```bash
+# Should return Alice's user info with primaryParty
+curl -s "http://localhost:6501/v2/users/alice_validator_user" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" | jq .
 ```
 
 ### B.7. Resolve configuration values
 
 ```bash
-# Participant Ledger API (Alice's HTTP JSON API)
 PARTICIPANT_JSON_API="http://localhost:6501"
 
 # Get sender party
@@ -338,17 +369,21 @@ SENDER_PARTY=$(curl -s "$PARTICIPANT_JSON_API/v2/users/alice_validator_user" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   | jq -r '.user.primaryParty')
+echo "Sender party: $SENDER_PARTY"
 
 # Get DSO party from Scan API
 DSO_PARTY=$(curl -s "http://localhost:5012/api/scan/v0/dso-party-id" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   | jq -r '.dso_party_id')
+echo "DSO party: $DSO_PARTY"
 
 # Get synchronizer ID
 SYNCHRONIZER_ID=$(curl -s "$PARTICIPANT_JSON_API/v2/state/connected-synchronizers" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   | jq -r '.connectedSynchronizers[0].synchronizerId')
+echo "Synchronizer: $SYNCHRONIZER_ID"
 ```
 
 ### B.8. Build amulet-drip and test
@@ -362,7 +397,7 @@ npm run build
 cat > .env << EOF
 PARTICIPANT_LEDGER_API=http://localhost:6501
 LEDGER_ACCESS_TOKEN=$TOKEN
-VALIDATOR_API_URL=http://localhost:5503/api/validator
+VALIDATOR_API_URL=http://localhost:5503/api/validator/v0/scan-proxy
 VALIDATOR_ACCESS_TOKEN=$TOKEN
 ADMIN_USER=alice_validator_user
 SYNCHRONIZER_ID=$SYNCHRONIZER_ID
@@ -430,9 +465,14 @@ flowchart TD
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `Sender has no Amulet holdings` | Sender party not funded | Run faucet script or tap via wallet UI |
+| `HTTP 404` on transfer factory | `VALIDATOR_API_URL` path is wrong | Must end with `/api/validator/v0/scan-proxy` (the OpenAPI client appends `/registry/...`) |
 | `Failed to get transfer factory` | Validator scan-proxy unreachable | Check `VALIDATOR_API_URL` and that validator is running |
-| `HTTP 401` on any API call | Token expired or wrong audience | Regenerate JWT token (valid for 24h) |
+| `The supplied authentication is invalid` | Wrong token type for the API | Use self-signed JWT (HMAC256, secret `"test"`), not raw hex from `canton.tokens` |
+| `HTTP 401` on any API call | Token expired or wrong audience | Regenerate JWT with audience `https://canton.network.global` |
+| `cd: too many arguments` in Canton tmux | Shell alias shadows `canton` binary | Remove `alias canton=...` from `~/.zshrc` and restart tmux session |
+| Canton timeout (300s) then fails | Stale database from previous run | `./scripts/postgres.sh docker stop` then restart Canton |
+| `canton.tokens` not found | Canton not started or crashed | Start Canton first: `./start-canton.sh -d -w` |
 | `PARTY_NOT_KNOWN_ON_DOMAIN` | Recipient not allocated on this participant | Allocate parties on the same participant node |
-| `No connected synchronizer` | Canton not fully initialized | Wait longer after `start-canton.sh` or re-run `wait-for-canton.sh` |
-| Connection refused on port 2975 | JSON API not started | Quickstart: `make status`; Splice: check Canton tmux session |
+| `No connected synchronizer` | Canton not fully initialized | Wait longer after `start-canton.sh` |
+| Connection refused on port 6501 | JSON API not started | Check Canton tmux session: `tmux attach -t canton` |
 | `INSTRUMENT_ADMIN` mismatch | DSO party ID is wrong | Re-query via scan-proxy `/dso-party-id` endpoint |

@@ -134,7 +134,7 @@ Create a `.env` file or export environment variables:
 # Required
 export PARTICIPANT_LEDGER_API="http://localhost:2975"
 export LEDGER_ACCESS_TOKEN="your-ledger-token"
-export VALIDATOR_API_URL="http://localhost:2903/api/validator"
+export VALIDATOR_API_URL="http://localhost:2903/api/validator/v0/scan-proxy"
 export VALIDATOR_ACCESS_TOKEN="your-validator-token"
 export ADMIN_USER="ledger-api-user"
 export SYNCHRONIZER_ID="synchronizer::1220..."
@@ -213,7 +213,7 @@ The output JSON includes metadata and per-transfer results:
 |----------|----------|---------|-------------|
 | `PARTICIPANT_LEDGER_API` | Yes | — | Canton JSON API URL |
 | `LEDGER_ACCESS_TOKEN` | Yes | — | Bearer token for Ledger API |
-| `VALIDATOR_API_URL` | Yes | — | Validator API base URL |
+| `VALIDATOR_API_URL` | Yes | — | Validator scan-proxy base URL (e.g., `.../api/validator/v0/scan-proxy`) |
 | `VALIDATOR_ACCESS_TOKEN` | Yes | — | Bearer token for Validator API |
 | `ADMIN_USER` | Yes | — | Canton user ID for command submission |
 | `SYNCHRONIZER_ID` | Yes | — | Synchronizer ID for commands |
