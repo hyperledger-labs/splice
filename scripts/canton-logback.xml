@@ -21,7 +21,7 @@
           </fieldNames>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-          <level>${LOG_LEVEL_STDOUT:-WARN}</level>
+          <level>${LOG_LEVEL_STDOUT:-INFO}</level>
         </filter>
         <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
           <evaluator>
@@ -66,7 +66,7 @@
           <pattern>${pattern}</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-          <level>${LOG_LEVEL_STDOUT:-WARN}</level>
+          <level>${LOG_LEVEL_STDOUT:-INFO}</level>
         </filter>
         <filter class="${filter_class}" />
       </appender>
@@ -318,7 +318,7 @@
     </then>
     <else>
       <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-INFO}"/>
-      <logger name="com.digitalasset.canton.networking.grpc" level="${LOG_LEVEL_API_REQUEST:-DEBUG}" />
+      <logger name="com.digitalasset.canton.networking.grpc" level="${LOG_LEVEL_API_REQUEST:-INFO}" />
       <logger name="com.daml" level="${LOG_LEVEL_CANTON:-INFO}"/>
       <logger name="org.lfdecentralizedtrust.splice" level="${LOG_LEVEL_CANTON:-INFO}"/>
     </else>
