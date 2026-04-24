@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useMutation } from '@tanstack/react-query';
 import {
-  AllocateAmuletRequest,
+  AllocateAmuletV2Request,
   AllocateAmuletRequestSettlementSettlementRef,
-  AllocateAmuletRequestTransferLeg,
+  TransferLegV2,
 } from '@lfdecentralizedtrust/wallet-openapi';
-import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Button, Card, CardContent, Divider, Stack, TextField, Typography } from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
 import AmountInput from './AmountInput';
@@ -20,13 +20,13 @@ import {
 } from '../utils/timestampConversion';
 
 const CreateAllocation: React.FC = () => {
-  const { createAllocation } = useWalletClient();
+  const { createAllocationV2 } = useWalletClient();
   const [error, setError] = useState<object | null>(null);
-  const [allocation, setAllocation] = useState<PartialAllocateAmuletRequest>(emptyForm());
+  const [allocation, setAllocation] = useState<PartialAllocateAmuletV2Request>(emptyForm());
   const validated = validatedForm(allocation);
   const createAllocationMutation = useMutation({
     mutationFn: async () => {
-      return validated && (await createAllocation(validated));
+      return validated && (await createAllocationV2(validated));
     },
     onSuccess: () => {
       setError(null);
@@ -38,6 +38,54 @@ const CreateAllocation: React.FC = () => {
     },
   });
 
+  const updateExecutor = (idx: number, party: string) => {
+    const newExecutors = [...allocation.settlement.executors];
+    newExecutors[idx] = party;
+    setAllocation({
+      ...allocation,
+      settlement: { ...allocation.settlement, executors: newExecutors },
+    });
+  };
+
+  const addExecutor = () => {
+    setAllocation({
+      ...allocation,
+      settlement: {
+        ...allocation.settlement,
+        executors: [...allocation.settlement.executors, ''],
+      },
+    });
+  };
+
+  const removeExecutor = (idx: number) => {
+    const newExecutors = allocation.settlement.executors.filter((_, i) => i !== idx);
+    setAllocation({
+      ...allocation,
+      settlement: {
+        ...allocation.settlement,
+        executors: newExecutors.length > 0 ? newExecutors : [''],
+      },
+    });
+  };
+
+  const updateLeg = (idx: number, updated: Partial<PartialTransferLeg>) => {
+    const newLegs = [...allocation.transfer_legs];
+    newLegs[idx] = { ...newLegs[idx], ...updated };
+    setAllocation({ ...allocation, transfer_legs: newLegs });
+  };
+
+  const addLeg = () => {
+    setAllocation({
+      ...allocation,
+      transfer_legs: [...allocation.transfer_legs, emptyTransferLeg()],
+    });
+  };
+
+  const removeLeg = (idx: number) => {
+    const newLegs = allocation.transfer_legs.filter((_, i) => i !== idx);
+    setAllocation({ ...allocation, transfer_legs: newLegs.length > 0 ? newLegs : [emptyTransferLeg()] });
+  };
+
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
@@ -45,19 +93,12 @@ const CreateAllocation: React.FC = () => {
       </Typography>
       <Card variant="outlined">
         <CardContent sx={{ paddingX: '64px' }}>
-          <Stack spacing={1}>
+          <Stack spacing={2}>
             {error ? (
               <Alert severity="error">Failed to submit: {JSON.stringify(error)}</Alert>
             ) : null}
-            <Typography variant="h6">Transfer Leg ID</Typography>
-            <TextField
-              id="create-allocation-transfer-leg-id"
-              value={allocation.transfer_leg_id}
-              error={!allocation.transfer_leg_id}
-              onChange={event =>
-                setAllocation({ ...allocation, transfer_leg_id: event.target.value })
-              }
-            />
+
+            <Typography variant="h5">Settlement</Typography>
             <Typography variant="h6">Settlement Ref</Typography>
             <Stack direction="row" alignItems="center" spacing={2}>
               <Typography variant="h6">ID</Typography>
@@ -96,47 +137,31 @@ const CreateAllocation: React.FC = () => {
                 }
               />
             </Stack>
-            <Typography variant="h6">Recipient</Typography>
-            <BftAnsField
-              name="Receiver"
-              label="Receiver"
-              aria-label="Receiver"
-              id="create-allocation-transfer-leg-receiver"
-              onPartyChanged={party =>
-                setAllocation({
-                  ...allocation,
-                  transfer_leg: { ...allocation.transfer_leg, receiver: party },
-                })
-              }
-            />
-            <Typography variant="h6">Executor</Typography>
-            <BftAnsField
-              name="Executor"
-              label="Executor"
-              aria-label="Executor"
-              id="create-allocation-settlement-executor"
-              onPartyChanged={party =>
-                setAllocation({
-                  ...allocation,
-                  settlement: { ...allocation.settlement, executor: party },
-                })
-              }
-            />
-            <AmountInput
-              idPrefix="create-allocation"
-              ccAmountText={allocation.transfer_leg.amount || ''}
-              setCcAmountText={ccAmountText =>
-                setAllocation({
-                  ...allocation,
-                  transfer_leg: { ...allocation.transfer_leg, amount: ccAmountText },
-                })
-              }
-            />
-            {/*For these timestamp fields: a date picker doesn't work because
-            daml Time has microsecond precision, while javascript only millisecond precision.
-            Furthermore, the timestamps need to match that of an original allocation request,
-            so they will either be copy-pasted or (in the near future) auto-filled.
-            Therefore, a TextField where we validate the timestamp is correctly formatted makes more sense.*/}
+            <Typography variant="h6">Executors</Typography>
+            {allocation.settlement.executors.map((_executor, idx) => (
+              <Stack key={idx} direction="row" alignItems="center" spacing={1}>
+                <BftAnsField
+                  name={`Executor ${idx}`}
+                  label={`Executor ${idx + 1}`}
+                  aria-label={`Executor ${idx}`}
+                  id={`create-allocation-settlement-executor-${idx}`}
+                  onPartyChanged={party => updateExecutor(idx, party)}
+                />
+                {allocation.settlement.executors.length > 1 && (
+                  <Button
+                    startIcon={<Remove />}
+                    color="error"
+                    size="small"
+                    onClick={() => removeExecutor(idx)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </Stack>
+            ))}
+            <Button startIcon={<Add />} size="small" onClick={addExecutor}>
+              Add Executor
+            </Button>
             <Typography variant="h6">Requested at ({DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-requested-at"
@@ -150,54 +175,92 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Settle before ({DAML_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">Settle at ({DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
-              id="create-allocation-settlement-settle-before"
+              id="create-allocation-settlement-settle-at"
               placeholder={DAML_TIMESTAMP_FORMAT}
-              value={allocation.settlement.settle_before || ''}
-              error={!isValidDamlTimestamp(allocation.settlement.settle_before)}
+              value={allocation.settlement.settle_at || ''}
+              error={!isValidDamlTimestamp(allocation.settlement.settle_at)}
               onChange={event =>
                 setAllocation({
                   ...allocation,
-                  settlement: { ...allocation.settlement, settle_before: event.target.value },
+                  settlement: { ...allocation.settlement, settle_at: event.target.value },
                 })
               }
             />
-            <Typography variant="h6">Allocate before ({DAML_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">Settlement deadline (optional, {DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
-              id="create-allocation-settlement-allocate-before"
+              id="create-allocation-settlement-deadline"
               placeholder={DAML_TIMESTAMP_FORMAT}
-              value={allocation.settlement.allocate_before || ''}
-              error={!isValidDamlTimestamp(allocation.settlement.allocate_before)}
+              value={allocation.settlement.settlement_deadline || ''}
+              error={
+                !!allocation.settlement.settlement_deadline &&
+                !isValidDamlTimestamp(allocation.settlement.settlement_deadline)
+              }
               onChange={event =>
                 setAllocation({
                   ...allocation,
-                  settlement: { ...allocation.settlement, allocate_before: event.target.value },
+                  settlement: {
+                    ...allocation.settlement,
+                    settlement_deadline: event.target.value || undefined,
+                  },
                 })
               }
             />
-            <Typography variant="h6">Settlement meta</Typography>
-            <MetaEditor
-              idPrefix="settlement"
-              meta={allocation.settlement.meta || {}}
-              setMeta={meta =>
-                setAllocation({
-                  ...allocation,
-                  settlement: { ...allocation.settlement, meta: meta },
-                })
-              }
-            />
-            <Typography variant="h6">Transfer leg meta</Typography>
-            <MetaEditor
-              idPrefix="transfer-leg"
-              meta={allocation.transfer_leg.meta || {}}
-              setMeta={meta =>
-                setAllocation({
-                  ...allocation,
-                  transfer_leg: { ...allocation.transfer_leg, meta: meta },
-                })
-              }
-            />
+
+            <Divider />
+            <Typography variant="h5">Transfer Legs</Typography>
+            {allocation.transfer_legs.map((leg, idx) => (
+              <Card key={idx} variant="outlined" sx={{ p: 2 }}>
+                <Stack spacing={1}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6">Transfer Leg {idx + 1}</Typography>
+                    {allocation.transfer_legs.length > 1 && (
+                      <Button
+                        startIcon={<Remove />}
+                        color="error"
+                        size="small"
+                        onClick={() => removeLeg(idx)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Stack>
+                  <Typography variant="body2">Transfer Leg ID</Typography>
+                  <TextField
+                    id={`create-allocation-transfer-leg-id-${idx}`}
+                    value={leg.transfer_leg_id}
+                    error={!leg.transfer_leg_id}
+                    onChange={event => updateLeg(idx, { transfer_leg_id: event.target.value })}
+                  />
+                  <Typography variant="body2">Sender</Typography>
+                  <BftAnsField
+                    name={`Sender ${idx}`}
+                    label="Sender"
+                    aria-label={`Sender ${idx}`}
+                    id={`create-allocation-transfer-leg-sender-${idx}`}
+                    onPartyChanged={party => updateLeg(idx, { sender: party })}
+                  />
+                  <Typography variant="body2">Receiver</Typography>
+                  <BftAnsField
+                    name={`Receiver ${idx}`}
+                    label="Receiver"
+                    aria-label={`Receiver ${idx}`}
+                    id={`create-allocation-transfer-leg-receiver-${idx}`}
+                    onPartyChanged={party => updateLeg(idx, { receiver: party })}
+                  />
+                  <AmountInput
+                    idPrefix={`create-allocation-${idx}`}
+                    ccAmountText={leg.amount}
+                    setCcAmountText={amount => updateLeg(idx, { amount })}
+                  />
+                </Stack>
+              </Card>
+            ))}
+            <Button startIcon={<Add />} onClick={addLeg}>
+              Add Transfer Leg
+            </Button>
+
             <DisableConditionally
               conditions={[
                 {
@@ -227,135 +290,78 @@ const CreateAllocation: React.FC = () => {
   );
 };
 
-interface PartialAllocateAmuletRequest {
-  settlement: {
-    executor: string;
-    settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
-    // dates as strings as opposed to numbers, they're converted once pressing Send.
-    // the user will type (likely copy-paste, or auto-fill) a string with DAML_TIMESTAMP_FORMAT
-    requested_at: string;
-    allocate_before: string;
-    settle_before: string;
-    meta?: { [key: string]: string };
-  };
-  transfer_leg_id: string;
-  transfer_leg: Partial<AllocateAmuletRequestTransferLeg>;
-}
-
-function emptyForm(): PartialAllocateAmuletRequest {
-  return {
-    settlement: {
-      executor: '',
-      meta: {},
-      requested_at: '',
-      allocate_before: '',
-      settle_before: '',
-      settlement_ref: {
-        id: '',
-        cid: undefined,
-      },
-    },
-    transfer_leg_id: '',
-    transfer_leg: {
-      amount: '1',
-      receiver: '',
-      meta: {},
-    },
-  };
-}
-
-function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletRequest | null {
-  if (
-    !partial.settlement.executor ||
-    !partial.settlement.settlement_ref?.id ||
-    !partial.transfer_leg_id ||
-    !partial.transfer_leg.amount ||
-    !partial.transfer_leg.receiver ||
-    ![
-      partial.settlement.allocate_before,
-      partial.settlement.settle_before,
-      partial.settlement.allocate_before,
-    ].every(isValidDamlTimestamp)
-  ) {
-    return null;
-  }
-  return {
-    settlement: {
-      executor: partial.settlement.executor,
-      meta: partial.settlement.meta,
-      requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
-      allocate_before: damlTimestampToOpenApiTimestamp(partial.settlement.allocate_before),
-      settle_before: damlTimestampToOpenApiTimestamp(partial.settlement.settle_before),
-      settlement_ref: {
-        id: partial.settlement.settlement_ref.id,
-        cid: partial.settlement.settlement_ref.cid,
-      },
-    },
-    transfer_leg_id: partial.transfer_leg_id,
-    transfer_leg: {
-      amount: partial.transfer_leg.amount,
-      receiver: partial.transfer_leg.receiver,
-      meta: partial.transfer_leg.meta,
-    },
-  };
-}
-
 export default CreateAllocation;
 
-type Meta = { [key: string]: string };
-const MetaEditor: React.FC<{ meta: Meta; setMeta: (meta: Meta) => void; idPrefix: string }> = ({
-  meta,
-  setMeta,
-  idPrefix,
-}) => {
-  const keys = Object.keys(meta);
-  // will always have at least keys(meta).length
-  const [nEntries, setNEntries] = useState(keys.length);
-  const emptyEntries: string[] = Array.from({ length: nEntries - keys.length }).map(() => '');
-  const allEntries = keys.concat(emptyEntries);
-  const deleteEntry = (key: string) => {
-    const newMeta = { ...meta };
-    delete newMeta[key];
-    setMeta(newMeta);
-    setNEntries(nEntries - 1);
-  };
-  return (
-    <Stack direction="column">
-      {allEntries.map((k, idx) => {
-        const key = k || '';
-        const value = meta[key] || '';
-        const updateKey = (newKey: string) => {
-          const newMeta = { ...meta };
-          delete newMeta[key];
-          newMeta[newKey] = value;
-          setMeta(newMeta);
-        };
-        const updateValue = (newValue: string) => setMeta({ ...meta, [key]: newValue });
-        return (
-          <Stack direction="row" key={idx}>
-            <TextField
-              id={`${idPrefix}-meta-key-${idx}`}
-              placeholder="key"
-              value={key}
-              onChange={event => updateKey(event.target.value)}
-            />
-            <TextField
-              id={`${idPrefix}-meta-value-${idx}`}
-              placeholder="value"
-              value={value}
-              onChange={event => updateValue(event.target.value)}
-            />
-            <Button startIcon={<Remove />} onClick={() => deleteEntry(key)} />
-          </Stack>
-        );
-      })}
-      <Button
-        id={`${idPrefix}-add-meta`}
-        startIcon={<Add />}
-        onClick={() => setNEntries(nEntries + 1)}
-      >
-        Add Entry
-      </Button>
-    </Stack>
-  );
-};
+interface PartialTransferLeg {
+    transfer_leg_id: string;
+    sender: string;
+    receiver: string;
+    amount: string;
+}
+
+interface PartialAllocateAmuletV2Request {
+    settlement: {
+        executors: string[];
+        settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
+        requested_at: string;
+        settle_at: string;
+        settlement_deadline?: string;
+    };
+    transfer_legs: PartialTransferLeg[];
+}
+
+function emptyTransferLeg(): PartialTransferLeg {
+    return { transfer_leg_id: '', sender: '', receiver: '', amount: '1' };
+}
+
+function emptyForm(): PartialAllocateAmuletV2Request {
+    return {
+        settlement: {
+            executors: [''],
+            requested_at: '',
+            settle_at: '',
+            settlement_deadline: undefined,
+            settlement_ref: { id: '', cid: undefined },
+        },
+        transfer_legs: [emptyTransferLeg()],
+    };
+}
+
+function validatedForm(partial: PartialAllocateAmuletV2Request): AllocateAmuletV2Request | null {
+    if (
+        !partial.settlement.executors.length ||
+        partial.settlement.executors.some(e => !e) ||
+        !partial.settlement.settlement_ref?.id ||
+        ![partial.settlement.requested_at, partial.settlement.settle_at].every(isValidDamlTimestamp) ||
+        (partial.settlement.settlement_deadline &&
+            !isValidDamlTimestamp(partial.settlement.settlement_deadline))
+    ) {
+        return null;
+    }
+    const validLegs: TransferLegV2[] = [];
+    for (const leg of partial.transfer_legs) {
+        if (!leg.transfer_leg_id || !leg.sender || !leg.receiver || !leg.amount) return null;
+        validLegs.push({
+            transfer_leg_id: leg.transfer_leg_id,
+            sender: leg.sender,
+            receiver: leg.receiver,
+            amount: leg.amount,
+        });
+    }
+    if (validLegs.length === 0) return null;
+    return {
+        settlement: {
+            executors: partial.settlement.executors,
+            requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
+            settle_at: damlTimestampToOpenApiTimestamp(partial.settlement.settle_at),
+            settlement_deadline: partial.settlement.settlement_deadline
+                ? damlTimestampToOpenApiTimestamp(partial.settlement.settlement_deadline)
+                : undefined,
+            settlement_ref: {
+                id: partial.settlement.settlement_ref.id,
+                cid: partial.settlement.settlement_ref.cid,
+            },
+        },
+        transfer_legs: validLegs,
+    };
+}
