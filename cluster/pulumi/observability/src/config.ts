@@ -19,7 +19,7 @@ export function parseDurationToSeconds(d: string): number {
   }
   const [, n, unit] = match;
   const multiplier = unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
-  return parseInt(n) * multiplier;
+  return parseInt(n, 10) * multiplier;
 }
 
 const GcpQuotasConfigSchema = z.object({
