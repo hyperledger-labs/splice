@@ -165,7 +165,8 @@ monitoring:
         # threshold alert. Prometheus duration format (e.g. "60s", "5m").
         rollingWindow: "10m"
         # How long the condition must be continuously true before firing.
-        # Must be >= rollingWindow. Prometheus duration format.
+        # Should typically be >= rollingWindow to avoid retesting "old" data.
+        # Prometheus duration format.
         retestWindow: "10m"
       trafficBasedRewards:
         # Alert if we have more than this many featured app rights,

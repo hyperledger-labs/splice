@@ -22,26 +22,18 @@ export function parseDurationToSeconds(d: string): number {
   return parseInt(n) * multiplier;
 }
 
-const GcpQuotasConfigSchema = z
-  .object({
-    // so existing overrides don't break
-    enabled: z.literal(true).optional(),
-    excludedMetrics: z.array(quotaMetricNameSchema),
-    excludedApproachingMetrics: z.array(quotaMetricNameSchema),
-    rollingWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) >= 60, {
-      message: 'must be at least 60s',
-    }),
-    retestWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) % 60 === 0, {
-      message: 'must be a multiple of 1m',
-    }),
-  })
-  .refine(
-    data => parseDurationToSeconds(data.retestWindow) >= parseDurationToSeconds(data.rollingWindow),
-    {
-      message: 'retestWindow must be >= rollingWindow',
-      path: ['retestWindow'],
-    }
-  );
+const GcpQuotasConfigSchema = z.object({
+  // so existing overrides don't break
+  enabled: z.literal(true).optional(),
+  excludedMetrics: z.array(quotaMetricNameSchema),
+  excludedApproachingMetrics: z.array(quotaMetricNameSchema),
+  rollingWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) >= 60, {
+    message: 'must be at least 60s',
+  }),
+  retestWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) % 60 === 0, {
+    message: 'must be a multiple of 1m',
+  }),
+});
 
 const MonitoringConfigSchema = z
   .object({
