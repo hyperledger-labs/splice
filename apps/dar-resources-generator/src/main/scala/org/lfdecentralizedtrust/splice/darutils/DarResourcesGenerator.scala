@@ -77,7 +77,10 @@ object DarResourcesGenerator {
   def readDarEntry(file: File): Option[DarEntry] = {
     // Filenames look like "splice-amulet-0.1.18.dar" — split on the
     // last hyphen followed by a digit to separate name from version.
-    val versionPattern = """^(.+)-([0-9]+\.[0-9]+\.[0-9]+)\.dar$""".r
+    // Accept 3 or more version segments so patched DARs such as
+    // `splice-amulet-0.1.18.123.dar` (produced by prep-app-upgrade-test)
+    // are still picked up.
+    val versionPattern = """^(.+)-([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)*)\.dar$""".r
     file.name match {
       case versionPattern(name, _) =>
         val dar = readDar(file)
