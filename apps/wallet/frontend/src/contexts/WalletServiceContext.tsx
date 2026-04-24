@@ -13,6 +13,7 @@ import React, { useContext, useMemo } from 'react';
 import {
   ArchivedDevelopmentFundCoupon,
   AllocateAmuletRequest,
+  AllocateAmuletV2Request,
   createConfiguration,
   ListTransactionsRequest,
   Middleware,
@@ -68,9 +69,14 @@ import {
   ListTokenStandardTransfersResponse,
 } from '../models/models';
 import { DevelopmentFundCoupon as DevelopmentFundCouponTemplate } from '@daml.js/splice-amulet/lib/Splice/Amulet/';
-import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
-import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
+import { AllocationRequest as AllocationRequestV2 } from '@daml.js/splice-api-token-allocation-request-v2/lib/Splice/Api/Token/AllocationRequestV2/module';
+import { AllocationRequest as AllocationRequestV1 } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { AmuletAllocation as AmuletAllocationV1 } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
+import { AmuletAllocationV2 } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocationV2';
 import { ContractId } from '@daml/types';
+
+export type AllocationRequest = AllocationRequestV1 | AllocationRequestV2;
+export type AmuletAllocation = AmuletAllocationV1 | AmuletAllocationV2;
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
@@ -131,6 +137,7 @@ export interface WalletClient {
   withdrawMintingDelegation: (delegationContractId: ContractId<MintingDelegation>) => Promise<void>;
   rejectAllocationRequest: (allocationRequestCid: ContractId<AllocationRequest>) => Promise<void>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
+  createAllocationV2: (allocateAmuletV2Request: AllocateAmuletV2Request) => Promise<void>;
   withdrawAllocation: (allocationCid: ContractId<AmuletAllocation>) => Promise<void>;
 
   getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
@@ -366,13 +373,23 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       listAmuletAllocations: async () => {
         const res = await walletClient.listAmuletAllocations();
-        return res.allocations.map(all => Contract.decodeOpenAPI(all.contract, AmuletAllocation));
+        return res.allocations.map(all => {
+          try {
+            return Contract.decodeOpenAPI(all.contract, AmuletAllocationV2);
+          } catch {
+            return Contract.decodeOpenAPI(all.contract, AmuletAllocationV1);
+          }
+        });
       },
       listAllocationRequests: async () => {
         const res = await walletClient.listAllocationRequests();
-        return res.allocation_requests.map(ar =>
-          Contract.decodeOpenAPI(ar.contract, AllocationRequest)
-        );
+        return res.allocation_requests.map(ar => {
+          try {
+            return Contract.decodeOpenAPI(ar.contract, AllocationRequestV2);
+          } catch {
+            return Contract.decodeOpenAPI(ar.contract, AllocationRequestV1);
+          }
+        });
       },
       listMintingDelegations: async () => {
         const res = await walletClient.listMintingDelegations();
@@ -402,6 +419,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       createAllocation: async allocateAmuletRequest => {
         await walletClient.allocateAmulet(allocateAmuletRequest);
+      },
+      createAllocationV2: async allocateAmuletV2Request => {
+        await walletClient.allocateAmuletV2(allocateAmuletV2Request);
       },
       withdrawAllocation: async allocationCid => {
         await walletClient.withdrawAmuletAllocation(allocationCid);
