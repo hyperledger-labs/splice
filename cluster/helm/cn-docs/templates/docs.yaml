@@ -7,8 +7,11 @@ kind: Deployment
 metadata:
   name: docs
   namespace: {{ .Release.Namespace }}
+  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- if $annotations }}
   annotations:
-    {{- include "splice-util-lib.default-annotations" .Values | nindent 4 }}
+    {{- $annotations .Values | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" "docs") | nindent 4 }}
 spec:

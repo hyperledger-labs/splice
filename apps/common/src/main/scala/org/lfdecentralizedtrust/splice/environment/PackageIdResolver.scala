@@ -32,6 +32,7 @@ object PackageIdResolver {
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
+      // Token Standard v1
       case TokenStandard.SpliceApiTokenMetadataV1 =>
         DarResources.TokenStandard.apiTokenMetadataV1.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenHoldingV1 =>
@@ -47,6 +48,19 @@ object PackageIdResolver {
           .toString()
       case TokenStandard.SpliceTokenTestTradingApp =>
         DarResources.TokenStandard.tokenTestTradingApp.latest.metadata.version.toString()
+      // Token Standard v2
+      case TokenStandard.SpliceApiTokenHoldingV2 =>
+        DarResources.TokenStandard.apiTokenHoldingV2.latest.metadata.version.toString()
+      case TokenStandard.SpliceApiTokenTransferInstructionV2 =>
+        DarResources.TokenStandard.apiTokenTransferInstructionV2.latest.metadata.version.toString()
+      case TokenStandard.SpliceApiTokenAllocationV2 =>
+        DarResources.TokenStandard.apiTokenAllocationV2.latest.metadata.version.toString()
+      case TokenStandard.SpliceApiTokenAllocationRequestV2 =>
+        DarResources.TokenStandard.apiTokenAllocationRequestV2.latest.metadata.version.toString()
+      case TokenStandard.SpliceApiTokenAllocationInstructionV2 =>
+        DarResources.TokenStandard.apiTokenAllocationInstructionV2.latest.metadata.version
+          .toString()
+      // Batched markers
       case SpliceUtilBatchedMarkers =>
         DarResources.utilBatchedMarkers.latest.metadata.version.toString()
     }
@@ -88,6 +102,13 @@ object PackageIdResolver {
       final case object SpliceApiTokenAllocationV1 extends Package
       final case object SpliceApiTokenAllocationRequestV1 extends Package
       final case object SpliceApiTokenAllocationInstructionV1 extends Package
+
+      final case object SpliceApiTokenHoldingV2 extends Package
+      final case object SpliceApiTokenTransferInstructionV2 extends Package
+      final case object SpliceApiTokenAllocationV2 extends Package
+      final case object SpliceApiTokenAllocationRequestV2 extends Package
+      final case object SpliceApiTokenAllocationInstructionV2 extends Package
+
       final case object SpliceTokenTestTradingApp extends Package
     }
     final case object SpliceAmulet extends Package

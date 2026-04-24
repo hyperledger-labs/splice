@@ -233,19 +233,25 @@
     "list": [
       {
         "current": {
-          "text": "sv-7",
-          "value": "sv-7"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(splice_history_bulk_storage_object_count,namespace)",
+        "definition": "label_values(splice_history_bulk_storage_updates_count,namespace)",
+        "includeAll": true,
+        "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(splice_history_bulk_storage_object_count,namespace)",
+          "query": "label_values(splice_history_bulk_storage_updates_count,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -256,13 +262,13 @@
     ]
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-2d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Bulk Storage",
   "uid": "cnxl9bn",
-  "version": 6,
+  "version": 3,
   "weekStart": ""
 }

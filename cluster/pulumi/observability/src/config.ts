@@ -87,6 +87,17 @@ const MonitoringConfigSchema = z
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
+      muteTimeIntervals: z
+        .array(
+          z.object({
+            name: z.string(),
+            objectMatchers: z.array(z.tuple([z.string(), z.string(), z.string()])),
+            startTime: z.string(), // UTC
+            endTime: z.string(), // UTC
+            weekdays: z.array(z.string()).optional(), // e.g. ['monday', 'tuesday:friday']
+          })
+        )
+        .default([]),
     }),
   })
   .strict();
