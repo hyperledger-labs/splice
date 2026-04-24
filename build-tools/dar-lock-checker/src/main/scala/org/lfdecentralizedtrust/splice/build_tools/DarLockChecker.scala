@@ -310,11 +310,13 @@ object DarLockChecker {
       File(s"token-standard/${packageName}/daml.yaml"),
       File(s"token-standard/examples/${packageName}/daml.yaml"),
     )
-    candidates.find(_.exists).getOrElse(
-      sys.error(
-        s"Could not locate daml.yaml for $packageName; checked: ${candidates.map(_.toString).mkString(", ")}"
+    candidates
+      .find(_.exists)
+      .getOrElse(
+        sys.error(
+          s"Could not locate daml.yaml for $packageName; checked: ${candidates.map(_.toString).mkString(", ")}"
+        )
       )
-    )
   }
 
   private def fetchMainDarsLock(): Map[(PackageName, PackageVersion), String] = {

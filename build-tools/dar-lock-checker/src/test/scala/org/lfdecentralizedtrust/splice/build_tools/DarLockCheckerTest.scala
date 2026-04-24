@@ -138,7 +138,11 @@ class DarLockCheckerTest extends AnyWordSpec with Matchers {
           |    "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.20"
           |  }
           |}""".stripMargin
-      DarLockChecker.rewritePackageJson(json, pkg("splice-amulet-name-service"), ver("0.1.20")) shouldBe expected
+      DarLockChecker.rewritePackageJson(
+        json,
+        pkg("splice-amulet-name-service"),
+        ver("0.1.20"),
+      ) shouldBe expected
     }
   }
 }
