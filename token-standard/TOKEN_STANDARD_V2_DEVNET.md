@@ -2,7 +2,8 @@
 
 Splice version: `0.6.0-snapshot.20260422.2626.0.v5aaef00e`
 
-Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev`
+Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev/docker`
+So the docker pull command should look like `docker pull ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/SOME_IMAGE:THE_VERSION_ABOVE`
 
 Latest release bundle can be downloaded [here](https://github.com/digital-asset/decentralized-canton-sync/releases/tag/token-standard-v2-upcoming)
 
