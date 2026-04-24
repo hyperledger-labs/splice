@@ -10,7 +10,7 @@ const quotaMetricNameSchema = z
 // Prometheus duration format, e.g. "60s", "5m", "1h"
 const prometheusDurationSchema = z
   .string()
-  .regex(/^\d+[smh]$/, 'Prometheus duration (e.g. "60s", "5m", "1h")');
+  .regex(/^\d+[smh]$/, 'basic Prometheus duration (e.g. "60s", "5m", "1h")');
 
 export function parseDurationToSeconds(d: string): number {
   const match = d.match(/^(\d+)([smh])$/);
@@ -28,14 +28,19 @@ const GcpQuotasConfigSchema = z.object({
   excludedMetrics: z.array(quotaMetricNameSchema),
   excludedApproachingMetrics: z.array(quotaMetricNameSchema),
   rollingWindow: prometheusDurationSchema.refine(v => parseDurationToSeconds(v) >= 60, {
+    // this rule comes from GCP aggregations.alignmentPeriod on quota-exceeded
     message: 'must be at least 60s',
   }),
-  retestWindow: prometheusDurationSchema.refine(v => {
-    const seconds = parseDurationToSeconds(v);
-    return seconds >= 60 && seconds % 60 === 0;
-  }, {
-    message: 'must be at least 60s and a multiple of 1m',
-  }),
+  retestWindow: prometheusDurationSchema.refine(
+    v => {
+      const seconds = parseDurationToSeconds(v);
+      return seconds > 0 && seconds % 60 === 0;
+    },
+    {
+      // this rule comes from GCP duration on quota-exceeded
+      message: 'must be a positive multiple of 1m',
+    }
+  ),
 });
 
 const MonitoringConfigSchema = z
