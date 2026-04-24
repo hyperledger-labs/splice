@@ -133,31 +133,65 @@ SYNCHRONIZER_ID=$(curl -s "$PARTICIPANT_JSON_API/v2/state/connected-synchronizer
 echo "Synchronizer: $SYNCHRONIZER_ID"
 ```
 
-### A.5. Fund the sender party (DevNet tap)
+### A.5. Fund the sender party
 
-The sender needs Amulet holdings before it can distribute. On LocalNet, use the faucet:
+The sender party needs Amulet holdings before it can distribute. Use the wallet UI to tap Amulet via the DevNet faucet:
+
+1. Open the wallet UI at `http://wallet.localhost:2000`
+2. Use the DevNet tap feature to fund the sender party
+
+Alternatively, use the `party-allocator` tool from the Splice repo, which supports DevNet tap via `AmuletRules_DevNet_Tap`.
+
+Verify the sender has holdings:
 
 ```bash
-cd ~/Quickstart/quickstart/docker/setup-internal-parties
-cp .env.example .env
-# Edit .env if needed (defaults usually work for LocalNet)
-./04-faucet-amulet.sh
+curl -s "$PARTICIPANT_JSON_API/v2/state/active-contracts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"filter\": {
+      \"filtersByParty\": {
+        \"$SENDER_PARTY\": {
+          \"cumulative\": [{
+            \"identifierFilter\": {
+              \"TemplateFilter\": {
+                \"value\": {
+                  \"templateId\": \"#splice-amulet:Splice.Amulet:Amulet\",
+                  \"includeCreatedEventBlob\": false
+                }
+              }
+            }
+          }]
+        }
+      }
+    },
+    \"verbose\": true,
+    \"activeAtOffset\": $(curl -s "$PARTICIPANT_JSON_API/v2/state/ledger-end" \
+      -H "Authorization: Bearer $TOKEN" | jq '.offset')
+  }" | jq '.[] | .contractEntry.JsActiveContract.createdEvent.createArguments.amount'
 ```
-
-Or use the Quickstart's built-in faucet via the wallet UI at `http://wallet.localhost:2000`.
 
 ### A.6. Create recipient parties
 
-Allocate internal parties to receive Amulet:
+Allocate test parties directly via the Ledger API:
 
 ```bash
-cd ~/Quickstart/quickstart/docker/setup-internal-parties
+# Allocate 3 test recipient parties
+for i in $(seq 1 3); do
+  PARTY_ID=$(curl -s "$PARTICIPANT_JSON_API/v2/parties/allocate" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"partyIdHint\": \"test-recipient-$i\"}" \
+    | jq -r '.partyId')
+  echo "$PARTY_ID,10.0" >> recipients.csv
+  echo "Allocated: $PARTY_ID"
+done
 
-# Allocate 5 parties with prefix "test-recipient"
-NUM_PARTIES=5 PARTY_HINT_PREFIX=test-recipient ./01-allocate-internal-parties.sh
+# Add header
+sed -i '' '1i\
+party,amount
+' recipients.csv
 ```
-
-This produces `internal-parties.json` with party IDs.
 
 ### A.7. Build and configure amulet-drip
 
@@ -185,21 +219,16 @@ LOG_LEVEL=debug
 EOF
 ```
 
-### A.8. Prepare the CSV and run
+### A.8. Run amulet-drip
 
 ```bash
-# Extract party IDs from the allocated parties into a CSV
-jq -r '.parties[].partyId' \
-  ~/Quickstart/quickstart/docker/setup-internal-parties/internal-parties.json \
-  | awk '{print $1",10.0"}' > parties.csv
+# Run with the recipients CSV from step A.6
+node build/bundle.js drip recipients.csv --output results.json
 
-# Add header
-sed -i '' '1i\
-party,amount
-' parties.csv
-
-# Run amulet-drip
-node build/bundle.js drip parties.csv --output results.json
+# Or do a self-transfer smoke test first
+echo "party,amount" > smoke-test.csv
+echo "$SENDER_PARTY,1.0" >> smoke-test.csv
+node build/bundle.js drip smoke-test.csv --output results.json
 ```
 
 ### A.9. Verify the results
@@ -213,38 +242,7 @@ echo "Succeeded: $(jq '[.transfers[] | select(.status=="success")] | length' res
 echo "Failed: $(jq '[.transfers[] | select(.status=="error")] | length' results.json)"
 ```
 
-Verify on-chain via the Scan UI at `http://scan.localhost:4000` or query holdings directly:
-
-```bash
-# Check a recipient's holdings
-RECIPIENT=$(jq -r '.parties[0].partyId' \
-  ~/Quickstart/quickstart/docker/setup-internal-parties/internal-parties.json)
-
-curl -s "$PARTICIPANT_JSON_API/v2/state/active-contracts" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"filter\": {
-      \"filtersByParty\": {
-        \"$RECIPIENT\": {
-          \"cumulative\": [{
-            \"identifierFilter\": {
-              \"TemplateFilter\": {
-                \"value\": {
-                  \"templateId\": \"#splice-amulet:Splice.Amulet:Amulet\",
-                  \"includeCreatedEventBlob\": false
-                }
-              }
-            }
-          }]
-        }
-      }
-    },
-    \"verbose\": true,
-    \"activeAtOffset\": $(curl -s "$PARTICIPANT_JSON_API/v2/state/ledger-end" \
-      -H "Authorization: Bearer $TOKEN" | jq '.offset')
-  }" | jq '.[] | .contractEntry.JsActiveContract.createdEvent.createArguments.amount'
-```
+Verify on-chain via the Scan UI at `http://scan.localhost:4000`.
 
 ### A.10. Cleanup
 
