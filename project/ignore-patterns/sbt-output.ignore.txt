@@ -133,6 +133,8 @@ WARN: InvalidDefaultArgInFrom
 # the script does not try to be secure
 .*api_jwt\.py:153: InsecureKeyLengthWarning:.*
 
+cannot change locale.*No such file or directory
+
 # Temporarily ignore the warnings around deprecated stuff in our daml tests
 # TODO(#5114): stop using the deprecated APIs, and remove this
 Severity: DsWarning

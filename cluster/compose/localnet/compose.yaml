@@ -197,6 +197,8 @@ services:
       - ${LOCALNET_DIR}/conf/console/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/sv:/app/sv/${SV_PROFILE}
       - ${LOCALNET_DIR}/docker/console/entrypoint.sh:/app/entrypoint.sh
+    tmpfs:
+      - /tmp
     entrypoint: /app/entrypoint.sh
     stdin_open: true
     tty: true
