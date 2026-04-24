@@ -13,7 +13,9 @@ const TransferLegsDisplay: React.FC<{
   transferLegs: TransferLeg[];
   getActionButton: (transferLegId: string, parentComponentId: string) => React.ReactNode | null;
 }> = ({ transferLegs, parentId, getActionButton }) => {
-  const sortedLegs = [...transferLegs].sort((a, b) => a.transferLegId.localeCompare(b.transferLegId));
+  const sortedLegs = [...transferLegs].sort((a, b) =>
+    a.transferLegId.localeCompare(b.transferLegId)
+  );
   return (
     <Container>
       <Table>
@@ -42,7 +44,7 @@ const TransferLegsDisplay: React.FC<{
                   <Stack>
                     <BftAnsEntry partyId={sender.owner} className="allocation-sender" />
                     {sender.provider ? (
-                        <BftAnsEntry partyId={sender.provider} className="allocation-provider" />
+                      <BftAnsEntry partyId={sender.provider} className="allocation-provider" />
                     ) : null}
                     {sender.id ? (
                       <Typography variant="caption" color="text.secondary">

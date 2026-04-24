@@ -231,7 +231,6 @@ const V1AllocationRequestActionButton: React.FC<{
   transferLegId: string;
 }> = ({ parentComponentId, allocationRequest, transferLegId, userParty, allocations }) => {
   const transferLeg = allocationRequest.payload.transferLegs[transferLegId];
-  if (!transferLeg) return null;
   const actionAllowed =
     transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
   const correspondingAllocation = allocations.find(alloc =>

@@ -54,7 +54,8 @@ const AllocationSettlementDisplay: React.FC<{
           </Typography>
           {settlementDeadline ? (
             <Typography variant="body2">
-              Settlement deadline: <DateWithDurationDisplay datetime={settlementDeadline} enableDuration />
+              Settlement deadline:{' '}
+              <DateWithDurationDisplay datetime={settlementDeadline} enableDuration />
             </Typography>
           ) : null}
         </Stack>
