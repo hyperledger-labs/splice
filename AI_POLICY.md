@@ -1,6 +1,6 @@
 # AI Policy
 
-This policy applies to all contributions — code, issues, reviews, comments — to this repository, regardless of whether you are a maintainer or an external contributor.
+This policy applies to all contributions — code, issues, reviews, comments, docs — to this repository, regardless of whether you are a maintainer or an external contributor.
 
 Using AI tools is allowed and often useful. The rules below exist to protect the quality of the codebase and the time of reviewers and other contributors.
 
@@ -21,12 +21,6 @@ The same applies to review comments you leave on others' PRs: do not post AI-gen
 **Issues and PRs that appear to be unreviewed AI output — overlong and padded, referencing things that do not exist, plausible-sounding but wrong, filled with bot-style prose, or (in the case of security reports) describing a vulnerability that does not reproduce against the actual code — may be closed without further discussion.** Maintainers are not obligated to explain, respond to, or debate the merits of such submissions. Repeated submissions of this kind may lead to being blocked from the repository.
 
 If you believe a closure was in error, a single comment with a concrete, verifiable correction is welcome. Further back-and-forth is at maintainers' discretion.
-
-## Do not leak information through AI tools
-
-Do not paste private, security-sensitive, or proprietary information into AI tools outside of your control — including secrets, customer data, and non-public designs or code.
-
-Prefer running agentic AI tools (Claude Code, Copilot CLI, Cursor agents, and similar) inside a sandbox — a VM, container, or dedicated workstation — to limit the blast radius if the tool is compromised or misbehaves.
 
 ## PRs opened autonomously by AI require two human reviews
 
