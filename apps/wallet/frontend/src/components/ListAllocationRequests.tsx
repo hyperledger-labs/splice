@@ -15,14 +15,17 @@ import { useAmuletAllocations } from '../hooks/useAmuletAllocations';
 import MetaDisplay from './MetaDisplay';
 import TransferLegsDisplay from './TransferLegsDisplay';
 import {
-    useWalletClient,
-    AllocationRequest,
-    AmuletAllocation,
-    isV2Allocation,
-    isV2AllocationRequest
+  useWalletClient,
+  AllocationRequest,
+  AmuletAllocation,
+  isV2Allocation,
+  isV2AllocationRequest,
 } from '../contexts/WalletServiceContext';
 import { useMutation } from '@tanstack/react-query';
-import { AllocateAmuletRequest, AllocateAmuletV2Request } from '@lfdecentralizedtrust/wallet-openapi';
+import {
+  AllocateAmuletRequest,
+  AllocateAmuletV2Request,
+} from '@lfdecentralizedtrust/wallet-openapi';
 import {
   SettlementInfo,
   TransferLeg,
@@ -197,7 +200,6 @@ const V2AllocationRequestActionButton: React.FC<{
     },
   });
 
-
   // TODO (#4915): implement withdraw button for v2 when hasExistingAllocation
   if (!canAccept || hasExistingAllocation) return null;
 
@@ -325,15 +327,19 @@ function isAllocationForTransferLeg(
   allocationRequest: Contract<AllocationRequestV1>,
   legId: string
 ): boolean {
-    let sameExecutor: boolean;
-    let sameLegId: boolean;
-    if (isV2Allocation(allocation.payload)) {
-        sameExecutor = allocation.payload.allocation.settlement.executors.some(e => e === allocationRequest.payload.settlement.executor);
-        sameLegId = allocation.payload.allocation.transferLegs.some(leg => leg.transferLegId === legId);
-    } else {
-        sameExecutor = allocation.payload.allocation.settlement.executor === allocationRequest.payload.settlement.executor;
-        sameLegId = allocation.payload.allocation.transferLegId === legId;
-    }
+  let sameExecutor: boolean;
+  let sameLegId: boolean;
+  if (isV2Allocation(allocation.payload)) {
+    sameExecutor = allocation.payload.allocation.settlement.executors.some(
+      e => e === allocationRequest.payload.settlement.executor
+    );
+    sameLegId = allocation.payload.allocation.transferLegs.some(leg => leg.transferLegId === legId);
+  } else {
+    sameExecutor =
+      allocation.payload.allocation.settlement.executor ===
+      allocationRequest.payload.settlement.executor;
+    sameLegId = allocation.payload.allocation.transferLegId === legId;
+  }
   return (
     sameExecutor &&
     allocation.payload.allocation.settlement.settlementRef.id ===
@@ -387,7 +393,7 @@ export function openApiV2RequestFromAllocationRequest(
       settle_at: damlTimestampToOpenApiTimestamp(settlement.settleAt),
       settlement_deadline: settlement.settlementDeadline
         ? damlTimestampToOpenApiTimestamp(settlement.settlementDeadline)
-        : undefined,
+        : null,
       meta: settlement.meta.values,
     },
     transfer_legs: transferLegs.map(leg => ({
@@ -402,27 +408,27 @@ export function openApiV2RequestFromAllocationRequest(
 
 /** Convert V1 AllocationRequest fields to V2 shapes for display */
 function v1RequestToV2Display(payload: AllocationRequestV1): {
-    settlement: SettlementInfo;
-    transferLegs: TransferLeg[];
+  settlement: SettlementInfo;
+  transferLegs: TransferLeg[];
 } {
-    return {
-        settlement: {
-            executors: [payload.settlement.executor],
-            settlementRef: payload.settlement.settlementRef,
-            requestedAt: payload.settlement.requestedAt,
-            settleAt: payload.settlement.settleBefore,
-            settlementDeadline: null,
-            meta: payload.settlement.meta,
-        },
-        transferLegs: Object.entries(payload.transferLegs).map(([legId, leg]) => ({
-            transferLegId: legId,
-            sender: { owner: leg.sender, provider: null, id: '' },
-            receiver: { owner: leg.receiver, provider: null, id: '' },
-            amount: leg.amount,
-            instrumentId: leg.instrumentId,
-            meta: leg.meta,
-        })),
-    };
+  return {
+    settlement: {
+      executors: [payload.settlement.executor],
+      settlementRef: payload.settlement.settlementRef,
+      requestedAt: payload.settlement.requestedAt,
+      settleAt: payload.settlement.settleBefore,
+      settlementDeadline: null,
+      meta: payload.settlement.meta,
+    },
+    transferLegs: Object.entries(payload.transferLegs).map(([legId, leg]) => ({
+      transferLegId: legId,
+      sender: { owner: leg.sender, provider: null, id: '' },
+      receiver: { owner: leg.receiver, provider: null, id: '' },
+      amount: leg.amount,
+      instrumentId: leg.instrumentId,
+      meta: leg.meta,
+    })),
+  };
 }
 
 export default ListAllocationRequests;

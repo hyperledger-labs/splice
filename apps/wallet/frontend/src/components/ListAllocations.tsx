@@ -76,7 +76,8 @@ const AllocationDisplay: React.FC<{ allocation: Contract<AmuletAllocation | Amul
             parentId={allocation.contractId}
             transferLegs={transferLegs}
             getActionButton={() => (
-              <WithdrawAllocationButton allocationCid={allocation.contractId} />
+              // TODO (#4915): implement withdraw button for v2 when hasExistingAllocation
+              v2 ? null : <WithdrawAllocationButton allocationCid={allocation.contractId} />
             )}
           />
         </Stack>
