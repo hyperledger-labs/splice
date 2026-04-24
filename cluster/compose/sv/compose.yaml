@@ -54,6 +54,8 @@ services:
       - CANTON_DOMAIN_POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}
       - CANTON_SEQUENCER_POSTGRES_DB=sequencer
       - CANTON_DOMAIN_INITIALIZE=false
+    tmpfs:
+      - /tmp
     depends_on:
       postgres-splice-sv:
         condition: service_healthy
@@ -77,6 +79,8 @@ services:
       - CANTON_PARTICIPANT_ADMIN_USER_NAME=administrator
       - AUTH_TARGET_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
       - ADDITIONAL_CONFIG_DISABLE_AUTH=canton.participants.participant.ledger-api.auth-services=[]
+    tmpfs:
+      - /tmp
     depends_on:
       postgres-splice-sv:
         condition: service_healthy
