@@ -88,25 +88,31 @@ class AllocationsFrontendIntegrationTest
 
     actAndCheck(
       "create allocation", {
-        textField("create-allocation-transfer-leg-id").underlying
+        textField("create-allocation-transfer-leg-id-0").underlying
           .sendKeys(wantedAllocation.transferLegId)
         textField("create-allocation-settlement-ref-id").underlying
           .sendKeys(wantedAllocation.settlement.settlementRef.id)
-        eventuallyClickOn(id("create-allocation-transfer-leg-receiver"))
+        eventuallyClickOn(id("create-allocation-transfer-leg-sender-0"))
         setAnsField(
-          textField("create-allocation-transfer-leg-receiver"),
+          textField("create-allocation-transfer-leg-sender-0"),
+          sender.toProtoPrimitive,
+          sender.toProtoPrimitive,
+        )
+        eventuallyClickOn(id("create-allocation-transfer-leg-receiver-0"))
+        setAnsField(
+          textField("create-allocation-transfer-leg-receiver-0"),
           receiver.toProtoPrimitive,
           receiver.toProtoPrimitive,
         )
-        eventuallyClickOn(id("create-allocation-settlement-executor"))
+        eventuallyClickOn(id("create-allocation-settlement-executor-0"))
         setAnsField(
-          textField("create-allocation-settlement-executor"),
+          textField("create-allocation-settlement-executor-0"),
           validatorPartyId.toProtoPrimitive,
           validatorPartyId.toProtoPrimitive,
         )
-        eventuallyClickOn(id("create-allocation-amulet-amount"))
-        numberField("create-allocation-amulet-amount").value = ""
-        numberField("create-allocation-amulet-amount").underlying.sendKeys(
+        eventuallyClickOn(id("create-allocation-0-amulet-amount"))
+        numberField("create-allocation-0-amulet-amount").value = ""
+        numberField("create-allocation-0-amulet-amount").underlying.sendKeys(
           wantedAllocation.transferLeg.amount.toString
         )
 
@@ -118,21 +124,12 @@ class AllocationsFrontendIntegrationTest
               wantedAllocation.settlement.requestedAt.atOffset(ZoneOffset.UTC)
             )
           )
-        textField("create-allocation-settlement-settle-before").underlying
+        textField("create-allocation-settlement-settle-at").underlying
           .sendKeys(
             allocationTimestampFormat.format(
               wantedAllocation.settlement.settleBefore.atOffset(ZoneOffset.UTC)
             )
           )
-        textField("create-allocation-settlement-allocate-before").underlying
-          .sendKeys(
-            allocationTimestampFormat.format(
-              wantedAllocation.settlement.allocateBefore.atOffset(ZoneOffset.UTC)
-            )
-          )
-
-        setMeta(wantedAllocation.settlement.meta, "settlement")
-        setMeta(wantedAllocation.transferLeg.meta, "transfer-leg")
 
         eventuallyClickOn(id("create-allocation-submit-button"))
       },
@@ -145,7 +142,7 @@ class AllocationsFrontendIntegrationTest
           allocation,
           wantedAllocation.settlement.settlementRef.id,
           wantedAllocation.settlement.settlementRef.cid.map(_.contractId).toScala,
-          wantedAllocation.settlement.executor,
+          Seq(wantedAllocation.settlement.executor),
         )
 
         checkTransferLegs(
@@ -156,16 +153,6 @@ class AllocationsFrontendIntegrationTest
         )
       },
     )
-  }
-
-  private def setMeta(meta: Metadata, idPrefix: String)(implicit webDriver: WebDriverType) = {
-    import scala.jdk.CollectionConverters.*
-
-    meta.values.asScala.zipWithIndex.foreach { case ((key, value), index) =>
-      eventuallyClickOn(id(s"$idPrefix-add-meta"))
-      textField(s"$idPrefix-meta-key-$index").underlying.sendKeys(key)
-      textField(s"$idPrefix-meta-value-$index").underlying.sendKeys(value)
-    }
   }
 
   "A wallet UI" should {
@@ -211,7 +198,7 @@ class AllocationsFrontendIntegrationTest
               allocationRequest,
               "OTCTradeProposal", // hardcoded in daml
               Some(otcTrade.trade.data.tradeCid.contractId),
-              venueParty.toProtoPrimitive,
+              Seq(venueParty.toProtoPrimitive),
             )
 
             checkTransferLegs(allocationRequest, otcTrade.trade.data.transferLegs.asScala.toMap)
@@ -244,7 +231,7 @@ class AllocationsFrontendIntegrationTest
               allocation,
               "OTCTradeProposal", // hardcoded in daml
               Some(otcTrade.trade.data.tradeCid.contractId),
-              venueParty.toProtoPrimitive,
+              Seq(venueParty.toProtoPrimitive),
             )
 
             checkTransferLegs(allocation, otcTrade.trade.data.transferLegs.asScala.toMap)
@@ -314,7 +301,7 @@ class AllocationsFrontendIntegrationTest
       parent: Element,
       id: String,
       cid: Option[String],
-      executor: String,
+      executors: Seq[String],
   ) = {
     seleniumText(
       parent.childElement(className("settlement-id"))
@@ -326,9 +313,10 @@ class AllocationsFrontendIntegrationTest
         parent.childElement(className("settlement-cid"))
       ) should be(s"SettlementRef cid: $cid")
     )
-    seleniumText(
-      parent.childElement(className("settlement-executor"))
-    ) should matchText(executor)
+    val executorElements = parent.findAllChildElements(className("settlement-executor")).toSeq
+    executorElements.map(seleniumText).zip(executors).foreach { case (actual, expected) =>
+      actual should matchText(expected)
+    }
   }
 
   private def checkTransferLegs(
