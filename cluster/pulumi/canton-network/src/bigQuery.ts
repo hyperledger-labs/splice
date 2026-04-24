@@ -23,8 +23,14 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
 import { spliceConfig } from '../../common/src/config/config';
-import { computedDataTable } from './bigQuery_functions';
-import { BIGNUMERIC, BQColumn, BQTable, FLOAT64, INT64, TIMESTAMP } from './bigQuery_functions_types';
+import {
+  BIGNUMERIC,
+  BQColumn,
+  BQTable,
+  FLOAT64,
+  INT64,
+  TIMESTAMP,
+} from './bigQuery_functions_types';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -457,20 +463,13 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  installDatastream(
-    postgres,
-    sourceProfile,
-    destinationProfile,
-    dataset,
-    pubRepSlots
-  );
+  installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
 
   // We installed the dashboards dataset, which consists of all the processed data,
   // from the canton-network stack initially, so for now we keep it here just to avoid
   // recreating it (or messing with pulumi export-import to move it to the cn-internal
   // pulumi stack)
-  // TODO(XXX): move it (perhaps the easiest is: create a new one from the internal stack first,
-  // just copy the data, then destroy the old one)
+  // TODO(DACH-NY/canton-network-internal#4773): move it.
   installDashboardsDataset();
   return;
 }
