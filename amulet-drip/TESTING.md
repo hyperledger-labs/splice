@@ -315,6 +315,63 @@ Once Canton is healthy, it generates `canton.tokens` and `canton.participants` i
 
 This starts the Splice validator, scan, wallet, and other backend services. It reads `canton.tokens` to configure auth, so Canton must be running first.
 
+Optionally, start the frontend UIs:
+
+```bash
+./start-frontends.sh
+```
+
+### Local Splice Port Reference
+
+Once Canton and backends are running, the following services are available. Ports follow a numbering pattern where the hundreds digit identifies the node (1=SV1, 2=SV2, ..., 5=Alice, 6=Bob, 7=Splitwell) and the last two digits identify the service type.
+
+> **Note:** `start-backends-for-local-frontend-testing.sh` starts a subset of backends (SV1, Alice, Splitwell). Not all ports listed below will be active unless the corresponding backend is started.
+
+#### Canton Participant Nodes
+
+| Node | Ledger API (gRPC) | Admin API | HTTP JSON API | User ID |
+|------|-------------------|-----------|---------------|---------|
+| SV1 | `5101` | `5102` | `6101` | `sv1` |
+| SV2 | `5201` | `5202` | `6201` | `sv2` |
+| SV3 | `5301` | `5302` | `6301` | `sv3` |
+| SV4 | `5401` | `5402` | `6401` | `sv4` |
+| Alice | `5501` | `5502` | `6501` | `alice_validator_user` |
+| Bob | `5601` | `5602` | `6601` | `bob_validator_user` |
+| Splitwell | `5701` | `5702` | `6701` | `splitwell_validator_user` |
+
+#### Splice Backend Services
+
+| Service | Port | URL | Started by default |
+|---------|------|-----|--------------------|
+| Scan API | `5012` | `http://localhost:5012/api/scan` | Yes |
+| SV1 Validator API | `5103` | `http://localhost:5103/api/validator` | Yes |
+| SV1 App API | `5114` | `http://localhost:5114/api/sv` | Yes |
+| Alice Validator API | `5503` | `http://localhost:5503/api/validator` | Yes |
+| Splitwell Validator API | `5703` | `http://localhost:5703/api/validator` | Yes |
+| Splitwell Backend | `5113` | `http://localhost:5113/api/splitwell` | Yes |
+| Bob Validator API | `5603` | `http://localhost:5603/api/validator` | No |
+| SV2-4 Validator APIs | `5203`/`5303`/`5403` | `http://localhost:5x03/api/validator` | No |
+
+#### Frontend UIs (via `start-frontends.sh`)
+
+| UI | Port | URL |
+|----|------|-----|
+| Alice Wallet | `3000` | `http://localhost:3000` |
+| Bob Wallet | `3001` | `http://localhost:3001` |
+| SV1 Wallet | `3011` | `http://localhost:3011` |
+| Amulet Name Service (Alice) | `3100` | `http://localhost:3100` |
+| SV1 App | `3211` | `http://localhost:3211` |
+| Scan Explorer | `3311` | `http://localhost:3311` |
+| Splitwell (Alice) | `3400` | `http://localhost:3400` |
+| Splitwell (Bob) | `3401` | `http://localhost:3401` |
+
+#### Ports used by amulet-drip
+
+| Env Variable | Port | Service |
+|--------------|------|---------|
+| `PARTICIPANT_LEDGER_API` | `6501` | Alice's HTTP JSON API |
+| `VALIDATOR_API_URL` | `5503` | Alice's validator scan-proxy (`/api/validator/v0/scan-proxy`) |
+
 ### B.6. Get access tokens
 
 The Splice backend services use **self-signed HMAC256 JWTs** for authentication — not the raw hex tokens from `canton.tokens`. The JWT secret is `"test"` and the audience is set by the `OIDC_AUTHORITY_LEDGER_API_AUDIENCE` environment variable (typically `https://canton.network.global` in the Nix dev shell).
