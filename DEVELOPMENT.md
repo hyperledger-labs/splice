@@ -378,13 +378,23 @@ Whenever you update a .dar file, the version of the corresponding daml package â
 The one-command path:
 
 ```bash
-git fetch origin main       # needed so the tool can compare against main
+git fetch origin            # needed so the tool can compare against the latest release line branch
 sbt damlBumpPackageVersions
 ```
 
-The bump target is always `max(origin/main version) + 1`, so feature branches stay at `main+1`.
+By default the bump target is `max(latest release line version) + 1`, matching what the
+DAR lock checker enforces â€” so a branch that's about to land on `main` doesn't re-bump a
+package that has already been bumped on `main` since the last release.
 
-If the auto-bumper can't help (e.g. you want a minor/major bump, or need to compare against a release line rather than `origin/main`), fall back to the manual steps:
+For long-running branches that aren't merging to main soon, bumping relative to `main` or some other branch might make more sense.
+You can achieve that by passing a git ref as an argument; this ref will be used as the base for the bump instead of the latest release line.
+For example:
+
+```bash
+sbt 'damlBumpPackageVersions origin/main'
+```
+
+If the auto-bumper can't help (e.g. you want a minor/major bump), fall back to the manual steps:
 
 1. Bump the version inside the `daml.yaml` file inside the updated module, and in all modules that (recursively) depend on it.
 2. Run `sbt damlBuild; sbt damlDarsLockFileUpdate` to compile the `.dar` files.

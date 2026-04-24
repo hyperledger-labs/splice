@@ -14,36 +14,36 @@ class DarLockCheckerTest extends AnyWordSpec with Matchers {
   private def key(name: String, v: String) = (pkg(name), ver(v))
 
   "detectBumps" should {
-    "return empty when branch and main match exactly" in {
+    "return empty when branch and compare base match exactly" in {
       val branch = Map(key("splice-amulet", "0.1.18") -> "hashA")
-      val main = Map(key("splice-amulet", "0.1.18") -> "hashA")
-      DarLockChecker.detectBumps(branch, main) shouldBe empty
+      val compare = Map(key("splice-amulet", "0.1.18") -> "hashA")
+      DarLockChecker.detectBumps(branch, compare) shouldBe empty
     }
 
-    "detect a hash mismatch and bump to main's max + patch" in {
+    "detect a hash mismatch and bump to compare base's max + patch" in {
       val branch = Map(key("splice-amulet", "0.1.18") -> "branchHash")
-      val main = Map(
-        key("splice-amulet", "0.1.17") -> "mainHash17",
-        key("splice-amulet", "0.1.18") -> "mainHash18",
+      val compare = Map(
+        key("splice-amulet", "0.1.17") -> "compareHash17",
+        key("splice-amulet", "0.1.18") -> "compareHash18",
       )
-      DarLockChecker.detectBumps(branch, main) shouldBe Seq(
+      DarLockChecker.detectBumps(branch, compare) shouldBe Seq(
         DarLockChecker.BumpTarget(pkg("splice-amulet"), ver("0.1.18"), ver("0.1.19"))
       )
     }
 
-    "ignore branch-only versions not present on main" in {
+    "ignore branch-only versions not present in compare base" in {
       val branch = Map(key("splice-amulet", "0.1.20") -> "branchHash")
-      val main = Map(key("splice-amulet", "0.1.18") -> "mainHash18")
-      DarLockChecker.detectBumps(branch, main) shouldBe empty
+      val compare = Map(key("splice-amulet", "0.1.18") -> "compareHash18")
+      DarLockChecker.detectBumps(branch, compare) shouldBe empty
     }
 
-    "pick the maximum version on main even if branch is behind it" in {
+    "pick the maximum version in compare base even if branch is behind it" in {
       val branch = Map(key("splice-amulet", "0.1.15") -> "branchHash")
-      val main = Map(
-        key("splice-amulet", "0.1.15") -> "mainHashOther",
-        key("splice-amulet", "0.1.19") -> "mainHash19",
+      val compare = Map(
+        key("splice-amulet", "0.1.15") -> "compareHashOther",
+        key("splice-amulet", "0.1.19") -> "compareHash19",
       )
-      DarLockChecker.detectBumps(branch, main) shouldBe Seq(
+      DarLockChecker.detectBumps(branch, compare) shouldBe Seq(
         DarLockChecker.BumpTarget(pkg("splice-amulet"), ver("0.1.15"), ver("0.1.20"))
       )
     }
@@ -53,11 +53,11 @@ class DarLockCheckerTest extends AnyWordSpec with Matchers {
         key("splice-wallet", "0.1.18") -> "branchWallet",
         key("splice-amulet", "0.1.18") -> "branchAmulet",
       )
-      val main = Map(
-        key("splice-wallet", "0.1.18") -> "mainWallet",
-        key("splice-amulet", "0.1.18") -> "mainAmulet",
+      val compare = Map(
+        key("splice-wallet", "0.1.18") -> "compareWallet",
+        key("splice-amulet", "0.1.18") -> "compareAmulet",
       )
-      DarLockChecker.detectBumps(branch, main).map(_.name.toString) shouldBe
+      DarLockChecker.detectBumps(branch, compare).map(_.name.toString) shouldBe
         Seq("splice-amulet", "splice-wallet")
     }
   }
