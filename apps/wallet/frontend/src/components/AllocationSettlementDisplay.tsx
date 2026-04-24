@@ -6,17 +6,17 @@ import Typography from '@mui/material/Typography';
 import { DateWithDurationDisplay } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsEntry from './BftAnsEntry';
 import MetaDisplay from './MetaDisplay';
-import { SettlementInfo } from '@daml.js/splice-api-token-allocation/lib/Splice/Api/Token/AllocationV1/module';
+import { SettlementInfo } from '@daml.js/splice-api-token-allocation-v2/lib/Splice/Api/Token/AllocationV2/module';
 
 const AllocationSettlementDisplay: React.FC<{
   settlement: SettlementInfo;
 }> = ({ settlement }) => {
   const {
-    settleBefore,
+    settleAt,
     requestedAt,
-    allocateBefore,
+    settlementDeadline,
     settlementRef,
-    executor,
+    executors,
     meta: settlementMeta,
   } = settlement;
 
@@ -40,19 +40,23 @@ const AllocationSettlementDisplay: React.FC<{
       </Stack>
       <Stack direction="row" spacing={2}>
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="body2">Executor:</Typography>
-          <BftAnsEntry partyId={executor} className="settlement-executor" />
+          <Typography variant="body2">Executors:</Typography>
+          {executors.map((executor: string, idx: number) => (
+            <BftAnsEntry key={idx} partyId={executor} className="settlement-executor" />
+          ))}
         </Stack>
         <Stack>
           <Typography variant="body2">
             Requested at: <DateWithDurationDisplay datetime={requestedAt} enableDuration />
           </Typography>
           <Typography variant="body2">
-            Allocate before: <DateWithDurationDisplay datetime={allocateBefore} enableDuration />
+            Settle at: <DateWithDurationDisplay datetime={settleAt} enableDuration />
           </Typography>
-          <Typography variant="body2">
-            Settle before: <DateWithDurationDisplay datetime={settleBefore} enableDuration />
-          </Typography>
+          {settlementDeadline ? (
+            <Typography variant="body2">
+              Settlement deadline: <DateWithDurationDisplay datetime={settlementDeadline} enableDuration />
+            </Typography>
+          ) : null}
         </Stack>
       </Stack>
       {Object.keys(settlementMeta.values).length > 0 ? (
