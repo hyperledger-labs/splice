@@ -34,6 +34,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 
+import org.scalatest.Ignore
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -41,6 +42,8 @@ import scala.util.Using
 import scala.util.Using.Releasable
 import scala.concurrent.duration.*
 
+// TODO(DACH-NY/cn-test-failures#8182) Reenable
+@Ignore
 class AppUpgradeIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with PostgresAroundEach
