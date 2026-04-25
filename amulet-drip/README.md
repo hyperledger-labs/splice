@@ -48,7 +48,7 @@ sequenceDiagram
 
     Note over CLI: Select best-fit holding<br/>(smallest >= requested amount)
 
-    CLI->>Registry: POST /v0/scan-proxy/registry/<br/>transfer-instruction/v1/transfer-factory
+    CLI->>Registry: POST /api/validator/v0/scan-proxy/<br/>registry/transfer-instruction/v1/transfer-factory
     Registry-->>CLI: factoryId + choiceContext + disclosedContracts
 
     CLI->>Ledger: POST /v2/commands/submit-and-wait-for-transaction
@@ -107,13 +107,13 @@ flowchart LR
     Fallback --> Use
 ```
 
-This minimizes unnecessary change outputs and follows the same strategy used by the Splice Quickstart setup scripts.
+This minimizes unnecessary change outputs and avoids splitting holdings across multiple inputs.
 
 ## Prerequisites
 
 - A running Canton/Splice network with a participant node
 - A funded internal sender party with Amulet holdings
-- Access tokens for both the Participant Ledger API and Validator API
+- Self-signed JWTs (HMAC256) for the Participant Ledger API and Validator scan-proxy API (see [TESTING.md](TESTING.md) for token generation)
 - Node.js >= 18
 
 ## Installation
@@ -132,14 +132,14 @@ Create a `.env` file or export environment variables:
 
 ```bash
 # Required
-export PARTICIPANT_LEDGER_API="http://localhost:2975"
-export LEDGER_ACCESS_TOKEN="your-ledger-token"
-export VALIDATOR_API_URL="http://localhost:2903/api/validator/v0/scan-proxy"
-export VALIDATOR_ACCESS_TOKEN="your-validator-token"
-export ADMIN_USER="ledger-api-user"
-export SYNCHRONIZER_ID="synchronizer::1220..."
-export SENDER_PARTY_ID="sender-party::1220..."
-export INSTRUMENT_ADMIN="dso-party::1220..."
+export PARTICIPANT_LEDGER_API="http://localhost:6501"
+export LEDGER_ACCESS_TOKEN="<self-signed-jwt>"
+export VALIDATOR_API_URL="http://localhost:5503/api/validator/v0/scan-proxy"
+export VALIDATOR_ACCESS_TOKEN="<self-signed-jwt>"
+export ADMIN_USER="alice_validator_user"
+export SYNCHRONIZER_ID="global-domain::1220..."
+export SENDER_PARTY_ID="alice-validator-1::1220..."
+export INSTRUMENT_ADMIN="DSO::1220..."
 
 # Optional
 export INSTRUMENT_ID="Amulet"          # default: Amulet
@@ -211,10 +211,10 @@ The output JSON includes metadata and per-transfer results:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PARTICIPANT_LEDGER_API` | Yes | — | Canton JSON API URL |
-| `LEDGER_ACCESS_TOKEN` | Yes | — | Bearer token for Ledger API |
-| `VALIDATOR_API_URL` | Yes | — | Validator scan-proxy base URL (e.g., `.../api/validator/v0/scan-proxy`) |
-| `VALIDATOR_ACCESS_TOKEN` | Yes | — | Bearer token for Validator API |
+| `PARTICIPANT_LEDGER_API` | Yes | — | Canton HTTP JSON API URL (e.g., `http://localhost:6501`) |
+| `LEDGER_ACCESS_TOKEN` | Yes | — | Self-signed JWT (HMAC256) for Ledger API |
+| `VALIDATOR_API_URL` | Yes | — | Validator scan-proxy base URL (e.g., `http://localhost:5503/api/validator/v0/scan-proxy`) |
+| `VALIDATOR_ACCESS_TOKEN` | Yes | — | Self-signed JWT (HMAC256) for Validator API |
 | `ADMIN_USER` | Yes | — | Canton user ID for command submission |
 | `SYNCHRONIZER_ID` | Yes | — | Synchronizer ID for commands |
 | `SENDER_PARTY_ID` | Yes | — | Funded internal sender party |

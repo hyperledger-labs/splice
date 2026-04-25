@@ -494,19 +494,21 @@ Expected: all 26 unit tests pass (config, csv-parser, holdings).
 ```mermaid
 flowchart TD
     subgraph Setup["Setup (once)"]
-        A[Start Canton/Splice network] --> B[Fund sender party]
-        B --> C[Allocate recipient parties]
-        C --> D[Build amulet-drip]
-        D --> E[Configure .env]
+        A[Build Splice] --> B[Start PostgreSQL + Canton]
+        B --> C[Start Splice backends]
+        C --> D[Generate self-signed JWT]
+        D --> E[Resolve party IDs + synchronizer ID]
+        E --> F[Build amulet-drip]
+        F --> G[Configure .env]
     end
 
     subgraph Test["Test cycle (repeat)"]
-        F[Prepare CSV] --> G[Run amulet-drip]
-        G --> H{Check results.json}
-        H -->|All success| I[Verify on-chain via Scan UI]
-        H -->|Failures| J[Check LOG_LEVEL=debug output]
-        J --> K[Fix config / retry]
-        K --> F
+        H[Prepare CSV] --> I[Run amulet-drip]
+        I --> J{Check results.json}
+        J -->|All success| K[Verify on-chain via Scan UI]
+        J -->|Failures| L[Check LOG_LEVEL=debug output]
+        L --> M[Fix config / retry]
+        M --> H
     end
 
     Setup --> Test
@@ -517,17 +519,44 @@ flowchart TD
 
 ## Troubleshooting
 
+#### Build Issues
+
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Sender has no Amulet holdings` | Sender party not funded | Run faucet script or tap via wallet UI |
-| `HTTP 404` on transfer factory | `VALIDATOR_API_URL` path is wrong | Must end with `/api/validator/v0/scan-proxy` (the OpenAPI client appends `/registry/...`) |
-| `Failed to get transfer factory` | Validator scan-proxy unreachable | Check `VALIDATOR_API_URL` and that validator is running |
-| `The supplied authentication is invalid` | Wrong token type for the API | Use self-signed JWT (HMAC256, secret `"test"`), not raw hex from `canton.tokens` |
-| `HTTP 401` on any API call | Token expired or wrong audience | Regenerate JWT with audience `https://canton.network.global` |
-| `cd: too many arguments` in Canton tmux | Shell alias shadows `canton` binary | Remove `alias canton=...` from `~/.zshrc` and restart tmux session |
+| `sphinx-build` locale error during `sbt bundle` | Nix Python can't see macOS locales | Run `LC_ALL=C.UTF-8 sbt bundle` or skip docs: `sbt 'set docs / bundle := {}' bundle` |
+
+#### Canton Startup Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `cd: too many arguments` in Canton tmux | Possible shell alias shadowing the `canton` binary | Check with `alias \| grep canton` — if an alias exists, remove it from your shell config and restart the tmux session |
 | Canton timeout (300s) then fails | Stale database from previous run | `./scripts/postgres.sh docker stop` then restart Canton |
+| `docker: Error response from daemon: Conflict` | Postgres container already exists | `./scripts/postgres.sh docker stop` first, then retry |
 | `canton.tokens` not found | Canton not started or crashed | Start Canton first: `./start-canton.sh -d -w` |
+| `duplicate session: cn-frontends` | Frontend tmux session already running | Harmless — frontends are already up. Kill with `tmux kill-session -t cn-frontends` if you want to restart |
+
+#### Authentication Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `The supplied authentication is invalid` | Wrong token type for the API | Use self-signed JWT (HMAC256, secret `"test"`), not raw hex from `canton.tokens` |
+| `HTTP 401` on any API call | Token has wrong audience or user | Regenerate JWT with audience `https://canton.network.global` and correct `sub` claim |
+| `HTTP 403` on JSON API (6x01) | JWT `sub` doesn't match the participant's user | Use the correct user ID (e.g., `alice_validator_user` for port 6501) |
+
+#### Transfer Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `Sender has no Amulet holdings` | Sender party not funded | Use wallet UI DevNet tap or `party-allocator` to fund |
+| `HTTP 404` on transfer factory | `VALIDATOR_API_URL` path is wrong | Must end with `/api/validator/v0/scan-proxy` (the OpenAPI client appends `/registry/...`) |
+| `Failed to get transfer factory` | Validator scan-proxy unreachable | Check `VALIDATOR_API_URL` and that validator backend is running |
 | `PARTY_NOT_KNOWN_ON_DOMAIN` | Recipient not allocated on this participant | Allocate parties on the same participant node |
+| `INSTRUMENT_ADMIN` mismatch | DSO party ID is wrong | Re-query via scan-proxy `/dso-party-id` endpoint |
+
+#### Network Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
 | `No connected synchronizer` | Canton not fully initialized | Wait longer after `start-canton.sh` |
 | Connection refused on port 6501 | JSON API not started | Check Canton tmux session: `tmux attach -t canton` |
-| `INSTRUMENT_ADMIN` mismatch | DSO party ID is wrong | Re-query via scan-proxy `/dso-party-id` endpoint |
+| Connection refused on port 5503 | Validator backend not started | Run `./scripts/start-backends-for-local-frontend-testing.sh` |
