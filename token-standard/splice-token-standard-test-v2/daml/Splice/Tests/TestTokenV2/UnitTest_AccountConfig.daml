@@ -13,9 +13,12 @@ import Splice.Testing.Tokens.TestTokenV2.AccountConfig
 import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import qualified Splice.Api.Token.TransferInstructionV2 as V2
+import qualified Splice.Api.Token.AllocationInstructionV2 as V2
+import qualified Splice.Api.Token.AllocationV2 as V2
 import DA.List (dedupSort)
 
 ad : Party = fromSome $ partyFromText "admin"
+ex : Party = fromSome $ partyFromText "executor"
 -- investor parties
 a : Party = fromSome $ partyFromText "a"
 b : Party = fromSome $ partyFromText "b"
@@ -76,8 +79,8 @@ sc id admin owner provider =
   let acc = ic id admin owner provider
    in acc with account.provider = None
 
-test_availableActions : Script ()
-test_availableActions = do 
+test_availableTransferInstructionActions : Script ()
+test_availableTransferInstructionActions = do 
   let
     test_cases = [
 
@@ -188,7 +191,7 @@ test_availableActions = do
 
       -- In the self-custodial case, the extra steps fall away. This is equally true
       -- for other account types if investors are their own providers.
-        <> (mconcat . (flip map) [j, p, pc, ic, sc])  (\acc -> [        
+      <> (mconcat . (flip map) [j, p, pc, ic, sc])  (\acc -> [        
       (a, a, b, b, acc, acc, [], [] ,[], [[a]], [], []),
       -- Now it's sender-authorized
       (a, a, b, b, acc, acc, [a], [] ,[], [[b]], [[a]], [[b]]),
@@ -213,14 +216,14 @@ test_availableActions = do
       ]
       
   forA_ test_cases (\(s, ps, r, pr, mks, mkr, aa, wa, ra, eaa, ewa, era) ->
-    test_case s ps r pr mks mkr aa wa ra eaa ewa era)
+    test_transfer_instruction_case s ps r pr mks mkr aa wa ra eaa ewa era)
 
-test_case : Party -> Party -> Party -> Party
+test_transfer_instruction_case : Party -> Party -> Party -> Party
   -> MkAccountConfig -> MkAccountConfig
   -> [Party] -> [Party] -> [Party]
   -> [[Party]] -> [[Party]] -> [[Party]]
   -> Script ()
-test_case sender senderProvider receiver receiverProvider mkacSender mkacReceiver
+test_transfer_instruction_case sender senderProvider receiver receiverProvider mkacSender mkacReceiver
   acceptAuthorizers withdrawAuthorizers rejectAuthorizers 
   expectedAcceptActors expectedWithdrawActors expectedRejectActors = do
   let
@@ -244,3 +247,134 @@ test_case sender senderProvider receiver receiverProvider mkacSender mkacReceive
     (reversedAvailableActions == expectedAvailableActions)
 
   return ()
+
+-- Allocation Instruction Tests
+test_availableAllocationInstructionActions : Script ()
+test_availableAllocationInstructionActions = do 
+  let
+    test_cases = [
+      -- Start with Joint/Joint and all different parties
+      (a, v, j, [], [], [[a] ,[v], [a,v]], []),
+      (a, v, j, [a], [], [[v]], [[a]]),
+      (a, v, j, [v], [], [[a]], [[v]]),
+      (a, v, j, [a,v], [], [], [[a] ,[v], [a,v]]),
+      (a, v, j, [a], [a], [[v]], []),
+      (a, v, j, [v], [v], [[a]], []),
+      (a, v, j, [a,v], [a,v], [], []),
+      (a, v, p, [], [], [[a, v], [v]], []),
+      (a, v, p, [v], [], [[a]], [[v]]),
+      (a, v, p, [a,v], [], [], [[v], [a,v]]),
+      (a, v, p, [v], [v], [[a]], []),
+      (a, v, p, [a,v], [a,v], [], [])
+      ]
+      -- We do not expect a difference between provider confirmed, investor controlled,
+      -- In both cases the investor authorizes first. 
+      -- The second authorization from the provider is needed, but pulled in thorugh
+      -- the accounts
+      <> (mconcat . (flip map) [pc, ic])  (\acc -> [
+      (a, v, acc, [], [], [[a], [a, v]], []),
+      (a, v, acc, [a], [], [[v]], [[a]]),
+      (a, v, acc, [a,v], [], [], [[a], [a,v]]),
+      (a, v, acc, [a], [a], [[v]], []),
+      (a, v, acc, [a,v], [a,v], [], [])
+      ])
+
+            -- In the self-custodial case, the extra steps fall away. This is equally true
+      -- for other account types if investors are their own providers.
+      <> (mconcat . (flip map) [j, p, pc, ic, sc])  (\acc -> [        
+      (a, a, acc, [], [], [[a]], []),
+      (a, a, acc, [a], [], [], [[a]]),
+      (a, a, acc, [a], [a], [], [])
+      ])
+
+  forA_ test_cases (\(authorizer, provider, mkacc, aa, wa, eaa, ewa) ->
+    test_allocation_instruction_case authorizer provider mkacc aa wa eaa ewa)
+
+
+test_allocation_instruction_case : Party -> Party
+  -> MkAccountConfig 
+  -> [Party] -> [Party]
+  -> [[Party]] -> [[Party]]
+  -> Script ()
+test_allocation_instruction_case authorizer provider mkacc
+  acceptAuthorizers withdrawAuthorizers  
+  expectedAcceptActors expectedWithdrawActors  = do
+    let
+      account = mkacc "authorizer" ad authorizer provider
+      actionAuthorizers = Map.fromList [(V2.AIA_Accept, acceptAuthorizers), (V2.AIA_Withdraw, withdrawAuthorizers)]
+      availableActions = mkAvailableAllocationInstructionActions actionAuthorizers account
+      reversedAvailableActions = reverseMap availableActions
+      expectedAvailableActions = Map.fromList $
+        filter (\(_, x) -> not (null x)) [(V2.AIA_Accept, dedupSort expectedAcceptActors), (V2.AIA_Withdraw, dedupSort expectedWithdrawActors)]
+
+    assertMsg
+      (T.unlines [
+          "Unexpected avaialble actions.",
+          "Account: " <> show account,
+          "Existing authorizations: " <> show actionAuthorizers,
+          "Expected available actions: " <> show expectedAvailableActions,
+          "Actual available actions: " <> show reversedAvailableActions
+      ])
+      (reversedAvailableActions == expectedAvailableActions)
+
+    return ()
+
+
+
+-- Allocation  Tests
+test_availableAllocationActions : Script ()
+test_availableAllocationActions = do 
+  let
+    test_cases = [
+      -- Start with Joint/Joint and all different parties
+      (a, v, ad, [ex], j, [], [], [], [[a] ,[v], [a,v]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], j, [a], [], [], [[v]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], j, [v], [], [], [[a]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], j, [a,v], [], [], [], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], j, [], [ex], [], [[a] ,[v], [a,v]], [], [[ad, ex]]),
+      (a, v, ad, [ex], j, [], [], [ad, ex], [[a] ,[v], [a,v]], [[ex]], []),
+
+      -- One other account type
+      (a, a, ad, [ex], sc, [], [], [], [[a]], [[ex]], [[ad, ex]]),
+
+      -- Multiple executors
+      (a, v, ad, [ex,b], j, [], [], [], [[a] ,[v], [a,v]], [[b, ex]], [[ad, b, ex]]),
+
+      -- Admin as executor
+      (a, v, ad, [ad], j, [], [], [], [[a] ,[v], [a,v]], [[ad]], [[ad]]),
+
+      -- Provider as executor
+      (a, v, ad, [v], j, [], [], [], [[a] ,[v], [a,v]], [[v]], [[ad, v]])
+      ]
+
+  forA_ test_cases (\(authorizer, provider, admin, executor, mkacc, wa, ca, sa, ewa, eca, esa) ->
+    test_allocation_case authorizer provider admin executor mkacc wa ca sa ewa eca esa)
+
+
+test_allocation_case : Party -> Party -> Party -> [Party]
+  -> MkAccountConfig 
+  -> [Party] -> [Party] -> [Party]
+  -> [[Party]] -> [[Party]] -> [[Party]]
+  -> Script ()
+test_allocation_case authorizer provider admin executors mkacc
+  withdrawAuthorizers cancelAuthorizers settleAuthorizers
+  expectedWithdrawActors expectedCancelActors expectedSettleActors = do
+    let
+      account = mkacc "authorizer" admin authorizer provider
+      actionAuthorizers = Map.fromList [(V2.AA_Withdraw, withdrawAuthorizers), (V2.AA_Cancel, cancelAuthorizers), (V2.AA_Settle, settleAuthorizers)]
+      availableActions = mkAvailableAllocationActions actionAuthorizers executors admin account
+      reversedAvailableActions = reverseMap availableActions
+      expectedAvailableActions = Map.fromList $
+        filter (\(_, x) -> not (null x)) [(V2.AA_Withdraw, dedupSort expectedWithdrawActors), (V2.AA_Cancel, dedupSort expectedCancelActors), (V2.AA_Settle, dedupSort expectedSettleActors)]
+
+    assertMsg
+      (T.unlines [
+          "Unexpected avaialble actions.",
+          "Account: " <> show account,
+          "Existing authorizations: " <> show actionAuthorizers,
+          "Expected available actions: " <> show expectedAvailableActions,
+          "Actual available actions: " <> show reversedAvailableActions
+      ])
+      (reversedAvailableActions == expectedAvailableActions)
+
+    return ()

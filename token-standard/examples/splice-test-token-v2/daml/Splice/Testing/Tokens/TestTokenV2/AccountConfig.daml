@@ -8,6 +8,8 @@ import DA.Map qualified as Map
 
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.TokenStandard.Utils (accountParties)
 import Splice.Api.Token.MetadataV1 (AnyValue(..), ExtraArgs)
 import DA.List (dedupSort, dedup, (\\))
@@ -15,6 +17,7 @@ import DA.Assert ((===))
 import DA.Optional (fromSome, isSome, isNone, fromOptional)
 import qualified DA.TextMap as TextMap
 import DA.Action (foldlA)
+import DA.Foldable (forA_)
 
 
 data PartyConfig = PartyConfig with
@@ -42,7 +45,7 @@ template AccountConfig
     ensure isValidAccountConfig this && isSome account.provider
 
     nonconsuming choice AuthorizeTransferInstructionAction : V2.TransferInstructionResult
-     -- ^ This choice allos one of the two account parties to get authority from the other
+     -- ^ This choice allows one of the two account parties to get authority from the other
      -- if their mustApprove flag is False.
       with
         actor : Party
@@ -62,7 +65,52 @@ template AccountConfig
           V2.TIA_Accept -> exercise transferInstructionCid (V2.TransferInstruction_Accept [authorizer] extraArgs)
           V2.TIA_Reject -> exercise transferInstructionCid (V2.TransferInstruction_Reject [authorizer] extraArgs)
           V2.TIA_Withdraw -> exercise transferInstructionCid (V2.TransferInstruction_Withdraw [authorizer] extraArgs)
-          _ -> abort "Custom actions are not supported."
+          V2.TIA_Custom {} -> abort "Custom actions are not supported."
+
+    nonconsuming choice AuthorizeAllocationAction : V2.AllocationResult
+     -- ^ This choice allows one of the two account parties to get authority from the other
+     -- if their mustApprove flag is False.
+      with
+        actor : Party
+        authorizer : Party
+        action : V2.AllocationAction
+        allocationCid : ContractId V2.Allocation
+        extraArgs : ExtraArgs
+      controller actor
+      do 
+        assertMsg ("Authorization transfer from " <> show actor <> " to " <> show authorizer <> " is not allowed.") 
+          ((actor, authorizer) `elem` authorizationTransfers this)
+        
+        allocation <- view <$> fetch allocationCid
+        forA_ allocation.allocation.transferLegs (\leg -> admin === leg.instrumentId.admin)
+        
+        case action of
+          V2.AA_Withdraw -> exercise allocationCid (V2.Allocation_Withdraw [authorizer] extraArgs)
+          V2.AA_Settle -> abort "Only withdraw is supported."
+          V2.AA_Custom {} -> abort "Only withdraw is supported."
+          V2.AA_Cancel -> abort "Only withdraw is supported."
+
+    nonconsuming choice AuthorizeAllocationInstructionAction : V2.AllocationInstructionResult
+     -- ^ This choice allows one of the two account parties to get authority from the other
+     -- if their mustApprove flag is False.
+      with
+        actor : Party
+        authorizer : Party
+        action : V2.AllocationInstructionAction
+        instrCid : ContractId V2.AllocationInstruction
+        extraArgs : ExtraArgs
+      controller actor
+      do 
+        assertMsg ("Authorization transfer from " <> show actor <> " to " <> show authorizer <> " is not allowed.") 
+          ((actor, authorizer) `elem` authorizationTransfers this)
+        
+        instr <- view <$> fetch instrCid
+        forA_ instr.allocation.transferLegs (\leg -> admin === leg.instrumentId.admin)
+        
+        case action of
+          V2.AIA_Accept -> exercise instrCid (V2.AllocationInstruction_Accept [authorizer] extraArgs)
+          V2.AIA_Withdraw -> exercise instrCid (V2.AllocationInstruction_Withdraw [authorizer] extraArgs)
+          V2.AIA_Custom {} -> abort "Custom actions are not supported."
 
 data AccountProposal_Accept_Result = AccountProposal_Accept_Result with
     accountConfig : ContractId AccountConfig
@@ -153,6 +201,53 @@ reverseMap m =
   concatMap (\(x, ys) -> map (, [x]) ys) $
   Map.toList m
 
+-- | Available actions on an allocation instruction.
+-- This function encodes the core of the state machine for who needs to act when.
+--
+-- FIXME: invert the Map of actions in a separate PR to simplify this code.
+mkAvailableAllocationInstructionActions
+  : Map.Map V2.AllocationInstructionAction [Party]
+  -> AccountConfig -> Map.Map [Party] [V2.AllocationInstructionAction]
+mkAvailableAllocationInstructionActions actionAuthorizers authorizer =
+    Map.fromListWithR (++) $
+      actionsFor V2.AIA_Accept missingAcceptAuthorizers authorizer <>
+      actionsFor V2.AIA_Withdraw missingWithdrawAuthorizers authorizer
+  where
+    acceptAuthorizers = fromOptional [] $ Map.lookup V2.AIA_Accept actionAuthorizers
+    missingAcceptAuthorizers = accountParties authorizer.account \\ acceptAuthorizers
+  
+    withdrawAuthorizers = fromOptional [] $ Map.lookup V2.AIA_Withdraw actionAuthorizers
+    missingWithdrawAuthorizers = acceptAuthorizers \\ withdrawAuthorizers
+    
+    actionsFor action missingAuthorizers config =
+      [ (actors, [action]) | actors <- nextActors' missingAuthorizers config, not (null actors) ]
+
+-- | Available actions on an allocation.
+-- This function encodes the core of the state machine for who needs to act when.
+--
+-- FIXME: invert the Map of actions in a separate PR to simplify this code.
+mkAvailableAllocationActions
+  : Map.Map V2.AllocationAction [Party]
+  -> [Party] -> Party -> AccountConfig -> Map.Map [Party] [V2.AllocationAction]
+mkAvailableAllocationActions actionAuthorizers executors admin authorizer =
+    Map.fromListWithR (++) $
+      filter (\(as, _) -> as /= [])
+        [(dedupSort missingCancelAuthorizers, [V2.AA_Cancel]), (dedupSort missingSettleAuthorizers, [V2.AA_Settle])]
+      <> actionsFor V2.AA_Withdraw missingWithdrawAuthorizers authorizer
+  where
+    withdrawAuthorizers = fromOptional [] $ Map.lookup V2.AA_Withdraw actionAuthorizers
+    missingWithdrawAuthorizers = accountParties authorizer.account \\ withdrawAuthorizers
+    
+    cancelAuthorizers = fromOptional [] $ Map.lookup V2.AA_Cancel actionAuthorizers
+    missingCancelAuthorizers = executors \\ cancelAuthorizers
+
+    settleAuthorizers = fromOptional [] $ Map.lookup V2.AA_Settle actionAuthorizers
+    missingSettleAuthorizers = (admin::executors) \\ settleAuthorizers
+
+    actionsFor action missingAuthorizers config =
+      [ (actors, [action]) | actors <- nextActors' missingAuthorizers config, not (null actors) ]
+
+
 -- A function to determine whose authority can be transferred to another via
 -- AuthorizeTransferInstructionAction.
 authorizationTransfers : AccountConfig -> [(Party, Party)]
@@ -164,7 +259,7 @@ authorizationTransfers config = case config.account.provider of
 
 -- Utility function to use sender/receiver accounts to transfer authority between owner and provider
 -- via AuthorizeTransferInstructionAction
-tryUseAccountAuthority : 
+tryUseAccountAuthorityForTIA : 
   [Party] 
   -> [[Party]]
   -> V2.TransferInstructionAction
@@ -173,7 +268,7 @@ tryUseAccountAuthority :
   -> ContractId V2.TransferInstruction
   -> ExtraArgs
   -> Update (Optional V2.TransferInstructionResult)
-tryUseAccountAuthority actors neededActors action (senderConfig, oSenderCid) (receiverConfig, oReceiverCid) instrCid extraArgs = do
+tryUseAccountAuthorityForTIA actors neededActors action (senderConfig, oSenderCid) (receiverConfig, oReceiverCid) instrCid extraArgs = do
   let senderAuthorizationTransfers = 
         filter (\(actor, authorizer) -> actor `elem` actors && [authorizer] `elem` neededActors) 
         (authorizationTransfers senderConfig)
@@ -217,6 +312,60 @@ tryUseAccountAuthority actors neededActors action (senderConfig, oSenderCid) (re
 
     _ -> pure None
 
+-- Utility function to use sender/receiver accounts to transfer authority between owner and provider
+-- via AuthorizeAllocationAction
+tryUseAccountAuthorityForAA : 
+  [Party] 
+  -> [[Party]]
+  -> V2.AllocationAction
+  -> (AccountConfig, Optional (ContractId AccountConfig))
+  -> ContractId V2.Allocation
+  -> ExtraArgs
+  -> Update (Optional V2.AllocationResult)
+tryUseAccountAuthorityForAA actors neededActors action (authorizerConfig, oAuthorizerCid) instrCid extraArgs = do
+  let authTransfers = 
+        filter (\(actor, authorizer) -> actor `elem` actors && [authorizer] `elem` neededActors)
+        (authorizationTransfers authorizerConfig)
+
+  let transferAuthority actor authorizer accountCid =
+        exercise accountCid AuthorizeAllocationAction with
+          actor
+          authorizer
+          extraArgs
+          allocationCid = instrCid
+          action
+
+  case (authTransfers, oAuthorizerCid, action) of
+    ((actor, authorizer)::_, Some accountCid, V2.AA_Withdraw) -> Some <$> transferAuthority actor authorizer accountCid
+    _ -> pure None
+
+-- Utility function to use sender/receiver accounts to transfer authority between owner and provider
+-- via AuthorizeAllocationInstructionAction
+tryUseAccountAuthorityForAIA : 
+  [Party] 
+  -> [[Party]]
+  -> V2.AllocationInstructionAction
+  -> (AccountConfig, Optional (ContractId AccountConfig))
+  -> ContractId V2.AllocationInstruction
+  -> ExtraArgs
+  -> Update (Optional V2.AllocationInstructionResult)
+tryUseAccountAuthorityForAIA actors neededActors action (authorizerConfig, oAuthorizerCid) instrCid extraArgs = do
+  let authTransfers = 
+        filter (\(actor, authorizer) -> actor `elem` actors && [authorizer] `elem` neededActors)
+        (authorizationTransfers authorizerConfig)
+
+  let transferAuthority actor authorizer accountCid =
+        exercise accountCid AuthorizeAllocationInstructionAction with
+          actor
+          authorizer
+          extraArgs
+          instrCid
+          action
+
+  case (authTransfers, oAuthorizerCid, action) of
+    ((actor, authorizer)::_, Some accountCid, V2.AIA_Withdraw) -> Some <$> transferAuthority actor authorizer accountCid
+    ((actor, authorizer)::_, Some accountCid, V2.AIA_Accept) -> Some <$> transferAuthority actor authorizer accountCid
+    _ -> pure None
 
 -- Parsing Choice Context
 -------------------------

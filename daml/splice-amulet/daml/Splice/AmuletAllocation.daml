@@ -106,7 +106,8 @@ template AmuletAllocation
         let v1HistoryMeta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
         -- NOTE: we report this as a burn in the V1 history metadata, as representing the full
         -- set of transfer legs is very difficult to do using the V1 metadata.
-        pure V2.Allocation_SettleResult with
+        pure V2.AllocationResult with
+          output = V2.AllocationResult_Settled
           authorizerHoldingCids = mempty
           meta = v1HistoryMeta
 
