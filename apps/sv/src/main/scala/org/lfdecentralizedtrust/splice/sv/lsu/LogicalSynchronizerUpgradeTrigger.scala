@@ -134,6 +134,7 @@ class LogicalSynchronizerUpgradeTrigger(
         task.work.announcement.successorSynchronizerId,
         task.readyAt,
         Some(task.work.announcement.upgradeTime),
+        ignorePsidCheck = false,
       )
       currentPsid <- currentSynchronizerNode.sequencerAdminConnection
         .getPhysicalSynchronizerId()

@@ -156,7 +156,7 @@ class SequencerAdminConnection(
   def initializeFromPredecessor(
       topologySnapshot: Path,
       staticSynchronizerParameters: StaticSynchronizerParameters,
-      ignorePsidCheck: Boolean = false,
+      ignorePsidCheck: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
