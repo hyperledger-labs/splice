@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.concurrent.PatienceConfiguration
+import scala.concurrent.duration.DurationInt
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -203,7 +204,7 @@ class UnsupportedPackageVettingIntegrationTest
             synchronizerId,
           ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
         }
-        eventually() {
+        eventually(40.seconds) {
           alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
         }
       }

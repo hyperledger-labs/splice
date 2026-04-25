@@ -31,6 +31,6 @@ else
     --head "$updated_branch" \
     --title "Bump $submodule_name version to the latest (auto-generated)" \
     --body "" \
-    --reviewer martinflorian-da,krzysztofczyz-da,mblaze-da
+    --reviewer martinflorian-da,krzysztofczyz-da,mblaze-da,moritzkiefer-da
 fi
 echo "Done."

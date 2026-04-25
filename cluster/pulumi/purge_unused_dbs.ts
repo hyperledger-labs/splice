@@ -9,6 +9,7 @@ import { CLUSTER_BASENAME, config } from '@lfdecentralizedtrust/splice-pulumi-co
 
 import { stack } from './pulumi';
 import { runSvCantonForAllMigrations } from './sv-canton/pulumi';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 const gcpSqlClient = new cloudsql.SqlInstancesServiceClient({
   fallback: 'rest',
@@ -33,9 +34,21 @@ async function getDBsInStack(stack: automation.Stack): Promise<gcp.sql.DatabaseI
 
 async function getAllPulumiDbs(): Promise<gcp.sql.DatabaseInstance[]> {
   const projects = ['canton-network', 'sv-runbook', 'splitwell', 'validator1'];
-  const coreDbs = await Promise.all(
-    projects.map(async project => await getDBsInStack(await stack(project, project, true, {})))
-  ).then(dbs => dbs.flat());
+  const coreDbs = [
+    ...await Promise.all(
+      projects.map(async project => await getDBsInStack(await stack(project, project, true, {})))
+    ).then(dbs => dbs.flat()),
+    ...(await Promise.all(
+      runSvProjectForAllSvs(
+        'get_dbs',
+        async stack => {
+          return getDBsInStack(stack);
+        },
+        false,
+        true
+      ).map(res => res.promise)
+    )).flat()
+  ]
 
   const readDbsForAllStacks = runSvCantonForAllMigrations(
     'get_dbs',
