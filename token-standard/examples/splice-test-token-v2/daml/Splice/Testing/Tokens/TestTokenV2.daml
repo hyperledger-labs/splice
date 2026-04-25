@@ -39,6 +39,7 @@ template Token with
 
 -- | Implementation of a V2-only allocation instruction
 template TokenAllocationInstructionV2 with
+    originalInstructionCid : Optional (ContractId V2.AllocationInstruction)
     actionAuthorizers : Map.Map V2.AllocationInstructionAction [Party]
       -- ^ A map from actions to which parties have already authorized that action.
       -- As soon as an action is fully authorized, it is executed.
@@ -60,7 +61,7 @@ template TokenAllocationInstructionV2 with
 
     interface instance V2.AllocationInstruction for TokenAllocationInstructionV2 where
       view = V2.AllocationInstructionView with
-        originalInstructionCid = None
+        originalInstructionCid
         allocation
         requestedAt
         inputHoldingCids = Foldable.concat inputHoldingCids
@@ -84,6 +85,7 @@ template TokenAllocationInstructionV2 with
           [(accountConfig, _)] <- extractAccountConfigs admin arg.extraArgs [allocation.authorizer]
           (lockedTokens, authorizerChangeCids) <- splitAndLock allocation inputHoldingCids
           allocationCid <- create TokenAllocationV2 with
+            originalAllocationCid = None
             availableActions = mkAvailableAllocationActions Map.empty allocation.settlement.executors admin accountConfig
             actionAuthorizers = Map.empty
             ..
@@ -148,11 +150,9 @@ authorizeAllocationInstructionAction
     res <- if fullyAuthorized
       then execute
       else do
-        -- All valid actions on an existing allocation instruction should fully
-        -- authorize it.
-        assertMsg "Impossible branch in TestTokenV2.authorizeAllocationInstructionAction" (isNone oSelf)
         -- record the request for this actor
         pendingInstrCid <- create this with
+          originalInstructionCid = fmap coerceContractId oSelf
           actionAuthorizers = newActionAuthorizers
           availableActions = newAvailableActions
 
@@ -176,6 +176,7 @@ authorizeAllocationInstructionAction
 
 -- | Implementation of a V2-only allocation.
 template TokenAllocationV2 with
+    originalAllocationCid : Optional (ContractId V2.Allocation)
     actionAuthorizers : Map.Map V2.AllocationAction [Party]
       -- ^ A map from actions to which parties have already authorized that action.
       -- As soon as an action is fully authorized, it is executed.
@@ -195,7 +196,7 @@ template TokenAllocationV2 with
 
     interface instance V2.Allocation for TokenAllocationV2 where
       view = V2.AllocationView with
-        originalAllocationCid = None
+        originalAllocationCid
           -- This reference Allocation is immutable so the original allocation Cid
           -- is always None.
         expiresAt = None
@@ -339,20 +340,9 @@ authorizeAllocationAction
     res <- if fullyAuthorized
       then execute
       else do
-        -- All valid actions on an existing allocation instruction should fully
-        -- authorize it.
-        assertMsg 
-          ("Impossible branch in TestTokenV2.authorizeAllocationAction" 
-            <> "\nAction: " <> show action
-            <> "\nPossible Actors: " <> show possibleActors
-            <> "\nActors: " <> show actors
-            <> "\nNew Authorizers: " <> show newActionAuthorizers
-            <> "\nNew Available Actions: " <> show newAvailableActions
-            <> "\nNew Possible Actors: " <> show newPossibleActors
-          )
-          (isNone oSelf)
         -- record the request for this actor
         pendingInstrCid <- create this with
+          originalAllocationCid = fmap coerceContractId oSelf
           actionAuthorizers = newActionAuthorizers
           availableActions = newAvailableActions
 
@@ -771,6 +761,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 
   let
     allocationInstruction = TokenAllocationInstructionV2 with
+      originalInstructionCid = None
       actionAuthorizers = Map.empty
       availableActions = Map.empty -- Will be computed.
       inputHoldingCids = inputHoldingMap
@@ -782,6 +773,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
     [(accountConfig, _)] <- extractAccountConfigs tokenRules.admin arg.extraArgs [arg.allocation.authorizer]
     (lockedTokens, authorizerChangeCids) <- splitAndLock arg.allocation inputHoldingMap
     allocationCid <- create TokenAllocationV2 with
+      originalAllocationCid = None
       admin = tokenRules.admin
       allocation = arg.allocation
       availableActions = mkAvailableAllocationActions Map.empty arg.allocation.settlement.executors tokenRules.admin accountConfig
@@ -824,7 +816,7 @@ jointAuthorizers = dedupSort . accountParties
 ----------------------
 
 tokenRulesContextKey : Text
-tokenRulesContextKey = "token-rules"
+tokenRulesContextKey = "testTokenV2/tokenRules"
 
 getTokenRulesFromContext : ChoiceContext -> Update (ContractId TokenRules)
 getTokenRulesFromContext context = do

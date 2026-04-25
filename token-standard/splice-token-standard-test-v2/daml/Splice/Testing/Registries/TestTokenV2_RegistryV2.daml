@@ -48,6 +48,8 @@ instance RegistryApi TestTokenV2Registry where
   getSettlementFactory = registryApi_getSettlementFactory
   getAllocation_WithdrawContext = registryApi_getWithdrawContext
   getAllocation_CancelContext = registryApi_getCancelContext
+  getAllocationInstruction_WithdrawContext = registryApi_getAllocationInstructionContext
+  getAllocationInstruction_AcceptContext = registryApi_getAllocationInstructionContext
   getTransferInstruction_AcceptContext = registryApi_getTransferOfferContext
   getTransferInstruction_RejectContext = registryApi_getTransferOfferContext
   getTransferInstruction_WithdrawContext = registryApi_getTransferOfferContext
@@ -99,7 +101,7 @@ registryApi_getTransferFactory registry transfer = do
   let 
     transfer' = 
       transfer with
-        extraArgs.context.values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs transfer.extraArgs.context.values
+        extraArgs.context.values = TextMap.insert accountConfigsContextKey accountConfigs transfer.extraArgs.context.values
 
   pure EnrichedFactoryChoice with
     factoryCid = coerceContractId tokenRulesCid
@@ -113,7 +115,7 @@ registryApi_getAllocationFactory registry allocation = do
   let 
     allocation' = 
       allocation with
-        extraArgs.context.values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs allocation.extraArgs.context.values
+        extraArgs.context.values = TextMap.insert accountConfigsContextKey accountConfigs allocation.extraArgs.context.values
   pure EnrichedFactoryChoice with
     factoryCid = coerceContractId tokenRulesCid
     arg = allocation'
@@ -132,7 +134,9 @@ registryApi_getSettlementFactory registry arg = do
   let 
     arg' = 
       arg with
-        extraArgs.context.values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs arg.extraArgs.context.values
+        extraArgs.context.values = 
+          TextMap.insert accountConfigsContextKey accountConfigs $
+          TextMap.insert tokenRulesContextKey (AV_ContractId $ coerceContractId tokenRulesCid) arg.extraArgs.context.values
  
   pure EnrichedFactoryChoice with
     factoryCid = coerceContractId tokenRulesCid
@@ -146,13 +150,26 @@ registryApi_getTransferOfferContext registry instrCid _meta = do
   let 
     choiceContext = 
       emptyChoiceContext with
-        values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs TextMap.empty
+        values = TextMap.insert accountConfigsContextKey accountConfigs TextMap.empty
 
   lockedDs <- forA instrView.transfer.inputHoldingCids $ \holdingCid -> do
     let tokenCid = coerceContractId holdingCid : ContractId Token
     queryDisclosure' @Token registry.admin tokenCid
   pure OpenApiChoiceContext with
     disclosures = accountConfigD <> mconcat lockedDs
+    choiceContext
+
+registryApi_getAllocationInstructionContext : TestTokenV2Registry -> ContractId V2.AllocationInstruction -> Metadata -> Script OpenApiChoiceContext
+registryApi_getAllocationInstructionContext registry instrCid _meta = do
+  Some instrView <- queryInterfaceContractId @V2.AllocationInstruction registry.admin instrCid
+  (accountConfigs, accountConfigD) <- getAccountMapAndDisclosures registry [instrView.allocation.authorizer]
+  let 
+    choiceContext = 
+      emptyChoiceContext with
+        values = TextMap.insert accountConfigsContextKey accountConfigs TextMap.empty
+
+  pure OpenApiChoiceContext with
+    disclosures = accountConfigD
     choiceContext
 
 registryApi_getWithdrawContext
@@ -166,7 +183,7 @@ registryApi_getWithdrawContext registry cid _meta = do
   let 
     choiceContext = 
       emptyChoiceContext with
-        values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs TextMap.empty
+        values = TextMap.insert accountConfigsContextKey accountConfigs TextMap.empty
 
   pure OpenApiChoiceContext with
     disclosures = accountConfigD
@@ -183,7 +200,7 @@ registryApi_getCancelContext registry cid _meta = do
   let 
     choiceContext = 
       emptyChoiceContext with
-        values = TextMap.insert "testTokenV2/accountConfigs" accountConfigs TextMap.empty
+        values = TextMap.insert accountConfigsContextKey accountConfigs TextMap.empty
 
   lockedTokensD <- getLockedTokensForAllocationsD registry cid
   pure OpenApiChoiceContext with

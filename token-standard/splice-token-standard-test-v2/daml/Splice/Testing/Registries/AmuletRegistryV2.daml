@@ -89,6 +89,9 @@ instance RegistryApi AmuletRegistry where
   getAllocation_WithdrawContext app cid _meta =
     registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
+  -- Amulet does not have AllocationInstructions.
+  getAllocationInstruction_WithdrawContext _ _ _ = error "unimplemented"
+  getAllocationInstruction_AcceptContext _ _ _ = error "unimplemented"
   getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
   getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
   getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid

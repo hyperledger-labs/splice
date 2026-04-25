@@ -35,6 +35,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
+    listAllocationInstructionsV2,
     listAllocationRequestsV2,
     listAllocationsV2,
 
@@ -42,6 +43,11 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
     acceptAllocationRequestV1,
     acceptAllocationRequestV2,
+
+    acceptAllocationInstructionV2,
+    withdrawAllocationInstructionV2,
+
+    withdrawAllocationV2,
 
     -- * Batching utility usage
     TSABatch(..),
@@ -309,6 +315,11 @@ listAllocationsV2 tradingAccount actor = do
   allocs <- queryInterface @V2.Allocation actor
   pure [ (allocCid, allocView) | (allocCid, Some allocView) <- allocs, tradingAccount == allocView.allocation.authorizer ]
 
+listAllocationInstructionsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationInstruction, V2.AllocationInstructionView)]
+listAllocationInstructionsV2 tradingAccount actor = do
+  instrs <- queryInterface @V2.AllocationInstruction actor
+  pure [ (instrCid, instrView) | (instrCid, Some instrView) <- instrs, tradingAccount == instrView.allocation.authorizer ]
+
 listAllocationRequestsV1 : Party -> Script [(ContractId V1.AllocationRequest, V1.AllocationRequestView)]
 listAllocationRequestsV1 actor = do
   reqs <- queryInterface @V1.AllocationRequest actor
@@ -334,6 +345,64 @@ acceptAllocationRequestV2
 acceptAllocationRequestV2 registries actor (reqCid, req) = do
   batch <- mkAcceptAllocationRequestV2 registries actor (reqCid, req)
   executeTSABatch actor batch
+
+-- | Simulate a V2 wallet accepting an allocation instruction from a V2 app.
+-- TODO: Use Batching
+acceptAllocationInstructionV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationInstruction, V2.AllocationInstructionView)
+  -> Script V2.AllocationInstructionResult
+acceptAllocationInstructionV2 registries actor (instrCid, instr) = do
+  Some instrView <- queryInterfaceContractId @V2.AllocationInstruction actor instrCid
+  let firstTl::_ = instrView.allocation.transferLegs
+  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
+  context <- V2.getAllocationInstruction_WithdrawContext registry instrCid emptyMetadata
+  submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.AllocationInstruction_Accept with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+-- | Simulate a V2 wallet withdrawing an allocation instruction from a V2 app.
+-- TODO: Use Batching
+withdrawAllocationInstructionV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationInstruction, V2.AllocationInstructionView)
+  -> Script (Optional (ContractId V2.AllocationInstruction))
+withdrawAllocationInstructionV2 registries actor (instrCid, instrView) = do
+  let firstTl::_ = instrView.allocation.transferLegs
+  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
+  context <- V2.getAllocationInstruction_WithdrawContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.AllocationInstruction_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.AllocationInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
+
+-- | Simulate a V2 wallet withdrawing an allocation from a V2 app.
+-- TODO: Use Batching
+withdrawAllocationV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.Allocation, V2.AllocationView)
+  -> Script (Optional (ContractId V2.Allocation))
+withdrawAllocationV2 registries actor (allocCid, allocView) = do
+  let firstTl::_ = allocView.allocation.transferLegs
+  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
+  context <- V2.getAllocation_WithdrawContext registry allocCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd allocCid
+      V2.Allocation_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.AllocationResult_Pending instrCid' -> Some instrCid'
+    _ -> None
 
 -- | Execute a batch of token standard actions.
 executeTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult

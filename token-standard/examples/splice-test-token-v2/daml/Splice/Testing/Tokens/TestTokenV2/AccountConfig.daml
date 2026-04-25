@@ -374,10 +374,10 @@ extractAccountConfigMap
   : Party -> ExtraArgs -> [V2.Account] -> Update (Map.Map V2.Account (AccountConfig, Optional (ContractId AccountConfig)))
 extractAccountConfigMap admin extraArgs as = do
   let
-    cids = case TextMap.lookup "testTokenV2/accountConfigs" extraArgs.context.values of
+    cids = case TextMap.lookup accountConfigsContextKey extraArgs.context.values of
       Some (AV_List cs) -> map (\(AV_ContractId cid) -> cid) cs
       None -> []
-      _ -> error "unexpected value in testTokenV2/accountConfigs"
+      _ -> error ("unexpected value in " <> accountConfigsContextKey)
   
   suppliedMap <- Map.fromList <$>
     mapA (\cid -> do
@@ -398,7 +398,7 @@ extractAccountConfigMap admin extraArgs as = do
           assertMsg "Not expecting account contract for self-custodial account" (isNone (Map.lookup account accountMap))
           return (Map.insert account (basicConfig account, None) accountMap)
         Some _ -> do
-          assertMsg ("No account config supplies for account " <> (show account)) (isSome (Map.lookup account accountMap))
+          assertMsg ("No account config supplied for account " <> (show account)) (isSome (Map.lookup account accountMap))
           return accountMap
 
   foldlA addBasicValidated suppliedMap (dedup as)
@@ -410,3 +410,5 @@ extractAccountConfigs admin extraArgs as = do
   accountConfigsMap <- extractAccountConfigMap admin extraArgs as
   return $ map (\a -> fromSome (Map.lookup a accountConfigsMap)) as
 
+accountConfigsContextKey : Text
+accountConfigsContextKey = "testTokenV2/accountConfigs"

@@ -42,6 +42,12 @@ class RegistryApi app where
   getAllocation_CancelContext
     : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
 
+  getAllocationInstruction_WithdrawContext
+    : app -> ContractId V2.AllocationInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocationInstruction_AcceptContext
+    : app -> ContractId V2.AllocationInstruction -> Metadata -> Script OpenApiChoiceContext
+
   getTransferInstruction_AcceptContext
     : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
 
@@ -50,7 +56,6 @@ class RegistryApi app where
 
   getTransferInstruction_WithdrawContext
     : app -> ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
-
 
 -- Generic registry support
 ---------------------------
@@ -79,6 +84,12 @@ data GenericRegistry = GenericRegistry with
 
   ggetAllocation_CancelContext
     : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
+  
+  ggetAllocationInstruction_WithdrawContext
+    : ContractId V2.AllocationInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  ggetAllocationInstruction_AcceptContext
+    : ContractId V2.AllocationInstruction -> Metadata -> Script OpenApiChoiceContext
 
   ggetTransferInstruction_AcceptContext
     : ContractId V2.TransferInstruction -> Metadata -> Script OpenApiChoiceContext
@@ -98,6 +109,8 @@ mkGenericRegistry app =
     ggetSettlementFactory = getSettlementFactory app
     ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
     ggetAllocation_CancelContext = getAllocation_CancelContext app
+    ggetAllocationInstruction_WithdrawContext = getAllocationInstruction_WithdrawContext app
+    ggetAllocationInstruction_AcceptContext = getAllocationInstruction_AcceptContext app
     ggetTransferInstruction_AcceptContext = getTransferInstruction_AcceptContext app
     ggetTransferInstruction_RejectContext = getTransferInstruction_RejectContext app
     ggetTransferInstruction_WithdrawContext = getTransferInstruction_WithdrawContext app
@@ -108,6 +121,8 @@ instance RegistryApi GenericRegistry where
   getSettlementFactory registry = registry.ggetSettlementFactory
   getAllocation_WithdrawContext registry = registry.ggetAllocation_WithdrawContext
   getAllocation_CancelContext registry = registry.ggetAllocation_CancelContext
+  getAllocationInstruction_WithdrawContext registry = registry.ggetAllocationInstruction_WithdrawContext
+  getAllocationInstruction_AcceptContext registry = registry.ggetAllocationInstruction_AcceptContext
   getTransferInstruction_AcceptContext registry = registry.ggetTransferInstruction_AcceptContext
   getTransferInstruction_RejectContext registry = registry.ggetTransferInstruction_RejectContext
   getTransferInstruction_WithdrawContext registry = registry.ggetTransferInstruction_WithdrawContext

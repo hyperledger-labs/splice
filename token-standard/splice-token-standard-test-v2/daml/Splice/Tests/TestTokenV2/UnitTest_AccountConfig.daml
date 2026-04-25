@@ -326,7 +326,7 @@ test_availableAllocationActions : Script ()
 test_availableAllocationActions = do 
   let
     test_cases = [
-      -- Start with Joint/Joint and all different parties
+      -- Start with Joint and all different parties
       (a, v, ad, [ex], j, [], [], [], [[a] ,[v], [a,v]], [[ex]], [[ad, ex]]),
       (a, v, ad, [ex], j, [a], [], [], [[v]], [[ex]], [[ad, ex]]),
       (a, v, ad, [ex], j, [v], [], [], [[a]], [[ex]], [[ad, ex]]),
@@ -334,8 +334,12 @@ test_availableAllocationActions = do
       (a, v, ad, [ex], j, [], [ex], [], [[a] ,[v], [a,v]], [], [[ad, ex]]),
       (a, v, ad, [ex], j, [], [], [ad, ex], [[a] ,[v], [a,v]], [[ex]], []),
 
-      -- One other account type
+      -- One other account types.
       (a, a, ad, [ex], sc, [], [], [], [[a]], [[ex]], [[ad, ex]]),
+      (a, a, ad, [ex], j, [], [], [], [[a]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], ic, [], [], [], [[a], [a, v]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], pc, [], [], [], [[a], [a, v]], [[ex]], [[ad, ex]]),
+      (a, v, ad, [ex], p, [], [], [], [[a,v], [v]], [[ex]], [[ad, ex]]),
 
       -- Multiple executors
       (a, v, ad, [ex,b], j, [], [], [], [[a] ,[v], [a,v]], [[b, ex]], [[ad, b, ex]]),
