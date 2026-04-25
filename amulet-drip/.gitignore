@@ -1,0 +1,5 @@
+.env
+build/
+node_modules/
+test-results.json
+test-parties.csv
