@@ -19,8 +19,6 @@ There are three ways to recover from disasters:
    created, the balance of the SV can be :ref:`recovered <sv_reonboard>` on a dedicated
    validator but the SV must be onboarded as a separate node.
 
-#. Lastly, For network-wide failures, a more complex :ref:`Disaster recovery procedure <sv_network_dr>` is required.
-
 
 .. _sv_backup_restore:
 
@@ -52,7 +50,7 @@ Assuming such a consistent set of backups is available, the following steps can 
 to restore the node:
 
 Scale down all components in the SV node to 0 replicas
-(replace ``-0`` with the correct migration ID in case a :ref:`migration <sv-upgrades>` has already been performed):
+(replace ``-0`` with the correct serial ID in case a :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>` has already been performed):
 
 .. code-block:: bash
 
@@ -60,7 +58,7 @@ Scale down all components in the SV node to 0 replicas
       global-domain-0-cometbft \
       global-domain-0-mediator \
       global-domain-0-sequencer \
-      participant-0 \
+      participant \
       scan-app \
       sv-app \
       validator-app
@@ -69,7 +67,7 @@ Restore the storage and DBs of all components from the backups. The exact proces
 depends on the storage and DBs used by the components, and is not documented here.
 
 Once all storage has been restored, scale up all components in the SV node back to 1 replica
-(replace ``-0`` with the correct migration ID in case a :ref:`migration <sv-upgrades>` has already been performed):
+(replace ``-0`` with the correct serial ID in case a :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>` has already been performed):
 
 .. code-block:: bash
 
@@ -77,7 +75,7 @@ Once all storage has been restored, scale up all components in the SV node back 
       global-domain-0-cometbft \
       global-domain-0-mediator \
       global-domain-0-sequencer \
-      participant-0 \
+      participant \
       scan-app \
       sv-app \
       validator-app

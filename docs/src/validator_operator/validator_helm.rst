@@ -453,13 +453,6 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-v
   ``<organization>-<function>-<enumerator>``.
 - Replace ``YOUR_VALIDATOR_NODE_NAME`` with the name you want your validator node to be represented as on the network. Usually you can use the same value as for your ``validatorPartyHint``.
 
-If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: MIGRATION_START
-    :end-before: MIGRATION_END
-
 Finally, please download the UI config values file from
 https://github.com/global-synchronizer-foundation/configs/blob/main/configs/ui-config-values.yaml
 and add the values from it to your ``standalone-validator-values.yaml``.
