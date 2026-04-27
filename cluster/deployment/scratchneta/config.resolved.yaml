@@ -65,6 +65,8 @@ monitoring:
           - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
           - 'cloudkms.googleapis.com/hsm_generate_random_requests'
           - 'cloudkms.googleapis.com/external_kms_requests'
+        retestWindowSeconds: 600
+        rollingWindowSeconds: 600
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
