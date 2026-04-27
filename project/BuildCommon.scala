@@ -25,6 +25,23 @@ import java.util.concurrent.atomic.AtomicInteger
 
 object BuildCommon {
 
+  // Accepts an optional git ref that is forwarded to damlBumpPackageVersionsMutate
+  // as its `--base` target. With no arg, the underlying tool falls back to the
+  // latest release line.
+  private val damlBumpPackageVersionsCommand: Command =
+    Command.args("damlBumpPackageVersions", "[<git-ref>]") { (state, args) =>
+      val refArg = args.map(_.trim).filter(_.nonEmpty).mkString(" ")
+      val mutateInvocation =
+        if (refArg.nonEmpty) s"damlBumpPackageVersionsMutate $refArg"
+        else "damlBumpPackageVersionsMutate"
+      List(
+        mutateInvocation,
+        "damlDarsLockFileUpdate",
+        "updateDarResources",
+        "npmInstall",
+      ) ::: state
+    }
+
   object defs {
     lazy val bundle = taskKey[(File, Set[File])]("create a release bundle")
     lazy val damlTsCodegen = taskKey[Seq[File]]("generate typescript for the daml models")
@@ -264,8 +281,9 @@ object BuildCommon {
         addCommandAlias("splice-clean", "; clean-splice") ++
         addCommandAlias(
           "updateDarResources",
-          "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala; apps-common/scalafmt; apps-common/headerCreate",
-        )
+          "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala daml/dars; apps-common/scalafmt; apps-common/headerCreate",
+        ) ++
+        Seq(commands += damlBumpPackageVersionsCommand)
     val buildSettings = inThisBuild(
       Seq(
         organization := "org.lfdecentralizedtrust.splice",

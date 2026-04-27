@@ -448,7 +448,7 @@ object DarResources {
     )
     val apiTokenAllocationRequestV1 = PackageResource(
       apiTokenAllocationRequestV1_current,
-      apiTokenAllocationV1_1_0_0,
+      apiTokenAllocationRequestV1_1_0_0,
       Seq(apiTokenAllocationRequestV1_1_0_0),
     )
     val apiTokenAllocationInstructionV1_1_0_0 = DarResource(
@@ -911,7 +911,7 @@ object DarResources {
     )
     val apiTokenAllocationRequestV2 = PackageResource(
       apiTokenAllocationRequestV2_current,
-      apiTokenAllocationV2_1_0_0,
+      apiTokenAllocationRequestV2_1_0_0,
       Seq(apiTokenAllocationRequestV2_1_0_0),
     )
     val apiTokenAllocationInstructionV2_1_0_0 = DarResource(
@@ -1196,6 +1196,119 @@ object DarResources {
       tokenTestTradingApp_1_0_0,
       Seq(tokenTestTradingApp_1_0_0, tokenTestTradingApp_1_0_1, tokenTestTradingApp_1_0_2),
     )
+    val tokenTestTradingAppV2_1_0_0 = DarResource(
+      "splice-token-test-trading-app-v2-1.0.0.dar",
+      "f9d216cb64959d9743314a16d9d3d4848e1f081f70e589236687848e26968cd1",
+      PackageMetadata(
+        PackageName.assertFromString("splice-token-test-trading-app-v2"),
+        PackageVersion.assertFromString("1.0.0"),
+        None,
+      ),
+      Set(
+        "280dd8e8b2ffed60d1906ccb43e19f876865bff73bf4ed8a6e9ceaf15e8427b8",
+        "52854220dc199884704958df38befd5492d78384a032fd7558c38f00e3d778a2",
+        "9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69",
+        "7adc4c2d07fa3a51173c843cba36e610c1168b2dbbf53076e20c0092eae8763d",
+        "4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f",
+        "54f85ebfc7dfae18f7d70370015dcc6c6792f60135ab369c44ae52c6fc17c274",
+        "7cff38e34bd192d498d5a7606aa3b893e35b0f632d582b273f66dab90f2f14ef",
+        "bde4bd30749e99603e5afa354706608601029e225d4983324d617825b634253a",
+        "c3bb0c5d04799b3f11bad7c3c102963e115cf53da3e4afcbcfd9f06ebd82b4ff",
+        "0e4a572ab1fb94744abb02243a6bbed6c78fc6e3c8d3f60c655f057692a62816",
+        "ab068e2f920d0e06347975c2a342b71f8b8e3b4be0f02ead9442caac51aa8877",
+        "e7e0adfa881e7dbbb07da065ae54444da7c4bccebcb8872ab0cb5dcf9f3761ce",
+        "b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946",
+        "93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d",
+        "3b25c9b08ac6d895417c604fc0ee4b7e47ef974ff8fa43f139daa43bb431fefc",
+        "718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b",
+        "d095a2ccf6dd36b2415adc4fa676f9191ba63cd39828dc5207b36892ec350cbc",
+        "6fe848530b2404017c4a12874c956ad7d5c8a419ee9b040f96b5c13172d2e193",
+        "f181cd661f7af3a60bdaae4b0285a2a67beb55d6910fc8431dbae21a5825ec0f",
+        "60c61c542207080e97e378ab447cc355ecc47534b3a3ebbff307c4fb8339bc4d",
+        "fcee8dfc1b81c449b421410edd5041c16ab59c45bbea85bcb094d1b17c3e9df7",
+        "6f8e6085f5769861ae7a40dccd618d6f747297d59b37cab89b93e2fa80b0c024",
+        "fa79192fe1cce03d7d8db36471dde4cf6c96e6d0f07e1c391dd49e355af9b38c",
+        "19f0df5fdaf5a96e137b6ea885fdb378f37bd3166bd9a47ee11518e33fa09a20",
+        "a1fa18133ae48cbb616c4c148e78e661666778c3087d099067c7fe1868cbb3a1",
+        "9a436eaf5630c602d8e4eb0a30c7a3f65fe270f83afc98e297e76b03ff502b89",
+        "11d0b79ddf16863ddec898fb63511f062dd15753ae1a4872a436af10210d4422",
+        "86d888f34152dae8729900966b44abcb466b9c111699678de58032de601d2b04",
+        "6da1f43a10a179524e840e7288b47bda213339b0552d92e87ae811e52f59fc0e",
+        "f078e0f513097b984ffc94e6c9cb576a1669715019aa0e08704de581e5609f86",
+        "c280cc3ef501d237efa7b1120ca3ad2d196e089ad596b666bed59a85f3c9a074",
+        "3cde94fe9be5c700fc1d9a8ad2277e2c1214609f8c52a5b4db77e466875b8cb7",
+        "9d1a644e686435cf934f2f3f049138a424863b2a800130046dadc0c994ea5df3",
+        "bfda48f9aa2c89c895cde538ec4b4946c7085959e031ad61bde616b9849155d7",
+        "ee33fb70918e7aaa3d3fc44d64a399fb2bf5bcefc54201b1690ecd448551ba88",
+        "275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520",
+        "e5411f3d75f072b944bd88e652112a14a3d409c491fd9a51f5f6eede6d3a3348",
+        "5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4",
+        "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
+        "cae345b5500ef6f84645c816f88b9f7a85a9f3c71697984abdf6849f81e80324",
+        "91e167fa7a256f21f990c526a0a0df840e99aeef0e67dc1f5415b0309486de74",
+        "1621170f6beee641ff59c4a7be3f139fff78553ccfd6c93ddd2ada85332031f2",
+        "be938fb90d5ac9cffcd8381e04c51203544238972ee5b78abc872bc900fb98b5",
+      ),
+    )
+    val tokenTestTradingAppV2_current = DarResource(
+      "splice-token-test-trading-app-v2-current.dar",
+      "f9d216cb64959d9743314a16d9d3d4848e1f081f70e589236687848e26968cd1",
+      PackageMetadata(
+        PackageName.assertFromString("splice-token-test-trading-app-v2"),
+        PackageVersion.assertFromString("1.0.0"),
+        None,
+      ),
+      Set(
+        "280dd8e8b2ffed60d1906ccb43e19f876865bff73bf4ed8a6e9ceaf15e8427b8",
+        "52854220dc199884704958df38befd5492d78384a032fd7558c38f00e3d778a2",
+        "9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69",
+        "7adc4c2d07fa3a51173c843cba36e610c1168b2dbbf53076e20c0092eae8763d",
+        "4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f",
+        "54f85ebfc7dfae18f7d70370015dcc6c6792f60135ab369c44ae52c6fc17c274",
+        "7cff38e34bd192d498d5a7606aa3b893e35b0f632d582b273f66dab90f2f14ef",
+        "bde4bd30749e99603e5afa354706608601029e225d4983324d617825b634253a",
+        "c3bb0c5d04799b3f11bad7c3c102963e115cf53da3e4afcbcfd9f06ebd82b4ff",
+        "0e4a572ab1fb94744abb02243a6bbed6c78fc6e3c8d3f60c655f057692a62816",
+        "ab068e2f920d0e06347975c2a342b71f8b8e3b4be0f02ead9442caac51aa8877",
+        "e7e0adfa881e7dbbb07da065ae54444da7c4bccebcb8872ab0cb5dcf9f3761ce",
+        "b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946",
+        "93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d",
+        "3b25c9b08ac6d895417c604fc0ee4b7e47ef974ff8fa43f139daa43bb431fefc",
+        "718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b",
+        "d095a2ccf6dd36b2415adc4fa676f9191ba63cd39828dc5207b36892ec350cbc",
+        "6fe848530b2404017c4a12874c956ad7d5c8a419ee9b040f96b5c13172d2e193",
+        "f181cd661f7af3a60bdaae4b0285a2a67beb55d6910fc8431dbae21a5825ec0f",
+        "60c61c542207080e97e378ab447cc355ecc47534b3a3ebbff307c4fb8339bc4d",
+        "fcee8dfc1b81c449b421410edd5041c16ab59c45bbea85bcb094d1b17c3e9df7",
+        "6f8e6085f5769861ae7a40dccd618d6f747297d59b37cab89b93e2fa80b0c024",
+        "fa79192fe1cce03d7d8db36471dde4cf6c96e6d0f07e1c391dd49e355af9b38c",
+        "19f0df5fdaf5a96e137b6ea885fdb378f37bd3166bd9a47ee11518e33fa09a20",
+        "a1fa18133ae48cbb616c4c148e78e661666778c3087d099067c7fe1868cbb3a1",
+        "9a436eaf5630c602d8e4eb0a30c7a3f65fe270f83afc98e297e76b03ff502b89",
+        "11d0b79ddf16863ddec898fb63511f062dd15753ae1a4872a436af10210d4422",
+        "86d888f34152dae8729900966b44abcb466b9c111699678de58032de601d2b04",
+        "6da1f43a10a179524e840e7288b47bda213339b0552d92e87ae811e52f59fc0e",
+        "f078e0f513097b984ffc94e6c9cb576a1669715019aa0e08704de581e5609f86",
+        "c280cc3ef501d237efa7b1120ca3ad2d196e089ad596b666bed59a85f3c9a074",
+        "3cde94fe9be5c700fc1d9a8ad2277e2c1214609f8c52a5b4db77e466875b8cb7",
+        "9d1a644e686435cf934f2f3f049138a424863b2a800130046dadc0c994ea5df3",
+        "bfda48f9aa2c89c895cde538ec4b4946c7085959e031ad61bde616b9849155d7",
+        "ee33fb70918e7aaa3d3fc44d64a399fb2bf5bcefc54201b1690ecd448551ba88",
+        "275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520",
+        "e5411f3d75f072b944bd88e652112a14a3d409c491fd9a51f5f6eede6d3a3348",
+        "5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4",
+        "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
+        "cae345b5500ef6f84645c816f88b9f7a85a9f3c71697984abdf6849f81e80324",
+        "91e167fa7a256f21f990c526a0a0df840e99aeef0e67dc1f5415b0309486de74",
+        "1621170f6beee641ff59c4a7be3f139fff78553ccfd6c93ddd2ada85332031f2",
+        "be938fb90d5ac9cffcd8381e04c51203544238972ee5b78abc872bc900fb98b5",
+      ),
+    )
+    val tokenTestTradingAppV2 = PackageResource(
+      tokenTestTradingAppV2_current,
+      tokenTestTradingAppV2_1_0_0,
+      Seq(tokenTestTradingAppV2_1_0_0),
+    )
     val allProductionPackageResources = Seq(
       apiTokenMetadataV1,
       apiTokenHoldingV1,
@@ -1209,7 +1322,8 @@ object DarResources {
       apiTokenAllocationRequestV2,
       apiTokenAllocationInstructionV2,
     )
-    val allPackageResources = allProductionPackageResources :+ tokenTestTradingApp
+    val allPackageResources =
+      allProductionPackageResources :+ tokenTestTradingApp :+ tokenTestTradingAppV2
   }
   val amulet_0_1_0 = DarResource(
     "splice-amulet-0.1.0.dar",
@@ -8266,12 +8380,12 @@ object DarResources {
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
-      DarResources.utilBatchedMarkers,
       DarResources.dsoGovernance,
-      DarResources.splitwell,
+      DarResources.utilBatchedMarkers,
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,
+      DarResources.splitwell,
     )
 
   lazy val pkgIdToDarResource: Map[String, DarResource] =

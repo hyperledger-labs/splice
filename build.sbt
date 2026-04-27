@@ -184,6 +184,13 @@ lazy val root: Project = (project in file("."))
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
+    damlBumpPackageVersionsMutate := Def.inputTaskDyn {
+      import sbt.complete.DefaultParsers.*
+      val ref: Option[String] = (Space ~> StringBasic).?.parsed
+      val refArg = ref.filter(_.nonEmpty).map(r => s" --base=$r").getOrElse("")
+      (`build-tools-dar-lock-checker` / Compile / run)
+        .toTask(" bump" + refArg + damlDarsLockCheckerFileArg.value)
+    }.evaluated,
     Headers.OtherHeaderSettings,
     // Disable assembly for all submodules as we want to assemble just the splice-node jar from the apps module
     assembly / aggregate := false,
@@ -191,6 +198,11 @@ lazy val root: Project = (project in file("."))
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
 val damlDarsLockFileUpdate = taskKey[Unit]("Update the daml/dars.lock file")
+val damlBumpPackageVersionsMutate =
+  inputKey[Unit](
+    "Edit daml.yaml and apps/package.json based on comparison with the latest release line " +
+      "(override via an optional git ref argument, e.g. `damlBumpPackageVersionsMutate origin/main`)"
+  )
 val damlDarsLockCheckerFileArg =
   taskKey[String]("Argument line for updating the daml/dars.lock file")
 
@@ -200,6 +212,7 @@ lazy val `build-tools-dar-lock-checker` = project
     libraryDependencies ++= Seq(
       Dependencies.better_files,
       CantonDependencies.daml_lf_archive_reader,
+      Dependencies.scalatest % Test,
     ),
     Headers.ApacheDAHeaderSettings,
   )
@@ -2299,8 +2312,6 @@ updateTestConfigForParallelRuns := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
-  def isPermissionedSynchronizerTest(name: String): Boolean =
-    name.contains("PermissionedSynchronizer")
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
       "IntegrationTest"
@@ -2380,11 +2391,6 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
-    (
-      "permissioned synchronizer tests",
-      "test-full-class-names-permissioned.log",
-      (t: String) => isPermissionedSynchronizerTest(t),
-    ),
     (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",

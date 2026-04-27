@@ -423,9 +423,9 @@ class JoiningNodeInitializer(
       currentNode <- synchronizerNodeService.activeSynchronizerNode()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
-      // submission rights.
+      // not being onboarding.
       _ <- (
-        waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
+        waitForSvParticipantToBeOnboarded(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator(currentNode),
       ).tupled
@@ -552,12 +552,12 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def waitForSvParticipantToHaveSubmissionRights(
+  private def waitForSvParticipantToBeOnboarded(
       dsoParty: PartyId,
       synchronizerId: SynchronizerId,
   ) = {
     val description =
-      show"SV participant $participantId has Submission rights for party $dsoParty"
+      show"SV participant $participantId has Submission rights and is not onboarding for party $dsoParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       "submission_rights",
@@ -578,8 +578,8 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission, _)) =>
-            if (permission == ParticipantPermission.Submission)
+          case Some(HostingParticipant(_, permission, onboarding)) =>
+            if (permission == ParticipantPermission.Submission && !onboarding)
               dsoPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
