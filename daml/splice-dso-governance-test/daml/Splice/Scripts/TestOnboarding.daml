@@ -23,7 +23,7 @@ import Splice.Testing.Registries.AmuletRegistry (getActiveOpenRoundsSorted)
 import Splice.AmuletRules (AmuletRules)
 import Splice.Types
 import Splice.ValidatorPermission
-
+import Splice.ValidatorLicenseRequest
 
 testOnboardValidator : Script ()
 testOnboardValidator = do
@@ -694,3 +694,38 @@ testMergeValidatorPermission = do
 
   pure ()
 
+testValidatorLicenseRequest : Script ()
+testValidatorLicenseRequest = do
+  (app, dso, (sv1, _, _, _)) <- initDevNet
+
+  v1 <- allocateParty "v1"
+
+  requestCid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    sponsor = sv1
+    dso
+    contactPoint = "v1@example.com"
+    version = "0.1.0"
+
+  [(fetchedRequestCid, _)] <- queryFilter @ValidatorLicenseRequest v1 (\r -> r.validator == v1)
+  fetchedRequestCid === requestCid
+
+  DsoRules_AcceptValidatorLicenseRequestResult licenseCid <- 
+    svSubmits app sv1 $ \cid -> exerciseCmd cid $ 
+      DsoRules_AcceptValidatorLicenseRequest with
+        validatorLicenseRequestCid = requestCid
+        sponsor = sv1
+
+  requests <- queryFilter @ValidatorLicenseRequest sv1 (\r -> r.validator == v1)
+  assert (null requests)
+
+  [(fetchedLicenseCid, fetchedLicense)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
+  fetchedLicenseCid === licenseCid
+  fetchedLicense.sponsor === sv1
+  fetchedLicense.validator === v1
+  
+  let Some metadata = fetchedLicense.metadata
+  metadata.contactPoint === "v1@example.com"
+  metadata.version === "0.1.0"
+
+  pure ()
