@@ -74,6 +74,6 @@ export function installScanBulkStorage(
   return {
     region: GcpRegion,
     bucket,
-    secret
+    secret,
   } as BulkStorageBucket;
 }
