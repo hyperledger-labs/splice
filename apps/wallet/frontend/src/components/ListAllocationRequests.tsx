@@ -32,6 +32,7 @@ import {
 } from '@daml.js/splice-api-token-allocation-v2/lib/Splice/Api/Token/AllocationV2/module';
 import { damlTimestampToOpenApiTimestamp } from '../utils/timestampConversion';
 import AllocationSettlementDisplay from './AllocationSettlementDisplay';
+import UseGetAmuletRules from '../hooks/scan-proxy/useGetAmuletRules';
 
 dayjs.extend(relativeTime);
 
@@ -39,14 +40,22 @@ const ListAllocationRequests: React.FC = () => {
   const allocationRequestsQuery = useTokenStandardAllocationRequests();
   const allocationsQuery = useAmuletAllocations();
   const primaryPartyId = usePrimaryParty();
+  const amuletRulesQuery = UseGetAmuletRules();
 
-  if (allocationRequestsQuery.isLoading || !primaryPartyId) {
+  if (allocationRequestsQuery.isLoading || amuletRulesQuery.isLoading || !primaryPartyId) {
     return <Loading />;
   }
   if (allocationRequestsQuery.isError) {
     return (
       <Typography color="error">
         Error loading allocation requests: {JSON.stringify(allocationRequestsQuery.error)}
+      </Typography>
+    );
+  }
+  if (amuletRulesQuery.isError) {
+    return (
+      <Typography color="error">
+        Error loading allocation requests: {JSON.stringify(amuletRulesQuery.error)}
       </Typography>
     );
   }
@@ -71,6 +80,7 @@ const ListAllocationRequests: React.FC = () => {
           request={ar}
           userParty={primaryPartyId}
           allocations={allocations}
+          dso={amuletRulesQuery.data!.contract.payload.dso}
         />
       ))}
     </Stack>
@@ -81,7 +91,8 @@ const AllocationRequestDisplay: React.FC<{
   request: Contract<AllocationRequest>;
   allocations: Contract<AmuletAllocation>[];
   userParty: string;
-}> = ({ request, userParty, allocations }) => {
+  dso: string;
+}> = ({ request, userParty, allocations, dso }) => {
   const payload = request.payload;
   const isV2 = isV2AllocationRequest(payload);
   const { settlement, transferLegs } = isV2
@@ -142,6 +153,7 @@ const AllocationRequestDisplay: React.FC<{
                 allocationRequest={request as Contract<AllocationRequestV2>}
                 allocations={allocations}
                 userParty={userParty}
+                dso={dso}
               />
             </>
           ) : (
@@ -155,6 +167,7 @@ const AllocationRequestDisplay: React.FC<{
                   allocations={allocations}
                   transferLegId={transferLegId}
                   userParty={userParty}
+                  dso={dso}
                 />
               )}
             />
@@ -170,12 +183,14 @@ const V2AllocationRequestActionButton: React.FC<{
   allocationRequest: Contract<AllocationRequestV2>;
   allocations: Contract<AmuletAllocation>[];
   userParty: string;
-}> = ({ allocationRequest, userParty, allocations }) => {
+  dso: string;
+}> = ({ allocationRequest, userParty, allocations, dso }) => {
   const payload = allocationRequest.payload;
   const amuletLegsForUser = payload.transferLegs.filter(
     leg =>
       (leg.sender.owner === userParty || leg.receiver.owner === userParty) &&
-      leg.instrumentId.id === 'Amulet'
+      leg.instrumentId.id === 'Amulet' &&
+      leg.instrumentId.admin === dso
   );
   const isAuthorizer =
     payload.authorizer.owner === userParty &&
@@ -229,10 +244,13 @@ const V1AllocationRequestActionButton: React.FC<{
   allocations: Contract<AmuletAllocation>[];
   userParty: string;
   transferLegId: string;
-}> = ({ parentComponentId, allocationRequest, transferLegId, userParty, allocations }) => {
+  dso: string;
+}> = ({ parentComponentId, allocationRequest, transferLegId, userParty, allocations, dso }) => {
   const transferLeg = allocationRequest.payload.transferLegs[transferLegId];
   const actionAllowed =
-    transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
+    transferLeg.sender === userParty &&
+    transferLeg.instrumentId.id === 'Amulet' &&
+    transferLeg.instrumentId.admin === dso;
   const correspondingAllocation = allocations.find(alloc =>
     isAllocationForTransferLeg(alloc, allocationRequest, transferLegId)
   );

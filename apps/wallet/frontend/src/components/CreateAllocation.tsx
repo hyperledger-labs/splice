@@ -223,12 +223,12 @@ const CreateAllocation: React.FC = () => {
             />
 
             <Divider />
-            <Typography variant="h5">Transfer Legs</Typography>
+            <Typography variant="h5">Amulet Transfer Legs</Typography>
             {allocation.transfer_legs.map((leg, idx) => (
               <Card key={idx} variant="outlined" sx={{ p: 2 }}>
                 <Stack spacing={1}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6">Transfer Leg {idx + 1}</Typography>
+                    <Typography variant="h6">Amulet Transfer Leg {idx + 1}</Typography>
                     {allocation.transfer_legs.length > 1 && (
                       <Button
                         startIcon={<Remove />}
