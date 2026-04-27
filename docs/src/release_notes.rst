@@ -18,7 +18,17 @@
 
 .. _release_notes:
 
-.. release-notes:: 0.6.0
+.. release-notes:: 0.6.1
+
+    Note: 0.6.0 was skipped as it introduced a regression where the SV UI governance page can become unusable due to slow SQL query.
+
+    - SV/Scan UI
+
+        - Fix an issue where the query for listing vote results could degrade to a sequential scan breaking the SV/Scan UI governance page.
+
+    - SV UI
+
+        - Fix calendar in the effective date field reverting selected month
 
     - Canton
 
