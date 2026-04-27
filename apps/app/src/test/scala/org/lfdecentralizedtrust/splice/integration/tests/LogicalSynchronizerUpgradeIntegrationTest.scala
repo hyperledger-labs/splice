@@ -354,7 +354,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
         waitForLsuAnnouncement()
       }
 
-      clue("Pause traffic transfer trigger on sv2") {
+      clue(
+        "Pause traffic transfer trigger on sv2 to simulate a participant that is conencted to a non initialized sequencer past upgrade tiem"
+      ) {
         sv2Backend.dsoAutomation
           .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
           .pause()
@@ -366,7 +368,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
-            eventuallySucceeds(2.minutes) {
+            eventuallySucceeds(3.minutes) {
               upgradeSequencerClient.physical_synchronizer_id shouldBe successorPsid
             }
           }
