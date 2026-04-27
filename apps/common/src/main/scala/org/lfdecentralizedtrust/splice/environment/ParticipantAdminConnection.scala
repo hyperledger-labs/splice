@@ -883,7 +883,7 @@ class ParticipantAdminConnection(
   )(implicit tc: TraceContext): Future[Unit] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity
-        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, Left(sequencerSuccessors))
     )
 }
 

@@ -44,17 +44,18 @@ object ManualLsuRequest {
 
       upgradeTimeO <- request.upgradeTime.traverse(CantonTimestamp.fromProtoTimestamp)
 
-      successors <- request.sequencerSuccessors.toSeq.traverse { case (sequencerIdP, connectionP) =>
-        for {
-          sequencerId <- SequencerId.fromProtoPrimitive(
-            sequencerIdP,
-            "successor.sequencer_successors.id",
-          )
-          connection <- GrpcConnection.fromProtoPrimitives(
-            connectionP.endpoints,
-            connectionP.customTrustCertificates,
-          )
-        } yield (sequencerId, connection)
+      successors <- request.getSequencerSuccessors.successors.toSeq.traverse {
+        case (sequencerIdP, connectionP) =>
+          for {
+            sequencerId <- SequencerId.fromProtoPrimitive(
+              sequencerIdP,
+              "successor.sequencer_successors.id",
+            )
+            connection <- GrpcConnection.fromProtoPrimitives(
+              connectionP.endpoints,
+              connectionP.customTrustCertificates,
+            )
+          } yield (sequencerId, connection)
       }
 
       _ <- checkInvariants(
