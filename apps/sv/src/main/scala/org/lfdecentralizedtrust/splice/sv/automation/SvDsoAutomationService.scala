@@ -227,40 +227,6 @@ class SvDsoAutomationService(
       )
     )
 
-    synchronizerNodeService.nodes.successor match {
-      case Some(successorSynchronizerNode) =>
-        registerTrigger(
-          new LogicalSynchronizerUpgradeTrigger(
-            triggerContext,
-            synchronizerNodeReconciler,
-            synchronizerNodeService.nodes,
-            successorSynchronizerNode,
-            participantAdminConnection,
-            store,
-            config.domainMigrationDumpPath.getOrElse(
-              throw new IllegalArgumentException("Domain migration dump path must be set for LSU")
-            ),
-            config.bftSequencerConnection,
-          )
-        )
-        registerTrigger(
-          new LogicalSyncUpgradeTransferTrafficTrigger(
-            triggerContext,
-            synchronizerNodeService.nodes.current,
-            successorSynchronizerNode,
-          )
-        )
-        registerTrigger(
-          new LogicalSynchronizerUpgradeSequencingTestTrigger(
-            config,
-            triggerContext,
-            synchronizerNodeService.nodes.current,
-            successorSynchronizerNode,
-          )
-        )
-      case _ => ()
-    }
-
     registerTrigger(
       new ReconcileDynamicSynchronizerParametersTrigger(
         triggerContext,
@@ -311,6 +277,42 @@ class SvDsoAutomationService(
 
     registerTriggersForSynchronizers(synchronizerNodeService.nodes.current)
     synchronizerNodeService.nodes.successor.foreach(registerTriggersForSynchronizers)
+  }
+
+  def registerLsuTriggers() = {
+    synchronizerNodeService.nodes.successor match {
+      case Some(successorSynchronizerNode) =>
+        registerTrigger(
+          new LogicalSynchronizerUpgradeTrigger(
+            triggerContext,
+            synchronizerNodeReconciler,
+            synchronizerNodeService.nodes,
+            successorSynchronizerNode,
+            participantAdminConnection,
+            store,
+            config.domainMigrationDumpPath.getOrElse(
+              throw new IllegalArgumentException("Domain migration dump path must be set for LSU")
+            ),
+            config.bftSequencerConnection,
+          )
+        )
+        registerTrigger(
+          new LogicalSyncUpgradeTransferTrafficTrigger(
+            triggerContext,
+            synchronizerNodeService.nodes.current,
+            successorSynchronizerNode,
+          )
+        )
+        registerTrigger(
+          new LogicalSynchronizerUpgradeSequencingTestTrigger(
+            config,
+            triggerContext,
+            synchronizerNodeService.nodes.current,
+            successorSynchronizerNode,
+          )
+        )
+      case _ => ()
+    }
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
