@@ -615,9 +615,9 @@ function installScan(
           bulkStorage: {
             s3: {
               region: config.bulkStorageBucket.region,
-              bucketName: config.bulkStorageBucket.bucketName,
+              bucketName: config.bulkStorageBucket.bucket.name,
               endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
-              secretName: config.bulkStorageBucket.secretName,
+              secretName: config.bulkStorageBucket.secret.metadata.name,
             },
           },
         }

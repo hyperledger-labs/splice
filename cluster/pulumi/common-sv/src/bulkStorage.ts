@@ -12,10 +12,8 @@ import {
 import { BulkStorageConfig } from './singleSvConfig';
 
 export type BulkStorageBucket = {
-  bucketName: string;
-  region: string;
-  secretName: string;
   bucket: gcp.storage.Bucket;
+  region: string;
   secret: k8s.core.v1.Secret;
 };
 
@@ -74,9 +72,7 @@ export function installScanBulkStorage(
   );
 
   return {
-    bucketName,
     region: GcpRegion,
-    secretName,
     bucket,
     secret
   } as BulkStorageBucket;
