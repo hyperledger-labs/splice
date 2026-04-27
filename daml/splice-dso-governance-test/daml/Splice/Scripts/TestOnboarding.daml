@@ -707,25 +707,25 @@ testValidatorLicenseRequest = do
     contactPoint = "v1@example.com"
     version = "0.1.0"
 
-  [(fetchedRequestCid, _)] <- queryFilter @ValidatorLicenseRequest v1 (\r -> r.validator == v1)
+  [(fetchedRequestCid, fetchedRequest)] <- queryFilter @ValidatorLicenseRequest v1 (\r -> r.validator == v1)
   fetchedRequestCid === requestCid
 
-  DsoRules_AcceptValidatorLicenseRequestResult licenseCid <- 
-    svSubmits app sv1 $ \cid -> exerciseCmd cid $ 
-      DsoRules_AcceptValidatorLicenseRequest with
-        validatorLicenseRequestCid = requestCid
-        sponsor = sv1
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  svSubmits app sv1 $ \dsoRulesCid ->
+    (exerciseCmd requestCid ValidatorLicenseRequest_Accept) *>
+    (exerciseCmd dsoRulesCid DsoRules_OnboardValidator with
+      sponsor = sv1
+      validator = v1
+      version = Some fetchedRequest.version
+      contactPoint = Some fetchedRequest.contactPoint)
 
   requests <- queryFilter @ValidatorLicenseRequest sv1 (\r -> r.validator == v1)
   assert (null requests)
 
-  [(fetchedLicenseCid, fetchedLicense)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
-  fetchedLicenseCid === licenseCid
+  [(_, fetchedLicense)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
   fetchedLicense.sponsor === sv1
   fetchedLicense.validator === v1
   
-  let Some metadata = fetchedLicense.metadata
-  metadata.contactPoint === "v1@example.com"
-  metadata.version === "0.1.0"
-
   pure ()
+

@@ -37,7 +37,6 @@ import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
 import Splice.ValidatorPermission
-import Splice.ValidatorLicenseRequest
 
 -- Types
 ---------
@@ -211,10 +210,6 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
     validatorLicense : ContractId ValidatorLicense
-
-data DsoRules_AcceptValidatorLicenseRequestResult = DsoRules_AcceptValidatorLicenseRequestResult with
-    validatorLicense : ContractId ValidatorLicense
-  deriving (Eq, Show)
 
 data DsoRules_GrantValidatorPermissionResult = DsoRules_GrantValidatorPermissionResult with
     permissionCid : ContractId ValidatorPermission
@@ -1056,34 +1051,6 @@ template DsoRules with
           newLoginAfter
           newIsRevoked
         return DsoRules_SetValidatorRevocationStateResult with permissionCid = result.permissionCid
-
-    nonconsuming choice DsoRules_AcceptValidatorLicenseRequest : DsoRules_AcceptValidatorLicenseRequestResult
-      with
-        validatorLicenseRequestCid : ContractId ValidatorLicenseRequest
-        sponsor : Party
-      controller sponsor
-      do
-        require "Sponsor is an SV" (sponsor `Map.member` svs)
-        
-        request <- fetchChecked (ForDso with dso) validatorLicenseRequestCid
-        
-        require "Controller is the sponsor named in the request" (sponsor == request.sponsor)
-
-        exercise validatorLicenseRequestCid ValidatorLicenseRequest_Accept
-        
-        now <- getTime
-        validatorLicense <- create ValidatorLicense with
-          dso
-          sponsor
-          validator = request.validator
-          faucetState = None
-          metadata = Some ValidatorLicenseMetadata with 
-            version = request.version
-            contactPoint = request.contactPoint
-            lastUpdatedAt = now
-          lastActiveAt = Some now
-
-        return DsoRules_AcceptValidatorLicenseRequestResult with ..
 
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
