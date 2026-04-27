@@ -37,13 +37,11 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
-  DomainMigration,
   FoundDso,
   JoinWithKey,
   RollForwardLsu,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
-import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
@@ -301,25 +299,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                       onboardingConfig,
                       upgradesConfig,
                     )
-                  case domainMigrationConfig: DomainMigration =>
-                    val migrationDump =
-                      loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-                    val initialRound = migrationDump.participantUsers.users.collectFirst {
-                      case user if user.id == config.ledgerApiUser =>
-                        user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
-                    }.flatten match {
-                      case None =>
-                        logger.info(
-                          "Initial round not found in user's metadata dump, defaulting to 0."
-                        )
-                        "0"
-                      case Some(rnd) =>
-                        logger.info(
-                          s"Setting the initial round to $rnd from migration user's metadata dump."
-                        )
-                        rnd
-                    }
-                    setInitialRound(connection, initialRound.toLong)
                   case _: RollForwardLsu =>
                     sys.error("Initial round should already be set when doing an LSU")
                 }

@@ -550,9 +550,6 @@ object SpliceConfig {
           _.as[SvOnboardingConfig.InitialPackageConfig].toTry
         }
       )
-    implicit val svOnboardingDomainMigrationReader
-        : ConfigReader[SvOnboardingConfig.DomainMigration] =
-      deriveReader[SvOnboardingConfig.DomainMigration]
     implicit val svOnboardingRollForwardLsuTimestampConfigReader
         : ConfigReader[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
       deriveReader[SvOnboardingConfig.RollForwardLsuTimestampConfig]
@@ -640,7 +637,6 @@ object SpliceConfig {
           conf.onboarding.fold(true) {
             case foundDso: SvOnboardingConfig.FoundDso => check(conf, foundDso)
             case _: SvOnboardingConfig.JoinWithKey => true
-            case _: SvOnboardingConfig.DomainMigration => true
             case _: SvOnboardingConfig.RollForwardLsu => true
           }
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
@@ -1009,9 +1005,6 @@ object SpliceConfig {
     implicit val svOnboardingInitialPackageConfigWriter
         : ConfigWriter[SvOnboardingConfig.InitialPackageConfig] =
       ConfigWriter.stringConfigWriter.contramap(_.asJson.noSpaces)
-    implicit val svOnboardingDomainMigrationWriter
-        : ConfigWriter[SvOnboardingConfig.DomainMigration] =
-      deriveWriter[SvOnboardingConfig.DomainMigration]
     implicit val svOnboardingRollForwardLsuTimestampConfigWriter
         : ConfigWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
       deriveWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig]
