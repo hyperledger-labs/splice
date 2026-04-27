@@ -13,4 +13,5 @@ USER root
 RUN chown -R nonroot:nonroot /app/additional-config.conf
 USER nonroot
 
-HEALTHCHECK --start-period=10m exit 0
+HEALTHCHECK --start-period=10m \
+  CMD exit 0
