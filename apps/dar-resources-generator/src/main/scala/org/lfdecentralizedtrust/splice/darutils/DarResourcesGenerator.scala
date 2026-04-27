@@ -33,6 +33,13 @@ object DarResourcesGenerator {
     "splice-api-token-allocation-request-v1" -> "1.0.0",
     "splice-api-token-allocation-instruction-v1" -> "1.0.0",
     "splice-token-test-trading-app" -> "1.0.0",
+    "splice-api-token-holding-v2" -> "1.0.0",
+    "splice-api-token-transfer-instruction-v2" -> "1.0.0",
+    "splice-api-token-allocation-v2" -> "1.0.0",
+    "splice-api-token-allocation-request-v2" -> "1.0.0",
+    "splice-api-token-allocation-instruction-v2" -> "1.0.0",
+    "splice-token-test-trading-app" -> "1.0.0",
+    "splice-token-test-trading-app-v2" -> "1.0.0",
   )
 
   // fix the order to reduce the diff to the existing status quo
@@ -54,8 +61,14 @@ object DarResourcesGenerator {
     "splice-api-token-allocation-v1",
     "splice-api-token-allocation-request-v1",
     "splice-api-token-allocation-instruction-v1",
+    "splice-api-token-holding-v2",
+    "splice-api-token-transfer-instruction-v2",
+    "splice-api-token-allocation-v2",
+    "splice-api-token-allocation-request-v2",
+    "splice-api-token-allocation-instruction-v2",
   )
   private val tokenStandardTestPackage: String = "splice-token-test-trading-app"
+  private val tokenStandardTestPackageV2: String = "splice-token-test-trading-app-v2"
 
   final case class DarEntry(
       path: String,
@@ -165,12 +178,17 @@ object DarResourcesGenerator {
       grouped.getOrElse(tokenStandardTestPackage, Nil),
       grouped,
     )
+    val testV2 = renderPackage(
+      tokenStandardTestPackageV2,
+      grouped.getOrElse(tokenStandardTestPackageV2, Nil),
+      grouped,
+    )
 
     Seq("object TokenStandard {") ++
-      indent(2, production ++ test) ++
+      indent(2, production ++ test ++ testV2) ++
       Seq(
         s"  val allProductionPackageResources = Seq(${tokenStandardProductionPackageOrder.map(camel).mkString(", ")})",
-        s"  val allPackageResources = allProductionPackageResources :+ ${camel(tokenStandardTestPackage)}",
+        s"  val allPackageResources = allProductionPackageResources :+ ${camel(tokenStandardTestPackage)} :+ ${camel(tokenStandardTestPackageV2)}",
         "}",
       )
   }
