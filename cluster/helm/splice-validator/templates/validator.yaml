@@ -248,11 +248,6 @@ spec:
           value: |
             canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
         {{- end }}
-        {{- if and (not .Values.migration.migrating) (not .Values.svValidator) }}
-        - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
-          value: |
-            canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
-        {{- end }}
         - name: ADDITIONAL_CONFIG_ENABLE_WALLET
           value: |
             canton.validator-apps.validator_backend.enable-wallet = {{ .Values.enableWallet | quote }}
