@@ -448,7 +448,7 @@ object DarResources {
     )
     val apiTokenAllocationRequestV1 = PackageResource(
       apiTokenAllocationRequestV1_current,
-      apiTokenAllocationV1_1_0_0,
+      apiTokenAllocationRequestV1_1_0_0,
       Seq(apiTokenAllocationRequestV1_1_0_0),
     )
     val apiTokenAllocationInstructionV1_1_0_0 = DarResource(
@@ -8266,12 +8266,12 @@ object DarResources {
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
-      DarResources.utilBatchedMarkers,
       DarResources.dsoGovernance,
-      DarResources.splitwell,
+      DarResources.utilBatchedMarkers,
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,
+      DarResources.splitwell,
     )
 
   lazy val pkgIdToDarResource: Map[String, DarResource] =

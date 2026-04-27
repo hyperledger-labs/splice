@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import com.digitalasset.canton.participant.admin.party.PartyManagementServiceError
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
@@ -23,15 +24,18 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
+import io.grpc.Status
 
 import io.grpc.StatusRuntimeException
 import java.time.Instant
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class DsoPartyMigration(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
+    @unused ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -56,15 +60,39 @@ class DsoPartyMigration(
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
       // this will wait until the PartyToParticipant state change completed
-      authorizedAt <- partyHosting
+      _ <- partyHosting
         .authorizeDsoPartyToParticipant(
           dsoRules.domain,
           participantId,
         )
-      _ = logger.info(
-        s"DSO party was authorized on $participantId, downloading snapshot at time $authorizedAt."
+      activationTx <- EitherT.liftF(
+        participantAdminConnection
+          .getDsoPartyToParticipantTransaction(
+            dsoRules.domain,
+            participantId,
+            dsoParty,
+          )
+          .getOrElseF(
+            Future.failed(
+              Status.NOT_FOUND
+                .withDescription(
+                  s"Transaction where the participant $participantId was activated not found."
+                )
+                .asRuntimeException()
+            )
+          )
       )
-      acsBytes <- EitherT.liftF(downloadSnapshotFromTime(authorizedAt, dsoRules.domain))
+      activationTime = activationTx.base.validFrom
+      _ = logger.info(
+        s"DSO party was authorized on $participantId, downloading snapshot at time $activationTime."
+      )
+      acsBytes <- EitherT.liftF(
+        downloadSnapshotFromTime(
+          participantId,
+          activationTime,
+          dsoRules.domain,
+        )
+      )
     } yield {
       acsBytes
     }
@@ -72,7 +100,8 @@ class DsoPartyMigration(
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
-      authorizedAt: Instant,
+      targetParticipantId: ParticipantId,
+      activationTime: Instant,
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
 
@@ -96,12 +125,13 @@ class DsoPartyMigration(
         retryProvider.retry(
           RetryFor.ClientCalls,
           "download_acs_snapshot",
-          show"Download ACS snapshot for DSO at $authorizedAt",
+          show"Download ACS snapshot for DSO at $activationTime",
           participantAdminConnection
-            .downloadAcsSnapshotNonChunked(
-              Set(dsoParty),
-              filterSynchronizerId = decentralizedSynchronizer,
-              timestampOrOffset = Left(authorizedAt),
+            .exportPartyAcs(
+              dsoParty,
+              synchronizerId = decentralizedSynchronizer,
+              targetParticipantId = targetParticipantId,
+              activationTime = activationTime,
             )
             .recoverWith { case ex: StatusRuntimeException =>
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
@@ -112,7 +142,7 @@ class DsoPartyMigration(
                         metadata,
                       ) =>
                     logger.info(
-                      s"Requested record time $authorizedAt is not yet clean: $metadata, submitting dummy transaction"
+                      s"Requested record time $activationTime is not yet clean: $metadata, submitting dummy transaction"
                     )
                     submitDummyTransaction()
                   case _ => Future.unit

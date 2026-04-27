@@ -24,7 +24,11 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.{RetryingService, ServiceWithShutdown}
-import org.lfdecentralizedtrust.splice.environment.{RetryProvider, ServiceWithGuaranteedShutdown}
+import org.lfdecentralizedtrust.splice.environment.{
+  RetryFor,
+  RetryProvider,
+  ServiceWithGuaranteedShutdown,
+}
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
@@ -172,10 +176,18 @@ class ScanVerdictIngestionService(
       val trafficSummariesF: Future[Seq[DbScanVerdictStore.TrafficSummaryT]] =
         sequencerTrafficClient match {
           case Some(sequencerTrafficClient) =>
-            getTrafficSummaries(
-              sequencerTrafficClient,
-              sequencingTimes,
-              viewHashToViewIdByTime,
+            // Retry because this can fail wih REQUESTED_TIMESTAMP_IN_THE_FUTURE
+            // temporarily,
+            retryProvider.getValueWithRetriesNoPretty(
+              RetryFor.Automation,
+              s"traffic summaries for $sequencingTimes",
+              "traffic_summaries",
+              getTrafficSummaries(
+                sequencerTrafficClient,
+                sequencingTimes,
+                viewHashToViewIdByTime,
+              ),
+              logger,
             )
           case None =>
             Future.successful(Seq.empty)

@@ -192,7 +192,7 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingPromoteParticipantToSubmitterTrigger(
+      new SvClearOnboardingFlagTrigger(
         onboardingTriggerContext,
         dsoStore,
         participantAdminConnection,
@@ -574,7 +574,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOffboardingSequencerTrigger],
       aTrigger[ReconcileSequencerLimitWithMemberTrafficTrigger],
       aTrigger[SvNamespaceMembershipTrigger],
-      aTrigger[SvOnboardingPromoteParticipantToSubmitterTrigger],
+      aTrigger[SvClearOnboardingFlagTrigger],
       aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOnboardingSequencerTrigger],
       aTrigger[SvOnboardingMediatorProposalTrigger],
