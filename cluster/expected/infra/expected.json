@@ -3443,8 +3443,9 @@
       "conditions": [
         {
           "conditionPrometheusQueryLanguage": {
-            "duration": "300s",
-            "query": "\n            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"}\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"} > 0)\n            > 0.9\n          "
+            "duration": "600s",
+            "evaluationInterval": "30s",
+            "query": "\n            avg_over_time(serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"}[600s])\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"} > 0)\n            > 0.9\n          "
           },
           "displayName": "Allocation Quota approaching limit (>90%) in mock"
         }
@@ -3487,7 +3488,7 @@
           "conditionThreshold": {
             "aggregations": [
               {
-                "alignmentPeriod": "60s",
+                "alignmentPeriod": "600s",
                 "crossSeriesReducer": "REDUCE_SUM",
                 "groupByFields": [
                   "metric.label.quota_metric"
@@ -3496,7 +3497,7 @@
               }
             ],
             "comparison": "COMPARISON_GT",
-            "duration": "60s",
+            "duration": "600s",
             "filter": "resource.type=\"consumer_quota\" AND metric.type=\"serviceruntime.googleapis.com/quota/exceeded\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/read_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/write_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/crypto_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_symmetric_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_asymmetric_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_generate_random_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/external_kms_requests\"",
             "trigger": {
               "count": 1
@@ -3541,8 +3542,9 @@
       "conditions": [
         {
           "conditionPrometheusQueryLanguage": {
-            "duration": "300s",
-            "query": "\n            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"}\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"} > 0)\n            > 0.9\n          "
+            "duration": "600s",
+            "evaluationInterval": "30s",
+            "query": "\n            avg_over_time(serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"}[600s])\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\", quota_metric!~\"cloudkms.googleapis.com/read_requests|cloudkms.googleapis.com/write_requests|cloudkms.googleapis.com/crypto_requests|cloudkms.googleapis.com/hsm_symmetric_requests|cloudkms.googleapis.com/hsm_asymmetric_requests|cloudkms.googleapis.com/hsm_generate_random_requests|cloudkms.googleapis.com/external_kms_requests\"} > 0)\n            > 0.9\n          "
           },
           "displayName": "Rate Quota approaching limit (>90%) in mock"
         }
