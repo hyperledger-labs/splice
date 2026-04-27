@@ -40,11 +40,8 @@ class PermissionedSynchronizerIntegrationTest
         }(config)
       )
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllValidatorConfigs {
-          case (name, c) if name == "aliceValidator" || name.startsWith("sv") =>
-            c.copy(permissionedSynchronizer = true)
-          case (_, c) =>
-            c
+        ConfigTransforms.updateAllValidatorConfigs { case (_, c) =>
+          c.copy(permissionedSynchronizer = true)
         }(config)
       )
       .withManualStart
@@ -75,11 +72,6 @@ class PermissionedSynchronizerIntegrationTest
             validator,
           ) // note that SVApp submits ValidatorLicense
         }
-      }
-    }
-    withClue("Wait for follower SVs to fully join the DSO to stabilize DsoRules") {
-      eventually(timeUntilSuccess = 40.seconds) {
-        sv1Backend.getDsoInfo().dsoRules.payload.svs.size() shouldBe 3
       }
     }
 
@@ -164,37 +156,41 @@ class PermissionedSynchronizerIntegrationTest
 
     def manuallyApproveValidatorRequest(): Unit = {
 
-      val (sponsorBackend, requestCid) = eventually(timeUntilSuccess = 40.seconds) {
+      val (sponsorBackend, requestContract) = eventually(timeUntilSuccess = 40.seconds) {
         val foundRequests = Seq(sv1Backend, sv2Backend, sv3Backend).flatMap { sv =>
           val sponsorParty = sv.getDsoInfo().svParty
           val requestsInAcs = sv.participantClient.ledger_api_extensions.acs
             .filterJava(ValidatorLicenseRequest.COMPANION)(sponsorParty)
-          requestsInAcs.map(req => (sv, req.id))
+          requestsInAcs.map(req => (sv, req))
         }
         foundRequests should have size 1
-        foundRequests.head
+        foundRequests.loneElement
       }
 
       eventuallySucceeds(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second) {
+        val dsoInfo = sponsorBackend.getDsoInfo()
+        val dsoRules = sponsorBackend.appState.dsoStore.getDsoRules().futureValue
+
         sponsorBackend.appState.svAutomation
           .connection(
             org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
           )
           .submit(
-            Seq(sponsorBackend.getDsoInfo().svParty),
-            Seq(sponsorBackend.getDsoInfo().dsoParty),
-            sponsorBackend.appState.dsoStore
-              .getDsoRules()
-              .futureValue
-              .exercise(
-                _.exerciseDsoRules_AcceptValidatorLicenseRequest(
-                  requestCid,
-                  sponsorBackend.getDsoInfo().svParty.toProtoPrimitive,
-                )
+            actAs = Seq(dsoInfo.svParty),
+            readAs = Seq(dsoInfo.dsoParty),
+            update = Seq(
+              requestContract.id.exerciseValidatorLicenseRequest_Accept(),
+              dsoRules.contractId.exerciseDsoRules_OnboardValidator(
+                dsoInfo.svParty.toProtoPrimitive,
+                requestContract.data.validator,
+                java.util.Optional.of(requestContract.data.version),
+                java.util.Optional.of(requestContract.data.contactPoint),
               ),
+            ),
           )
+          .withSynchronizerId(decentralizedSynchronizerId)
           .noDedup
-          .yieldResult()
+          .yieldUnit()
           .futureValue
       }
     }
