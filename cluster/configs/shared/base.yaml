@@ -162,12 +162,12 @@ monitoring:
         excludedApproachingMetrics: []
         # Smoothing window for quota usage checks. Used as the avg_over_time
         # range in PromQL queries and as the alignmentPeriod for the exceeded
-        # threshold alert. Prometheus duration format (e.g. "60s", "5m").
-        rollingWindow: "10m"
+        # threshold alert.
+        rollingWindowSeconds: 600
         # How long the condition must be continuously true before firing.
-        # Should typically be >= rollingWindow to avoid retesting "old" data.
-        # Prometheus duration format.
-        retestWindow: "10m"
+        # Should typically be >= rollingWindowSeconds to avoid retesting "old"
+        # data.
+        retestWindowSeconds: 600
       trafficBasedRewards:
         # Alert if we have more than this many featured app rights,
         # as too many rights may cause performance problems in computing app activity records.
