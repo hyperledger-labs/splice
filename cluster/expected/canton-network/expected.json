@@ -984,6 +984,90 @@
   {
     "custom": true,
     "id": "",
+    "inputs": {},
+    "name": "mock-sv-1-bulk-hmac",
+    "provider": "",
+    "type": "gcp:storage/hmacKey:HmacKey"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "bucket": "mock-sv-1-bulk",
+      "member": "serviceAccount:undefined",
+      "role": "roles/storage.objectUser"
+    },
+    "name": "mock-sv-1-bulk-sa-role",
+    "provider": "",
+    "type": "gcp:storage/bucketIAMMember:BucketIAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "mock-sv-1-bulk-sa",
+      "displayName": "Service Account for Bulk-Storage Bucket Read/Write Access"
+    },
+    "name": "mock-sv-1-bulk-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "location": "europe-west6",
+      "name": "mock-sv-1-bulk"
+    },
+    "name": "mock-sv-1-bulk",
+    "provider": "",
+    "type": "gcp:storage/bucket:Bucket"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {},
+    "name": "mock-sv-da-1-bulk-hmac",
+    "provider": "",
+    "type": "gcp:storage/hmacKey:HmacKey"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "bucket": "mock-sv-da-1-bulk",
+      "member": "serviceAccount:undefined",
+      "role": "roles/storage.objectUser"
+    },
+    "name": "mock-sv-da-1-bulk-sa-role",
+    "provider": "",
+    "type": "gcp:storage/bucketIAMMember:BucketIAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "mock-sv-da-1-bulk-sa",
+      "displayName": "Service Account for Bulk-Storage Bucket Read/Write Access"
+    },
+    "name": "mock-sv-da-1-bulk-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "location": "europe-west6",
+      "name": "mock-sv-da-1-bulk"
+    },
+    "name": "mock-sv-da-1-bulk",
+    "provider": "",
+    "type": "gcp:storage/bucket:Bucket"
+  },
+  {
+    "custom": true,
+    "id": "",
     "inputs": {
       "datasetId": "mock_da2_scan",
       "deleteContentsOnDestroy": true,
@@ -1878,6 +1962,29 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "accessKey": "",
+          "secretAccessKey": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-bulk-storage-credentials",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "sv-1-bulk-storage-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
@@ -1942,7 +2049,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -2570,6 +2677,14 @@
           }
         },
         "apiRequestLogLevel": "DEBUG",
+        "bulkStorage": {
+          "s3": {
+            "bucketName": "mock-sv-1-bulk",
+            "endpoint": "https://storage.googleapis.com",
+            "region": "europe-west6",
+            "secretName": "splice-app-bulk-storage-credentials"
+          }
+        },
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -3082,6 +3197,29 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "accessKey": "",
+          "secretAccessKey": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-bulk-storage-credentials",
+        "namespace": "sv-da-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "sv-da-1-bulk-storage-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
@@ -3146,7 +3284,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -3603,6 +3741,14 @@
           }
         },
         "apiRequestLogLevel": "DEBUG",
+        "bulkStorage": {
+          "s3": {
+            "bucketName": "mock-sv-da-1-bulk",
+            "endpoint": "https://storage.googleapis.com",
+            "region": "europe-west6",
+            "secretName": "splice-app-bulk-storage-credentials"
+          }
+        },
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,

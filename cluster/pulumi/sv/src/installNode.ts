@@ -67,8 +67,8 @@ async function getParticipantMigrationInfo(
     DecentralizedSynchronizerUpgradeConfig.active.id
   );
   return {
-    participantDatabaseId: await svCantonRef.getOutputValue('participantDatabaseId'),
-    participantDatabaseSecretName: await svCantonRef.getOutputValue(
+    participantDatabaseId: await svCantonRef.requireOutputValue('participantDatabaseId'),
+    participantDatabaseSecretName: await svCantonRef.requireOutputValue(
       'participantDatabaseSecretName'
     ),
   };

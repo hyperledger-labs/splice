@@ -35,11 +35,11 @@ testExpectedDsoParty_Transfer = do
         context = context.context
         expectedDso = None
 
-  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+  submitMustFail (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules
     transferChoice
-  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+  submitMustFail (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules
     transferChoice with expectedDso = Some alice.primaryParty
-  submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+  submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules
     transferChoice with expectedDso = Some app.dso
 
   pure ()

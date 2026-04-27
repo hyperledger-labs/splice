@@ -56,7 +56,7 @@ import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
-import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
+import org.lfdecentralizedtrust.splice.setup.ParticipantInitializer
 import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
@@ -79,7 +79,6 @@ import org.lfdecentralizedtrust.splice.sv.config.{
 }
 import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
 import org.lfdecentralizedtrust.splice.sv.migration.DomainDataSnapshotGenerator
-import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.lsu.RollForwardLsuInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
@@ -138,46 +137,27 @@ class SvApp(
     (for {
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
-          config.onboarding match {
-            case Some(SvOnboardingConfig.DomainMigration(_, dumpFilePath)) =>
-              logger.info(
-                "We're restoring from a migration dump, ensuring participant is initialized"
-              )
-              val participantInitializer = new NodeInitializer(
-                participantAdminConnection,
-                retryProvider,
-                loggerFactory,
-              )
-              participantInitializer.initializeFromDumpAndWait(
-                DomainMigrationInitializer
-                  .loadDomainMigrationDump(dumpFilePath)
-                  .nodeIdentities
-                  .participant
-              )
-
+          UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
+            case Some(migrationId) if migrationId < config.domainMigrationId =>
+              throw Status.INVALID_ARGUMENT
+                .withDescription(
+                  s"Migration ID was incremented (to ${config.domainMigrationId}). The migration id should not be changed from the last value it had."
+                )
+                .asRuntimeException()
             case _ =>
-              UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
-                case Some(migrationId) if migrationId < config.domainMigrationId =>
-                  throw Status.INVALID_ARGUMENT
-                    .withDescription(
-                      s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
-                    )
-                    .asRuntimeException()
-                case _ =>
-                  logger.info(
-                    "Ensuring participant is initialized"
-                  )
-                  val cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
-                    SvCantonIdentifierConfig.default(config)
-                  )
-                  ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-                    cantonIdentifierConfig.participant,
-                    participantAdminConnection,
-                    config.participantBootstrappingDump,
-                    loggerFactory,
-                    retryProvider,
-                  )
-              }
+              logger.info(
+                "Ensuring participant is initialized"
+              )
+              val cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+                SvCantonIdentifierConfig.default(config)
+              )
+              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                cantonIdentifierConfig.participant,
+                participantAdminConnection,
+                config.participantBootstrappingDump,
+                loggerFactory,
+                retryProvider,
+              )
           }
         }
     } yield ()).andThen { case _ => participantAdminConnection.close() }
@@ -359,29 +339,6 @@ class SvApp(
             val initializer = newJoiningNodeInitializer(Some(joiningConfig))
             initializer.joinDsoAndOnboardNodes()
           }
-        case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
-          appInitStep("DomainMigrationInitializer initializing node from dump") {
-            new DomainMigrationInitializer(
-              synchronizerNodeService,
-              domainMigrationConfig,
-              participantId,
-              config,
-              amuletAppParameters.upgradesConfig,
-              ledgerClient,
-              participantAdminConnection,
-              clock,
-              domainTimeAutomationService.domainTimeSync,
-              domainParamsAutomationService.domainUnpausedSync,
-              storage,
-              loggerFactory,
-              retryProvider,
-              config.spliceInstanceNames,
-              newJoiningNodeInitializer,
-              config.parameters.enabledFeatures,
-              config.svAcsStoreDescriptorUserVersion,
-              config.dsoAcsStoreDescriptorUserVersion,
-            ).migrateDomain()
-          }
         case Some(rollForwardLsuConfig: SvOnboardingConfig.RollForwardLsu) =>
           appInitStep("Roll forward LSU") {
             new RollForwardLsuInitializer(
@@ -540,6 +497,7 @@ class SvApp(
           svAutomation,
           dsoAutomation,
           participantAdminConnection,
+          ledgerClient,
           retryProvider,
           dsoPartyHosting,
           loggerFactory,

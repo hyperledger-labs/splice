@@ -3,11 +3,13 @@ org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
 org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTest
+org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
 org.lfdecentralizedtrust.splice.config.SpliceConfigTest
 org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
+org.lfdecentralizedtrust.splice.http.NonProxyHostsTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.GeneratedScanRouteDropNullsTest

@@ -29,6 +29,7 @@ import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.openqa.selenium.support.ui.{ExpectedCondition, ExpectedConditions, WebDriverWait}
 import org.scalatest.{Assertion, ParallelTestExecution}
+import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
@@ -220,6 +221,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         Try {
           val builder = new GeckoDriverService.Builder()
             .withLogFile(browserLogFile)
+            .withTimeout(Duration.ofSeconds(40))
             // Specify the driver executable explicitly, this is important to avoid it checking for new versions which can result in log warnings like this:
             // The geckodriver version (0.35.0) detected in PATH at /nix/store/… might not be compatible with the detected firefox version
             .usingDriverExecutable(
@@ -307,7 +309,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           webDriver.quit()
         }
       }
-      .futureValue
+      .futureValue(timeout = PatienceConfiguration.Timeout(40.seconds))
     logger.info("Stopped web drivers")
   }
 

@@ -26,7 +26,7 @@ testRewardComputation = do
       validatorRewardCoupon = 2.3
 
   -- bare-create all five kinds of rewards for Alice
-  appCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon1 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = None
@@ -34,7 +34,7 @@ testRewardComputation = do
     round = Round 0
     featured = True
 
-  appCoupon2 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon2 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = None
@@ -42,7 +42,7 @@ testRewardComputation = do
     round = Round 0
     featured = False
 
-  appCoupon3 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon3 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = Some bobValidator.primaryParty
@@ -50,7 +50,7 @@ testRewardComputation = do
     round = Round 0
     featured = True
 
-  appCoupon4 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon4 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = Some bobValidator.primaryParty
@@ -59,7 +59,7 @@ testRewardComputation = do
     featured = False
 
 
-  validatorCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+  validatorCoupon1 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd ValidatorRewardCoupon with
     dso = app.dso
     user = aliceValidator.primaryParty
     amount = validatorRewardCoupon
@@ -79,7 +79,7 @@ testRewardComputation = do
   let alice2Weight = 3 * 1000
   let bob2Weight = 3 * 2000
   let provider2Weight = svNode2Weight - alice2Weight - bob2Weight
-  let createSvRewardCoupon provider beneficiary weight = submitMulti [app.dso] [] $ createCmd SvRewardCoupon with
+  let createSvRewardCoupon provider beneficiary weight = submit (actAs app.dso) $ createCmd SvRewardCoupon with
         dso = app.dso
         sv = provider.primaryParty
         beneficiary = beneficiary.primaryParty
@@ -106,7 +106,7 @@ testRewardComputation = do
 
   -- Provider2 cannot redeem Bob's coupon, even with bob's authorization
   context <- getPaymentTransferContext app provider2
-  submitMultiMustFail [provider1.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  submitMustFail (actAs provider1.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = provider1.primaryParty
       provider = provider1.primaryParty
@@ -120,7 +120,7 @@ testRewardComputation = do
   -- But bob can redeem the coupon himself
   context <- getPaymentTransferContext app provider2
   transferResult <- checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
-    submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bob.primaryParty
         provider = bob.primaryParty
@@ -135,7 +135,7 @@ testRewardComputation = do
   -- Alice can redeem her coupons and do so even in a single transfer to bob
   context <- getPaymentTransferContext app aliceValidator
   transferResult <- checkTransferMetadata app TxKind_Transfer aliceValidator.primaryParty $
-    submitMulti [aliceValidator.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs aliceValidator.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = aliceValidator.primaryParty
         provider = aliceValidator.primaryParty
@@ -190,7 +190,7 @@ testRewardComputation = do
   -- Bob validator can redeem the coupons they are a beneficiary on
   context <- getPaymentTransferContext app bobValidator
   transferResult <- checkTransferMetadata app TxKind_MergeSplit bobValidator.primaryParty $
-    submitMulti [bobValidator.primaryParty, bobValidator.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs bobValidator.primaryParty <> actAs bobValidator.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bobValidator.primaryParty
         provider = bobValidator.primaryParty

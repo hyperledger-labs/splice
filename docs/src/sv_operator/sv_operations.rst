@@ -144,7 +144,7 @@ Determining the cost of a single CC transfer
 As per Canton Improvement Proposal `cip-0042 <https://github.com/global-synchronizer-foundation/cips>`_,
 the ``extraTrafficPrice`` should be set so that the cost of a standard CC transfer is 1 USD.
 Actual traffic costs change depending on factors such as the size of the DSO (number of SVs) and the Canton protocol version
-(so can change also on major upgrades).
+(so can change also on protocol upgrades).
 It is therefore recommended for SVs to measure current costs periodically and adjust traffic parameters accordingly.
 
 One way to determine the current :ref:`traffic consumption <traffic_accounting>` (in bytes)

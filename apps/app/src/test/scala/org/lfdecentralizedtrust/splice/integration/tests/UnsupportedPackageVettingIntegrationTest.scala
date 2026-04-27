@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.concurrent.PatienceConfiguration
+import scala.concurrent.duration.DurationInt
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -43,6 +44,8 @@ class UnsupportedPackageVettingIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      // if other tests run before, packages that break this test might already be vetted
+      .withNoVettedPackages(implicit env => env.validators.local.map(_.participantClient))
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[SvPackageVettingTrigger]
@@ -201,7 +204,7 @@ class UnsupportedPackageVettingIntegrationTest
             synchronizerId,
           ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
         }
-        eventually() {
+        eventually(40.seconds) {
           alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
         }
       }

@@ -152,4 +152,8 @@ Not publishing sequencer successor as we are past upgrade time.*LsuNodeInitializ
 Failed to connect to scan of FAILED Seed URL.*RollForwardLsu.*IntegrationTest
 Found roll forward config.*but available sequencers.*is less than the trust threshold in the configuration.*RollForwardLsuIntegrationTest
 
+# slow future supervision, ignore logs as we want them just for debugging
+Supervised futures for the following trace IDs have not completed
+Waiting for.*has not completed after
+
 Ryuk has been disabled
