@@ -1,0 +1,127 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Store Ingestion Performance
+    folder: database
+    interval: 1h
+    rules:
+      - uid: scan-store-ingestion-total-time
+        title: Scan Store Ingestion Total Time Too High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: splice_perf_ingestion_total_time_ns{test="ScanStoreIngestion"} / 1e9
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [300]
+              refId: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: Scan store ingestion total time exceeded 300s
+        labels:
+          severity: warning
+
+      - uid: sv-dso-store-ingestion-total-time
+        title: SV DSO Store Ingestion Total Time Too High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: splice_perf_ingestion_total_time_ns{test="SvDsoStoreIngestion"} / 1e9
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [300]
+              refId: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: SV DSO store ingestion total time exceeded 600s
+        labels:
+          severity: warning
+
+      - uid: update-history-ingestion-total-time
+        title: Update History Ingestion Total Time Too High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: splice_perf_ingestion_total_time_ns{test="UpdateHistoryIngestion"} / 1e9
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1200]
+              refId: C
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: Update history ingestion total time exceeded 900s
+        labels:
+          severity: warning
