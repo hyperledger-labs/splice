@@ -136,7 +136,7 @@ template ValidatorLicense with
 
     choice ValidatorLicense_ReportActive : ValidatorLicense_ReportActiveResult
       -- ^ Choice for validators with disabled wallets to report themselves as active.
-      -- Validators that receive amulets will report through ReceiveFaucetCoupon.
+      -- Validators with enabled wallets report through ValidatorLicense_RecordValidatorLivenessActivity instead.
       controller validator
       do now <- getTime
          Foldable.forA_ lastActiveAt $ \activeAt -> do
