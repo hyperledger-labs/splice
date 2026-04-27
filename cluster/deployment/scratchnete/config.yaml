@@ -1,6 +1,6 @@
 !include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
 multiValidator:
-  postgresPvcSize: '500Gi'
+  postgresPvcSize: '1000Gi'
   requiresOnboardingSecret: false
 loadTester:
   enable: true
@@ -22,7 +22,7 @@ synchronizerMigration:
   frozenMigrationId: 0
   active:
     id: 0
-    version: 0.6.0-snapshot.20260415.2501.0.veebc16a5
+    version: 0.6.2-snapshot.20260427.2745.0.v10b34c2a
     sequencer:
       enableBftSequencer: true
     releaseReference:
