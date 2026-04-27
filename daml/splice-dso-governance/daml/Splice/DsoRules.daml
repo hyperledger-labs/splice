@@ -1052,7 +1052,6 @@ template DsoRules with
           newIsRevoked
         return DsoRules_SetValidatorRevocationStateResult with permissionCid = result.permissionCid
 
-
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
         sponsor : Party
