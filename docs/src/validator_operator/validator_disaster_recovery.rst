@@ -43,10 +43,9 @@ The entire node can be restored from backups as long as **all** of the following
 - The database backup is less than 30 days old.
   Due to sequencer pruning, a participant that is more than 30 days behind will be unable to catch up on the synchronizer
   to become fully operational again.
-- If the backup was taken before the synchronizer underwent a :ref:`major upgrade <validator-upgrades>`,
-  then restoring the node from the backup will only be possible if synchronizer nodes on the old migration ID are still available.
-  If this is true, you must restore the node on the old migration ID first and can then move it through
-  the regular :ref:`migration process <validator-upgrades>` so it becomes fully operational on the new migration ID.
+- If the backup was taken before the synchronizer underwent a :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>`,
+  then restoring the node from the backup will only be possible if synchronizer nodes on the old physical synchronizer are still available.
+  If this is true, you must restore the node on the old physical synchronizer first so it can catch up and become fully operational on the new physical synchronizer.
 
 If one of the above does not hold, it might still be possible to recover the node using the
 :ref:`re-onboarding <validator_reonboard>` procedure discussed below.

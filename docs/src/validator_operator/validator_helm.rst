@@ -748,8 +748,7 @@ Canton Name Service.
 Participant Pruning
 -------------------
 
-By default, participants preserve all history (it is not preserved
-across :ref:`major upgrades <validator-upgrades>` though). However, this leads to
+By default, participants preserve all history. However, this leads to
 gradually growing databases and can slow down certain queries, in
 particular, queries for the active contract set on the ledger API.
 
