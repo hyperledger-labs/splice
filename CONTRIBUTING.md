@@ -54,13 +54,13 @@ working on.
 - Keep patches small, focused, and clearly motivated. One logical change per PR.
 - Reference the issue that the PR addresses.
 - Keep the text in your PR concise, write only what is useful for the reviewers to read. Specifically,
-  avoid AI-generated text in PR descriptions. See our [AI contribution guidelines](AI_POLICY.md)
+  avoid AI-generated text in PR descriptions. See our [AI contribution guidelines](AI_POLICY.md).
 
 ## Opening new issues
 
 Please note that GH issues are not meant for Q&A, but rather for tracking future and current work items.
 Issues that are purely a question may be closed with no further comments.
-Please also consult our AI contribution guidelines (coming soon) for guidelines on AI-created issues.
+Please also consult our [AI contribution guidelines](AI_POLICY.md) for guidelines on AI-created issues.
 
 ## Testing
 
