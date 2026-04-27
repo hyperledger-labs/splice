@@ -350,17 +350,17 @@ class LogicalSynchronizerUpgradeIntegrationTest
       logSuffix = "global-synchronizer-upgrade",
     )() {
 
-      clue(s"wait for lsu announcement") {
-        waitForLsuAnnouncement()
-      }
-
       clue(
-        "Pause traffic transfer trigger on sv2 to simulate a participant that is conencted to a non initialized sequencer past upgrade tiem"
+        "Pause traffic transfer trigger on sv2 to simulate a participant that is connected to a non initialized sequencer past upgrade tiem"
       ) {
         sv2Backend.dsoAutomation
           .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
           .pause()
           .futureValue
+      }
+
+      clue(s"wait for lsu announcement") {
+        waitForLsuAnnouncement()
       }
 
       clue("new nodes are initialized") {
