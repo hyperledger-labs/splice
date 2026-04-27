@@ -24,16 +24,15 @@ private[onboarding] object SetupUtil {
   )(implicit
       traceContext: TraceContext
   ): Future[PartyId] = {
-    val partyHint = config.svPartyHint.getOrElse(
-      config.onboarding
-        .getOrElse(
-          sys.error("Cannot setup SV party without either party hint or an onboarding config")
-        )
-        .name
-    )
     connection.ensureUserPrimaryPartyIsAllocated(
       config.ledgerApiUser,
-      partyHint,
+      config.svPartyHint.getOrElse(
+        config.onboarding
+          .getOrElse(
+            sys.error("Cannot setup SV party without either party hint or an onboarding config")
+          )
+          .name
+      ),
       participantAdminConnection,
     )
   }
