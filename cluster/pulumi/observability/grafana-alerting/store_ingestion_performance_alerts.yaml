@@ -16,7 +16,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: splice_perf_ingestion_total_time_ns{test="ScanStoreIngestion"} / 1e9
+              expr: splice_perf_ingestion_total_time_ns{test="ScanStoreIngestionPerformanceTest"} / 1e9
               refId: A
           - refId: B
             relativeTimeRange:
@@ -56,7 +56,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: splice_perf_ingestion_total_time_ns{test="SvDsoStoreIngestion"} / 1e9
+              expr: splice_perf_ingestion_total_time_ns{test="SvDsoStoreIngestionPerformanceTest"} / 1e9
               refId: A
           - refId: B
             relativeTimeRange:
@@ -82,7 +82,7 @@ groups:
         noDataState: OK
         execErrState: Alerting
         annotations:
-          summary: SV DSO store ingestion total time exceeded 600s
+          summary: SV DSO store ingestion total time exceeded 300s
         labels:
           severity: warning
 
@@ -96,7 +96,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: splice_perf_ingestion_total_time_ns{test="UpdateHistoryIngestion"} / 1e9
+              expr: splice_perf_ingestion_total_time_ns{test="UpdateHistoryIngestionPerformanceTest"} / 1e9
               refId: A
           - refId: B
             relativeTimeRange:
@@ -122,6 +122,6 @@ groups:
         noDataState: OK
         execErrState: Alerting
         annotations:
-          summary: Update history ingestion total time exceeded 900s
+          summary: Update history ingestion total time exceeded 1200s
         labels:
           severity: warning
