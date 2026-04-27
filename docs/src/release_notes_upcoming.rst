@@ -7,12 +7,4 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
-.. release-notes:: Upcoming
-
-- SV/Scan UI
-
-  - Fix an issue where the query for listing vote results could degrade to a sequential scan breaking the SV/Scan UI governance page.
-
-- SV UI
-
-   - Fix calendar in the effective date field reverting selected month
+.. .. release-notes:: Upcoming
