@@ -141,7 +141,7 @@ class ScanApp(
         Some(
           new SequencerTrafficClient(
             syncConfig.sequencer,
-            ScanApp.this,
+            retryProvider,
             nodeMetrics.grpcClientMetrics,
             loggerFactory,
           )

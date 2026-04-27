@@ -723,7 +723,7 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportPartyAcs(
-        file: File,
+        inputStream: java.io.InputStream,
         synchronizer: Synchronizer,
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
@@ -748,7 +748,7 @@ object ParticipantAdminCommands {
           service: PartyManagementServiceStub,
           request: Unit,
       ): Future[v30.ImportPartyAcsResponse] =
-        ResourceUtil.withResource(new FileInputStream(file)) { inputStream =>
+        ResourceUtil.withResource(inputStream) { inputStream =>
           val isFirstChunk = new AtomicBoolean(true)
           GrpcStreamingUtils.streamToServer(
             service.importPartyAcs,
