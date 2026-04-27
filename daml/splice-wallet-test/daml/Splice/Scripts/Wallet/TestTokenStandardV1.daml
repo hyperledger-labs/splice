@@ -31,13 +31,13 @@ testTokenStandardTransfer = script do
   bobValidator <- allocateParty "bobValidator"
   bob <- allocateParty "bob"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso
     validatorParty = aliceValidator
 
-  bobInstall <- submitMulti [bob, bobValidator] [] $ createCmd $ WalletAppInstall with
+  bobInstall <- submit (actAs bob <> actAs bobValidator) $ createCmd $ WalletAppInstall with
     endUserParty = bob
     endUserName = "bob_user"
     dsoParty = registry.dso
@@ -69,14 +69,14 @@ testTokenStandardTransfer = script do
     transfer
     extraArgs = emptyExtraArgs
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg = enrichedChoice.arg
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change1 = result.senderChangeCids
 
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
     transferInstructionCid = aliceInstrCid
     withdrawArg = Api.Token.TransferInstructionV1.TransferInstruction_Withdraw with
       extraArgs = ExtraArgs with
@@ -86,7 +86,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
   let change2 = result.senderChangeCids
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg = Api.Token.TransferInstructionV1.TransferFactory_Transfer with
       expectedAdmin = registry.dso
@@ -97,7 +97,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change3 = result.senderChangeCids
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
     transferInstructionCid = aliceInstrCid
     rejectArg = Api.Token.TransferInstructionV1.TransferInstruction_Reject with
       extraArgs = ExtraArgs with
@@ -107,7 +107,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
   let change4 = result.senderChangeCids
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg =  Api.Token.TransferInstructionV1.TransferFactory_Transfer with
       expectedAdmin = registry.dso
@@ -118,7 +118,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
     transferInstructionCid = aliceInstrCid
     acceptArg =  Api.Token.TransferInstructionV1.TransferInstruction_Accept with
       extraArgs = ExtraArgs with
@@ -138,7 +138,7 @@ testTokenStandardAllocate = script do
 
   provider <- allocateParty "provider"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso
@@ -179,7 +179,7 @@ testTokenStandardAllocate = script do
     requestedAt = now
     extraArgs = emptyExtraArgs
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_AllocationFactory_Allocate with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_AllocationFactory_Allocate with
     allocationFactory = enrichedChoice.factoryCid
     allocateArg = enrichedChoice.arg
 
@@ -187,7 +187,7 @@ testTokenStandardAllocate = script do
 
   context <- RegistryApi.getAllocation_WithdrawContext registry allocationCid emptyMetadata
 
-  _ <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_Allocation_Withdraw with
+  _ <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_Allocation_Withdraw with
     allocationCid = allocationCid
     withdrawArg = Api.Token.AllocationV1.Allocation_Withdraw with
       extraArgs = ExtraArgs with

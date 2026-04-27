@@ -387,7 +387,7 @@ runTest mkTest = do
 
   -- setup settlement agreements
   forA_ test.partiesWithSettlementAgreements $ \trader -> do
-    submitMulti [env.venue, trader] [] $ createCmd TradingAppV2.TradeSettlementAgreement with
+    submit (actAs env.venue <> actAs trader) $ createCmd TradingAppV2.TradeSettlementAgreement with
       venue = env.venue
       trader
 
