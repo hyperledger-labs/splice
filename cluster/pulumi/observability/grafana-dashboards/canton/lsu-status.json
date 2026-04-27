@@ -85,7 +85,9 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -263,7 +265,9 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -338,7 +342,9 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true
@@ -466,7 +472,9 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true
@@ -539,8 +547,12 @@
       },
       {
         "current": {
-          "text": ["global-domain-8-sequencer"],
-          "value": ["global-domain-8-sequencer"]
+          "text": [
+            "global-domain-8-sequencer"
+          ],
+          "value": [
+            "global-domain-8-sequencer"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -568,7 +580,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Logical Synchronizer Upgrade",
   "uid": "cnqlq8j",
   "version": 12,
