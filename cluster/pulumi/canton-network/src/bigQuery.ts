@@ -23,14 +23,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 
 import { spliceConfig } from '../../common/src/config/config';
-import {
-  BIGNUMERIC,
-  BQColumn,
-  BQTable,
-  FLOAT64,
-  INT64,
-  TIMESTAMP,
-} from './bigQuery_functions_types';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -199,48 +191,6 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
       cluster: CLUSTER_BASENAME,
     },
   });
-}
-
-const computedDataTable = new BQTable('dashboards-data', [
-  new BQColumn('as_of_record_time', TIMESTAMP),
-  new BQColumn('migration_id', INT64),
-  new BQColumn('locked', BIGNUMERIC),
-  new BQColumn('unlocked', BIGNUMERIC),
-  new BQColumn('current_supply_total', BIGNUMERIC),
-  new BQColumn('unminted', BIGNUMERIC),
-  new BQColumn('daily_mint_app_rewards', BIGNUMERIC),
-  new BQColumn('daily_mint_validator_rewards', BIGNUMERIC),
-  new BQColumn('daily_mint_sv_rewards', BIGNUMERIC),
-  new BQColumn('daily_mint_unclaimed_activity_records', BIGNUMERIC),
-  new BQColumn('daily_burn', BIGNUMERIC),
-  new BQColumn('num_amulet_holders', INT64),
-  new BQColumn('num_active_validators', INT64),
-  new BQColumn('average_tps', FLOAT64),
-  new BQColumn('peak_tps', FLOAT64),
-  new BQColumn('daily_min_coin_price', BIGNUMERIC),
-  new BQColumn('daily_max_coin_price', BIGNUMERIC),
-  new BQColumn('daily_avg_coin_price', BIGNUMERIC),
-]);
-
-function installDashboardsDataset(): gcp.bigquery.Dataset {
-  const datasetName = 'dashboards';
-  const dataset = new gcp.bigquery.Dataset(datasetName, {
-    datasetId: datasetName,
-    friendlyName: `${datasetName} Dataset`,
-    location: cloudsdkComputeRegion(),
-    deleteContentsOnDestroy: true,
-    labels: {
-      cluster: CLUSTER_BASENAME,
-    },
-  });
-
-  computedDataTable.toPulumi(
-    dataset,
-    // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
-    false
-  );
-
-  return dataset;
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -465,11 +415,5 @@ export function configureScanBigQuery(
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
   installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
 
-  // We installed the dashboards dataset, which consists of all the processed data,
-  // from the canton-network stack initially, so for now we keep it here just to avoid
-  // recreating it (or messing with pulumi export-import to move it to the cn-internal
-  // pulumi stack)
-  // TODO(DACH-NY/canton-network-internal#4773): move it.
-  installDashboardsDataset();
   return;
 }

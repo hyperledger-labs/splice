@@ -170,35 +170,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "datasetId": "dashboards",
-      "deletionProtection": false,
-      "schema": "[{\"name\":\"as_of_record_time\",\"type\":\"TIMESTAMP\"},{\"name\":\"migration_id\",\"type\":\"INT64\"},{\"name\":\"locked\",\"type\":\"BIGNUMERIC\"},{\"name\":\"unlocked\",\"type\":\"BIGNUMERIC\"},{\"name\":\"current_supply_total\",\"type\":\"BIGNUMERIC\"},{\"name\":\"unminted\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_app_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_validator_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_sv_rewards\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_mint_unclaimed_activity_records\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_burn\",\"type\":\"BIGNUMERIC\"},{\"name\":\"num_amulet_holders\",\"type\":\"INT64\"},{\"name\":\"num_active_validators\",\"type\":\"INT64\"},{\"name\":\"average_tps\",\"type\":\"FLOAT64\"},{\"name\":\"peak_tps\",\"type\":\"FLOAT64\"},{\"name\":\"daily_min_coin_price\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_max_coin_price\",\"type\":\"BIGNUMERIC\"},{\"name\":\"daily_avg_coin_price\",\"type\":\"BIGNUMERIC\"}]",
-      "tableId": "dashboards-data"
-    },
-    "name": "dashboards-data",
-    "provider": "",
-    "type": "gcp:bigquery/table:Table"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "datasetId": "dashboards",
-      "deleteContentsOnDestroy": true,
-      "friendlyName": "dashboards Dataset",
-      "labels": {
-        "cluster": "mock"
-      },
-      "location": "europe-west6"
-    },
-    "name": "dashboards",
-    "provider": "",
-    "type": "gcp:bigquery/dataset:Dataset"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
