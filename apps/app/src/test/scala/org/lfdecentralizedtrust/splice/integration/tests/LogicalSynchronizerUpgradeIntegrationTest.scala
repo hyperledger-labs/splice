@@ -33,7 +33,10 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSyncUpgradeTransferTrafficTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -351,6 +354,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
         waitForLsuAnnouncement()
       }
 
+      clue("Pause traffic transfer trigger on sv2") {
+        sv2Backend.dsoAutomation
+          .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
+          .pause()
+          .futureValue
+      }
+
       clue("new nodes are initialized") {
         initialSvNodesDoingTheLsu.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
@@ -371,6 +381,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue(s"wait for upgrade time $upgradeTime") {
         Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
+      }
+
+      clue("Restart sv2 and resume traffic transfer trigger") {
+        sv2Backend.stop()
+        sv2Backend.startSync()
+        sv2Backend.dsoAutomation
+          .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
+          .resume()
       }
 
       def participantIsConnectedToNewSynchronizer(

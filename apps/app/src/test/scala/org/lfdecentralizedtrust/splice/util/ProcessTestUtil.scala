@@ -114,7 +114,7 @@ trait ProcessTestUtil { this: BaseTest =>
       extraEnv*
     )
   }
-  val defaultJavaToolOptions = "-Xms4g -Xmx6g"
+  val defaultJavaToolOptions = "-Xms4g -Xmx8g"
   private def startCantonInternal(
       args: Seq[String],
       logSuffix: String,
