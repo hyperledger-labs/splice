@@ -219,6 +219,7 @@ export async function installSvNode(
         ? svCometBftGovernanceKeySecret(xns, config.cometBftGovernanceKey)
         : []
     )
+    .concat(bulkStorageBucket ? [bulkStorageBucket.secret, bulkStorageBucket.bucket] : [])
     .concat(extraDependsOn);
 
   const defaultPostgres = config.splitPostgresInstances

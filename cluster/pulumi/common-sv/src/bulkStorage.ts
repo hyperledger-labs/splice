@@ -15,6 +15,8 @@ export type BulkStorageBucket = {
   bucketName: string;
   region: string;
   secretName: string;
+  bucket: gcp.storage.Bucket;
+  secret: k8s.core.v1.Secret;
 };
 
 export function installScanBulkStorage(
@@ -53,7 +55,7 @@ export function installScanBulkStorage(
   const secretAccessKey = hmacKey.secret;
 
   const secretName = 'splice-app-bulk-storage-credentials';
-  new k8s.core.v1.Secret(
+  const secret = new k8s.core.v1.Secret(
     `${xns.logicalName}-bulk-storage-credentials`,
     {
       metadata: {
@@ -75,5 +77,7 @@ export function installScanBulkStorage(
     bucketName,
     region: GcpRegion,
     secretName,
+    bucket,
+    secret
   } as BulkStorageBucket;
 }
