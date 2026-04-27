@@ -100,7 +100,7 @@ testMintingDelegation = do
         featuredAppRight = None
   (amuletRulesCid, _) <- getAmuletRules app
 
-  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+  submit (actAs delegate <> readAs beneficiary <> readAs app.dso) $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
     inputs = [
         InputValidatorLivenessActivityRecord livenessActivityRecordCid,
         InputAppRewardCoupon appRewardCouponCid,
@@ -158,7 +158,7 @@ testMintingDelegation_checksExpiry = do
 
   -- Record an activity before expiry to have a valid livenessActivityRecordCid
   (openRoundCid, _) <- getLatestOpenRound app
-  submitMulti [beneficiary] [app.dso] $ exerciseCmd validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+  submit (actAs beneficiary <> readAs app.dso) $ exerciseCmd validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
 
   [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
 
@@ -174,7 +174,7 @@ testMintingDelegation_checksExpiry = do
   context <- getTransferContext app alice None
   (amuletRulesCid, _) <- getAmuletRules app
 
-  submitMultiMustFail [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+  submitMustFail (actAs delegate <> readAs beneficiary <> readAs app.dso) $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
     inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
     context = PaymentTransferContext with
       context
