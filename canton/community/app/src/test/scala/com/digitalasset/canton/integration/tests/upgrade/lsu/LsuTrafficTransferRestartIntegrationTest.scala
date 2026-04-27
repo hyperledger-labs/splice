@@ -197,7 +197,9 @@ final class LsuTrafficTransferRestartIntegrationTest extends LsuBase with Traffi
          */
         (
           LogEntryOptionality.Optional,
-          _.warningMessage should (include("Response message for request") and include("timed out")),
+          _.warningMessage should (include("Response message for request") and include(
+            "timed out"
+          )),
         ),
         (
           LogEntryOptionality.OptionalMany,
