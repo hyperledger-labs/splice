@@ -162,6 +162,8 @@ tests:
           persistentVolumeClaim:
             claimName: claim_name
         - name: empty-dir-volume
+        - name: tmp-volume
+          emptyDir: {}
     documentSelector:
       path: kind
       value: Deployment
@@ -232,12 +234,16 @@ tests:
             - name: participant-volume
               persistentVolumeClaim:
                 claimName: participant-1-participant-pvc
+            - name: tmp-volume
+              emptyDir: {}
       # Volume mount is created
       - equal:
           path: spec.template.spec.containers[0].volumeMounts
           value:
             - name: participant-volume
               mountPath: /persistent-data
+            - name: tmp-volume
+              mountPath: /tmp
   - it: "pvc creates PersistentVolumeClaim resource"
     set:
       pvc:
@@ -302,6 +308,8 @@ tests:
             - name: participant-volume
               persistentVolumeClaim:
                 claimName: participant-1-participant-pvc
+            - name: tmp-volume
+              emptyDir: {}
       # All volume mounts are created (extraVolumeMounts + pvc mount)
       - equal:
           path: spec.template.spec.containers[0].volumeMounts
@@ -313,3 +321,5 @@ tests:
               mountPath: /config
             - name: participant-volume
               mountPath: /persistent-data
+            - name: tmp-volume
+              mountPath: /tmp

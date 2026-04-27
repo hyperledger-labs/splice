@@ -111,6 +111,8 @@ services:
       - ${LOCALNET_DIR}/conf/canton/app-provider:/app/app-provider/${APP_PROVIDER_PROFILE}
       - ${LOCALNET_DIR}/conf/canton/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/canton/sv:/app/sv/${SV_PROFILE}
+    tmpfs:
+      - /tmp
     ports:
       - "${TEST_PORT-4$PARTICIPANT_LEDGER_API_PORT_SUFFIX:}4${PARTICIPANT_LEDGER_API_PORT_SUFFIX}"
       - "${TEST_PORT-4$PARTICIPANT_ADMIN_API_PORT_SUFFIX:}4${PARTICIPANT_ADMIN_API_PORT_SUFFIX}"
@@ -137,7 +139,6 @@ services:
       - app-user
       - sv
       - multi-sync
-
   splice:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
     container_name: splice
@@ -196,6 +197,8 @@ services:
       - ${LOCALNET_DIR}/conf/console/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/sv:/app/sv/${SV_PROFILE}
       - ${LOCALNET_DIR}/docker/console/entrypoint.sh:/app/entrypoint.sh
+    tmpfs:
+      - /tmp
     entrypoint: /app/entrypoint.sh
     stdin_open: true
     tty: true

@@ -129,8 +129,8 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- if or (and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0)) .Values.pvc }}
         volumeMounts:
+        {{- if or (and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0)) .Values.pvc }}
           {{- range .Values.extraVolumeMounts }}
           - name: {{ .name }}
             mountPath: {{ .mountPath }}
@@ -146,6 +146,8 @@ spec:
             mountPath: /persistent-data
         {{- end }}
         {{- end }}
+          - name: tmp-volume
+            mountPath: /tmp
       {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
       initContainers:
         {{- if .Values.persistence.enablePgInitContainer }}
@@ -187,8 +189,8 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or (and .Values.extraVolumes (gt (len .Values.extraVolumes) 0)) .Values.pvc }}
       volumes:
+      {{- if or (and .Values.extraVolumes (gt (len .Values.extraVolumes) 0)) .Values.pvc }}
         {{- range .Values.extraVolumes }}
         - name: {{ .name }}
           {{- if .secret }}
@@ -206,6 +208,8 @@ spec:
             claimName: {{ .Release.Name }}-participant-pvc
         {{- end }}
       {{- end }}
+        - name: tmp-volume
+          emptyDir: {}
 ---
 {{-  if .Values.pvc }}
 apiVersion: v1
