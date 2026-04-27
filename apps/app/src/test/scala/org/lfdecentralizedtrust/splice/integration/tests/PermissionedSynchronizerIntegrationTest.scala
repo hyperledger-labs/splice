@@ -6,12 +6,15 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicenserequest.ValidatorLicenseRequest
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SvTestUtil, WalletTestUtil}
+
+import scala.concurrent.duration.*
 
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
@@ -36,6 +39,14 @@ class PermissionedSynchronizerIntegrationTest
           )
         }(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs {
+          case (name, c) if name == "aliceValidator" || name.startsWith("sv") =>
+            c.copy(permissionedSynchronizer = true)
+          case (_, c) =>
+            c
+        }(config)
+      )
       .withManualStart
 
   "onboard validator in permissioned mode" in { implicit env =>
@@ -58,8 +69,17 @@ class PermissionedSynchronizerIntegrationTest
         clue(
           s"Starting SV ${validator.participantClient.id}"
         ) {
-          startAllSync(sv, scan, validator)
+          startAllSync(
+            sv,
+            scan,
+            validator,
+          ) // note that SVApp submits ValidatorLicense
         }
+      }
+    }
+    withClue("Wait for follower SVs to fully join the DSO to stabilize DsoRules") {
+      eventually(timeUntilSuccess = 40.seconds) {
+        sv1Backend.getDsoInfo().dsoRules.payload.svs.size() shouldBe 3
       }
     }
 
@@ -130,8 +150,11 @@ class PermissionedSynchronizerIntegrationTest
     }
 
     actAndCheck(
-      "Start Alice validator",
-      aliceValidatorBackend.startSync(),
+      "Start Alice validator", {
+        aliceValidatorBackend.start()
+        manuallyApproveValidatorRequest()
+        aliceValidatorBackend.waitForInitialization()
+      },
     )(
       "Onboard Alice test user",
       _ => {
@@ -139,5 +162,41 @@ class PermissionedSynchronizerIntegrationTest
       },
     )
 
+    def manuallyApproveValidatorRequest(): Unit = {
+
+      val (sponsorBackend, requestCid) = eventually(timeUntilSuccess = 40.seconds) {
+        val foundRequests = Seq(sv1Backend, sv2Backend, sv3Backend).flatMap { sv =>
+          val sponsorParty = sv.getDsoInfo().svParty
+          val requestsInAcs = sv.participantClient.ledger_api_extensions.acs
+            .filterJava(ValidatorLicenseRequest.COMPANION)(sponsorParty)
+          requestsInAcs.map(req => (sv, req.id))
+        }
+        foundRequests should have size 1
+        foundRequests.head
+      }
+
+      eventuallySucceeds(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second) {
+        sponsorBackend.appState.svAutomation
+          .connection(
+            org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
+          )
+          .submit(
+            Seq(sponsorBackend.getDsoInfo().svParty),
+            Seq(sponsorBackend.getDsoInfo().dsoParty),
+            sponsorBackend.appState.dsoStore
+              .getDsoRules()
+              .futureValue
+              .exercise(
+                _.exerciseDsoRules_AcceptValidatorLicenseRequest(
+                  requestCid,
+                  sponsorBackend.getDsoInfo().svParty.toProtoPrimitive,
+                )
+              ),
+          )
+          .noDedup
+          .yieldResult()
+          .futureValue
+      }
+    }
   }
 }
