@@ -317,7 +317,7 @@ object SpliceTests extends LazyLogging with HasRetryProvider {
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialTickDuration.asJava
-        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
+        case Some(_: SvOnboardingConfig.JoinWithKey) |
             Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1.")
       }).toSeconds)
@@ -331,8 +331,8 @@ object SpliceTests extends LazyLogging with HasRetryProvider {
       sv1Backend.config.onboarding match {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialSynchronizerFeesConfig
-        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
-            Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.RollForwardLsu) |
+            None =>
           fail("Failed to retrieve defaultSynchronizerFeesConfig from sv1.")
       }
 
