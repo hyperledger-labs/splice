@@ -2553,14 +2553,9 @@ object HttpScanAppClient {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-      pageToken: Option[BigInt] = None,
-  ) extends InternalBaseCommand[
-        http.ListVoteRequestResultsResponse,
-        (
-            Seq[DsoRules_CloseVoteRequestResult],
-            Option[BigInt],
-        ),
-      ] {
+  ) extends InternalBaseCommand[http.ListVoteRequestResultsResponse, Seq[
+        DsoRules_CloseVoteRequestResult
+      ]] {
 
     override def submitRequest(
         client: ScanClient,
@@ -2574,7 +2569,6 @@ object HttpScanAppClient {
           effectiveFrom,
           effectiveTo,
           limit,
-          pageToken,
         ),
         headers = headers,
       )
@@ -2582,17 +2576,18 @@ object HttpScanAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListVoteRequestResultsResponse.OK(response) =>
-      val results = response.dsoRulesVoteResults
-        .map(e =>
-          decoder.decodeValue(
-            DsoRules_CloseVoteRequestResult.valueDecoder(),
-            DsoRules_CloseVoteRequestResult._packageId,
-            "Splice.DsoRules",
-            "DsoRules_CloseVoteRequestResult",
-          )(e)
-        )
-        .toSeq
-      Right((results, response.nextPageToken))
+      Right(
+        response.dsoRulesVoteResults
+          .map(e =>
+            decoder.decodeValue(
+              DsoRules_CloseVoteRequestResult.valueDecoder(),
+              DsoRules_CloseVoteRequestResult._packageId,
+              "Splice.DsoRules",
+              "DsoRules_CloseVoteRequestResult",
+            )(e)
+          )
+          .toSeq
+      )
     }
   }
 

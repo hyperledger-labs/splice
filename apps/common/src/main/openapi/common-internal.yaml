@@ -339,10 +339,6 @@ components:
           type: string
         limit:
           type: integer
-        pageToken:
-          type: integer
-          description: |
-            Cursor for pagination. When requesting the next page of results, pass the `next_page_token` from the previous response.
 
     ListDsoRulesVoteResultsResponse:
       type: object
@@ -353,11 +349,6 @@ components:
           type: array
           items:
             type: object
-        next_page_token:
-          type: integer
-          description: |
-            Cursor for the next page of results. Pass this as `pageToken` in the request.
-            If absent or `null`, there are no more pages.
 
     ListValidatorLicensesResponse:
       type: object
