@@ -50,7 +50,7 @@ import * as damlTypes from '@daml/types';
 import { ContractId, Optional, Text } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
 import { AmuletAllocationV2 } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocationV2';
-import { AmuletAllocation as AmuletAllocationV1 } from '@daml.js/splice-amulet-0.1.18/lib/Splice/AmuletAllocation';
+import { AmuletAllocation as AmuletAllocationV1 } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
