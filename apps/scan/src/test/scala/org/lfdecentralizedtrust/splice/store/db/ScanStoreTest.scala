@@ -1562,6 +1562,7 @@ trait AmuletTransferUtil { self: StoreTestBase =>
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
       Optional.empty(),
+      Optional.empty(),
     )
 
   def mkTransfer(receiver: PartyId, amount: Double) =
@@ -1570,7 +1571,6 @@ trait AmuletTransferUtil { self: StoreTestBase =>
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputAmulet()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
-      Optional.empty(),
       Optional.empty(),
     )
 
@@ -1598,7 +1598,6 @@ trait AmuletTransferUtil { self: StoreTestBase =>
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
-      Optional.empty(),
       Optional.empty(),
     )
 

@@ -76,10 +76,10 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
                 expiresAt = transferBefore
                 holders = [dso]
                 optContext = Some lockContext
+              meta = None -- no metadata for the lock step
           ]
         inputs = transferInputs
         beneficiaries = None
-        meta = None -- no metadata for the lock step
 
   result <- executeExternalPartyTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
@@ -113,13 +113,13 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid transferMeta extraArg
         amount = amount
         receiverFeeRatio = 0.0  -- all fees are paid by the sender
         lock = None
+        meta = Some transferMeta
   let amuletRulesTransfer = Splice.AmuletRules.Transfer with
         sender
         provider
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
         beneficiaries
-        meta = Some transferMeta
   result <- executeExternalPartyTransfer dso context amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)

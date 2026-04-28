@@ -994,7 +994,7 @@ executeTransfer' config csum dso t = do
   issueRewards config csum t.provider t.beneficiaries
   -- record outputs
   (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.eventLogCid csum.openRoundNumber csum.config dso t.sender t.meta summary osum
+    createTransferOutputs csum.eventLogCid csum.openRoundNumber csum.config dso t.sender summary osum
 
   let senderRetainsControl o =
         t.sender == o.receiver &&
@@ -1081,6 +1081,7 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     outputFee : Decimal -- ^ Fee charged to create this output
     amount : Decimal -- ^ Amount of amulet held by this output (after deducting fees)
     lock : Optional TimeLock -- ^ Whether to lock the amulet or not
+    meta : Optional Metadata -- ^ Metadata to attach to the output amulet
   deriving (Eq, Show)
 
 summarizeAndValidateContext : Optional (ContractId TransferEventsV2.EventLog) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
@@ -1330,7 +1331,7 @@ preprocessOutputs : TransferConfigV2 Amulet -> [TransferOutput] -> Update Transf
 preprocessOutputs transferConfigAmulet outs =
     mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
-    preprocessOutput (TransferOutput with receiver; amount; lock; receiverFeeRatio)
+    preprocessOutput (TransferOutput with receiver; amount; lock; receiverFeeRatio; meta)
       | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
           error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
       | otherwise = do
@@ -1346,6 +1347,7 @@ preprocessOutputs transferConfigAmulet outs =
             outputFee = 0.0
             amount
             lock
+            meta
 
 summarizeTransfer : Party -> Round -> Decimal -> TransferConfigV2 Amulet -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer sender openRoundNumber amuletPrice transferConfigAmulet inp preprocessedOutputs = do
@@ -1423,9 +1425,9 @@ issueRewards config csum provider beneficiaries = do
     featured = Some provider == csum.featuredAppProvider
 
 createTransferOutputs
-  : Optional (ContractId TransferEventsV2.EventLog) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> Optional Metadata -> TransferSummary -> TransferOutputsSummary
+  : Optional (ContractId TransferEventsV2.EventLog) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
   -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso sender optTransferMeta summary preprocessedOutputs = do
+createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
     outputAmulets <- mapA createOutput preprocessedOutputs
     senderChangeAmulet <- createSenderChange
     return (outputAmulets, senderChangeAmulet)
@@ -1437,12 +1439,12 @@ createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso send
             dso
             owner = sender
             amount = expiringAmount transferConfigAmulet.holdingFee summary.senderChangeAmount currentOpenRound
-    transferMeta = fromOptional emptyMetadata optTransferMeta
     createOutput out = do
       let amulet = Amulet with
             dso
             owner = out.owner
             amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound
+      let transferMeta = fromOptional emptyMetadata out.meta
 
       -- register transfer events for non-self transfers, if required
       unless (sender == out.owner) $
@@ -1638,8 +1640,6 @@ data Transfer = Transfer with
     outputs : [TransferOutput]
     beneficiaries : Optional [AppRewardBeneficiary]
       -- ^ Beneficiaries between which the app reward is split.
-    meta : Optional Metadata
-      -- ^ Token standard metadata to include in the transfer event log.
   deriving (Eq, Ord, Show)
 
 -- | An individual output for a batch transfer.
@@ -1653,7 +1653,10 @@ data TransferOutput = TransferOutput with
       -- If a receiver's fee is not covered by the specified output amount, the transfer is aborted.
     amount : Decimal
       -- ^ The amount of amulet to receive, before deducting the receiver's part of the output fee.
-    lock : Optional TimeLock -- ^ The lock to be added, if any.
+    lock : Optional TimeLock
+      -- ^ The lock to be added, if any.
+    meta : Optional Metadata
+      -- ^ Token standard metadata to include in the transfer event log.
   deriving (Eq, Ord, Show)
 
 data TransferResult
@@ -1868,13 +1871,13 @@ template TransferPreapproval
                  receiverFeeRatio = 0.0
                  amount = amount
                  lock = None
+                 meta = Some metaWithDescription
              ]
            beneficiaries = None
              -- We don't make this configurable. Rewards should
              -- go to the party hosting the receiver. Allowing the sender
              -- to configure arbitrary beneficiaries doesn't make sense.
              -- If needed, we could extend preapprovals to track beneficiaries later.
-           meta = Some metaWithDescription
 
          -- V1 history metdata also reports on mints that happened in the transfer
          let metaForV1History = fromOptional mempty transferResult.meta <> metaWithDescription
@@ -1913,13 +1916,13 @@ template TransferPreapproval
                  receiverFeeRatio = 0.0
                  amount = amount
                  lock = None
+                 meta = Some metaWithDescription
              ]
            beneficiaries = None
              -- We don't make this configurable. Rewards should
              -- go to the party hosting the receiver. Allowing the sender
              -- to configure arbitrary beneficiaries doesn't make sense.
              -- If needed, we could extend preapprovals to track beneficiaries later.
-           meta = Some metaWithDescription
          let metaForV1History = fromOptional mempty transferResult.meta <> metaWithDescription
          -- strip metadata to avoid duplicating it needlessly
          let result = transferResult with meta = None
@@ -2020,9 +2023,9 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
           receiverFeeRatio = 0.0
           amount
           lock = None
+          meta = None -- No metadata for self-transfers, as they do not create transfer events
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
-    meta = None -- No metadata for self-transfers, as they do not create transfer events
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid

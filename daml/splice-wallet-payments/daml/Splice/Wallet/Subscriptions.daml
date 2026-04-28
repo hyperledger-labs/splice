@@ -394,9 +394,9 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
                expiresAt = expiresAt
                optContext = Some $ "amulet-subscription: " <> subscriptionData.description
              receiverFeeRatio = 0.0
+             meta = None -- empty metadata for self-transfer
          ]
        beneficiaries = None -- no beneficiaries for locking step
-       meta = None -- empty metadata for self-transfer
 
   result <- exercisePaymentTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
@@ -410,24 +410,25 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
 
   -- unlock amulet and transfer the remainder to the receiver
   result <- exercise lockedAmulet LockedAmulet_UnlockV2
+  let reason = "subscription payment for " <> subscriptionData.description
   let transfer = Transfer with
         sender
         provider
         inputs = [InputAmulet result.amuletCid]
-        outputs = [mkTransferOutput receiver targetAmount]
+        outputs = [mkTransferOutput reason receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
         -- TODO(#5001): test that this reason metadata is reported as a TransferEventV2
-        meta = Some (TSU.reasonToMeta ("subscription for " <> subscriptionData.description) emptyMetadata)
   result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets
 
   pure amuletCid
 
-mkTransferOutput : Party -> Decimal -> TransferOutput
-mkTransferOutput receiver amount =
+mkTransferOutput : Text -> Party -> Decimal -> TransferOutput
+mkTransferOutput reason receiver amount =
   TransferOutput with
     receiver
     amount
     lock = None
     receiverFeeRatio = 0.0
+    meta = Some (TSU.reasonToMeta reason emptyMetadata)

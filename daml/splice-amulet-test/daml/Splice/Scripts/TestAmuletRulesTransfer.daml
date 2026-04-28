@@ -57,6 +57,7 @@ testUsageFees = do
                       receiverFeeRatio = 0.0
                       amount = outputAmount1
                       lock = None
+                      meta = None
                     -- test locking a amulet with no lock-holder
                   , TransferOutput with
                       receiver = alice.primaryParty
@@ -66,12 +67,14 @@ testUsageFees = do
                         expiresAt = addRelTime now (days 2)
                         holders = []
                         optContext = None
+                      meta = None
                   -- normal receiver amulet
                   , TransferOutput with
                       receiver = bob.primaryParty
                       receiverFeeRatio = 0.4
                       amount = outputAmount2
                       lock = None
+                      meta = None
                     -- test locking a amulet owned by a non-sender party
                   , TransferOutput with
                       receiver = bob.primaryParty
@@ -81,10 +84,9 @@ testUsageFees = do
                         expiresAt = addRelTime now (days 2)
                         holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
                         optContext = None
-
+                      meta = None
                   ]
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -154,9 +156,10 @@ testAmuletUsedInRoundBeforeItsCreation = do
                       receiver = bob.primaryParty
                       amount = 10.0
                       lock = None
-                      receiverFeeRatio = 0.4 ]
+                      receiverFeeRatio = 0.4
+                      meta = None
+                  ]
         beneficiaries = None -- test code, no beneficiaries
-        meta = None
       context = contextWithRound1.context
       expectedDso = Some app.dso
 
@@ -236,9 +239,10 @@ submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amou
                         receiver
                         amount
                         lock = None
-                        receiverFeeRatio = 1.0]
+                        receiverFeeRatio = 1.0
+                        meta = None
+                    ]
           beneficiaries = None -- test code, no beneficiaries
-          meta = None
         context = transferContext
         expectedDso = Some app.dso
 
@@ -271,21 +275,23 @@ testSenderChangeAndOutput = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = None
                 -- test another output to sender
                 , TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
+                    meta = None
                 -- normal receiver amulet
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount3
                     lock = None
+                    meta = None
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -326,21 +332,23 @@ testSenderSmallChange = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = None
                 -- test another output to sender
                 , TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
+                    meta = None
                 -- normal receiver amulet
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount3
                     lock = None
+                    meta = None
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -378,15 +386,15 @@ testSenderSmallChangeNoSenderOutput = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = None
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
-
+                    meta = None
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -427,9 +435,9 @@ testAppRewardBeneficiaries = do
                     receiverFeeRatio = 0.0
                     amount = 10.0
                     lock = None
+                    meta = None
                 ]
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -446,9 +454,9 @@ testAppRewardBeneficiaries = do
                     receiverFeeRatio = 0.0
                     amount = 10.0
                     lock = None
+                    meta = None
                 ]
       beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -471,9 +479,9 @@ testAppRewardBeneficiaries = do
                       receiverFeeRatio = 0.0
                       amount = 10.0
                       lock = None
+                      meta = None
                   ]
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -499,9 +507,9 @@ testAppRewardBeneficiaries = do
                             receiverFeeRatio = 0.0
                             amount = 10.0
                             lock = None
+                            meta = None
                         ]
               beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
-              meta = None
             context = context.context
             expectedDso = Some app.dso
 
@@ -558,7 +566,6 @@ testUnclaimedActivityRecordTransferInput = do
         inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
         outputs = []
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -575,7 +582,6 @@ testUnclaimedActivityRecordTransferInput = do
           inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
           outputs = []
           beneficiaries = None
-          meta = None
         context = context.context
         expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app
@@ -622,7 +628,6 @@ testInputDevelopmentFundCoupon = do
         inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
         outputs = []
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
   setTime now
@@ -639,7 +644,6 @@ testInputDevelopmentFundCoupon = do
             inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
             outputs = []
             beneficiaries = None
-            meta = None
           context = context.context
           expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app

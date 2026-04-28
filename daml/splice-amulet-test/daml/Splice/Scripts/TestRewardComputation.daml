@@ -113,7 +113,6 @@ testRewardComputation = do
       inputs = [ InputSvRewardCoupon svRewardBob2 ]
       outputs = [ ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -128,7 +127,6 @@ testRewardComputation = do
         inputs = [ InputSvRewardCoupon svRewardBob2 ]
         outputs = [ ]
         beneficiaries = None -- test code, don't set beneficiaries
-        meta = None
       context = context.context
       expectedDso = Some app.dso
   transferResult.summary.senderChangeAmount ===
@@ -154,9 +152,9 @@ testRewardComputation = do
                       receiverFeeRatio = 0.0
                       amount = 8.0
                       lock = None
+                      meta = None
                   ]
         beneficiaries = None -- test code, don't set beneficiaries
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -203,7 +201,6 @@ testRewardComputation = do
           ]
         outputs = []
         beneficiaries = None -- test code, don't set beneficiaries
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 

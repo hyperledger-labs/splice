@@ -139,9 +139,9 @@ template AppPaymentRequest
                       expiresAt = expiresAt
                       optContext = Some $ "amulet-payment-request: " <> description
                     receiverFeeRatio = 0.0
+                    meta = None -- empty metadata for self-transfer
                 ]
               beneficiaries = None -- no beneficiaries for the locking step
-              meta = None -- empty metadata for self-transfer
          result <- exercisePaymentTransfer dso context transfer
          let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
          let round = result.round
@@ -194,6 +194,9 @@ mkReceiverOutput receiverAmount =
     amount = receiverAmount.amuletAmount
     receiverFeeRatio = 0.0
     lock = None
+    meta = Some (TSU.reasonToMeta reason emptyMetadata)
+  where
+    reason = "execute Amulet payment"
 
 data AcceptedAppPayment_CollectResult = AcceptedAppPayment_CollectResult with
   receiverAmulets: [(Party, ContractId Amulet)]
@@ -219,14 +222,12 @@ template AcceptedAppPayment
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock amulet and transfer the remainder to the receiver
         result <- exercise lockedAmulet LockedAmulet_UnlockV2
-        let reason = "execute Amulet payments " <> show amuletReceiverAmounts
         let transfer = Transfer with
               sender
               provider
               inputs = [InputAmulet result.amuletCid]
               outputs = map mkReceiverOutput amuletReceiverAmounts
               beneficiaries = None -- not set for now, could extend later but we probably prefer investment in allocations through the token standard.
-              meta = Some (TSU.reasonToMeta reason emptyMetadata)
         result <- exerciseAppTransfer dso context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets

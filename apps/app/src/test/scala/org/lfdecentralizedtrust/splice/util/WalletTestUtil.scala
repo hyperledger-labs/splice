@@ -1277,7 +1277,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
-      None.toJava,
+      None.toJava, // lock
+      None.toJava, // meta
     )
   }
 
@@ -1302,6 +1303,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           None.toJava,
         )
       ).toJava,
+      None.toJava, // meta
     )
   }
 
@@ -1346,7 +1348,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
                   expiredDuration,
                 )
               ).asJava,
-              java.util.Optional.empty(),
               java.util.Optional.empty(),
             ),
             new splice.amuletrules.TransferContext(
@@ -1474,7 +1475,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
               )
             ).asJava,
             outputs.asJava,
-            java.util.Optional.empty(),
             java.util.Optional.empty(),
           ),
           new splice.amuletrules.TransferContext(

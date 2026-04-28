@@ -1047,6 +1047,7 @@ class UserWalletTxLogParser(
               BigDecimal(0).bigDecimal, // receiver fee ratio is irrelevant, there are no fees
               node.argument.value.amount,
               java.util.Optional.empty(), // lock
+              java.util.Optional.empty(), // meta
             )
             now {
               State

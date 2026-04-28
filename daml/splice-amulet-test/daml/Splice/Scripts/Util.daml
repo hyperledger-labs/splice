@@ -333,9 +333,9 @@ payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
               amount = amuletAmount
               receiverFeeRatio = transferFeeRatio
               lock = None
+              meta = None -- test code only, don't set metadata
           ]
         beneficiaries = None -- test code only, don't set beneficiaries
-        meta = None -- test code only, don't set metadata
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, recipient] readAs
@@ -365,9 +365,9 @@ lockTo1 app sender lockHolder amuletAmount lockDuration = do
                 expiresAt = now `addRelTime` lockDuration
                 optContext = None
               receiverFeeRatio = 0.0
+              meta = None -- test-code only, don't set metadata
           ]
         beneficiaries = None -- no beneficiaries for self-transfer
-        meta = None -- test-code only, don't set metadata
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, lockHolder] readAs
@@ -439,7 +439,6 @@ runAmuletDepositBots app = do
               amulets
           outputs = []
           beneficiaries = None -- no beneficiaries for self-transfer
-          meta = None -- test code only, don't set metadata
     -- merge multiple amulets or rewards and claim rewards even if there are no amulets yet
     when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null amulets)) $ void $
       submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with

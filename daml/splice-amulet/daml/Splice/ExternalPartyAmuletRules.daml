@@ -357,9 +357,9 @@ amulet_transferFactory_transferImpl this _self arg = do
               receiver = transfer.sender
               amount = transfer.amount
               receiverFeeRatio = 0.0
-              lock = None ]
+              lock = None
+              meta = Some transfer.meta]
             beneficiaries = None
-            meta = Some transfer.meta
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
             senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
