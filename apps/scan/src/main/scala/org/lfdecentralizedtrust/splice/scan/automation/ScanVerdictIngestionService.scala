@@ -254,11 +254,11 @@ class ScanVerdictIngestionService(
           case None => Future.successful(Seq.empty)
         }
 
-        // Ensure meta row exists and versions match (first batch only).
-        // Called after activity computation so we have the earliest round number.
-        // Deferred until a batch with activity records arrives — early batches
-        // (e.g., during SV onboarding) may have verdicts but no featured apps,
-        // so there are no activity records and no meaningful earliest round.
+        // Ensure meta row exists and versions match (once, on the first batch
+        // with activity records). Called after activity computation so we have
+        // the earliest round number. Deferred until a batch with activity
+        // records arrives — early batches (e.g., during SV onboarding) may
+        // have verdicts but no featured apps, producing no activity records.
         _ <- activityMetaCheckO match {
           case Some(metaCheck) if !metaCheck.isChecked && appActivityRecords.nonEmpty =>
             val earliestRound = appActivityRecords

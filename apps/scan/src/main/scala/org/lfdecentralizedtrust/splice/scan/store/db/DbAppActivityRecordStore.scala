@@ -47,8 +47,8 @@ object DbAppActivityRecordStore {
     * @param codeVersion code version of the ingestion logic
     * @param userVersion operator-configured version from ScanAppConfig
     * @param startedIngestingAt record time (microseconds since epoch) of the first
-    *                           verdict in the first ingested batch
-    * @param earliestIngestedRound the earliest round number in the first ingested batch
+    *                           verdict in the first batch with activity records
+    * @param earliestIngestedRound the earliest round number in the first batch with activity records
     */
   final case class AppActivityRecordMetaT(
       historyId: Long,
