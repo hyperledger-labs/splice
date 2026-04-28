@@ -223,7 +223,7 @@ data OTCTrade_SettleResult = OTCTrade_SettleResult with
 data OTCTrade_CancelResult = OTCTrade_CancelResult with
   resultsV1 : TextMap.TextMap V1.Allocation_CancelResult
     -- ^ Results for V1 allocation cancellations keyed by transferLegId
-  resultsV2 : [(V2.Account, V2.Allocation_CancelResult)]
+  resultsV2 : [(V2.Account, V2.AllocationResult)]
 
 makeTradeRef : ContractId OTCTrade -> V2.Reference
 makeTradeRef tradeCid = V2.Reference with

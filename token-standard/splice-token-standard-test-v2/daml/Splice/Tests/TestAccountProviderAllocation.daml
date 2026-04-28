@@ -1,0 +1,276 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests about transfers that invlove account providers, and their various authorization schemes.
+module Splice.Tests.TestAccountProviderAllocation where
+
+import Daml.Script
+
+import DA.Map qualified as Map
+import DA.Time
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.AllocationV2 qualified as V2
+import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+
+
+import Splice.Testing.Utils
+import Splice.Testing.Tokens.TestTokenV2.AccountConfig qualified as AccountConfig
+import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Testing.Apps.TradingAppV2 qualified as TradingAppV2
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
+
+import Splice.Tests.TestTokenV2.UnitTest_AccountConfig
+import Splice.Testing.Tokens.TestTokenV2.AccountConfig (AccountConfig)
+import DA.Action (foldlA, when)
+import DA.Functor (void)
+import DA.Foldable (forA_)
+import DA.Optional (fromSome)
+
+
+-- Shared test setup
+--------------------
+
+make_account_if_missing : MultiRegistry.Env -> AccountConfig -> Script ()
+make_account_if_missing env config = do
+  -- Make sure the account is funded.
+  let instrX = V2.InstrumentId with
+        id = "X"
+        admin = env.testTokenV2.admin
+
+  cids <- WalletClientV2.listUnlockedHoldingCidsFor config.account config.account.owner instrX
+  when (null cids) (void $ TestTokenRegistryV2.mint env.testTokenV2 config.account instrX.id 100.0)
+
+  -- Create an AccountConfig contract as needed.
+  case config.account.provider of
+    None -> return ()
+    Some provider -> do
+      oAccount <- queryFilter @AccountConfig config.account.owner (\ac -> ac.account == config.account)
+      case oAccount of
+        [(_, config')] -> assertMsg ("Account already exists with different config: " <> show config) (config' == config)
+        [] -> do
+          accountProposalCid <- submit provider do
+            createCmd AccountConfig.AccountProposal with
+              config 
+
+          submit config.account.owner do
+            exerciseCmd accountProposalCid AccountConfig.AccountProposal_Accept
+          
+          return ()
+        _ -> abort ("Multiple accounts found for config: " <> show config)
+
+
+test_allocation_flows : Script ()
+test_allocation_flows = do
+  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  let mkParty name = do
+        party <- allocatePartyExact name
+        WalletClientV2.createBatchingUtility party
+        pure party
+  
+  -- Same party names as in UnitTest_AccountConfig
+  a <- mkParty "a"
+  v <- mkParty "v"
+  e1 <- mkParty "e1"
+  e2 <- mkParty "e2"
+
+  -- Shorthands
+  let
+    aaia = ([a], V2.AIA_Accept)
+    vaia = ([v], V2.AIA_Accept)
+    aaiw = ([a], V2.AIA_Withdraw)
+    vaiw = ([v], V2.AIA_Withdraw)
+
+    aaw = ([a], V2.AA_Withdraw)
+    vaw = ([v], V2.AA_Withdraw)
+
+    e1ac = ([e1], V2.AA_Cancel)
+    esac = ([e1, e2], V2.AA_Cancel)
+
+    e1s = ([e1], V2.AA_Settle)
+    ess = ([e1, e2], V2.AA_Settle)
+
+
+  let 
+    test_cases = [
+        -- Happy flows
+        (a, v, [e1], j, a, [vaia], [e1s], True),
+        (a, v, [e1, e2], j, a, [vaia], [ess], True),
+        (a, v, [e1], j, v, [aaia], [e1s], True),
+        (a, v, [e1, e2], j, v, [aaia], [ess], True),
+        (a, v, [e1], ic, a, [], [e1s], True),
+        (a, v, [e1], pc, a, [vaia], [e1s], True),
+        (a, v, [e1], p, v, [], [e1s], True),
+        (a, a, [e1], j, a, [], [e1s], True),
+        (a, a, [e1], sc, a, [], [e1s], True),
+
+        -- Widhdrawals
+        (a, v, [e1, e2], j, v, [vaiw], [], False),
+        (a, v, [e1, e2], j, a, [aaiw], [], False),
+        (a, v, [e1, e2], j, v, [aaia], [aaw, vaw], False),
+        (a, v, [e1, e2], j, v, [aaia], [vaw, aaw], False),
+        (a, v, [e1], ic, a, [], [aaw], False),
+        (a, v, [e1], pc, a, [vaia], [aaw, vaw], False),
+        (a, v, [e1], p, v, [], [vaw], False),
+        (a, a, [e1], j, a, [], [aaw], False),
+        (a, a, [e1], sc, a, [], [aaw], False),
+
+        -- Cancellations
+        (a, v, [e1], j, a, [vaia], [e1ac], False),
+        (a, v, [e1, e2], j, a, [vaia], [esac], False),
+
+        -- Cancellations and settlements with partial withdrawal
+        (a, v, [e1, e2], j, a, [vaia], [aaw, ess], True),
+        (a, v, [e1], j, a, [vaia], [aaw, e1s], True)
+      ]
+
+  forA_ test_cases (\(i, p, es, mkacc,init, aias, aas, succ) -> do
+    test_allocation_flow env i p es mkacc init aias aas succ
+    )
+
+
+test_allocation_flow : MultiRegistry.Env
+  -> Party -> Party -> [Party]
+  -> MkAccountConfig
+  -> Party
+  -> [([Party], V2.AllocationInstructionAction)]
+  -> [([Party], V2.AllocationAction)]
+  -> Bool
+  -> Script ()
+test_allocation_flow env authorizer provider executors mkac initiator instr_actions alloc_actions expectSuccess = do
+  let registries = env.registries
+  let instrX = V2.InstrumentId with
+        id = "X"
+        admin = env.testTokenV2.admin
+  let instrY = V2.InstrumentId with
+        id = "Y"
+        admin = env.testTokenV2.admin
+  let
+    accountConfig = mkac "authorizer" env.testTokenV2.admin authorizer provider
+    voidAccount = V2.Account with 
+      owner = fromSome $ partyFromText "void"
+      provider = None
+      id = ""
+
+  debug ("Test Case: " <> show (accountConfig, instr_actions, alloc_actions))
+
+  make_account_if_missing env accountConfig
+
+  balanceXBefore <- WalletClientV2.getAccountBalance authorizer accountConfig.account instrX
+  balanceYBefore <- WalletClientV2.getAccountBalance authorizer accountConfig.account instrY
+
+  
+  -- shared transfer params
+  now <- getTime
+  let requestedAt = now
+  let settleAt = now `addRelTime` days 1
+
+  let 
+    transferLegs = [
+        V2.TransferLeg with
+          transferLegId = "out"
+          sender = accountConfig.account
+          receiver = voidAccount
+          amount = 1.0
+          instrumentId = instrX
+          meta = emptyMetadata
+        ,
+        V2.TransferLeg with
+          transferLegId = "in"
+          sender = voidAccount
+          receiver = accountConfig.account
+          amount = 1.0
+          instrumentId = instrY
+          meta = emptyMetadata
+      ]
+    settlement = V2.SettlementInfo with
+      executors
+      requestedAt
+      settleAt
+      settlementDeadline = None
+      settlementRef = V2.Reference "foo" None
+      meta = emptyMetadata
+    request = TradingAppV2.OTCTradeAllocationRequest with
+      authorizer = accountConfig.account
+      settlement
+      transferLegs
+
+  -- Create the allocation request
+  submit executors do
+    createCmd request
+
+  -- Initiate allocation
+  [ar] <- WalletClientV2.listAllocationRequestsV2 accountConfig.account authorizer
+  WalletClientV2.acceptAllocationRequestV2 registries initiator ar
+
+  -- Now fold through instruction actions
+  foldlA (\() ([actor], action) -> do
+      [ai] <- WalletClientV2.listAllocationInstructionsV2 accountConfig.account authorizer
+      case action of
+        V2.AIA_Accept -> void $ WalletClientV2.acceptAllocationInstructionV2 registries actor ai
+        V2.AIA_Withdraw -> void $  WalletClientV2.withdrawAllocationInstructionV2 registries actor ai
+        _ -> abort "Custom actions are not supported."
+    )
+    ()
+    instr_actions
+
+  let
+    settle_allocation actors (allocCid, V2.AllocationView{..}) = do
+      let
+        batch = V2.SettlementFactory_SettleBatch with
+          allocationCids = [allocCid]
+          extraReceiptAuthorizers = []
+          extraArgs = emptyExtraArgs
+          ..
+
+        -- Add the admin to actors so we can settle direct.
+        actors' = env.testTokenV2.admin::actors
+
+      registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
+      context <- V2.getSettlementFactory registry batch
+      submit (actAs actors' <> mconcat (map disclose (Map.values context.disclosures.disclosures))) do 
+        -- We don't go through the factory because we don't have a counterparty allocation.
+        -- exerciseCmd context.factoryCid batch
+        exerciseCmd allocCid V2.Allocation_Settle with
+          actors = actors'
+          extraArgs = context.arg.extraArgs
+          
+    cancel_allocation actors (allocCid, _) = do
+      registry <- MultiRegistry.getRegistryApiV2 registries env.testTokenV2.admin
+      context <- V2.getAllocation_CancelContext registry allocCid emptyMetadata
+      submit (actAs actors <> mconcat (map disclose (Map.values context.disclosures.disclosures))) do 
+        exerciseCmd allocCid V2.Allocation_Cancel with
+          actors
+          extraArgs = emptyExtraArgs with context = context.choiceContext
+
+  -- Now fold through allocation actions
+  foldlA (\() (actors@(actor::_), action) -> do
+      [alloc] <- WalletClientV2.listAllocationsV2 accountConfig.account authorizer
+      case action of
+        V2.AA_Settle -> void $ settle_allocation actors alloc
+        V2.AA_Cancel -> void $ cancel_allocation actors alloc
+        V2.AA_Withdraw -> void $  WalletClientV2.withdrawAllocationV2 registries actor alloc
+        _ -> abort "Custom actions are not supported."
+    )
+    ()
+    alloc_actions
+
+  balanceXAfter <- WalletClientV2.getAccountBalance authorizer accountConfig.account instrX
+  balanceYAfter <- WalletClientV2.getAccountBalance authorizer accountConfig.account instrY
+
+  instructions <- WalletClientV2.listAllocationInstructionsV2 accountConfig.account authorizer
+  allocations <- WalletClientV2.listAllocationsV2 accountConfig.account authorizer
+
+  assertMsg "There should be no allocation left at the end." (null allocations)
+  assertMsg "There should be no allocation instruction left at the end. " (null instructions)
+  if expectSuccess
+    then do
+      assertMsg "X balance should have decreased by 1.0." (balanceXBefore - balanceXAfter == 1.0)
+      assertMsg "Y balance should have increased by 1.0." (balanceYAfter - balanceYBefore == 1.0)
+    else do
+      assertMsg "X balance should not have changed." (balanceXBefore == balanceXAfter)
+      assertMsg "Y balance should not have changed." (balanceYBefore == balanceYAfter)
+  

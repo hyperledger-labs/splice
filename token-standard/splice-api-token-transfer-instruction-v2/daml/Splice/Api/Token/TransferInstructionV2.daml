@@ -103,7 +103,7 @@ data TransferInstructionAction
           -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
         meta : Metadata
           -- ^ Additional metadata specific to the action, used for extensibility.
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with
@@ -141,7 +141,8 @@ interface TransferInstruction where
   transferInstruction_withdrawExtraObservers : TransferInstruction_Withdraw -> [Party]
 
   nonconsuming choice TransferInstruction_Accept : TransferInstructionResult
-    -- ^ Accept the transfer
+    -- ^ Accept the transfer instruction as someone that needs to authorize it, either on the
+    -- sending or receiving side.
     --
     -- Implementations MUST ensure that the transfer instruction is archived upon acceptance.
     -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Accept`

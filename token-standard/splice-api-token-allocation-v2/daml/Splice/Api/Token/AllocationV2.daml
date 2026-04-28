@@ -111,7 +111,7 @@ data AllocationAction
           -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
         meta : Metadata
           -- ^ Additional metadata specific to the action, used for extensibility.
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | View of a contract representing a ready-to-settle allocation.
 data AllocationView = AllocationView with
@@ -181,15 +181,15 @@ defaultAllocation_CancelControllers allocView =
 interface Allocation where
   viewtype AllocationView
 
-  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
-  allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
-  allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
+  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update AllocationResult
+  allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update AllocationResult
+  allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update AllocationResult
 
   allocation_settleExtraObservers : Allocation_Settle -> [Party]
   allocation_cancelExtraObservers : Allocation_Cancel -> [Party]
   allocation_withdrawExtraObservers : Allocation_Withdraw -> [Party]
 
-  nonconsuming choice Allocation_Settle : Allocation_SettleResult
+  nonconsuming choice Allocation_Settle : AllocationResult
     -- ^ Settle the allocation by moving the net amount of the transfer legs.
     --
     -- The choice is nonconsuming to support alternative consumption patterns,
@@ -224,7 +224,7 @@ interface Allocation where
     controller actors
     do allocation_settleImpl this self arg
 
-  nonconsuming choice Allocation_Cancel : Allocation_CancelResult
+  nonconsuming choice Allocation_Cancel : AllocationResult
     -- ^ Cancel the allocation to release the funds and invalidate the approval
     -- to execute the settlement.
     --
@@ -256,7 +256,7 @@ interface Allocation where
     controller actors
     do allocation_cancelImpl this self arg
 
-  nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult
+  nonconsuming choice Allocation_Withdraw : AllocationResult
     -- ^ Allow the authorizer to withdraw the allocation to release the funds
     -- and invalidate the approval to execute the settlement. This can for
     -- example be used by the authorizer to undo a mistakenly created
@@ -287,19 +287,10 @@ interface Allocation where
 -- Result Types
 ---------------
 
--- | The result of settling an allocation by exercising the `Allocation_Settle` choice.
-data Allocation_SettleResult = Allocation_SettleResult with
-    authorizerHoldingCids : TextMap.TextMap [ContractId Holding]
-      -- ^ New holdings created for the authorizer as part of the settlement
-      -- keyed by their `instrumentId.id`.
-      --
-      -- Implementations MAY decide to not return any holdings.
-    meta : Metadata
-      -- ^ Additional metadata specific to the settlement, used for extensibility.
-  deriving (Eq, Show)
-
 -- | The result of the `Allocation_Cancel` choice.
-data Allocation_CancelResult = Allocation_CancelResult with
+data AllocationResult = AllocationResult with
+    output : AllocationResult_Output
+      -- ^ The output of the action.
     authorizerHoldingCids : TextMap.TextMap [ContractId Holding]
       -- ^ The holdings that were released back to the authorizer keyed by
       -- their `instrumentId.id`.
@@ -307,14 +298,22 @@ data Allocation_CancelResult = Allocation_CancelResult with
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
 
--- | The result of the `Allocation_Withdraw` choice.
-data Allocation_WithdrawResult = Allocation_WithdrawResult with
-    authorizerHoldingCids : TextMap.TextMap [ContractId Holding]
-      -- ^ The holdings that were released back to the authorizer keyed by
-      -- their `instrumentId.id`.
-    meta : Metadata
-      -- ^ Additional metadata specific to the allocation, used for extensibility.
+-- | The output of instructing an allocation or advancing the state of an allocation.
+data AllocationResult_Output
+  = AllocationResult_Pending
+      -- ^ Use this result to communicate that the allocation is pending further steps.
+      with
+        allocationCid : ContractId Allocation
+          -- ^ Contract id of the allocation representing the pending state.
+  | AllocationResult_Settled
+      -- | ^ The result of settling an allocation by exercising the `Allocation_Settle` choice.
+  | AllocationResult_Cancelled
+      -- | ^ The result of the `Allocation_Cancel` choice  when fully authorized.
+  | AllocationResult_Withdrawn
+      -- | ^ The result of the `Allocation_Withdraw` choice when fully authorized.
+
   deriving (Show, Eq)
+
 
 
 -- Settlement Factory

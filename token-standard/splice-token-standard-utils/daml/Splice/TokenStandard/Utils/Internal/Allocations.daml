@@ -90,6 +90,7 @@ import Splice.Api.Token.AllocationRequestV1 qualified as AllocationRequestV1
 import Splice.Api.Token.AllocationRequestV2 qualified as AllocationRequestV2
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
+import Splice.Api.Token.AllocationV2 (AllocationResult(AllocationResult))
 
 
 -- Allocation utilities
@@ -187,7 +188,7 @@ allocationV2_withdrawDefaultImplUsingV1
   : AllocationV1.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
-  -> Update AllocationV2.Allocation_WithdrawResult
+  -> Update AllocationV2.AllocationResult
 allocationV2_withdrawDefaultImplUsingV1 this self (AllocationV2.Allocation_Withdraw{..}) = do
   let thisView = view this
   -- no archive of self, as the V1 choice is consuming
@@ -195,7 +196,8 @@ allocationV2_withdrawDefaultImplUsingV1 this self (AllocationV2.Allocation_Withd
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
-  pure AllocationV2.Allocation_WithdrawResult with
+  pure AllocationResult with
+    output = AllocationV2.AllocationResult_Withdrawn
     authorizerHoldingCids = TextMap.fromList
       [ (thisView.allocation.transferLeg.instrumentId.id, map upcast result.senderHoldingCids) ]
     meta = emptyMetadata -- empty to avoid duplicating the metadata
@@ -209,7 +211,7 @@ allocationV2_cancelDefaultImplUsingV1
   : AllocationV1.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
-  -> Update AllocationV2.Allocation_CancelResult
+  -> Update AllocationV2.AllocationResult
 allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{..}) = do
   let thisView = view this
   -- no archive of self, as the V1 choice is consuming
@@ -217,7 +219,8 @@ allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
-  pure AllocationV2.Allocation_CancelResult with
+  pure AllocationResult with
+    output = AllocationV2.AllocationResult_Cancelled
     authorizerHoldingCids = TextMap.fromList
       [ (thisView.allocation.transferLeg.instrumentId.id, map upcast result.senderHoldingCids) ]
     meta = emptyMetadata -- empty to avoid duplicating the metadata

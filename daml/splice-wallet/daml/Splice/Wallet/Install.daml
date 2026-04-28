@@ -721,7 +721,7 @@ template WalletAppInstall
             extraArgs = ExtraArgs emptyChoiceContext emptyMetadata
         exercise allocationFactory allocateArg
 
-    nonconsuming choice WalletAppInstall_AllocationV2_Withdraw : Splice.Api.Token.AllocationV2.Allocation_WithdrawResult
+    nonconsuming choice WalletAppInstall_AllocationV2_Withdraw : Splice.Api.Token.AllocationV2.AllocationResult
       with
         allocationCid : ContractId Splice.Api.Token.AllocationV2.Allocation
         withdrawArg : Splice.Api.Token.AllocationV2.Allocation_Withdraw
@@ -731,6 +731,28 @@ template WalletAppInstall
         allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
         checkAllocationSpecificationV2 dsoParty (view allocation).allocation endUserParty
         exercise allocationCid withdrawArg
+
+    nonconsuming choice WalletAppInstall_AllocationInstructionV2_Accept : Splice.Api.Token.AllocationInstructionV2.AllocationInstructionResult
+      with
+        allocationInstructionCid : ContractId Splice.Api.Token.AllocationInstructionV2.AllocationInstruction
+        acceptArg : Splice.Api.Token.AllocationInstructionV2.AllocationInstruction_Accept
+      controller validatorParty
+      do
+        TokenStandard.Utils.checkActors acceptArg.actors [[endUserParty]]
+        allocationInstruction <- fetchCheckedInterface (ForDso dsoParty) allocationInstructionCid
+        checkAllocationSpecificationV2 dsoParty (view allocationInstruction).allocation endUserParty
+        exercise allocationInstructionCid acceptArg
+
+    nonconsuming choice WalletAppInstall_AllocationInstructionV2_Withdraw : Splice.Api.Token.AllocationInstructionV2.AllocationInstructionResult
+      with
+        allocationInstructionCid : ContractId Splice.Api.Token.AllocationInstructionV2.AllocationInstruction
+        withdrawArg : Splice.Api.Token.AllocationInstructionV2.AllocationInstruction_Withdraw
+      controller validatorParty
+      do
+        TokenStandard.Utils.checkActors withdrawArg.actors [[endUserParty]]
+        allocationInstruction <- fetchCheckedInterface (ForDso dsoParty) allocationInstructionCid
+        checkAllocationSpecificationV2 dsoParty (view allocationInstruction).allocation endUserParty
+        exercise allocationInstructionCid withdrawArg
 
 
 checkTransferInstructionV2 : Party -> ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction -> [Party] -> Party -> Update ()

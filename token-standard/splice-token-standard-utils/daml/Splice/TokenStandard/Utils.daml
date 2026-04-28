@@ -31,6 +31,8 @@ module Splice.TokenStandard.Utils (
   requireMatchExpected,
   requireUnique,
 
+  expectOneElement,
+
   -- ** Actors pattern
   checkActor,
   checkActors,
@@ -174,3 +176,4 @@ import Splice.TokenStandard.Utils.Internal.Choices
 import Splice.TokenStandard.Utils.Internal.Events
 import Splice.TokenStandard.Utils.Internal.Transfers
 import Splice.TokenStandard.Utils.Internal.Allocations
+import qualified DA.Text as T

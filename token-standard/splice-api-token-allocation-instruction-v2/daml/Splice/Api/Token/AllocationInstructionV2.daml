@@ -18,6 +18,7 @@ import Splice.Api.Token.AllocationV2
 -- | Actions to advance the state of an allocation instruction.
 data AllocationInstructionAction
     = AIA_Withdraw
+    | AIA_Accept
     | -- | Used to represent registry-specific actions that need to happen
       -- for the allocation to be created.
       AIA_Custom with
@@ -28,7 +29,7 @@ data AllocationInstructionAction
           -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
         meta : Metadata
           -- ^ Additional metadata specific to the action, used for extensibility.
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
@@ -73,7 +74,25 @@ interface AllocationInstruction where
   viewtype AllocationInstructionView
 
   allocationInstruction_withdrawImpl : ContractId AllocationInstruction -> AllocationInstruction_Withdraw -> Update AllocationInstructionResult
-  allocationInstruction_withdrawExtraObservers : AllocationInstruction_Withdraw -> [Party]
+  allocationInstruction_withdrawExtraObservers : AllocationInstruction_Withdraw -> [Party] 
+  allocationInstruction_acceptImpl : ContractId AllocationInstruction -> AllocationInstruction_Accept -> Update AllocationInstructionResult
+  allocationInstruction_acceptExtraObservers : AllocationInstruction_Accept -> [Party]
+
+  nonconsuming choice AllocationInstruction_Accept : AllocationInstructionResult
+    -- ^ Accept the allocation instruction as someone that needs to authorize it.
+    with
+      actors : [Party]
+        -- ^ Parties executing the acceptance.
+        -- 
+        -- Registries are free to decide on the required authorization for
+        -- acceptance. They MUST however report the parties that can accept
+        -- unilaterally via the `AllocationInstructionView.availableActions`
+        -- field, so that wallets can show the accept option to the user.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    observer allocationInstruction_acceptExtraObservers this arg
+    controller actors
+    do allocationInstruction_acceptImpl this self arg
 
   nonconsuming choice AllocationInstruction_Withdraw : AllocationInstructionResult
     -- ^ Withdraw the allocation instruction as the sender.

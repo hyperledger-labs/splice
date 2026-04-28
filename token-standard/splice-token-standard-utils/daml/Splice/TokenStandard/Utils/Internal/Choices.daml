@@ -23,6 +23,7 @@ module Splice.TokenStandard.Utils.Internal.Choices (
   isGreaterR,
   isLessR,
   isLessOrEqualR,
+  expectOneElement,
 
   -- * Choice implementations
   publicFetchDefaultImpl,
@@ -136,6 +137,12 @@ requireUnique description xs
    groups = Map.fromListWithR (++) [(x, [x]) | x <- xs]
    duplicates = [x | (x, occurrences) <- Map.toList groups, length occurrences > 1]
 
+expectOneElement : (ActionFail m) => Text -> (a -> Text) -> [a] -> m a
+expectOneElement description pretty xs =
+  case xs of
+    [x] -> pure x
+    [] -> fail $ "Expected exactly one " <> description <> ", but got none."
+    xs -> fail $ T.unlines $ "Expected exactly one " <> description <> ", but got: " :: map pretty xs
 
 -- Actors pattern
 -----------------

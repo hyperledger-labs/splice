@@ -22,15 +22,20 @@ module Splice.Testing.TokenStandard.WalletClientV2
     checkHoldingBounds,
     checkHoldingApprox,
 
+    getAccountBalance,
+
     -- * Managing transfer offers
     listTransferOffers,
     listTransferOffersV2,
 
     transfer,
     acceptTransferOffer,
+    rejectTransferOffer,
+    withdrawTransferOffer,
 
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
+    listAllocationInstructionsV2,
     listAllocationRequestsV2,
     listAllocationsV2,
 
@@ -38,6 +43,11 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
     acceptAllocationRequestV1,
     acceptAllocationRequestV2,
+
+    acceptAllocationInstructionV2,
+    withdrawAllocationInstructionV2,
+
+    withdrawAllocationV2,
 
     -- * Batching utility usage
     TSABatch(..),
@@ -99,6 +109,7 @@ import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
 import Splice.Testing.Utils
 
 import Daml.Script
+import Splice.TokenStandard.Utils (allocationAdmin)
 
 -- | List the holdings of a party of a specific instrument.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
@@ -181,11 +192,7 @@ checkBalance p instrumentId balance =
 
 checkAccountBalance : Party -> V2.Account -> V2.InstrumentId -> Decimal -> Script ()
 checkAccountBalance actor account instrumentId balance = do
-  holdings <- listVisibleHoldings actor
-  let totalAmount = sum $ do
-        (_, holding) <- holdings
-        guard (holding.account == account && holding.instrumentId == instrumentId)
-        pure holding.amount
+  totalAmount <- getAccountBalance actor account instrumentId
   unless (totalAmount == balance) $ fail $ T.unlines
     [ "Unexpected account balance:"
     , "Account: " <> show account
@@ -194,6 +201,13 @@ checkAccountBalance actor account instrumentId balance = do
     , "Actual balance: " <> show totalAmount
     ]
 
+getAccountBalance : Party -> V2.Account -> V2.InstrumentId -> Script Decimal
+getAccountBalance actor account instrumentId = do
+  holdings <- listVisibleHoldings actor
+  return . sum $ do
+    (_, holding) <- holdings
+    guard (holding.account == account && holding.instrumentId == instrumentId)
+    pure holding.amount
 
 -- Transfer offers
 ------------------
@@ -235,6 +249,40 @@ acceptTransferOffer registries actor instrCid = do
   batch <- mkTransferInstruction_AcceptV2 registries actor instrCid
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch actor batch
 
+-- TODO: Switch to batching
+rejectTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
+rejectTransferOffer registries actor instrCid = do
+  Some instrView <- queryInterfaceContractId @V2.TransferInstruction actor instrCid
+  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.transfer.instrumentId.admin)
+  context <- V2.getTransferInstruction_RejectContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.TransferInstruction_Reject with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.TransferInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
+
+-- TODO: Switch to batching
+withdrawTransferOffer : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
+withdrawTransferOffer registries actor instrCid = do
+  Some instrView <- queryInterfaceContractId @V2.TransferInstruction actor instrCid
+  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.transfer.instrumentId.admin)
+  context <- V2.getTransferInstruction_WithdrawContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.TransferInstruction_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.TransferInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
+
 extractPendingTransferInstructionV2 : BatchingUtilityV2.TokenStandardActionResult -> Optional (ContractId V2.TransferInstruction)
 extractPendingTransferInstructionV2 (BatchingUtilityV2.TSAR_TransferInstructionResultV2 result) =
   case result.output of
@@ -268,6 +316,11 @@ listAllocationsV2 tradingAccount actor = do
   allocs <- queryInterface @V2.Allocation actor
   pure [ (allocCid, allocView) | (allocCid, Some allocView) <- allocs, tradingAccount == allocView.allocation.authorizer ]
 
+listAllocationInstructionsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationInstruction, V2.AllocationInstructionView)]
+listAllocationInstructionsV2 tradingAccount actor = do
+  instrs <- queryInterface @V2.AllocationInstruction actor
+  pure [ (instrCid, instrView) | (instrCid, Some instrView) <- instrs, tradingAccount == instrView.allocation.authorizer ]
+
 listAllocationRequestsV1 : Party -> Script [(ContractId V1.AllocationRequest, V1.AllocationRequestView)]
 listAllocationRequestsV1 actor = do
   reqs <- queryInterface @V1.AllocationRequest actor
@@ -293,6 +346,62 @@ acceptAllocationRequestV2
 acceptAllocationRequestV2 registries actor (reqCid, req) = do
   batch <- mkAcceptAllocationRequestV2 registries actor (reqCid, req)
   executeTSABatch actor batch
+
+-- | Simulate a V2 wallet accepting an allocation instruction from a V2 app.
+-- TODO: Use Batching
+acceptAllocationInstructionV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationInstruction, V2.AllocationInstructionView)
+  -> Script V2.AllocationInstructionResult
+acceptAllocationInstructionV2 registries actor (instrCid, instr) = do
+  Some instrView <- queryInterfaceContractId @V2.AllocationInstruction actor instrCid
+  let firstTl::_ = instrView.allocation.transferLegs
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin instrView.allocation)
+  context <- V2.getAllocationInstruction_AcceptContext registry instrCid emptyMetadata
+  submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.AllocationInstruction_Accept with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+-- | Simulate a V2 wallet withdrawing an allocation instruction from a V2 app.
+-- TODO: Use Batching
+withdrawAllocationInstructionV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationInstruction, V2.AllocationInstructionView)
+  -> Script (Optional (ContractId V2.AllocationInstruction))
+withdrawAllocationInstructionV2 registries actor (instrCid, instrView) = do
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin instrView.allocation)
+  context <- V2.getAllocationInstruction_WithdrawContext registry instrCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd instrCid
+      V2.AllocationInstruction_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.AllocationInstructionResult_Pending instrCid' -> Some instrCid'
+    _ -> None
+
+-- | Simulate a V2 wallet withdrawing an allocation from a V2 app.
+-- TODO: Use Batching
+withdrawAllocationV2
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.Allocation, V2.AllocationView)
+  -> Script (Optional (ContractId V2.Allocation))
+withdrawAllocationV2 registries actor (allocCid, allocView) = do
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin allocView.allocation)
+  context <- V2.getAllocation_WithdrawContext registry allocCid emptyMetadata
+  res <- submitWithDisclosures' actor context.disclosures $ 
+    exerciseCmd allocCid
+      V2.Allocation_Withdraw with
+        actors = [actor]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+  return $ case res.output of
+    V2.AllocationResult_Pending instrCid' -> Some instrCid'
+    _ -> None
 
 -- | Execute a batch of token standard actions.
 executeTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
@@ -320,10 +429,10 @@ executeSingletonTSABatch actor batch = do
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
 getHoldingMap actor accountAndInstruments0 = do
   taggedHoldings <- forA (dedupSort accountAndInstruments0) $ \(account, instrumentId) -> do
-    holdings <- listHoldings actor instrumentId
+    holdings <- listVisibleHoldings actor
     let scopedAccount = BatchingUtilityV2.ScopedAccount instrumentId.admin account
     pure [ (scopedAccount, TextMap.fromList [(instrumentId.id, [holdingCid])])
-         | (holdingCid, holding) <- holdings, holding.account == account, isNone holding.lock ]
+         | (holdingCid, holding) <- holdings, holding.account == account, holding.instrumentId == instrumentId, isNone holding.lock ]
   pure $ BatchingUtilityV2.holdingMapFromList (concat taggedHoldings)
 
 
