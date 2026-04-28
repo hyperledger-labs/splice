@@ -191,6 +191,42 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/domains/{domain_id}/participants/{participant_id}/synchronizer-permission:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getParticipantSynchronizerPermission"
+      description: |
+        Check if the ParticipantSynchronizerPermission topology transaction is confirmed.
+      parameters:
+        - name: "domain_id"
+          description: |
+            The synchronizer ID to check the permission on.
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "participant_id"
+          description: |
+            The participant ID to check the permission for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetParticipantSynchronizerPermissionResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
       tags: [external, scan]
@@ -4141,6 +4177,14 @@ components:
             synchronizer in bytes.
           type: integer
           format: int64
+    GetParticipantSynchronizerPermissionResponse:
+      type: object
+      required: ["is_permissioned"]
+      properties:
+        is_permissioned:
+          description: |
+            True if the ParticipantSynchronizerPermission exists.
+          type: boolean
     GetPartyToParticipantResponse:
       type: object
       required: [ "participant_id" ]
