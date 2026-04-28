@@ -613,7 +613,7 @@ testGrantValidatorPermission = do
 
 testMergeValidatorPermission : Script ()
 testMergeValidatorPermission = do
-  (_, dso, (sv1, sv2, _, _)) <- initDevNet
+  (app, dso, (sv1, sv2, _, _)) <- initDevNet
 
   v1 <- allocateParty "v1"
   v2 <- allocateParty "v2"
@@ -651,7 +651,7 @@ testMergeValidatorPermission = do
 
   -- Test 1: Successful merge
   DsoRules_MergeValidatorPermissionResult mergedCid <-
-    submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+    svSubmits app sv1 $ \dsoRulesCid -> exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
       validatorPermissionCids = [perm1Cid, perm2Cid, perm3Cid]
       sv = sv1
 
@@ -662,7 +662,7 @@ testMergeValidatorPermission = do
   mergedPerm.loginAfter === Some (now `addRelTime` hours 2)
 
   -- Test 2: Failure on less than 2 contracts
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
     validatorPermissionCids = [mergedCid]
     sv = sv1
 
@@ -675,7 +675,7 @@ testMergeValidatorPermission = do
     loginAfter = None
     isRevoked = False
 
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
     validatorPermissionCids = [mergedCid, permV2Cid]
     sv = sv1
 
@@ -688,7 +688,7 @@ testMergeValidatorPermission = do
     loginAfter = None
     isRevoked = False
 
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
     validatorPermissionCids = [mergedCid, permParticipant2Cid]
     sv = sv1
 
