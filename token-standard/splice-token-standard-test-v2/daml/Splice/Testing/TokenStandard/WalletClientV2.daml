@@ -250,14 +250,18 @@ acceptAllocationRequestV2 registries actor (reqCid, req) = do
 
 -- | Execute a batch of token standard actions.
 executeTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
-executeTSABatch actor batch = do
-  inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
-  [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
-  submitWithDisclosures' actor batch.disclosures $
-    exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
-        actions = batch.actions
-        inputHoldingMap
-        archiveAfterExecution = False
+executeTSABatch actor batch
+  | null batch.actions = pure $ BatchingUtilityV2.BatchingUtility_ExecuteBatchResult with
+      actionResults = []
+      outputHoldingMap = mempty
+  | otherwise = do
+    inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
+    [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
+    submitWithDisclosures' actor batch.disclosures $
+      exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
+          actions = batch.actions
+          inputHoldingMap
+          archiveAfterExecution = False
 
 -- | Get a map of unlocked holding cids for the given accounts and instruments.
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
@@ -420,9 +424,9 @@ mkAcceptAllocationRequestV1 :  MultiRegistry.MultiRegistry -> Party -> V1.Alloca
 mkAcceptAllocationRequestV1 registries actor req = do
   batches <- forA (TextMap.toList req.transferLegs) $ \(legId, leg) -> do
     let admin = leg.instrumentId.admin
-    registry <- MultiRegistry.getRegistryApiV1 registries admin
     if actor == leg.sender
       then do
+        registry <- MultiRegistry.getRegistryApiV1 registries admin
         mkAllocationFactory_AllocateV1 registry actor V1.AllocationSpecification with
           settlement = req.settlement
           transferLegId = legId

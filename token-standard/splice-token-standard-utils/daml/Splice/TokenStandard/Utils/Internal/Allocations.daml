@@ -13,6 +13,9 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   splitLegsByAuthorizer,
   filterLegsForAccount,
 
+  -- ** Auto-creation of receipt allocations
+  ensureIsReceiptAllocation,
+
   -- * Allocation template implementations
 
   -- ** Validation for ensure clauses
@@ -37,10 +40,7 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
 
   -- * SettlementFactory template implementations
   settlementFactoryV2_settleBatchDefaultImpl,
-  settlementFactoryV2_defaultCreateReceiptAllocation,
-
-  PreparedAllocations(..),
-  validateAndPrepareAllocations,
+  fetchAndValidateAllocations,
 
   settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl,
   settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl,
@@ -176,6 +176,37 @@ isValidAllocationSpecificationV2 validInstrumentId AllocationV2.AllocationSpecif
       validateNoAccountMeta "receiver" leg.meta
 
 
+-- TODO(#4517): add negative test cases for this validation function
+
+-- | Check that the allocation factory call creates a receipt allocation for the given accont.
+ensureIsReceiptAllocation
+  : [Party] -- ^ Expected executors of the receipt allocation
+  -> Party -- ^ Actor creating the receipt allocation
+  -> HoldingV2.Account -- ^ Account receiving the transfers
+  -> AllocationInstructionV2.AllocationFactory_Allocate
+  -> Update ()
+ensureIsReceiptAllocation executors receiver receiptAccount choiceArg = do
+  let (AllocationInstructionV2.AllocationFactory_Allocate with
+        allocation; requestedAt = _ignore; inputHoldingCids; extraArgs; actors) = choiceArg
+  let (ExtraArgs with context = _ignore; meta) = extraArgs
+  let (AllocationV2.AllocationSpecification with settlement; transferLegs; authorizer) = allocation
+  requireMatchExpected ("allocation.settlement.executor", settlement.executors) executors
+  require' ("choiceArg.allocation.authorizer", authorizer) isEqualR ("receiptAccount", receiptAccount)
+  -- restrict to single actor choices with the receiver as the actor
+  requireMatchExpected ("choiceArg.actors", actors) [receiver]
+  -- require all transfer legs to be receipts
+  forA_ transferLegs $ \leg -> do
+    let legName = "transferLeg[" <> leg.transferLegId <> "]"
+    require' (legName <> ".receiver", leg.receiver) isEqualR ("receiptAccount", receiptAccount)
+    -- avoid accidental delegation of authority for non-receipt legs
+    require' (legName <> ".sender.owner", leg.sender.owner) (notR isEqualR) ("receivingActor", receiver)
+    require' (legName <> ".sender.provider", leg.sender.provider) (notR isEqualR) ("receivingActor", Some receiver)
+  -- no holdings for funding
+  require' ("choiceArg.inputHoldingCids", inputHoldingCids) isEqualR ("emptyList", [])
+  -- no extra metadata to avoid accidental delegation over special functionality
+  require' ("choiceArg.extraArgs.meta", meta) isEqualR ("emptyMetadata", emptyMetadata)
+
+
 -- Allocation choices
 ---------------------
 
@@ -293,13 +324,7 @@ settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl
   : AllocationV2.SettlementFactory_SettleBatch -> [Party]
 settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl _arg = []
 
--- | Internal type to hold the results of validating and preparing the allocations for batch settlement.
-data PreparedAllocations = PreparedAllocations with
-    receiptAllocationsToCreate : [AllocationV2.AllocationSpecification]
-      -- ^ Missing receipt allocations that were authorized to be created as part of the settlement.
-    existingAllocationsToSettle : [(ContractId AllocationV2.Allocation, AllocationV2.AllocationView)]
-      -- ^ Existing allocations to settle jointly with the missing receipt allocations.
-  deriving (Eq, Show)
+-- TODO(#4517): re-review this implementation jointly to focus the increase in test coverage
 
 -- | Default implementation for settling a batch of allocations.
 --
@@ -311,32 +336,20 @@ data PreparedAllocations = PreparedAllocations with
 -- validation and preparation logic in `validateAndPrepareAllocations`, but will
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
-  : HasToInterface t AllocationV2.SettlementFactory
-  => (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
-     -- ^ How to create the allocation of a missing receipt leg.
-  -> t
+  : Party
+     -- ^ Admin of the allocations and the settlement factory
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFactory0 _self arg= do
-  -- check that executors are part of the actors
-  -- additional actors are allowed, and are implicitly checked via authorization context in all steps that require authority
-  require'
-    ("settlement.executors", arg.settlement.executors)
-    isSubsetOfR
-    ("SettlementFactory_SettleBatch.actors", arg.actors)
+settlementFactoryV2_settleBatchDefaultImpl admin self arg= do
+  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
+  checkActors actors [settlement.executors]
 
   -- validate call to factory and retrieve context
-  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
-  let settlementFactory = toInterface @AllocationV2.SettlementFactory settlementFactory0
-  let admin = (view settlementFactory).admin
-  prep <- validateAndPrepareAllocations admin arg
-
-  -- create missing receipt allocations
-  receiptAllocations <- forA prep.receiptAllocationsToCreate createReceiptAllocation
+  allocations <- fetchAndValidateAllocations admin arg
 
   -- settle all allocations
-  newHoldingCidss <- forA (prep.existingAllocationsToSettle ++ receiptAllocations) $ \(allocationCid, allocView) -> do
+  newHoldingCidss <- forA allocations $ \(allocationCid, allocView) -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with
       -- Use default controllers as the actors
       actors = AllocationV2.defaultAllocation_SettleControllers allocView
@@ -348,42 +361,14 @@ settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFac
     newHoldingCids = Map.fromListWithR (textMapUnionWith (++)) newHoldingCidss
     meta = emptyMetadata
 
-
--- | Default implementation for creating receipt allocations using the allocation factory interface.
-settlementFactoryV2_defaultCreateReceiptAllocation
-  : ContractId AllocationInstructionV2.AllocationFactory
-  -> (HoldingV2.Account -> [Party])
-     -- ^ Which actors must authorize the creation of the receipt allocation for a given account.
-  -> AllocationV2.SettlementFactory_SettleBatch
-  -> AllocationV2.AllocationSpecification
-     -- ^ Allocation to create.
-  -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView)
-settlementFactoryV2_defaultCreateReceiptAllocation allocationFactoryCid directAllocateActors settleBatchArg allocSpec = do
-  -- prudent engineering: check that there are no sender legs, as they must not be created implicitly
-  let senderLegs = [ leg | leg <- allocSpec.transferLegs, leg.sender == allocSpec.authorizer ]
-  require' ("sender legs", senderLegs) isEqualR ("empty list", [])
-  -- create allocation for the receipt
-  result <- exercise allocationFactoryCid AllocationInstructionV2.AllocationFactory_Allocate with
-    allocation = allocSpec
-    requestedAt = settleBatchArg.settlement.requestedAt
-    inputHoldingCids = []
-    extraArgs = settleBatchArg.extraArgs
-    actors = directAllocateActors allocSpec.authorizer
-  case result.output of
-    AllocationInstructionV2.AllocationInstructionResult_Completed with allocationCid -> do
-      allocation <- fetch allocationCid
-      pure (allocationCid, view allocation)
-    AllocationInstructionV2.AllocationInstructionResult_Pending _instrCid -> do
-      abort $ "unexpected: receipt allocation did create a pending allocation instruction for " <> show allocSpec
-    AllocationInstructionV2.AllocationInstructionResult_Failed ->
-      abort $ "failed to create receipt allocation for " <> show allocSpec
-
 -- | Core logic to validate the allocations for a batch settlement.
 -- Used in `settlementFactoryV2_settleBatchDefaultImpl` and exposed as a standalone function to
 -- be reused by factories that need custom settlement execution logic.
-validateAndPrepareAllocations : Party ->  AllocationV2.SettlementFactory_SettleBatch -> Update PreparedAllocations
-validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{..} = do
-  requireUnique "transfer legs" transferLegs
+fetchAndValidateAllocations
+  : Party ->  AllocationV2.SettlementFactory_SettleBatch
+  -> Update [(ContractId AllocationV2.Allocation, AllocationV2.AllocationView)]
+fetchAndValidateAllocations admin AllocationV2.SettlementFactory_SettleBatch{..} = do
+  requireUnique "SettleBatch.transferLegs ids" (map (.transferLegId) transferLegs)
 
   -- fetch and validate all allocations
   allocations <- forA allocationCids $ \allocationCid -> do
@@ -392,11 +377,6 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
     let allocation = allocationView.allocation
 
     requireMatchExpected ("allocation.settlement", allocation.settlement) settlement
-    requireUnique "allocation.transferLegs ids" (map (.transferLegId) allocation.transferLegs)
-    require'
-      ("allocation.extraSettlementAuthorizers", allocationView.extraSettlementAuthorizers)
-      isSubsetOfR
-      ("SettlementFactory_SettleBatch.actors", actors)
     forA_ allocation.transferLegs $ \leg -> do
       requireMatchExpected ("transferLeg.instrumentId.admin", leg.instrumentId.admin) admin
     pure (allocationCid, allocationView)
@@ -408,29 +388,16 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
         pure (allocationView.allocation.authorizer, leg)
   requireUnique "allocated authorizations" allocatedAuthorizations
 
-  -- determine missing allocations for receipt legs
+  -- check that exactly the required allocations are present
   let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
   let allocatedAuthorizationsSet = Set.fromList allocatedAuthorizations
-  let missingReceiptAllocations =
-        Set.filter (\(authorizer, leg) -> leg.sender /= authorizer) $
-        Set.difference requiredAuthorizations allocatedAuthorizationsSet
-  let missingAllocationsByAuthorizer = Map.fromListWithR (++) $ do
-        (authorizer, leg) <- Set.toList missingReceiptAllocations
-        pure (authorizer, [leg])
-  let missingAllocations = do
-        (authorizer, legs) <- Map.toList missingAllocationsByAuthorizer
-        pure $ AllocationV2.AllocationSpecification with
-          authorizer = authorizer
-          settlement = settlement
-          transferLegs = legs
+  let superfluousAuthorizations = allocatedAuthorizationsSet `Set.difference` requiredAuthorizations
+  let missingAuthorizations = requiredAuthorizations `Set.difference` allocatedAuthorizationsSet
 
-  -- check that all missing authorizations are covered by the extra receipt authorizers
-  forA_ (Set.toList missingReceiptAllocations) $ \(authorizer, leg) -> do
-    require' ("missing authorizer of " <> leg.transferLegId, authorizer) isMemberR ("extraReceiptAuthorizers", extraReceiptAuthorizers)
+  require' ("superfluous authorizations", superfluousAuthorizations) isEqualR ("empty set", Set.empty)
+  require' ("missing authorizations", missingAuthorizations) isEqualR ("empty set", Set.empty)
 
-  pure PreparedAllocations with
-    receiptAllocationsToCreate = missingAllocations
-    existingAllocationsToSettle = allocations
+  pure allocations
 
 
 -- | Helper type of a transfer leg together with its authorizer.
@@ -516,7 +483,6 @@ upcast_v1_v2_Allocation availableActions (AllocationV1.AllocationView with alloc
     allocation = upcast allocation
     holdingCids = map upcast holdingCids
     expiresAt = Some (allocation.settlement.settleBefore)
-    extraSettlementAuthorizers = [allocation.transferLeg.sender, allocation.transferLeg.receiver]
     availableActions
     meta
 
@@ -531,14 +497,13 @@ allocationV1_availableActionsDefault allocView = Map.fromList
     leg = allocation.transferLeg
 
 -- | Available actions for a V2 allocation that uses the default controllers for its actions.
-allocationV2_availableActionsDefault : AllocationV2.AllocationSpecification -> [Party] -> Map.Map [Party] [AllocationV2.AllocationAction]
-allocationV2_availableActionsDefault allocation extraSettlementAuthorizers = Map.fromList
+allocationV2_availableActionsDefault : AllocationV2.AllocationSpecification -> Map.Map [Party] [AllocationV2.AllocationAction]
+allocationV2_availableActionsDefault allocation = Map.fromList
   [ ([allocation.authorizer.owner], [AllocationV2.AA_Withdraw])
-  , (dedupSort settlementControllers, [AllocationV2.AA_Cancel])
-  , (dedupSort (admin :: settlementControllers), [AllocationV2.AA_Settle])
+  , (dedupSort allocation.settlement.executors, [AllocationV2.AA_Cancel])
+  , (dedupSort (admin :: allocation.settlement.executors), [AllocationV2.AA_Settle])
   ]
   where
-    settlementControllers = allocation.settlement.executors <> extraSettlementAuthorizers
     admin = case allocation.transferLegs of
       leg :: _ -> leg.instrumentId.admin
       [] -> error "unexpected: allocation with no transfer legs"
