@@ -72,9 +72,9 @@ function featureSupportHandler(
 }
 
 test('can parse allocation request', async () => {
-  const ar = getAllocationRequest();
-  const res = mkContract(AllocationRequest, ar);
-  const decoded = Contract.decodeOpenAPI(res, AllocationRequest);
+  const ar = getAllocationRequestV1();
+  const res = mkContract(AllocationRequestV1, ar);
+  const decoded = Contract.decodeOpenAPI(res, AllocationRequestV1);
   expect(decoded.contractId).toStrictEqual(res.contract_id);
   expect(decoded.createdAt).toStrictEqual(res.created_at);
   expect(decoded.createdEventBlob).toStrictEqual(res.created_event_blob);
