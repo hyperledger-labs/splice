@@ -323,6 +323,1225 @@ sv:
           type: 'unlimited'
 svs:
   default:
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          memory: '12Gi'
+    pruning:
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-1:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-10:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-11:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-12:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-13:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-14:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-15:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-16:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-2:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-3:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-4:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-5:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-6:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-7:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-8:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-9:
     cometbft:
       resources:
         limits:
@@ -399,15 +1618,85 @@ svs:
   sv-da-1:
     cometbft:
       nodeId: 'd825622358065aea3cb3b3479cf64d172675037e'
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
       validatorKeyAddress: '2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7'
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
     publicName: 'Digital-Asset-1'
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
     subdomain: 'sv-1'
     svApp:
       auth0:
         clientId: 'bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7'
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
     validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
       auth0:
         clientId: 'fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY'
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
       walletUser: 'auth0|68c2c41e6470184569e4521e'
 validator1:
   deduplicationDuration: '30m'
