@@ -7,6 +7,9 @@ module Splice.Api.Token.TransferEventsV2 where
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
+-- FIXME: reconsider whether to import transfer leg from here
+import Splice.Api.Token.AllocationV2 (TransferLeg)
+
 -- | An interface for templates that can be used to report token standard v2 events.
 --
 -- The non-consuming choices of this interface are used by the instrument admin
@@ -17,6 +20,53 @@ interface EventLog where
 
   eventLog_transferOutImpl : ContractId EventLog -> EventLog_TransferOut -> Update EventLog_TransferOutResult
   eventLog_transferInImpl : ContractId EventLog -> EventLog_TransferIn -> Update EventLog_TransferInResult
+  eventLog_holdingsChangeImpl : ContractId EventLog -> EventLog_HoldingsChange -> Update EventLog_HoldingsChangeResult
+
+  nonconsuming choice EventLog_HoldingsChange : EventLog_HoldingsChangeResult
+    -- ^ Signal a change in the holdings of an account to the observers.
+    --
+    -- Asset admins MUST ensure that these events explain:
+    --   1. all changes to the holdings of all accounts
+    --   2. all incoming and outgoing transfers for all accounts
+    --      that are not owned by the instrument admin.
+    with
+      admin : Party
+        -- ^ Instrument admin reporting the change in holdings.
+      account : Account
+        -- ^ The account for which the change in holdings occurred.
+      inputHoldingCids : [ContractId Holding]
+        -- ^ The holdings of the account that were consumed.
+      transfers : [TransferLeg]
+        -- ^ The transfers that caused the change in holdings.
+        --
+        -- Their net balance changes MUST match the change in holdings of the account.
+        -- Transfers between accounts MUST be reported for both sender and receiver separately.
+        --
+        -- Note that the settlement of transfers whose net balance change is
+        -- zero MAY result in events that do have empty input and output
+        -- holdings.
+        --
+        -- Note also that merging and splitting of holdings MAY be reported with
+        -- an empty list of transfer legs, as the merge and split actions may not
+        -- related to a (self-)transfer of tokens.
+      outputHoldingCids : [ContractId Holding]
+        -- ^ The newly created holdings of the account.
+      observers : [Party]
+        -- ^ Parties that should be notified about the change in holdings.
+        --
+        -- MUST include at least the account parties.
+      extraArgs : ExtraArgs
+        -- ^ Arguments storing both metadata and additional context information about the event.
+        --
+        -- Use `splice.lfdecentralizedtrust.org/reason` to explain the reason for the overall change
+        -- in holdings.
+        --
+        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
+        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
+    observer observers
+    controller admin
+    do eventLog_holdingsChangeImpl this self arg
+
 
   nonconsuming choice EventLog_TransferOut : EventLog_TransferOutResult
     -- ^ Signal an outgoing transfer to the sender and the observers.
@@ -97,3 +147,7 @@ data EventLog_TransferOutResult = EventLog_TransferOutResult {}
 -- | Result of logging a transfer in event. Provided for extensibility
 -- in a future where interfaces are upgradeable.
 data EventLog_TransferInResult = EventLog_TransferInResult {}
+
+-- | Result of logging a change in holdings event. Provided for extensibility
+-- in a future where interfaces are upgradeable.
+data EventLog_HoldingsChangeResult = EventLog_HoldingsChangeResult {}
