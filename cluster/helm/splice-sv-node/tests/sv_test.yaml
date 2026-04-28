@@ -1,7 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-suite: "Validator values"
+suite: "SV values"
 templates:
   - sv.yaml
 release:
@@ -188,6 +188,112 @@ tests:
                 admin-api {
                   address = "mediator-test-address"
                   port = 5007
+                }
+              }
+            }
+  - it: "supports roll-forward-lsu configuration"
+    set:
+      domain:
+        sequencerPublicUrl: "https://sequencer.test.com"
+        sequencerAddress: "sequencer-test-address"
+        mediatorAddress: "mediator-test-address"
+        sequencerPruningConfig:
+          enabled: true
+          pruningInterval: "1h"
+          retentionPeriod: "7d"
+      rollForwardLsu:
+        newPhysicalSynchronizerSerial: 23
+        newPhysicalSynchronizerProtocolVersion: 42
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_ONBOARDING')].value
+          value: |
+            _onboarding {
+              type = "roll-forward-lsu"
+              new-physical-synchronizer-serial = 23
+              new-physical-synchronizer-protocol-version = "42"
+            }
+  - it: "supports roll-forward-lsu configuration with export times"
+    set:
+      domain:
+        sequencerPublicUrl: "https://sequencer.test.com"
+        sequencerAddress: "sequencer-test-address"
+        mediatorAddress: "mediator-test-address"
+        sequencerPruningConfig:
+          enabled: true
+          pruningInterval: "1h"
+          retentionPeriod: "7d"
+      rollForwardLsu:
+        newPhysicalSynchronizerSerial: 23
+        newPhysicalSynchronizerProtocolVersion: 42
+        exportTimes:
+          topologyExportTime: "2026-04-30T00:00:00Z"
+          trafficExportTime: "2026-04-30T00:01:00Z"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_ONBOARDING')].value
+          value: |
+            _onboarding {
+              type = "roll-forward-lsu"
+              new-physical-synchronizer-serial = 23
+              new-physical-synchronizer-protocol-version = "42"
+              export-times = {
+                topology-export-time = {
+                  type = "timestamp"
+                  time = "2026-04-30T00:00:00Z"
+                }
+                traffic-export-time = {
+                  type = "timestamp"
+                  time = "2026-04-30T00:01:00Z"
+                }
+              }
+            }
+  - it: "supports roll-forward-lsu configuration with export times"
+    set:
+      domain:
+        sequencerPublicUrl: "https://sequencer.test.com"
+        sequencerAddress: "sequencer-test-address"
+        mediatorAddress: "mediator-test-address"
+        sequencerPruningConfig:
+          enabled: true
+          pruningInterval: "1h"
+          retentionPeriod: "7d"
+      rollForwardLsu:
+        newPhysicalSynchronizerSerial: 23
+        newPhysicalSynchronizerProtocolVersion: 42
+        exportTimes:
+          topologyExportTime: "2026-04-30T00:00:00Z"
+          trafficExportTime: "2026-04-30T00:01:00Z"
+          upgradeTime: "2026-04-30T00:02:00Z"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_ONBOARDING')].value
+          value: |
+            _onboarding {
+              type = "roll-forward-lsu"
+              new-physical-synchronizer-serial = 23
+              new-physical-synchronizer-protocol-version = "42"
+              export-times = {
+                topology-export-time = {
+                  type = "timestamp"
+                  time = "2026-04-30T00:00:00Z"
+                }
+                traffic-export-time = {
+                  type = "timestamp"
+                  time = "2026-04-30T00:01:00Z"
+                }
+                upgrade-time = {
+                  type = "timestamp"
+                  time = "2026-04-30T00:02:00Z"
                 }
               }
             }

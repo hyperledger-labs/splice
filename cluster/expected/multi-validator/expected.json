@@ -2706,10 +2706,6 @@
                     "value": "INFO"
                   },
                   {
-                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3161,10 +3157,6 @@
                   {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
-                  },
-                  {
-                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3620,10 +3612,6 @@
                     "value": "INFO"
                   },
                   {
-                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4077,10 +4065,6 @@
                     "value": "INFO"
                   },
                   {
-                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4532,10 +4516,6 @@
                   {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
-                  },
-                  {
-                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
-                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
                   },
                   {
                     "name": "NUM_NODES",

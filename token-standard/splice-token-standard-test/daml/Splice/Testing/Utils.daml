@@ -91,11 +91,11 @@ queryDisclosure' p cid = do
 
 -- | Version of 'submitWithDisclosures' that works with the simplified `Disclosures'` type.
 submitWithDisclosures' : Party -> Disclosures' -> Commands a -> Script a
-submitWithDisclosures' p (Disclosures' ds) cmds = submitWithDisclosures p (Map.values ds) cmds
+submitWithDisclosures' p (Disclosures' ds) cmds = submit (actAs p <> discloseMany (Map.values ds)) cmds
 
 -- | Version of 'submitWithDisclosuresMustFail' that works with the simplified `Disclosures'` type.
 submitWithDisclosuresMustFail' : Party -> Disclosures' -> Commands a -> Script ()
-submitWithDisclosuresMustFail' p (Disclosures' ds) cmds = submitWithDisclosuresMustFail p (Map.values ds) cmds
+submitWithDisclosuresMustFail' p (Disclosures' ds) cmds = submitMustFail (actAs p <> discloseMany (Map.values ds)) cmds
 
 -- | Allocate party with a specific name.
 allocatePartyExact : Text -> Script Party

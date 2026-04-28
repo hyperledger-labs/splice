@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-util-batched-markers-test
 source: daml
-version: 1.0.4
+version: 1.0.5
 dependencies:
   - daml-prim
   - daml-script
