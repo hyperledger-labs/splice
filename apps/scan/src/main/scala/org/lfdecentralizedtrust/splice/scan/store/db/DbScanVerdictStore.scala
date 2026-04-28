@@ -209,7 +209,6 @@ object DbScanVerdictStore {
       updateId = verdict.updateId,
       submittingParties = verdict.submittingParties,
       transactionRootViews = transactionRootViews,
-      // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
       trafficSummaryO = byTimestamp.get(recordTime),
     )
 

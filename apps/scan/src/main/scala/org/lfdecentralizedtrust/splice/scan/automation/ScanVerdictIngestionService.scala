@@ -17,6 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -230,10 +231,6 @@ class ScanVerdictIngestionService(
           DbScanVerdictStore.fromProto(v, migrationId, synchronizerId, summaryByTime)
         )
 
-      // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
-      //
-      // Once #4060 is confirmed, this should simplify, as 'items' will fail
-      // construction if any verdicts did not have a trafficSummary
       val summariesWithVerdicts = verdicts.flatMap { v =>
         val recordTime = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
         summaryByTime.get(recordTime).map(_ -> v)
@@ -282,6 +279,33 @@ class ScanVerdictIngestionService(
           case _ => Future.unit
         }
 
+        // After ingestion has started (meta exists), every verdict must have
+        // a traffic summary. Missing summaries before meta are expected
+        // during SV onboarding (#4457).
+        // This fails the batch rather than silently dropping data. The
+        // RetryingService framework will retry indefinitely with backoff,
+        // stalling ingestion until the summaries become available or an
+        // operator investigates. sys.exit is not used here because this
+        // is a data availability issue, not a configuration error.
+        _ <- {
+          val missingTimes = if (activityMetaCheckO.exists(_.isChecked))
+            verdicts.flatMap { v =>
+              val rt = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
+              if (summaryByTime.contains(rt)) None else Some(rt)
+            }
+          else Seq.empty
+          if (missingTimes.nonEmpty)
+            Future.failed(
+              Status.INTERNAL
+                .withDescription(
+                  s"${missingTimes.size} verdicts missing traffic summaries " +
+                    s"after ingestion start: $missingTimes"
+                )
+                .asRuntimeException()
+            )
+          else Future.unit
+        }
+
         _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
       } yield {
         val lastRecordTime = verdicts.lastOption
@@ -311,9 +335,10 @@ class ScanVerdictIngestionService(
         DbScanVerdictStore
           .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
       })
-      // TODO(#4060): handle missing traffic summaries more robustly. In particular,
-      // note that the whole call will fail if ANY of the requested traffic summaries are missing.
-      // This workaround may therefore drop existing traffic summaries.
+      // During SV onboarding, the sequencer may not have traffic summaries
+      // for early verdicts. Recover from NO_EVENT_AT_TIMESTAMPS by returning
+      // an empty result; the missing-summary check in process() will fail the
+      // batch if this happens after ingestion has started.
       .recoverWith { case ex @ GrpcException(status, trailers) =>
         val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
         val errorDetails = ErrorDetails.from(statusProto)

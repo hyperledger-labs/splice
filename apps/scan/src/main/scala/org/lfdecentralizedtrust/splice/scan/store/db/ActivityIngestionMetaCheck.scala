@@ -21,6 +21,9 @@ class ActivityIngestionMetaCheck(
 
   private val checked = new AtomicBoolean(false)
 
+  /** Whether the meta check has completed successfully at least once. */
+  def isChecked: Boolean = checked.get()
+
   /** Ensures the activity record meta row exists and versions are compatible.
     * Returns the check result; the caller is responsible for acting on
     * [[DowngradeDetected]] (e.g. shutting down).
