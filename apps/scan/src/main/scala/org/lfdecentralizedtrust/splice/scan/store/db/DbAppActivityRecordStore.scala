@@ -37,6 +37,23 @@ object DbAppActivityRecordStore {
   )
 
   val DUMMY_VERDICT_ROW_ID: Long = -123456789L
+
+  /** Metadata for an activity record ingestion run.
+    *
+    * @param historyId history identifier from update_history_descriptors
+    * @param codeVersion code version of the ingestion logic
+    * @param userVersion operator-configured version from ScanAppConfig
+    * @param startedIngestingAt record time (microseconds since epoch) of the first
+    *                           verdict in the first ingested batch
+    * @param earliestIngestedRound the earliest round number in the first ingested batch
+    */
+  final case class AppActivityRecordMetaT(
+      historyId: Long,
+      codeVersion: Int,
+      userVersion: Int,
+      startedIngestingAt: Long,
+      earliestIngestedRound: Long,
+  )
 }
 
 class DbAppActivityRecordStore(
@@ -59,6 +76,7 @@ class DbAppActivityRecordStore(
   object Tables {
     val appActivityRecords = "app_activity_record_store"
     val verdicts = "scan_verdict_store"
+    val activityRecordMeta = "app_activity_record_meta"
   }
 
   private def historyId = updateHistory.historyId
@@ -286,6 +304,70 @@ class DbAppActivityRecordStore(
       )
     }
   }
+
+  type AppActivityRecordMetaT = DbAppActivityRecordStore.AppActivityRecordMetaT
+
+  private implicit val getResultAppActivityRecordMeta: GetResult[AppActivityRecordMetaT] =
+    GetResult { prs =>
+      DbAppActivityRecordStore.AppActivityRecordMetaT(
+        historyId = prs.<<[Long],
+        codeVersion = prs.<<[Int],
+        userVersion = prs.<<[Int],
+        startedIngestingAt = prs.<<[Long],
+        earliestIngestedRound = prs.<<[Long],
+      )
+    }
+
+  def getActivityRecordMeta()(implicit
+      tc: TraceContext
+  ): Future[Option[AppActivityRecordMetaT]] =
+    runQuerySingle(
+      sql"""select history_id, activity_ingestion_code_version,
+                   activity_ingestion_user_version, started_ingesting_at,
+                   earliest_ingested_round
+            from #${Tables.activityRecordMeta}
+            where history_id = $historyId
+      """.as[AppActivityRecordMetaT].headOption,
+      "appActivity.getActivityRecordMeta",
+    )
+
+  def insertActivityRecordMeta(
+      codeVersion: Int,
+      userVersion: Int,
+      startedIngestingAt: Long,
+      earliestIngestedRound: Long,
+  )(implicit tc: TraceContext): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update_(
+        sql"""insert into #${Tables.activityRecordMeta}
+                (history_id, activity_ingestion_code_version,
+                 activity_ingestion_user_version, started_ingesting_at,
+                 earliest_ingested_round)
+              values ($historyId, $codeVersion, $userVersion, $startedIngestingAt,
+                      $earliestIngestedRound)
+        """.asUpdate,
+        "appActivity.insertActivityRecordMeta",
+      )
+    )
+
+  def updateActivityRecordMeta(
+      codeVersion: Int,
+      userVersion: Int,
+      startedIngestingAt: Long,
+      earliestIngestedRound: Long,
+  )(implicit tc: TraceContext): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update_(
+        sql"""update #${Tables.activityRecordMeta}
+              set activity_ingestion_code_version = $codeVersion,
+                  activity_ingestion_user_version = $userVersion,
+                  started_ingesting_at = $startedIngestingAt,
+                  earliest_ingested_round = $earliestIngestedRound
+              where history_id = $historyId
+        """.asUpdate,
+        "appActivity.updateActivityRecordMeta",
+      )
+    )
 
   private def runQuerySingle[T](
       action: DBIOAction[Option[T], NoStream, Effect.Read],

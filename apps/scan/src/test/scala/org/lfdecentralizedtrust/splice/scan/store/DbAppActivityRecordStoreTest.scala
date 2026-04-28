@@ -383,6 +383,116 @@ class DbAppActivityRecordStoreTest
     }
   }
 
+  "getActivityRecordMeta" should {
+
+    "return None when no meta row exists" in {
+      for {
+        (store, _) <- newStore()
+        result <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe None
+      }
+    }
+
+    "return the meta row after insert" in {
+      for {
+        (store, _) <- newStore()
+        _ <- store.insertActivityRecordMeta(
+          codeVersion = 1,
+          userVersion = 0,
+          startedIngestingAt = 1000000L,
+          earliestIngestedRound = 0L,
+        )
+        result <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe defined
+        result.value.codeVersion shouldBe 1
+        result.value.userVersion shouldBe 0
+        result.value.startedIngestingAt shouldBe 1000000L
+      }
+    }
+
+    "return updated values after update" in {
+      for {
+        (store, _) <- newStore()
+        _ <- store.insertActivityRecordMeta(
+          codeVersion = 1,
+          userVersion = 0,
+          startedIngestingAt = 1000000L,
+          earliestIngestedRound = 0L,
+        )
+        _ <- store.updateActivityRecordMeta(
+          codeVersion = 2,
+          userVersion = 1,
+          startedIngestingAt = 2000000L,
+          earliestIngestedRound = 0L,
+        )
+        result <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe defined
+        result.value.codeVersion shouldBe 2
+        result.value.userVersion shouldBe 1
+        result.value.startedIngestingAt shouldBe 2000000L
+      }
+    }
+
+    "isolate meta rows by history_id" in {
+      for {
+        (store1, _) <- newStore()
+        (store2, _) <- newStore()
+        _ <- store1.insertActivityRecordMeta(
+          codeVersion = 1,
+          userVersion = 0,
+          startedIngestingAt = 1000000L,
+          earliestIngestedRound = 0L,
+        )
+        _ <- store2.insertActivityRecordMeta(
+          codeVersion = 5,
+          userVersion = 3,
+          startedIngestingAt = 9000000L,
+          earliestIngestedRound = 0L,
+        )
+        result1 <- store1.getActivityRecordMeta()
+        result2 <- store2.getActivityRecordMeta()
+      } yield {
+        result1.value.codeVersion shouldBe 1
+        result1.value.userVersion shouldBe 0
+        result2.value.codeVersion shouldBe 5
+        result2.value.userVersion shouldBe 3
+      }
+    }
+
+    "not affect other history_id on update" in {
+      for {
+        (store1, _) <- newStore()
+        (store2, _) <- newStore()
+        _ <- store1.insertActivityRecordMeta(
+          codeVersion = 1,
+          userVersion = 0,
+          startedIngestingAt = 1000000L,
+          earliestIngestedRound = 0L,
+        )
+        _ <- store2.insertActivityRecordMeta(
+          codeVersion = 1,
+          userVersion = 0,
+          startedIngestingAt = 1000000L,
+          earliestIngestedRound = 0L,
+        )
+        _ <- store1.updateActivityRecordMeta(
+          codeVersion = 99,
+          userVersion = 99,
+          startedIngestingAt = 9999999L,
+          earliestIngestedRound = 0L,
+        )
+        result2 <- store2.getActivityRecordMeta()
+      } yield {
+        result2.value.codeVersion shouldBe 1
+        result2.value.userVersion shouldBe 0
+        result2.value.startedIngestingAt shouldBe 1000000L
+      }
+    }
+  }
+
   "latestRoundWithCompleteAppActivity" should {
 
     "return None when no activity records exist" in {
