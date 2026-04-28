@@ -55,7 +55,7 @@ testOnboardValidator = do
   -- v1 can update its version and contact point
 
   -- fails without advancing the time
-  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
+  submitMustFail (actAs v1 <> readAs dso) $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
     version = "0.2.0"
     contactPoint = "v1@example2.com"
 
@@ -63,7 +63,7 @@ testOnboardValidator = do
   metadataUpdateTime <- getTime
 
   -- works after advancing time
-  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
+  submit (actAs v1 <> readAs dso) $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
     version = "0.2.0"
     contactPoint = "v1@example2.com"
 
@@ -82,12 +82,12 @@ testOnboardValidator = do
 
 
   -- activity cannot be reported without advancing time
-  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+  submitMustFail (actAs v1 <> readAs dso) $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
 
   passTime (hours 1)
   now <- getTime
 
-  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+  submit (actAs v1 <> readAs dso) $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
   [(_, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   validatorLicense === ValidatorLicense with
     validator = v1
@@ -130,7 +130,7 @@ testSvOnboarding = do
   -- svX collects three confirmations which is enough to onboard him
   [(dsoRulesCid, _)] <- query @DsoRules dso
   forA_ [sv2, sv3, sv4] $ \sv ->
-    submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
@@ -161,14 +161,14 @@ testSvOnboarding = do
   [(amuletRulesCid, _)] <- query @AmuletRules dso
 
   -- the rounds need to be passed in the correct order
-  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+  submitMustFail (actAs svX <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid = latestRoundCid
     middleRoundCid
     latestRoundCid = earliestRoundCid
     amuletRulesCid
-  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+  submitMustFail (actAs svX <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -180,7 +180,7 @@ testSvOnboarding = do
   now <- getTime
   setTime svOnboardingConfirmed.expiresAt
 
-  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+  submitMustFail (actAs svX <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -192,7 +192,7 @@ testSvOnboarding = do
   setTime now
 
   -- svX completes its own onboarding by adding itself to the DsoRules
-  submitMulti [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+  submit (actAs svX <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -339,7 +339,7 @@ testSvOnboardingConfirmedExpiry = do
   -- svX collects three confirmations which is enough to onboard him
   [(dsoRulesCid, _)] <- query @DsoRules dso
   forA_ [sv2, sv3, sv4] $ \sv ->
-    submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
@@ -461,7 +461,7 @@ testSvReonboarding = do
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
-  submitMulti [sv4New] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+  submit (actAs sv4New <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = sv4New
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -523,7 +523,7 @@ test_MergeValidatorLicense = do
 
   -- the license with the highest lastReceivedFor is kept
   [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
+  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submit (actAs sv1 <> readAs dso) $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
   validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   length validatorLicenses === 1
   (head validatorLicenses)._2.faucetState === Some FaucetState with
@@ -532,11 +532,11 @@ test_MergeValidatorLicense = do
     numCouponsMissed = 0
 
   -- we can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3] (Some sv1))
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3] (Some sv1))
 
   -- we can't merge contracts for different validator names
   [(validatorLicenseSv2Cid, _)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == sv2)
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid] (Some sv1))
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid] (Some sv1))
 
   pure()
 

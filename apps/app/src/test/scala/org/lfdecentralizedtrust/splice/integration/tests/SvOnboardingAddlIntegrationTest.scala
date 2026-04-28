@@ -342,8 +342,10 @@ class SvOnboardingAddlIntegrationTest
         inside(mapping.item.participants) { case Seq(sv1Participant, sv2Participant) =>
           sv1Participant.participantId shouldBe sv1Backend.participantClientWithAdminToken.id
           sv1Participant.permission shouldBe ParticipantPermission.Submission
+          sv1Participant.onboarding shouldBe false
           sv2Participant.participantId shouldBe sv2Backend.participantClientWithAdminToken.id
           sv2Participant.permission shouldBe ParticipantPermission.Submission
+          sv2Participant.onboarding shouldBe false
         }
       }
       clue("create a amulet again with actAs = DSO") {

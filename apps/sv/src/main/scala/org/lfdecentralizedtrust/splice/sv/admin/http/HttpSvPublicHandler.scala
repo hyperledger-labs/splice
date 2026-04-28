@@ -525,8 +525,8 @@ class HttpSvPublicHandler(
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
           dsoRules <- dsoStore.getDsoRules()
           isCandidateSv = SvApp.isSvParty(candidateParty, dsoRules)
-          contracts <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
-          candidateParticipantId = contracts
+          contract <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
+          candidateParticipantId = contract
             .getOrElse(
               throw Status.NOT_FOUND
                 .withDescription(errorMessage)
@@ -552,9 +552,7 @@ class HttpSvPublicHandler(
       participantId: ParticipantId
   )(implicit tc: TraceContext): Future[r0.OnboardSvPartyMigrationAuthorizeResponse] = {
     dsoPartyMigration
-      .authorizeParticipantForHostingDsoParty(
-        participantId
-      )
+      .authorizeParticipantForHostingDsoParty(participantId)
       .fold(
         {
           case DsoPartyHosting

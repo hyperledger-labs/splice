@@ -40,7 +40,7 @@ testAmuletConversionRateFeed = do
 
   now <- getTime
 
-  AmuletConversionRateFeed_UpdateResult cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  AmuletConversionRateFeed_UpdateResult cid <- submit (actAs publisher <> readAs app.dso) $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 2.0
     amuletRulesCid
     markerContextO = None
@@ -49,7 +49,7 @@ testAmuletConversionRateFeed = do
   checkRate app.dso cid 2.0
 
   -- fails due to rate limit, as now < nextUpdateAfter
-  submitMultiMustFail [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  submitMustFail (actAs publisher <> readAs app.dso) $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 2.0
     amuletRulesCid
     markerContextO = None
@@ -60,7 +60,7 @@ testAmuletConversionRateFeed = do
   now <- getTime
 
   -- fails as newNextUpdateAfter is not > now + 5 minutes
-  submitMultiMustFail [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  submitMustFail (actAs publisher <> readAs app.dso) $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 4.0
     amuletRulesCid
     markerContextO = Some MarkerContext with
@@ -69,7 +69,7 @@ testAmuletConversionRateFeed = do
     newNextUpdateAfter = now `addRelTime` minutes 4
 
   -- succeeds if newNextUpdateAfter = now + 5 minutes
-  AmuletConversionRateFeed_UpdateResult cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+  AmuletConversionRateFeed_UpdateResult cid <- submit (actAs publisher <> readAs app.dso) $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 4.0
     amuletRulesCid
     markerContextO = Some MarkerContext with

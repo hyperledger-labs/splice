@@ -174,6 +174,13 @@ lazy val root: Project = (project in file("."))
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
+    damlBumpPackageVersionsMutate := Def.inputTaskDyn {
+      import sbt.complete.DefaultParsers.*
+      val ref: Option[String] = (Space ~> StringBasic).?.parsed
+      val refArg = ref.filter(_.nonEmpty).map(r => s" --base=$r").getOrElse("")
+      (`build-tools-dar-lock-checker` / Compile / run)
+        .toTask(" bump" + refArg + damlDarsLockCheckerFileArg.value)
+    }.evaluated,
     Headers.OtherHeaderSettings,
     // Disable assembly for all submodules as we want to assemble just the splice-node jar from the apps module
     assembly / aggregate := false,
@@ -181,6 +188,11 @@ lazy val root: Project = (project in file("."))
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
 val damlDarsLockFileUpdate = taskKey[Unit]("Update the daml/dars.lock file")
+val damlBumpPackageVersionsMutate =
+  inputKey[Unit](
+    "Edit daml.yaml and apps/package.json based on comparison with the latest release line " +
+      "(override via an optional git ref argument, e.g. `damlBumpPackageVersionsMutate origin/main`)"
+  )
 val damlDarsLockCheckerFileArg =
   taskKey[String]("Argument line for updating the daml/dars.lock file")
 
@@ -190,6 +202,7 @@ lazy val `build-tools-dar-lock-checker` = project
     libraryDependencies ++= Seq(
       Dependencies.better_files,
       CantonDependencies.daml_lf_archive_reader,
+      Dependencies.scalatest % Test,
     ),
     Headers.ApacheDAHeaderSettings,
   )
@@ -2041,8 +2054,6 @@ lazy val `apps-app`: Project =
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       libraryDependencies += kubernetes_client,
-      libraryDependencies +=
-        "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
@@ -2241,11 +2252,6 @@ updateTestConfigForParallelRuns := {
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
-    ),
-    (
-      "BigQuery-accessing tests",
-      "test-full-class-names-bigquery.log",
-      (t: String) => t contains "BigQuery",
     ),
     (
       "resource intensive tests",

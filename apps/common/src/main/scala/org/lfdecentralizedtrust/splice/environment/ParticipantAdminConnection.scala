@@ -16,10 +16,14 @@ import com.digitalasset.canton.admin.api.client.data.{
   NodeStatus,
   ParticipantStatus,
 }
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.admin.participant.v30.{
+  ExportAcsResponse,
+  ExportPartyAcsResponse,
+  PruningServiceGrpc,
+}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
@@ -35,6 +39,7 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.{
+  ConfiguredPhysicalSynchronizerId,
   KnownPhysicalSynchronizerId,
   NodeIdentity,
   ParticipantId,
@@ -146,9 +151,7 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Option[PhysicalSynchronizerId]] =
     OptionT(for {
-      configuredDomains <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-      )
+      configuredDomains <- listRegisteredSynchronizers()
     } yield configuredDomains.collectFirst {
       case (configuredSynchronizer, psid, _)
           if configuredSynchronizer.synchronizerAlias == synchronizerAlias =>
@@ -163,11 +166,17 @@ class ParticipantAdminConnection(
       )
       .value
 
+  def listRegisteredSynchronizers()(implicit
+      tc: TraceContext
+  ): Future[Seq[(SynchronizerConnectionConfig, ConfiguredPhysicalSynchronizerId, Boolean)]] = {
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+    )
+  }
+
   def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] = runCmd(
-    ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-  ).map(
+  ): Future[PhysicalSynchronizerId] = listRegisteredSynchronizers().map(
     _.collectFirst {
       case (_, KnownPhysicalSynchronizerId(psid), _) if psid.logical == synchronizerId => psid
     }.getOrElse(
@@ -347,8 +356,8 @@ class ParticipantAdminConnection(
     )
   }
 
-  private def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(
-      implicit tc: TraceContext
+  def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(implicit
+      tc: TraceContext
   ): Future[Long] =
     runCmd(
       ParticipantAdminCommands.PartyManagement
@@ -367,16 +376,7 @@ class ParticipantAdminConnection(
     val observer = new SeqAccumulatingObserver[ExportAcsResponse]
 
     for {
-      offset <- timestampOrOffset match {
-        case Right(offset) => Future.successful(offset)
-        case Left(timestamp) =>
-          offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
-            logger.debug(
-              s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
-            )
-            offset
-          }
-      }
+      offset <- resolveOffset(timestampOrOffset, synchronizerId, force)
       _ <- runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
           parties = parties,
@@ -389,6 +389,58 @@ class ParticipantAdminConnection(
       )
       responses <- observer.resultFuture
     } yield responses.map(_.chunk)
+  }
+
+  private def resolveOffset(
+      timestampOrOffset: Either[Instant, Long],
+      synchronizerId: SynchronizerId,
+      force: Boolean,
+  )(implicit tc: TraceContext) = {
+    timestampOrOffset match {
+      case Right(offset) => Future.successful(offset)
+      case Left(timestamp) =>
+        offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
+          logger.debug(
+            s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
+          )
+          offset
+        }
+    }
+  }
+
+  def exportPartyAcs(
+      party: PartyId,
+      synchronizerId: SynchronizerId,
+      targetParticipantId: ParticipantId,
+      activationTime: Instant,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
+
+    for {
+      // The current ExportPartyAcs requires us to pass an offset that is right before the topology tx
+      // in which the participant started hosing `partyId`.
+      // Unfortunately, for this code to be fault-tolerant we'd need to store said offset somewhere and then use it.
+      // We instead just get the time of the transaction (`activationTime`), resolve its offset,
+      // and subtract one so that we have an offset that is guaranteed to be before the activation transaction.
+      activationOffset <- resolveOffset(Left(activationTime), synchronizerId, force = true)
+      beforeActivationOffset = activationOffset - 1L
+      _ = logger.info(
+        show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
+      )
+      _ <- runCmd(
+        ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
+          party,
+          synchronizerId,
+          targetParticipantId,
+          beforeActivationOffset,
+          waitForActivationTimeout = None, // i.e., default
+          observer,
+        )
+      )
+      chunks <- observer.resultFuture
+    } yield ByteString.copyFrom(chunks.map(_.chunk).asJava)
   }
 
   def downloadAcsSnapshotNonChunked(
@@ -430,6 +482,30 @@ class ParticipantAdminConnection(
     )
   }
 
+  def importPartyAcs(acsBytes: ByteString, synchronizerId: SynchronizerId, partyId: PartyId)(
+      implicit tc: TraceContext
+  ): Future[Unit] = {
+    retryProvider.retryForClientCalls(
+      "import_party_acs",
+      "Imports the acs in the participant",
+      runCmd(
+        ParticipantAdminCommands.PartyManagement
+          .ImportPartyAcs(
+            acsBytes.newInput(),
+            synchronizerId,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            contractImportMode = ContractImportMode.Validation,
+            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+            // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
+            // ...except that only works from protocol version 35+
+            party = Some(partyId),
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+      ).map(_ => ()),
+      logger,
+    )
+  }
+
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
 
@@ -437,9 +513,7 @@ class ParticipantAdminConnection(
       domain: SynchronizerAlias
   )(implicit traceContext: TraceContext): Future[Option[SynchronizerConnectionConfig]] =
     for {
-      configuredDomains <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-      )
+      configuredDomains <- listRegisteredSynchronizers()
     } yield configuredDomains
       .collectFirst {
         case (configuredDomain, _, _) if configuredDomain.synchronizerAlias == domain =>
@@ -635,10 +709,9 @@ class ParticipantAdminConnection(
       newParticipant: ParticipantId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
-      // See SvOnboardingPromoteToSubmitterTrigger.
+      // onboarding flag is cleared in SvClearOnboardingFlagTrigger
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermission.Observation)
+        HostingParticipant(newParticipant, ParticipantPermission.Submission, onboarding = true)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
@@ -685,7 +758,8 @@ class ParticipantAdminConnection(
         val newHostingParticipants = previous.participants.appended(
           HostingParticipant(
             newParticipant,
-            ParticipantPermission.Observation,
+            ParticipantPermission.Submission,
+            onboarding = true,
           )
         )
         Right(
@@ -746,7 +820,7 @@ class ParticipantAdminConnection(
     )
   }
 
-  def ensureHostingParticipantIsPromotedToSubmitter(
+  def ensureHostingParticipantIsPromotedToSubmitterAndIsNotOnboarding(
       synchronizerId: SynchronizerId,
       party: PartyId,
       participantId: ParticipantId,
@@ -755,7 +829,8 @@ class ParticipantAdminConnection(
     def promoteParticipantToSubmitter(
         participants: Seq[HostingParticipant]
     ): Seq[HostingParticipant] = {
-      val newValue = HostingParticipant(participantId, ParticipantPermission.Submission)
+      val newValue =
+        HostingParticipant(participantId, ParticipantPermission.Submission, onboarding = false)
       val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
       participants.updated(oldIndex, newValue)
     }
@@ -773,7 +848,13 @@ class ParticipantAdminConnection(
           ).map(result => {
             Either.cond(
               result.mapping.participants
-                .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
+                .contains(
+                  HostingParticipant(
+                    participantId,
+                    ParticipantPermission.Submission,
+                    onboarding = false,
+                  )
+                ),
               result,
               result,
             )
@@ -805,7 +886,7 @@ class ParticipantAdminConnection(
   )(implicit tc: TraceContext): Future[Unit] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity
-        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, Left(sequencerSuccessors))
     )
 }
 

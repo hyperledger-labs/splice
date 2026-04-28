@@ -176,11 +176,21 @@ class JoiningNodeInitializer(
           RetryFor.WaitingOnInitDependency,
         )
       )
-
-      // It is possible that the participant left disconnected to domains due to a failure in the last SV startup.
-      // Reconnect all domains at the beginning of SV initialization in case, but
-      // only if we already host the dso party or if we don't see a proposal to host it.
-      decentralizedSynchronizerId <- proceedWithReconnectAllDomains(dsoPartyId)
+      decentralizedSynchronizerId <- participantAdminConnection
+        .getSynchronizerId(config.domains.global.alias)
+      dsoPartyHosting = newDsoPartyHosting(dsoPartyId)
+      dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
+        decentralizedSynchronizerId,
+        participantId,
+      )
+      _ <-
+        // do not reconnect if we host the party, as we can be in some LSU stage and the participant cannot reconnect if the new sync is not functional
+        if (!dsoPartyIsAuthorized) {
+          reconnectSynchronizersIfDsoPartyMigrationSafe(
+            decentralizedSynchronizerId,
+            dsoPartyId,
+          )
+        } else Future.unit
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -224,16 +234,11 @@ class JoiningNodeInitializer(
         connection,
         loggerFactory,
       )
-      dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       currentNode <- synchronizerNodeService.activeSynchronizerNode()
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp(currentNode)
-      dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
-        decentralizedSynchronizerId,
-        participantId,
-      )
       withSvStore = new WithSvStore(
         svAutomation,
         new JoiningNodeDsoPartyHosting(
@@ -278,6 +283,12 @@ class JoiningNodeInitializer(
                 config.parameters.enabledFeatures,
                 synchronizerNodeReconciler,
               )
+            // register before maybe reconnecting to proceed with the LSU if the participant is in a broken state
+            _ = dsoAutomation.registerLsuTriggers()
+            _ <- reconnectSynchronizersIfDsoPartyMigrationSafe(
+              decentralizedSynchronizerId,
+              dsoPartyId,
+            )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider
@@ -314,6 +325,7 @@ class JoiningNodeInitializer(
                 packageVersionSupport,
                 decentralizedSynchronizerId,
               )
+            _ = dsoAutomation.registerLsuTriggers()
           } yield dsoAutomation
         }
       // We set the initial round to the one from the sponsor if no initial round is store in the user metadata yet
@@ -468,9 +480,9 @@ class JoiningNodeInitializer(
       currentNode <- synchronizerNodeService.activeSynchronizerNode()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
-      // submission rights.
+      // not being onboarding.
       _ <- (
-        waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
+        waitForSvParticipantToBeOnboarded(dsoPartyId, decentralizedSynchronizer),
         waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator(currentNode),
       ).tupled
@@ -548,18 +560,15 @@ class JoiningNodeInitializer(
   // - already hosts the dsoParty or
   // - is not in the process to host it
   // if not we risk reconnecting while the party was authorized but the acs was not imported yet thus breaking the participant
-  private def proceedWithReconnectAllDomains(
-      dsoParty: PartyId
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[SynchronizerId] = {
+  private def reconnectSynchronizersIfDsoPartyMigrationSafe(
+      decentralizedSynchronizerId: SynchronizerId,
+      dsoParty: PartyId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     retryProvider.retry(
       RetryFor.ClientCalls,
       "reconnect_all_domains",
       "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
       for {
-        decentralizedSynchronizerId <- participantAdminConnection
-          .getPhysicalSynchronizerId(
-            config.domains.global.alias
-          )
         participantId <- participantAdminConnection.getParticipantId()
         // Check if the participant hosts the DSO party. If so,
         // the dsoParty is hosted on the participant we can proceed to all domains reconnect
@@ -591,18 +600,17 @@ class JoiningNodeInitializer(
         logger.info(
           s"Participant hosts dsoParty: ${dsoPartyToParticipantMapping.nonEmpty} and has proposals to host dsoParty ${activeDsoPartyToParticipantProposals.nonEmpty}"
         )
-        decentralizedSynchronizerId.logical
       },
       logger,
     )
   }
 
-  private def waitForSvParticipantToHaveSubmissionRights(
+  private def waitForSvParticipantToBeOnboarded(
       dsoParty: PartyId,
       synchronizerId: SynchronizerId,
   ) = {
     val description =
-      show"SV participant $participantId has Submission rights for party $dsoParty"
+      show"SV participant $participantId has Submission rights and is not onboarding for party $dsoParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       "submission_rights",
@@ -623,8 +631,8 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission, _)) =>
-            if (permission == ParticipantPermission.Submission)
+          case Some(HostingParticipant(_, permission, onboarding)) =>
+            if (permission == ParticipantPermission.Submission && !onboarding)
               dsoPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
