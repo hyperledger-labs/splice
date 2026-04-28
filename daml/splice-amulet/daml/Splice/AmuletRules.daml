@@ -27,11 +27,11 @@ import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
-import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
+import Splice.Api.Token.AllocationV2 qualified as Api.Token.AllocationV2
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, logMint, logBurn )
+  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, logMint, logBurn, burnAccount )
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -994,8 +994,8 @@ executeTransfer' config csum dso t = do
   -- issue rewards for burns
   issueRewards config csum t.provider t.beneficiaries
   -- record outputs
-  (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.eventLogCid csum.openRoundNumber csum.config dso t.sender summary osum
+  (createdAmulets, senderChangeAmulet, outputEvents) <-
+    createTransferOutputs csum.openRoundNumber csum.config dso t.sender summary osum
 
   let senderRetainsControl o =
         t.sender == o.receiver &&
@@ -1024,12 +1024,24 @@ executeTransfer' config csum dso t = do
         fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount +
         fromOptional 0.0 summary.inputValidatorFaucetAmount +
         fromOptional 0.0 summary.inputDevelopmentFundAmount
+
+  {- FIXME: add mint event, add event for sender amulet inputs
+  let mintEvents = do
+        guard (mintAmount > 0.0)
+        pure $
   when (mintAmount > 0.0) $
     forA_ csum.eventLogCid $ \eventLogCid -> do
       logAmuletMint dso eventLogCid t.sender mintAmount $ Metadata with
         values =
           TextMap.insert reasonMetaKey "mint rewards" $
           rewardInputMeta.values
+    -}
+
+  -- record all holdings changes grouped by account
+  forA_ csum.eventLogCid $ \eventLogCid ->
+    forA_ (mergeHoldingsChangeEvents outputEvents) $ \holdingChangeEvent ->
+      exercise eventLogCid holdingChangeEvent
+
 
   return TransferResult with
     round = csum.openRoundNumber
@@ -1426,12 +1438,13 @@ issueRewards config csum provider beneficiaries = do
     featured = Some provider == csum.featuredAppProvider
 
 createTransferOutputs
-  : Optional (ContractId TransferEventsV2.EventLog) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
-  -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
-    outputAmulets <- mapA createOutput preprocessedOutputs
+  : Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  -> Update ([CreatedAmulet], Optional (ContractId Amulet), [TransferEventsV2.EventLog_HoldingsChange])
+createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
+    let indices = [0 .. length preprocessedOutputs - 1]
+    outputAmuletsWithEvents <- mapA createOutput (zip indices preprocessedOutputs)
     senderChangeAmulet <- createSenderChange
-    return (outputAmulets, senderChangeAmulet)
+    return (map fst outputAmuletsWithEvents, senderChangeAmulet, concatMap snd outputAmuletsWithEvents)
   where
     createSenderChange
       | summary.senderChangeAmount <= 0.0 = return None
@@ -1440,44 +1453,50 @@ createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso send
             dso
             owner = sender
             amount = expiringAmount transferConfigAmulet.holdingFee summary.senderChangeAmount currentOpenRound
-    createOutput out = do
+    createOutput (i, out) = do
       let amulet = Amulet with
             dso
             owner = out.owner
             amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound
-      let transferMeta = fromOptional emptyMetadata out.meta
-
-{- FIXME: remove once the replacement is written
-      -- register transfer events for non-self transfers, if required
-      unless (sender == out.owner) $
-        forA_ eventLogCid $ \eventLogCid -> do
-          if out.owner == dso
-            then
-              -- Transfers to the DSO party always represent burns. This codepath is used for
-              -- example in ANS.
-              logAmuletBurn dso eventLogCid sender out.amount transferMeta
-            else do
-              let extraArgs = ExtraArgs with
-                    context = emptyChoiceContext
-                    meta = transferMeta
-              void $ exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
-                observers = [sender]
-                instrumentId = upcast (amuletInstrumentId dso)
-                sender = basicAccount sender
-                receiver = basicAccount out.owner
-                amount = out.amount
-                extraArgs
-              void $ exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
-                observers = [out.owner]
-                instrumentId = upcast (amuletInstrumentId dso)
-                sender = basicAccount sender
-                receiver = basicAccount out.owner
-                amount = out.amount
-                extraArgs
--}
-      case out.lock of
+      createdAmulet <- case out.lock of
         None -> TransferResultAmulet <$> create amulet
         Some lock -> TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
+      let outputHoldingCid = case createdAmulet of
+            TransferResultAmulet amuletCid -> toInterfaceContractId amuletCid
+            TransferResultLockedAmulet lockedAmuletCid -> toInterfaceContractId lockedAmuletCid
+            ExtCreatedAmulet _ -> error "unexpected: ExtCreatedAmulet used for transfer output"
+      let senderAccount = basicAccount sender
+      let receiverAccount
+            | out.owner == dso = burnAccount dso
+            | otherwise = basicAccount out.owner
+      let leg = Api.Token.AllocationV2.TransferLeg with
+            transferLegId = "leg" <> show i
+            sender = senderAccount
+            receiver = receiverAccount
+            amount = out.amount
+            instrumentId = upcast (amuletInstrumentId dso)
+            meta = fromOptional emptyMetadata out.meta
+      let emptyExtraArgs = ExtraArgs with context = emptyChoiceContext; meta = emptyMetadata
+      let senderEvent = TransferEventsV2.EventLog_HoldingsChange with
+            admin = dso
+            account = senderAccount
+            inputHoldingCids = [] -- sender input holdings are recorded separately
+            transferLegs = [leg]
+            outputHoldingCids = [] -- sender change is recorded separately
+            observers = [sender]
+            extraArgs = emptyExtraArgs
+      let receiverEvent = TransferEventsV2.EventLog_HoldingsChange with
+            admin = dso
+            account = receiverAccount
+            inputHoldingCids = [] -- no receiver input holdings
+            transferLegs = [leg]
+            outputHoldingCids = [outputHoldingCid] -- the created output holding
+            observers = [out.owner]
+            extraArgs = emptyExtraArgs
+      let events
+            | out.owner == sender = [receiverEvent] -- self-transfers are reported only once
+            | otherwise = [senderEvent, receiverEvent]
+      pure (createdAmulet, events)
 
 -- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
 scaleFees : Decimal -> TransferConfig Unit.USD -> TransferConfig Amulet
@@ -2025,15 +2044,14 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
           receiverFeeRatio = 0.0
           amount
           lock = None
-          meta = None -- No metadata for self-transfers, as they do not create transfer events
+          meta = Some (reasonToMeta ("split for " <> usage) emptyMetadata)
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
-  let input
-  logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata)
+  logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata) amuletCid
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso
@@ -2112,14 +2130,26 @@ logAmuletMint dso factoryCid receiver amount meta mintedAmuletCid = do
   let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
   void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta [toInterfaceContractId mintedAmuletCid]
 
--- FIXME: review whether we still need these functions
-{-
 
-logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
-logAmuletBurn dso factoryCid sender amount meta = do
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> ContractId Amulet -> Update ()
+logAmuletBurn dso factoryCid sender amount meta burnedAmuletCid = do
   let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
-  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta [toInterfaceContractId burnedAmuletCid]
 
--}
 
--- FIXME: report unlocking
+mergeHoldingsChangeEvents : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
+mergeHoldingsChangeEvents events =
+    Map.values eventsWithAccount
+  where
+    eventsWithAccount = Map.fromListWithR mergeTwoHoldingChangeEvents [ (event.account, event) | event <- events ]
+    mergeTwoHoldingChangeEvents e1 e2 =
+      e1 with
+        inputHoldingCids = e1.inputHoldingCids ++ e2.inputHoldingCids
+        transferLegs = e1.transferLegs ++ e2.transferLegs
+        outputHoldingCids = e1.outputHoldingCids ++ e2.outputHoldingCids
+        observers = dedupSort (e1.observers ++ e2.observers)
+        extraArgs = e1.extraArgs with
+          -- we know there's no choice-context
+          meta = e1.extraArgs.meta <> e2.extraArgs.meta
+
+

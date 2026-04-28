@@ -410,6 +410,7 @@ lazy val `splice-api-token-transfer-events-v2-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value,
     )
 

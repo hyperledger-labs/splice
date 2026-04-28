@@ -99,7 +99,7 @@ template AmuletAllocation
 
         -- report transfer events for V2 transaction history parsing
         (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
-        logAllocationSettlement (toInterfaceContractId configStateCid) (upcast allocation)
+        logAllocationSettlement (toInterfaceContractId configStateCid) [toInterfaceContractId lockedAmulet] (upcast allocation) []
 
          -- construct metadata to aid V1 tx history parsers
         let reason = "Debit for settlement " <> show allocation.settlement.settlementRef

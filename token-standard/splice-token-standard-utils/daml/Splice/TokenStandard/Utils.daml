@@ -69,6 +69,9 @@ module Splice.TokenStandard.Utils (
   -- * Events
   eventLog_holdingsChangeDefaultImpl,
 
+  burnAccount,
+  mintAccount,
+
   logMint,
   logBurn,
   logTransfer,

@@ -157,9 +157,7 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
-
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
 
 
 -- Legacy transfer commands

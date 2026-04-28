@@ -9,9 +9,14 @@ module Splice.TokenStandard.Utils.Internal.Events (
   -- * Default implementation
   eventLog_holdingsChangeDefaultImpl,
 
-  -- * Utilities to log events
+  -- * Burn and Mint support
+  burnAccount,
+  mintAccount,
+
   logMint,
   logBurn,
+
+  -- * Utilities to log events
   logTransfer,
   logAllocationSettlement,
 ) where
@@ -46,6 +51,18 @@ mintAccountId = tokenStandardV2Namespace <> "mint"
 
 burnAccountId : Text
 burnAccountId = tokenStandardV2Namespace <> "burn"
+
+mintAccount : Party -> V2.Account
+mintAccount p = V2.Account with
+  owner = p
+  provider = None
+  id = mintAccountId
+
+burnAccount : Party -> V2.Account
+burnAccount p = V2.Account with
+  owner = p
+  provider = None
+  id = burnAccountId
 
 logMint
   : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]

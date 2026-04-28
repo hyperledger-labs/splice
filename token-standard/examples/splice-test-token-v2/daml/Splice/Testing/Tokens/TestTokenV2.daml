@@ -101,7 +101,8 @@ template TokenAllocationV2 with
 
         -- log v2 transfer events
         tokenRulesCid <- getEventLogFromContext extraArgs.context
-        logAllocationSettlement (toInterfaceContractId tokenRulesCid) allocation
+        -- FIXME
+        -- logAllocationSettlement (toInterfaceContractId tokenRulesCid) allocation
 
         -- prudent engineering: compare debits with expected debits based on the transfer legs, and settle
         let creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
@@ -217,9 +218,7 @@ template TokenRules with
         admin = admin
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl admin
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl admin
-
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl admin
 
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
@@ -285,7 +284,8 @@ token_transferFactory_transferImpl tokenRules self arg = do
         pure [toInterfaceContractId cid]
 
   -- report v2 event
-  logTransfer (coerceContractId self) transfer
+  -- FIXME
+  -- logTransfer (coerceContractId self) transfer
 
   -- create holding for self-transfer, or transfer offer
   if transfer.receiver == transfer.sender
