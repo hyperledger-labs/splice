@@ -10,5 +10,5 @@ COPY additional-config.conf /app/
 COPY target/logback.xml /app/
 COPY R__repeatable-migration.sql /app/repeatable-migrations/
 USER root
-RUN chown -R nonroot:nonroot /app/additional-config.conf
+RUN chown -R nonroot:nonroot /app/additional-config.conf /app/repeatable-migrations/R__repeatable-migration.sql
 USER nonroot
