@@ -288,12 +288,12 @@ class ScanVerdictIngestionService(
         // operator investigates. sys.exit is not used here because this
         // is a data availability issue, not a configuration error.
         _ <- {
-          val missingTimes = if (activityMetaCheckO.exists(_.isChecked))
-            verdicts.flatMap { v =>
-              val rt = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
-              if (summaryByTime.contains(rt)) None else Some(rt)
-            }
-          else Seq.empty
+          val verdictTimes =
+            verdicts.map(v => CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime))
+          val missingTimes = activityMetaCheckO
+            .fold(Seq.empty[CantonTimestamp])(
+              _.findMissingSummaryTimes(verdictTimes, summaryByTime.keySet)
+            )
           if (missingTimes.nonEmpty)
             Future.failed(
               Status.INTERNAL

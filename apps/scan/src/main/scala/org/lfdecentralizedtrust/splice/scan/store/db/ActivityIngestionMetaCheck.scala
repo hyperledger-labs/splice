@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.*
@@ -23,6 +24,19 @@ class ActivityIngestionMetaCheck(
 
   /** Whether the meta check has completed successfully at least once. */
   def isChecked: Boolean = checked.get()
+
+  /** Returns verdict timestamps that are missing traffic summaries.
+    * Only reports missing summaries after the meta check has completed
+    * (ingestion has started); before that, missing summaries are expected
+    * during SV onboarding.
+    */
+  def findMissingSummaryTimes(
+      verdictTimes: Seq[CantonTimestamp],
+      summaryTimes: Set[CantonTimestamp],
+  ): Seq[CantonTimestamp] = {
+    if (!checked.get()) Seq.empty
+    else verdictTimes.filterNot(summaryTimes.contains)
+  }
 
   /** Ensures the activity record meta row exists and versions are compatible.
     * Returns the check result; the caller is responsible for acting on
