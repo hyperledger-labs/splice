@@ -73,7 +73,7 @@ class UpdateHistoryReadPerformanceTest(
   ): Seq[ReadOperation] =
     Seq(
       getUpdateByIdOperation(store, txs),
-      encodeUpdateOperation(store, txs),
+      encodeUpdateOperation(txs),
     )
 
   /** Fetches the update from the store and decode. */
@@ -83,7 +83,7 @@ class UpdateHistoryReadPerformanceTest(
   ): ReadOperation = {
     val updateIds = txs.map(_.update.update.updateId)
     ReadOperation(
-      name = "getUpdateById",
+      name = "getUpdate",
       execute = { implicit tc: TraceContext =>
         updateIds.foldLeft(Future.successful(())) { (accF, updateId) =>
           accF.flatMap { _ =>
@@ -94,14 +94,12 @@ class UpdateHistoryReadPerformanceTest(
     )
   }
 
-  /** Runs ScanHttpEncodings.encodeUpdate to isolate the
+  /** Runs ScanHttpEncodings.encodeUpdate. This isolates the
     * cost of the encoding step from the cost of the DB read.
     */
   private def encodeUpdateOperation(
-      store: UpdateHistory,
-      txs: Seq[TreeUpdateWithMigrationId],
+      txs: Seq[TreeUpdateWithMigrationId]
   ): ReadOperation = {
-    val _ = store
     ReadOperation(
       name = "encodeUpdate",
       execute = { implicit tc: TraceContext =>
