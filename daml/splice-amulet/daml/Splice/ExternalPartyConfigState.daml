@@ -38,8 +38,7 @@ template ExternalPartyConfigState
         admin = dso
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
 
 
 instance HasCheckedFetch ExternalPartyConfigState ForDso where

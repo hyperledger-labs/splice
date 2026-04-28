@@ -67,8 +67,7 @@ module Splice.TokenStandard.Utils (
   ForwardCompatible(..),
 
   -- * Events
-  eventLog_transferOutDefaultImpl,
-  eventLog_transferInDefaultImpl,
+  eventLog_holdingsChangeDefaultImpl,
 
   logMint,
   logBurn,

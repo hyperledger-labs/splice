@@ -26,10 +26,12 @@ import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  ( basicAccount, upcast, eventLog_transferOutDefaultImpl, eventLog_transferInDefaultImpl, reasonToMeta)
+  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, logMint, logBurn )
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -148,9 +150,7 @@ template AmuletRules
         admin = dso
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
-
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
@@ -358,9 +358,10 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
+        result <- exercise self AmuletRules_Mint with ..
         logAmuletMint dso (toInterfaceContractId self) receiver amount
           (reasonToMeta "tapped DevNet faucet" emptyMetadata)
-        result <- exercise self AmuletRules_Mint with ..
+          result.amuletSum.amulet
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
           meta = Some (simpleHoldingTxMeta TxKind_Mint (Some "tapped faucet") None)
@@ -1446,6 +1447,7 @@ createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso send
             amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound
       let transferMeta = fromOptional emptyMetadata out.meta
 
+{- FIXME: remove once the replacement is written
       -- register transfer events for non-self transfers, if required
       unless (sender == out.owner) $
         forA_ eventLogCid $ \eventLogCid -> do
@@ -1472,7 +1474,7 @@ createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso send
                 receiver = basicAccount out.owner
                 amount = out.amount
                 extraArgs
-
+-}
       case out.lock of
         None -> TransferResultAmulet <$> create amulet
         Some lock -> TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
@@ -2030,6 +2032,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
+  let input
   logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata)
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
@@ -2098,3 +2101,25 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
   create configState0
   create configState1
   pure ()
+
+
+-- V2 tx history Events
+-----------------------
+
+
+logAmuletMint : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> ContractId Amulet -> Update ()
+logAmuletMint dso factoryCid receiver amount meta mintedAmuletCid = do
+  let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta [toInterfaceContractId mintedAmuletCid]
+
+-- FIXME: review whether we still need these functions
+{-
+
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletBurn dso factoryCid sender amount meta = do
+  let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
+
+-}
+
+-- FIXME: report unlocking

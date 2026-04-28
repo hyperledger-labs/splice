@@ -18,8 +18,6 @@ import Splice.Api.Token.AllocationV2 (TransferLeg)
 interface EventLog where
   viewtype EventLogView
 
-  eventLog_transferOutImpl : ContractId EventLog -> EventLog_TransferOut -> Update EventLog_TransferOutResult
-  eventLog_transferInImpl : ContractId EventLog -> EventLog_TransferIn -> Update EventLog_TransferInResult
   eventLog_holdingsChangeImpl : ContractId EventLog -> EventLog_HoldingsChange -> Update EventLog_HoldingsChangeResult
 
   nonconsuming choice EventLog_HoldingsChange : EventLog_HoldingsChangeResult
@@ -36,7 +34,7 @@ interface EventLog where
         -- ^ The account for which the change in holdings occurred.
       inputHoldingCids : [ContractId Holding]
         -- ^ The holdings of the account that were consumed.
-      transfers : [TransferLeg]
+      transferLegs : [TransferLeg]
         -- ^ The transfers that caused the change in holdings.
         --
         -- Their net balance changes MUST match the change in holdings of the account.
@@ -68,70 +66,7 @@ interface EventLog where
     do eventLog_holdingsChangeImpl this self arg
 
 
-  nonconsuming choice EventLog_TransferOut : EventLog_TransferOutResult
-    -- ^ Signal an outgoing transfer to the sender and the observers.
-    --
-    -- Asset admins MUST ensure that
-    --   1. every TransferOut has a matching TransferIn event
-    --   2. balance changes to accounts are fully explained by the TransferOut
-    --      and TransferIn events for that account unless the account is owned by the
-    --      instrument admin.
-    --
-    -- Changes to the locked balance of an account are not explained by transfer events,
-    -- as the locks themselves carry context about why the balance is locked.
-    with
-      sender : Account
-        -- ^ Account from which the transfer was sent.
-      receiver : Account
-        -- ^ Account to which the transfer was sent.
-      instrumentId : InstrumentId
-        -- ^ Instrument of the transfer.
-      amount : Decimal
-        -- ^ Amount transferred.
-      observers : [Party]
-        -- ^ Parties that should be notified about the transfer out.
-      extraArgs : ExtraArgs
-        -- ^ Arguments storing both metadata and additional context information about the event.
-        --
-        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
-        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
-    observer observers
-    controller instrumentId.admin
-    do eventLog_transferOutImpl this self arg
-
-  nonconsuming choice EventLog_TransferIn : EventLog_TransferInResult
-    -- ^ Signal an incoming transfer to the receiver and the observers.
-    --
-    -- Asset admins MUST ensure that
-    --   1. every TransferIn has a matching TransferOut event
-    --   2. balance changes to accounts are fully explained by the TransferOut
-    --      and TransferIn events for that account unless the account is owned by the
-    --      instrument admin.
-    --
-    -- Changes to the locked balance of an account are not explained by transfer events,
-    -- as the locks themselves carry context about why the balance is locked.
-    with
-      sender : Account
-        -- ^ Account from which the transfer was sent.
-      receiver : Account
-        -- ^ Account to which the transfer was sent.
-      instrumentId : InstrumentId
-        -- ^ Instrument of the transfer.
-      amount : Decimal
-        -- ^ Amount transferred.
-      observers : [Party]
-        -- ^ Parties that should be notified about the transfer in.
-      extraArgs : ExtraArgs
-        -- ^ Arguments storing both metadata and additional context information about the event.
-        --
-        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
-        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
-    observer observers
-    controller instrumentId.admin
-    do eventLog_transferInImpl this self arg
-
-
--- | View on an `EventLog` contract.
+-- | View of an `EventLog` contract.
 --
 -- Note that `EventLog` contracts do not support public fetching, as they are intended to
 -- be used by the instrument admin or app provider only.
@@ -139,14 +74,6 @@ data EventLogView = EventLogView with
     admin : Party
     meta : Metadata
   deriving (Eq, Show)
-
--- | Result of logging a transfer out event. Provided for extensibility
--- in a future where interfaces are upgradeable.
-data EventLog_TransferOutResult = EventLog_TransferOutResult {}
-
--- | Result of logging a transfer in event. Provided for extensibility
--- in a future where interfaces are upgradeable.
-data EventLog_TransferInResult = EventLog_TransferInResult {}
 
 -- | Result of logging a change in holdings event. Provided for extensibility
 -- in a future where interfaces are upgradeable.

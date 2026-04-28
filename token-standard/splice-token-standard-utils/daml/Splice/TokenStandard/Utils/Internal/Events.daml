@@ -7,8 +7,7 @@
 module Splice.TokenStandard.Utils.Internal.Events (
 
   -- * Default implementation
-  eventLog_transferOutDefaultImpl,
-  eventLog_transferInDefaultImpl,
+  eventLog_holdingsChangeDefaultImpl,
 
   -- * Utilities to log events
   logMint,
@@ -17,8 +16,7 @@ module Splice.TokenStandard.Utils.Internal.Events (
   logAllocationSettlement,
 ) where
 
-import DA.Action (when, void)
-import DA.Foldable (forA_)
+import DA.Action (void)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -33,17 +31,11 @@ import Splice.TokenStandard.Utils.Internal.Choices
 -- default implementations
 --------------------------
 
-eventLog_transferOutDefaultImpl
-  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_TransferOut -> Update TransferEventsV2.EventLog_TransferOutResult
-eventLog_transferOutDefaultImpl admin _self arg = do
-  requireMatchExpected ("instrumentId.admin", arg.instrumentId.admin) admin
-  pure TransferEventsV2.EventLog_TransferOutResult
-
-eventLog_transferInDefaultImpl
-  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_TransferIn -> Update TransferEventsV2.EventLog_TransferInResult
-eventLog_transferInDefaultImpl admin _self arg = do
-  requireMatchExpected ("instrumentId.admin", arg.instrumentId.admin) admin
-  pure TransferEventsV2.EventLog_TransferInResult
+eventLog_holdingsChangeDefaultImpl
+  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_HoldingsChange -> Update TransferEventsV2.EventLog_HoldingsChangeResult
+eventLog_holdingsChangeDefaultImpl admin _self arg = do
+  requireMatchExpected ("admin", arg.admin) admin
+  pure TransferEventsV2.EventLog_HoldingsChangeResult
 
 
 -- utilities to log mint and burn events
@@ -55,77 +47,109 @@ mintAccountId = tokenStandardV2Namespace <> "mint"
 burnAccountId : Text
 burnAccountId = tokenStandardV2Namespace <> "burn"
 
-logMint : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventLog_TransferInResult
-logMint factoryCid receiver amount instrumentId meta = do
-  exercise factoryCid TransferEventsV2.EventLog_TransferIn with
-    sender = V2.Account with
-      owner = instrumentId.admin
-      provider = None
-      id = mintAccountId
-    receiver
-    instrumentId
-    amount
+logMint
+  : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
+  -> Update TransferEventsV2.EventLog_HoldingsChangeResult
+logMint factoryCid receiver amount instrumentId meta outputHoldingCids = do
+  let leg = AllocationV2.TransferLeg with
+        transferLegId = "mint"
+        sender = V2.Account with
+          owner = instrumentId.admin
+          provider = None
+          id = mintAccountId
+        receiver
+        instrumentId
+        amount
+        meta
+  exercise factoryCid TransferEventsV2.EventLog_HoldingsChange with
+    admin = instrumentId.admin
+    account = receiver
+    inputHoldingCids = []
+    transferLegs = [leg]
+    outputHoldingCids
     observers = accountParties receiver
     extraArgs = ExtraArgs with meta; context = emptyChoiceContext
 
-logBurn : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventLog_TransferOutResult
-logBurn factoryCid sender amount instrumentId meta = do
-  exercise factoryCid TransferEventsV2.EventLog_TransferOut with
-    receiver = V2.Account with
-      owner = instrumentId.admin
-      provider = None
-      id = burnAccountId
-    instrumentId
-    amount
-    sender
+logBurn
+  : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
+  -> Update TransferEventsV2.EventLog_HoldingsChangeResult
+logBurn factoryCid sender amount instrumentId meta inputHoldingCids = do
+  let leg = AllocationV2.TransferLeg with
+        transferLegId = "burn" -- FIXME: not sure about this name
+        sender
+        receiver = V2.Account with
+          owner = instrumentId.admin
+          provider = None
+          id = burnAccountId
+        instrumentId
+        amount
+        meta
+  exercise factoryCid TransferEventsV2.EventLog_HoldingsChange with
+    admin = instrumentId.admin
+    account = sender
+    inputHoldingCids
+    transferLegs = [leg]
+    outputHoldingCids = []
     observers = accountParties sender
-    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
+    extraArgs = emptyExtraArgs
 
 -- | Log transfer events for the settlement of an allocation.
-logAllocationSettlement : ContractId TransferEventsV2.EventLog -> AllocationV2.AllocationSpecification -> Update ()
-logAllocationSettlement eventLogCid allocation = do
-  forA_ allocation.transferLegs $ \AllocationV2.TransferLeg{..} -> do
-    let observers = accountParties allocation.authorizer
-    when (allocation.authorizer == sender) $
-      void $ exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
-        observers
-        sender
-        receiver
-        amount
-        instrumentId
-        extraArgs = ExtraArgs with
-          meta
-          context = emptyChoiceContext
-    when (allocation.authorizer == receiver) $
-      void $ exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
-        observers
-        sender
-        receiver
-        amount
-        instrumentId
-        extraArgs = ExtraArgs with
-          meta
-          context = emptyChoiceContext
+logAllocationSettlement
+  : ContractId TransferEventsV2.EventLog
+  -> [ContractId V2.Holding] -- ^ Input holdings
+  -> AllocationV2.AllocationSpecification
+  -> [ContractId V2.Holding] -- ^ Output holdings
+  -> Update ()
+logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCids = do
+  let admin =
+        -- inlined version of 'allocationAdmin' to avoid a cyclic module dependency
+        case allocation.transferLegs of
+          [] -> error "logAllocationSettlement: No transfer legs in allocation"
+          (leg ::_) -> leg.instrumentId.admin
+  void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+    admin
+    account = allocation.authorizer
+    inputHoldingCids
+    transferLegs = allocation.transferLegs
+    outputHoldingCids
+    observers = accountParties allocation.authorizer
+    extraArgs = emptyExtraArgs
 
 -- | Log events for the execution a transfer.
-logTransfer : ContractId TransferEventsV2.EventLog -> TransferInstructionV2.Transfer -> Update ()
-logTransfer eventLogCid transfer = do
-  exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
-    sender = transfer.sender
-    receiver = transfer.receiver
-    instrumentId = transfer.instrumentId
-    amount = transfer.amount
+logTransfer
+  : ContractId TransferEventsV2.EventLog
+  -> [ContractId V2.Holding] -- ^ Sender input holdings
+  -> TransferInstructionV2.Transfer
+  -> [ContractId V2.Holding] -- ^ Sender change output holdings
+  -> [ContractId V2.Holding] -- ^ Receiver output holdings
+  -> Update ()
+logTransfer eventLogCid senderInputHoldingCids transfer senderOutputHoldingCids receiverOutputHoldingCids = do
+  let admin = transfer.instrumentId.admin
+  let leg = AllocationV2.TransferLeg with
+        transferLegId = "leg0"
+        sender = transfer.sender
+        receiver = transfer.receiver
+        instrumentId = transfer.instrumentId
+        amount = transfer.amount
+        meta = transfer.meta
+  -- sender event
+  void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+    admin
+    account = transfer.sender
+    inputHoldingCids = senderInputHoldingCids
+    transferLegs = [leg]
+    outputHoldingCids = senderOutputHoldingCids
     observers = accountParties transfer.sender
-    extraArgs = ExtraArgs with
-      context = emptyChoiceContext
-      meta = transfer.meta
-  exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
-    sender = transfer.sender
-    receiver = transfer.receiver
-    instrumentId = transfer.instrumentId
-    amount = transfer.amount
+    extraArgs = emptyExtraArgs
+  -- receiver event
+  void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+    admin
+    account = transfer.receiver
+    inputHoldingCids = []
+    transferLegs = [leg]
+    outputHoldingCids = receiverOutputHoldingCids
     observers = accountParties transfer.receiver
-    extraArgs = ExtraArgs with
-      context = emptyChoiceContext
-      meta = transfer.meta
-  pure ()
+    extraArgs = emptyExtraArgs
+
+emptyExtraArgs : ExtraArgs
+emptyExtraArgs = ExtraArgs with meta = emptyMetadata; context = emptyChoiceContext
