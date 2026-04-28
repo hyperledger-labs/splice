@@ -335,6 +335,15 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
+  @Help.Summary("Check if a participant has ParticipantSynchronizerPermission")
+  def getParticipantSynchronizerPermission(
+      domainId: String,
+      participantId: String,
+  ): Boolean =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetParticipantSynchronizerPermission(domainId, participantId))
+    }
+
   @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")
   @Help.Summary(
     "Get the id of the participant hosting a given party (fails if multiple)"

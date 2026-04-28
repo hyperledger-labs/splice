@@ -839,6 +839,27 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetParticipantSynchronizerPermission(
+      domainId: String,
+      participantId: String,
+  ) extends ExternalBaseCommand[http.GetParticipantSynchronizerPermissionResponse, Boolean] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetParticipantSynchronizerPermissionResponse] =
+      client.getParticipantSynchronizerPermission(domainId, participantId, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetParticipantSynchronizerPermissionResponse.OK(response) =>
+      Right(response.isPermissioned)
+    }
+  }
+
   case class GetPartyToParticipant(synchronizerId: SynchronizerId, partyId: PartyId)
       extends ExternalBaseCommand[
         http.GetPartyToParticipantResponse,

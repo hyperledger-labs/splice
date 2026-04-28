@@ -141,6 +141,15 @@ class PermissionedSynchronizerIntegrationTest
 
     }
 
+    clue("Scan returns the ParticipantSynchronizerPermission") {
+      eventually() {
+        sv1ScanBackend.getParticipantSynchronizerPermission(
+          decentralizedSynchronizerId.toProtoPrimitive,
+          aliceValidatorBackend.participantClient.id.toProtoPrimitive,
+        ) shouldBe true
+      }
+    }
+
     actAndCheck(
       "Start Alice validator", {
         aliceValidatorBackend.start()
