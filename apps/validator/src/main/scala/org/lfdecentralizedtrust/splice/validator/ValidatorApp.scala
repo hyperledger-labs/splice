@@ -610,7 +610,7 @@ class ValidatorApp(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
-      "topology_permission",
+      "ParticipantSynchronizerPermission",
       s"ParticipantSynchronizerPermission for $participantId is visible on scan",
       scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
         isPermissioned =>
