@@ -143,11 +143,21 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       )
       rewardsHistoryId = updateHistory.historyId
 
-      // Allocate real ledger parties for batch tests
+      // Allocate real ledger parties for batch tests (idempotent across re-runs)
       testParties = (0 until MaxTestParties).map { i =>
-        sv1Backend.participantClient.ledger_api.parties
-          .allocate(s"batch-test-$i")
-          .party
+        val hint = s"batch-test-$i"
+        scala.util
+          .Try(
+            sv1Backend.participantClient.ledger_api.parties
+              .allocate(hint)
+              .party
+          )
+          .getOrElse(
+            sv1Backend.participantClient.ledger_api.parties
+              .list(filterParty = hint)
+              .head
+              .party
+          )
       }
     }
 
