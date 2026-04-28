@@ -658,8 +658,8 @@ testMergeValidatorPermission = do
   Some mergedPerm <- queryContractId dso mergedCid
   mergedPerm.validator === v1
   mergedPerm.validatorParticipantId === participant1
-  mergedPerm.isRevoked === True 
-  mergedPerm.loginAfter === Some (now `addRelTime` hours 2) 
+  mergedPerm.isRevoked === True
+  mergedPerm.loginAfter === Some (now `addRelTime` hours 2)
 
   -- Test 2: Failure on less than 2 contracts
   submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
@@ -710,8 +710,6 @@ testValidatorLicenseRequest = do
   [(fetchedRequestCid, fetchedRequest)] <- queryFilter @ValidatorLicenseRequest v1 (\r -> r.validator == v1)
   fetchedRequestCid === requestCid
 
-  [(dsoRulesCid, _)] <- query @DsoRules dso
-
   svSubmits app sv1 $ \dsoRulesCid ->
     (exerciseCmd requestCid ValidatorLicenseRequest_Accept) *>
     (exerciseCmd dsoRulesCid DsoRules_OnboardValidator with
@@ -726,6 +724,6 @@ testValidatorLicenseRequest = do
   [(_, fetchedLicense)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
   fetchedLicense.sponsor === sv1
   fetchedLicense.validator === v1
-  
+
   pure ()
 
