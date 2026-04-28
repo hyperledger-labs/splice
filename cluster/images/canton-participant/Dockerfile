@@ -8,7 +8,7 @@ FROM europe-docker.pkg.dev/da-images/public-all/docker/canton-participant:${cant
 
 COPY additional-config.conf /app/
 COPY target/logback.xml /app/
-COPY R__repeatable-migration.sql /app/
+COPY R__repeatable-migration.sql /app/repeatable-migrations/
 USER root
 RUN chown -R nonroot:nonroot /app/additional-config.conf
 USER nonroot
