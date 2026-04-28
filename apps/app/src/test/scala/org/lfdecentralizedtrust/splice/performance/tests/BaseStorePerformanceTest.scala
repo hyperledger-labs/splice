@@ -195,20 +195,23 @@ abstract class BaseStorePerformanceTest(
       metricsJson: Json,
       metricsDir: String,
       pertTestType: String,
+      opName: Option[String] = None,
   ): Unit = {
-    val json = Json
-      .obj(
-        "test_name" -> Json.fromString(testName),
-        "metrics" -> metricsJson,
-      )
-      .spaces2
+    val effectiveName = opName.fold(testName)(s => s"$testName-$s")
+    val baseFields = Seq(
+      "test_name" -> Json.fromString(effectiveName),
+      "metrics" -> metricsJson,
+    )
+    val fields =
+      opName.fold(baseFields)(op => baseFields :+ ("operation" -> Json.fromString(op)))
+    val json = Json.obj(fields*).spaces2
 
-    println(s"$pertTestType metrics for $testName:\n$json")
+    println(s"$pertTestType metrics for $effectiveName:\n$json")
 
     try {
       val dir = Paths.get(s"/tmp/$metricsDir")
       Files.createDirectories(dir)
-      val metricsFile = dir.resolve(s"$testName.json")
+      val metricsFile = dir.resolve(s"$effectiveName.json")
       Files.writeString(
         metricsFile,
         json,
@@ -218,7 +221,7 @@ abstract class BaseStorePerformanceTest(
       println(s"Wrote metrics to $metricsFile")
     } catch {
       case e: Exception =>
-        println(s"Failed to write metrics file for $testName: ${e.getMessage}")
+        println(s"Failed to write metrics file for $effectiveName: ${e.getMessage}")
     }
   }
 }
