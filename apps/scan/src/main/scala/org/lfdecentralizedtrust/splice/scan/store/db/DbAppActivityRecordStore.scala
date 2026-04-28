@@ -38,6 +38,9 @@ object DbAppActivityRecordStore {
 
   val DUMMY_VERDICT_ROW_ID: Long = -123456789L
 
+  /** Bump this when the ingestion logic changes materially. */
+  val ActivityIngestionCodeVersion: Int = 1
+
   /** Metadata for an activity record ingestion run.
     *
     * @param historyId history identifier from update_history_descriptors

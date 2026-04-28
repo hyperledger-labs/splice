@@ -34,7 +34,12 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  ActivityIngestionMetaCheck,
+  DbAppActivityRecordStore,
+  DbScanVerdictStore,
+}
+import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.DowngradeDetected
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 
@@ -63,6 +68,16 @@ class ScanVerdictIngestionService(
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
 ) extends RetryingService(config.automation, backoffClock, "verdict ingestion") {
+
+  private val activityMetaCheckO: Option[ActivityIngestionMetaCheck] =
+    store.appActivityRecordStoreO.map { activityStore =>
+      new ActivityIngestionMetaCheck(
+        activityStore,
+        runningCodeVersion = DbAppActivityRecordStore.ActivityIngestionCodeVersion,
+        runningUserVersion = config.activityIngestionUserVersion.fold(0)(_.toInt),
+        loggerFactory,
+      )
+    }
 
   private lazy val currentMediatorClient =
     new MediatorVerdictsClient(
@@ -224,8 +239,11 @@ class ScanVerdictIngestionService(
         summaryByTime.get(recordTime).map(_ -> v)
       }
       // Insert verdicts, traffic summaries, and app activity records in a single transaction
-      for {
+      val firstRecordTimeMicros = verdicts.headOption.fold(0L)(v =>
+        CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime).toMicros
+      )
 
+      for {
         // Compute app activity records (before DB transaction).
         // Records have verdictRowId = DUMMY_VERDICT_ROW_ID
         // the store resolves actual row_ids during insertion.
@@ -237,6 +255,31 @@ class ScanVerdictIngestionService(
               }
             }
           case None => Future.successful(Seq.empty)
+        }
+
+        // Ensure meta row exists and versions match (first batch only).
+        // Called after activity computation so we have the earliest round number.
+        // Deferred until a batch with activity records arrives — early batches
+        // (e.g., during SV onboarding) may have verdicts but no featured apps,
+        // so there are no activity records and no meaningful earliest round.
+        _ <- activityMetaCheckO match {
+          case Some(metaCheck) if !metaCheck.isChecked && appActivityRecords.nonEmpty =>
+            val earliestRound = appActivityRecords
+              .map(_._2.roundNumber)
+              .minOption
+              .getOrElse(0L)
+            metaCheck.ensure(firstRecordTimeMicros, earliestRound).map {
+              case DowngradeDetected(rc, ru, sc, su) =>
+                logger.error(
+                  s"Activity ingestion version downgrade detected: " +
+                    s"running=($rc,$ru), stored=($sc,$su). " +
+                    s"Shutting down to prevent data corruption."
+                )
+                sys.exit(1)
+              case _ => ()
+            }
+          case Some(metaCheck) if metaCheck.isChecked => Future.unit
+          case _ => Future.unit
         }
 
         _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)

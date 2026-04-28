@@ -7,7 +7,11 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  ActivityIngestionMetaCheck,
+  DbAppActivityRecordStore,
+}
+import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.*
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, UpdateHistory}
@@ -489,6 +493,64 @@ class DbAppActivityRecordStoreTest
         result2.value.codeVersion shouldBe 1
         result2.value.userVersion shouldBe 0
         result2.value.startedIngestingAt shouldBe 1000000L
+      }
+    }
+  }
+
+  "ActivityIngestionMetaCheck" should {
+
+    "insert meta on first call and cache on second" in {
+      for {
+        (store, _) <- newStore()
+        check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
+        r1 <- check.ensure(1000000L)
+        r2 <- check.ensure(2000000L)
+        meta <- store.getActivityRecordMeta()
+      } yield {
+        r1 shouldBe InsertMeta
+        r2 shouldBe Resume
+        meta.value.startedIngestingAt shouldBe 1000000L
+      }
+    }
+
+    "return Resume when versions match existing meta" in {
+      for {
+        (store, _) <- newStore()
+        _ <- store.insertActivityRecordMeta(1, 0, 1000000L)
+        check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
+        result <- check.ensure(2000000L)
+        meta <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe Resume
+        meta.value.startedIngestingAt shouldBe 1000000L
+      }
+    }
+
+    "return UpgradeMeta and update the row on version bump" in {
+      for {
+        (store, _) <- newStore()
+        _ <- store.insertActivityRecordMeta(1, 0, 1000000L)
+        check = new ActivityIngestionMetaCheck(store, 2, 0, loggerFactory)
+        result <- check.ensure(2000000L)
+        meta <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe UpgradeMeta
+        meta.value.codeVersion shouldBe 2
+        meta.value.startedIngestingAt shouldBe 2000000L
+      }
+    }
+
+    "return DowngradeDetected without modifying the row" in {
+      for {
+        (store, _) <- newStore()
+        _ <- store.insertActivityRecordMeta(2, 0, 1000000L)
+        check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
+        result <- check.ensure(2000000L)
+        meta <- store.getActivityRecordMeta()
+      } yield {
+        result shouldBe DowngradeDetected(1, 0, 2, 0)
+        meta.value.codeVersion shouldBe 2
+        meta.value.startedIngestingAt shouldBe 1000000L
       }
     }
   }
