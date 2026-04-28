@@ -358,6 +358,41 @@ sv:
           name: 'version'
           type: 'unlimited'
 svs:
+  default:
+    logging:
+      apiRequestLogLevel: 'DEBUG'
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          memory: '12Gi'
+    pruning:
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
+      sequencer:
+        enabled: false
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
   sv:
     cometbft:
       resources:

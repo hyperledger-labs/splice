@@ -223,6 +223,8 @@ sv:
         maxTokens: 2147483647
         tokensPerFill: 2147483647
         fillInterval: 60s
+svs:
+  default: !include(base-sv.yaml) {}
 validators:
   validator-runbook:
     namespace: validator
