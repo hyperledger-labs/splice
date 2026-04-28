@@ -25,6 +25,7 @@ import {
   mockDelegationHostedStatusSorted,
   mockProposalHostedStatusSorted,
   mockMintingDelegationProposalsSorted,
+  dsoPartyId,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
@@ -1281,7 +1282,7 @@ function getAllocationRequestV1() {
         amount: '3',
         instrumentId: {
           id: 'Amulet',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1291,7 +1292,7 @@ function getAllocationRequestV1() {
         amount: '3',
         instrumentId: {
           id: 'Amulet',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1301,7 +1302,7 @@ function getAllocationRequestV1() {
         amount: '3',
         instrumentId: {
           id: 'Another',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1332,7 +1333,7 @@ function getAllocationRequestV2() {
         amount: '3',
         instrumentId: {
           id: 'Amulet',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1343,7 +1344,7 @@ function getAllocationRequestV2() {
         amount: '3',
         instrumentId: {
           id: 'Amulet',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1354,7 +1355,7 @@ function getAllocationRequestV2() {
         amount: '3',
         instrumentId: {
           id: 'Another',
-          admin: 'dso::party',
+          admin: dsoPartyId,
         },
         meta: { values: {} },
       },
@@ -1373,7 +1374,7 @@ function getAllocation(
 ) {
   return {
     lockedAmulet: null as damlTypes.Optional<string>,
-    dso: 'dso::party',
+    dso: dsoPartyId,
     expiresAt: new Date().toISOString(),
     allocation: {
       transferLegs: [
@@ -1383,7 +1384,7 @@ function getAllocation(
           receiver: { owner: receiver, provider: null, id: '' },
           amount,
           meta: { values: {} },
-          instrumentId: { id: 'Amulet', admin: 'dso::party' },
+          instrumentId: { id: 'Amulet', admin: dsoPartyId },
         },
       ],
       settlement: {
