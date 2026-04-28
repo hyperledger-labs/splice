@@ -6,8 +6,6 @@ package org.lfdecentralizedtrust.splice.validator.migration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.EnabledFeaturesConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -44,44 +42,6 @@ class DomainMigrationDumpGenerator(
   )
   private val darExporter = new DarExporter(participantConnection)
   private val participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
-
-  // This is the safe option used for migrations
-  def generateDomainDump(
-      migrationId: Long,
-      domain: SynchronizerId,
-  )(implicit tc: TraceContext): Future[DomainMigrationDump] = {
-    for {
-      (acsSnapshot, acsTimestamp) <- acsExporter
-        .safeExportParticipantPartiesAcsFromPausedDomain(domain)
-        .leftMap(failure =>
-          Status.FAILED_PRECONDITION
-            .withDescription("Failed to export ACS snapshot")
-            .augmentDescription(failure.toString)
-            .asRuntimeException()
-        )
-        .rethrowT
-      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
-      participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
-      dars <- darExporter.exportAllDars()
-      createdAt = Instant.now()
-    } yield {
-      val result = DomainMigrationDump(
-        domainId = domain,
-        migrationId = migrationId,
-        participant = nodeIdentities,
-        participantUsers = participantUsersData,
-        acsSnapshot = acsSnapshot,
-        acsTimestamp = acsTimestamp,
-        dars = dars,
-        createdAt = createdAt,
-        synchronizerWasPaused = true,
-      )
-      logger.info(
-        show"Finished generating $result"
-      )
-      result
-    }
-  }
 
   // This is the safe option used for DR
   def getDomainDataSnapshot(
