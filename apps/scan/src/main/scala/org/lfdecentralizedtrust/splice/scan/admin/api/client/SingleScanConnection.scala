@@ -367,6 +367,19 @@ class SingleScanConnection private[client] (
     )
   }
 
+  override def getParticipantSynchronizerPermission(
+      domainId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetParticipantSynchronizerPermission(
+        domainId.toProtoPrimitive,
+        participantId.toProtoPrimitive,
+      ),
+    )
+  }
+
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,

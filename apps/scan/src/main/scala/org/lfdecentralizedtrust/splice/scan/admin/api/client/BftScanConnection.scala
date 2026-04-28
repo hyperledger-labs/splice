@@ -253,6 +253,13 @@ class BftScanConnection(
     bftCall(_.lookupRollForwardLsu())
   }
 
+  override def getParticipantSynchronizerPermission(
+      domainId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+    bftCall(_.getParticipantSynchronizerPermission(domainId, participantId))
+  }
+
   override def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,

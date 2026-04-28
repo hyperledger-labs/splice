@@ -152,6 +152,11 @@ trait ScanConnection
       tc: TraceContext
   ): Future[Option[HttpScanAppClient.RollForwardLsu]]
 
+  def getParticipantSynchronizerPermission(
+      domainId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean]
+
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
