@@ -409,10 +409,10 @@ export function openApiV2RequestFromAllocationRequest(
       },
       requested_at: damlTimestampToOpenApiTimestamp(settlement.requestedAt),
       settle_at: damlTimestampToOpenApiTimestamp(settlement.settleAt),
-      settlement_deadline: settlement.settlementDeadline
-        ? damlTimestampToOpenApiTimestamp(settlement.settlementDeadline)
-        : undefined,
       meta: settlement.meta.values,
+      ...(settlement.settlementDeadline
+        ? { settlement_deadline: damlTimestampToOpenApiTimestamp(settlement.settlementDeadline) }
+        : {}),
     },
     transfer_legs: transferLegs.map(leg => ({
       transfer_leg_id: leg.transferLegId,
