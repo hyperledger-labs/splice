@@ -17,7 +17,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -558,6 +558,7 @@ class ValidatorApp(
       ledgerConnection: SpliceLedgerConnection,
       dedupDuration: DedupDuration,
       synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     store.lookupValidatorLicenseWithOffset().flatMap {
       case QueryResult(_, Some(_)) =>
@@ -573,6 +574,7 @@ class ValidatorApp(
               for {
                 dsoInfo <- scanConnection.getDsoInfo()
                 sponsorPartyId = dsoInfo.svPartyId
+                _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
                 _ <- submitValidatorLicenceRequest(
                   validatorParty,
                   dsoInfo,
@@ -599,6 +601,29 @@ class ValidatorApp(
             waitForValidatorLicense(store)
         }
     }
+  }
+
+  private def waitForTopologyPermission(
+      scanConnection: BftScanConnection,
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "topology_permission",
+      s"ParticipantSynchronizerPermission for $participantId is visible on scan",
+      scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
+        isPermissioned =>
+          if (isPermissioned) Future.successful(())
+          else
+            Future.failed(
+              Status.NOT_FOUND
+                .withDescription(s"Topology permission for $participantId not yet found")
+                .asRuntimeException()
+            )
+      },
+      logger,
+    )
   }
 
   private def submitValidatorLicenceRequest(
@@ -1012,6 +1037,7 @@ class ValidatorApp(
           automation.connection(SpliceLedgerConnectionPriority.High),
           dedupDuration,
           synchronizerId,
+          participantId,
         )
       }
 
