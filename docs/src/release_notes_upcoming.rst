@@ -5,6 +5,14 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
+- Scan app
+
+    - Added an optional ``activity-ingestion-user-version`` configuration field.
+      Incrementing this value forces the Scan app to restart activity record
+      ingestion from the current point in time, resetting the completeness
+      window. This is useful for recovering from ingestion errors without
+      reprocessing historical data.
+
 - Validator app
 
     - the configuration ``domain-migration-dump-path`` was removed
