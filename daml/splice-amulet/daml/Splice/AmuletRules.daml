@@ -29,7 +29,7 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  ( basicAccount, upcast, eventLog_transferOutDefaultImpl, eventLog_transferInDefaultImpl, reasonToMeta)
+  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, mintAccount, burnAccount )
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -142,15 +142,12 @@ template AmuletRules
 
     signatory dso
 
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for AmuletRules where
       view = TransferEventsV2.EventLogView with
         admin = dso
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
-
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
@@ -179,7 +176,7 @@ template AmuletRules
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer (Some (toInterfaceContractId self)) rewardsConfig context dso transfer
+        executeTransfer (toInterfaceContractId self) rewardsConfig context dso transfer
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
@@ -331,6 +328,7 @@ template AmuletRules
         receiver: Party
         amount: Decimal
         openRound: ContractId OpenMiningRound
+        reason : Optional Text
       controller dso, receiver
       do
         require "isDevNet flag is true" isDevNet
@@ -344,6 +342,9 @@ template AmuletRules
                   owner = receiver
                   amount = expiringAmount
                   ..
+        logAmuletMint dso (toInterfaceContractId self) receiver amount
+          (reasonToMeta (fromOptional "" reason) emptyMetadata)
+          amulet
         let amuletSum = AmuletCreateSummary with
                   amulet
                   amuletPrice = openRound.amuletPrice
@@ -358,12 +359,11 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
-        logAmuletMint dso (toInterfaceContractId self) receiver amount
-          (reasonToMeta "tapped DevNet faucet" emptyMetadata)
+        let reason = Some "tapped DevNet faucet"
         result <- exercise self AmuletRules_Mint with ..
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
-          meta = Some (simpleHoldingTxMeta TxKind_Mint (Some "tapped faucet") None)
+          meta = Some (simpleHoldingTxMeta TxKind_Mint reason None)
 
     nonconsuming choice AmuletRules_DevNet_FeatureApp : AmuletRules_DevNet_FeatureAppResult
       with
@@ -964,7 +964,7 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : Optional (ContractId TransferEventsV2.EventLog) -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer : ContractId TransferEventsV2.EventLog -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
 executeTransfer eventLogCid config context dso t = do
   -- compute summaries
   csum <- summarizeAndValidateContext eventLogCid context dso t
@@ -993,8 +993,8 @@ executeTransfer' config csum dso t = do
   -- issue rewards for burns
   issueRewards config csum t.provider t.beneficiaries
   -- record outputs
-  (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.eventLogCid csum.openRoundNumber csum.config dso t.sender t.meta summary osum
+  (createdAmulets, senderChangeAmulet, outputEvents) <-
+    createTransferOutputs csum.openRoundNumber csum.config dso t.sender summary osum
 
   let senderRetainsControl o =
         t.sender == o.receiver &&
@@ -1010,7 +1010,6 @@ executeTransfer' config csum dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
-          optionalNonZeroMetadata validatorFaucetAmountMetaKey summary.inputValidatorFaucetAmount $
           optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
           optionalNonZeroMetadata developmentFundAmountMetaKey summary.inputDevelopmentFundAmount $
           TextMap.empty
@@ -1021,14 +1020,34 @@ executeTransfer' config csum dso t = do
         summary.inputValidatorRewardAmount +
         summary.inputSvRewardAmount +
         fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount +
-        fromOptional 0.0 summary.inputValidatorFaucetAmount +
         fromOptional 0.0 summary.inputDevelopmentFundAmount
-  when (mintAmount > 0.0) $
-    forA_ csum.eventLogCid $ \eventLogCid -> do
-      logAmuletMint dso eventLogCid t.sender mintAmount $ Metadata with
-        values =
-          TextMap.insert reasonMetaKey "mint rewards" $
-          rewardInputMeta.values
+  let optMintLeg = do
+        guard (mintAmount > 0.0)
+        pure $ TransferEventsV2.TransferLeg with
+          transferLegId = "mint"
+          sender = mintAccount dso
+          receiver = basicAccount t.sender
+          amount = mintAmount
+          instrumentId = amuletInstrumentIdV2 dso
+          meta = Metadata with
+            values =
+              TextMap.insert reasonMetaKey "mint rewards" $
+              rewardInputMeta.values
+  let senderInputOutputEvent = TransferEventsV2.EventLog_HoldingsChange with
+        admin = dso
+        account = basicAccount t.sender
+        inputHoldingCids = [ toInterfaceContractId cid | InputAmulet cid <- t.inputs ]
+        transferLegs = optionalToList optMintLeg
+        outputHoldingCids = [ toInterfaceContractId cid | Some cid <- pure senderChangeAmulet ]
+        observers = [t.sender]
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext
+          meta = emptyMetadata
+
+  -- record all holdings changes grouped by account
+  forA_ csum.eventLogCid $ \eventLogCid ->
+    forA_ (mergeHoldingsChangeEventsByAccount (senderInputOutputEvent :: outputEvents)) $ \holdingChangeEvent ->
+      exercise eventLogCid holdingChangeEvent
 
   return TransferResult with
     round = csum.openRoundNumber
@@ -1081,9 +1100,10 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     outputFee : Decimal -- ^ Fee charged to create this output
     amount : Decimal -- ^ Amount of amulet held by this output (after deducting fees)
     lock : Optional TimeLock -- ^ Whether to lock the amulet or not
+    meta : Optional Metadata -- ^ Metadata to attach to the output amulet
   deriving (Eq, Show)
 
-summarizeAndValidateContext : Optional (ContractId TransferEventsV2.EventLog) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
+summarizeAndValidateContext : ContractId TransferEventsV2.EventLog -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
 summarizeAndValidateContext eventLogCid context dso tf = do
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
@@ -1113,7 +1133,7 @@ summarizeAndValidateContext eventLogCid context dso tf = do
     issuingMiningRounds = Map.fromList issuingMiningRounds
     validatorRights = Map.fromList validatorRights
     amuletPrice = openRound.amuletPrice
-    eventLogCid
+    eventLogCid = Some eventLogCid
 
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
@@ -1330,7 +1350,7 @@ preprocessOutputs : TransferConfigV2 Amulet -> [TransferOutput] -> Update Transf
 preprocessOutputs transferConfigAmulet outs =
     mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
-    preprocessOutput (TransferOutput with receiver; amount; lock; receiverFeeRatio)
+    preprocessOutput (TransferOutput with receiver; amount; lock; receiverFeeRatio; meta)
       | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
           error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
       | otherwise = do
@@ -1346,6 +1366,7 @@ preprocessOutputs transferConfigAmulet outs =
             outputFee = 0.0
             amount
             lock
+            meta
 
 summarizeTransfer : Party -> Round -> Decimal -> TransferConfigV2 Amulet -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer sender openRoundNumber amuletPrice transferConfigAmulet inp preprocessedOutputs = do
@@ -1423,12 +1444,13 @@ issueRewards config csum provider beneficiaries = do
     featured = Some provider == csum.featuredAppProvider
 
 createTransferOutputs
-  : Optional (ContractId TransferEventsV2.EventLog) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> Optional Metadata -> TransferSummary -> TransferOutputsSummary
-  -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso sender optTransferMeta summary preprocessedOutputs = do
-    outputAmulets <- mapA createOutput preprocessedOutputs
+  : Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  -> Update ([CreatedAmulet], Optional (ContractId Amulet), [TransferEventsV2.EventLog_HoldingsChange])
+createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
+    let indices = [0 .. length preprocessedOutputs - 1]
+    outputAmuletsWithEvents <- mapA createOutput (zip indices preprocessedOutputs)
     senderChangeAmulet <- createSenderChange
-    return (outputAmulets, senderChangeAmulet)
+    return (map fst outputAmuletsWithEvents, senderChangeAmulet, concatMap snd outputAmuletsWithEvents)
   where
     createSenderChange
       | summary.senderChangeAmount <= 0.0 = return None
@@ -1437,43 +1459,52 @@ createTransferOutputs eventLogCid currentOpenRound transferConfigAmulet dso send
             dso
             owner = sender
             amount = expiringAmount transferConfigAmulet.holdingFee summary.senderChangeAmount currentOpenRound
-    transferMeta = fromOptional emptyMetadata optTransferMeta
-    createOutput out = do
+    createOutput (i, out) = do
       let amulet = Amulet with
             dso
             owner = out.owner
             amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound
-
-      -- register transfer events for non-self transfers, if required
-      unless (sender == out.owner) $
-        forA_ eventLogCid $ \eventLogCid -> do
-          if out.owner == dso
-            then
-              -- Transfers to the DSO party always represent burns. This codepath is used for
-              -- example in ANS.
-              logAmuletBurn dso eventLogCid sender out.amount transferMeta
-            else do
-              let extraArgs = ExtraArgs with
-                    context = emptyChoiceContext
-                    meta = transferMeta
-              void $ exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
-                observers = [sender]
-                instrumentId = upcast (amuletInstrumentId dso)
-                sender = basicAccount sender
-                receiver = basicAccount out.owner
-                amount = out.amount
-                extraArgs
-              void $ exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
-                observers = [out.owner]
-                instrumentId = upcast (amuletInstrumentId dso)
-                sender = basicAccount sender
-                receiver = basicAccount out.owner
-                amount = out.amount
-                extraArgs
-
-      case out.lock of
+      createdAmulet <- case out.lock of
         None -> TransferResultAmulet <$> create amulet
         Some lock -> TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
+      -- compute tx history v2 events for this output
+      let outputHoldingCid = case createdAmulet of
+            TransferResultAmulet amuletCid -> toInterfaceContractId amuletCid
+            TransferResultLockedAmulet lockedAmuletCid -> toInterfaceContractId lockedAmuletCid
+            ExtCreatedAmulet _ -> error "unexpected: ExtCreatedAmulet used for transfer output"
+      let senderAccount = basicAccount sender
+      let receiverAccount
+            | out.owner == dso = burnAccount dso  -- transfers to the DSO are always burns
+            | otherwise = basicAccount out.owner
+      let leg = TransferEventsV2.TransferLeg with
+            transferLegId = "leg" <> show i
+            sender = senderAccount
+            receiver = receiverAccount
+            amount = out.amount
+            instrumentId = upcast (amuletInstrumentId dso)
+            meta = fromOptional emptyMetadata out.meta
+      let emptyExtraArgs = ExtraArgs with context = emptyChoiceContext; meta = emptyMetadata
+      let senderEvent = TransferEventsV2.EventLog_HoldingsChange with
+            admin = dso
+            account = senderAccount
+            inputHoldingCids = [] -- sender input holdings are recorded separately
+            transferLegs = [leg]
+            outputHoldingCids = [] -- sender change is recorded separately
+            observers = [sender]
+            extraArgs = emptyExtraArgs
+      let receiverEvent = TransferEventsV2.EventLog_HoldingsChange with
+            admin = dso
+            account = receiverAccount
+            inputHoldingCids = [] -- no receiver input holdings
+            transferLegs = [leg]
+            outputHoldingCids = [outputHoldingCid] -- the created output holding
+            observers = [out.owner]
+            extraArgs = emptyExtraArgs
+      let events
+            | out.owner == sender = [receiverEvent] -- self-transfers are reported only once
+            | out.owner == dso = [senderEvent] -- the DSO party does not need holding change events
+            | otherwise = [senderEvent, receiverEvent]
+      pure (createdAmulet, events)
 
 -- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
 scaleFees : Decimal -> TransferConfig Unit.USD -> TransferConfig Amulet
@@ -1638,8 +1669,6 @@ data Transfer = Transfer with
     outputs : [TransferOutput]
     beneficiaries : Optional [AppRewardBeneficiary]
       -- ^ Beneficiaries between which the app reward is split.
-    meta : Optional Metadata
-      -- ^ Token standard metadata to include in the transfer event log.
   deriving (Eq, Ord, Show)
 
 -- | An individual output for a batch transfer.
@@ -1653,7 +1682,10 @@ data TransferOutput = TransferOutput with
       -- If a receiver's fee is not covered by the specified output amount, the transfer is aborted.
     amount : Decimal
       -- ^ The amount of amulet to receive, before deducting the receiver's part of the output fee.
-    lock : Optional TimeLock -- ^ The lock to be added, if any.
+    lock : Optional TimeLock
+      -- ^ The lock to be added, if any.
+    meta : Optional Metadata
+      -- ^ Token standard metadata to include in the transfer event log.
   deriving (Eq, Ord, Show)
 
 data TransferResult
@@ -1868,13 +1900,13 @@ template TransferPreapproval
                  receiverFeeRatio = 0.0
                  amount = amount
                  lock = None
+                 meta = Some metaWithDescription
              ]
            beneficiaries = None
              -- We don't make this configurable. Rewards should
              -- go to the party hosting the receiver. Allowing the sender
              -- to configure arbitrary beneficiaries doesn't make sense.
              -- If needed, we could extend preapprovals to track beneficiaries later.
-           meta = Some metaWithDescription
 
          -- V1 history metdata also reports on mints that happened in the transfer
          let metaForV1History = fromOptional mempty transferResult.meta <> metaWithDescription
@@ -1913,13 +1945,13 @@ template TransferPreapproval
                  receiverFeeRatio = 0.0
                  amount = amount
                  lock = None
+                 meta = Some metaWithDescription
              ]
            beneficiaries = None
              -- We don't make this configurable. Rewards should
              -- go to the party hosting the receiver. Allowing the sender
              -- to configure arbitrary beneficiaries doesn't make sense.
              -- If needed, we could extend preapprovals to track beneficiaries later.
-           meta = Some metaWithDescription
          let metaForV1History = fromOptional mempty transferResult.meta <> metaWithDescription
          -- strip metadata to avoid duplicating it needlessly
          let result = transferResult with meta = None
@@ -2010,7 +2042,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer None rewardsConfig context dso Transfer with
+  transferResult <- executeTransfer eventLogCid rewardsConfig context dso Transfer with
     sender
     provider = sender
     inputs
@@ -2020,14 +2052,14 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
           receiverFeeRatio = 0.0
           amount
           lock = None
+          meta = Some (reasonToMeta ("split for " <> usage) emptyMetadata)
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
-    meta = None -- No metadata for self-transfers, as they do not create transfer events
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
-  logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata)
+  logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso
@@ -2095,3 +2127,19 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
   create configState0
   create configState1
   pure ()
+
+-- | Utility to combine multiple holding change events for Amulet.
+mergeHoldingsChangeEventsByAccount : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
+mergeHoldingsChangeEventsByAccount events =
+    Map.values eventsWithAccount
+  where
+    eventsWithAccount = Map.fromListWithR mergeTwoHoldingChangeEvents [ (event.account, event) | event <- events ]
+    mergeTwoHoldingChangeEvents e1 e2 =
+      e1 with
+        inputHoldingCids = e1.inputHoldingCids ++ e2.inputHoldingCids
+        transferLegs = e1.transferLegs ++ e2.transferLegs
+        outputHoldingCids = e1.outputHoldingCids ++ e2.outputHoldingCids
+        observers = dedupSort (e1.observers ++ e2.observers)
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext -- we ignore merging choice-contexts, as it is always empty for Amulet holdings changes
+          meta = e1.extraArgs.meta <> e2.extraArgs.meta

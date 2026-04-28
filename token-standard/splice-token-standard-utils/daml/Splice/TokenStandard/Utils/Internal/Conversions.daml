@@ -47,6 +47,9 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   -- ** Internal metadata functions
   tokenStandardV2Namespace,
 
+  -- * Pure allocation utilities
+  allocationAdmin,
+
 ) where
 
 import DA.Action
@@ -59,6 +62,7 @@ import DA.TextMap qualified as TextMap
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 
 
 
@@ -77,6 +81,13 @@ decodeTime : Text -> Time
 decodeTime t = case T.parseInt t of
   Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
   None -> error ("Cannot parse time " <> t)
+
+-- Note: placed here to avoid a circular dependency
+allocationAdmin : AllocationV2.AllocationSpecification -> Party
+allocationAdmin AllocationV2.AllocationSpecification{..} =
+  case transferLegs of
+    [] -> error "No transfer legs in allocation"
+    (leg ::_) -> leg.instrumentId.admin
 
 
 -- AnyContractId conversion

@@ -106,15 +106,20 @@ Cleanup performed so far:
     - Asset owners must be aware that allocations created using `V1.AllocationFactory_Allocate` can
       be settled with only `executor` authority. They must only create allocations for `executors`
       that they trust to atomically settle trades involving their allocations.
-- Introduce and implement event based reporting of transfers:
-   - motivation:
-       - decouple the logic of executing a transfer from reporting it to external systems
-       - simplify parsing for wallets: just look for `TransferEventV2` events to understand all balance changes
-   - add new API package `splice-api-token-transfer-events-v2`
-   - add `Splice.Api.Token.TransferEventV2` module
-   - add `Splice.TokenStandard.Utils` convenience functions to log events for burns, mints, and transfers
-   - emit `TransferEventV2` events for all amulet choices, including properly tagging burns from ANS payments
-   - emit `TransferEventV2` events for `TestTokenV2` choices
+- Introduce and implement event based reporting of all holdings changes and transfers:
+  - motivation: - decouple the logic of executing a transfer from reporting it to external systems
+    - simplify parsing for wallets: just look for `EventLog_HoldingsChange` events to understand all changes
+      to the holdings of an account
+  - add new API package `splice-api-token-transfer-events-v2`
+  - add `Splice.Api.Token.TransferEventsV2` module
+  - add `Splice.TokenStandard.Utils` convenience functions to log events for burns, mints, and transfers
+  - emit `EventLog_HoldingsChange` events for all amulet choices, including properly tagging burns from ANS payments
+    - includes adding metadata arguments for `AmuletRules.TransferOutput` and `TransferPreapproval_SendV2` choices
+    - includes adding a `reason` argument for `AmuletRules_Mint`
+    - includes populating the above arguments for both the locking and payments steps of
+      the legacy ANS payment and subscription workflows in `splice-wallet-payments`
+      and the legacy `TransferOffer` workflow in `splice-wallet`
+  - emit `EventLog_HoldingsChange` events for `TestTokenV2` choices
 - Introduce `AllocationRequest.originalRequestId` and `Allocation.originalAllocationId` fields, which
-  are used to track the same request or allocation across state updates,
+  can be used to track the same request or allocation across state updates,
   analogously to the `originalInstructionCid` of transfer and allocation instructions.

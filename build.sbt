@@ -893,7 +893,8 @@ lazy val `splice-amulet-test-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-amulet-daml` / Compile / damlBuild).value ++
-          (`splice-token-standard-test-v1-daml` / Compile / damlBuild).value,
+          (`splice-token-standard-test-v1-daml` / Compile / damlBuild).value ++
+          (`splice-token-standard-test-v2-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
 

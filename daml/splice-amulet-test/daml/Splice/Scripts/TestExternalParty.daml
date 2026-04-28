@@ -83,9 +83,11 @@ createExternalPartySetupProposal app validator user = do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   context <- getPaymentTransferContext app validator
   amuletCid <- tap app validator 50.0
+  let reason = "create ExternalPartySetupProposal"
   AmuletRules_CreateExternalPartySetupProposalResult{..} <-
+    checkTxHistoryV2Reasons [(validator.primaryParty, ["split for " <> reason, reason])] $
     checkTxMetadata app TxKind_Burn validator.primaryParty $
-    submit (actAs validator.primaryParty <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
+    submitResultAndTree (actAs validator.primaryParty <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
       context = context
       inputs = [InputAmulet amuletCid]
       user

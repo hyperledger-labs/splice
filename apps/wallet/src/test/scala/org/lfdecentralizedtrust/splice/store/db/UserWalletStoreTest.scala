@@ -2035,7 +2035,6 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
             Seq().asJava,
             Seq().asJava,
             Optional.empty(),
-            Optional.empty(),
           ),
           new amuletRulesCodegen.TransferContext(
             openMiningRoundCid,

@@ -29,7 +29,6 @@ testTransferExceedsMaxInputs = do
             inputs = inputAmulets
             outputs = []
             beneficiaries = None
-            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()
@@ -38,7 +37,7 @@ testTransferExceedsMaxOutputs: Script ()
 testTransferExceedsMaxOutputs = do
     DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     amulet <- tap app alice 100.0
-    let outputAmulet = TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0
+    let outputAmulet = TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0; meta = None
         outputAmulets = map (const outputAmulet) [1..101]
     paymentContext <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
@@ -51,7 +50,6 @@ testTransferExceedsMaxOutputs = do
             inputs = [InputAmulet amulet]
             outputs = outputAmulets
             beneficiaries = None
-            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()
@@ -85,9 +83,9 @@ testTransferExceedsMaxLockHolders = do
                     expiresAt = now `addRelTime` (minutes 1)
                     optContext = None
                   receiverFeeRatio = 0.0
+                  meta = None
               ]
             beneficiaries = None
-            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()

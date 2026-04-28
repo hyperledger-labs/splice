@@ -10,9 +10,13 @@ import DA.List
 import DA.Optional
 import DA.Time
 import qualified DA.Map as Map
+import DA.TextMap as TextMap
 import Daml.Script
 
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils qualified as TSU
+
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
@@ -21,6 +25,9 @@ import Splice.Fees
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 import Splice.Scripts.Util
+
+testLeg : Int -> Optional Metadata
+testLeg legNumber = Some $ TSU.reasonToMeta ("leg-" <> show legNumber) emptyMetadata
 
 testUsageFees: Script ()
 testUsageFees = do
@@ -45,9 +52,11 @@ testUsageFees = do
   runNextIssuance app
 
   transferResult <-
+    checkTxHistoryV2Reasons
+      [(alice.primaryParty, ["leg-1", "leg-2", "leg-3", "leg-4"]), (bob.primaryParty, ["leg-3", "leg-4"])] $
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -57,6 +66,7 @@ testUsageFees = do
                       receiverFeeRatio = 0.0
                       amount = outputAmount1
                       lock = None
+                      meta = testLeg 1
                     -- test locking a amulet with no lock-holder
                   , TransferOutput with
                       receiver = alice.primaryParty
@@ -66,12 +76,14 @@ testUsageFees = do
                         expiresAt = addRelTime now (days 2)
                         holders = []
                         optContext = None
+                      meta = testLeg 2
                   -- normal receiver amulet
                   , TransferOutput with
                       receiver = bob.primaryParty
                       receiverFeeRatio = 0.4
                       amount = outputAmount2
                       lock = None
+                      meta = testLeg 3
                     -- test locking a amulet owned by a non-sender party
                   , TransferOutput with
                       receiver = bob.primaryParty
@@ -81,10 +93,9 @@ testUsageFees = do
                         expiresAt = addRelTime now (days 2)
                         holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
                         optContext = None
-
+                      meta = testLeg 4
                   ]
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -143,8 +154,10 @@ testAmuletUsedInRoundBeforeItsCreation = do
   round1.round.number === 1
 
   transferResult <-
+    checkTxHistoryV2Reasons [(alice.primaryParty, ["leg-1"]), (bob.primaryParty, ["leg-1"])] $
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
+    checkBalanceChanges defaultAppWithUsers $
+    submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
     exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -154,9 +167,10 @@ testAmuletUsedInRoundBeforeItsCreation = do
                       receiver = bob.primaryParty
                       amount = 10.0
                       lock = None
-                      receiverFeeRatio = 0.4 ]
+                      receiverFeeRatio = 0.4
+                      meta = testLeg 1
+                  ]
         beneficiaries = None -- test code, no beneficiaries
-        meta = None
       context = contextWithRound1.context
       expectedDso = Some app.dso
 
@@ -208,25 +222,23 @@ testAmuletUsedAfterHoldingFeeChanged = do
 
   -- use the amulet created in round 2 before holding fee changes
   transferResult2 <-
-    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $
-    submitTransfer context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
+    submitTransfer defaultAppWithUsers context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
 
   -- use the amulet created in round 3 when holding fee changes
   transferResult3 <-
-    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $
-    submitTransfer context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
+    submitTransfer defaultAppWithUsers context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
 
   -- Both amulets are used as transfer input at round 7
   -- no holding fees are charged on transfer
   transferResult2.summary.holdingFees === 0.0
   transferResult3.summary.holdingFees === 0.0
 
-submitTransfer: ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
-submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amount =
+submitTransfer: DefaultAppWithUsers -> ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
+submitTransfer defaultAppWithUsers amuletRulesCid transferContext app sender receiver amuletCid amount =
+  checkTxHistoryV2Reasons [(sender, ["leg-1"]), (receiver, ["leg-1"])] $
+  checkBalanceChanges defaultAppWithUsers $
   checkTransferMetadata app TxKind_Transfer sender $
-    submit (actAs sender <> actAs receiver <> readAs app.dso) $
+    submitResultAndTree (actAs sender <> actAs receiver <> readAs app.dso) $
       exerciseCmd amuletRulesCid AmuletRules_Transfer with
         transfer = Transfer with
           sender = sender
@@ -236,9 +248,10 @@ submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amou
                         receiver
                         amount
                         lock = None
-                        receiverFeeRatio = 1.0]
+                        receiverFeeRatio = 1.0
+                        meta = testLeg 1
+                    ]
           beneficiaries = None -- test code, no beneficiaries
-          meta = None
         context = transferContext
         expectedDso = Some app.dso
 
@@ -260,8 +273,11 @@ testSenderChangeAndOutput = do
   aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
 
   transferResult <-
+    checkTxHistoryV2Reasons
+      [(alice.primaryParty, ["leg-1", "leg-2", "leg-3"]), (bob.primaryParty, ["leg-3"])] $
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $
+    submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -271,21 +287,23 @@ testSenderChangeAndOutput = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = testLeg 1
                 -- test another output to sender
                 , TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
+                    meta = testLeg 2
                 -- normal receiver amulet
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount3
                     lock = None
+                    meta = testLeg 3
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -315,8 +333,11 @@ testSenderSmallChange = do
   runNextIssuance app
 
   transferResult <-
+    checkTxHistoryV2Reasons
+      [(alice.primaryParty, ["leg-1", "leg-2", "leg-3"]), (bob.primaryParty, ["leg-3"])] $
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $
+    submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -326,21 +347,23 @@ testSenderSmallChange = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = testLeg 1
                 -- test another output to sender
                 , TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
+                    meta = testLeg 2
                 -- normal receiver amulet
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount3
                     lock = None
+                    meta = testLeg 3
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -366,8 +389,11 @@ testSenderSmallChangeNoSenderOutput = do
   runNextIssuance app
 
   transferResult <-
+    checkTxHistoryV2Reasons
+      [(alice.primaryParty, ["leg-1", "leg-2"]), (bob.primaryParty, ["leg-1", "leg-2"])] $
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $
+    submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -378,15 +404,15 @@ testSenderSmallChangeNoSenderOutput = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
+                    meta = testLeg 1
                 , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = None
-
+                    meta = testLeg 2
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -427,9 +453,9 @@ testAppRewardBeneficiaries = do
                     receiverFeeRatio = 0.0
                     amount = 10.0
                     lock = None
+                    meta = None
                 ]
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -446,9 +472,9 @@ testAppRewardBeneficiaries = do
                     receiverFeeRatio = 0.0
                     amount = 10.0
                     lock = None
+                    meta = None
                 ]
       beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
-      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -459,8 +485,10 @@ testAppRewardBeneficiaries = do
     context <- getPaymentTransferContextFeaturedApp app alice (if featured then Some featuredAppRightCid else None)
 
     transferResult <-
+      checkTxHistoryV2Reasons
+        [(alice.primaryParty, ["leg-1"]), (bob.primaryParty, ["leg-1"])] $
       checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-      submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -471,9 +499,9 @@ testAppRewardBeneficiaries = do
                       receiverFeeRatio = 0.0
                       amount = 10.0
                       lock = None
+                      meta = testLeg 1
                   ]
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -488,7 +516,7 @@ testAppRewardBeneficiaries = do
         -- unfeatured with beneficiaries
 
         checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-          submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+          submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
             transfer = Transfer with
               sender = alice.primaryParty
               provider = alice.primaryParty
@@ -499,9 +527,9 @@ testAppRewardBeneficiaries = do
                             receiverFeeRatio = 0.0
                             amount = 10.0
                             lock = None
+                            meta = None
                         ]
               beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
-              meta = None
             context = context.context
             expectedDso = Some app.dso
 
@@ -558,7 +586,6 @@ testUnclaimedActivityRecordTransferInput = do
         inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
         outputs = []
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -566,16 +593,16 @@ testUnclaimedActivityRecordTransferInput = do
   unclaimedActivityRecordCid <- submit app.dso $
     createCmd unclaimedActivityRecord
   transferResult <-
+    checkTxHistoryV2Reasons [(alice.primaryParty, ["mint rewards"])] $
     checkTransferMetadata app TxKind_MergeSplit alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-      submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      submitResultAndTree (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
           provider = alice.primaryParty
           inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
           outputs = []
           beneficiaries = None
-          meta = None
         context = context.context
         expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app
@@ -622,16 +649,15 @@ testInputDevelopmentFundCoupon = do
         inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
         outputs = []
         beneficiaries = None
-        meta = None
       context = context.context
       expectedDso = Some app.dso
   setTime now
 
   -- Happy
-  transferResult <-
+  (transferResult, changes) <-
     checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-      submit (actAs bob.primaryParty <> readAs app.dso) $
+      submitResultAndTree (actAs bob.primaryParty <> readAs app.dso) $
         exerciseCmd context.amuletRules AmuletRules_Transfer with
           transfer = Transfer with
             sender = bob.primaryParty
@@ -639,12 +665,20 @@ testInputDevelopmentFundCoupon = do
             inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
             outputs = []
             beneficiaries = None
-            meta = None
           context = context.context
           expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app
   let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
   transferResult.summary.senderChangeAmount === totalAmount - createFee
   transferResult.summary.inputDevelopmentFundAmount === Some totalAmount
+
+  -- check tx v2 history
+  let expectedMetadata = Metadata with
+        values = TextMap.fromList
+          [ ("amulet.splice.lfdecentralizedtrust.org/development-fund", show totalAmount)
+          , ("splice.lfdecentralizedtrust.org/reason", "mint rewards")]
+  [change] <- pure changes
+  [leg] <- pure change.transferLegs
+  leg.meta === expectedMetadata
 
   pure ()

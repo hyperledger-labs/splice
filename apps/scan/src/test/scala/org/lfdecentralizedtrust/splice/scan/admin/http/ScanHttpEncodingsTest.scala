@@ -60,6 +60,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
             receiver.toProtoPrimitive,
             amuletContract.payload.amount.initialAmount,
             new roundCodegen.OpenMiningRound.ContractId(validContractId(2)),
+            java.util.Optional.empty(),
           ).toValue,
           new amuletrulesCodegen.AmuletRules_MintResult(
             new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](

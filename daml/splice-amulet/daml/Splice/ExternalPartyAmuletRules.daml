@@ -151,15 +151,12 @@ template ExternalPartyAmuletRules
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for ExternalPartyAmuletRules where
       view = TransferEventsV2.EventLogView with
         admin = dso
         meta = emptyMetadata
 
-      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
-      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
-
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
 
 
 -- Legacy transfer commands
@@ -357,9 +354,9 @@ amulet_transferFactory_transferImpl this _self arg = do
               receiver = transfer.sender
               amount = transfer.amount
               receiverFeeRatio = 0.0
-              lock = None ]
+              lock = None
+              meta = Some transfer.meta]
             beneficiaries = None
-            meta = Some transfer.meta
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
             senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
@@ -499,7 +496,6 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg fundingAmoun
           dso
           sender = authorizer
           amount = fundingAmount
-          -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
           lockContext = AmuletAllocationV1.mkAllocationLockContext (downcast settlement.settlementRef)
           transferBefore = expiresAt
           transferBeforeDeadline = "allocation.expiresAt"

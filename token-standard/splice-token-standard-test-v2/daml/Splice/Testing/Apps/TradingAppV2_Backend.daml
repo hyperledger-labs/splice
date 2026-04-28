@@ -30,6 +30,7 @@ import Splice.Api.Token.AllocationV1 qualified as V1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 
 import Splice.TokenStandard.Utils
 
@@ -38,6 +39,7 @@ import Splice.Testing.Utils
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApiV1
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 
 -- Test version of the trading app backend functionality
@@ -227,7 +229,7 @@ querySettleableTrades registries venue = do
         allocationRequestCids = trade.allocationRequestCids
 
 -- | Settle a trade using the trade agreements for the required extra authority.
-settleWithTradeAgreements : SettleableTrade -> Script OTCTrade_SettleResult
+settleWithTradeAgreements : SettleableTrade -> Script (OTCTrade_SettleResult, [TransferEventsV2.EventLog_HoldingsChange])
 settleWithTradeAgreements trade = do
   let venue = trade.otcTrade.venue
   let settleArg = OTCTrade_Settle with
@@ -235,10 +237,11 @@ settleWithTradeAgreements trade = do
         allocationRequests = trade.allocationRequestCids
 
   -- settle directly if no extra authorizations are required
-  submitWithDisclosures' venue trade.disclosures $ exerciseCmd trade.otcTradeCid settleArg
+  WalletClientV2.extractAndCheckTxHistory (Map.keys trade.batchesByAdmin) $ do
+    submitResultAndTree (actAs venue <> discloseMany' trade.disclosures) $ exerciseCmd trade.otcTradeCid settleArg
 
 -- | Cancel a trade using the trade agreements for the required extra authority for cancelling V1 allocations.
-cancelWithTradeAgreements : MultiRegistry.MultiRegistry -> TradeWithAllocations -> Script OTCTrade_CancelResult
+cancelWithTradeAgreements : MultiRegistry.MultiRegistry -> TradeWithAllocations -> Script (OTCTrade_CancelResult, [TransferEventsV2.EventLog_HoldingsChange])
 cancelWithTradeAgreements registries trade = do
   -- grab contexts for V1 allocation cancellation
   allocationsWithContextV1 <- forA trade.allocationsV1 $ \(allocCid, allocView) -> do
@@ -274,7 +277,8 @@ cancelWithTradeAgreements registries trade = do
   let disclosures = foldMap snd allocationsWithContextV1 <> foldMap snd allocationsWithContextV2
 
   -- cancel directly if no extra authorizations are required
-  submitWithDisclosures' venue disclosures $ exerciseCmd trade.otcTradeCid cancelArg
+  WalletClientV2.extractAndCheckTxHistory (Map.keys registries) $ do
+    submitResultAndTree (actAs venue <> discloseMany' disclosures) $ exerciseCmd trade.otcTradeCid cancelArg
 
 getSettlementAgreement : Party -> Party -> Script (ContractId TradeSettlementAgreement)
 getSettlementAgreement venue trader = do
