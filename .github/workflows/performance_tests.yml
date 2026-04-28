@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   ingestion_performance_tests:
-
     # note that we're loading the entirety of mainnet updates (and in the future, the ACS) so as to make sure that that's not the bottleneck.
     # as of 03.03.2026 that seems to be enough, but we might have to increase it as the activity in mainnet does too.
     runs-on: self-hosted-k8s-medium
