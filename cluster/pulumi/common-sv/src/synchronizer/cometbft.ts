@@ -29,7 +29,6 @@ import { jsonStringify, Output } from '@pulumi/pulumi';
 import { svsConfig } from '../config';
 import { SingleSvConfiguration } from '../singleSvConfig';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
-import { disableCometBftStateSync } from './cometbftConfig';
 
 export type Cometbft = {
   rpcServiceName: string;
@@ -75,7 +74,7 @@ export function installCometBftNode(
   isActiveDomain: boolean,
   isRunningMigration: boolean,
   version: CnChartVersion = activeVersion,
-  enableStateSync: boolean = !disableCometBftStateSync,
+  enableStateSync: boolean = svConfiguration.cometbft?.enableStateSync ?? false,
   enableTimeoutCommit: boolean = false,
   imagePullServiceAccountName?: string,
   disableProtection?: boolean,
