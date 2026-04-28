@@ -184,7 +184,7 @@ const SingleSvConfigSchema = z
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
   z.object({
-    default: SingleSvConfigSchema,
+    default: SingleSvConfigSchema.default({}),
   })
 );
 const SvsConfigurationSchema = z.object({
