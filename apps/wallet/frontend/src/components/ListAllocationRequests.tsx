@@ -411,7 +411,7 @@ export function openApiV2RequestFromAllocationRequest(
       settle_at: damlTimestampToOpenApiTimestamp(settlement.settleAt),
       settlement_deadline: settlement.settlementDeadline
         ? damlTimestampToOpenApiTimestamp(settlement.settlementDeadline)
-        : null,
+        : undefined,
       meta: settlement.meta.values,
     },
     transfer_legs: transferLegs.map(leg => ({
