@@ -10,11 +10,11 @@ import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.TokenStandard.Utils (accountParties)
+import Splice.TokenStandard.Utils (requireMatchExpected, isMemberR, require', accountParties)
 import Splice.Api.Token.MetadataV1 (AnyValue(..), ExtraArgs)
 import DA.List (dedupSort, dedup, (\\))
 import DA.Assert ((===))
-import DA.Optional (fromSome, isSome, isNone, fromOptional)
+import DA.Optional (fromSomeNote, isSome, isNone, fromOptional)
 import qualified DA.TextMap as TextMap
 import DA.Action (foldlA)
 import DA.Foldable (forA_)
@@ -55,11 +55,10 @@ template AccountConfig
         extraArgs : ExtraArgs
       controller actor
       do 
-        assertMsg ("Authorization transfer from " <> show actor <> " to " <> show authorizer <> " is not allowed.") 
-          ((actor, authorizer) `elem` authorizationTransfers this)
+        require' ("(actor, authorizer)", (actor, authorizer)) isMemberR ("authorizationTransfers", authorizationTransfers this)
         
         trasferInstructionView <- view <$> fetch transferInstructionCid
-        admin === trasferInstructionView.transfer.instrumentId.admin
+        requireMatchExpected ("trasferInstruction.transfer.instrumentId.admin", trasferInstructionView.transfer.instrumentId.admin) admin
         
         case action of
           V2.TIA_Accept -> exercise transferInstructionCid (V2.TransferInstruction_Accept [authorizer] extraArgs)
@@ -154,43 +153,40 @@ isValidAccountConfig config =
 -- | Available actions on a transfer instruction.
 -- This function encodes the core of the state machine for who needs to act when.
 --
--- FIXME: invert the Map of actions in a separate PR to simplify this code.
+-- TODO(#4978): invert the Map of actions in a separate PR to simplify this code.
 mkAvailableTransferActions
   : Map.Map V2.TransferInstructionAction [Party]
   -> AccountConfig -> AccountConfig -> Map.Map [Party] [V2.TransferInstructionAction]
 mkAvailableTransferActions actionAuthorizers sender receiver =
     Map.fromListWithR (++) $
-      actionsFor V2.TIA_Accept missingAcceptAuthorizers acceptAccount <>
-      actionsFor V2.TIA_Reject missingRejectAuthorizers receiver <>
-      actionsFor V2.TIA_Withdraw missingWithdrawAuthorizers sender
+      map (, [V2.TIA_Accept]) nextAcceptAuthorizers
+      <> map (, [V2.TIA_Reject]) neededRejectAuthorizers
+      <> map (, [V2.TIA_Withdraw]) nextWithdrawAuthorizers  
   where
-    acceptAuthorizers = fromOptional [] $ Map.lookup V2.TIA_Accept actionAuthorizers
-    isSenderAccepted = null (accountParties sender.account \\ acceptAuthorizers)
-    (missingAcceptAuthorizers, acceptAccount) = 
-      if isSenderAccepted
-        then ((accountParties receiver.account \\ acceptAuthorizers), receiver)
-        else ((accountParties sender.account \\ acceptAuthorizers), sender)
-    
-    rejectAuthorizers = fromOptional [] $ Map.lookup V2.TIA_Reject actionAuthorizers
-    missingRejectAuthorizers = 
-      if isSenderAccepted
-        then (accountParties receiver.account \\ rejectAuthorizers)
-        else []
+    senderParties = accountParties sender.account
+    receiverParties = accountParties receiver.account
+
+    acceptAuthorizers = fromOptional [] (Map.lookup V2.TIA_Accept actionAuthorizers)
+    isSenderAcceptCompleted = null (senderParties \\ acceptAuthorizers)
+    nextAcceptAuthorizers = if isSenderAcceptCompleted
+      then nextActors' (receiverParties \\ acceptAuthorizers) receiver
+      else nextActors' (senderParties \\ acceptAuthorizers) sender
 
     withdrawAuthorizers = fromOptional [] $ Map.lookup V2.TIA_Withdraw actionAuthorizers
-    missingWithdrawAuthorizers = 
-      if isSenderAccepted
-        then (accountParties sender.account \\ withdrawAuthorizers)
-        else (acceptAuthorizers \\ withdrawAuthorizers)
-    
-    actionsFor action missingAuthorizers config =
-      [ (actors, [action]) | actors <- nextActors' missingAuthorizers config, not (null actors) ]
+    nextWithdrawAuthorizers = if isSenderAcceptCompleted
+      then nextActors' (senderParties \\ withdrawAuthorizers) sender
+      else nextActors' (acceptAuthorizers \\ withdrawAuthorizers) sender
+
+    rejectAuthorizers = fromOptional [] $ Map.lookup V2.TIA_Reject actionAuthorizers
+    neededRejectAuthorizers = if isSenderAcceptCompleted
+      then nextActors' (receiverParties \\ rejectAuthorizers) receiver
+      else []
 
 nextActors' : [Party] -> AccountConfig -> [[Party]]
 nextActors' missingAuthorizers config = dedupSort $
   [[config.account.owner] | canAct config.account.owner config.ownerConfig] <>
   [[provider] | Some provider <- [config.account.provider], provider `elem` missingAuthorizers && (isInitialized || config.providerConfig.canInitiate)] <>
-  [missingAuthorizers]
+  if null missingAuthorizers then [] else [missingAuthorizers]
   where
     canAct p c = p `elem` missingAuthorizers && (isInitialized || c.canInitiate)
     isInitialized = missingAuthorizers /= (accountParties config.account)
@@ -204,7 +200,7 @@ reverseMap m =
 -- | Available actions on an allocation instruction.
 -- This function encodes the core of the state machine for who needs to act when.
 --
--- FIXME: invert the Map of actions in a separate PR to simplify this code.
+-- TODO(#4978): invert the Map of actions in a separate PR to simplify this code.
 mkAvailableAllocationInstructionActions
   : Map.Map V2.AllocationInstructionAction [Party]
   -> AccountConfig -> Map.Map [Party] [V2.AllocationInstructionAction]
@@ -225,7 +221,7 @@ mkAvailableAllocationInstructionActions actionAuthorizers authorizer =
 -- | Available actions on an allocation.
 -- This function encodes the core of the state machine for who needs to act when.
 --
--- FIXME: invert the Map of actions in a separate PR to simplify this code.
+-- TODO(#4978): invert the Map of actions in a separate PR to simplify this code.
 mkAvailableAllocationActions
   : Map.Map V2.AllocationAction [Party]
   -> [Party] -> Party -> AccountConfig -> Map.Map [Party] [V2.AllocationAction]
@@ -374,10 +370,11 @@ extractAccountConfigMap
   : Party -> ExtraArgs -> [V2.Account] -> Update (Map.Map V2.Account (AccountConfig, Optional (ContractId AccountConfig)))
 extractAccountConfigMap admin extraArgs as = do
   let
-    cids = case TextMap.lookup accountConfigsContextKey extraArgs.context.values of
+    val = TextMap.lookup accountConfigsContextKey extraArgs.context.values
+    cids = case val of
       Some (AV_List cs) -> map (\(AV_ContractId cid) -> cid) cs
       None -> []
-      _ -> error ("unexpected value in " <> accountConfigsContextKey)
+      _ -> error ("unexpected value " <> show val <> " in " <> accountConfigsContextKey)
   
   suppliedMap <- Map.fromList <$>
     mapA (\cid -> do
@@ -408,7 +405,7 @@ extractAccountConfigs
   : Party -> ExtraArgs -> [V2.Account] -> Update [(AccountConfig, Optional (ContractId AccountConfig))]
 extractAccountConfigs admin extraArgs as = do
   accountConfigsMap <- extractAccountConfigMap admin extraArgs as
-  return $ map (\a -> fromSome (Map.lookup a accountConfigsMap)) as
+  return $ map (\a -> fromSomeNote ("No account config supplied for account " <> show a) (Map.lookup a accountConfigsMap)) as
 
 accountConfigsContextKey : Text
 accountConfigsContextKey = "testTokenV2/accountConfigs"

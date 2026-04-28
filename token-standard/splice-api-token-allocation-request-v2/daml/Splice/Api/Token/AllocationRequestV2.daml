@@ -148,8 +148,8 @@ data AllocationRequestView = AllocationRequestView with
       -- This field can be used to inform wallet users whether they can take an action or not;
       -- and which other parties they might be waiting on to take their action.
       --
-      -- Supports multiple parties for actions that require joint authorization. Executing them
-      -- will require appropriate, app-specific delegation contracts to be in place.
+      -- Supports multiple parties for actions that require joint authorization. All possible combinations
+      -- of action actors that could call a choice could be included.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation request, used for extensibility.
   deriving (Show, Eq)

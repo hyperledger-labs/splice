@@ -341,7 +341,6 @@ test_self_transfer_to_account = do
         ownerConfig = AccountConfig.PartyConfig True True
         providerConfig = AccountConfig.PartyConfig True True
   let aliceCustody = aliceCustodyConfig.account
-  -- FIXME: consider again ruling out the empty account-id by removing the 'Optional' from the account ID field
 
   -- Set up Alice's account
   accountProposalCid <- submit custodian1 do

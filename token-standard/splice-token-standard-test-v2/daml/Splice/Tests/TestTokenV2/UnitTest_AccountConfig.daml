@@ -237,7 +237,7 @@ test_transfer_instruction_case sender senderProvider receiver receiverProvider m
 
   assertMsg
     (T.unlines [
-        "Unexpected avaialble actions.",
+        "Unexpected available actions.",
         "Sender account: " <> show senderAccount,
         "Receiver account: " <> show receiverAccount,
         "Existing authorizations: " <> show actionAuthorizers,
@@ -309,7 +309,7 @@ test_allocation_instruction_case authorizer provider mkacc
 
     assertMsg
       (T.unlines [
-          "Unexpected avaialble actions.",
+          "Unexpected available actions.",
           "Account: " <> show account,
           "Existing authorizations: " <> show actionAuthorizers,
           "Expected available actions: " <> show expectedAvailableActions,
@@ -373,7 +373,7 @@ test_allocation_case authorizer provider admin executors mkacc
 
     assertMsg
       (T.unlines [
-          "Unexpected avaialble actions.",
+          "Unexpected available actions.",
           "Account: " <> show account,
           "Existing authorizations: " <> show actionAuthorizers,
           "Expected available actions: " <> show expectedAvailableActions,

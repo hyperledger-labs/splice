@@ -109,6 +109,7 @@ import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
 import Splice.Testing.Utils
 
 import Daml.Script
+import Splice.TokenStandard.Utils (allocationAdmin)
 
 -- | List the holdings of a party of a specific instrument.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
@@ -354,8 +355,8 @@ acceptAllocationInstructionV2
 acceptAllocationInstructionV2 registries actor (instrCid, instr) = do
   Some instrView <- queryInterfaceContractId @V2.AllocationInstruction actor instrCid
   let firstTl::_ = instrView.allocation.transferLegs
-  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
-  context <- V2.getAllocationInstruction_WithdrawContext registry instrCid emptyMetadata
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin instrView.allocation)
+  context <- V2.getAllocationInstruction_AcceptContext registry instrCid emptyMetadata
   submitWithDisclosures' actor context.disclosures $ 
     exerciseCmd instrCid
       V2.AllocationInstruction_Accept with
@@ -370,8 +371,7 @@ withdrawAllocationInstructionV2
   :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationInstruction, V2.AllocationInstructionView)
   -> Script (Optional (ContractId V2.AllocationInstruction))
 withdrawAllocationInstructionV2 registries actor (instrCid, instrView) = do
-  let firstTl::_ = instrView.allocation.transferLegs
-  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin instrView.allocation)
   context <- V2.getAllocationInstruction_WithdrawContext registry instrCid emptyMetadata
   res <- submitWithDisclosures' actor context.disclosures $ 
     exerciseCmd instrCid
@@ -390,8 +390,7 @@ withdrawAllocationV2
   :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.Allocation, V2.AllocationView)
   -> Script (Optional (ContractId V2.Allocation))
 withdrawAllocationV2 registries actor (allocCid, allocView) = do
-  let firstTl::_ = allocView.allocation.transferLegs
-  registry <- MultiRegistry.getRegistryApiV2 registries (firstTl.instrumentId.admin)
+  registry <- MultiRegistry.getRegistryApiV2 registries (allocationAdmin allocView.allocation)
   context <- V2.getAllocation_WithdrawContext registry allocCid emptyMetadata
   res <- submitWithDisclosures' actor context.disclosures $ 
     exerciseCmd allocCid

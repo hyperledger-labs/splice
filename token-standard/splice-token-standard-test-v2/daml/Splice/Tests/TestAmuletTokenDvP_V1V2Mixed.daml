@@ -569,12 +569,3 @@ checkEqual description expected actual =
       , "expected: " <> show expected
       , "actual: " <> show actual
       ]
-
-expectOneElement : Text -> (a -> Text) -> [a] -> Script a
-expectOneElement description pretty xs =
-  case xs of
-    [x] -> pure x
-    [] -> fail $ "Expected exactly one " <> description <> ", but got none."
-    xs -> fail $ T.unlines $ "Expected exactly one " <> description <> ", but got: " :: map pretty xs
-
-

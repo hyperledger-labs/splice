@@ -25,7 +25,7 @@ import qualified DA.Foldable as Foldable
 import qualified DA.Traversable as Traversable
 
 template Token with
-      holding : V2.HoldingView
+     holding : V2.HoldingView
   where
     -- We model a token that is jointly maintained by the account parties and the instrument admin
     -- to test that the authorization rules work our for that as well.
@@ -105,24 +105,27 @@ authorizeAllocationInstructionAction
   -> Update V2.AllocationInstructionResult
 authorizeAllocationInstructionAction 
   this
-    -- | The AllocationInstruction on which to apply the authorization.
+    -- ^ The AllocationInstruction on which to apply the authorization.
   oSelf
-    -- | ContractId of the AllocationInstruction if it existed already.
+    -- ^ ContractId of the AllocationInstruction if it existed already.
     --   Used only to archive.
   actors
-    -- | The actors authorizing the action on the AllocationInstruction.
+    -- ^ The actors authorizing the action on the AllocationInstruction.
   action
     -- | The action to be authorized.
   extraArgs
-    -- | ExtraArgs from which to extract choice context.
+    -- ^ ExtraArgs from which to extract choice context.
   execute
-    -- | A continuation to execute when fully authorized. 
+    -- ^ A continuation to execute when fully authorized. 
   = do
     -- Extract account info.
-    [(accountConfig, oAccountCid)] <- extractAccountConfigs 
+    acs <- 
+      extractAccountConfigs 
       this.admin 
       extraArgs 
       [this.allocation.authorizer]
+
+    (accountConfig, oAccountCid) <- expectOneElement "account config" show acs
 
     -- Apply the account authorization rules
     -- First check the actors are allowed to authorize the action.
@@ -145,7 +148,7 @@ authorizeAllocationInstructionAction
       -- If the taken action no longer has possible actors, it's fully authorized.
       fullyAuthorized = null newPossibleActors
 
-    -- If the action is fully authrozed, execute the continuation.
+    -- If the action is fully authorized, execute the continuation.
     -- Otherwise create a pending instruction and try continuing on that.
     res <- if fullyAuthorized
       then execute
@@ -156,7 +159,7 @@ authorizeAllocationInstructionAction
           actionAuthorizers = newActionAuthorizers
           availableActions = newAvailableActions
 
-        -- Now check whether we can use the accounts to transfer authorit.
+        -- Now check whether we can use the accounts to transfer authority.
         oRes <- tryUseAccountAuthorityForAIA actors newPossibleActors action (accountConfig, oAccountCid) (coerceContractId pendingInstrCid) extraArgs
         case oRes of 
           Some res -> pure res
@@ -167,8 +170,8 @@ authorizeAllocationInstructionAction
               authorizerChangeCids = TextMap.empty
               meta = emptyMetadata
 
-    -- Archive old TransferOffer
-    -- Do this last to be able to use the TransferOffer as event
+    -- Archive old AllocationInstruction
+    -- Do this last to be able to use the AllocationInstruction as event
     -- factory
     whenSome oSelf archive
 
@@ -187,6 +190,7 @@ template TokenAllocationV2 with
       -- ^ Stored results of mkAvailableAllocationActions at time of creation as we cannot
       -- access account contracts in view function.
     lockedTokens : TextMap.TextMap [ContractId V2.Holding]
+      -- ^ Map from instrumentId to holdings.
     allocation : V2.AllocationSpecification
     admin : Party
   where
@@ -197,8 +201,6 @@ template TokenAllocationV2 with
     interface instance V2.Allocation for TokenAllocationV2 where
       view = V2.AllocationView with
         originalAllocationCid
-          -- This reference Allocation is immutable so the original allocation Cid
-          -- is always None.
         expiresAt = None
           -- Note: in a production implementation we would also want to add a choice
           -- for the `admin` to expire the allocation. We don't need it for testing though.
@@ -294,18 +296,18 @@ authorizeAllocationAction
   -> Update V2.AllocationResult
 authorizeAllocationAction 
   this
-    -- | The Allocation on which to apply the authorization.
+    -- ^ The Allocation on which to apply the authorization.
   oSelf
-    -- | ContractId of the Allocation if it existed already.
+    -- ^ ContractId of the Allocation if it existed already.
     --   Used only to archive.
   actors
-    -- | The actors authorizing the action on the Allocation.
+    -- ^ The actors authorizing the action on the Allocation.
   action
-    -- | The action to be authorized.
+    -- ^ The action to be authorized.
   extraArgs
-    -- | ExtraArgs from which to extract choice context.
+    -- ^ ExtraArgs from which to extract choice context.
   execute
-    -- | A continuation to execute when fully authorized. 
+    -- ^ A continuation to execute when fully authorized. 
   = do
     -- Extract account info.
     [(accountConfig, oAccountCid)] <- extractAccountConfigs 
@@ -335,7 +337,7 @@ authorizeAllocationAction
       -- If the taken action no longer has possible actors, it's fully authorized.
       fullyAuthorized = null newPossibleActors
 
-    -- If the action is fully authrozed, execute the continuation.
+    -- If the action is fully authorized, execute the continuation.
     -- Otherwise create a pending instruction and try continuing on that.
     res <- if fullyAuthorized
       then execute
@@ -346,7 +348,7 @@ authorizeAllocationAction
           actionAuthorizers = newActionAuthorizers
           availableActions = newAvailableActions
 
-        -- Now check whether we can use the accounts to transfer authorit.
+        -- Now check whether we can use the accounts to transfer authority.
         oRes <- tryUseAccountAuthorityForAA actors newPossibleActors action (accountConfig, oAccountCid) (coerceContractId pendingInstrCid) extraArgs
         case oRes of 
           Some res -> pure res
@@ -459,18 +461,18 @@ authorizeTransferOfferAction
   -> Update V2.TransferInstructionResult
 authorizeTransferOfferAction 
   this
-    -- | The TransferOffer on which to apply the authorization.
+    -- ^ The TransferOffer on which to apply the authorization.
   oSelf
-    -- | ContractId of the TransferOffer if it existed already.
+    -- ^ ContractId of the TransferOffer if it existed already.
     --   Used only to archive.
   actors
-    -- | The actors authorizing the action on the TransferOffer.
+    -- ^ The actors authorizing the action on the TransferOffer.
   action
-    -- | The action to be authorized.
+    -- ^ The action to be authorized.
   extraArgs
-    -- | ExtraArgs from which to extract choice context.
+    -- ^ ExtraArgs from which to extract choice context.
   execute
-    -- | A continuation to execute when fully authorized. 
+    -- ^ A continuation to execute when fully authorized. 
   = do
     -- Extract account info.
     [(senderConfig, oSenderCid), (receiverConfig, oReceiverCid)] <- extractAccountConfigs 
@@ -520,7 +522,7 @@ authorizeTransferOfferAction
           else pure ([], this.transfer.inputHoldingCids)
       else pure ([], this.transfer.inputHoldingCids)
 
-    -- If the action is fully authrozed, execute the continuation.
+    -- If the action is fully authorized, execute the continuation.
     -- Otherwise create a pending instruction and try continuing on that.
     res <- if fullyAuthorized
       then execute
@@ -535,7 +537,7 @@ authorizeTransferOfferAction
           transfer.inputHoldingCids = inputHoldingCids
           originalInstructionCid
 
-        -- Now check whether we can use the accounts to transfer authorit.
+        -- Now check whether we can use the accounts to transfer authority.
         oRes <- tryUseAccountAuthorityForTIA actors newPossibleActors action (senderConfig, oSenderCid) (receiverConfig, oReceiverCid) (coerceContractId pendingInstrCid) extraArgs
         case oRes of 
           Some res -> pure res with senderChangeCids = res.senderChangeCids ++ senderChangeCids

@@ -141,7 +141,8 @@ interface TransferInstruction where
   transferInstruction_withdrawExtraObservers : TransferInstruction_Withdraw -> [Party]
 
   nonconsuming choice TransferInstruction_Accept : TransferInstructionResult
-    -- ^ Accept the transfer
+    -- ^ Accept the transfer instruction as someone that needs to authorize it, either on the
+    -- sending or receiving side.
     --
     -- Implementations MUST ensure that the transfer instruction is archived upon acceptance.
     -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Accept`

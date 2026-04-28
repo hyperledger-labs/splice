@@ -32,6 +32,8 @@ import Daml.Script
 import DA.Action (foldlA)
 import qualified DA.TextMap as TextMap
 import DA.List (dedup)
+import DA.Optional (catOptionals)
+import DA.Foldable (Foldable(foldMap))
 
 
 -- Registry representation
@@ -235,14 +237,8 @@ getLockedTokensForAllocationsD registry allocCid = do
 
 getAccountMapAndDisclosures : TestTokenV2Registry -> [V2.Account] -> Script (AnyValue, Disclosures')
 getAccountMapAndDisclosures registry accounts = do
-  foldlA (\acc@(AV_List cids, disclosures) account -> do
-      oConfig <- getAccountConfig registry account
-      case oConfig of
-        None -> return acc
-        Some (cid, disclosure) -> return (AV_List (AV_ContractId (coerceContractId cid) :: cids),  disclosure <> disclosures)
-      )
-    (AV_List [], mempty)
-    accounts
+  accountConfigs <- catOptionals <$> forA accounts (getAccountConfig registry)
+  pure (AV_List (map (AV_ContractId . coerceContractId . fst) accountConfigs), foldMap snd accountConfigs)
 
 getAccountConfig : TestTokenV2Registry -> V2.Account -> Script (Optional (ContractId AccountConfig.AccountConfig, Disclosures'))
 getAccountConfig registry account = do
