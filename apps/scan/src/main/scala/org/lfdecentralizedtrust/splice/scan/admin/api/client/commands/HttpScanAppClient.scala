@@ -2333,7 +2333,6 @@ object HttpScanAppClient {
           choiceArgs.settlement,
           choiceArgs.transferLegs,
           choiceArgs.allocationCids,
-          choiceArgs.extraReceiptAuthorizers,
           choiceArgs.actors,
           new metadatav1.ExtraArgs(
             choiceContext,

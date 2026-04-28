@@ -102,7 +102,6 @@ class TokenStandardV2AllocationIntegrationTest
       settlementInfo,
       otcTrade.data.transferLegs,
       allocations.asJava,
-      /* extraReceiptAuthorizers =*/ java.util.List.of(),
       /*actors = */ java.util.List.of(venueParty.toProtoPrimitive),
       emptyExtraArgs,
     )
@@ -111,12 +110,11 @@ class TokenStandardV2AllocationIntegrationTest
         settleBatch
       )
 
-    val extraAuthorizers =
-      otcTrade.data.autoReceiptAuthorizers.asScala.filterNot(_.startsWith("splitwell")).asJava
     val otcTradeSettleArgs = new tradingappv2.OTCTrade_Settle(
       Map[String, tradingappv2.SettlementBatch](
         dsoParty.toProtoPrimitive -> new tradingappv2.settlementbatch.SettlementBatchV2(
           allocations.asJava,
+          /*missingAllocations=*/ java.util.List.of(),
           settlementFactoryWithDisclosures.factoryId,
           settlementFactoryWithDisclosures.args.extraArgs,
         )
@@ -129,7 +127,6 @@ class TokenStandardV2AllocationIntegrationTest
           bobAllocationRequestId.contractId
         ),
       ).asJava,
-      extraAuthorizers,
     )
 
     actAndCheck(
@@ -431,7 +428,6 @@ class TokenStandardV2AllocationIntegrationTest
       // Settlement happens at any point after this time.
       Instant.now().plusSeconds(30L),
       java.util.Optional.empty,
-      /*autoReceiptAuthorizers=*/ java.util.List.of(),
     )
   }
 

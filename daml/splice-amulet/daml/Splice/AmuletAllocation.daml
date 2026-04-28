@@ -87,7 +87,24 @@ template AmuletAllocation
 
       allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
       allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
-      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
+      allocation_settleImpl self arg = do
+        -- V2 settlement of a V1 allocation
+        let leg = allocation.transferLeg
+        let dso = leg.instrumentId.admin
+        archiveAndCheckActors self arg.actors [[dso, allocation.settlement.executor]]
+        -- Archive locked amulet to execute the debit (extra checks part of defensive programming)
+        la <- fetchAndArchive (ForOwner with dso, owner = leg.sender) lockedAmulet
+        requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
+
+         -- construct metadata to aid V1 tx history parsers
+        let reason = "Debit for settlement " <> show allocation.settlement.settlementRef
+        let v1HistoryMeta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
+        -- NOTE: we report this as a burn in the V1 history metadata, as representing the full
+        -- set of transfer legs is very difficult to do using the V1 metadata.
+        pure V2.Allocation_SettleResult with
+          authorizerHoldingCids = mempty
+          meta = v1HistoryMeta
+
 
     -- Implemented on the concrete template as you cannot upgrade interfaces so we cannot add a choice to the Allocation interface.
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
