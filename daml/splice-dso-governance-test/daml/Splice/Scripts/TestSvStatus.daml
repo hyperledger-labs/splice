@@ -37,7 +37,7 @@ testStatusReportSubmission = do
         pure report
   let submitStatusReport sv svName dummyNr = do
         (previousReportCid, prevReport) <- getStatusReport sv
-        submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_SubmitStatusReport with
+        submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_SubmitStatusReport with
           sv
           previousReportCid
           status = dummyStatus dummyNr

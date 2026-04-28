@@ -317,7 +317,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -601,7 +601,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",

@@ -122,7 +122,6 @@ trait TokenStandardV2TestUtil extends TestCommon {
       // Settlement happens at any point after this time.
       Instant.now().plusSeconds(30L),
       java.util.Optional.empty,
-      /*autoReceiptAuthorizers=*/ java.util.List.of(),
     )
   }
 

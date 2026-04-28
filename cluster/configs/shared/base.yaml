@@ -160,6 +160,18 @@ monitoring:
         # These metrics will still trigger the "quota exceeded" alert.
         # GCP is more forgiving of larger sets in this value.
         excludedApproachingMetrics: []
+        # Smoothing window for quota usage checks. Used as the avg_over_time
+        # range in PromQL queries and as the alignmentPeriod for the exceeded
+        # threshold alert.
+        rollingWindowSeconds: 600
+        # How long the condition must be continuously true before firing.
+        # Should typically be >= rollingWindowSeconds to avoid retesting "old"
+        # data.
+        retestWindowSeconds: 600
+      trafficBasedRewards:
+        # Alert if we have more than this many featured app rights,
+        # as too many rights may cause performance problems in computing app activity records.
+        featuredAppRightsLimit: 10000
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')

@@ -67,6 +67,8 @@ monitoring:
           - 'cloudkms.googleapis.com/hsm_asymmetric_requests'
           - 'cloudkms.googleapis.com/hsm_generate_random_requests'
           - 'cloudkms.googleapis.com/external_kms_requests'
+        retestWindowSeconds: 600
+        rollingWindowSeconds: 600
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
@@ -82,6 +84,8 @@ monitoring:
       sequencerRateLimits:
         circuitBreakerStateThreshold: 0.5
         rejectionRateThreshold: 0
+      trafficBasedRewards:
+        featuredAppRightsLimit: 10000
       trafficWaste:
         kilobytes: 1
         overMinutes: 5

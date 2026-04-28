@@ -103,9 +103,6 @@ data TestWorkflow
 data TestTrade = TestTrade with
     partiesWithV1Wallet : [Party]
     partiesWithSettlementAgreements : [Party]
-    partiesWithAutoReceipt : [Party]
-      -- ^ Parties that have enabled auto-receipt for their trades at the venue.
-      -- Unless they are the venue itself, they must have a settlement agreement in place to enable settlement.
     initialHoldings : [TestHolding]
     transferLegs : [TestLeg]
     expectedNumRequests : Int
@@ -126,7 +123,6 @@ singleTransferTest TestEnvironment{..} =
   TestTrade with
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
-    partiesWithAutoReceipt = []
     initialHoldings = [mkH AM alice 100.0]
     transferLegs = [aliceToBob]
     expectedNumRequests = 2
@@ -155,8 +151,6 @@ singleTransferTest_senderV1 = runTest $ \env@TestEnvironment{..} ->
 singleTransferTest_receiverV1 = runTest $ \env@TestEnvironment{..} ->
   (singleTransferTest env) with
     partiesWithV1Wallet = [bob]
-    partiesWithAutoReceipt = [bob]
-    expectedNumRequests = 1 -- only one request is sent, as bob has enabled auto-receipt
     expectedNumAllocationsV1 = 0
     expectedNumAllocationsV2 = 1
     partiesWithSettlementAgreements = [bob]
@@ -179,7 +173,6 @@ bilateralDvPWithFeeTest TestEnvironment{..} =
   TestTrade with
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
-    partiesWithAutoReceipt = []
     initialHoldings =
       [ mkH AM alice 100.0
       , mkH AM bob 100.0
@@ -191,7 +184,7 @@ bilateralDvPWithFeeTest TestEnvironment{..} =
       ]
     expectedNumRequests = 3
     expectedNumAllocationsV1 = 0
-    expectedNumAllocationsV2 = 5 -- alice, bob for both admins, venue for one admin
+    expectedNumAllocationsV2 = 4 -- alice, bob for both admins, venue does not allocate
     expectedHoldingsAfterAllocation =
       [ mkLH AM alice 20.0, mkH AM alice 80.0
       , mkH AM bob 100.0
@@ -224,20 +217,24 @@ bilateralDvPWithFeeTest TestEnvironment{..} =
 bilateralDvPWithFeeTest_onlyV2 = runTest $ \env ->
   bilateralDvPWithFeeTest env
 
-bilateralDvPWithFeeTest_onlyV2_venueAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+
+{- TODO(#4818): once TestTokenV2 has V1 API support also build the tests below
+
+bilateralDvPWithFeeTest_aliceV1 = runTest $ \env@TestEnvironment{..} ->
   (bilateralDvPWithFeeTest env) with
-    partiesWithAutoReceipt = [venue]
-    expectedNumRequests = 2 -- no request sent to venue, as it has enabled auto-receipt
+    partiesWithV1Wallet = [alice]
     expectedNumAllocationsV1 = 0
     expectedNumAllocationsV2 = 4
 
-bilateralDvPWithFeeTest_onlyV2_venueBobAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+bilateralDvPWithFeeTest_bobV1 = runTest $ \env@TestEnvironment{..} ->
   (bilateralDvPWithFeeTest env) with
-    partiesWithAutoReceipt = [venue, bob]
-    expectedNumRequests = 2 -- request still sent to bob as they are a sender
+    partiesWithV1Wallet = [bob]
     expectedNumAllocationsV1 = 0
     expectedNumAllocationsV2 = 4
     partiesWithSettlementAgreements = [bob]
+
+bilateralDvPWithFeeTest_onlyV1  = error "implement"
+-}
 
 bilateralDvPWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
   (bilateralDvPWithFeeTest env) with
@@ -260,7 +257,6 @@ multiDvPWithFeeTest TestEnvironment{..} =
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements =
       [alice, bob] -- We need settlement agreements due to the V1 asset transfer from bob to alice
-    partiesWithAutoReceipt = []
     initialHoldings =
       [ mkH AM alice 100.0
       , mkH AM bob 100.0
@@ -273,7 +269,7 @@ multiDvPWithFeeTest TestEnvironment{..} =
       ]
     expectedNumRequests = 3
     expectedNumAllocationsV1 = 1
-    expectedNumAllocationsV2 = 5
+    expectedNumAllocationsV2 = 4
     expectedHoldingsAfterAllocation =
       [ mkLH AM alice 20.0, mkH AM alice 80.0
       , mkH AM bob 100.0
@@ -319,19 +315,23 @@ multiDvPWithFeeTest TestEnvironment{..} =
 multiDvPWithFeeTest_onlyV2 = runTest $ \env ->
   multiDvPWithFeeTest env
 
-multiDvPWithFeeTest_onlyV2_venueAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+multiDvPWithFeeTest_alice_v1 = runTest $ \env@TestEnvironment{..} ->
   (multiDvPWithFeeTest env) with
-    partiesWithAutoReceipt = [venue]
-    expectedNumRequests = 2 -- no request sent to venue, as it has enabled auto-receipt
+    partiesWithV1Wallet = [alice]
+    expectedNumAllocationsV1 = 1  -- allocation for bobToAliceX1
+    expectedNumAllocationsV2 = 3  -- alice's V1 wallet does not create a receipt allocation
+
+{- TODO(#4818): once TestTokenV2 has V1 API support also build the two tests below
+
+multiDvPWithFeeTest_bob_v1 = runTest $ \env@TestEnvironment{..} ->
+  (multiDvPWithFeeTest env) with
+    partiesWithAutoReceipt = [venue, bob]
     expectedNumAllocationsV1 = 1
     expectedNumAllocationsV2 = 4
 
-multiDvPWithFeeTest_onlyV2_venueBobAutoReceipt = runTest $ \env@TestEnvironment{..} ->
-  (multiDvPWithFeeTest env) with
-    partiesWithAutoReceipt = [venue, bob]
-    expectedNumRequests = 2 -- request still sent to bob as they are a sender
-    expectedNumAllocationsV1 = 1
-    expectedNumAllocationsV2 = 4
+multiDvPWithFeeTest_onlyV1 = error "implement"
+
+-}
 
 multiDvPWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
   (multiDvPWithFeeTest env) with
@@ -387,7 +387,7 @@ runTest mkTest = do
 
   -- setup settlement agreements
   forA_ test.partiesWithSettlementAgreements $ \trader -> do
-    submitMulti [env.venue, trader] [] $ createCmd TradingAppV2.TradeSettlementAgreement with
+    submit (actAs env.venue <> actAs trader) $ createCmd TradingAppV2.TradeSettlementAgreement with
       venue = env.venue
       trader
 
@@ -409,7 +409,6 @@ runTest mkTest = do
         settleAt = now `addRelTime` hours 1
         createdAt = now
         settlementDeadline = Some settlementDeadline
-        autoReceiptAuthorizers = test.partiesWithAutoReceipt
   otcTradeCid <- submit env.venue $ createCmd otcTrade
 
   -- create allocation requests
@@ -418,9 +417,8 @@ runTest mkTest = do
   reqs <- query @TradingAppV2.OTCTradeAllocationRequest env.venue
   checkEqual "number of allocation requests" test.expectedNumRequests (length reqs)
 
-  -- have all parties accept the allocation requests
-  trace ("all parties", env.allParties) $
-   forA_ env.allParties $ \trader -> do
+  -- have all parties except the venue accept the allocation requests
+  forA_ (filter (/= env.venue) env.allParties) $ \trader -> do
     if trader `elem` test.partiesWithV1Wallet
       then do
         reqs <- WalletClientV2.listAllocationRequestsV1 trader

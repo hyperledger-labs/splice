@@ -10,7 +10,7 @@ import Daml.Script
 import DA.Action (void, when, unless)
 import DA.Date
 import DA.Exception
-import DA.Foldable (forA_)
+import DA.Foldable (forA_, foldMap)
 import qualified DA.Map as Map
 import DA.List.Total
 import DA.Optional (fromOptional)
@@ -113,7 +113,7 @@ setupValidator' app name = do
   validatorParty <- allocatePartyByHint (PartyIdHint name)
   sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
   now <- getTime
-  submitMulti [validatorParty, app.dso] [] $ createCmd ValidatorLicense with
+  submit (actAs validatorParty <> actAs app.dso) $ createCmd ValidatorLicense with
     dso = app.dso
     sponsor = sponsorParty
     validator = validatorParty
@@ -192,13 +192,16 @@ getAllValidatorRights _app = do
 
 recordValidatorOf : AmuletApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
-  submitMulti [u, v] [] $
+  submit (actAs u <> actAs v) $
     void $ createCmd ValidatorRight with dso = app.dso; validator = v; user = u
 
 getUserReadAs : UserId -> Script [Party]
 getUserReadAs user = do
   rights <- listUserRights user
   pure [p | CanReadAs p <- rights]
+
+getUserReadAs' : UserId -> Script SubmitOptions
+getUserReadAs' user = foldMap readAs <$> getUserReadAs user
 
 
 -- Issuance automation
@@ -273,7 +276,7 @@ submitExerciseAmuletRulesByKey app actors readers arg = do
   (rules, _) <- fetchAmuletRulesByKey app.dso
   -- TODO(#2957): remove read-as DSO party.
   let adjustedReaders = (app.dso :: readers)
-  submitMulti actors adjustedReaders $ exerciseCmd rules arg
+  submit (foldMap actAs actors <> foldMap readAs adjustedReaders) $ exerciseCmd rules arg
 
 submitExerciseAmuletRulesByKey' : Choice AmuletRules c r => AmuletApp -> AmuletUser -> c -> Script r
 submitExerciseAmuletRulesByKey' app user arg = do
@@ -379,7 +382,7 @@ drawOnAllValidatorFaucets app = do
       (\l -> optional True (\state -> state.lastReceivedFor < openRound._2.round) l.faucetState)
     forA_ licenses $ \(lcid, l) ->
       -- submitMulti as the OpenMiningRound would be disclosed using explicit disclosure
-      submitMulti [l.validator] [app.dso] $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
+      submit (actAs l.validator <> readAs app.dso) $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
         openRoundCid = openRound._1
 
 -- | Deposit all amulets together with new issuances into a single amulet.

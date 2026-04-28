@@ -29,7 +29,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 10000
+                      - $FEATURED_APP_RIGHTS_LIVE_ROW_LIMIT
                     type: gt
                   operator:
                     type: and
@@ -49,9 +49,9 @@ groups:
               type: threshold
         dashboardUid: "00000039"
         panelId: 74
-        noDataState: $NODATA
+        noDataState: OK
         execErrState: Alerting
-        for: 1m
+        for: 60m
         annotations:
           __dashboardUid__: "00000039"
           __panelId__: "74"

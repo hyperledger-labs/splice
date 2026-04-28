@@ -53,12 +53,10 @@ import org.lfdecentralizedtrust.splice.sv.lsu.{
   LogicalSynchronizerUpgradeTrigger,
   LogicalSyncUpgradeTransferTrafficTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
 
 class SvDsoAutomationService(
@@ -192,7 +190,7 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingPromoteParticipantToSubmitterTrigger(
+      new SvClearOnboardingFlagTrigger(
         onboardingTriggerContext,
         dsoStore,
         participantAdminConnection,
@@ -228,24 +226,6 @@ class SvDsoAutomationService(
         participantAdminConnection,
       )
     )
-
-    config.domainMigrationDumpPath match {
-      case Some(dumpPath) =>
-        registerTrigger(
-          new DecentralizedSynchronizerMigrationTrigger(
-            config.domainMigrationId,
-            triggerContext,
-            config.domains.global.alias,
-            synchronizerNodeService.nodes.current,
-            dsoStore,
-            connection(SpliceLedgerConnectionPriority.High),
-            participantAdminConnection,
-            dumpPath: Path,
-            enabledFeatures,
-          )
-        )
-      case _ => ()
-    }
 
     synchronizerNodeService.nodes.successor match {
       case Some(successorSynchronizerNode) =>
@@ -574,11 +554,10 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOffboardingSequencerTrigger],
       aTrigger[ReconcileSequencerLimitWithMemberTrafficTrigger],
       aTrigger[SvNamespaceMembershipTrigger],
-      aTrigger[SvOnboardingPromoteParticipantToSubmitterTrigger],
+      aTrigger[SvClearOnboardingFlagTrigger],
       aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOnboardingSequencerTrigger],
       aTrigger[SvOnboardingMediatorProposalTrigger],
-      aTrigger[DecentralizedSynchronizerMigrationTrigger],
       aTrigger[PublishLocalCometBftNodeConfigTrigger],
       aTrigger[PublishScanConfigTrigger],
       aTrigger[ReconcileCometBftNetworkConfigWithDsoRulesTrigger],
