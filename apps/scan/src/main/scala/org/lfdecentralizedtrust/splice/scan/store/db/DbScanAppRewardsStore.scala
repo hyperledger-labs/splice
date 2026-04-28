@@ -834,7 +834,7 @@ class DbScanAppRewardsStore(
     * Level 1+: hash batches of batches until a single root remains.
     * All levels run in a single transaction.
     */
-  private[store] def computeRewardHashes(
+  private[splice] def computeRewardHashes(
       roundNumber: Long,
       batchSize: Int,
   )(implicit tc: TraceContext): Future[Unit] = {
@@ -893,7 +893,7 @@ class DbScanAppRewardsStore(
             min(seq_num), max(seq_num) + 1,
             decode(hash_batch_of_minting_allowances(
               array_agg(
-                hash_minting_allowance(party, amount::text)
+                hash_minting_allowance(party, daml_numeric_to_text(amount))
                 order by seq_num
               )
             ), 'hex')

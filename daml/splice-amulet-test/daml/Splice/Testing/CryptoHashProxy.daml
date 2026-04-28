@@ -4,6 +4,7 @@
 module Splice.Testing.CryptoHashProxy where
 
 import Splice.Amulet.CryptoHash (Hash(..), Hashable(..), hashRecord, hashVariant)
+import Splice.Amulet.RewardAccountingV2 (Batch)
 
 -- | Hash a MintingAllowance{provider, amount}.
 hashMintingAllowance : Text -> Text -> Hash
@@ -65,3 +66,16 @@ template CryptoHashProxy with
         childHashes : [Text]
       controller owner
       do pure (hashBatchOfBatches (map Hash childHashes)).value
+
+    nonconsuming choice CryptoHashProxy_HashDecimal : Text
+      with
+        input : Decimal
+      controller owner
+      do pure (hash input).value
+
+    nonconsuming choice CryptoHashProxy_HashBatch : Text
+      with
+        batch : Batch
+      controller owner
+      do pure (hash batch).value
+
