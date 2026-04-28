@@ -86,7 +86,7 @@ export function installCometBftNode(
     {
       TARGET_CLUSTER: CLUSTER_BASENAME,
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-      MIGRATION_ID: migrationId.toString(),
+      SERIAL_ID: migrationId.toString(),
       YOUR_SV_NAME: onboardingName,
       YOUR_COMETBFT_NODE_ID: nodeConfigs.self.id,
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,

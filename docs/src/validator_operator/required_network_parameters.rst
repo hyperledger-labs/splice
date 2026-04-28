@@ -12,7 +12,7 @@ required for doing so.
 
 
 MIGRATION_ID
-    The current migration id of the network (dev/test/mainnet) you are trying to connect to. You can find this on https://sync.global/sv-network/.
+    The current migration id of the network (dev/test/mainnet) you are trying to connect to. This value is frozen and must not be changed from the last value. You can find this on https://sync.global/sv-network/.
 
 SPONSOR_SV_URL
     The URL of the SV app of your SV sponsor. This should be of the form |generic_sv_url|, e.g., if the Global Synchronizer Foundation is your sponsor use |gsf_sv_url|.
@@ -33,4 +33,3 @@ ONBOARDING_SECRET
      Make sure to use the **SV app URL** (starting with ``sv.``), not the Scan URL (starting with ``scan.``).
 
      Note that this self-served secret is only valid for 1 hour.
-

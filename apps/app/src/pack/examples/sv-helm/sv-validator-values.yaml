@@ -1,9 +1,9 @@
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
 migration:
   id: "MIGRATION_ID"
 
-# replace MIGRATION_ID with the current migration ID of the global synchronizer
-participantAddress: "participant-MIGRATION_ID"
+# Replace SERIAL_ID with the current serial ID of the global synchronizer.
+participantAddress: "participant-SERIAL_ID"
 
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 nodeIdentifier: YOUR_SV_NAME

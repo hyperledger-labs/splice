@@ -1,8 +1,8 @@
 nodeName: "YOUR_SV_NAME"
 
 sv1:
-  # Replace MIGRATION_ID (part of port number!) with the current migration ID of the global synchronizer.
-  externalAddress: cometbft.TARGET_HOSTNAME:26MIGRATION_ID16
+  # Replace SERIAL_ID (part of port number!) with the current serial ID of the global synchronizer.
+  externalAddress: cometbft.TARGET_HOSTNAME:26SERIAL_ID16
 
   ## Uncomment these for DevNet/TestNet:
   # nodeId: "5af57aa83abcec085c949323ed8538108757be9c"
@@ -16,15 +16,15 @@ sv1:
 
 node:
   id: YOUR_COMETBFT_NODE_ID
-  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
-  identifier: "global-domain-MIGRATION_ID-cometbft"
-  # Replace both instances of MIGRATION_ID (also part of port number!) with the current migration ID of the global synchronizer.
-  externalAddress: "global-domain-MIGRATION_ID-cometbft.sv.YOUR_HOSTNAME:26MIGRATION_ID56"
+  # Replace SERIAL_ID with the current serial ID of the global synchronizer.
+  identifier: "global-domain-SERIAL_ID-cometbft"
+  # Replace both instances of SERIAL_ID (also part of port number!) with the current serial ID of the global synchronizer.
+  externalAddress: "global-domain-SERIAL_ID-cometbft.sv.YOUR_HOSTNAME:26SERIAL_ID56"
   keysSecret: "cometbft-keys"
 
 genesis:
-  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
-  chainId: "TARGET_CLUSTER-MIGRATION_ID"
+  # Replace SERIAL_ID with the current serial ID of the global synchronizer.
+  chainId: "TARGET_CLUSTER-SERIAL_ID"
   # Reserved for future use; keep at 0 until further notice
   chainIdSuffix: "0"  # must be a string value
 

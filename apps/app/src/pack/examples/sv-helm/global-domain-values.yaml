@@ -3,15 +3,15 @@ sequencer:
     host: sequencer-pg
     port: 5432
     secretName: sequencer-pg-secret
-    databaseName: sequencer_MIGRATION_ID
+    databaseName: sequencer_SERIAL_ID
   driver:
     type: "cometbft"
-    host: "global-domain-MIGRATION_ID-cometbft-cometbft-rpc"
+    host: "global-domain-SERIAL_ID-cometbft-cometbft-rpc"
     port: 26657
 mediator:
   persistence:
-    # replace MIGRATION_ID with the current migration ID of the global synchronizer
+    # replace SERIAL_ID with the current serial ID of the global synchronizer
     host: mediator-pg
     port: 5432
     secretName: mediator-pg-secret
-    databaseName: mediator_MIGRATION_ID
+    databaseName: mediator_SERIAL_ID
