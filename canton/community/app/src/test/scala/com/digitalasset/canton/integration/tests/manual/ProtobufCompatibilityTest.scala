@@ -134,7 +134,7 @@ final class ProtobufCompatibilityReaderTest
     // Contract id recomputation had to be removed
     """com/digitalasset/canton/admin/participant/v30/acs_import.proto:Previously present enum value "3" on enum "ContractImportMode" was deleted.""",
     """com/digitalasset/canton/admin/participant/v30/participant_repair_service.proto:Previously present field "1" with name "contract_id_mappings" on message "ImportAcsResponse" was deleted.""",
-    // Internal classes that should have been marked as alpha/unsable
+    // Internal classes that should have been marked as alpha/unstable
     """com/digitalasset/canton/synchronizer/sequencing/sequencer/bftordering/v30/bft_ordering_service.proto:Field "3" with name "message_id" on message "OrderingRequest" changed type from "bytes" to "string".""",
     """com/digitalasset/canton/synchronizer/sequencing/sequencer/bftordering/v30/bft_ordering_service.proto:Field "4" with name "payload" on message "OrderingRequest" changed cardinality from "optional with explicit presence" to "optional with implicit presence".""",
     """com/digitalasset/canton/synchronizer/sequencing/sequencer/bftordering/v30/bft_ordering_service.proto:Field "4" with name "payload" on message "OrderingRequest" changed type from "message" to "bytes".""",
@@ -153,7 +153,7 @@ final class ProtobufCompatibilityReaderTest
         .toList :+
         (ReleaseVersion.current.major, ReleaseVersion.current.minor - 1)
 
-    versionsToTest.foreach { case majorMinor @ (major, minor) =>
+    versionsToTest.foreach { majorMinor =>
       S3Dump.getDumpBaseDirectoriesForVersion(Some(majorMinor)).foreach { case (dumpRef, version) =>
         s"be compatible with $version" in {
           val protoImageFile = dumpRef.localDownloadPath / protobufImageFileName

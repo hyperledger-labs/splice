@@ -18,7 +18,17 @@
 
 .. _release_notes:
 
-.. release-notes:: 0.6.0
+.. release-notes:: 0.6.1
+
+    Note: 0.6.0 was skipped as it introduced a regression where the SV UI governance page can become unusable due to slow SQL query.
+
+    - SV/Scan UI
+
+        - Fix an issue where the query for listing vote results could degrade to a sequential scan breaking the SV/Scan UI governance page.
+
+    - SV UI
+
+        - Fix calendar in the effective date field reverting selected month
 
     - Canton
 
@@ -983,7 +993,7 @@
 
   - Docs
 
-    - Improvements to validator docs on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+    - Improvements to validator docs on Synchronizer Upgrades with Downtime.
 
 .. release-notes:: 0.5.1
 
@@ -1001,7 +1011,7 @@
 
       Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
       For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
-      as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
+      as well as the respective documentation pages for validators and SVs.
 
   - Deployment
 
@@ -2442,7 +2452,7 @@ which can happen in certain cases when the sequencer is down.
 .. important::
 
     * This release fixes an upgrading-related bug in 0.3.0.
-      Please skip 0.3.0 and upgrade directly to 0.3.1 through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
+      Please skip 0.3.0 and upgrade directly to 0.3.1 through the Synchronizer Upgrade with Downtime procedure.
 
 * Bugfixes
 
@@ -2462,7 +2472,7 @@ which can happen in certain cases when the sequencer is down.
       If your Daml code depends on ``splice-amulet`` < ``0.1.6``, then you **must
       recompile** and redeploy it after the network was upgraded to ``splice-amulet-0.1.6`` and
       before the SVs change this optional config value away from its default value.
-    * This release must be applied through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
+    * This release must be applied through the Synchronizer Upgrade with Downtime procedure.
 
 * Canton
 
@@ -2814,7 +2824,7 @@ Note: This release must be applied through the `Synchronizer Upgrades with Downt
 
 * Documentation
 
-  * Updated recommendations for checking synchronizer health after a :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` to focus exclusively on monitoring signals.
+  * Updated recommendations for checking synchronizer health after a Synchronizer Upgrade with Downtime to focus exclusively on monitoring signals.
   * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
 
 * Metrics
@@ -3227,7 +3237,7 @@ Note: 0.1.11 was skipped as it contained some issues. Upgrade directly from 0.1.
 * Documentation
 
   * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
-    for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
+    for SVs and validators.
 
   * Updated ``Preparing for Validator Onboarding`` sections to describe the steps a validator operator needs to take
     to onboard a new node.
@@ -3410,16 +3420,16 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * ``participant-values.yaml`` and ``global-domain-values.yaml`` now require specifying your SV name as ``nodeIdentifier: YOUR_SV_NAME``.
     This is used to provide better names to Canton nodes.
   * Multiple changes to the way (non-SV) validator nodes are deployed,
-    to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+    to prepare for supporting Synchronizer Upgrades with Downtime.
     Please revisit the section on :ref:`Helm-based validator deployment <k8s_validator>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
 
 * Documentation
 
   * Added detailed instructions for (non-SV) validator node operators on participating in a synchronizer upgrade.
-    Please see the new validator operations section on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`,
+    Please see the new validator operations section on Synchronizer Upgrades with Downtime,
     as well as the updates in :ref:`k8s_validator`.
-  * :ref:`SV Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
+  * SV Synchronizer Upgrades: Added more detailed instructions on testing, as well as various clarifications.
   * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
   * Added :ref:`backup and restore documentation for (non-SV) validator nodes <validator-backups>`.
 
@@ -3437,7 +3447,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Deployment
 
-  * Multiple changes to the way SV nodes are deployed, to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+  * Multiple changes to the way SV nodes are deployed, to prepare for supporting Synchronizer Upgrades with Downtime.
     Please revisit the section on :ref:`Helm-based SV deployment <sv-helm>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
   * ``sv-values.yaml`` now also requires you to specify an ``internalUrl`` for your scan instance that the SV app
@@ -3453,7 +3463,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 * Documentation
 
   * Added more detailed instructions for SV node operators on participating in a synchronizer upgrade.
-    Please see the updated section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`,
+    Please see the updated section on Synchronizer Upgrades with Downtime,
     as well as the updates in :ref:`sv-helm`.
 
   * Added a section on how to configure the `extraBeneficiaries` to the SV rewards so that the SV can distribute its SV rewards to other parties.
@@ -3470,7 +3480,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Documentation
 
-  * Added section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+  * Added section on Synchronizer Upgrades with Downtime.
     This section only contains a high-level overview for now and will be expanded in the upcoming weeks.
   * Preliminary documentation of :ref:`restoring from backups <sv_restore>`.
     Note that for now, only the case of restoring a full SV node from a backup is fully covered.

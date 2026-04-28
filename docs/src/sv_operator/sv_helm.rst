@@ -29,9 +29,8 @@ Requirements
 
   tar xzvf |version|\_splice-node.tar.gz
 
-5) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
-   If it has, please record the current migration ID of the synchronizer.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+5) Please inquire the migration id of the global synchronizer on your target network.
+   The migration ID is 0 for the initial synchronizer deployment and clusters that have gone through a legacy hard upgrade have incremented it by 1 for each upgrade.
 
 .. code-block:: bash
 
@@ -645,11 +644,6 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
   This will create an amulet price vote from your SV with the configured price when onboarded.
   If not set, no vote will be cast. This can always be done later manually from the SV app UI.
 
-If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, in your ``sv-values.yaml``:
-
-- set ``migrating`` to ``true``
-- set ``legacyId`` to the value of migration ID before incremented (``MIGRATION_ID`` - 1)
-
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
     :language: yaml
     :start-after: MIGRATION_START
@@ -690,12 +684,17 @@ Install the Canton and CometBFT components:
 
     helm install global-domain-${MIGRATION_ID}-cometbft |helm_repo_prefix|/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
     helm install global-domain-${MIGRATION_ID} |helm_repo_prefix|/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant-${MIGRATION_ID} |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
 
-Note that we use the migration ID when naming Canton components.
-This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
+Note that we use the migration ID when naming Canton synchronizer components.
+This is to support operating multiple instances of these components side by side as part of a :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>`.
 
-Install the SV node apps (replace ``helm install`` in these commands with ``helm upgrade`` if you are following :ref:`sv-upgrades-deploying-apps`):
+Install the participant:
+
+.. parsed-literal::
+
+    helm install participant |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
+
+Install the SV node apps:
 
 .. parsed-literal::
 

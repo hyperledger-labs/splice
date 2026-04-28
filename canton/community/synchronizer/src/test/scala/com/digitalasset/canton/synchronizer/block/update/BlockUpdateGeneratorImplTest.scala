@@ -110,11 +110,10 @@ class BlockUpdateGeneratorImplTest
             OrderingTimeFixMode.ValidateOnly,
             lsuSequencingBounds = Some(
               LsuSequencingBounds
-                .create(
+                .unsafeCreate(
                   sequencingTimeLowerBoundExclusive,
                   sequencingTimeLowerBoundExclusive,
                 )
-                .value
             ),
             drSequencingTimeUpperBound = None,
             getAnnouncedLsu = None,

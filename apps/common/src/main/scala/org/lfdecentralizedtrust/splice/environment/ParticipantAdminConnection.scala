@@ -34,11 +34,12 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnections,
+  SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.{
+  ConfiguredPhysicalSynchronizerId,
   KnownPhysicalSynchronizerId,
   NodeIdentity,
   ParticipantId,
@@ -150,9 +151,7 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Option[PhysicalSynchronizerId]] =
     OptionT(for {
-      configuredDomains <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-      )
+      configuredDomains <- listRegisteredSynchronizers()
     } yield configuredDomains.collectFirst {
       case (configuredSynchronizer, psid, _)
           if configuredSynchronizer.synchronizerAlias == synchronizerAlias =>
@@ -167,11 +166,17 @@ class ParticipantAdminConnection(
       )
       .value
 
+  def listRegisteredSynchronizers()(implicit
+      tc: TraceContext
+  ): Future[Seq[(SynchronizerConnectionConfig, ConfiguredPhysicalSynchronizerId, Boolean)]] = {
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+    )
+  }
+
   def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] = runCmd(
-    ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-  ).map(
+  ): Future[PhysicalSynchronizerId] = listRegisteredSynchronizers().map(
     _.collectFirst {
       case (_, KnownPhysicalSynchronizerId(psid), _) if psid.logical == synchronizerId => psid
     }.getOrElse(
@@ -508,9 +513,7 @@ class ParticipantAdminConnection(
       domain: SynchronizerAlias
   )(implicit traceContext: TraceContext): Future[Option[SynchronizerConnectionConfig]] =
     for {
-      configuredDomains <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
-      )
+      configuredDomains <- listRegisteredSynchronizers()
     } yield configuredDomains
       .collectFirst {
         case (configuredDomain, _, _) if configuredDomain.synchronizerAlias == domain =>
@@ -883,7 +886,7 @@ class ParticipantAdminConnection(
   )(implicit tc: TraceContext): Future[Unit] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity
-        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, Left(sequencerSuccessors))
     )
 }
 

@@ -56,7 +56,7 @@ Splice aims to make a high level of trust possible in the following ways:
 
 * Keep synchronizer transaction costs low via integrated payment, operations monitoring and governance automation, so operating groups can adjust their operations as needed to maintain a stable, long-term service offering.
 
-* Manage these tools and applications via an Apache 2.0 license and an open source community within the Hyperledger Foundation.
+* Manage these tools and applications via an Apache 2.0 license.
 
 Splice’s interlocking system of incentives and fees includes:
 
@@ -98,7 +98,7 @@ Amulet behaviors are controlled by the underlying Daml models. These models can 
 
 The Amulet models expose a large number of configuration variables to the Governance app (fifty-five variables in the current version). These allow synchronizer operating groups to use the Governance app to modify minting and burning behaviors, including but not limited to issuance curves, issuance round timing, fees, and rewards. This makes it possible to separate the governance of a particular implementation of the Amulet reference application from development of the Splice code base.
 
-We expect that contributors interested in Splice may contribute, for example, extensions to the APIs for the reference applications, including extensions to Amulet Wallet and the Payment Scan; extensions and enhancements to the Synchronizer Governance application; changes to Traffic Acquisition behavior and APIs, and enhanced UI features in the Wallet and the Name Service. These will be accepted based on the Hyperledger Foundation process for open source projects.
+We expect that contributors interested in Splice may contribute, for example, extensions to the APIs for the reference applications, including extensions to Amulet Wallet and the Payment Scan; extensions and enhancements to the Synchronizer Governance application; changes to Traffic Acquisition behavior and APIs, and enhanced UI features in the Wallet and the Name Service.
 
 Any group operating a Canton synchronizer may accept and implement new versions of the Splice reference applications at its own discretion. The amulet configuration used by any Canton synchronizer operating group can be made publicly available (visible) by that operating group.
 
