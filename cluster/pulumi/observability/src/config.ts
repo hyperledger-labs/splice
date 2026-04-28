@@ -12,6 +12,18 @@ const GcpQuotasConfigSchema = z.object({
   enabled: z.literal(true).optional(),
   excludedMetrics: z.array(quotaMetricNameSchema),
   excludedApproachingMetrics: z.array(quotaMetricNameSchema),
+  rollingWindowSeconds: z.number().int().min(60, {
+    // this rule comes from GCP aggregations.alignmentPeriod on quota-exceeded
+    message: 'must be at least 60s',
+  }),
+  retestWindowSeconds: z
+    .number()
+    .int()
+    .positive()
+    .refine(v => v % 60 === 0, {
+      // this rule comes from GCP duration on quota-exceeded
+      message: 'must be a positive multiple of 60s',
+    }),
 });
 
 const MonitoringConfigSchema = z

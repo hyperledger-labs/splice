@@ -44,7 +44,10 @@ abstract class StoreReadPerformanceTest(
       ingestionConfig,
     ) {
 
-  protected def readOperation(store: Store, txs: Seq[TreeUpdateWithMigrationId]): ReadOperation
+  protected def readOperations(
+      store: Store,
+      txs: Seq[TreeUpdateWithMigrationId],
+  ): Seq[ReadOperation]
 
   /** Verify that the data read back from the store matches the original ingested data. */
   protected def verifyReadResults(
@@ -67,15 +70,15 @@ abstract class StoreReadPerformanceTest(
             * we just write and read immediately, which is not what we have in production.
             *  Need to flush the caches(db etc)
             */
-          metrics <- runReadBenchmarks(store, txs)
+          metricsByOp <- runReadBenchmarks(store, txs)
           _ <- verifyReadResults(store, txs)
-          _ = writeReadMetrics(metrics)
+          _ = metricsByOp.foreach { case (opName, m) => writeReadMetrics(opName, m) }
         } yield ()
       }
   }
 
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
-  private def writeReadMetrics(metrics: StoreReadPerfMetrics): Unit = {
+  private def writeReadMetrics(opName: String, metrics: StoreReadPerfMetrics): Unit = {
     val completionEpochSec = java.time.Instant.now().getEpochSecond
     val jobName = "splice_perf_read"
 
@@ -114,38 +117,43 @@ abstract class StoreReadPerformanceTest(
       ),
     )
 
-    writeMetricsFile(metricsJson, "store-read-perf-metrics", "Read")
+    writeMetricsFile(metricsJson, "store-read-perf-metrics", "Read", opName = Some(opName))
   }
 
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
   private def runReadBenchmarks(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
-  ): Future[StoreReadPerfMetrics] = {
-    val op = readOperation(store, txs)
+  ): Future[Seq[(String, StoreReadPerfMetrics)]] = {
+    val ops = readOperations(store, txs)
     val updateSizeBytes = Files.size(updateHistoryDumpPath)
-    val wallBefore = System.nanoTime()
-    val cpuBefore = getProcessCpuTimeNs
-    op.execute(tc).map { _ =>
-      val wallAfter = System.nanoTime()
-      val cpuAfter = getProcessCpuTimeNs
-      val duration = wallAfter - wallBefore
-      val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
-      val heapUsed = getHeapUsedBytes
-      val cpuToWallClockRatio =
-        if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
+    ops.foldLeft(Future.successful(Vector.empty[(String, StoreReadPerfMetrics)])) { (accF, op) =>
+      accF.flatMap { acc =>
+        val wallBefore = System.nanoTime()
+        val cpuBefore = getProcessCpuTimeNs
+        op.execute(tc).map { _ =>
+          val wallAfter = System.nanoTime()
+          val cpuAfter = getProcessCpuTimeNs
+          val duration = wallAfter - wallBefore
+          val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
+          val heapUsed = getHeapUsedBytes
+          val cpuToWallClockRatio =
+            if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
 
-      val msg =
-        f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
-      logger.info(msg)
-      println(s"${this.getClass.getName}: $msg")
+          val msg =
+            f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
+          logger.info(msg)
+          println(s"${this.getClass.getName}: $msg")
 
-      StoreReadPerfMetrics(
-        totalTimeNs = BigDecimal(duration),
-        peakHeapBytes = heapUsed,
-        cpuToWallClockRatio = cpuToWallClockRatio,
-        updateSizeBytes = updateSizeBytes,
-        numUpdates = txs.size.toLong,
-      )
+          val m = StoreReadPerfMetrics(
+            totalTimeNs = BigDecimal(duration),
+            peakHeapBytes = heapUsed,
+            cpuToWallClockRatio = cpuToWallClockRatio,
+            updateSizeBytes = updateSizeBytes,
+            numUpdates = txs.size.toLong,
+          )
+          acc :+ (op.name -> m)
+        }
+      }
     }
   }
 

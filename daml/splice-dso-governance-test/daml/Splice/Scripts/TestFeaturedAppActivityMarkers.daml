@@ -45,7 +45,7 @@ testFeaturedAppActivityMarkers = do
             provider
 
     confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
-      result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
         confirmer = svParty
         action
       return result.confirmation
@@ -53,7 +53,7 @@ testFeaturedAppActivityMarkers = do
     confirmations <- query @Confirmation dso
     length confirmations === 3
 
-    submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
       DsoRules_ExecuteConfirmedAction with
         action
         amuletRulesCid = None
@@ -92,7 +92,7 @@ testFeaturedAppActivityMarkers = do
 
   (openMiningRoundCid, openMiningRound) <- getLatestOpenRound app
 
-  DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult (AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids) <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers with
+  DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult (AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids) <- submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers with
     amuletRulesCid
     argument = AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [marker1, marker3, marker2, marker4, marker5] -- interleave different providers to test grouping

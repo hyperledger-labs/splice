@@ -3,14 +3,20 @@ package org.lfdecentralizedtrust.splice.performance.tests
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.http.{
+  ExternalHashInclusionPolicy,
+  ScanHttpEncodings,
+}
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   TreeUpdateWithMigrationId,
@@ -61,19 +67,54 @@ class UpdateHistoryReadPerformanceTest(
     )
   }
 
-  override protected def readOperation(
+  override protected def readOperations(
+      store: UpdateHistory,
+      txs: Seq[TreeUpdateWithMigrationId],
+  ): Seq[ReadOperation] =
+    Seq(
+      getUpdateByIdOperation(store, txs),
+      encodeUpdateOperation(txs),
+    )
+
+  /** Fetches the update from the store and decode. */
+  private def getUpdateByIdOperation(
       store: UpdateHistory,
       txs: Seq[TreeUpdateWithMigrationId],
   ): ReadOperation = {
     val updateIds = txs.map(_.update.update.updateId)
     ReadOperation(
-      name = "getUpdateById",
+      name = "getUpdate",
       execute = { implicit tc: TraceContext =>
         updateIds.foldLeft(Future.successful(())) { (accF, updateId) =>
           accF.flatMap { _ =>
-            /** TODO(#4790): Add application level processing (e.g. normalization for SVs using makeConsistentAcrossSvs())
-              */
             store.getUpdate(updateId).map(_ => ())
+          }
+        }
+      },
+    )
+  }
+
+  /** Runs ScanHttpEncodings.encodeUpdate. This isolates the
+    * cost of the encoding step from the cost of the DB read.
+    */
+  private def encodeUpdateOperation(
+      txs: Seq[TreeUpdateWithMigrationId]
+  ): ReadOperation = {
+    ReadOperation(
+      name = "encodeUpdate",
+      execute = { implicit tc: TraceContext =>
+        implicit val elc: ErrorLoggingContext =
+          ErrorLoggingContext.fromTracedLogger(logger)(tc)
+        Future {
+          txs.foreach { tx =>
+            val _ = ScanHttpEncodings.encodeUpdate(
+              tx,
+              encoding = DamlValueEncoding.members.CompactJson,
+              version = ScanHttpEncodings.V1,
+              hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+              externalTransactionHashThresholdTime =
+                ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+            )
           }
         }
       },

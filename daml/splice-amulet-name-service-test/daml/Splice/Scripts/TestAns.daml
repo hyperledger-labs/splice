@@ -22,12 +22,12 @@ testWithSubscription = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+  ansRulesCid <- submit (actAs app.dso) $ createCmd AnsRules with
     dso = app.dso
     config = defaultAnsRulesConfig
 
   -- user requests entry
-  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  requestSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"
@@ -40,7 +40,7 @@ testWithSubscription = script do
   -- amulet wallet accepts subscription and first payment and locks amulet to DSO party
 
   paymentContext <- getPaymentTransferContext app alice
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -77,7 +77,7 @@ testWithSubscription = script do
   appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -98,7 +98,7 @@ testWithSubscription = script do
 
   -- user can't pay earlier than `renewalDuration` from the next due date
   amulet <- tap app alice 1.5
-  submitMultiMustFail [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  submitMustFail (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -110,7 +110,7 @@ testWithSubscription = script do
   appContext <- getAppTransferContext app app.dsoUser
 
   -- amulet wallet and DSO party can repeat the "payment and collect" cycle indefinitely
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -135,7 +135,7 @@ testWithSubscription = script do
   appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -169,17 +169,17 @@ terminatedSubscriptionCanBeCleanedUp = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+  ansRulesCid <- submit (actAs app.dso) $ createCmd AnsRules with
     dso = app.dso
     config = defaultAnsRulesConfig
 
-  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  requestSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"
     user = alice.primaryParty
 
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd requestSummary.requestCid SubscriptionRequest_Reject
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd requestSummary.requestCid SubscriptionRequest_Reject
   submit app.dso $ exerciseCmd requestSummary.entryCid (AnsEntryContext_Terminate app.dso result.terminatedSubscription)
 
   entryContexts <- query @AnsEntryContext app.dso
