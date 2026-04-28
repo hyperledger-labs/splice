@@ -48,7 +48,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Equivalence test: Daml (real participant) == SQL (scan Postgres).
   *
-  * Validates that the plpgsql hash functions produce identical results
+  * Validates that the Postgres SQL hash functions produce identical results
   * to the Daml CryptoHash module. Daml is the authority.
   *
   * Uses a shared environment so the dar is uploaded and proxy created once,
@@ -399,21 +399,26 @@ object CryptoHashEquivalenceIntegrationTest {
 
   // -- Test case definitions (fully static) -----------------------------------
 
-  // Decimal values to test format equivalence between Daml's show on Decimal
-  // and Postgres daml_numeric_to_text. Covers trailing zeros, negatives,
-  // small fractions, and integers.
-  val decimalFormatCases: Seq[String] = Seq(
-    "10.0000000000",
-    "0.0000000000",
-    "5.0",
-    "3.14",
-    "0",
-    "100",
-    "-3.14",
-    "-0.0",
-    "0.0000000001",
-    "99999999999.0",
-    "1.10",
+  // Hand-written edge cases for hashing Decimal values. Each case verifies that
+  // Daml's hash(d) equals Postgres' daml_crypto_hash_text(daml_numeric_to_text(d)),
+  // which requires Daml's show and Postgres' daml_numeric_to_text to produce
+  // identical text. Each entry is (value, category, description) targeting a
+  // specific formatting divergence risk between the two representations.
+  val decimalFormatCases: Seq[(String, String, String)] = Seq(
+    ("10.0000000000", "trailing zeros", "10 trailing zeros are stripped to .0"),
+    ("0.0000000000", "all-zero fraction", "result is 0.0, not 0 or 0."),
+    ("5.0", "integer with .0", "trailing zeros stripped then .0 re-appended"),
+    ("3.14", "fractional digits", "non-zero fractional digits pass through"),
+    ("0", "bare integer", ".0 is appended when no decimal point"),
+    ("100", "bare integer", ".0 is appended to larger integer"),
+    ("-3.14", "negative", "sign is preserved"),
+    ("-0.0", "negative zero", "Daml vs Postgres agree on -0.0"),
+    ("0.0000000001", "smallest fraction", "10th decimal place survives"),
+    ("99999999999.0", "large integer part", "11-digit integer part formats correctly"),
+    ("1.10", "mixed trailing zeros", "single trailing zero stripped to 1.1"),
+    ("9999999999999999999999999999.9999999999", "max positive", "28 integer + 10 fractional nines"),
+    ("-9999999999999999999999999999.9999999999", "max negative", "negated max"),
+    ("-0.0000000001", "negative fraction", "sign + smallest fraction"),
   )
 
   // Test cases are defined statically using HashRef (Lit/IntermediateRef) to
@@ -422,7 +427,9 @@ object CryptoHashEquivalenceIntegrationTest {
   //
   // Order matters: intermediates must precede composites that reference them.
   val allTestCaseDefs: Seq[TestCaseDef] =
-    decimalFormatCases.map(v => TestCaseDef(s"decimal $v", HashDecimal(v))) ++ Seq(
+    decimalFormatCases.map { case (v, category, desc) =>
+      TestCaseDef(s"decimal $v ($category: $desc)", HashDecimal(v))
+    } ++ Seq(
       // Primitive text hashes — used as intermediates by composite cases
       TestCaseDef("hAlice", HashText("alice::provider")),
       TestCaseDef("h10", HashText("10.0")),
