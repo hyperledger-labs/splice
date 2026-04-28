@@ -71,7 +71,7 @@ template CryptoHashProxy with
       with
         input : Decimal
       controller owner
-      do pure (hash (show input)).value
+      do pure (hash input).value
 
     nonconsuming choice CryptoHashProxy_HashBatch : Text
       with
