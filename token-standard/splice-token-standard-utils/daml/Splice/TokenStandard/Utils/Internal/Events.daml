@@ -123,6 +123,7 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
         case allocation.transferLegs of
           [] -> error "logAllocationSettlement: No transfer legs in allocation"
           (leg ::_) -> leg.instrumentId.admin
+  let settlementId = allocation.settlement.settlementRef.id
   void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
     admin
     account = allocation.authorizer
@@ -130,17 +131,18 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
     transferLegs = allocation.transferLegs
     outputHoldingCids
     observers = accountParties allocation.authorizer
-    extraArgs = emptyExtraArgs
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = reasonToMeta ("settle allocation for '" <> settlementId <> "'") emptyMetadata
 
 -- | Log events for the execution a transfer.
 logTransfer
   : ContractId TransferEventsV2.EventLog
-  -> [ContractId V2.Holding] -- ^ Sender input holdings
   -> TransferInstructionV2.Transfer
   -> [ContractId V2.Holding] -- ^ Sender change output holdings
   -> [ContractId V2.Holding] -- ^ Receiver output holdings
   -> Update ()
-logTransfer eventLogCid senderInputHoldingCids transfer senderOutputHoldingCids receiverOutputHoldingCids = do
+logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCids = do
   let admin = transfer.instrumentId.admin
   let leg = AllocationV2.TransferLeg with
         transferLegId = "leg0"
@@ -153,7 +155,7 @@ logTransfer eventLogCid senderInputHoldingCids transfer senderOutputHoldingCids 
   void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
     admin
     account = transfer.sender
-    inputHoldingCids = senderInputHoldingCids
+    inputHoldingCids = transfer.inputHoldingCids
     transferLegs = [leg]
     outputHoldingCids = senderOutputHoldingCids
     observers = accountParties transfer.sender

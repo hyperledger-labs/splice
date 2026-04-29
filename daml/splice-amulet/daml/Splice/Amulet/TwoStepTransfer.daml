@@ -20,6 +20,7 @@ import DA.Optional (fromOptional, optionalToList)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
+import Splice.TokenStandard.Utils qualified as TSU
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -76,7 +77,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
                 expiresAt = transferBefore
                 holders = [dso]
                 optContext = Some lockContext
-              meta = None -- no metadata for the lock step
+              meta = Some (TSU.reasonToMeta ("lock for " <> lockContext) emptyMetadata)
           ]
         inputs = transferInputs
         beneficiaries = None
