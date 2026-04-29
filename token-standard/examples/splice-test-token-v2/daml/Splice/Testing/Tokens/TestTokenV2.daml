@@ -4,7 +4,7 @@
 -- | A mock implementation of a test token for the purpose of testing V2 token standard workflows.
 module Splice.Testing.Tokens.TestTokenV2 where
 
-import DA.Action (when)
+import DA.Action (when, unless)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List (dedup)
@@ -71,7 +71,7 @@ template TokenAllocationV2 with
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 "allocation withdrawn" this extraArgs
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -79,7 +79,7 @@ template TokenAllocationV2 with
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 "allocation cancelled" this extraArgs
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -422,8 +422,8 @@ token_allocationFactoryV2_allocateImpl tokenRules self arg = do
 -- Utilities
 ------------
 
-unlockTokenAllocationV2 : TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
-unlockTokenAllocationV2 tokenAllocation _extraArgs = do
+unlockTokenAllocationV2 : Text -> TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
+unlockTokenAllocationV2 reason tokenAllocation _extraArgs = do
   -- FIXME: report events here
   holdingCids <- forA tokenAllocation.lockedTokens $ \lockedCid -> do
     token <- fetch lockedCid
@@ -433,7 +433,24 @@ unlockTokenAllocationV2 tokenAllocation _extraArgs = do
     unlockedCid <- create Token with
       holding = holding with lock = None
     pure $ (holding.instrumentId.id, [toInterfaceContractId unlockedCid])
+  -- log the unlock as a V2 event
+  withTempEventLog tokenAllocation.admin $ \eventLogCid -> do
+    unless (null tokenAllocation.lockedTokens) $
+      logMergeSplit eventLogCid
+        tokenAllocation.admin
+        tokenAllocation.allocation.authorizer
+        (map toInterfaceContractId tokenAllocation.lockedTokens)
+        reason
+        (concatMap snd holdingCids)
+
   pure $ TextMap.fromListWithR (++) holdingCids
+
+withTempEventLog : Party -> (ContractId TransferEventsV2.EventLog -> Update a) -> Update a
+withTempEventLog admin action = do
+  eventLogCid <- toInterfaceContractId <$> create TokenRules with admin
+  result <- action eventLogCid
+  archive eventLogCid
+  pure result
 
 mergeAmountMaps : Ord k => Map.Map k Decimal -> Map.Map k Decimal -> Map.Map k (Decimal, Decimal)
 mergeAmountMaps = Map.merge (\_ x -> Some (x, 0.0)) (\_ y -> Some (0.0, y)) (\_ x y -> Some (x, y))
