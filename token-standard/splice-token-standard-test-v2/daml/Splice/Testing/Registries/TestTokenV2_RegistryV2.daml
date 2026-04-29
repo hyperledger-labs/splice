@@ -15,7 +15,7 @@ module Splice.Testing.Registries.TestTokenV2_RegistryV2
   ) where
 
 
-import DA.Foldable (foldMap)
+import DA.Action (void)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -73,20 +73,34 @@ initialize config = do
   pure TestTokenV2Registry with admin
 
 -- | Mint test token instrument
-mint : TestTokenV2Registry -> V2.Account -> Text -> Decimal -> Script (ContractId V2.Holding)
+mint : TestTokenV2Registry -> V2.Account -> Text -> Decimal -> Script ()
 mint registry account intrumentName amount = do
-  -- TODO(#4813): perform the mint via a transfer from `Account admin "cip-112/mint` once we have transfer support
-  -- FIXME: perform mint in a way that produces the proper transfer events
-  tokenCid <- submit (foldMap actAs (registry.admin :: accountParties account)) $ createCmd TestTokenV2.Token with
-    holding = V2.HoldingView with
-      account
-      amount = amount
-      lock = None
-      meta = emptyMetadata
-      instrumentId = V2.InstrumentId with
-        id = intrumentName
-        admin = registry.admin
-  return $ toInterfaceContractId tokenCid
+  -- offer mint
+  [(tokenRulesCid, _)] <- query @TestTokenV2.TokenRules registry.admin
+  now <- getTime
+  result <- submit registry.admin $ exerciseCmd tokenRulesCid TestTokenV2.TokenRules_OfferMint with
+    receiver = account
+    instrumentId = V2.InstrumentId with
+      id = intrumentName
+      admin = registry.admin
+    amount = amount
+    offeredAt = now
+  -- have receiver accept immediately
+  let offerCid = toInterfaceContractId result.offerCid
+  let accept = V2.TransferInstruction_Accept with
+        actors = [account.owner]
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext
+          meta = emptyMetadata
+  context <- registryApi_getTransferOfferContext registry offerCid emptyMetadata
+
+  void $ submit (actAs account.owner <> discloseMany' context.disclosures) $
+    exerciseCmd offerCid accept with
+      extraArgs = ExtraArgs with
+        context = context.choiceContext
+        meta = emptyMetadata
+
+
 
 
 -- Token standard registry methods

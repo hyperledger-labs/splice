@@ -11,6 +11,7 @@ import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
+import DA.Time
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -243,7 +244,6 @@ template TokenRules with
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
-
     interface instance V2.AllocationFactory for TokenRules where
       view = V2.AllocationFactoryView with
         admin
@@ -253,6 +253,34 @@ template TokenRules with
 
       allocationFactory_allocateImpl self arg = token_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
+
+    nonconsuming choice TokenRules_OfferMint : TokenRulesOfferMintResult with
+        receiver : V2.Account
+        amount : Decimal
+        instrumentId : V2.InstrumentId
+        offeredAt : Time
+      controller admin
+      do
+        requireMatchExpected ("instrumentId.admin", instrumentId.admin) admin
+        assertDeadlineExceeded "offeredAt" offeredAt
+        offerCid <- create TokenTransferOffer with
+          transfer = V2.Transfer with
+            sender = mintAccount admin
+            receiver
+            amount
+            instrumentId
+            inputHoldingCids = []
+            requestedAt = offeredAt
+            executeBefore = offeredAt `addRelTime` days 7
+            meta = reasonToMeta "mint offer" emptyMetadata
+        pure TokenRulesOfferMintResult with
+          offerCid
+          meta = emptyMetadata
+
+data TokenRulesOfferMintResult = TokenRulesOfferMintResult with
+    offerCid : ContractId TokenTransferOffer
+    meta : Metadata
+  deriving (Eq, Show)
 
 -- | Create a V2 transfer offer
 token_transferFactory_transferImpl

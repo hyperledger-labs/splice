@@ -7,6 +7,7 @@ module Splice.Testing.Utils
     -- * Utilities for disclosures
     Disclosures'(..),
     queryDisclosure',
+    discloseMany',
     submitWithDisclosures',
     submitWithDisclosuresMustFail',
 
@@ -88,6 +89,9 @@ queryDisclosure' p cid = do
   case optDisc of
     None -> fail $ "Disclosure not found for: " <> show cid
     Some d -> pure Disclosures' with disclosures = Map.fromList [(coerceContractId cid, d)]
+
+discloseMany' : Disclosures' -> SubmitOptions
+discloseMany' d = discloseMany (Map.values d.disclosures)
 
 -- | Version of 'submitWithDisclosures' that works with the simplified `Disclosures'` type.
 submitWithDisclosures' : Party -> Disclosures' -> Commands a -> Script a

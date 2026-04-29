@@ -152,6 +152,9 @@ logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCi
         instrumentId = transfer.instrumentId
         amount = transfer.amount
         meta = transfer.meta
+
+  -- FIXME: log self transfers properly
+
   -- sender event
   void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
     admin

@@ -375,10 +375,10 @@ runTest mkTest = do
   -- setup initial funds
   forA_ test.initialHoldings $ \TestHolding{..} -> do
     case instrumentId of
-      AM -> AmuletRegistryV2.tapFaucet env.registryV2 owner amount
+      AM -> void $ AmuletRegistryV2.tapFaucet env.registryV2 owner amount
       tt
         | "1" `T.isSuffixOf` show tt ->
-            upcast <$> TestTokenV1_RegistryV1.mint env.tty1Registry owner (show tt) amount
+            void $ TestTokenV1_RegistryV1.mint env.tty1Registry owner (show tt) amount
         | otherwise -> do
             let instrumentName = show tt
             TestTokenV2_RegistryV2.mint env.tty2Registry (basicAccount owner) instrumentName amount
