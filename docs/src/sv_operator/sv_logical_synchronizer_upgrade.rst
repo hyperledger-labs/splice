@@ -69,21 +69,6 @@ Disaster Recovery through Roll-Forward LSU
 In case of a disaster that causes the current physical synchronizer to become unavailable, an LSU can be used as a roll-forward recovery mechanism.
 The procedure is similar to a regular LSU but because the current physical synchronizer is unusable, the coordination through a vote and topology transactions is not possible and instead validators and super validators need to manually initiate the upgrade.
 
-Concretely, the procedure is as follows:
-
-1. The old physical synchronizer is deemed broken and the last sequenced message was at record time R.
-2. Super validators deploy successor nodes. Depending on the issue, the successor nodes may be configured with older image and protocol versions if the issue is limited to the new version.
-3. Super validators configure their SV app app to transfer the topology and traffic state from the old physical synchronizer to the successor nodes.
-
-   .. todo:: add more details once this is implemented
-
-4. Super Validators configure their scan to indicate to validators that they should roll forward to a new synchronizer.
-
-5. Validator app automation picks up that configuration and initiates a manual roll-forward LSU to the new synchronizer.
-
-Note that depending on how exactly the old synchronizer failed, validators may desynchronize if some validators have observed a transaction before the failure while others have not.
-In that case, the participant will produce ACS mismatches that should be resolved using the `standard ACS mismatch resolution process <https://docs.digitalasset.com/operate/3.4/howtos/troubleshoot/commitments.html>`_ after migrating to the new physical synchronizer.
-
 This procedure can also be used for recovering from a failed LSU. There are two relevant cases:
 
 1. The LSU did not get cancelled before the upgrade time but no Daml transactions and topology transactions were able to be sequenced on the successor physical synchronizer after the upgrade time. In this case, the original successor synchronizer can be thrown away and replaced
@@ -92,6 +77,81 @@ This procedure can also be used for recovering from a failed LSU. There are two 
    the SVs should keep both the original synchronizer and the broken successor synchronizer running (assuming it can still serve events just not sequence new messages) to allow nodes to catchup first and spin up a new successor synchronizer on the side
    so they are running 3 synchronizer nodes for some period of time. Allowing nodes to catch up as much as possible limits the potential for desynchronization requiring manual resolution through ACS commitment mismatches.
 
+Concretely, the procedure is as follows:
+
+1. The old physical synchronizer is deemed broken and the last sequenced message was at record time R.
+2. Super validators configure this as the max sequencing time on the old sequencer to guarantee that nothing accidentally gets sequenced after that time. This is done by applying the following environment variable to the existing sequencer:
+
+.. code::
+
+    - name: ADDITIONAL_CONFIG_SEQUENCER_LSU_MAX_SEQUENCING_TIME
+      value: |
+        canton.sequencers.sequencer.parameters.lsu-repair.global-max-sequencing-time-exclusive=MAX_SEQUENCING_TIME
+
+2. Super validators deploy successor nodes. Depending on the issue,
+   the successor nodes may be configured with older image and protocol
+   versions if the issue is limited to the new version.  The successor
+   sequencer must be configured with two timestamps:
+   ``lower-bound-sequencing-time-exclusive`` and
+   ``upgrade-time``. These correspond to the topology freeze time and
+   the upgrade time in a regular LSU. In particular, after
+   ``lower-bound-sequencing-time-exclusive`` sequencing test messages
+   can be submitted and observed in the ``LSU Sequencing Test``
+   dashboard. After ``upgrade-time`` all Daml transactions can be
+   submitted. The actual timestamps will be chosen through coordination with all SVs.
+   The timestamps are applied through an environment variable on the successor sequencer:
+
+.. code::
+
+    - name: ADDITIONAL_CONFIG_SEQUENCER_LSU_SEQUENCING_BOUNDS
+      value: |
+        canton.sequencers.sequencer.parameters.parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=LOWER_BOUND_SEQUENCING_TIME_EXCLUSIVE
+        canton.sequencers.sequencer.parameters.parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=UPGRADE_TIME
+
+3. Super validators wait until ingestion completed.
+
+4. Super validators configure their SV app app to transfer the topology and traffic state from the old physical synchronizer to the successor nodes.
+   To do so, add the following helm values to the SV app:
+
+.. code::
+
+   rollForwardLsu:
+     newPhysicalSynchronizerSerial: NEW_PHYSICAL_SYNCHRONIZER_SERIAL # Must be agreed between SVs, usually existing (broken) synchronizer serial + 1
+     newPhysicalSynchronizerProtocolVersion: NEW_PHYSICAL_SYNCHRONIZER_PROTOCOL_VERSION # Must be agreed between SVs, usually existing (broken) synchronizer serial + 1
+     exportTimes:
+       topologyExportTime: TOPOLOGY_EXPORT_TIME # Must be agreed between SVs
+       trafficExportTime: TRAFFIC_EXPORT_TIME # Must be agreed between SVs
+       upgradeTime: UPGRADE_TIME # Must be agreed between SVs
+
+5. Validators initiate the :ref:`procedure <validator_roll_forward_lsu>` on their side.
+
+Recovery from a failed LSU where nothing got sequenced
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For the special case where an LSU was announced and not cancelled but
+failed and nothing got sequenced on the successor synchronizer, there
+is a variant that avoids the need to manually check for ingestion
+being completed and does not require explicit interaction from validators.
+
+To do so, use the following steps:
+
+1. Super validators configure the manual LSU in their scan.
+
+.. code::
+
+  rollForwardLsu:
+     enabled: true
+     upgradeTime: UPGRADE_TIME # Must be agreed between SVs, optional, if not specified it is taken from an existing LSU announcement which should usually be sufficient.
+
+2. Validator app automation picks up that configuration and initiates a manual roll-forward LSU to the new synchronizer.
+
+Resolving ACS mismatches
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Note that depending on how exactly the old synchronizer failed,
+validators may desynchronize if some validators have observed a
+transaction before the failure while others have not. To recover from
+that follow the instructions for :ref:`validators <validator_acs_mismatches>`.
 
 .. _lsu_deployment_changes:
 

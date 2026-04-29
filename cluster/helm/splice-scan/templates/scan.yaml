@@ -8,10 +8,10 @@ kind: Deployment
 metadata:
   name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
@@ -193,6 +193,15 @@ spec:
         - name: SPLICE_APP_SCAN_MEDIATOR_ADDRESS
           value: {{ .Values.mediatorAddress | quote }}
         {{- end }}
+        {{- if (.Values.rollForwardLsu).enabled }}
+        - name: ADDITIONAL_CONFIG_ROLL_FORWARD_LSU
+          value: |
+            canton.scan-apps.scan-app.roll-forward-lsu {
+              {{- with .Values.rollForwardLsu.upgradeTime }}
+              upgrade-time = {{ . | quote }}
+              {{- end }}
+            }
+        {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME
@@ -294,10 +303,10 @@ kind: Deployment
 metadata:
   name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $scanWebUiAppLabel) | nindent 4 }}
