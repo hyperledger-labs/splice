@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicensereque
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.SynchronizerPermissionState
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SvTestUtil, WalletTestUtil}
@@ -137,7 +138,9 @@ class PermissionedSynchronizerIntegrationTest
             sv1ScanBackend.getParticipantSynchronizerPermission(
               decentralizedSynchronizerId.toProtoPrimitive,
               aliceValidatorBackend.participantClient.id.toProtoPrimitive,
-            ) shouldBe Some(None) // by default sv1 doesn't submit a timestamp for loginAfter
+            ) shouldBe Some(
+              SynchronizerPermissionState(None)
+            ) // by default sv1 doesn't submit a timestamp for loginAfter
           }
         },
       )

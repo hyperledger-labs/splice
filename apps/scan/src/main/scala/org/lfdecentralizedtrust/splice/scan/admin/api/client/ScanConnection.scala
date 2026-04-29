@@ -31,7 +31,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  SynchronizerPermissionState,
+  TransferContextWithInstances,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -158,7 +161,7 @@ trait ScanConnection
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[Option[CantonTimestamp]]]
+  ): Future[Option[SynchronizerPermissionState]]
 
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,

@@ -77,7 +77,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  BftSequencer,
+  SynchronizerPermissionState,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 
 /** Connection to the admin API of CC Scan. This is used by other apps
@@ -373,18 +376,14 @@ class SingleScanConnection private[client] (
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[Option[CantonTimestamp]]] = {
+  ): Future[Option[SynchronizerPermissionState]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetParticipantSynchronizerPermission(
         synchronizerId.toProtoPrimitive,
         participantId.toProtoPrimitive,
       ),
-    ).map { nestedOptions =>
-      nestedOptions.map { innerOption =>
-        innerOption.map(ts => CantonTimestamp.assertFromInstant(ts.toInstant))
-      }
-    }
+    )
   }
 
   override def getPartyToParticipant(

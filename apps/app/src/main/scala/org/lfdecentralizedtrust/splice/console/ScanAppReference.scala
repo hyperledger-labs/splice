@@ -35,7 +35,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 import org.lfdecentralizedtrust.splice.scan.{ScanApp, ScanAppBootstrap}
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  SynchronizerPermissionState,
+  TransferContextWithInstances,
+}
 import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.util.{
@@ -339,15 +342,11 @@ abstract class ScanAppReference(
   def getParticipantSynchronizerPermission(
       synchronizerId: String,
       participantId: String,
-  ): Option[Option[CantonTimestamp]] =
+  ): Option[SynchronizerPermissionState] =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetParticipantSynchronizerPermission(synchronizerId, participantId)
-      ).map { nestedOptions =>
-        nestedOptions.map { innerOption =>
-          innerOption.map(ts => CantonTimestamp.assertFromInstant(ts.toInstant))
-        }
-      }
+      )
     }
 
   @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")

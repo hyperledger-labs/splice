@@ -57,6 +57,7 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.SynchronizerPermissionState
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   SingleScanConnection,
@@ -613,23 +614,23 @@ class ValidatorApp(
       "ParticipantSynchronizerPermission",
       s"ParticipantSynchronizerPermission for $participantId is visible on scan and loginAfter barrier is passed",
       scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
-        case Some(Some(loginAfter)) => // permission found with a loginAfter
+        case Some(SynchronizerPermissionState(Some(loginAfter))) =>
           if (clock.now >= loginAfter) {
             Future.successful(())
           } else {
             Future.failed(
-              Status.NOT_FOUND
+              Status.PERMISSION_DENIED
                 .withDescription(
-                  s"ParticipantSynchronizerPermission exists but waiting for loginAfter barrier: $loginAfter (current time: $clock.now)"
+                  s"ParticipantSynchronizerPermission exists but waiting for loginAfter barrier: $loginAfter (current time: ${clock.now})"
                 )
                 .asRuntimeException()
             )
           }
 
-        case Some(None) => // permission found, no timestamp specified
+        case Some(SynchronizerPermissionState(None)) =>
           Future.successful(())
 
-        case None => // permission not found
+        case None =>
           Future.failed(
             Status.NOT_FOUND
               .withDescription(
