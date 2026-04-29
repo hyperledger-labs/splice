@@ -23,4 +23,25 @@
       Logical synchronizer upgrades are now the default mechanism for protocol upgrades.
     - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
 
+- Scan app
+
+    - Note that the following deprecated endpoints that have been deprecated are planned for removal
+      in the next release (0.6.3),  or the following one (0.6.4) at the latest:
+
+      - /v0/closed-rounds
+      - /v0/top-validators-by-validator-faucets
+      - /v0/synchronizer-identities/{domain_id_prefix}
+      - /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}
+      - /v0/aggregated-rounds
+      - /v0/round-totals
+      - /v0/round-party-totals
+      - /v0/amulet-config-for-round
+      - /v0/round-of-latest-data
+      - /v0/rewards-collected
+      - /v0/top-providers-by-app-rewards
+      - /v0/top-validators-by-validator-rewards
+      - /v0/top-validators-by-purchased-traffic
+      - /v0/activities
+      - /v0/transactions
+
 .. .. release-notes:: Upcoming
