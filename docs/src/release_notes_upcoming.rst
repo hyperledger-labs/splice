@@ -25,7 +25,7 @@
 
 - Scan app
 
-    - Note that the following deprecated endpoints that have been deprecated are planned for removal
+    - Note that the following endpoints that have been deprecated are planned for removal
       in the next release (0.6.3),  or the following one (0.6.4) at the latest:
 
       - /v0/closed-rounds
