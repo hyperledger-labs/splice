@@ -165,7 +165,7 @@ abstract class InStackDecentralizedSynchronizerNode
           additionalJvmOptions: getAdditionalJvmOptions(svConfig.sequencer?.additionalJvmOptions),
           pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
-                size: '10Gi',
+                size: '35Gi',
                 volumeStorageClass: standardStorageClassName,
               }
             : undefined,
