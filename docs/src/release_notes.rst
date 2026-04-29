@@ -60,7 +60,7 @@
     - Deployment
 
         - SV only: Introduced the concept of **serial ID** alongside the existing **migration ID** for synchronizer deployment.
-          The migration ID is now frozen at its current value and is only used for the ``migration.id`` field in helm chart values.
+          The migration ID is now frozen at its current value and configured only once, as the ``migration.id`` field in helm chart values.
           The serial ID is incremented by 1 for each :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>` and replaces the migration ID
           in synchronizer (sequencer/mediator/CometBFT) release names, DNS entries, DB names, chain IDs and port numbers. Participant naming and the participant DB name continue to use MIGRATION_ID, which is now frozen.
           All example YAML files and documentation have been updated to use ``SERIAL_ID`` for addressing and ``MIGRATION_ID`` for migration-specific configuration.
