@@ -254,10 +254,13 @@ class BftScanConnection(
   }
 
   override def getParticipantSynchronizerPermission(
-      domainId: SynchronizerId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
-    bftCall(_.getParticipantSynchronizerPermission(domainId, participantId))
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[Option[CantonTimestamp]]] = {
+    bftCall(_.getParticipantSynchronizerPermission(synchronizerId, participantId))
   }
 
   override def getPartyToParticipant(

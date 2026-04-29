@@ -368,16 +368,23 @@ class SingleScanConnection private[client] (
   }
 
   override def getParticipantSynchronizerPermission(
-      domainId: SynchronizerId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[Option[CantonTimestamp]]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetParticipantSynchronizerPermission(
-        domainId.toProtoPrimitive,
+        synchronizerId.toProtoPrimitive,
         participantId.toProtoPrimitive,
       ),
-    )
+    ).map { nestedOptions =>
+      nestedOptions.map { innerOption =>
+        innerOption.map(ts => CantonTimestamp.assertFromInstant(ts.toInstant))
+      }
+    }
   }
 
   override def getPartyToParticipant(

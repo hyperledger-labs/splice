@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicenserequest.ValidatorLicenseRequest
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -111,48 +110,42 @@ class PermissionedSynchronizerIntegrationTest
       )
     }
 
+    clue(
+      "Initially scan doesn't find ParticipantSynchronizerPermission for aliceValidatorBackend"
+    ) {
+      eventually() {
+        sv1ScanBackend.getParticipantSynchronizerPermission(
+          decentralizedSynchronizerId.toProtoPrimitive,
+          aliceValidatorBackend.participantClient.id.toProtoPrimitive,
+        ) shouldBe None
+      }
+    }
+
+    clue("Start Alice validator") { aliceValidatorBackend.start() }
+
     withClue("Grant validator permission to Alice and verify visibility across all SVs") {
 
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
-
-      val allSvValidators =
-        Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend)
 
       actAndCheck(
         "Grant validator permission to Alice",
         sv1Backend.grantValidatorPermission(aliceParticipantId.adminParty, aliceParticipantId),
       )(
-        "Verify confirmed topology permission across all SVs",
+        "Scan returns the ParticipantSynchronizerPermission",
         _ => {
-          for (svValidator <- allSvValidators) {
-            logger.info(s"Checking topology state on ${svValidator.name}")
-            svValidator.participantClient.topology.participant_synchronizer_permissions
-              .list(
-                store = decentralizedSynchronizerId,
-                filterUid = aliceParticipantId.filterString,
-              )
-              .map(_.item.permission) should contain(
-              ParticipantPermission.Submission
-            )
-
+          eventually() {
+            sv1ScanBackend.getParticipantSynchronizerPermission(
+              decentralizedSynchronizerId.toProtoPrimitive,
+              aliceValidatorBackend.participantClient.id.toProtoPrimitive,
+            ) shouldBe Some(None) // by default sv1 doesn't submit a timestamp for loginAfter
           }
         },
       )
 
     }
 
-    clue("Scan returns the ParticipantSynchronizerPermission") {
-      eventually() {
-        sv1ScanBackend.getParticipantSynchronizerPermission(
-          decentralizedSynchronizerId.toProtoPrimitive,
-          aliceValidatorBackend.participantClient.id.toProtoPrimitive,
-        ) shouldBe true
-      }
-    }
-
     actAndCheck(
-      "Start Alice validator", {
-        aliceValidatorBackend.start()
+      "Create ValidatorLicense for Alice", {
         manuallyApproveValidatorRequest()
         aliceValidatorBackend.waitForInitialization()
       },

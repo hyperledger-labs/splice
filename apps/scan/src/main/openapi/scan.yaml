@@ -191,7 +191,7 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/domains/{domain_id}/participants/{participant_id}/synchronizer-permission:
+  /v0/domains/{synchronizer_id}/participants/{participant_id}/synchronizer-permission:
     get:
       tags: [external, scan]
       x-jvm-package: scan
@@ -199,7 +199,7 @@ paths:
       description: |
         Check if the ParticipantSynchronizerPermission topology transaction is confirmed.
       parameters:
-        - name: "domain_id"
+        - name: "synchronizer_id"
           description: |
             The synchronizer ID to check the permission on.
           in: "path"
@@ -4179,12 +4179,10 @@ components:
           format: int64
     GetParticipantSynchronizerPermissionResponse:
       type: object
-      required: ["is_permissioned"]
       properties:
-        is_permissioned:
-          description: |
-            True if the ParticipantSynchronizerPermission exists.
-          type: boolean
+        login_after:
+          type: string
+          format: date-time
     GetPartyToParticipantResponse:
       type: object
       required: [ "participant_id" ]

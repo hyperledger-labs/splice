@@ -611,16 +611,32 @@ class ValidatorApp(
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "ParticipantSynchronizerPermission",
-      s"ParticipantSynchronizerPermission for $participantId is visible on scan",
+      s"ParticipantSynchronizerPermission for $participantId is visible on scan and loginAfter barrier is passed",
       scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
-        isPermissioned =>
-          if (isPermissioned) Future.successful(())
-          else
+        case Some(Some(loginAfter)) => // permission found with a loginAfter
+          if (clock.now >= loginAfter) {
+            Future.successful(())
+          } else {
             Future.failed(
               Status.NOT_FOUND
-                .withDescription(s"Topology permission for $participantId not yet found")
+                .withDescription(
+                  s"ParticipantSynchronizerPermission exists but waiting for loginAfter barrier: $loginAfter (current time: $clock.now)"
+                )
                 .asRuntimeException()
             )
+          }
+
+        case Some(None) => // permission found, no timestamp specified
+          Future.successful(())
+
+        case None => // permission not found
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(
+                s"ParticipantSynchronizerPermission for $participantId not yet found"
+              )
+              .asRuntimeException()
+          )
       },
       logger,
     )

@@ -13,7 +13,6 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{
@@ -2542,17 +2541,17 @@ class HttpScanHandler(
   override def getParticipantSynchronizerPermission(
       respond: ScanResource.GetParticipantSynchronizerPermissionResponse.type
   )(
-      domainId: String,
+      synchronizerId: String,
       participantId: String,
   )(extracted: TraceContext): Future[ScanResource.GetParticipantSynchronizerPermissionResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getParticipantSynchronizerPermission") { _ => _ =>
       for {
-        domain <- SynchronizerId.fromString(domainId) match {
-          case Right(domain) => Future.successful(domain)
+        synchronizer <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(synchronizer) => Future.successful(synchronizer)
           case Left(error) =>
             Future.failed(
-              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
             )
         }
         participant <- ParticipantId.fromProtoPrimitive(participantId, "participantId") match {
@@ -2564,17 +2563,26 @@ class HttpScanHandler(
         }
 
         permissions <- participantAdminConnection.listParticipantSynchronizerPermission(
-          domain,
+          synchronizer,
           participant.filterString,
         )
       } yield {
-        val isPermissioned = permissions.exists { result =>
-          result.mapping.permission == Submission
+        permissions.headOption.map(_.mapping) match {
+          case Some(mapping) =>
+            v0.ScanResource.GetParticipantSynchronizerPermissionResponse.OK(
+              definitions.GetParticipantSynchronizerPermissionResponse(
+                loginAfter = mapping.loginAfter.map(ts =>
+                  java.time.OffsetDateTime.ofInstant(ts.toInstant, java.time.ZoneOffset.UTC)
+                )
+              )
+            )
+          case None =>
+            v0.ScanResource.GetParticipantSynchronizerPermissionResponse.NotFound(
+              definitions.ErrorResponse(
+                s"Topology permission for participant $participantId on $synchronizerId not found."
+              )
+            )
         }
-
-        v0.ScanResource.GetParticipantSynchronizerPermissionResponse.OK(
-          definitions.GetParticipantSynchronizerPermissionResponse(isPermissioned)
-        )
       }
     }
   }

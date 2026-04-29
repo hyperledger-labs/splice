@@ -840,23 +840,29 @@ object HttpScanAppClient {
   }
 
   case class GetParticipantSynchronizerPermission(
-      domainId: String,
+      synchronizerId: String,
       participantId: String,
-  ) extends ExternalBaseCommand[http.GetParticipantSynchronizerPermissionResponse, Boolean] {
+  ) extends ExternalBaseCommand[
+        http.GetParticipantSynchronizerPermissionResponse,
+        Option[Option[java.time.OffsetDateTime]],
+      ] {
+
+    override val nonErrorStatusCodes = Set(StatusCodes.NotFound)
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
     ], http.GetParticipantSynchronizerPermissionResponse] =
-      client.getParticipantSynchronizerPermission(domainId, participantId, headers)
+      client.getParticipantSynchronizerPermission(synchronizerId, participantId, headers)
 
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.GetParticipantSynchronizerPermissionResponse.OK(response) =>
-      Right(response.isPermissioned)
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetParticipantSynchronizerPermissionResponse.OK(response) =>
+        Right(Some(response.loginAfter))
+      case http.GetParticipantSynchronizerPermissionResponse.NotFound(_) =>
+        Right(None)
     }
   }
 

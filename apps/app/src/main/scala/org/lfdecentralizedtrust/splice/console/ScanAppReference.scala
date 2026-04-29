@@ -337,11 +337,17 @@ abstract class ScanAppReference(
 
   @Help.Summary("Check if a participant has ParticipantSynchronizerPermission")
   def getParticipantSynchronizerPermission(
-      domainId: String,
+      synchronizerId: String,
       participantId: String,
-  ): Boolean =
+  ): Option[Option[CantonTimestamp]] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetParticipantSynchronizerPermission(domainId, participantId))
+      httpCommand(
+        HttpScanAppClient.GetParticipantSynchronizerPermission(synchronizerId, participantId)
+      ).map { nestedOptions =>
+        nestedOptions.map { innerOption =>
+          innerOption.map(ts => CantonTimestamp.assertFromInstant(ts.toInstant))
+        }
+      }
     }
 
   @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")
