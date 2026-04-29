@@ -3,7 +3,7 @@
 SUBCOMMAND_NAME="$1"
 shift
 
-set -euox pipefail
+set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
