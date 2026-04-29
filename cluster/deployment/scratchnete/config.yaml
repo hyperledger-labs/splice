@@ -7,6 +7,11 @@ loadTester:
   iterationsPerMinute: 1200
 svs:
   default:
+    svApp:
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_DABFT_PRUNING
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current.sequencer.dabft-pruning = null
     sequencer:
       cloudSql:
         tier: 'db-perf-optimized-N-4'
