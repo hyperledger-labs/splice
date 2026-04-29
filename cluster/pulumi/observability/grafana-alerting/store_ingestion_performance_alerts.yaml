@@ -5,8 +5,10 @@ groups:
     folder: database
     interval: 1h
     rules:
-      - uid: scan-store-ingestion-total-time
-        title: Scan Store Ingestion Total Time Too High
+      # Single multi-dimensional rule: one alert instance per `test` label.
+      # To add a new test, append one `or label_replace(...)` line below with the test name and its threshold (in seconds).
+      - uid: store-ingestion-total-time
+        title: Store Ingestion Total Time Too High
         condition: C
         data:
           - refId: A
@@ -15,112 +17,35 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: splice_perf_ingestion_total_time_ns{test="ScanStoreIngestionPerformanceTest"} / 1e9
               refId: A
+              expr: |
+                (splice_perf_ingestion_total_time_ns / 1e9)
+                / on(test) group_left() (
+                    label_replace(vector(300),  "test", "ScanStoreIngestionPerformanceTest",   "", "")
+                 or label_replace(vector(300),  "test", "SvDsoStoreIngestionPerformanceTest",  "", "")
+                 or label_replace(vector(1200), "test", "UpdateHistoryIngestionPerformanceTest","", "")
+                )
           - refId: B
-            relativeTimeRange:
-              from: 86400
-              to: 0
             datasourceUid: __expr__
             model:
+              refId: B
               type: reduce
               expression: A
               reducer: last
-              refId: B
           - refId: C
             datasourceUid: __expr__
             model:
+              refId: C
               type: threshold
               expression: B
               conditions:
                 - evaluator:
                     type: gt
-                    params: [300]
-              refId: C
+                    params: [ 1 ]
         for: 5m
         noDataState: OK
         execErrState: Alerting
         annotations:
-          summary: Scan store ingestion total time exceeded 300s
-        labels:
-          severity: warning
-
-      - uid: sv-dso-store-ingestion-total-time
-        title: SV DSO Store Ingestion Total Time Too High
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 86400
-              to: 0
-            datasourceUid: prometheus
-            model:
-              expr: splice_perf_ingestion_total_time_ns{test="SvDsoStoreIngestionPerformanceTest"} / 1e9
-              refId: A
-          - refId: B
-            relativeTimeRange:
-              from: 86400
-              to: 0
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              expression: A
-              reducer: last
-              refId: B
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: B
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [300]
-              refId: C
-        for: 5m
-        noDataState: OK
-        execErrState: Alerting
-        annotations:
-          summary: SV DSO store ingestion total time exceeded 300s
-        labels:
-          severity: warning
-
-      - uid: update-history-ingestion-total-time
-        title: Update History Ingestion Total Time Too High
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 86400
-              to: 0
-            datasourceUid: prometheus
-            model:
-              expr: splice_perf_ingestion_total_time_ns{test="UpdateHistoryIngestionPerformanceTest"} / 1e9
-              refId: A
-          - refId: B
-            relativeTimeRange:
-              from: 86400
-              to: 0
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              expression: A
-              reducer: last
-              refId: B
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: B
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [1200]
-              refId: C
-        for: 5m
-        noDataState: OK
-        execErrState: Alerting
-        annotations:
-          summary: Update history ingestion total time exceeded 1200s
+          summary: 'Store ingestion total time for {{ $labels.test }} exceeded its threshold (ratio: {{ $values.B }})'
         labels:
           severity: warning
