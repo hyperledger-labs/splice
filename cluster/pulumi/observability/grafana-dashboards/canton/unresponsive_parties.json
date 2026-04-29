@@ -297,8 +297,8 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "pluginVersion": "12.4.0",
@@ -323,8 +323,12 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "sv-1",
-          "value": "sv-1"
+          "text": [
+            "sv-1"
+          ],
+          "value": [
+            "sv-1"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -347,7 +351,9 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
+          "text": [
+            "All"
+          ],
           "value": [
             "$__all"
           ]
@@ -399,13 +405,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Unresponsive Parties",
   "uid": "cnck4jp",
-  "version": 2,
+  "version": 7,
   "weekStart": ""
 }
