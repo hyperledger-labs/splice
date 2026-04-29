@@ -26,12 +26,11 @@ import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
-import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2 qualified as Api.Token.AllocationV2
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
-  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, logMint, logBurn, burnAccount )
+  ( basicAccount, upcast, eventLog_holdingsChangeDefaultImpl, reasonToMeta, mintAccount, burnAccount )
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -331,6 +330,7 @@ template AmuletRules
         receiver: Party
         amount: Decimal
         openRound: ContractId OpenMiningRound
+        reason : Optional Text
       controller dso, receiver
       do
         require "isDevNet flag is true" isDevNet
@@ -344,6 +344,9 @@ template AmuletRules
                   owner = receiver
                   amount = expiringAmount
                   ..
+        logAmuletMint dso (toInterfaceContractId self) receiver amount
+          (reasonToMeta (fromOptional "" reason) emptyMetadata)
+          amulet
         let amuletSum = AmuletCreateSummary with
                   amulet
                   amuletPrice = openRound.amuletPrice
@@ -358,13 +361,11 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
+        let reason = Some "tapped DevNet faucet"
         result <- exercise self AmuletRules_Mint with ..
-        logAmuletMint dso (toInterfaceContractId self) receiver amount
-          (reasonToMeta "tapped DevNet faucet" emptyMetadata)
-          result.amuletSum.amulet
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
-          meta = Some (simpleHoldingTxMeta TxKind_Mint (Some "tapped faucet") None)
+          meta = Some (simpleHoldingTxMeta TxKind_Mint reason None)
 
     nonconsuming choice AmuletRules_DevNet_FeatureApp : AmuletRules_DevNet_FeatureAppResult
       with
@@ -1024,24 +1025,33 @@ executeTransfer' config csum dso t = do
         fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount +
         fromOptional 0.0 summary.inputValidatorFaucetAmount +
         fromOptional 0.0 summary.inputDevelopmentFundAmount
-
-  {- FIXME: add mint event, add event for sender amulet inputs
-  let mintEvents = do
+  let optMintLeg = do
         guard (mintAmount > 0.0)
-        pure $
-  when (mintAmount > 0.0) $
-    forA_ csum.eventLogCid $ \eventLogCid -> do
-      logAmuletMint dso eventLogCid t.sender mintAmount $ Metadata with
-        values =
-          TextMap.insert reasonMetaKey "mint rewards" $
-          rewardInputMeta.values
-    -}
+        pure $ Api.Token.AllocationV2.TransferLeg with
+          transferLegId = "mint"
+          sender = mintAccount dso
+          receiver = basicAccount t.sender
+          amount = mintAmount
+          instrumentId = amuletInstrumentIdV2 dso
+          meta = Metadata with
+            values =
+              TextMap.insert reasonMetaKey "mint rewards" $
+              rewardInputMeta.values
+  let senderInputOutputEvent = TransferEventsV2.EventLog_HoldingsChange with
+        admin = dso
+        account = basicAccount t.sender
+        inputHoldingCids = [ toInterfaceContractId cid | InputAmulet cid <- t.inputs ]
+        transferLegs = optionalToList optMintLeg
+        outputHoldingCids = [ toInterfaceContractId cid | Some cid <- pure senderChangeAmulet ]
+        observers = [t.sender]
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext
+          meta = emptyMetadata
 
   -- record all holdings changes grouped by account
   forA_ csum.eventLogCid $ \eventLogCid ->
-    forA_ (mergeHoldingsChangeEvents outputEvents) $ \holdingChangeEvent ->
+    forA_ (mergeHoldingsChangeEvents (senderInputOutputEvent :: outputEvents)) $ \holdingChangeEvent ->
       exercise eventLogCid holdingChangeEvent
-
 
   return TransferResult with
     round = csum.openRoundNumber
@@ -1495,6 +1505,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
             extraArgs = emptyExtraArgs
       let events
             | out.owner == sender = [receiverEvent] -- self-transfers are reported only once
+            | out.owner == dso = [senderEvent] -- no events need to be reported to the DSO party
             | otherwise = [senderEvent, receiverEvent]
       pure (createdAmulet, events)
 
@@ -2051,7 +2062,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
-  logAmuletBurn dso eventLogCid sender amount (reasonToMeta usage emptyMetadata) amuletCid
+  logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso
@@ -2124,17 +2135,6 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
 -- V2 tx history Events
 -----------------------
 
-
-logAmuletMint : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> ContractId Amulet -> Update ()
-logAmuletMint dso factoryCid receiver amount meta mintedAmuletCid = do
-  let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
-  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta [toInterfaceContractId mintedAmuletCid]
-
-
-logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> ContractId Amulet -> Update ()
-logAmuletBurn dso factoryCid sender amount meta burnedAmuletCid = do
-  let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
-  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta [toInterfaceContractId burnedAmuletCid]
 
 
 mergeHoldingsChangeEvents : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]

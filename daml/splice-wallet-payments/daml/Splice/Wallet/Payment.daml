@@ -139,7 +139,7 @@ template AppPaymentRequest
                       expiresAt = expiresAt
                       optContext = Some $ "amulet-payment-request: " <> description
                     receiverFeeRatio = 0.0
-                    meta = None -- empty metadata for self-transfer
+                    meta = Some (TSU.reasonToMeta ("Locking amulet for payment request: " <> description) emptyMetadata)
                 ]
               beneficiaries = None -- no beneficiaries for the locking step
          result <- exercisePaymentTransfer dso context transfer

@@ -394,7 +394,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
                expiresAt = expiresAt
                optContext = Some $ "amulet-subscription: " <> subscriptionData.description
              receiverFeeRatio = 0.0
-             meta = None -- empty metadata for self-transfer
+             meta = Some (TSU.reasonToMeta ("Locking amulet for subscription payment: " <> subscriptionData.description) emptyMetadata)
          ]
        beneficiaries = None -- no beneficiaries for locking step
 

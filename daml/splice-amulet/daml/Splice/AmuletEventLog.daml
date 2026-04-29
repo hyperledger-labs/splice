@@ -1,0 +1,35 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AmuletEventLog where
+
+import DA.Foldable
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
+import Splice.TokenStandard.Utils
+
+-- | Standalone template intended to log holdings changes using create-exercise-archive.
+template AmuletEventLog with
+    dso : Party
+  where
+    signatory dso
+
+    -- FIXME: complete these tests here; and remove TODO notes
+    -- TODO(#5001): test all calls to this event log using submitTree
+    interface instance TransferEventsV2.EventLog for AmuletEventLog where
+      view = TransferEventsV2.EventLogView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl dso
+
+-- | Log the given events pertaining to Amulet holdings using a temporary AmuletEventLog contract.
+-- Use only when there's no already existing contract available that implements the `EventLog` interface.
+logWithTempAmuletEventLog : [TransferEventsV2.EventLog_HoldingsChange] -> Update ()
+logWithTempAmuletEventLog [] = error "logWithAmuletEventLog: empty list of changes"
+logWithTempAmuletEventLog changes@(change :: _) = do
+  eventLogCid <- create AmuletEventLog with
+    dso = change.admin
+  forA_ changes (exercise (toInterfaceContractId @TransferEventsV2.EventLog eventLogCid))
+  archive eventLogCid

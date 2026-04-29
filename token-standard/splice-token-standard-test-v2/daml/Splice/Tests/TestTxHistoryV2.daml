@@ -1,22 +1,20 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-module Splice.Scripts.TestTxHistoryV2 where
+module Splice.Tests.TestTxHistoryV2 where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as AllocationV2
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils qualified as TSU
 
+import Splice.Round
 import Splice.AmuletRules
-import Splice.Amulet.TokenApiUtils
-import Splice.Scripts.Util
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 
-
 import DA.Action
-import DA.Assert
 import DA.Optional
 import DA.Text qualified as T
 
@@ -25,14 +23,15 @@ import Daml.Script
 -- FIXME: consider moving this to token standard v2 tests
 testAmuletTap_History: Script ()
 testAmuletTap_History = do
-    AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
+    app <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
     dora <- allocateParty "Dora"
     let dso = app.dso
     let aliceP = dora
-    let amuletId = amuletInstrumentIdV2 dso
+    let amuletId = app.instrumentId
 
-    (rulesCid, _) <- getAmuletRules app
-    (roundCid, _) <- getLatestActiveOpenRound app
+    [(rulesCid, _)] <- query @AmuletRules dso
+    [(roundCid, _)] <- queryFilter @OpenMiningRound dso (\r -> r.round.number == 0)
+
     txTree <- submitTree (actAs aliceP <> readAs dso) $ exerciseCmd rulesCid AmuletRules_DevNet_Tap with
         receiver = aliceP
         amount = 100.0
