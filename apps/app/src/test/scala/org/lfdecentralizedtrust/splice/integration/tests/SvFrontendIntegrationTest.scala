@@ -450,15 +450,7 @@ class SvFrontendIntegrationTest
       )
 
       actAndCheck(
-        "sv2 casts vote on the proposal",
-        {},
-      )(
-        "sv2 can see the vote request and cast a vote",
-        _ => {
-          find(
-            testId("your-vote-reason-input")
-          ) should not be empty withClue "vote 'Reason' textfield"
-
+        "sv2 fills out and submits a vote", {
           inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
             element.underlying.sendKeys("A sample reason")
           }
@@ -468,11 +460,13 @@ class SvFrontendIntegrationTest
           }
 
           click on testId("your-vote-accept")
-
+        },
+      )(
+        "the vote submission success message is shown",
+        _ =>
           inside(find(testId("vote-submission-success"))) { case Some(element) =>
             element.text shouldBe "Vote successfully updated!"
-          }
-        },
+          },
       )
     }
 
