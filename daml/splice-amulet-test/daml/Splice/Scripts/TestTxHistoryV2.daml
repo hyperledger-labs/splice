@@ -1,0 +1,132 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestTxHistoryV2 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV2 as AllocationV2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
+import Splice.TokenStandard.Utils qualified as TSU
+
+import Splice.AmuletRules
+import Splice.Amulet.TokenApiUtils
+import Splice.Scripts.Util
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+
+
+
+import DA.Action
+import DA.Assert
+import DA.Optional
+import DA.Text qualified as T
+
+import Daml.Script
+
+-- FIXME: consider moving this to token standard v2 tests
+testTap_History: Script ()
+testTap_History = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    dora <- allocateParty "Dora"
+    let dso = app.dso
+    let aliceP = dora
+    let amuletId = amuletInstrumentIdV2 dso
+
+    (rulesCid, _) <- getAmuletRules app
+    (roundCid, _) <- getLatestActiveOpenRound app
+    txTree <- submitTree (actAs aliceP <> readAs dso) $ exerciseCmd rulesCid AmuletRules_DevNet_Tap with
+        receiver = aliceP
+        amount = 100.0
+        openRound = roundCid
+
+    [tappedCid] <- WalletClientV2.listHoldingCids aliceP amuletId
+
+
+    let expectedLeg = AllocationV2.TransferLeg with
+          transferLegId = "mint"
+          sender = TSU.mintAccount dso
+          receiver = TSU.basicAccount aliceP
+          amount = 100.0
+          instrumentId = amuletId
+          meta = TSU.reasonToMeta "tapped DevNet faucet" emptyMetadata
+    let expectedEvent = TransferEventsV2.EventLog_HoldingsChange with
+          admin = app.dso
+          account = TSU.basicAccount aliceP
+          inputHoldingCids = []
+          transferLegs = [expectedLeg]
+          outputHoldingCids = [tappedCid]
+          observers = [aliceP]
+          extraArgs = ExtraArgs with
+            context = emptyChoiceContext
+            meta = emptyMetadata
+
+    checkTxLog [expectedEvent] txTree
+
+
+    pure ()
+
+checkTxLog : [TransferEventsV2.EventLog_HoldingsChange] -> TransactionTree -> Script ()
+checkTxLog expected txTree = do
+    let actual = getHoldingsChanges txTree
+    unless (expected == actual) $ fail $ T.unlines $
+      [ "Expected and actual holdings changes do not match:"
+      , "Expected:"
+      ] ++ map show expected ++
+      [ "Actual:"
+      ] ++ map show actual
+
+
+
+
+
+getHoldingsChanges : TransactionTree -> [TransferEventsV2.EventLog_HoldingsChange]
+getHoldingsChanges txTree = do
+  exercised <- getExercisedEvents txTree
+  optionalToList $ fromAnyChoice @TransferEventsV2.EventLog exercised.argument
+
+
+getExercisedEvents : TransactionTree -> [Exercised]
+getExercisedEvents txTree =
+  concatMap getExercisedFromTreeEvent txTree.rootEvents
+
+getExercisedFromTreeEvent : TreeEvent -> [Exercised]
+getExercisedFromTreeEvent (ExercisedEvent e) = e :: concatMap getExercisedFromTreeEvent e.childEvents
+getExercisedFromTreeEvent (CreatedEvent _) = []
+
+{- for reference
+
+-- | MOVE Daml.Script
+data TransactionTree = TransactionTree
+  with
+    rootEvents: [TreeEvent]
+  deriving Show
+
+-- | MOVE Daml.Script
+data TreeEvent
+  = CreatedEvent Created
+  | ExercisedEvent Exercised
+  deriving Show
+
+-- | MOVE Daml.Script
+data Created = Created
+  with
+    contractId : AnyContractId
+    argument : AnyTemplate
+
+-- Custom Show instance since we cannot show AnyTemplate
+-- | MOVE Daml.Script
+instance Show Created where
+  showsPrec d (Created contractId _) =
+    showString "Created {" .
+    showString "contractId = " .
+    showsPrec 0 contractId .
+    showString "}"
+
+-- | MOVE Daml.Script
+data Exercised = Exercised
+  with
+    contractId : AnyContractId
+    choice : Text
+    argument : AnyChoice
+    childEvents: [TreeEvent]
+
+-}

@@ -18,7 +18,11 @@ data-dependencies:
   - ../dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../dars/splice-api-token-holding-v1-1.0.0.dar
   - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
+  - ../../token-standard/splice-api-token-transfer-events-v2/.daml/dist/splice-api-token-transfer-events-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
   - ../../token-standard/splice-token-standard-test-v1/.daml/dist/splice-token-standard-test-v1-current.dar
+  - ../../token-standard/splice-token-standard-test-v2/.daml/dist/splice-token-standard-test-v2-current.dar
+  - ../../token-standard/splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

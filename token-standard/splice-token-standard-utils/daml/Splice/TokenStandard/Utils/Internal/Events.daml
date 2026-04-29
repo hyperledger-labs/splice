@@ -85,7 +85,7 @@ logMint factoryCid receiver amount instrumentId meta outputHoldingCids = do
     transferLegs = [leg]
     outputHoldingCids
     observers = accountParties receiver
-    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
+    extraArgs = emptyExtraArgs
 
 logBurn
   : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
