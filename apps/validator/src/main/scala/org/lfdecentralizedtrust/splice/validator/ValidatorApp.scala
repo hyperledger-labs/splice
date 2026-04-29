@@ -17,7 +17,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -57,6 +57,7 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.SynchronizerPermissionState
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   SingleScanConnection,
@@ -558,6 +559,7 @@ class ValidatorApp(
       ledgerConnection: SpliceLedgerConnection,
       dedupDuration: DedupDuration,
       synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     store.lookupValidatorLicenseWithOffset().flatMap {
       case QueryResult(_, Some(_)) =>
@@ -573,6 +575,7 @@ class ValidatorApp(
               for {
                 dsoInfo <- scanConnection.getDsoInfo()
                 sponsorPartyId = dsoInfo.svPartyId
+                _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
                 _ <- submitValidatorLicenceRequest(
                   validatorParty,
                   dsoInfo,
@@ -599,6 +602,45 @@ class ValidatorApp(
             waitForValidatorLicense(store)
         }
     }
+  }
+
+  private def waitForTopologyPermission(
+      scanConnection: BftScanConnection,
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "ParticipantSynchronizerPermission",
+      s"ParticipantSynchronizerPermission for $participantId is visible on scan and loginAfter barrier is passed",
+      scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
+        case Some(SynchronizerPermissionState(Some(loginAfter))) =>
+          if (clock.now >= loginAfter) {
+            Future.successful(())
+          } else {
+            Future.failed(
+              Status.PERMISSION_DENIED
+                .withDescription(
+                  s"ParticipantSynchronizerPermission exists but waiting for loginAfter barrier: $loginAfter (current time: ${clock.now})"
+                )
+                .asRuntimeException()
+            )
+          }
+
+        case Some(SynchronizerPermissionState(None)) =>
+          Future.successful(())
+
+        case None =>
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(
+                s"ParticipantSynchronizerPermission for $participantId not yet found"
+              )
+              .asRuntimeException()
+          )
+      },
+      logger,
+    )
   }
 
   private def submitValidatorLicenceRequest(
@@ -1012,6 +1054,7 @@ class ValidatorApp(
           automation.connection(SpliceLedgerConnectionPriority.High),
           dedupDuration,
           synchronizerId,
+          participantId,
         )
       }
 
