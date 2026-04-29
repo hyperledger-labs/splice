@@ -73,7 +73,8 @@
 
     - Canton
 
-        - Bugfixes
+        - Bugfixes and stability improvements.
+          Among other things, fix a regression in 0.6.0/0.6.1 which causes participants to get stuck at random times, requiring a restart to recover.
 
 .. release-notes:: 0.6.1
 
