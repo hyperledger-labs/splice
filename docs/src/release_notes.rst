@@ -56,7 +56,6 @@
 
         - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
         - Updated the Logical Synchronizer Upgrade documentation to include details for Roll Forward LSUs used for disaster recovery.
-        
 
     - Deployment
 
