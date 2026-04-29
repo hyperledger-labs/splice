@@ -327,11 +327,9 @@ class SvFrontendIntegrationTest
       )(
         "can see the governance page",
         _ =>
-          eventuallySucceeds() {
-            find(
-              id("initiate-proposal-button")
-            ) should not be empty withClue "'Initiate Proposal' button"
-          },
+          find(
+            id("initiate-proposal-button")
+          ) should not be empty withClue "'Initiate Proposal' button",
       )
 
     def navigateToLegacyGovernancePage(uiPort: Int)(implicit webDriver: WebDriverType): Unit =
@@ -425,13 +423,11 @@ class SvFrontendIntegrationTest
       )(
         "sv1 is redirected to the governance page after successful submission",
         _ => {
-          eventuallySucceeds() {
-            find(
-              id("initiate-proposal-button")
-            ) should not be empty withClue "'Initiate Proposal' button"
-            val proposals = getInflightProposals()
-            proposals.size should be > 0
-          }
+          find(
+            id("initiate-proposal-button")
+          ) should not be empty withClue "'Initiate Proposal' button"
+          val proposals = getInflightProposals()
+          proposals.size should be > 0
         },
       )
     }
@@ -448,25 +444,13 @@ class SvFrontendIntegrationTest
       )(
         "sv2 can see the vote form",
         _ =>
-          eventuallySucceeds() {
-            find(
-              testId("your-vote-reason-input")
-            ) should not be empty withClue "'Action Required' Box"
-          },
+          find(
+            testId("your-vote-reason-input")
+          ) should not be empty withClue "'Action Required' Box",
       )
 
       actAndCheck(
-        "sv2 casts vote on the proposal",
-        {},
-      )(
-        "sv2 can see the vote request and cast a vote",
-        _ => {
-          eventuallySucceeds() {
-            find(
-              testId("your-vote-reason-input")
-            ) should not be empty withClue "vote 'Reason' textfield"
-          }
-
+        "sv2 fills out and submits a vote", {
           inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
             element.underlying.sendKeys("A sample reason")
           }
@@ -476,15 +460,13 @@ class SvFrontendIntegrationTest
           }
 
           click on testId("your-vote-accept")
-
-          clue("wait for the vote submission success message") {
-            eventuallySucceeds() {
-              inside(find(testId("vote-submission-success"))) { case Some(element) =>
-                element.text shouldBe "Vote successfully updated!"
-              }
-            }
-          }
         },
+      )(
+        "the vote submission success message is shown",
+        _ =>
+          inside(find(testId("vote-submission-success"))) { case Some(element) =>
+            element.text shouldBe "Vote successfully updated!"
+          },
       )
     }
 
@@ -501,20 +483,18 @@ class SvFrontendIntegrationTest
         _ => {
           val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
           val sv2PartyHint = sv2PartyId.split("::").head
-          eventuallySucceeds() {
-            val votes =
-              webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
-            votes.size should be >= 1
+          val votes =
+            webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
+          votes.size should be >= 1
 
-            val voterPartyTexts = votes.asScala.map { vote =>
-              vote
-                .findElement(
-                  By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
-                )
-                .getText
-            }
-            voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
+          val voterPartyTexts = votes.asScala.map { vote =>
+            vote
+              .findElement(
+                By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
+              )
+              .getText
           }
+          voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
         },
       )
 
