@@ -20,11 +20,22 @@
 
 .. release-notes:: 0.6.2
 
-    - Validator app
+    Note: 0.6.1 and 0.6.0 were skipped on TestNet and MainNet due to regressions uncovered on DevNet.
 
-        - the configuration ``domain-migration-dump-path`` was removed
+    - SV / Validator apps
 
-    - Docs
+        - Hard Domain Migrations (HDMs) and HDM-based disaster recovery are no longer supported.
+          In particular:
+
+          - the validator configuration ``domain-migration-dump-path`` was removed,
+          - the SV onboarding mode ``domain-migration`` (``name`` / ``dump-file-path``) was removed.
+
+        Logical synchronizer upgrades (LSU) are now the only supported mechanism for
+        protocol upgrades.
+
+        - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
+
+    - Deployment
 
         - SV only: Introduced the concept of **serial ID** alongside the existing **migration ID** for synchronizer deployment.
           The migration ID is now frozen at its current value and is only used for the ``migration.id`` field in helm chart values.
@@ -34,9 +45,12 @@
           For existing networks, ``SERIAL_ID`` must initially be set to the current value of ``MIGRATION_ID``.
           Newly initialized networks start with ``SERIAL_ID=0``.
           This also changed the name of the participant helm installation in the documentation, along with the ``participantAddress`` in ``sv-values.yaml``. You can either reinstall the helm chart with the new name or ensure the ``participantAddress`` reflects the name of your helm chart installation.
-        - Removed references to major (hard) upgrades for both SV and validator operators.
-          Logical synchronizer upgrades are now the default mechanism for protocol upgrades.
-        - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
+
+      - Fixed a regression introduced in 0.6.1 where the ``reloader.stakater.com/auto`` annotation was silently dropped from all Deployments rendered by the Splice helm charts, disabling the auto-reload behaviour regardless of the ``enableReloader`` value.
+
+    - Canton
+
+        - Bugfixes
 
 .. release-notes:: 0.6.1
 
