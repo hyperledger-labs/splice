@@ -5,8 +5,10 @@ groups:
     folder: database
     interval: 1h
     rules:
-      - uid: update-history-read-total-time
-        title: Update History Read Total Time Too High
+      # Single multi-dimensional rule: one alert instance per `test` label.
+      # To add a new read test/operation, append one `or label_replace(...)` line below with the test name and its threshold (in seconds).
+      - uid: store-read-total-time
+        title: Store Read Total Time Too High
         condition: C
         data:
           - refId: A
@@ -15,32 +17,34 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: splice_perf_read_total_time_ns{test="UpdateHistoryReadPerformanceTest"} / 1e9
               refId: A
+              expr: |
+                (splice_perf_read_total_time_ns / 1e9)
+                / on(test) group_left() (
+                    label_replace(vector(1), "test", "UpdateHistoryReadPerformanceTest-getUpdate", "", "")
+                 or label_replace(vector(1), "test", "UpdateHistoryReadPerformanceTest-encodeUpdate",  "", "")
+                )
           - refId: B
-            relativeTimeRange:
-              from: 86400
-              to: 0
             datasourceUid: __expr__
             model:
+              refId: B
               type: reduce
               expression: A
               reducer: last
-              refId: B
           - refId: C
             datasourceUid: __expr__
             model:
+              refId: C
               type: threshold
               expression: B
               conditions:
                 - evaluator:
                     type: gt
-                    params: [1]
-              refId: C
+                    params: [ 1 ]
         for: 5m
         noDataState: OK
         execErrState: Alerting
         annotations:
-          summary: Update history read total time exceeded 1s
+          summary: 'Store read total time for {{ $labels.test }} exceeded its threshold (ratio: {{ $values.B }})'
         labels:
           severity: warning
