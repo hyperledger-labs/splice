@@ -163,7 +163,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Deploying new domain"
   local migration_config
-  export DISABLE_COMETBFT_STATE_SYNC="true"
+  _update_cluster_config "false" "svs.default.cometbft.enableStateSync"
   migration_config=$(cat <<EOF
   upgrade:
     id: 1
