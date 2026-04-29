@@ -18,6 +18,7 @@
       All example YAML files and documentation have been updated to use ``SERIAL_ID`` for addressing and ``MIGRATION_ID`` for migration-specific configuration.
       For existing networks, ``SERIAL_ID`` must initially be set to the current value of ``MIGRATION_ID``.
       Newly initialized networks start with ``SERIAL_ID=0``.
+      This also changed the name of the participant helm installation in the documentation, along with the ``participantAddress`` in ``sv-values.yaml``. You can either reinstall the helm chart with the new name or ensure the ``participantAddress`` reflects the name of your helm chart installation.
     - Removed references to major (hard) upgrades for both SV and validator operators.
       Logical synchronizer upgrades are now the default mechanism for protocol upgrades.
     - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
