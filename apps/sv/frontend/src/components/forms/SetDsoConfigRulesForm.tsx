@@ -166,10 +166,6 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
 
-        if (changes.length === 0) {
-          return 'Cannot submit a proposal with no configuration changes';
-        }
-
         const conflictingChanges = changes.filter(c =>
           pendingConfigFields.some(p => p.fieldName === c.fieldName)
         );
