@@ -30,8 +30,8 @@
           - the validator configuration ``domain-migration-dump-path`` was removed,
           - the SV onboarding mode ``domain-migration`` (``name`` / ``dump-file-path``) was removed.
 
-        Logical synchronizer upgrades (LSU) are now the only supported mechanism for
-        protocol upgrades.
+          Logical synchronizer upgrades (LSU) are now the only supported mechanism for
+          protocol upgrades.
 
         - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
 
@@ -46,7 +46,7 @@
           Newly initialized networks start with ``SERIAL_ID=0``.
           This also changed the name of the participant helm installation in the documentation, along with the ``participantAddress`` in ``sv-values.yaml``. You can either reinstall the helm chart with the new name or ensure the ``participantAddress`` reflects the name of your helm chart installation.
 
-      - Fixed a regression introduced in 0.6.1 where the ``reloader.stakater.com/auto`` annotation was silently dropped from all Deployments rendered by the Splice helm charts, disabling the auto-reload behaviour regardless of the ``enableReloader`` value.
+        - Fixed a regression introduced in 0.6.1 where the ``reloader.stakater.com/auto`` annotation was silently dropped from all Deployments rendered by the Splice helm charts, disabling the auto-reload behaviour regardless of the ``enableReloader`` value.
 
     - Canton
 
