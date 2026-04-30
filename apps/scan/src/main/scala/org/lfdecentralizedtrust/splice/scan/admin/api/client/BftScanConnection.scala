@@ -626,6 +626,15 @@ class BftScanConnection(
   ): Future[allocation.v1.definitions.ChoiceContext] =
     bftCall(_.getAllocationCancelContextRaw(allocationId, body))
 
+  def getAllocationV2CancelContextRaw(
+      allocationId: String,
+      body: allocation.v2.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[allocation.v2.definitions.ChoiceContext] =
+    bftCall(_.getAllocationV2CancelContextRaw(allocationId, body))
+
   def getAllocationWithdrawContextRaw(
       allocationId: String,
       body: allocation.v1.definitions.GetChoiceContextRequest,

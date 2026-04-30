@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferP
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
+  allocationv2,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
@@ -515,6 +516,17 @@ abstract class ValidatorAppReference(
       consoleEnvironment.run {
         httpCommand(
           HttpScanAppClient.GetAllocationCancelContext(allocationId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getAllocationV2CancelContext(
+        allocationId: allocationv2.Allocation.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetAllocationV2CancelContext(allocationId),
           Some(scanProxyPrefix),
         )
       }
