@@ -7,11 +7,12 @@
 
 - Scan app
 
-    - Added an optional ``activity-ingestion-user-version`` configuration field.
-      Incrementing this value forces the Scan app to restart activity record
-      ingestion from the current point in time, resetting the completeness
-      window. This is useful for recovering from ingestion errors without
-      reprocessing historical data.
+    - ``canton.scan-apps.scan-app.activity-ingestion-user-version`` configuration setting
+      has been added to control the activity record ingestion version.
+      Incrementing this value causes the Scan app to record a new completeness
+      boundary; reward accounting excludes rounds before it, while existing
+      activity records are retained.
+      See the :ref:`SV Operations docs <sv-reingest-scan-stores>` for more details.
 
 - Validator app
 
