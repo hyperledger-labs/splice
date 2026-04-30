@@ -22,6 +22,7 @@ const SvCometbftConfigSchema = z
     validatorKeyAddress: z.string().optional(),
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
+    enableStateSync: z.boolean().optional(),
     resources: K8sResourceSchema,
     mempool: z
       .object({
@@ -184,7 +185,7 @@ const SingleSvConfigSchema = z
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
   z.object({
-    default: SingleSvConfigSchema,
+    default: SingleSvConfigSchema.default({}),
   })
 );
 const SvsConfigurationSchema = z.object({

@@ -156,5 +156,6 @@ Failed to get status of BFT sequencer with p2p url*RollForwardLsu.*IntegrationTe
 # slow future supervision, ignore logs as we want them just for debugging
 Supervised futures for the following trace IDs have not completed
 Waiting for.*has not completed after
+Gave up waiting for.*as we are shutting down
 
 Ryuk has been disabled
