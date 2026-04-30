@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.*
@@ -23,12 +22,6 @@ import scala.concurrent.{ExecutionContext, Future}
   * ingested round. On subsequent batches it is a no-op. If a version
   * downgrade is detected, [[ensure]] returns [[DowngradeDetected]] so the
   * caller can shut down.
-  *
-  * Until [[ensure]] completes, traffic summary gaps are tolerated: during
-  * SV onboarding the sequencer does not yet have traffic data for early
-  * verdicts. After [[ensure]] completes, [[findMissingSummaryTimes]]
-  * reports any verdicts that lack a matching traffic summary, allowing the
-  * caller to fail the batch.
   */
 class ActivityIngestionMetaCheck(
     activityStore: DbAppActivityRecordStore,
@@ -42,17 +35,6 @@ class ActivityIngestionMetaCheck(
 
   /** Whether the meta check has completed successfully at least once. */
   def isChecked: Boolean = checked.get()
-
-  /** Returns verdict timestamps that are missing traffic summaries.
-    * Returns empty until [[ensure]] has completed.
-    */
-  def findMissingSummaryTimes(
-      verdictTimes: Seq[CantonTimestamp],
-      summaryTimes: Set[CantonTimestamp],
-  ): Seq[CantonTimestamp] = {
-    if (checked.get()) verdictTimes.filterNot(summaryTimes.contains)
-    else Seq.empty
-  }
 
   /** Ensures the activity record meta row exists and versions are compatible.
     * Returns the check result; the caller is responsible for acting on

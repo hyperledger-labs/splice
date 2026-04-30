@@ -254,13 +254,11 @@ class ScanVerdictIngestionService(
           case None => Future.successful(Seq.empty)
         }
 
-        // Ensure meta row exists and versions match (once, on the first batch
-        // with activity records). Called after activity computation so we have
-        // the earliest round number. Deferred until a batch with activity
-        // records arrives — early batches (e.g., during SV onboarding) may
-        // have verdicts but no featured apps, producing no activity records.
-        _ <- activityMetaCheckO match {
-          case Some(metaCheck) if !metaCheck.isChecked && appActivityRecords.nonEmpty =>
+        // Ensure meta row exists and versions match (first batch with activity records).
+        ingestionStarted <- activityMetaCheckO match {
+          case Some(metaCheck) if metaCheck.isChecked =>
+            Future.successful(true)
+          case Some(metaCheck) if appActivityRecords.nonEmpty =>
             val earliestRound = appActivityRecords
               .map(_._2.roundNumber)
               .minOption
@@ -273,24 +271,19 @@ class ScanVerdictIngestionService(
                     s"Shutting down to prevent data corruption."
                 )
                 sys.exit(1)
-              case _ => ()
+              case _ => true
             }
-          case Some(metaCheck) if metaCheck.isChecked => Future.unit
-          case _ => Future.unit
+          case _ => Future.successful(false)
         }
 
-        // Fail the batch if any verdicts are missing traffic summaries.
-        // See ActivityIngestionMetaCheck for why gaps are tolerated until
-        // ensure completes. The RetryingService framework will retry
-        // indefinitely with backoff, stalling ingestion until the summaries
-        // become available or an operator investigates.
+        // After ingestion has started, every verdict must have a traffic summary.
         _ <- {
-          val verdictTimes =
-            verdicts.map(v => CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime))
-          val missingTimes = activityMetaCheckO
-            .fold(Seq.empty[CantonTimestamp])(
-              _.findMissingSummaryTimes(verdictTimes, summaryByTime.keySet)
-            )
+          val missingTimes =
+            if (ingestionStarted)
+              verdicts
+                .map(v => CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime))
+                .filterNot(summaryByTime.keySet.contains)
+            else Seq.empty
           if (missingTimes.nonEmpty)
             Future.failed(
               Status.INTERNAL
@@ -332,10 +325,9 @@ class ScanVerdictIngestionService(
         DbScanVerdictStore
           .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
       })
-      // During SV onboarding, the sequencer may not have traffic summaries
-      // for early verdicts. Recover from NO_EVENT_AT_TIMESTAMPS by returning
-      // an empty result; the missing-summary check in process() will fail the
-      // batch if this happens after ingestion has started.
+      // Recover from NO_EVENT_AT_TIMESTAMPS by returning an empty result.
+      // See ActivityIngestionMetaCheck for when missing summaries are
+      // tolerated vs treated as errors.
       .recoverWith { case ex @ GrpcException(status, trailers) =>
         val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
         val errorDetails = ErrorDetails.from(statusProto)

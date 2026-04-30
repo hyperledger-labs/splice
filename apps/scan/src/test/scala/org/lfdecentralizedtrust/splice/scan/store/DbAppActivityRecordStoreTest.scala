@@ -599,22 +599,6 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "report missing summaries only after ensure completes" in {
-      for {
-        (store, _) <- newStore()
-        check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
-        baseTs = CantonTimestamp.now()
-        t1 = baseTs
-        t2 = baseTs.plusSeconds(1L)
-        // Before ensure: missing summaries are tolerated
-        _ = check.findMissingSummaryTimes(Seq(t1), Set.empty) shouldBe empty
-        _ <- check.ensure(t1.toMicros, 10L)
-        // After ensure: missing summaries are reported
-        _ = check.findMissingSummaryTimes(Seq(t1, t2), Set(t1)) shouldBe Seq(t2)
-        // All present: no missing
-        _ = check.findMissingSummaryTimes(Seq(t1, t2), Set(t1, t2)) shouldBe empty
-      } yield succeed
-    }
   }
 
   "latestRoundWithCompleteAppActivity" should {
