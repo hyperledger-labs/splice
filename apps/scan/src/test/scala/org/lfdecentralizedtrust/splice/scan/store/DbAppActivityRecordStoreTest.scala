@@ -427,12 +427,12 @@ class DbAppActivityRecordStoreTest
     }
   }
 
-  "getActivityRecordMeta" should {
+  "lookupActivityRecordMeta" should {
 
     "return None when no meta row exists" in {
       for {
         (store, _) <- newStore()
-        result <- store.getActivityRecordMeta()
+        result <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe None
       }
@@ -447,7 +447,7 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 1000000L,
           earliestIngestedRound = 0L,
         )
-        result <- store.getActivityRecordMeta()
+        result <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe defined
         result.value.codeVersion shouldBe 1
@@ -471,7 +471,7 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 2000000L,
           earliestIngestedRound = 5L,
         )
-        result <- store.getActivityRecordMeta()
+        result <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe defined
         result.value.codeVersion shouldBe 2
@@ -497,8 +497,8 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 9000000L,
           earliestIngestedRound = 0L,
         )
-        result1 <- store1.getActivityRecordMeta()
-        result2 <- store2.getActivityRecordMeta()
+        result1 <- store1.lookupActivityRecordMeta()
+        result2 <- store2.lookupActivityRecordMeta()
       } yield {
         result1.value.codeVersion shouldBe 1
         result1.value.userVersion shouldBe 0
@@ -529,7 +529,7 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 9999999L,
           earliestIngestedRound = 0L,
         )
-        result2 <- store2.getActivityRecordMeta()
+        result2 <- store2.lookupActivityRecordMeta()
       } yield {
         result2.value.codeVersion shouldBe 1
         result2.value.userVersion shouldBe 0
@@ -546,7 +546,7 @@ class DbAppActivityRecordStoreTest
         check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
         r1 <- check.ensure(1000000L, 10L)
         r2 <- check.ensure(2000000L, 20L)
-        meta <- store.getActivityRecordMeta()
+        meta <- store.lookupActivityRecordMeta()
       } yield {
         r1 shouldBe InsertMeta
         r2 shouldBe Resume
@@ -561,7 +561,7 @@ class DbAppActivityRecordStoreTest
         _ <- store.insertActivityRecordMeta(1, 0, 1000000L, 10L)
         check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
         result <- check.ensure(2000000L, 20L)
-        meta <- store.getActivityRecordMeta()
+        meta <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe Resume
         meta.value.startedIngestingAt shouldBe 1000000L
@@ -575,7 +575,7 @@ class DbAppActivityRecordStoreTest
         _ <- store.insertActivityRecordMeta(1, 0, 1000000L, 10L)
         check = new ActivityIngestionMetaCheck(store, 2, 0, loggerFactory)
         result <- check.ensure(2000000L, 20L)
-        meta <- store.getActivityRecordMeta()
+        meta <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe InsertMeta
         meta.value.codeVersion shouldBe 2
@@ -590,7 +590,7 @@ class DbAppActivityRecordStoreTest
         _ <- store.insertActivityRecordMeta(2, 0, 1000000L, 10L)
         check = new ActivityIngestionMetaCheck(store, 1, 0, loggerFactory)
         result <- check.ensure(2000000L, 20L)
-        meta <- store.getActivityRecordMeta()
+        meta <- store.lookupActivityRecordMeta()
       } yield {
         result shouldBe DowngradeDetected(1, 0, 2, 0)
         meta.value.codeVersion shouldBe 2

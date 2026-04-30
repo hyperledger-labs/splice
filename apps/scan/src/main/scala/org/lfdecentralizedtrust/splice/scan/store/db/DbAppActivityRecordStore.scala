@@ -307,7 +307,7 @@ class DbAppActivityRecordStore(
       )
     }
 
-  def getActivityRecordMeta()(implicit
+  def lookupActivityRecordMeta()(implicit
       tc: TraceContext
   ): Future[Option[AppActivityRecordMetaT]] =
     runQuerySingle(
@@ -320,7 +320,7 @@ class DbAppActivityRecordStore(
                      activity_ingestion_user_version desc
             limit 1
       """.as[AppActivityRecordMetaT].headOption,
-      "appActivity.getActivityRecordMeta",
+      "appActivity.lookupActivityRecordMeta",
     )
 
   def insertActivityRecordMeta(

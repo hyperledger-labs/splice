@@ -66,7 +66,7 @@ class ActivityIngestionMetaCheck(
   )(implicit tc: TraceContext): Future[MetaCheckResult] = {
     if (checked.get()) Future.successful(Resume)
     else {
-      activityStore.getActivityRecordMeta().flatMap { existing =>
+      activityStore.lookupActivityRecordMeta().flatMap { existing =>
         checkMetaVersions(existing, runningCodeVersion, runningUserVersion) match {
           case InsertMeta =>
             val label = if (existing.isDefined) "version upgrade" else "initializing"
