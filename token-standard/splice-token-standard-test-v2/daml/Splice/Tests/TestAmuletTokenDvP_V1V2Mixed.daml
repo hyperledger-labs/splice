@@ -430,7 +430,7 @@ runTest mkTest = do
         -- Note: whether to do this or not is a wallet UX concern.
         batches <- forA reqs $ \req -> do
           WalletClientV2.mkAcceptAllocationRequestV2 env.registries trader req
-        void $ WalletClientV2.executeTSABatch trader (mconcat batches)
+        void $ WalletClientV2.executeTSABatch env.registries trader (mconcat batches)
 
   -- check locked holdings
   checkHoldings env "holdings after allocation" test.expectedHoldingsAfterAllocation

@@ -351,7 +351,7 @@ token_transferFactory_transferImpl tokenRules self arg = do
         transfer = transfer with
           inputHoldingCids = [lockedCid]
       -- log the tx history v2 event
-      exercise (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
+      logNonEmptyChange (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
         admin = tokenRules.admin
         account = transfer.sender
         inputHoldingCids = transfer.inputHoldingCids
@@ -427,7 +427,7 @@ token_allocationFactoryV2_allocateImpl tokenRules self arg = do
   -- log v2 tx history event
   let lockedTokens = concatMap fst locksAndChange
   let authorizerChangeCids = TextMap.fromListWithR (++) $ concatMap snd locksAndChange
-  exercise (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
+  logNonEmptyChange (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
     admin = tokenRules.admin
     account = authorizer
     inputHoldingCids = arg.inputHoldingCids

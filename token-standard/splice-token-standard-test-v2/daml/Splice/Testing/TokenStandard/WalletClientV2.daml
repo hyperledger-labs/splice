@@ -61,12 +61,16 @@ module Splice.Testing.TokenStandard.WalletClientV2
     mkTransferFactory_TransferV1',
     mkTransferFactory_TransferV2',
 
+    -- * Tx history V2 checking utilities
+    -- FIXME
+
   ) where
 
-import DA.Action (unless)
-import DA.List (dedupSort)
+import DA.Action (unless, when)
+import DA.Foldable (forA_)
+import DA.List (dedupSort, unique)
 import DA.Map qualified as Map
-import DA.Optional (isSome, isNone)
+import DA.Optional
 import DA.Time
 import DA.TextMap qualified as TextMap
 import DA.Set qualified as Set
@@ -82,6 +86,7 @@ import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationRequestV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 
 import Splice.TokenStandard.Utils qualified as TSU
 import Splice.Util.Token.Wallet.BatchingUtilityV2 qualified as BatchingUtilityV2
@@ -238,7 +243,7 @@ acceptAllocationRequestV1
   -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
 acceptAllocationRequestV1 registries actor req = do
   batch <- mkAcceptAllocationRequestV1 registries actor req
-  executeTSABatch actor batch
+  executeTSABatch registries actor batch
 
 -- | Simulate a V2 wallet accepting an allocation request from a V2 app.
 acceptAllocationRequestV2
@@ -246,22 +251,23 @@ acceptAllocationRequestV2
   -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
 acceptAllocationRequestV2 registries actor (reqCid, req) = do
   batch <- mkAcceptAllocationRequestV2 registries actor (reqCid, req)
-  executeTSABatch actor batch
+  executeTSABatch registries actor batch
 
 -- | Execute a batch of token standard actions.
-executeTSABatch : Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
-executeTSABatch actor batch
+executeTSABatch : MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+executeTSABatch registries actor batch
   | null batch.actions = pure $ BatchingUtilityV2.BatchingUtility_ExecuteBatchResult with
       actionResults = []
       outputHoldingMap = mempty
   | otherwise = do
     inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
     [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
-    submitWithDisclosures' actor batch.disclosures $
-      exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
-          actions = batch.actions
-          inputHoldingMap
-          archiveAfterExecution = False
+    checkTxHistoryV2 registries $
+      submitResultAndTree (actAs actor <> discloseMany' batch.disclosures) $
+        exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
+            actions = batch.actions
+            inputHoldingMap
+            archiveAfterExecution = False
 
 -- | Get a map of unlocked holding cids for the given accounts and instruments.
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
@@ -521,3 +527,109 @@ mkTransferFactory_TransferV2' registries t = do
 
 -- TODO(#4823): add missing transfer instruction actions
 -- TODO(#4838): add support for allocaiton instruction actions
+
+
+-- Tx History V2 checking utilities
+-----------------------------------
+
+type HoldingSnapshot = Map.Map (ContractId V2.Holding) V2.HoldingView
+
+-- FIXME: return extracted history and use it to check metadata
+checkTxHistoryV2 : MultiRegistry.MultiRegistry -> Script (a, TransactionTree) -> Script a
+checkTxHistoryV2 registries action = do
+  let adminParties = Map.keys registries
+  holdingsBefore <- snapshotHoldings adminParties
+  (result, txTree) <- action
+  holdingsAfter <- snapshotHoldings adminParties
+  validateHoldingsChanges holdingsBefore txTree holdingsAfter
+  pure result
+
+snapshotHoldings : [Party] -> Script HoldingSnapshot
+snapshotHoldings parties = do
+  holdingsByParty <- forA parties $ \p -> do
+    holdings <- queryInterface @V2.Holding p
+    pure $ Map.fromList [ (cid, holding) | (cid, Some holding) <- holdings ]
+  pure $ mconcat holdingsByParty
+
+validateHoldingsChanges : HoldingSnapshot -> TransactionTree -> HoldingSnapshot -> Script ()
+validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
+    -- check invariants of individual holding changes
+    forA_ changes $ \change -> do
+      when (null change.transferLegs && null change.inputHoldingCids && null change.outputHoldingCids) $
+        fail $ "holding change is missing transfer legs or input/output holding cids: " <> show change
+    -- check merged changes per account
+    forA_ mergedChanges validateMergedHoldingsChange
+    -- FIXME: separately: check that all transfer legs are reported
+    -- FIXME: check overall holding changes are explained by the input output holdings
+  where
+    changes = getHoldingsChangesFromTree txTree
+    mergedChanges = mergeHoldingsChanges changes
+
+    validateMergedHoldingsChange change
+      | not (unique change.inputHoldingCids) = fail $ "duplicate input holding cids in change: " <> show change
+      | not (unique change.outputHoldingCids) = fail $ "duplicate output holding cids in change: " <> show change
+      | otherwise = do
+          let checkHolding cid holding
+                | holding.account /= change.account =
+                    fail $ "holding cid " <> show cid <> " belongs to account " <> show holding.account <> ", expected " <> show change.account
+                | holding.instrumentId.admin /= change.admin =
+                    fail $ "holding cid " <> show cid <> " belongs to admin " <> show holding.instrumentId.admin <> ", expected " <> show change.admin
+                | otherwise = pure ()
+          -- check input and output holdings are transient or can be read in the expected snapshots
+          forA_ change.inputHoldingCids $ \cid ->
+            case Map.lookup cid holdingsBefore of
+              None ->
+                unless (cid `elem` change.outputHoldingCids) $
+                  fail $ "input holding cid " <> show cid <> " not found in before snapshot"
+              Some holding -> checkHolding cid holding
+          forA_ change.outputHoldingCids $ \cid ->
+            case Map.lookup cid holdingsAfter of
+              None ->
+                unless (cid `elem` change.inputHoldingCids) $
+                  fail $ "output holding cid " <> show cid <> " not found in after snapshot"
+              Some holding -> checkHolding cid holding
+          -- check that the transfer legs affect the account
+          forA_ change.transferLegs $ \leg -> do
+            unless (leg.sender == change.account || leg.receiver == change.account) $
+              fail $ "holding change includes transfer leg that does not affect the account: " <> show leg
+          -- FIXME: that net balance changes of reported holdings are explained by transfer legs
+
+
+      -- retrieve all input holdings and output holdings from snapshot
+      -- check that they all belong to the right account
+      -- compute balance changes
+      -- compare against balance changes of the transfer legs in the change
+
+
+
+mergeHoldingsChanges : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
+mergeHoldingsChanges events =
+    Map.values eventsWithAccount
+  where
+    eventsWithAccount = Map.fromListWithR mergeTwoHoldingChangeEvents [ (event.account, event) | event <- events ]
+    mergeTwoHoldingChangeEvents e1 e2 =
+      e1 with
+        inputHoldingCids = e1.inputHoldingCids ++ e2.inputHoldingCids
+        transferLegs = e1.transferLegs ++ e2.transferLegs
+        outputHoldingCids = e1.outputHoldingCids ++ e2.outputHoldingCids
+        observers = dedupSort (e1.observers ++ e2.observers)
+        extraArgs = e1.extraArgs with
+          -- we dont care about the choice context
+          meta = e1.extraArgs.meta <> e2.extraArgs.meta
+
+
+
+
+getHoldingsChangesFromTree : TransactionTree -> [TransferEventsV2.EventLog_HoldingsChange]
+getHoldingsChangesFromTree txTree = do
+  exercised <- getExercisedEvents txTree
+  optionalToList $ fromAnyChoice @TransferEventsV2.EventLog exercised.argument
+
+
+getExercisedEvents : TransactionTree -> [Exercised]
+getExercisedEvents txTree =
+  concatMap getExercisedFromTreeEvent txTree.rootEvents
+
+getExercisedFromTreeEvent : TreeEvent -> [Exercised]
+getExercisedFromTreeEvent (ExercisedEvent e) = e :: concatMap getExercisedFromTreeEvent e.childEvents
+getExercisedFromTreeEvent (CreatedEvent _) = []

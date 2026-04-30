@@ -17,12 +17,13 @@ module Splice.TokenStandard.Utils.Internal.Events (
   logBurn,
 
   -- * Utilities to log events
+  logNonEmptyChange,
   logTransfer,
   logAllocationSettlement,
   logMergeSplit,
 ) where
 
-import DA.Action (void)
+import DA.Action (void, unless)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -64,6 +65,12 @@ burnAccount p = V2.Account with
   owner = p
   provider = None
   id = burnAccountId
+
+-- | Convenience function to avoid logging change events that report neither a holdings change nor a transfer leg.
+logNonEmptyChange : ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_HoldingsChange -> Update ()
+logNonEmptyChange eventLogCid arg = do
+  unless (null arg.transferLegs && null arg.inputHoldingCids && null arg.outputHoldingCids) $
+    void $ exercise eventLogCid arg
 
 logMint
   : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
@@ -183,7 +190,7 @@ logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCi
 -- | Log an account-local holding change not associated with a transfer; e.g., the effect of unlocking a lock.
 logMergeSplit : ContractId TransferEventsV2.EventLog -> Party -> V2.Account -> [ContractId V2.Holding] -> Text -> [ContractId V2.Holding] -> Update ()
 logMergeSplit eventLogCid admin account inputHoldingCids reason outputHoldingCids =
-  void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+  logNonEmptyChange eventLogCid TransferEventsV2.EventLog_HoldingsChange with
     admin
     account
     inputHoldingCids

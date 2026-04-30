@@ -2136,7 +2136,7 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
 -----------------------
 
 
-
+-- FIXME: consider moving
 mergeHoldingsChangeEvents : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
 mergeHoldingsChangeEvents events =
     Map.values eventsWithAccount

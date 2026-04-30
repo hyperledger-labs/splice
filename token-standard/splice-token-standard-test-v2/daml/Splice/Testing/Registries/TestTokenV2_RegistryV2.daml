@@ -93,7 +93,7 @@ mint registry account intrumentName amount = do
           context = emptyChoiceContext
           meta = emptyMetadata
   context <- registryApi_getTransferOfferContext registry offerCid emptyMetadata
-
+  -- FIXME: check tx history
   void $ submit (actAs account.owner <> discloseMany' context.disclosures) $
     exerciseCmd offerCid accept with
       extraArgs = ExtraArgs with

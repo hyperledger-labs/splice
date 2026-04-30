@@ -74,6 +74,7 @@ module Splice.TokenStandard.Utils (
 
   logMint,
   logBurn,
+  logNonEmptyChange,
   logMergeSplit,
   logTransfer,
   logAllocationSettlement,
