@@ -1458,7 +1458,7 @@ class HttpWalletHandler(
                 .asRuntimeException()
             ).toAssignedContract.getOrElse(
               throw Status.Code.FAILED_PRECONDITION.toStatus
-                .withDescription(s"AmuletAllocation is not assigned to a synchronizer.")
+                .withDescription(s"AllocationRequest is not assigned to a synchronizer.")
                 .asRuntimeException()
             )
           )
@@ -1477,6 +1477,55 @@ class HttpWalletHandler(
           .withSynchronizerId(allocationRequest.domain)
           .yieldResult()
       } yield WalletResource.RejectAllocationRequestResponseOK(
+        d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
+      )
+    }
+  }
+
+  override def rejectAllocationRequestV2(
+      respond: WalletResource.RejectAllocationRequestV2Response.type
+  )(contractId: String)(
+      tUser: WalletUserRequest
+  ): Future[WalletResource.RejectAllocationRequestV2Response] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tUser
+    withSpan(s"$workflowId.rejectAllocationRequestV2") { implicit traceContext => _ =>
+      val allocationRequestCid = Codec.tryDecodeJavaContractIdInterface(
+        allocationrequestv2.AllocationRequest.INTERFACE
+      )(
+        contractId
+      )
+      val store = userWallet.store
+      for {
+        allocationRequest <- store.multiDomainAcsStore
+          .findInterfaceViewByContractId(
+            allocationrequestv2.AllocationRequest.INTERFACE
+          )(allocationRequestCid)
+          .map(
+            _.getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription(s"No AllocationRequest v2 with contract id $contractId found.")
+                .asRuntimeException()
+            ).toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"AllocationRequest v2 is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            allocationRequest.exercise(
+              _.exerciseAllocationRequest_Reject(
+                java.util.List.of(store.key.endUserParty.toProtoPrimitive),
+                ChoiceContextWithDisclosures.emptyExtraArgs,
+              )
+            ),
+          )
+          .noDedup
+          .withSynchronizerId(allocationRequest.domain)
+          .yieldResult()
+      } yield WalletResource.RejectAllocationRequestV2ResponseOK(
         d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
       )
     }

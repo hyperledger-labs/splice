@@ -39,7 +39,8 @@ import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   allocationv2,
@@ -627,9 +628,19 @@ abstract class WalletAppReference(
   @Help.Description(
     "Exercises the choice AllocationRequest_Reject from the Token Standard on the passed contract id."
   )
-  def rejectAllocationRequest(id: AllocationRequest.ContractId): Unit = {
+  def rejectAllocationRequest(id: allocationrequestv1.AllocationRequest.ContractId): Unit = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
+    }
+  }
+
+  @Help.Summary("Reject AllocationRequestV2")
+  @Help.Description(
+    "Exercises the choice AllocationRequest_Reject from the Token Standard V2 on the passed contract id."
+  )
+  def rejectAllocationRequestV2(id: allocationrequestv2.AllocationRequest.ContractId): Unit = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequestV2(id))
     }
   }
 

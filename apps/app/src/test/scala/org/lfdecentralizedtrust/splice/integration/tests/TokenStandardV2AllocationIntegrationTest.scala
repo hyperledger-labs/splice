@@ -410,30 +410,26 @@ class TokenStandardV2AllocationIntegrationTest
     )
   }
 
-//  "Reject an allocation request" in { implicit env =>
-//    val allocatedOtcTrade = setupAllocatedOtcTrade()
-//    // sanity checks
-//    aliceWalletClient
-//      .listAllocationRequests() should have size (1) withClue "alice AllocationRequests"
-//    bobWalletClient
-//      .listAllocationRequests() should have size (1) withClue "bob AllocationRequests"
-//
-//    actAndCheck(
-//      "Alice rejects the allocation request", {
-//        aliceWalletClient.rejectAllocationRequest(
-//          allocatedOtcTrade.tradeId.toInterface(allocationrequestv1.AllocationRequest.INTERFACE)
-//        )
-//      },
-//    )(
-//      "Allocation request is archived",
-//      _ => {
-//        val aliceRequests = aliceWalletClient.listAllocationRequests()
-//        aliceRequests shouldBe empty withClue "alice Requests"
-//        val bobRequests = bobWalletClient.listAllocationRequests()
-//        bobRequests shouldBe empty withClue "bob Requests"
-//      },
-//    )
-//  }
+  "Reject an allocation request" in { implicit env =>
+    val allocatedOtcTrade = setupAllocatedOtcTrade()
+    // sanity checks
+    aliceWalletClient
+      .listAllocationRequests() should have size (1) withClue "alice AllocationRequests"
+
+    actAndCheck(
+      "Alice rejects the allocation request", {
+        aliceWalletClient.rejectAllocationRequestV2(
+          allocatedOtcTrade.aliceAllocationRequestId
+        )
+      },
+    )(
+      "Allocation request is archived",
+      _ => {
+        val aliceRequests = aliceWalletClient.listAllocationRequests()
+        aliceRequests shouldBe empty withClue "alice Requests"
+      },
+    )
+  }
 }
 
 object TokenStandardV2AllocationIntegrationTest {

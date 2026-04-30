@@ -1447,6 +1447,27 @@ object HttpWalletAppClient {
         Right(())
       }
     }
+
+    case class RejectAllocationRequestV2(id: allocationrequestv2.AllocationRequest.ContractId)
+        extends InternalBaseCommand[
+          http.RejectAllocationRequestV2Response,
+          Unit,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAllocationRequestV2Response] =
+        client.rejectAllocationRequestV2(id.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.RejectAllocationRequestV2Response, Either[
+        String,
+        Unit,
+      ]] = { case http.RejectAllocationRequestV2Response.OK(_) =>
+        Right(())
+      }
+    }
   }
 
   final case class AllocateDevelopmentFundCoupon(
