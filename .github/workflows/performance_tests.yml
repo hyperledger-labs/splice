@@ -81,7 +81,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Check ingestion thresholds
-        if: ${{ success() && github.event_name == 'schedule' }}
+        #if: ${{ success() && github.event_name == 'schedule' }}
+        if: ${{ success() }}
         run: |
           python3 scripts/performance/check_perf_thresholds.py /tmp/store-ingestion-perf-metrics
 
