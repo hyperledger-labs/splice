@@ -116,7 +116,7 @@ setupTest = do
           [ ("acme.com/correlation-id", "<test-UUID>")
           , ("splice.lfdecentralizedtrust.org/reason", "test reason")
           ]
-        -- TODO(#5001): use submitTree to test that this metadata is visible as a transfer event
+        -- FIXME: use submitTree to test that this metadata is visible as a transfer event
 
   return TestSetup with ..
 

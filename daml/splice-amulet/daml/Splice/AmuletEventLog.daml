@@ -15,8 +15,6 @@ template AmuletEventLog with
   where
     signatory dso
 
-    -- FIXME: complete these tests here; and remove TODO notes
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for AmuletEventLog where
       view = TransferEventsV2.EventLogView with
         admin = dso

@@ -560,47 +560,93 @@ snapshotHoldings parties = do
 
 validateHoldingsChanges : HoldingSnapshot -> TransactionTree -> HoldingSnapshot -> Script [TransferEventsV2.EventLog_HoldingsChange]
 validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
+    -- check no duplicate reporting of holding changes
+    unless (unique allInputHoldingCids) $
+      fail $ "duplicate input holding cids across changes: " <> show allInputHoldingCids
+    unless (unique allOutputHoldingCids) $
+      fail $ "duplicate output holding cids across changes: " <> show allOutputHoldingCids
     -- check invariants of individual holding changes
     forA_ changes $ \change -> do
       when (null change.transferLegs && null change.inputHoldingCids && null change.outputHoldingCids) $
         fail $ "holding change is missing transfer legs or input/output holding cids: " <> show change
-    -- check merged changes per account
-    forA_ mergedChanges validateMergedHoldingsChange
-    -- FIXME: separately: check that all transfer legs are reported
-    -- FIXME: check overall holding changes are explained by the input output holdings
+    -- check invariants of merged changes per account
+    outputHoldings <- forA mergedChanges validateMergedHoldingsChange
+    -- check that the changes explain the observed differences in holdings before and after the transaction
+    let expectedHoldingsAfter =
+          Map.filterWithKey (\cid _ -> cid `notElem` allInputHoldingCids) holdingsBefore <>
+          Map.fromList (concat outputHoldings)
+    unless (expectedHoldingsAfter == holdingsAfter) $
+      fail $ T.unlines
+        [ "holdings after change do not match expected holdings after change"
+        , "expected holdings after: " <> show expectedHoldingsAfter
+        , "actual holdings after:   " <> show holdingsAfter
+        ]
+    -- check that transfer legs are reported for both sides of the transfer for all non-admin accounts
+    forA_ changes $ \change -> do
+      forA_ change.transferLegs $ \leg -> do
+        forA_ [leg.sender, leg.receiver] $ \legAccount ->
+          unless ((legAccount, leg) `elem` allNonAdminTransferLegs || legAccount.owner == change.admin) $
+            fail $ "transfer leg " <> show leg <> " is not reported for both sender and receiver"
     pure changes
   where
     changes = getHoldingsChangesFromTree txTree
     mergedChanges = mergeHoldingsChanges changes
 
+    allInputHoldingCids = sort $ concatMap (.inputHoldingCids) changes
+    allOutputHoldingCids = sort $ concatMap (.outputHoldingCids) changes
+
+    allNonAdminTransferLegs = do
+      change <- changes
+      guard (change.account.owner /= change.admin) -- admins are free to not provide tx history for their accounts
+      leg <- change.transferLegs
+      pure (change.account, leg)
+
     validateMergedHoldingsChange change
       | not (unique change.inputHoldingCids) = fail $ "duplicate input holding cids in change: " <> show change
       | not (unique change.outputHoldingCids) = fail $ "duplicate output holding cids in change: " <> show change
       | otherwise = do
+          -- check that the transfer legs affect the account
+          forA_ change.transferLegs $ \leg -> do
+            unless (leg.sender == change.account || leg.receiver == change.account) $
+              fail $ "holding change includes transfer leg that does not affect the account: " <> show leg
+          -- check input and output holdings are transient or can be read in the expected snapshots
           let checkHolding cid holding
                 | holding.account /= change.account =
                     fail $ "holding cid " <> show cid <> " belongs to account " <> show holding.account <> ", expected " <> show change.account
                 | holding.instrumentId.admin /= change.admin =
                     fail $ "holding cid " <> show cid <> " belongs to admin " <> show holding.instrumentId.admin <> ", expected " <> show change.admin
                 | otherwise = pure ()
-          -- check input and output holdings are transient or can be read in the expected snapshots
-          forA_ change.inputHoldingCids $ \cid ->
+          debits <- forA change.inputHoldingCids $ \cid ->
             case Map.lookup cid holdingsBefore of
-              None ->
+              None -> do
                 unless (cid `elem` change.outputHoldingCids) $
                   fail $ "input holding cid " <> show cid <> " not found in before snapshot"
-              Some holding -> checkHolding cid holding
-          forA_ change.outputHoldingCids $ \cid ->
+                pure None
+              Some holding -> do
+                checkHolding cid holding
+                pure $ Some (holding.instrumentId, negate holding.amount)
+          creditsAndOutputs <- forA change.outputHoldingCids $ \cid ->
             case Map.lookup cid holdingsAfter of
-              None ->
+              None -> do
                 unless (cid `elem` change.inputHoldingCids) $
                   fail $ "output holding cid " <> show cid <> " not found in after snapshot"
-              Some holding -> checkHolding cid holding
-          -- check that the transfer legs affect the account
-          forA_ change.transferLegs $ \leg -> do
-            unless (leg.sender == change.account || leg.receiver == change.account) $
-              fail $ "holding change includes transfer leg that does not affect the account: " <> show leg
-          -- FIXME: that net balance changes of reported holdings are explained by transfer legs
+                pure None
+              Some holding -> do
+                checkHolding cid holding
+                pure $ Some ((holding.instrumentId, holding.amount), (cid, holding))
+          -- check that legs explain the balance changes of the holdings for all non-admin accounts
+          let (credits, outputHoldings) = unzip (catOptionals creditsAndOutputs)
+          let ignoreZeroChanges = Map.filter (/= 0.0)
+          let holdingAmountChanges = ignoreZeroChanges $ Map.fromListWithR (+) (catOptionals debits ++ credits)
+          let legAmountChanges = ignoreZeroChanges $ TSU.netAllocationCreditAmounts change.account change.transferLegs
+          unless (holdingAmountChanges == legAmountChanges || change.account.owner == change.admin) $
+            fail $ T.unlines
+              [ "holding amount changes do not match leg amount changes for account " <> show change.account
+              , "holding amount changes: " <> show holdingAmountChanges
+              , "leg amount changes:     " <> show legAmountChanges
+              , "change: " <> show change
+              ]
+          pure outputHoldings
 
 
       -- retrieve all input holdings and output holdings from snapshot

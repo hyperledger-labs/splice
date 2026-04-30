@@ -143,7 +143,6 @@ template AmuletRules
 
     signatory dso
 
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for AmuletRules where
       view = TransferEventsV2.EventLogView with
         admin = dso

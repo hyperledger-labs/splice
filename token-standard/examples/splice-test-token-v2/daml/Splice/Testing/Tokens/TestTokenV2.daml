@@ -218,7 +218,6 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
-    -- TODO(#5001): test all calls to this event log using submitTree
     interface instance TransferEventsV2.EventLog for TokenRules where
       view = TransferEventsV2.EventLogView with
         admin = admin

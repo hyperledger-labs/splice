@@ -417,7 +417,6 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
         inputs = [InputAmulet result.amuletCid]
         outputs = [mkTransferOutput reason receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
-        -- TODO(#5001): test that this reason metadata is reported as a TransferEventV2
   result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets

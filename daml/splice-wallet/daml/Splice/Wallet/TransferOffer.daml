@@ -144,7 +144,6 @@ template AcceptedTransferOffer
                   meta = Some (TSU.reasonToMeta "transfer offer accepted" emptyMetadata)
               ]
             beneficiaries = None -- no beneficiaries for p2p transfers
-            -- TODO(#5001): test that this reason metadata is reported as a TransferEventV2
         result <- exercisePaymentTransfer dso transferContext transfer
         pure AcceptedTransferOffer_CompleteResult with
           transferResult = result
