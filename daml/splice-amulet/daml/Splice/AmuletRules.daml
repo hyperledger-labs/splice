@@ -176,7 +176,7 @@ template AmuletRules
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer (Some (toInterfaceContractId self)) rewardsConfig context dso transfer
+        executeTransfer (toInterfaceContractId self) rewardsConfig context dso transfer
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
@@ -964,7 +964,7 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : Optional (ContractId TransferEventsV2.EventLog) -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer : ContractId TransferEventsV2.EventLog -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
 executeTransfer eventLogCid config context dso t = do
   -- compute summaries
   csum <- summarizeAndValidateContext eventLogCid context dso t
@@ -1103,7 +1103,7 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     meta : Optional Metadata -- ^ Metadata to attach to the output amulet
   deriving (Eq, Show)
 
-summarizeAndValidateContext : Optional (ContractId TransferEventsV2.EventLog) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
+summarizeAndValidateContext : ContractId TransferEventsV2.EventLog -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
 summarizeAndValidateContext eventLogCid context dso tf = do
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
@@ -1133,7 +1133,7 @@ summarizeAndValidateContext eventLogCid context dso tf = do
     issuingMiningRounds = Map.fromList issuingMiningRounds
     validatorRights = Map.fromList validatorRights
     amuletPrice = openRound.amuletPrice
-    eventLogCid
+    eventLogCid = Some eventLogCid
 
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
@@ -2042,7 +2042,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer (Some eventLogCid) rewardsConfig context dso Transfer with
+  transferResult <- executeTransfer eventLogCid rewardsConfig context dso Transfer with
     sender
     provider = sender
     inputs
