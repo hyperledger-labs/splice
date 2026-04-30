@@ -101,6 +101,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 app_reward_round_totals,
                 app_reward_batch_hashes,
                 app_reward_root_hashes,
+                app_activity_record_meta,
                 key_value_store,
                 acs_incremental_snapshot_data_next,
                 acs_incremental_snapshot_data_backfill,

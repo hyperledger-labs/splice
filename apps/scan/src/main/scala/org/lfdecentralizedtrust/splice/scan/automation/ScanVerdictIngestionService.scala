@@ -17,6 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -34,7 +35,12 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  ActivityIngestionMetaCheck,
+  DbAppActivityRecordStore,
+  DbScanVerdictStore,
+}
+import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.DowngradeDetected
 import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 
@@ -63,6 +69,16 @@ class ScanVerdictIngestionService(
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
 ) extends RetryingService(config.automation, backoffClock, "verdict ingestion") {
+
+  private val activityMetaCheckO: Option[ActivityIngestionMetaCheck] =
+    store.appActivityRecordStoreO.map { activityStore =>
+      new ActivityIngestionMetaCheck(
+        activityStore,
+        runningCodeVersion = DbAppActivityRecordStore.ActivityIngestionCodeVersion,
+        runningUserVersion = config.activityIngestionUserVersion.fold(0)(_.toInt),
+        loggerFactory,
+      )
+    }
 
   private lazy val currentMediatorClient =
     new MediatorVerdictsClient(
@@ -215,17 +231,16 @@ class ScanVerdictIngestionService(
           DbScanVerdictStore.fromProto(v, migrationId, synchronizerId, summaryByTime)
         )
 
-      // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
-      //
-      // Once #4060 is confirmed, this should simplify, as 'items' will fail
-      // construction if any verdicts did not have a trafficSummary
       val summariesWithVerdicts = verdicts.flatMap { v =>
         val recordTime = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
         summaryByTime.get(recordTime).map(_ -> v)
       }
       // Insert verdicts, traffic summaries, and app activity records in a single transaction
-      for {
+      val firstRecordTimeMicros = verdicts.headOption.fold(0L)(v =>
+        CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime).toMicros
+      )
 
+      for {
         // Compute app activity records (before DB transaction).
         // Records have verdictRowId = DUMMY_VERDICT_ROW_ID
         // the store resolves actual row_ids during insertion.
@@ -237,6 +252,48 @@ class ScanVerdictIngestionService(
               }
             }
           case None => Future.successful(Seq.empty)
+        }
+
+        // Ensure meta row exists and versions match (first batch with activity records).
+        ingestionStarted <- activityMetaCheckO match {
+          case Some(metaCheck) if metaCheck.isChecked =>
+            Future.successful(true)
+          case Some(metaCheck) if appActivityRecords.nonEmpty =>
+            val earliestRound = appActivityRecords
+              .map(_._2.roundNumber)
+              .minOption
+              .getOrElse(0L)
+            metaCheck.ensure(firstRecordTimeMicros, earliestRound).map {
+              case DowngradeDetected(rc, ru, sc, su) =>
+                logger.error(
+                  s"Activity ingestion version downgrade detected: " +
+                    s"running=($rc,$ru), stored=($sc,$su). " +
+                    s"Shutting down to prevent data corruption."
+                )
+                sys.exit(1)
+              case _ => true
+            }
+          case _ => Future.successful(false)
+        }
+
+        // After ingestion has started, every verdict must have a traffic summary.
+        _ <- {
+          val missingTimes =
+            if (ingestionStarted)
+              verdicts
+                .map(v => CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime))
+                .filterNot(summaryByTime.keySet.contains)
+            else Seq.empty
+          if (missingTimes.nonEmpty)
+            Future.failed(
+              Status.INTERNAL
+                .withDescription(
+                  s"${missingTimes.size} verdicts missing traffic summaries " +
+                    s"after ingestion start: $missingTimes"
+                )
+                .asRuntimeException()
+            )
+          else Future.unit
         }
 
         _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
@@ -268,9 +325,9 @@ class ScanVerdictIngestionService(
         DbScanVerdictStore
           .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
       })
-      // TODO(#4060): handle missing traffic summaries more robustly. In particular,
-      // note that the whole call will fail if ANY of the requested traffic summaries are missing.
-      // This workaround may therefore drop existing traffic summaries.
+      // Recover from NO_EVENT_AT_TIMESTAMPS by returning an empty result.
+      // See ActivityIngestionMetaCheck for when missing summaries are
+      // tolerated vs treated as errors.
       .recoverWith { case ex @ GrpcException(status, trailers) =>
         val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
         val errorDetails = ErrorDetails.from(statusProto)

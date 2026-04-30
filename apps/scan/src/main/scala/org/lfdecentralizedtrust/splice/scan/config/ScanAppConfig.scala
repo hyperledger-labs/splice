@@ -73,6 +73,7 @@ case class ScanAppBackendConfig(
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
+    activityIngestionUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
     publicUrl: Option[Uri] = None,
     // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.

@@ -5,6 +5,15 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
+- Scan app
+
+    - ``canton.scan-apps.scan-app.activity-ingestion-user-version`` configuration setting
+      has been added to control the activity record ingestion version.
+      Incrementing this value causes the Scan app to record a new completeness
+      boundary; reward accounting excludes rounds before it, while existing
+      activity records are retained.
+      See the :ref:`SV Operations docs <sv-reingest-scan-stores>` for more details.
+
 - Validator app
 
     - the configuration ``domain-migration-dump-path`` was removed

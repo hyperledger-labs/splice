@@ -37,6 +37,26 @@ object DbAppActivityRecordStore {
   )
 
   val DUMMY_VERDICT_ROW_ID: Long = -123456789L
+
+  /** Bump this when the ingestion logic changes materially. */
+  val ActivityIngestionCodeVersion: Int = 1
+
+  /** Metadata for an activity record ingestion run.
+    *
+    * @param historyId history identifier from update_history_descriptors
+    * @param codeVersion code version of the ingestion logic
+    * @param userVersion operator-configured version from ScanAppConfig
+    * @param startedIngestingAt record time (microseconds since epoch) of the first
+    *                           verdict in the first batch with activity records
+    * @param earliestIngestedRound the earliest round number in the first batch with activity records
+    */
+  final case class AppActivityRecordMetaT(
+      historyId: Long,
+      codeVersion: Int,
+      userVersion: Int,
+      startedIngestingAt: Long,
+      earliestIngestedRound: Long,
+  )
 }
 
 class DbAppActivityRecordStore(
@@ -59,6 +79,7 @@ class DbAppActivityRecordStore(
   object Tables {
     val appActivityRecords = "app_activity_record_store"
     val verdicts = "scan_verdict_store"
+    val activityRecordMeta = "app_activity_record_meta"
   }
 
   private def historyId = updateHistory.historyId
@@ -77,46 +98,32 @@ class DbAppActivityRecordStore(
 
   /** Find the earliest round with complete app activity.
     *
-    * Assumes that ledger ingestion order for app activity is sequential,
-    * i.e.,
-    * - app activity for round N always precedes round N + 1, and
-    * - if activity for N + 1 is present now, N has all its activity.
+    * Uses `earliest_ingested_round` from the meta table — the first round
+    * may be partial, so the earliest complete round is
+    * `earliest_ingested_round + 1`, provided that round has records.
     *
-    * Returns None if fewer than two consecutive rounds have been ingested.
+    * Returns None if no meta record exists (ingestion hasn't started) or
+    * if the next round after the earliest hasn't been ingested yet.
     */
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
 
-    // The inner `where exists` is used to make sure we only consider activity records for the correct history
-    // `order by ... limit 1` is used instead of min/max to force the query planner to use the index on round_number
     runQuerySingle(
-      sql"""select min_round + 1
-            from (
-              select a.round_number as min_round
-              from #${Tables.appActivityRecords} a
-              where exists (
-                select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
-              )
-              order by a.round_number asc
-              limit 1
-            ) sub
-            where exists (
-              select 1
-              from #${Tables.appActivityRecords} a
-              where a.round_number = sub.min_round + 1
+      sql"""select m.earliest_ingested_round + 1
+            from #${Tables.activityRecordMeta} m
+            where m.history_id = $historyId
               and exists (
                 select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
+                from #${Tables.appActivityRecords} a
+                where a.round_number = m.earliest_ingested_round + 1
+                  and exists (
+                    select 1
+                    from #${Tables.verdicts} v
+                    where v.row_id = a.verdict_row_id
+                      and v.history_id = $historyId
+                  )
               )
-              order by a.round_number asc
-              limit 1
-            )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.earliestRoundWithCompleteAppActivity",
     )
@@ -286,6 +293,54 @@ class DbAppActivityRecordStore(
       )
     }
   }
+
+  type AppActivityRecordMetaT = DbAppActivityRecordStore.AppActivityRecordMetaT
+
+  private implicit val getResultAppActivityRecordMeta: GetResult[AppActivityRecordMetaT] =
+    GetResult { prs =>
+      DbAppActivityRecordStore.AppActivityRecordMetaT(
+        historyId = prs.<<[Long],
+        codeVersion = prs.<<[Int],
+        userVersion = prs.<<[Int],
+        startedIngestingAt = prs.<<[Long],
+        earliestIngestedRound = prs.<<[Long],
+      )
+    }
+
+  def lookupActivityRecordMeta()(implicit
+      tc: TraceContext
+  ): Future[Option[AppActivityRecordMetaT]] =
+    runQuerySingle(
+      sql"""select history_id, activity_ingestion_code_version,
+                   activity_ingestion_user_version, started_ingesting_at,
+                   earliest_ingested_round
+            from #${Tables.activityRecordMeta}
+            where history_id = $historyId
+            order by activity_ingestion_code_version desc,
+                     activity_ingestion_user_version desc
+            limit 1
+      """.as[AppActivityRecordMetaT].headOption,
+      "appActivity.lookupActivityRecordMeta",
+    )
+
+  def insertActivityRecordMeta(
+      codeVersion: Int,
+      userVersion: Int,
+      startedIngestingAt: Long,
+      earliestIngestedRound: Long,
+  )(implicit tc: TraceContext): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update_(
+        sql"""insert into #${Tables.activityRecordMeta}
+                (history_id, activity_ingestion_code_version,
+                 activity_ingestion_user_version, started_ingesting_at,
+                 earliest_ingested_round)
+              values ($historyId, $codeVersion, $userVersion, $startedIngestingAt,
+                      $earliestIngestedRound)
+        """.asUpdate,
+        "appActivity.insertActivityRecordMeta",
+      )
+    )
 
   private def runQuerySingle[T](
       action: DBIOAction[Option[T], NoStream, Effect.Read],
