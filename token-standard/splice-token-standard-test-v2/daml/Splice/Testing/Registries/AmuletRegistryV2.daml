@@ -62,6 +62,7 @@ import Splice.ValidatorLicense
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.TokenStandard.RegistryApiV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 import Daml.Script
 
@@ -151,10 +152,12 @@ tapFaucet registry user amount = do
   amuletRulesD <- queryDisclosure' @AmuletRules registry.dso amuletRulesCid
   openMiningRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRound
   let disclosures = amuletRulesD <> openMiningRoundD
-  result <- submitWithDisclosures' user disclosures $ exerciseCmd amuletRulesCid AmuletRules_DevNet_Tap with
-    receiver = user
-    amount
-    openRound
+  result <- WalletClientV2.checkTxHistoryV2 [registry.dso] $
+    submitResultAndTree (actAs user <> discloseMany' disclosures) $
+      exerciseCmd amuletRulesCid AmuletRules_DevNet_Tap with
+        receiver = user
+        amount
+        openRound
   return $ toInterfaceContractId result.amuletSum.amulet
 
 

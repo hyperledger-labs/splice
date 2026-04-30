@@ -16,31 +16,16 @@ module Splice.Testing.TokenStandard.MultiRegistry
   , mkRegistryApisV1
   , mkRegistryApisV2
   , mkRegistryApisV1V2
-
-  -- * Default setup
-  , Config(..)
-  , defaultConfig
-  , initialize
   ) where
 
 import DA.Map qualified as Map
 import DA.Optional
 
-import Splice.TokenStandard.Utils (downcast)
-
 import Splice.Testing.TokenStandard.RegistryApi qualified as V1
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
 
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
-import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
-import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenV1_RegistryV1
-import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenV2_RegistryV2
-
 import Daml.Script
 
-
--- Multi-registry support
--------------------------
 
 -- | Type alias for a map of registries, keyed by the party that administers them.
 type MultiRegistry = Map.Map Party RegistryApis
@@ -90,51 +75,3 @@ mkRegistryApisV1V2 : (V1.RegistryApi v1, V2.RegistryApi v2) => v1 -> v2 -> Regis
 mkRegistryApisV1V2 v1Api v2Api = RegistryApis with
   v1Api = Some (V1.mkGenericRegistry v1Api)
   v2Api = Some (V2.mkGenericRegistry v2Api)
-
--- Default setup
----------------------
-
--- Note: this is not placed exactly right, as it uses the concrete registries
--- defined here. Move this default config into its own module if there are dependency issues.
-
-data Config = Config with
-    amulet : AmuletRegistryV2.AmuletRegistryConfig
-    testTokenV1 : TestTokenV1_RegistryV1.TestTokenV1RegistryConfig
-    testTokenV2 : TestTokenV2_RegistryV2.TestTokenV2RegistryConfig
-  deriving (Eq, Show)
-
-data Env = Env with
-  registries : MultiRegistry
-  amuletV1 : AmuletRegistryV1.AmuletRegistry
-  amuletV2 : AmuletRegistryV2.AmuletRegistry
-  testTokenV1 : TestTokenV1_RegistryV1.TestTokenV1Registry
-  testTokenV2 : TestTokenV2_RegistryV2.TestTokenV2Registry
-
-defaultConfig : Config
-defaultConfig = Config with
-  amulet = AmuletRegistryV2.defaultAmuletRegistryConfig
-  testTokenV1 = TestTokenV1_RegistryV1.defaultTestTokenV1RegistryConfig
-  testTokenV2 = TestTokenV2_RegistryV2.defaultTestTokenV2RegistryConfig
-
-initialize : Config -> Script Env
-initialize config = do
-  -- setup
-  amuletV2 <- AmuletRegistryV2.initialize config.amulet
-  let amuletId = amuletV2.instrumentId
-  let amuletV1 = AmuletRegistryV1.AmuletRegistry with
-        dso = amuletV2.dso
-        instrumentId = downcast amuletId
-
-  -- test token v1 registry setup
-  testTokenV1 <- TestTokenV1_RegistryV1.initialize config.testTokenV1
-
-  -- test token v2 registry setup
-  testTokenV2 <- TestTokenV2_RegistryV2.initialize config.testTokenV2
-
-  let registries = Map.fromList
-        [ (amuletV2.dso, mkRegistryApisV1V2 amuletV1 amuletV2)
-        , (testTokenV1.admin, mkRegistryApisV1 testTokenV1)
-        , (testTokenV2.admin, mkRegistryApisV2 testTokenV2 )
-        ]
-
-  pure Env with ..

@@ -27,6 +27,7 @@ import Splice.TokenStandard.Utils
 
 import Splice.Testing.Tokens.TestTokenV2 as TestTokenV2
 import Splice.Testing.TokenStandard.RegistryApiV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 import Splice.Testing.Utils
 
 import Daml.Script
@@ -93,12 +94,12 @@ mint registry account intrumentName amount = do
           context = emptyChoiceContext
           meta = emptyMetadata
   context <- registryApi_getTransferOfferContext registry offerCid emptyMetadata
-  -- FIXME: check tx history
-  void $ submit (actAs account.owner <> discloseMany' context.disclosures) $
-    exerciseCmd offerCid accept with
-      extraArgs = ExtraArgs with
-        context = context.choiceContext
-        meta = emptyMetadata
+  void $ WalletClientV2.checkTxHistoryV2 [registry.admin] $
+    submitResultAndTree (actAs account.owner <> discloseMany' context.disclosures) $
+      exerciseCmd offerCid accept with
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
 
 
 

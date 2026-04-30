@@ -23,6 +23,7 @@ import Splice.TokenStandard.Utils
 import Splice.Testing.Utils
 import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenRegistryV1
 import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
+import Splice.Testing.Registries.TestRegistries qualified as TestRegistries
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 (SimpleTransfer(..))
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
@@ -45,7 +46,7 @@ data TestSetup = TestSetup with
 test_v1_transfers : Script ()
 test_v1_transfers = do
   -- setup
-  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let instrX = V2.InstrumentId with
         id = "X1"
         admin = env.testTokenV1.admin
@@ -67,7 +68,7 @@ test_v1_transfers = do
 test_v2_transfer : Script ()
 test_v2_transfer = do
   -- setup
-  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let registries = env.registries
   let instrX = V2.InstrumentId with
         id = "X2"

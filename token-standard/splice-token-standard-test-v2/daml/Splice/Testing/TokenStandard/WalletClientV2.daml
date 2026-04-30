@@ -62,7 +62,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     mkTransferFactory_TransferV2',
 
     -- * Tx history V2 checking utilities
-    -- FIXME
+    checkTxHistoryV2,
 
   ) where
 
@@ -262,7 +262,7 @@ executeTSABatch registries actor batch
   | otherwise = do
     inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
     [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
-    checkTxHistoryV2 registries $
+    checkTxHistoryV2 (Map.keys registries) $
       submitResultAndTree (actAs actor <> discloseMany' batch.disclosures) $
         exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
             actions = batch.actions
@@ -535,9 +535,8 @@ mkTransferFactory_TransferV2' registries t = do
 type HoldingSnapshot = Map.Map (ContractId V2.Holding) V2.HoldingView
 
 -- FIXME: return extracted history and use it to check metadata
-checkTxHistoryV2 : MultiRegistry.MultiRegistry -> Script (a, TransactionTree) -> Script a
-checkTxHistoryV2 registries action = do
-  let adminParties = Map.keys registries
+checkTxHistoryV2 : [Party] -> Script (a, TransactionTree) -> Script a
+checkTxHistoryV2 adminParties action = do
   holdingsBefore <- snapshotHoldings adminParties
   (result, txTree) <- action
   holdingsAfter <- snapshotHoldings adminParties
@@ -615,7 +614,8 @@ mergeHoldingsChanges events =
         observers = dedupSort (e1.observers ++ e2.observers)
         extraArgs = e1.extraArgs with
           -- we dont care about the choice context
-          meta = e1.extraArgs.meta <> e2.extraArgs.meta
+          meta = Metadata with
+            values = e1.extraArgs.meta.values <> e2.extraArgs.meta.values
 
 
 
