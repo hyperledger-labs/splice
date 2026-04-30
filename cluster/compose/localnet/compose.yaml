@@ -97,7 +97,10 @@ services:
       - sv
 
   canton:
-    image: "${IMAGE_REPO}canton:${IMAGE_TAG}"
+    build:
+      context: ${LOCALNET_DIR}/docker/console
+      args:
+        BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
@@ -106,6 +109,7 @@ services:
       - *alpha-protocol-version-env
     container_name: canton
     volumes:
+      - ${LOCALNET_DIR}/docker/canton/health-check.sh:/app/health-check.sh
       - ${LOCALNET_DIR}/conf/canton/app.conf:/app/app.conf
       - ${LOCALNET_DIR}/conf/canton/app-provider:/app/app-provider/${APP_PROVIDER_PROFILE}
       - ${LOCALNET_DIR}/conf/canton/app-user:/app/app-user/${APP_USER_PROFILE}
@@ -121,7 +125,7 @@ services:
       - "${TEST_PORT-2$PARTICIPANT_ADMIN_API_PORT_SUFFIX:}2${PARTICIPANT_ADMIN_API_PORT_SUFFIX}"
       - "${TEST_PORT-2$PARTICIPANT_JSON_API_PORT_SUFFIX:}2${PARTICIPANT_JSON_API_PORT_SUFFIX}"
     healthcheck:
-      test: ["CMD", "exit", "0"]
+      test: ["CMD", "bash", "/app/health-check.sh"]
       interval: 20s
       start_interval: 5s
       timeout: 30s
