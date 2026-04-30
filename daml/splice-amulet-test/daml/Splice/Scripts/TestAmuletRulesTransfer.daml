@@ -47,7 +47,7 @@ testUsageFees = do
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-    submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -143,7 +143,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
     exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -177,7 +177,7 @@ testAmuletUsedAfterHoldingFeeChanged = do
 
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
-  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+  submit (actAs app.dso <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
     newConfig = amuletRules.configSchedule.initialValue with
                             transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
                               holdingFee = RatePerRound smallerHoldingFee
@@ -224,7 +224,7 @@ testAmuletUsedAfterHoldingFeeChanged = do
 submitTransfer: ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
 submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amount =
   checkTransferMetadata app TxKind_Transfer sender $
-    submitMulti [sender, receiver] [app.dso] $
+    submit (actAs sender <> actAs receiver <> readAs app.dso) $
       exerciseCmd amuletRulesCid AmuletRules_Transfer with
         transfer = Transfer with
           sender = sender
@@ -258,7 +258,7 @@ testSenderChangeAndOutput = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -312,7 +312,7 @@ testSenderSmallChange = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -362,7 +362,7 @@ testSenderSmallChangeNoSenderOutput = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -410,7 +410,7 @@ testAppRewardBeneficiaries = do
   context <- getPaymentTransferContext app alice
 
   -- Beneficiary weights don't add up to 1
-  _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  _ <- submitMustFail (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -428,7 +428,7 @@ testAppRewardBeneficiaries = do
 
   -- length beneficiaries > 20
 
-  _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  _ <- submitMustFail (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -452,7 +452,7 @@ testAppRewardBeneficiaries = do
 
     transferResult <-
       checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-      submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -474,12 +474,12 @@ testAppRewardBeneficiaries = do
       then do
         [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
         -- archive to simplify test queries
-        submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd rewardCid
+        submit (actAs alice.primaryParty <> actAs app.dso) $ archiveCmd rewardCid
 
         -- unfeatured with beneficiaries
 
         checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-          submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+          submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
             transfer = Transfer with
               sender = alice.primaryParty
               provider = alice.primaryParty
@@ -502,7 +502,7 @@ testAppRewardBeneficiaries = do
         [(rewardCid2, bobAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon bob.primaryParty (\r -> r.beneficiary == Some bob.primaryParty)
 
         -- archive to simplify test queries
-        forA_ [rewardCid1, rewardCid2] $ \cid -> submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd cid
+        forA_ [rewardCid1, rewardCid2] $ \cid -> submit (actAs alice.primaryParty <> actAs app.dso) $ archiveCmd cid
 
 
         forA_ [aliceAppRewardCouponUnfeaturedNoBeneficiary, aliceAppRewardCouponUnfeaturedBeneficiary, bobAppRewardCouponUnfeaturedBeneficiary] $ \reward -> do
@@ -540,7 +540,7 @@ testUnclaimedActivityRecordTransferInput = do
   -- Unhappy path - UnclaimedActivityRecord has expired
   expiredUnclaimedActivityRecordCid <- submit app.dso $
     createCmd unclaimedActivityRecord with expiresAt = addRelTime now (- hours 1)
-  submitMultiMustFail [alice.primaryParty] [app.dso] $
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -557,7 +557,7 @@ testUnclaimedActivityRecordTransferInput = do
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-      submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
           provider = alice.primaryParty
@@ -602,7 +602,7 @@ testInputDevelopmentFundCoupon = do
 
   -- Unhappy - expiresAt has been reached
   setTime $ addRelTime expiresAt (minutes 1)
-  submitMultiMustFail [bob.primaryParty] [app.dso] $
+  submitMustFail (actAs bob.primaryParty <> readAs app.dso) $
     exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bob.primaryParty
@@ -618,7 +618,7 @@ testInputDevelopmentFundCoupon = do
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-      submitMulti [bob.primaryParty] [app.dso] $
+      submit (actAs bob.primaryParty <> readAs app.dso) $
         exerciseCmd context.amuletRules AmuletRules_Transfer with
           transfer = Transfer with
             sender = bob.primaryParty

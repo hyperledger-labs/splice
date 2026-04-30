@@ -294,11 +294,10 @@ trait ScanConnection
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
-      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])]
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
   def listUnclaimedDevelopmentFundCoupons()(implicit
       ec: ExecutionContext,

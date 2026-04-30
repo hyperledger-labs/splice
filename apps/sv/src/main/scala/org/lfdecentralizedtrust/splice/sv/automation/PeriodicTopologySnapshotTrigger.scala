@@ -98,7 +98,7 @@ class PeriodicTopologySnapshotTrigger(
         .streamOnboardingState(
           Right(now),
           config.location,
-          Paths.get(s"$folderName/onboarding-state").toString,
+          Paths.get(s"$folderName/onboarding-state.zst").toString,
         )
         .andThen {
           case Success(storageObject) =>

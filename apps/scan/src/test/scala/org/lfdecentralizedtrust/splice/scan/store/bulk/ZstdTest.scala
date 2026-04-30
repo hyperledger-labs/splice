@@ -18,6 +18,7 @@ import java.time.Instant
 import io.circe.syntax.*
 import org.apache.pekko.stream.testkit.TestPublisher
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem
+import org.lfdecentralizedtrust.splice.store.bulk.ZstdGroupedWeight
 
 import java.io.ByteArrayInputStream
 import scala.concurrent.duration.*

@@ -16,6 +16,7 @@ import json
 import jsonpickle
 import sys
 import re
+import time
 
 MIN_EXPIRATION_DELTA = datetime.timedelta(days=2)
 CACHE_SECRET_NAME = "auth0-preflight-token-cache-v2"
@@ -296,7 +297,16 @@ def main(args: argparse.Namespace):
 
   info("Saving cache to k8s secret")
   encoded = jsonpickle.encode(cache)
-  k.replace_namespaced_secret(CACHE_SECRET_NAME, "default", client.V1Secret(metadata=client.V1ObjectMeta(name=CACHE_SECRET_NAME), data={"data": base64.b64encode(encoded.encode('ascii')).decode('ascii')}))
+  max_retries = 5
+  for attempt in range(max_retries):
+    try:
+      k.replace_namespaced_secret(CACHE_SECRET_NAME, "default", client.V1Secret(metadata=client.V1ObjectMeta(name=CACHE_SECRET_NAME), data={"data": base64.b64encode(encoded.encode('ascii')).decode('ascii')}))
+      break
+    except Exception as e:
+      if attempt == max_retries - 1:
+        raise
+      info(f"Failed to save cache (attempt {attempt + 1}/{max_retries}): {e}")
+      time.sleep(5)
 
 def parse_args():
   parser = argparse.ArgumentParser()

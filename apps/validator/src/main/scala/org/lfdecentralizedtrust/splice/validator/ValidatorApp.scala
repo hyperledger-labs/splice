@@ -895,7 +895,6 @@ class ValidatorApp(
           retryProvider,
           loggerFactory,
         ),
-        config.domainMigrationDumpPath,
         config.domainMigrationId,
         retryProvider,
         config.svValidator,

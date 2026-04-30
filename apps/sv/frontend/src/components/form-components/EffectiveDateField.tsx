@@ -8,7 +8,7 @@ import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-
 import dayjs from 'dayjs';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { EffectivityType } from '../../utils/types';
-import React from 'react';
+import React, { useMemo } from 'react';
 
 export interface EffectiveDateFieldProps {
   title?: string;
@@ -30,6 +30,11 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
   }>();
 
   const currentType = field.state.value?.type || 'custom';
+
+  const dateValue = useMemo(
+    () => dayjs(field.state.value.effectiveDate),
+    [field.state.value.effectiveDate]
+  );
 
   const handleTypeChange = (type: EffectivityType) => {
     if (type === 'custom') {
@@ -73,7 +78,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DesktopDateTimePicker
-                value={dayjs(field.state.value.effectiveDate)}
+                value={dateValue}
                 format={dateTimeFormatISO}
                 ampm={false}
                 onChange={newDate => {

@@ -33,7 +33,10 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSyncUpgradeTransferTrafficTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -347,6 +350,15 @@ class LogicalSynchronizerUpgradeIntegrationTest
       logSuffix = "global-synchronizer-upgrade",
     )() {
 
+      clue(
+        "Pause traffic transfer trigger on sv2 to simulate a participant that is connected to a non initialized sequencer past upgrade tiem"
+      ) {
+        sv2Backend.dsoAutomation
+          .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
+          .pause()
+          .futureValue
+      }
+
       clue(s"wait for lsu announcement") {
         waitForLsuAnnouncement()
       }
@@ -356,7 +368,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
-            eventuallySucceeds(2.minutes) {
+            eventuallySucceeds(3.minutes) {
               upgradeSequencerClient.physical_synchronizer_id shouldBe successorPsid
             }
           }
@@ -371,6 +383,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue(s"wait for upgrade time $upgradeTime") {
         Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
+      }
+
+      clue("Restart sv2 and resume traffic transfer trigger") {
+        sv2Backend.stop()
+        sv2Backend.startSync()
+        sv2Backend.dsoAutomation
+          .trigger[LogicalSyncUpgradeTransferTrafficTrigger]
+          .resume()
       }
 
       def participantIsConnectedToNewSynchronizer(

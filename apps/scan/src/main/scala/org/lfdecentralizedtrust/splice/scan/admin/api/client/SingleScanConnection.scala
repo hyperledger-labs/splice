@@ -555,11 +555,10 @@ class SingleScanConnection private[client] (
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
-      pageToken: Option[BigInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(Seq[DsoRules_CloseVoteRequestResult], Option[BigInt])] = runHttpCmd(
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = runHttpCmd(
     config.adminApi.url,
     HttpScanAppClient.ListVoteRequestResults(
       actionName,
@@ -568,7 +567,6 @@ class SingleScanConnection private[client] (
       effectiveFrom,
       effectiveTo,
       limit,
-      pageToken,
     ),
   )
 

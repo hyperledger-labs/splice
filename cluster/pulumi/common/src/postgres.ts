@@ -120,7 +120,9 @@ export class CloudPostgres
       name,
       {
         databaseVersion: 'POSTGRES_14',
-        deletionProtection: deletionProtection,
+        // keep always false as this is the terraform provider and cannot be manually removed
+        // https://github.com/pulumi/pulumi-gcp/issues/1209
+        deletionProtection: false,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           deletionProtectionEnabled: deletionProtection,

@@ -40,7 +40,7 @@ test_ValidatorFaucet = do
     -- round0 can be received
     passTime (hours 1)
     now <- getTime
-    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+    result <- submit (actAs aliceValidator.primaryParty <> readAs app.dso) $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0._1
     let faucetCid = result.licenseCid
     Some faucet <- queryContractId @ValidatorLicense aliceValidator.primaryParty faucetCid
@@ -48,11 +48,11 @@ test_ValidatorFaucet = do
     checkActivityRecordsExist (round0._2.round)
 
     -- but not twice
-    submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+    submitMustFail (actAs aliceValidator.primaryParty <> readAs app.dso) $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round0._1
 
     -- round1 can be received
-    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+    result <- submit (actAs aliceValidator.primaryParty <> readAs app.dso) $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round1._1
     let faucetCid = result.licenseCid
     checkActivityRecordsExist (round1._2.round)
@@ -86,7 +86,7 @@ test_ValidatorFaucet = do
     passTime (days 1)
 
     -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
-    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+    result <- submit (actAs aliceValidator.primaryParty <> readAs app.dso) $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round3._1
     let faucetCid = result.licenseCid
 
@@ -99,7 +99,7 @@ test_ValidatorFaucet = do
     faucetState.numCouponsMissed === 2
 
     -- round2 can no longer be received
-    submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+    submitMustFail (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
       openRoundCid = round2._1
 
     return ()

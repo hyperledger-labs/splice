@@ -85,7 +85,7 @@ createExternalPartySetupProposal app validator user = do
   amuletCid <- tap app validator 50.0
   AmuletRules_CreateExternalPartySetupProposalResult{..} <-
     checkTxMetadata app TxKind_Burn validator.primaryParty $
-    submitMulti [validator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
+    submit (actAs validator.primaryParty <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
       context = context
       inputs = [InputAmulet amuletCid]
       user

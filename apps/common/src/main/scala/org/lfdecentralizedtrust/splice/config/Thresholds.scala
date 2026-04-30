@@ -34,7 +34,9 @@ object Thresholds {
       hostingParticipants: Seq[HostingParticipant]
   ): PositiveInt = {
     governanceThreshold(
-      hostingParticipants.count(_.permission == ParticipantPermission.Submission)
+      hostingParticipants.count(participant =>
+        participant.permission == ParticipantPermission.Submission && !participant.onboarding
+      )
     )
   }
 

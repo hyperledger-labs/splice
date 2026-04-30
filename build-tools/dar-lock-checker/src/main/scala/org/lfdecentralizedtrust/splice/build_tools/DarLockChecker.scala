@@ -20,14 +20,91 @@ object DarLockChecker {
       filename: String,
   )
 
+  final case class BumpTarget(
+      name: PackageName,
+      fromVersion: PackageVersion,
+      toVersion: PackageVersion,
+  )
+
+  def detectBumps(
+      branchDars: Map[(PackageName, PackageVersion), String],
+      compareDars: Map[(PackageName, PackageVersion), String],
+  ): Seq[BumpTarget] = {
+    val mismatched: Seq[(PackageName, PackageVersion)] =
+      branchDars.toSeq.flatMap { case ((name, version), branchHash) =>
+        compareDars.get((name, version)) match {
+          case Some(compareHash) if compareHash != branchHash => Some((name, version))
+          case _ => None
+        }
+      }
+    val compareMaxByName: Map[PackageName, PackageVersion] =
+      compareDars.keys.foldLeft(Map.empty[PackageName, PackageVersion]) {
+        case (acc, (name, version)) =>
+          acc.updatedWith(name) {
+            case Some(current) if current >= version => Some(current)
+            case _ => Some(version)
+          }
+      }
+    mismatched
+      .map { case (name, fromVersion) =>
+        val compareMax = compareMaxByName.getOrElse(
+          name,
+          sys.error(s"Detected mismatch for $name but compare base has no entries"),
+        )
+        BumpTarget(name, fromVersion, bumpPatch(compareMax))
+      }
+      .sortBy(_.name.toString)
+  }
+
+  private def bumpPatch(v: PackageVersion): PackageVersion = {
+    val parts = v.toString.split('.').map(_.toInt)
+    require(parts.length == 3, s"Expected semver X.Y.Z, got $v")
+    PackageVersion.assertFromString(s"${parts(0)}.${parts(1)}.${parts(2) + 1}")
+  }
+
+  def rewriteDamlYamlVersion(content: String, newVersion: PackageVersion): String = {
+    // Matches only the top-level `version: X.Y.Z` line.
+    // Uses (?m) multiline so ^ anchors each line.
+    val pattern = """(?m)^version:\s+[0-9]+\.[0-9]+\.[0-9]+$""".r
+    pattern.findFirstIn(content) match {
+      case Some(_) => pattern.replaceFirstIn(content, s"version: $newVersion")
+      case None => sys.error(s"No top-level `version: X.Y.Z` line in daml.yaml content")
+    }
+  }
+
+  def rewritePackageJson(
+      content: String,
+      packageName: PackageName,
+      newVersion: PackageVersion,
+  ): String = {
+    val escapedName = java.util.regex.Pattern.quote(packageName.toString)
+    val pattern =
+      ("""("file:common/frontend/daml\.js/""" + escapedName + """)-[0-9]+\.[0-9]+\.[0-9]+(")""").r
+    pattern.replaceAllIn(
+      content,
+      m => java.util.regex.Matcher.quoteReplacement(s"${m.group(1)}-$newVersion${m.group(2)}"),
+    )
+  }
+
   def main(args: Array[String]): Unit = {
-    args.toSeq match {
+    val (flagArgs, positionalArgs) = args.toSeq.partition(_.startsWith("--"))
+    val baseRefFlag: Option[String] = flagArgs.collectFirst {
+      case s if s.startsWith("--base=") => s.stripPrefix("--base=")
+    }
+    val unknownFlags = flagArgs.filterNot(_.startsWith("--base="))
+    if (unknownFlags.nonEmpty)
+      printHelpAndError(s"unknown flag(s): ${unknownFlags.mkString(" ")}")
+
+    positionalArgs match {
       case cmd +: outputFilename +: inputFilenames =>
         // This includes all freshly built DARs but not the checked in DARs.
         val builtDars: Seq[Dar] = readDars(inputFilenames)
         val nonTestBuiltDars = builtDars.filter(dar => !dar.packageName.endsWith("-test"))
 
         val darMap = toDarMap(builtDars)
+
+        if (baseRefFlag.isDefined && cmd != "bump")
+          printHelpAndError(s"--base is only supported by the 'bump' command")
 
         cmd match {
           case "check" =>
@@ -66,6 +143,30 @@ object DarLockChecker {
             val checkedInDarMap = getCheckedInDarMap()
             val lockStr = getLockStr(checkedInDarMap ++ darMap)
             val _ = File(outputFilename).overwrite(lockStr)
+          case "bump" =>
+            val compareRef = baseRefFlag.getOrElse(defaultCompareRef())
+            println(s"[damlBumpPackageVersions] Comparing against $compareRef")
+            val compareDars = fetchCompareDarsLock(compareRef)
+            val targets = detectBumps(darMap, compareDars)
+            if (targets.isEmpty) {
+              println("[damlBumpPackageVersions] No Daml package version bumps needed.")
+            } else {
+              targets.foreach { t =>
+                println(
+                  s"[damlBumpPackageVersions] Bumping ${t.name} ${t.fromVersion} -> ${t.toVersion}"
+                )
+              }
+              targets.foreach { t =>
+                val yamlFile = findDamlYaml(t.name)
+                val updated = rewriteDamlYamlVersion(yamlFile.contentAsString, t.toVersion)
+                val _ = yamlFile.overwrite(updated)
+              }
+              val packageJson = File("apps/package.json")
+              val updatedJson = targets.foldLeft(packageJson.contentAsString) { (acc, t) =>
+                rewritePackageJson(acc, t.name, t.toVersion)
+              }
+              val _ = packageJson.overwrite(updatedJson)
+            }
           case _ =>
             printHelpAndError(s"unknown command '$cmd'")
         }
@@ -214,5 +315,43 @@ object DarLockChecker {
         }
       }
       .toMap
+  }
+
+  private def findDamlYaml(packageName: PackageName): File = {
+    val candidates = Seq(
+      File(s"daml/${packageName}/daml.yaml"),
+      File(s"token-standard/${packageName}/daml.yaml"),
+      File(s"token-standard/examples/${packageName}/daml.yaml"),
+    )
+    candidates
+      .find(_.exists)
+      .getOrElse(
+        sys.error(
+          s"Could not locate daml.yaml for $packageName; checked: ${candidates.map(_.toString).mkString(", ")}"
+        )
+      )
+  }
+
+  // Default: the release line ref used by checkPackageIdsImmutable, e.g.
+  // `refs/remotes/origin/release-line-0.6.0`. Override via the `--base=<ref>` flag
+  // (e.g. `--base=origin/main`) for long-running branches that are not targeting
+  // the next release.
+  private def defaultCompareRef(): String = {
+    val lastReleaseNumber = File("LATEST_RELEASE").contentAsString.strip
+    s"refs/remotes/origin/release-line-$lastReleaseNumber"
+  }
+
+  private def fetchCompareDarsLock(ref: String): Map[(PackageName, PackageVersion), String] = {
+    val result = Try(s"git show $ref:daml/dars.lock".!!)
+    result match {
+      case Success(content) => parseDarsLock(content)
+      case Failure(e) =>
+        sys.error(
+          s"Failed to read daml/dars.lock from $ref. " +
+            s"Make sure the ref is fetched (e.g. `git fetch origin`), " +
+            s"or pass a different ref via `--base=<ref>`. " +
+            s"Underlying error: ${e.getMessage}"
+        )
+    }
   }
 }

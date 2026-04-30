@@ -198,12 +198,19 @@ class RollForwardLsuIntegrationTest
       }
     }
 
+    // This is what is announced but then fails
+    val announcementNewSynchronizerSerial =
+      decentralizedSynchronizerPSId.serial + NonNegativeInt.one
+    // This is the synchronizer we roll forward two
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
-    val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
+    val successorPsid = decentralizedSynchronizerPSId.copy(
+      serial = newSynchronizerSerial,
+      protocolVersion = ProtocolVersion.v34,
+    )
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
+      scheduleLsu(topologyFreezeTime, upgradeTime, announcementNewSynchronizerSerial.value.toLong)
     }
     clue("Topology state contains LSU announcement") {
       eventually(3.minutes) {
@@ -229,6 +236,10 @@ class RollForwardLsuIntegrationTest
       participants = false,
       enableBftSequencer = true,
       logSuffix = "roll-forward-lsu",
+      extraSequencerConfig = Seq(
+        s"parameters.lsu-repair.lsu-sequencing-bounds-override.lower-bound-sequencing-time-exclusive=${upgradeTime}",
+        s"parameters.lsu-repair.lsu-sequencing-bounds-override.upgrade-time=${upgradeTime}",
+      ),
     )() {
       // Wait first so that the participant has observed the timestamp and will happily migrate.
       clue(s"wait for upgrade time $upgradeTime") {

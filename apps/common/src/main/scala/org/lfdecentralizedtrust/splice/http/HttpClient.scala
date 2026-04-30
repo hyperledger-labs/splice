@@ -27,6 +27,7 @@ import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 import org.apache.pekko.http.scaladsl.settings.{ClientConnectionSettings, HttpsProxySettings}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthTokenSource}
 import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
@@ -291,13 +292,19 @@ object HttpClient {
     // if pekko config is set, it overrides what is set in system properties
     // pekko does not support credentials in `pekko.http.client.proxy`,
     // so that can't be supported here, if users need this they need to set proxy settings via system properties.
+    //
+    // `nonProxyHosts` is always read from JVM system properties (there is no
+    // Pekko config key for it). Only the standard JDK property
+    // `http.nonProxyHosts` is consulted.
+    // An empty or unset value means "no bypass patterns".
+    val nonProxyHosts = NonProxyHosts.readFromSystemProperties()
     Try(HttpsProxySettings(ac.settings.config))
       .map { proxyConf =>
         logger.trace(
           s"Configuring pekko-http client from pekko.http.client.proxy config: host = ${proxyConf.host}, port = ${proxyConf.port}"
         )
         ClientConnectionSettings(ac).withTransport(
-          ClientTransport.httpsProxy()
+          withBypass(ClientTransport.httpsProxy(), nonProxyHosts, logger)
         )
       }
       .getOrElse {
@@ -311,18 +318,60 @@ object HttpClient {
             )
             ClientConnectionSettings(ac)
           } { proxySettings =>
-            proxySettings.creds.fold {
-              logger.trace(s"${msgPrefix(proxySettings)}, credentials = [redacted]")
-              ClientConnectionSettings(ac).withTransport(
-                ClientTransport.httpsProxy(proxySettings.address)
-              )
-            } { creds =>
+            val proxyTransport = proxySettings.creds.fold {
               logger.trace(s"${msgPrefix(proxySettings)}, no credentials set")
-              ClientConnectionSettings(ac).withTransport(
-                ClientTransport.httpsProxy(proxySettings.address, creds)
-              )
+              ClientTransport.httpsProxy(proxySettings.address)
+            } { creds =>
+              logger.trace(s"${msgPrefix(proxySettings)}, credentials = [redacted]")
+              ClientTransport.httpsProxy(proxySettings.address, creds)
             }
+            ClientConnectionSettings(ac).withTransport(
+              withBypass(proxyTransport, nonProxyHosts, logger)
+            )
           }
+      }
+  }
+
+  /** Wrap `proxyTransport` with a delegating transport that bypasses the proxy
+    * for hosts matching the configured `nonProxyHosts` patterns. If no patterns
+    * are configured, `proxyTransport` is returned unchanged (zero overhead).
+    */
+  private def withBypass(
+      proxyTransport: ClientTransport,
+      nonProxyHosts: NonProxyHosts,
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): ClientTransport = {
+    if (nonProxyHosts.isEmpty) proxyTransport
+    else
+      new NonProxyHostsClientTransport(proxyTransport, ClientTransport.TCP, nonProxyHosts, logger)
+  }
+
+  /** A [[ClientTransport]] that delegates to either a proxy transport or a
+    * direct (TCP) transport based on whether the target host matches the
+    * configured `nonProxyHosts` patterns.
+    *
+    * `connectTo` is invoked by Pekko on connection establishment (not per
+    * request), so the match cost is negligible; nevertheless the pattern list
+    * is pre-compiled in [[NonProxyHosts.parse]] to keep each check to simple
+    * string operations.
+    */
+  private final class NonProxyHostsClientTransport(
+      proxyTransport: ClientTransport,
+      directTransport: ClientTransport,
+      nonProxyHosts: NonProxyHosts,
+      logger: TracedLogger,
+  )(implicit tc: TraceContext)
+      extends ClientTransport {
+    override def connectTo(host: String, port: Int, settings: ClientConnectionSettings)(implicit
+        system: ActorSystem
+    ): Flow[ByteString, ByteString, Future[Http.OutgoingConnection]] =
+      if (nonProxyHosts.matches(host)) {
+        logger.trace(
+          s"Bypassing proxy for host '$host:$port' (matched http.nonProxyHosts)"
+        )
+        directTransport.connectTo(host, port, settings)
+      } else {
+        proxyTransport.connectTo(host, port, settings)
       }
   }
 }

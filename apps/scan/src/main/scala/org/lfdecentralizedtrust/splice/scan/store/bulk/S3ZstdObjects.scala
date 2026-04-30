@@ -10,6 +10,7 @@ import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
+import org.lfdecentralizedtrust.splice.store.bulk.ZstdGroupedWeight
 
 import scala.concurrent.ExecutionContext
 

@@ -808,25 +808,42 @@ object ScanHttpEncodings {
   ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
-    val nodesWithChildren = tree.getEventsById.asScala.map {
-      case (nodeId, exercised: data.ExercisedEvent) =>
-        mapping(nodeId.intValue()) -> tree
-          .getChildNodeIds(exercised)
-          .asScala
-          .toSeq
-          .map(_.intValue())
-          .map(mapping)
-      case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
-    }.toMap
+    // Cache it once and reuse.
+    val eventsById = tree.getEventsById.asScala
+    // Build `nodesWithChildren` with a pre-sized mutable HashMap and a
+    // single-pass, lazy child-id translation, then freeze to an immutable
+    // map at the end.
+    val nodesWithChildren: Map[Int, Seq[Int]] = {
+      val m = new scala.collection.mutable.HashMap[Int, Seq[Int]](eventsById.size, 0.75)
+      eventsById.foreach {
+        case (nodeId, exercised: data.ExercisedEvent) =>
+          val translated = tree
+            .getChildNodeIds(exercised)
+            .asScala
+            .iterator
+            .map(ci => mapping(ci.intValue()))
+            .toVector
+          m.update(mapping(nodeId.intValue()), translated)
+        case (nodeId, _) =>
+          m.update(mapping(nodeId.intValue()), Seq.empty)
+      }
+      m.toMap
+    }
     val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
-      tree.getEventsById.asScala.collect { case (_, exercised: javaApi.ExercisedEvent) =>
+      eventsById.collect { case (_, exercised: javaApi.ExercisedEvent) =>
         mapping(exercised.getNodeId)
       }.toSeq,
       nodesWithChildren,
     )
-    val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
+    // `Trees.getLocalEventIndices` assigns dense new node ids in `0..n-1`,
+    // so we can place remapped events directly at their target position in a
+    // pre-sized array and wrap it as a Java list for the Transaction
+    // constructor.
+    val size = eventsById.size
+    val remappedEventsArr = new Array[javaApi.Event](size)
+    eventsById.foreach {
       case (nodeId, created: javaApi.CreatedEvent) =>
-        mapping(nodeId) -> new javaApi.CreatedEvent(
+        remappedEventsArr(mapping(nodeId)) = new javaApi.CreatedEvent(
           created.getWitnessParties,
           created.getOffset,
           mapping(created.getNodeId),
@@ -846,7 +863,7 @@ object ScanHttpEncodings {
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)
-        mapping(nodeId) -> new javaApi.ExercisedEvent(
+        remappedEventsArr(mapping(nodeId)) = new javaApi.ExercisedEvent(
           exercised.getWitnessParties,
           exercised.getOffset,
           newNodeId,
@@ -869,6 +886,9 @@ object ScanHttpEncodings {
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
+    val remappedEventsJava: java.util.List[javaApi.Event] =
+      java.util.List.of(remappedEventsArr*)
+
     // Include the external transaction hash based on the hash inclusion policy.
     val externalTransactionHash: ByteString =
       hashInclusionPolicy match {
@@ -888,7 +908,7 @@ object ScanHttpEncodings {
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      eventsById.toList.sortBy(_._1).map(_._2).asJava,
+      remappedEventsJava,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
       tree.getSynchronizerId,
       tree.getTraceContext,

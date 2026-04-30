@@ -49,7 +49,7 @@ This means that backups must be preserved with a time difference between two his
 
 For SVs, by default, the mediator and the splice apps have no pruning enabled.
 
-Furthermore, backups must be retained for previous :ref:`major upgrades <sv-upgrades>`. This includes all the historical sequencer backups and the backups of the other apps.
+Furthermore, backups must be retained across :ref:`logical synchronizer upgrades <sv-logical-synchronizer-upgrades>`. This includes all the historical sequencer backups and the backups of the other apps.
 
 Backup of CometBFT
 ++++++++++++++++++
@@ -69,4 +69,4 @@ We target to set the number of blocks to retain to a value that keeps at least 3
 The CometBFT historical backups must be kept in such a way that the difference between the block height when two backups are taken is smaller than the configured number of blocks to retain.
 We recommend that backups are taken and preserved in a more aggressive fashion, every 2 weeks.
 
-Furthermore, backups must be retained for previous :ref:`major upgrades <sv-upgrades>`.
+Furthermore, backups must be retained across :ref:`logical synchronizer upgrades <sv-logical-synchronizer-upgrades>`.

@@ -185,7 +185,7 @@ class BaseLedgerConnection(
 
   def ensureUserPrimaryPartyIsAllocated(
       userId: String,
-      hint: String,
+      hint: => String,
       participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(

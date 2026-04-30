@@ -33,6 +33,7 @@ import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
 
 import java.time.Instant
+import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Matchers {
@@ -351,6 +352,200 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       .asInstanceOf[TransactionTreeUpdate]
       .tree
     withoutLocalData2 should be(withoutLocalData)
+  }
+
+  "makeConsistentAcrossSvs on a nested Java Transaction" should {
+    // Build events directly with given (original) node id and, for exercises,
+    // the given last-descendant node id.
+    def mkCreatedEvent(nodeId: Int, contractId: String): javaApi.CreatedEvent =
+      new javaApi.CreatedEvent(
+        /*witnessParties = */ java.util.Collections.emptyList(),
+        /*offset = */ 0L,
+        /*nodeId = */ nodeId,
+        /*templateId = */ new javaApi.Identifier("pkg", "Mod", "Tpl"),
+        /*packageName = */ "pkg-name",
+        /*contractId = */ contractId,
+        /*arguments = */ new javaApi.DamlRecord(
+          java.util.Collections.emptyList[javaApi.DamlRecord.Field]()
+        ),
+        /*createdEventBlob = */ ByteString.EMPTY,
+        /*interfaceViews = */ java.util.Collections.emptyMap(),
+        /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+        /*contractKey = */ java.util.Optional.empty(),
+        /*signatories = */ java.util.Collections.emptyList(),
+        /*observers = */ java.util.Collections.emptyList(),
+        /*createdAt = */ Instant.EPOCH,
+        /*acsDelta = */ false,
+        /*representativePackageId = */ "pkg",
+      )
+
+    def mkExercisedEvent(
+        nodeId: Int,
+        lastDescendantNodeId: Int,
+        contractId: String,
+    ): javaApi.ExercisedEvent =
+      new javaApi.ExercisedEvent(
+        /*witnessParties = */ java.util.Collections.emptyList(),
+        /*offset = */ 0L,
+        /*nodeId = */ nodeId,
+        /*templateId = */ new javaApi.Identifier("pkg", "Mod", "Tpl"),
+        /*packageName = */ "pkg-name",
+        /*interfaceId = */ java.util.Optional.empty(),
+        /*contractId = */ contractId,
+        /*choice = */ "Noop",
+        /*choiceArgument = */ com.daml.ledger.javaapi.data.Unit.getInstance(),
+        /*actingParties = */ java.util.Collections.emptyList(),
+        /*consuming = */ false,
+        /*lastDescendantNodeId = */ lastDescendantNodeId,
+        /*exerciseResult = */ com.daml.ledger.javaapi.data.Unit.getInstance(),
+        /*implementedInterfaces = */ java.util.Collections.emptyList(),
+        /*acsDelta = */ false,
+      )
+
+    // Wrap a list of javaApi.Events into a Transaction + TreeUpdateWithMigrationId,
+    // honouring the javaApi.Transaction constructor's requirement that events be
+    // sorted by nodeId.
+    def wrapTx(
+        events: Seq[javaApi.Event],
+        externalTransactionHash: ByteString = ByteString.EMPTY,
+        recordTime: Instant = Instant.parse("2025-01-01T00:00:00.000000Z"),
+    ): TreeUpdateWithMigrationId = {
+      val sortedEvents = events.sortBy(_.getNodeId.intValue())
+      val tx = new javaApi.Transaction(
+        /*updateId = */ "update-id",
+        /*commandId = */ "",
+        /*workflowId = */ "",
+        /*effectiveAt = */ recordTime,
+        /*events = */ sortedEvents.asJava,
+        /*offset = */ 42L,
+        /*synchronizerId = */ dummyDomain.toProtoPrimitive,
+        /*traceContext = */ com.daml.ledger.api.v2.TraceContextOuterClass.TraceContext.getDefaultInstance,
+        /*recordTime = */ recordTime,
+        /*externalTransactionHash = */ externalTransactionHash,
+        /*trafficCost = */ 0L,
+      )
+      TreeUpdateWithMigrationId(
+        update = UpdateHistoryResponse(
+          update = TransactionTreeUpdate(tx),
+          synchronizerId = dummyDomain,
+        ),
+        migrationId = 1L,
+      )
+    }
+
+    def normalise(update: TreeUpdateWithMigrationId): javaApi.Transaction =
+      ScanHttpEncodings
+        .makeConsistentAcrossSvs(update, ExternalHashInclusionPolicy.AlwaysInclude, None)
+        .update
+        .update
+        .asInstanceOf[TransactionTreeUpdate]
+        .tree
+
+    "renumber a deeply nested tree in in-order traversal order" in {
+      // Tree (original node ids chosen so in-order traversal renumbers them):
+      //
+      //   root (10) ─────────────────────────────────────
+      //     ├── childA (20) ──────────────────────────
+      //     │     ├── grandA1 (30) [create]
+      //     │     └── grandA2 (40) [create]
+      //     ├── childB (50) ──────────────────────────
+      //     │     └── grandB1 (60) [create]
+      //     └── childC (70) [create]
+      //
+      // In-order traversal visits:
+      //   root, childA, grandA1, grandA2, childB, grandB1, childC
+      // so remapped node ids are: 0,1,2,3,4,5,6.
+
+      val root = mkExercisedEvent(nodeId = 10, lastDescendantNodeId = 70, contractId = "cid:root")
+      val childA =
+        mkExercisedEvent(nodeId = 20, lastDescendantNodeId = 40, contractId = "cid:childA")
+      val grandA1 = mkCreatedEvent(nodeId = 30, contractId = "cid:grandA1")
+      val grandA2 = mkCreatedEvent(nodeId = 40, contractId = "cid:grandA2")
+      val childB =
+        mkExercisedEvent(nodeId = 50, lastDescendantNodeId = 60, contractId = "cid:childB")
+      val grandB1 = mkCreatedEvent(nodeId = 60, contractId = "cid:grandB1")
+      val childC = mkCreatedEvent(nodeId = 70, contractId = "cid:childC")
+
+      val update = wrapTx(Seq(root, childA, grandA1, grandA2, childB, grandB1, childC))
+      val out = normalise(update)
+
+      // New node ids are dense (no gaps) 0..6 in the order described above.
+      def byCid(cid: String): javaApi.Event =
+        out.getEvents.asScala.collectFirst {
+          case c: javaApi.CreatedEvent if c.getContractId == cid => c: javaApi.Event
+          case e: javaApi.ExercisedEvent if e.getContractId == cid => e: javaApi.Event
+        }.value
+
+      byCid("cid:root").getNodeId shouldBe 0
+      byCid("cid:childA").getNodeId shouldBe 1
+      byCid("cid:grandA1").getNodeId shouldBe 2
+      byCid("cid:grandA2").getNodeId shouldBe 3
+      byCid("cid:childB").getNodeId shouldBe 4
+      byCid("cid:grandB1").getNodeId shouldBe 5
+      byCid("cid:childC").getNodeId shouldBe 6
+
+      // lastDescendantNodeId is remapped to the deepest descendant's new id.
+      byCid("cid:root").asInstanceOf[javaApi.ExercisedEvent].getLastDescendantNodeId shouldBe 6
+      byCid("cid:childA").asInstanceOf[javaApi.ExercisedEvent].getLastDescendantNodeId shouldBe 3
+      byCid("cid:childB").asInstanceOf[javaApi.ExercisedEvent].getLastDescendantNodeId shouldBe 5
+
+      // The tree's structural accessors agree.
+      out.getRootNodeIds.asScala.toSeq shouldBe Seq[java.lang.Integer](0)
+      val rootEvent = out.getEventsById.get(0).asInstanceOf[javaApi.ExercisedEvent]
+      out.getChildNodeIds(rootEvent).asScala.toSeq shouldBe Seq[java.lang.Integer](1, 4, 6)
+      val childAEvent = out.getEventsById.get(1).asInstanceOf[javaApi.ExercisedEvent]
+      out.getChildNodeIds(childAEvent).asScala.toSeq shouldBe Seq[java.lang.Integer](2, 3)
+      val childBEvent = out.getEventsById.get(4).asInstanceOf[javaApi.ExercisedEvent]
+      out.getChildNodeIds(childBEvent).asScala.toSeq shouldBe Seq[java.lang.Integer](5)
+    }
+
+    "be idempotent and deterministic regardless of input event ordering" in {
+      // Same tree as above.
+      val root = mkExercisedEvent(10, 70, "cid:root")
+      val childA = mkExercisedEvent(20, 40, "cid:childA")
+      val grandA1 = mkCreatedEvent(30, "cid:grandA1")
+      val grandA2 = mkCreatedEvent(40, "cid:grandA2")
+      val childB = mkExercisedEvent(50, 60, "cid:childB")
+      val grandB1 = mkCreatedEvent(60, "cid:grandB1")
+      val childC = mkCreatedEvent(70, "cid:childC")
+      val allEvents = Seq(root, childA, grandA1, grandA2, childB, grandB1, childC)
+
+      val canonical = normalise(wrapTx(allEvents))
+
+      // Re-running must yield the same result.
+      normalise(wrapTx(allEvents)) shouldBe canonical
+
+      // Re-materialising the input in a different iteration order (the
+      // Transaction ctor sorts internally by nodeId, so downstream behaviour
+      // must not depend on input order) still yields the same result.
+      val rng = new Random(0xc0ffee)
+      val shuffles = (1 to 20).map(_ => rng.shuffle(allEvents))
+      forAll(shuffles) { shuffled =>
+        normalise(wrapTx(shuffled)) shouldBe canonical
+      }
+    }
+
+    "handle a deep linear chain without losing the last-descendant relationship" in {
+      // A purely linear chain of exercises with a single terminal create:
+      //   e(10) → e(20) → e(30) → e(40) → e(50) → create(60)
+      val depth = 6
+      val events: Seq[javaApi.Event] = (0 until depth).map { i =>
+        val nodeId = (i + 1) * 10
+        if (i == depth - 1) mkCreatedEvent(nodeId, s"cid:$i")
+        else mkExercisedEvent(nodeId, lastDescendantNodeId = depth * 10, s"cid:$i")
+      }
+
+      val out = normalise(wrapTx(events))
+
+      // The chain is renumbered to 0..depth-1.
+      out.getEvents.asScala.map(_.getNodeId.intValue()).toVector shouldBe (0 until depth).toVector
+
+      // Every exercise's lastDescendantNodeId points at the terminal create.
+      val exercises = out.getEvents.asScala.toVector.collect { case e: javaApi.ExercisedEvent =>
+        e
+      }
+      forAll(exercises)(_.getLastDescendantNodeId shouldBe depth - 1)
+    }
   }
 
   "return version specific event ids" in {

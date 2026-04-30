@@ -30,6 +30,7 @@ import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, config}
+import monocle.macros.syntax.lens.*
 
 /** This trait provides helpers for the logical synchronizer upgrade tests. The main goal is to
   * improve readability of each tests by focusing on the behavior we want to test and make it easier
@@ -58,6 +59,11 @@ private[lsu] trait LsuBase
 
   protected def configTransforms: Seq[ConfigTransform] = List(
     ConfigTransforms.disableAutoInit(newOldNodesResolution.keySet),
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.sequencerClient.maxConnectionRetryDelay)
+        // Retry more frequently so that eventually blocks don't need to wait for too long
+        .replace(config.NonNegativeFiniteDuration.ofSeconds(2))
+    ),
     ConfigTransforms.enableUnsafeMutiSynchronizerTopologyFeatureFlag,
   ) ++ ConfigTransforms.enableAlphaVersionSupport
     ++ ConfigTransforms.setTopologyTransactionRegistrationTimeout(

@@ -161,7 +161,7 @@ class UnclaimedActivityRecordIntegrationTest
                 aliceParty.toProtoPrimitive,
                 BigDecimal(amountToMint).bigDecimal,
                 "alice is doing great - vote",
-                Instant.now().plus(5, ChronoUnit.SECONDS),
+                Instant.now().plus(10, ChronoUnit.SECONDS),
               )
             )
           )

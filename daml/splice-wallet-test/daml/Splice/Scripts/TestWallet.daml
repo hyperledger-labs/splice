@@ -5,6 +5,7 @@ module Splice.Scripts.TestWallet where
 
 import DA.Action
 import DA.Assert
+import DA.Foldable (foldMap)
 import DA.Time
 import Daml.Script
 import DA.List
@@ -44,7 +45,7 @@ createPaymentRequest app provider sender receiverAmounts = do
   t <- getTime
   let description = "multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts
   -- multi-party submit to simplify test
-  submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
+  submit (foldMap actAs (sender :: provider :: map fst receiverAmounts)) $ createCmd AppPaymentRequest with
     sender
     provider
     dso = app.dso
@@ -60,7 +61,7 @@ acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId F
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest amulet = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   -- TODO(#2957): remove read-as DSO party.
-  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+  result <- submit (actAs sender.primaryParty <> actAs walletProvider <> readAs app.dso) $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputAmulet amulet]
     context
     walletProvider
@@ -76,14 +77,14 @@ collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContextForRound app provider round
   -- multi party submit to simplify test
-  submitMulti (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  submit (foldMap actAs (signatory acceptedPayment) <> readAs app.dso) $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
 
 collectAcceptedPaymentMustFail : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script ()
 collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContext app provider
   -- multi party submit to simplify test
-  _ <- submitMultiMustFail (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  _ <- submitMustFail (foldMap actAs (signatory acceptedPayment) <> readAs app.dso) $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
 sendPreapprovedTransfer : AmuletApp -> AmuletUser -> AmuletUser -> AmuletUser -> Decimal -> Script AmuletOperationOutcome
@@ -98,7 +99,7 @@ sendPreapprovedTransfer app sender senderWalletProvider receiver amount = do
 
   amulets <- query @Amulet sender.primaryParty
   context <- getPaymentTransferContextFeaturedApp app sender senderProviderFeaturedRight
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [senderWalletProvider.primaryParty] [sender.primaryParty, app.dso] $ exerciseCmd senderWalletInstall WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs senderWalletProvider.primaryParty <> readAs sender.primaryParty <> readAs app.dso) $ exerciseCmd senderWalletInstall WalletAppInstall_ExecuteBatch with
     inputs = fmap ((\amulet -> InputAmulet amulet) . fst) amulets
     operations = [CO_TransferPreapprovalSend preapprovalCid receiverProviderFeaturedRight amount (Some "wallet-app-install-preapproval-send-description")]
     context
@@ -161,20 +162,20 @@ testExpiringAmuletPaymentRequest = script do
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 AmuletUnit)
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "alice"
     dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   -- Try expiring too early
-  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+  submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty) $ exerciseCmd install
         WalletAppInstall_AppPaymentRequest_Expire with
           cid = transferRequest
 
   passTime (minutes 6)
 
-  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+  submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty) $ exerciseCmd install
         WalletAppInstall_AppPaymentRequest_Expire with
           cid = transferRequest
 
@@ -395,14 +396,14 @@ testTerminatedPayments = script do
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
-  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
   let tickDuration = defaultAmuletConfig.tickDuration
   passTime (tickDuration + tickDuration + seconds 1) -- pass one full round of time
-  submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
+  submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 
   pure ()
@@ -423,14 +424,14 @@ testSuccessfulBatchAmuletPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 2.0 AmuletUnit)]
 
   let endUserName = "wallet_service_participant_user"
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = endUserName
     dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   context <- getPaymentTransferContext app alice
-  executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  executeBatchResult <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     context
     inputs = [InputAmulet amulet]
     operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
@@ -475,7 +476,7 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
   runAmuletDepositBots app
   amulet <- tap app alice 42.0
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -497,7 +498,7 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
       operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
       context
   -- execute the second command alone
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_AppPayment transferRequest4]
     context
@@ -534,7 +535,7 @@ testCO_MergeTransferInputs = script do
   amulet <- tap app alice 42.0
   amulet2 <- tap app alice 43.0
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -543,7 +544,7 @@ testCO_MergeTransferInputs = script do
 
   context <- getPaymentTransferContext app alice
 
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet, InputAmulet amulet2]
     operations = [CO_MergeTransferInputs]
     context
@@ -568,7 +569,7 @@ testTransferPreapproval = script do
   [(_, amuletRules)] <- query @AmuletRules app.dso
   let createFee = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).transferConfig.createFee.fee
 
-  install <- submitMulti [aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = aliceValidator.primaryParty
     endUserName = "alice_validator_user"
     dsoParty = app.dso
@@ -581,7 +582,7 @@ testTransferPreapproval = script do
   validatorRewardsBefore <- query @ValidatorRewardCoupon aliceValidator.primaryParty
 
   let duration = days 1
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [aliceValidator.primaryParty, app.dso] $
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs aliceValidator.primaryParty <> readAs aliceValidator.primaryParty <> readAs app.dso) $
     exerciseCmd install WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet]
       operations = [CO_CreateExternalPartySetupProposal alice.primaryParty (now `addRelTime` duration)]
@@ -617,7 +618,7 @@ testTransferPreapproval = script do
   let newExpiresAt = preapproval.expiresAt `addRelTime` duration
   aliceValidatorAmulets <- query @Amulet aliceValidator.primaryParty
   let [_, (changeAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceValidatorAmulets
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [aliceValidator.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs aliceValidator.primaryParty <> readAs aliceValidator.primaryParty <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet changeAmuletCid]
     operations = [CO_RenewTransferPreapproval preapprovalCid newExpiresAt]
     context
@@ -636,7 +637,7 @@ testTransferPreapproval = script do
 
   tap app bob 42.0
 
-  submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  submit (actAs bob.primaryParty <> actAs bobValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = bob.primaryParty
     endUserName = "bob_user"
     dsoParty = app.dso
@@ -672,13 +673,13 @@ testTransferPreapproval = script do
     provider = bobValidator.primaryParty
     expectedDso = Some app.dso
 
-  bobValidatorInstall <- submitMulti [bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  bobValidatorInstall <- submit (actAs bobValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = bobValidator.primaryParty
     endUserName = "bob_validator_user"
     dsoParty = app.dso
     validatorParty = bobValidator.primaryParty
 
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [bobValidator.primaryParty] [bobValidator.primaryParty, app.dso] $
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs bobValidator.primaryParty <> readAs bobValidator.primaryParty <> readAs app.dso) $
     exerciseCmd bobValidatorInstall WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet bobValidatorAmulet]
       operations = [CO_AcceptTransferPreapprovalProposal preapprovalProposalCid (now `addRelTime` duration)]
@@ -832,7 +833,7 @@ testBuyMemberTraffic = script do
   openRound3.round.number === openRound2.round.number + 1
 
   -- create a wallet install contract and tap some amulets for provider2
-  provider2Install <- submitMulti [provider2.primaryParty, provider2Validator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  provider2Install <- submit (actAs provider2.primaryParty <> actAs provider2Validator.primaryParty) $ createCmd $ WalletAppInstall with
       endUserParty = provider2.primaryParty
       endUserName = "provider2_wallet_user"
       dsoParty = app.dso
@@ -840,7 +841,7 @@ testBuyMemberTraffic = script do
   _ <- tap app provider2 10.0
 
   let createTrafficRequest amount memberId synchronizerId trackingId expiresAt = do
-      result <- submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
+      result <- submit (actAs provider2Validator.primaryParty <> readAs provider2.primaryParty) $
           exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
             trafficAmount = amount
             memberId = memberId
@@ -914,7 +915,7 @@ testInsufficientFundsBatchSubscriptions = script do
   pizzeria <- setupUser app "pizzeria" validator
   provider <- setupUser app "la_famiglia" validator
 
-  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs validator) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -932,7 +933,7 @@ testInsufficientFundsBatchSubscriptions = script do
         dso = app.dso
         description = "test subscription"
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData payData)
 
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
@@ -945,7 +946,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs alice.primaryParty <> actAs validator <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -967,7 +968,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submit (actAs alice.primaryParty <> actAs validator <> readAs app.dso) $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
@@ -986,13 +987,13 @@ testTokenStandardTransfer = script do
   bobValidator <- allocateParty "bobValidator"
   bob <- allocateParty "bob"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso
     validatorParty = aliceValidator
 
-  bobInstall <- submitMulti [bob, bobValidator] [] $ createCmd $ WalletAppInstall with
+  bobInstall <- submit (actAs bob <> actAs bobValidator) $ createCmd $ WalletAppInstall with
     endUserParty = bob
     endUserName = "bob_user"
     dsoParty = registry.dso
@@ -1024,14 +1025,14 @@ testTokenStandardTransfer = script do
     transfer
     extraArgs = emptyExtraArgs
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg = enrichedChoice.arg
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change1 = result.senderChangeCids
 
   context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
     transferInstructionCid = aliceInstrCid
     withdrawArg = Api.Token.TransferInstructionV1.TransferInstruction_Withdraw with
       extraArgs = ExtraArgs with
@@ -1041,7 +1042,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
   let change2 = result.senderChangeCids
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg = Api.Token.TransferInstructionV1.TransferFactory_Transfer with
       expectedAdmin = registry.dso
@@ -1052,7 +1053,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change3 = result.senderChangeCids
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
     transferInstructionCid = aliceInstrCid
     rejectArg = Api.Token.TransferInstructionV1.TransferInstruction_Reject with
       extraArgs = ExtraArgs with
@@ -1062,7 +1063,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
   let change4 = result.senderChangeCids
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
     transferFactoryCid = enrichedChoice.factoryCid
     transferArg =  Api.Token.TransferInstructionV1.TransferFactory_Transfer with
       expectedAdmin = registry.dso
@@ -1073,7 +1074,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
     transferInstructionCid = aliceInstrCid
     acceptArg =  Api.Token.TransferInstructionV1.TransferInstruction_Accept with
       extraArgs = ExtraArgs with
@@ -1093,7 +1094,7 @@ testTokenStandardAllocate = script do
 
   provider <- allocateParty "provider"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso
@@ -1134,7 +1135,7 @@ testTokenStandardAllocate = script do
     requestedAt = now
     extraArgs = emptyExtraArgs
 
-  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_AllocationFactory_Allocate with
+  result <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_AllocationFactory_Allocate with
     allocationFactory = enrichedChoice.factoryCid
     allocateArg = enrichedChoice.arg
 
@@ -1142,7 +1143,7 @@ testTokenStandardAllocate = script do
 
   context <- RegistryApi.getAllocation_WithdrawContext registry allocationCid emptyMetadata
 
-  _ <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_Allocation_Withdraw with
+  _ <- submit (actAs aliceValidator <> readAs alice <> readAs registry.dso) $ exerciseCmd aliceInstall WalletAppInstall_Allocation_Withdraw with
     allocationCid = allocationCid
     withdrawArg = Api.Token.AllocationV1.Allocation_Withdraw with
       extraArgs = ExtraArgs with
@@ -1168,7 +1169,7 @@ executeAmuletOperation app user op = do
   context <- getPaymentTransferContext app user
   amulets <- queryFilter @Amulet user.primaryParty (\amulet -> amulet.owner == user.primaryParty)
   -- TODO(#2957): remove read-as DSO party.
-  result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.dso] $
+  result <- submit (actAs install.validatorParty <> readAs install.endUserParty <> readAs app.dso) $
     exerciseCmd installCid WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet._1 | amulet <- amulets]
       operations = [op]

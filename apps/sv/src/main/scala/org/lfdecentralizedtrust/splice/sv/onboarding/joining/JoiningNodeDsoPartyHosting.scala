@@ -150,9 +150,10 @@ class JoiningNodeDsoPartyHosting(
           _ = logger.info(
             "Received Acs snapshot from sponsor, importing into candidate participant"
           )
-          _ <- participantAdminConnection.uploadAcsSnapshot(
-            Seq(response.acsSnapshot),
+          _ <- participantAdminConnection.importPartyAcs(
+            response.acsSnapshot,
             synchronizerId,
+            dsoParty,
           )
           _ = logger.info(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"

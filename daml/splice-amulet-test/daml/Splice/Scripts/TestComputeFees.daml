@@ -27,7 +27,7 @@ testScaledHoldingFees = do
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
   -- Set holding fee and initial amulet price
-  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+  submit (actAs app.dso <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
     newConfig = amuletRules.configSchedule.initialValue with
                             transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
                               holdingFee = RatePerRound holdingFee

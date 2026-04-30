@@ -204,7 +204,7 @@ class LocalNetFrontendIntegrationTest
         appProviderParticipant.config.copy(token = Some(token)),
       )
       val hash = participantClient.upload_dar_unless_exists(
-        "apps/app/src/test/resources/nuck-example-main-0.0.1.dar"
+        "apps/app/src/test/resources/nuck-example-0.0.1.dar"
       )
       val AssetTemplate = Some(
         Identifier(

@@ -6,27 +6,19 @@
 Upgrades
 ========
 
-.. todo:: deduplicate this text with validators
-
 There are two types of upgrades:
 
-Upgrades to a new minor version (given that we have not yet reached
-``1.0``, this corresponds to an upgrade from ``0.A.X`` to ``0.A.Y``)
-and major upgrades (this corresponds to an upgrade from ``0.B.X`` to
-``0.CY``).
+Version upgrades (this corresponds to an upgrade from ``0.A.X`` to ``0.B.Y``)
+and protocol upgrades (the actual version can remain the same, only the protocol is upgraded).
 
-Minor upgrades can be done by each node independently and only require
+Version upgrades can be done by each node independently and only require
 a ``helm upgrade``. Make sure to read the :ref:`release_notes` to learn
 about changes you may need to make as part of the upgrade.
 
-Major upgrades require a more complex :ref:`procedure <sv-upgrades>`
-procedure with network-wide coordination and downtime.
-
-:ref:`Logical synchronizer upgrades <sv-logical-synchronizer-upgrades>` are the upcoming replacement for the major upgrade procedure to roll out protocol upgrades with
-significantly reduced operational overhead and downtime.
+Protocol upgrades are performed through :ref:`logical synchronizer upgrades <sv-logical-synchronizer-upgrades>`,
+which allow upgrading the protocol version with very limited network downtime.
 
 .. toctree::
    :hidden:
 
-   sv_major_upgrade
    sv_logical_synchronizer_upgrade

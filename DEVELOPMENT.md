@@ -373,15 +373,34 @@ from the repo root to delete all `.daml` build directories.
 
 ## Daml Version Bump
 
-Whenever you update a .dar file, you need to bump the version of the corresponding daml package,
-and the version of daml packages that (recursively) depend on it. For that,
+Whenever you update a .dar file, the version of the corresponding daml package — and of every daml package that (recursively) depends on it — must be bumped.
+
+The one-command path:
+
+```bash
+git fetch origin            # needed so the tool can compare against the latest release line branch
+sbt damlBumpPackageVersions
+```
+
+By default the bump target is `max(latest release line version) + 1`, matching what the
+DAR lock checker enforces — so a branch that's about to land on `main` doesn't re-bump a
+package that has already been bumped on `main` since the last release.
+
+For long-running branches that aren't merging to main soon, bumping relative to `main` or some other branch might make more sense.
+You can achieve that by passing a git ref as an argument; this ref will be used as the base for the bump instead of the latest release line.
+For example:
+
+```bash
+sbt 'damlBumpPackageVersions origin/main'
+```
+
+If the auto-bumper can't help (e.g. you want a minor/major bump), fall back to the manual steps:
 
 1. Bump the version inside the `daml.yaml` file inside the updated module, and in all modules that (recursively) depend on it.
 2. Run `sbt damlBuild; sbt damlDarsLockFileUpdate` to compile the `.dar` files.
-3. Manually update the relevant daml package versions inside `apps/dar-resources-generator/src/main/scala/org/lfdecentralizedtrust/splice/darutils/DarResources.scala`.
-4. Run `sbt updateDarResources` to update DarResources.
-5. Manually update `apps/package.json` to update the versions of the daml packages that were updated in step 1.
-6. Run `sbt npmInstall ; sbt compile`
+3. Run `sbt updateDarResources` to update DarResources.
+4. Manually update `apps/package.json` to update the versions of the daml packages that were updated in step 1.
+5. Run `sbt npmInstall ; sbt compile`
 
 ## Daml Version Guards in Integration Tests
 
@@ -430,9 +449,9 @@ assumes that the removal is not user facing, e.g., it won't break app
 devs or validator operators. If you are unsure about that, discuss it
 with the other splice maintainers.
 
-To bump the minimum version, go to `DarResources.scala` and edit the
-`minimumInitialization` field in the respective
-`PackageResource`. After doing that you can trigger CI. All the
+To bump the minimum version, go to `apps/dar-resources-generator/.../DarResourcesGenerator.scala`,
+edit the `minimumInitialization` map and run `sbt updateDarResources`.
+After doing that you can trigger CI. All the
 version checks from from `PackageVersionSupport` will warn for checks
 that are now redundant because the version they are testing against is
 now redundant so you can delete them and the code relying on them.

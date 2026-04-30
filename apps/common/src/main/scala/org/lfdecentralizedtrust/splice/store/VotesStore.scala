@@ -133,9 +133,8 @@ trait VotesStore extends ActiveVotesStore {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit = defaultLimit,
-      after: Option[Long] = None,
   )(implicit
       tc: TraceContext
-  ): Future[ResultsPage[DsoRules_CloseVoteRequestResult]]
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
 }
