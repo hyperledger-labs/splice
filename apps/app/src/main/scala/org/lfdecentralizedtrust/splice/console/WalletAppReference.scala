@@ -5,7 +5,8 @@ package org.lfdecentralizedtrust.splice.console
 
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationV1Codegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2 as amuletallocationV2Codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -582,9 +583,23 @@ abstract class WalletAppReference(
   @Help.Description(
     "Withdraw an AmuletAllocation, which is an implementation of the Allocation Token Standard for Amulet."
   )
-  def withdrawAmuletAllocation(contractId: amuletallocationCodegen.AmuletAllocation.ContractId) = {
+  def withdrawAmuletAllocation(
+      contractId: amuletallocationV1Codegen.AmuletAllocation.ContractId
+  ) = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.WithdrawAmuletAllocation(contractId))
+    }
+  }
+
+  @Help.Summary("Withdraws an AmuletAllocationV2")
+  @Help.Description(
+    "Withdraw an AmuletAllocationV2, which is an implementation of the Allocation Token Standard V2 for Amulet."
+  )
+  def withdrawAmuletAllocationV2(
+      contractId: amuletallocationV2Codegen.AmuletAllocationV2.ContractId
+  ) = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.WithdrawAmuletAllocationV2(contractId))
     }
   }
 

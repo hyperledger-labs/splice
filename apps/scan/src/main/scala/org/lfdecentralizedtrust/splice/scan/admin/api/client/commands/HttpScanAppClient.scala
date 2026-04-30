@@ -2472,6 +2472,39 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetAllocationWithdrawContextV2(allocationId: allocationv2.Allocation.ContractId)
+      extends TokenStandardAllocationV2BaseCommand[
+        allocation.v2.GetAllocationWithdrawContextResponse,
+        ChoiceContextWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], allocation.v2.GetAllocationWithdrawContextResponse] = {
+      client.getAllocationWithdrawContext(
+        allocationId.contractId,
+        body = allocation.v2.definitions.GetChoiceContextRequest(None),
+        headers = headers,
+      )
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      allocation.v2.GetAllocationWithdrawContextResponse,
+      Either[String, ChoiceContextWithDisclosures],
+    ] = { case allocation.v2.GetAllocationWithdrawContextResponse.OK(context) =>
+      val disclosedContracts =
+        context.disclosedContracts.map(fromAllocationV2HttpDisclosedContract)
+      for {
+        choiceContext <- parseAsChoiceContext(context.choiceContextData)
+      } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
+    }
+  }
+
   final case object GetRegistryInfo
       extends TokenStandardMetadataBaseCommand[
         metadata.v1.GetRegistryInfoResponse,

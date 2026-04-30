@@ -87,6 +87,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
@@ -642,13 +643,21 @@ class BftScanConnection(
   ): Future[ChoiceContextWithDisclosures] =
     bftCall(_.getAllocationCancelContext(allocationCid))
 
-  def getAllocationWithdrawContext(
+  def getAllocationWithdrawContextV1(
       allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[ChoiceContextWithDisclosures] =
-    bftCall(_.getAllocationWithdrawContext(allocationCid))
+    bftCall(_.getAllocationWithdrawContextV1(allocationCid))
+
+  def getAllocationWithdrawContextV2(
+      allocationCid: allocationv2.Allocation.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    bftCall(_.getAllocationWithdrawContextV2(allocationCid))
 
   def getAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)(implicit
       ec: ExecutionContext,

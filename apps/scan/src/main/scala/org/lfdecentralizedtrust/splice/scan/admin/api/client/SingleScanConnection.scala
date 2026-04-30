@@ -75,6 +75,7 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
@@ -768,7 +769,7 @@ class SingleScanConnection private[client] (
       HttpScanAppClient.GetAllocationCancelContext(allocationCid),
     )
 
-  def getAllocationWithdrawContext(
+  def getAllocationWithdrawContextV1(
       allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
@@ -777,6 +778,17 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetAllocationWithdrawContext(allocationCid),
+    )
+
+  def getAllocationWithdrawContextV2(
+      allocationCid: allocationv2.Allocation.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationWithdrawContextV2(allocationCid),
     )
 
   def getAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)(implicit
