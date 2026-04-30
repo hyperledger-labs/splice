@@ -534,7 +534,7 @@ mkTransferFactory_TransferV2' registries t = do
     extraArgs = emptyExtraArgs
 
 -- TODO(#4823): add missing transfer instruction actions
--- TODO(#4838): add support for allocaiton instruction actions
+-- TODO(#4838): add support for allocation instruction actions
 
 
 -- Tx History V2 checking utilities
@@ -542,7 +542,6 @@ mkTransferFactory_TransferV2' registries t = do
 
 type HoldingSnapshot = Map.Map (ContractId V2.Holding) V2.HoldingView
 
--- FIXME: return extracted history and use it to check metadata
 checkTxHistoryV2 : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
 checkTxHistoryV2 adminParties action = do
   holdingsBefore <- snapshotHoldings adminParties

@@ -2130,12 +2130,7 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
   create configState1
   pure ()
 
-
--- V2 tx history Events
------------------------
-
-
--- FIXME: consider moving
+-- | Utility to combine multiple holding change events for Amulet.
 mergeHoldingsChangeEvents : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
 mergeHoldingsChangeEvents events =
     Map.values eventsWithAccount
@@ -2147,8 +2142,8 @@ mergeHoldingsChangeEvents events =
         transferLegs = e1.transferLegs ++ e2.transferLegs
         outputHoldingCids = e1.outputHoldingCids ++ e2.outputHoldingCids
         observers = dedupSort (e1.observers ++ e2.observers)
-        extraArgs = e1.extraArgs with
-          -- we know there's no choice-context
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext -- we ignore merging choice-contexts, as it is always empty for Amulet holdings changes
           meta = e1.extraArgs.meta <> e2.extraArgs.meta
 
 
