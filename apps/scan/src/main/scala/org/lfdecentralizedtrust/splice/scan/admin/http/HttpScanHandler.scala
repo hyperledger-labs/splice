@@ -2035,8 +2035,11 @@ class HttpScanHandler(
         partyIds,
       ) = body
 
-      // Round 0 is used as a placeholder since the v1 endpoint does not compute holding fees.
-      // The totalUnlockedCoin, totalLockedCoin, and totalCoinHoldings fields are round-independent.
+      // The asOfRound parameter is only consumed by SpliceUtil.holdingFee, which feeds the
+      // accumulated*HoldingFees* and totalAvailableCoin fields on HoldingsSummary. The v1
+      // response only exposes totalUnlockedCoin, totalLockedCoin, and totalCoinHoldings, all
+      // of which are sums of amulet.amount.initialAmount and do not depend on the round.
+      // Any value for asOfRound therefore yields the same v1 result; we pass 0 as a sentinel.
       def exactQuery(recordTimeTs: CantonTimestamp) =
         snapshotStore
           .getHoldingsSummary(
