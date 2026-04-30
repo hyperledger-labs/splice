@@ -210,12 +210,6 @@ object SvOnboardingConfig {
   }
 
   // TODO(DACH-NY/canton-network-internal#498) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
-
-  case class DomainMigration(
-      name: String,
-      dumpFilePath: Path,
-  ) extends SvOnboardingConfig
-
   def hideConfidential(config: SvOnboardingConfig): SvOnboardingConfig = {
     val hidden = "****"
     config match {
@@ -416,7 +410,6 @@ case class SvAppBackendConfig(
       onboarding.fold(true) {
         case _: SvOnboardingConfig.FoundDso => true
         case _: SvOnboardingConfig.JoinWithKey => true
-        case _: SvOnboardingConfig.DomainMigration => false
         case _: SvOnboardingConfig.RollForwardLsu => false
       }
   override val nodeTypeName: String = "SV"

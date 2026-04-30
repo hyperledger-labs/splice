@@ -3,6 +3,7 @@
 
 module Splice.Scripts.TestIsDevNet where
 
+import DA.Foldable (foldMap)
 import Daml.Script
 
 import Splice.AmuletRules
@@ -24,14 +25,14 @@ testAmuletRules = do
   pure ()
 
 testChoice : AmuletApp -> [Party] -> [Party] -> (ContractId AmuletRules -> Commands a) -> Script ()
-testChoice app actAs readAs buildCommand = do
+testChoice app actAsArgs readAsArgs buildCommand = do
   setIsDevNetFlag app False
   Some (amuletRules, _) <- queryAmuletRulesByKey app.dso
-  submitMultiMustFail actAs readAs (buildCommand amuletRules)
+  submitMustFail (foldMap actAs actAsArgs <> foldMap readAs readAsArgs) (buildCommand amuletRules)
 
   setIsDevNetFlag app True
   Some (amuletRules, _) <- queryAmuletRulesByKey app.dso
-  submitMulti actAs readAs (buildCommand amuletRules)
+  submit (foldMap actAs actAsArgs <> foldMap readAs readAsArgs) (buildCommand amuletRules)
   pure ()
 
 setIsDevNetFlag : AmuletApp -> Bool -> Script ()

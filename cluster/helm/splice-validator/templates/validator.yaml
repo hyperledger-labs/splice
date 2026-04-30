@@ -6,10 +6,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}
@@ -247,11 +247,6 @@ spec:
         - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
           value: |
             canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
-        {{- end }}
-        {{- if and (not .Values.migration.migrating) (not .Values.svValidator) }}
-        - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
-          value: |
-            canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
         {{- end }}
         - name: ADDITIONAL_CONFIG_ENABLE_WALLET
           value: |

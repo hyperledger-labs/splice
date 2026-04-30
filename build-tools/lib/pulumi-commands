@@ -209,8 +209,7 @@ function _cluster_apply() {
         _pulumi_automation_run_up
     else
       _info "Applying all"
-      DISABLE_COMETBFT_STATE_SYNC=true \
-        SPLICE_DEPLOY_SV_RUNBOOK=false \
+      SPLICE_DEPLOY_SV_RUNBOOK=false \
         SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
         _pulumi_automation_run_up
     fi

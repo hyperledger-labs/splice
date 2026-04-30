@@ -22,6 +22,7 @@ const SvCometbftConfigSchema = z
     validatorKeyAddress: z.string().optional(),
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
+    enableStateSync: z.boolean().optional(),
     resources: K8sResourceSchema,
     mempool: z
       .object({
@@ -136,6 +137,8 @@ const SvValidatorAppConfigSchema = z
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 // things here are declared optional even when they aren't, to allow partial overrides of defaults
+// TODO(DACH-NY/canton-network-internal#4859) the above is no longer true since defaults were removed.
+//   We should remove .optional() from required fields.
 const SingleSvConfigSchema = z
   .object({
     publicName: z.string().optional(),
@@ -182,11 +185,7 @@ const SingleSvConfigSchema = z
     versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();
-const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
-  z.object({
-    default: SingleSvConfigSchema,
-  })
-);
+const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema);
 const SvsConfigurationSchema = z.object({
   svs: AllSvsConfigurationSchema,
 });
@@ -196,15 +195,13 @@ export type SingleSvConfiguration = z.infer<typeof SingleSvConfigSchema>;
 
 const clusterSvsConfiguration: SingleSvConfig = SvsConfigurationSchema.parse(clusterYamlConfig).svs;
 
-export const allConfiguredSvs: string[] = Object.keys(clusterSvsConfiguration).filter(
-  k => k !== 'default'
-);
+export const allConfiguredSvs: string[] = Object.keys(clusterSvsConfiguration);
 
 // SVs that don't match the standard sv-X pattern; we deploy those always, independently of DSO_SIZE
 export const configuredExtraSvs: string[] = allConfiguredSvs.filter(k => !k.match(/^sv(-\d+)?$/));
 
 export const configForSv = (svName: string): SingleSvConfiguration => {
-  return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);
+  return clusterSvsConfiguration[svName];
 };
 
 export const allSvsConfiguration: SingleSvConfiguration[] = allConfiguredSvs.map(sv => {

@@ -5,6 +5,7 @@ module Splice.Scripts.Wallet.TestSubscriptions where
 
 import DA.Action
 import DA.Assert
+import DA.Foldable (foldMap)
 import DA.Time
 import DA.List
 import Daml.Script
@@ -41,7 +42,7 @@ testSetup = script do
 
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
   pure (app, Users with .., subscriptionRequestCid)
 
 
@@ -55,11 +56,11 @@ testSubscription = script do
   (app, Users with .., subscriptionRequestCid) <- testSetup
 
   -- reject...
-  submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
+  submit (actAs alice.primaryParty <> readAs validator) $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
   -- ...and retry
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
 
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
   None <- queryContractId alice.primaryParty subscriptionRequestCid
@@ -72,7 +73,7 @@ testSubscription = script do
 
   -- ..and retry
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
   (subscriptionCid, subscriptionStateCid, amuletCid) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
@@ -159,7 +160,7 @@ testUSDSubscription = script do
         description = "test subscription"
   advanceToIssuanceWithPrice app 2.0
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData payData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator (Some featuredValidator) subscriptionRequestCid
 
   (_, round) <- getLatestOpenRound app
@@ -242,7 +243,7 @@ acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeatur
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
   -- TODO(#2957): remove read-as DSO party.
-  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+  result <- submit (actAs sender.primaryParty <> actAs walletProvider <> readAs app.dso) $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs
     context
     walletProvider
@@ -256,7 +257,7 @@ makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
   -- TODO(#2957): remove read-as DSO party.
-  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  result <- submit (actAs sender.primaryParty <> actAs walletProvider <> readAs app.dso) $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
     walletProvider
@@ -266,10 +267,10 @@ makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state
 failMakeSubscriptionPayment
   : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState -> Script ()
 failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
-  readAs <- getUserReadAs sender.userId
+  readAs <- getUserReadAs' sender.userId
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  submitMultiMustFail [sender.primaryParty, walletProvider] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  submitMustFail (foldMap actAs [sender.primaryParty, walletProvider] <> readAs) $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
     walletProvider
@@ -281,17 +282,17 @@ collectInitialSubscriptionPayment app provider receiver sender payment = do
 
 collectInitialSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
 collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
-  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+  result <- submit (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
   return (result.subscription, result.subscriptionState, result.amulet)
 
 collectInitialSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
 collectInitialSubscriptionPaymentMustFail app provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContext app provider
-  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+  submitMustFail (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
 
 collectSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
@@ -301,17 +302,17 @@ collectSubscriptionPayment app provider receiver sender payment = do
 
 collectSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
 collectSubscriptionPaymentInRound app round provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
-  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+  result <- submit (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
   return (result.subscriptionState, result.amulet)
 
 collectSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script ()
 collectSubscriptionPaymentMustFail app provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContext app provider
-  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+  submitMustFail (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
 
 diffContracts : [(ContractId a, a)] -> [(ContractId a, a)] -> [(ContractId a, a)]

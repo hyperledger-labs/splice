@@ -113,7 +113,6 @@ services:
             canton.validator-apps.validator_backend {
               domain-migration-id = ${MIGRATION_ID}
             }
-      - ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH=canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
     depends_on:
       chown-domain-upgrade-dump:
         condition: service_completed_successfully

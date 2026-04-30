@@ -171,7 +171,6 @@ case class ValidatorAppBackendConfig(
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
     svValidator: Boolean = false,
     svUser: Option[String] = None,
-    domainMigrationDumpPath: Option[Path] = None,
     restoreFromMigrationDump: Option[Path] = None,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,

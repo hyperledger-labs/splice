@@ -32,7 +32,7 @@ testLocking = do
 
 
   checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
     exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -45,20 +45,20 @@ testLocking = do
 
   [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
 
-  submitMultiMustFail [alice.primaryParty] [app.dso] $
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd lockedCid1 LockedAmulet_OwnerExpireLockV2
 
-  submitMultiMustFail [alice.primaryParty] [app.dso] $
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
   checkTxMetadata' app TxKind_Unlock alice.primaryParty $
-    submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
       exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
   passTime (days 2)
 
   checkTxMetadata' app TxKind_Unlock alice.primaryParty $
-    submitMulti [alice.primaryParty] [app.dso] $
+    submit (actAs alice.primaryParty <> readAs app.dso) $
       exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLockV2
 
   pure ()

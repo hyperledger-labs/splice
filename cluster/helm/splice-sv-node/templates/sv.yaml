@@ -8,10 +8,10 @@ kind: Deployment
 metadata:
   name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $appIdentifier) | nindent 4 }}
@@ -75,6 +75,32 @@ spec:
                   key: private
                   name: "splice-app-sv-key"
                   optional: false
+            {{- else if .Values.rollForwardLsu }}
+            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
+              value: |
+                _onboarding {
+                  type = "roll-forward-lsu"
+                  new-physical-synchronizer-serial = {{ .Values.rollForwardLsu.newPhysicalSynchronizerSerial }}
+                  new-physical-synchronizer-protocol-version = {{ .Values.rollForwardLsu.newPhysicalSynchronizerProtocolVersion | quote }}
+                  {{- with .Values.rollForwardLsu.exportTimes }}
+                  export-times = {
+                    topology-export-time = {
+                      type = "timestamp"
+                      time = {{ .topologyExportTime | quote }}
+                    }
+                    traffic-export-time = {
+                      type = "timestamp"
+                      time = {{ .trafficExportTime | quote }}
+                    }
+                    {{- with .upgradeTime }}
+                    upgrade-time = {
+                      type = "timestamp"
+                      time = {{ . | quote }}
+                    }
+                    {{- end }}
+                  }
+                  {{- end }}
+                }
             {{- else }}
               {{- if eq .Values.onboardingType "found-dso" }}
             - name: SPLICE_APP_SV_IS_DEV_NET

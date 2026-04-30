@@ -75,4 +75,4 @@ If you have enabled participant :ref:`pruning <validator_participant_pruning>`, 
 
 This means that backups must be preserved with a time difference between two historical backups smaller than the `retention` set for the participant.
 
-Furthermore, backups should be retained for previous :ref:`major upgrades <validator-upgrades>`, both the historical backups for the participant and all the backups for the other apps.
+Furthermore, backups should be retained across :ref:`logical synchronizer upgrades <sv-logical-synchronizer-upgrades>`.

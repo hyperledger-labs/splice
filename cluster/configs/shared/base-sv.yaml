@@ -1,0 +1,35 @@
+logging:
+  appsLogLevel: DEBUG
+  appsAsync: false
+  cantonLogLevel: DEBUG
+  apiRequestLogLevel: DEBUG
+  cantonAsync: false
+  cometbftLogLevel: debug
+pruning:
+  sequencer:
+    enabled: false
+  participant:
+    enabled: true
+    cron: '0 /10 * * * ?'
+    maxDuration: 5m
+    retentionPeriod: 30d
+participant:
+  bftSequencerConnection: true
+  resources:
+    requests:
+      memory: '12Gi'
+    limits:
+      memory: '18Gi'
+  additionalEnvVars:
+    - !include(./participant_pruning.yaml)
+validatorApp:
+  additionalEnvVars:
+    # enable https://github.com/hyperledger-labs/splice/pull/2499
+    - name: ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT
+      value: |
+        canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m
+  resources:
+    requests:
+      memory: '2Gi'
+    limits:
+      memory: '4Gi'
