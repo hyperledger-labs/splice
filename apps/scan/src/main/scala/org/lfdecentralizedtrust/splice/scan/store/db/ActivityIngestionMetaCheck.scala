@@ -3,10 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.db.ActivityIngestionMetaCheck.*
-import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordMetaT
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.{
+  AppActivityRecordMetaT,
+  AppActivityRecordT,
+}
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,11 +21,11 @@ import scala.concurrent.{ExecutionContext, Future}
   * table row that records when ingestion started and which versions
   * are running.
   *
-  * On the first batch that produces activity records, [[ensure]] creates
-  * the meta row storing the current code/user version and the earliest
-  * ingested round. On subsequent batches it is a no-op. If a version
-  * downgrade is detected, [[ensure]] returns [[DowngradeDetected]] so the
-  * caller can shut down.
+  * On the first batch that produces activity records, [[ensureIfReady]]
+  * creates the meta row storing the current code/user version and the
+  * earliest ingested round. On subsequent batches it is a no-op. If a
+  * version downgrade is detected, it returns [[DowngradeDetected]] so
+  * the caller can shut down.
   */
 class ActivityIngestionMetaCheck(
     activityStore: DbAppActivityRecordStore,
@@ -33,16 +37,28 @@ class ActivityIngestionMetaCheck(
 
   private val checked = new AtomicBoolean(false)
 
-  /** Whether the meta check has completed successfully at least once. */
-  def isChecked: Boolean = checked.get()
-
-  /** Ensures the activity record meta row exists and versions are compatible.
-    * Returns the check result; the caller is responsible for acting on
-    * [[DowngradeDetected]] (e.g. shutting down).
-    * After the first successful call the result is cached and subsequent
-    * calls return [[Resume]] without hitting the database.
+  /** Ensures the meta row exists if this batch has activity records.
+    * Returns any detected downgrade and whether ingestion has started.
     */
-  def ensure(
+  def ensureIfReady(
+      firstRecordTimeMicros: Long,
+      appActivityRecords: Seq[(CantonTimestamp, AppActivityRecordT)],
+  )(implicit tc: TraceContext): Future[(Option[DowngradeDetected], Boolean)] = {
+    if (checked.get()) Future.successful((None, true))
+    else if (appActivityRecords.isEmpty) Future.successful((None, false))
+    else {
+      val earliestRound = appActivityRecords
+        .map(_._2.roundNumber)
+        .minOption
+        .getOrElse(0L)
+      ensure(firstRecordTimeMicros, earliestRound).map {
+        case d: DowngradeDetected => (Some(d), false)
+        case _ => (None, checked.get())
+      }
+    }
+  }
+
+  private[scan] def ensure(
       firstRecordTimeMicros: Long,
       earliestIngestedRound: Long,
   )(implicit tc: TraceContext): Future[MetaCheckResult] = {
@@ -89,7 +105,12 @@ object ActivityIngestionMetaCheck {
       runningUser: Int,
       storedCode: Int,
       storedUser: Int,
-  ) extends MetaCheckResult
+  ) extends MetaCheckResult {
+    def message: String =
+      s"Activity ingestion version downgrade detected: " +
+        s"running=($runningCode,$runningUser), stored=($storedCode,$storedUser). " +
+        s"Shutting down to prevent data corruption."
+  }
 
   def checkMetaVersions(
       existing: Option[AppActivityRecordMetaT],

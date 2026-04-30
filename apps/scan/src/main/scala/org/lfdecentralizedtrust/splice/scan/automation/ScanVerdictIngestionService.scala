@@ -255,25 +255,13 @@ class ScanVerdictIngestionService(
         }
 
         // Ensure meta row exists and versions match (first batch with activity records).
-        ingestionStarted <- activityMetaCheckO match {
-          case Some(metaCheck) if metaCheck.isChecked =>
-            Future.successful(true)
-          case Some(metaCheck) if appActivityRecords.nonEmpty =>
-            val earliestRound = appActivityRecords
-              .map(_._2.roundNumber)
-              .minOption
-              .getOrElse(0L)
-            metaCheck.ensure(firstRecordTimeMicros, earliestRound).map {
-              case DowngradeDetected(rc, ru, sc, su) =>
-                logger.error(
-                  s"Activity ingestion version downgrade detected: " +
-                    s"running=($rc,$ru), stored=($sc,$su). " +
-                    s"Shutting down to prevent data corruption."
-                )
-                sys.exit(1)
-              case _ => true
-            }
-          case _ => Future.successful(false)
+        (downgradeO, ingestionStarted) <- activityMetaCheckO
+          .fold(Future.successful((None: Option[DowngradeDetected], false)))(
+            _.ensureIfReady(firstRecordTimeMicros, appActivityRecords)
+          )
+        _ = downgradeO.foreach { d =>
+          logger.error(d.message)
+          sys.exit(1)
         }
 
         // After ingestion has started, every verdict must have a traffic summary.
