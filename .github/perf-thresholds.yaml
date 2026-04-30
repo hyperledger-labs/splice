@@ -1,9 +1,9 @@
-ScanStoreIngestionPerformanceTest:
-  splice_perf_ingestion_total_time_ns:
-    max: 60000000000     # 60 s
 SvDsoStoreIngestionPerformanceTest:
   splice_perf_ingestion_total_time_ns:
-    max: 600000000000
+    max: 60000000000     # 60 s
+ScanStoreIngestionPerformanceTest:
+  splice_perf_ingestion_total_time_ns:
+    max: 600000000000     # 600 s
 UpdateHistoryIngestionPerformanceTest:
   splice_perf_ingestion_total_time_ns:
     max: 1800000000000    # 1800 s (30 min)
