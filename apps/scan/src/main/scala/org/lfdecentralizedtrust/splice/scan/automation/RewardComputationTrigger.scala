@@ -195,7 +195,7 @@ object RewardComputationTrigger {
       latestComputedO: Option[Long],
   ): Option[Long] =
     (earliestCompleteO, latestCompleteO) match {
-      case (Some(earliestComplete), Some(latestComplete)) =>
+      case (Some(earliestComplete), Some(latestComplete)) if earliestComplete <= latestComplete =>
         val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
         if (start <= latestComplete) Some(start)
         else None

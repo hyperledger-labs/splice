@@ -38,6 +38,11 @@ class RewardComputationTriggerTest extends AnyWordSpec with BaseTest {
       nextRound(round5, round5, round4) shouldBe Some(5L)
       nextRound(round5, round5, round5) shouldBe None
     }
+
+    "return None when earliest complete exceeds latest complete" in {
+      nextRound(round10, round5, noRound) shouldBe None
+      nextRound(round10, round5, round3) shouldBe None
+    }
   }
 }
 
