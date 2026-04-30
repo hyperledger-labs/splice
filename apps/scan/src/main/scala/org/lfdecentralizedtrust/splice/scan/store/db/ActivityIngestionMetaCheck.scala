@@ -12,6 +12,24 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.Ap
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future}
 
+/** Tracks and validates activity record ingestion metadata.
+  *
+  * This class manages the lifecycle of the `app_activity_record_meta`
+  * table row that records when ingestion started and which versions
+  * are running.
+  *
+  * On the first batch that produces activity records, [[ensure]] creates
+  * the meta row storing the current code/user version and the earliest
+  * ingested round. On subsequent batches it is a no-op. If a version
+  * downgrade is detected, [[ensure]] returns [[DowngradeDetected]] so the
+  * caller can shut down.
+  *
+  * Until [[ensure]] completes, traffic summary gaps are tolerated: during
+  * SV onboarding the sequencer does not yet have traffic data for early
+  * verdicts. After [[ensure]] completes, [[findMissingSummaryTimes]]
+  * reports any verdicts that lack a matching traffic summary, allowing the
+  * caller to fail the batch.
+  */
 class ActivityIngestionMetaCheck(
     activityStore: DbAppActivityRecordStore,
     runningCodeVersion: Int,
@@ -26,9 +44,7 @@ class ActivityIngestionMetaCheck(
   def isChecked: Boolean = checked.get()
 
   /** Returns verdict timestamps that are missing traffic summaries.
-    * Only reports missing summaries after the meta check has completed
-    * (ingestion has started); before that, missing summaries are expected
-    * during SV onboarding.
+    * Returns empty until [[ensure]] has completed.
     */
   def findMissingSummaryTimes(
       verdictTimes: Seq[CantonTimestamp],

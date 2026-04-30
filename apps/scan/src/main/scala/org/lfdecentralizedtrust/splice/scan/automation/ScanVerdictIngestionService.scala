@@ -279,14 +279,11 @@ class ScanVerdictIngestionService(
           case _ => Future.unit
         }
 
-        // After ingestion has started (meta exists), every verdict must have
-        // a traffic summary. Missing summaries before meta are expected
-        // during SV onboarding (#4060).
-        // This fails the batch rather than silently dropping data. The
-        // RetryingService framework will retry indefinitely with backoff,
-        // stalling ingestion until the summaries become available or an
-        // operator investigates. sys.exit is not used here because this
-        // is a data availability issue, not a configuration error.
+        // Fail the batch if any verdicts are missing traffic summaries.
+        // See ActivityIngestionMetaCheck for why gaps are tolerated until
+        // ensure completes. The RetryingService framework will retry
+        // indefinitely with backoff, stalling ingestion until the summaries
+        // become available or an operator investigates.
         _ <- {
           val verdictTimes =
             verdicts.map(v => CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime))
