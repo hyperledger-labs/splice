@@ -847,6 +847,25 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
       persistence:
         txLogStoreDescriptorUserVersion: 2
 
+The ``activityIngestionUserVersion`` field controls the activity record
+ingestion version. Incrementing this value causes the scan app to
+record a new completeness boundary. Reward accounting excludes rounds
+before this boundary, even though their activity records are retained.
+
+This is useful for recovering from ingestion errors without
+reprocessing historical data.
+
+The HOCON configuration key is
+``canton.scan-apps.scan-app.activity-ingestion-user-version``.
+It can be set via an ``ADDITIONAL_CONFIG`` environment variable:
+
+   .. code-block:: yaml
+
+      # Example to reset the activity ingestion completeness boundary
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_ACTIVITY_INGESTION_USER_VERSION
+          value: canton.scan-apps.scan-app.activity-ingestion-user-version = 1
+
 .. _sv-unvet_insecure_package_versions:
 
 Unvet insecure package versions
