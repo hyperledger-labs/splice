@@ -20,6 +20,7 @@ import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
+import Splice.TokenStandard.Utils qualified as TSU
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -570,11 +571,13 @@ getExternalPartyTransferContext app = do
 tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Amulet)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
-  result <- checkTxMetadata app TxKind_Mint user.primaryParty $
-    submitExerciseAmuletRulesByKey' app user AmuletRules_DevNet_Tap with
+  (result, changes) <- checkTxMetadata app TxKind_Mint user.primaryParty $ do
+    (rules, _) <- fetchAmuletRulesByKey app.dso
+    submitResultAndTree (actAs user.primaryParty <> readAs app.dso) $ exerciseCmd rules AmuletRules_DevNet_Tap with
       receiver = user.primaryParty
       amount
       openRound
+  WalletClientV2.expectTxHistoryReasons changes [(TSU.basicAccount user.primaryParty, ["tapped DevNet faucet"], "")]
   return result.amuletSum.amulet
 
 featureApp : AmuletApp -> AmuletUser -> Script (ContractId FeaturedAppRight)
@@ -607,13 +610,13 @@ getBalanceChangesFromAcs DefaultAppWithUsers{..} = do
   let normalizedBalanceChanges = map(\c -> (c.owner, balanceChangeFromAmulet c)) allAmulets
   return $ Map.fromListWithR (+) normalizedBalanceChanges
 
-checkBalanceChanges: DefaultAppWithUsers -> Script TransferResult -> Script TransferResult
+checkBalanceChanges: DefaultAppWithUsers -> Script (TransferResult, b) -> Script (TransferResult, b)
 checkBalanceChanges d script = do
   before <- getBalanceChangesFromAcs d
-  result <- script
+  (result, extra) <- script
   after <- getBalanceChangesFromAcs d
   Map.unionWith (+) before result.summary.balanceChanges === after
-  return result
+  return (result, extra)
 
 assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
 assertError f = do
@@ -656,23 +659,20 @@ allocateDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reaso
 checkTransferMetadata
   : AmuletApp -> TxKind -> Party -> Script (TransferResult, TransactionTree)
   -> Script (TransferResult, [TransferEventsV2.EventLog_HoldingsChange])
-checkTransferMetadata app kind sender action = do
-  WalletClientV2.extractAndCheckTxHistory [app.dso] $
-    genericCheckTxMetadata (\(result, _) -> result.meta) (\(result, _) -> Some result.summary) app kind sender action
+checkTransferMetadata = genericCheckTxMetadata (.meta) (Some . (.summary))
 
--- FIXME: consider also altering the ones below here
-
-checkTxMetadata : HasField "meta" a (Optional Metadata) => AmuletApp -> TxKind -> Party -> Script a -> Script a
+checkTxMetadata : HasField "meta" a (Optional Metadata) => AmuletApp -> TxKind -> Party -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
 checkTxMetadata = genericCheckTxMetadata (.meta) (const None)
 
-checkTxMetadata' : HasField "meta" a Metadata => AmuletApp -> TxKind -> Party -> Script a -> Script a
+checkTxMetadata' : HasField "meta" a Metadata => AmuletApp -> TxKind -> Party -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
 checkTxMetadata' = genericCheckTxMetadata (\a -> Some a.meta) (const None)
 
 genericCheckTxMetadata
-  : (a -> Optional Metadata) -> (a -> Optional TransferSummary) -> AmuletApp -> TxKind -> Party -> Script a -> Script a
+  : (a -> Optional Metadata) -> (a -> Optional TransferSummary) -> AmuletApp -> TxKind -> Party -> Script (a, TransactionTree)
+  -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
 genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body = do
   holdingsBefore <- getHoldingAmounts
-  result <- body
+  (result, changes) <- WalletClientV2.extractAndCheckTxHistory [app.dso] body
   (Some (Metadata meta)) <- pure (extractMeta result)
   holdingsAfter <- getHoldingAmounts
   let totalHoldingsBefore = sum (Map.values holdingsBefore)
@@ -724,7 +724,7 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
         fail $ "unnaccounted minting of " <> show (negate expectedBurn)
     else
       expectUnlessZero burnedMetaKey expectedBurn
-  pure result
+  pure (result, changes)
   where
     getHoldingAmounts : Script (Map.Map Party Decimal)
     getHoldingAmounts = do
@@ -733,3 +733,19 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
       pure $ Map.fromListWithR (+) $
         [ (c.owner, c.amount.initialAmount) | (_, c) <- amulets ] <>
         [ (c.amulet.owner, c.amulet.amount.initialAmount) | (_, c) <- lockedAmulets ]
+
+
+checkTxHistoryV2Reasons
+  : [(Party, [Text])] -> Script (a, [TransferEventsV2.EventLog_HoldingsChange]) -> Script a
+checkTxHistoryV2Reasons expectedReasons =
+  checkTxHistoryV2Reasons' [ (party, legReasons, "") | (party, legReasons) <- expectedReasons ]
+
+checkTxHistoryV2Reasons'
+  : [(Party, [Text], Text)] -> Script (a, [TransferEventsV2.EventLog_HoldingsChange]) -> Script a
+checkTxHistoryV2Reasons' expectedReasons body = do
+  (result, changes) <- body
+  let fullReasons = do
+        (party, legReasons, changeReason) <- expectedReasons
+        pure (TSU.basicAccount party, legReasons, changeReason)
+  WalletClientV2.expectTxHistoryReasons changes fullReasons
+  pure result

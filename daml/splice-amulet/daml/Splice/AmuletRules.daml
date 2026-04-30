@@ -2042,7 +2042,7 @@ splitAndBurn eventLogCid sender amount inputs context dso usage = do
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer None rewardsConfig context dso Transfer with
+  transferResult <- executeTransfer (Some eventLogCid) rewardsConfig context dso Transfer with
     sender
     provider = sender
     inputs
