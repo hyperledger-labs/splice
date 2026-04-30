@@ -69,6 +69,19 @@ jobs:
         run: |
           python3 scripts/performance/push_store_ingestion_perf_metrics.py
 
+      - name: Upload ingestion metrics artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-ingestion-perf-metrics-${{ github.run_id }}
+          path: /tmp/store-ingestion-perf-metrics
+          if-no-files-found: ignore
+
+      - name: Check ingestion thresholds
+        if: ${{ success() && github.event_name == 'schedule' }}
+        run: |
+          python3 scripts/performance/check_perf_thresholds.py /tmp/store-ingestion-perf-metrics
+
       # sanity check
       - name: Check logs for errors
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
@@ -148,6 +161,19 @@ jobs:
         if: ${{ success() }}
         run: |
           python3 scripts/performance/push_store_ingestion_perf_metrics.py /tmp/store-read-perf-metrics
+
+      - name: Upload read metrics artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-read-perf-metrics-${{ github.run_id }}
+          path: /tmp/store-read-perf-metrics
+          if-no-files-found: ignore
+
+      - name: Check read thresholds
+        if: ${{ success() && github.event_name == 'schedule' }}
+        run: |
+          python3 scripts/performance/check_perf_thresholds.py /tmp/store-read-perf-metrics
 
       # sanity check
       - name: Check logs for errors
