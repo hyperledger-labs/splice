@@ -61,7 +61,7 @@ testTransferPreapprovalSend = script do
   externalContext <- getExternalPartyTransferContext app
   amuletCid <- tap app bob 50.0
   (result, changes) <-
-    WalletClientV2.checkTxHistoryV2 [app.dso] $
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
       submitResultAndTree (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd transferPreapprovalCid TransferPreapproval_SendV2
         with
           sender = bob.primaryParty

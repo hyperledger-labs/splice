@@ -94,7 +94,7 @@ mint registry account intrumentName amount = do
           context = emptyChoiceContext
           meta = emptyMetadata
   context <- registryApi_getTransferOfferContext registry offerCid emptyMetadata
-  void $ WalletClientV2.checkTxHistoryV2 [registry.admin] $
+  void $ WalletClientV2.extractAndCheckTxHistory [registry.admin] $
     submitResultAndTree (actAs account.owner <> discloseMany' context.disclosures) $
       exerciseCmd offerCid accept with
         extraArgs = ExtraArgs with

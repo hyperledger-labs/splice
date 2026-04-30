@@ -153,7 +153,7 @@ tapFaucet registry user amount = do
   amuletRulesD <- queryDisclosure' @AmuletRules registry.dso amuletRulesCid
   openMiningRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRound
   let disclosures = amuletRulesD <> openMiningRoundD
-  (result, changes) <- WalletClientV2.checkTxHistoryV2 [registry.dso] $
+  (result, changes) <- WalletClientV2.extractAndCheckTxHistory [registry.dso] $
     submitResultAndTree (actAs user <> discloseMany' disclosures) $
       exerciseCmd amuletRulesCid AmuletRules_DevNet_Tap with
         receiver = user

@@ -237,7 +237,7 @@ settleWithTradeAgreements trade = do
         allocationRequests = trade.allocationRequestCids
 
   -- settle directly if no extra authorizations are required
-  WalletClientV2.checkTxHistoryV2 (Map.keys trade.batchesByAdmin) $ do
+  WalletClientV2.extractAndCheckTxHistory (Map.keys trade.batchesByAdmin) $ do
     submitResultAndTree (actAs venue <> discloseMany' trade.disclosures) $ exerciseCmd trade.otcTradeCid settleArg
 
 -- | Cancel a trade using the trade agreements for the required extra authority for cancelling V1 allocations.
@@ -277,7 +277,7 @@ cancelWithTradeAgreements registries trade = do
   let disclosures = foldMap snd allocationsWithContextV1 <> foldMap snd allocationsWithContextV2
 
   -- cancel directly if no extra authorizations are required
-  WalletClientV2.checkTxHistoryV2 (Map.keys registries) $ do
+  WalletClientV2.extractAndCheckTxHistory (Map.keys registries) $ do
     submitResultAndTree (actAs venue <> discloseMany' disclosures) $ exerciseCmd trade.otcTradeCid cancelArg
 
 getSettlementAgreement : Party -> Party -> Script (ContractId TradeSettlementAgreement)

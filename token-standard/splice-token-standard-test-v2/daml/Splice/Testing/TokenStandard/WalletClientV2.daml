@@ -62,9 +62,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     mkTransferFactory_TransferV2',
 
     -- * Tx history V2 checking utilities
-
-    -- FIXME: rename to 'extractAndCheckTxHistory'
-    checkTxHistoryV2,
+    extractAndCheckTxHistory,
     expectTxHistoryReasons,
   ) where
 
@@ -270,7 +268,7 @@ executeTSABatch registries actor batch
   | otherwise = do
     inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
     [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
-    checkTxHistoryV2 (Map.keys registries) $
+    extractAndCheckTxHistory (Map.keys registries) $
       submitResultAndTree (actAs actor <> discloseMany' batch.disclosures) $
         exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
             actions = batch.actions
@@ -542,13 +540,27 @@ mkTransferFactory_TransferV2' registries t = do
 
 type HoldingSnapshot = Map.Map (ContractId V2.Holding) V2.HoldingView
 
-checkTxHistoryV2 : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
-checkTxHistoryV2 adminParties action = do
+extractAndCheckTxHistory : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
+extractAndCheckTxHistory adminParties action = do
   holdingsBefore <- snapshotHoldings adminParties
   (result, txTree) <- action
   holdingsAfter <- snapshotHoldings adminParties
   changes <- validateHoldingsChanges holdingsBefore txTree holdingsAfter
   pure (result, changes)
+
+expectTxHistoryReasons : [TransferEventsV2.EventLog_HoldingsChange] -> [(V2.Account, [Text], Text)] -> Script ()
+expectTxHistoryReasons changes expectedReasons = do
+    unless (expectedReasons == actualReasons) $
+      fail $ T.unlines [
+        "tx history v2: expected reasons do not match actual reasons",
+        "expected: " <> show expectedReasons,
+        "actual:   " <> show actualReasons
+      ]
+  where
+    actualReasons = sort $ do
+      change <- mergeHoldingChangesByAdminAndAccount changes
+      let legReasons = [ TSU.reasonFromMeta leg.meta | leg <- change.transferLegs ]
+      pure (change.account, legReasons, TSU.reasonFromMeta change.extraArgs.meta)
 
 snapshotHoldings : [Party] -> Script HoldingSnapshot
 snapshotHoldings parties = do
@@ -589,7 +601,7 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
     pure changes
   where
     changes = getHoldingsChangesFromTree txTree
-    mergedChanges = mergeHoldingsChanges changes
+    mergedChanges = mergeHoldingChangesByAdminAndAccount changes
 
     allInputHoldingCids = sort $ concatMap (.inputHoldingCids) changes
     allOutputHoldingCids = sort $ concatMap (.outputHoldingCids) changes
@@ -647,30 +659,8 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
               ]
           pure outputHoldings
 
-
-      -- retrieve all input holdings and output holdings from snapshot
-      -- check that they all belong to the right account
-      -- compute balance changes
-      -- compare against balance changes of the transfer legs in the change
-
-expectTxHistoryReasons : [TransferEventsV2.EventLog_HoldingsChange] -> [(V2.Account, [Text], Text)] -> Script ()
-expectTxHistoryReasons changes expectedReasons = do
-    unless (expectedReasons == actualReasons) $
-      fail $ T.unlines [
-        "tx history v2: expected reasons do not match actual reasons",
-        "expected: " <> show expectedReasons,
-        "actual:   " <> show actualReasons
-      ]
-  where
-    actualReasons = sort $ do
-      change <- mergeHoldingsChanges changes
-      let legReasons = [ TSU.reasonFromMeta leg.meta | leg <- change.transferLegs ]
-      pure (change.account, legReasons, TSU.reasonFromMeta change.extraArgs.meta)
-
-
--- FIXME: name ByAdminAndAccount
-mergeHoldingsChanges : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
-mergeHoldingsChanges events =
+mergeHoldingChangesByAdminAndAccount : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
+mergeHoldingChangesByAdminAndAccount events =
     Map.values eventsWithAdminAndAccount
   where
     eventsWithAdminAndAccount =
@@ -682,22 +672,14 @@ mergeHoldingsChanges events =
         outputHoldingCids = e1.outputHoldingCids ++ e2.outputHoldingCids
         observers = dedupSort (e1.observers ++ e2.observers)
         extraArgs = e1.extraArgs with
-          -- we dont care about the choice context
+          -- we dont care about the choice context here
           meta = Metadata with
             values = e1.extraArgs.meta.values <> e2.extraArgs.meta.values
 
-
-
-
 getHoldingsChangesFromTree : TransactionTree -> [TransferEventsV2.EventLog_HoldingsChange]
 getHoldingsChangesFromTree txTree = do
-  exercised <- getExercisedEvents txTree
+  exercised <- concatMap getExercisedFromTreeEvent txTree.rootEvents
   optionalToList $ fromAnyChoice @TransferEventsV2.EventLog exercised.argument
-
-
-getExercisedEvents : TransactionTree -> [Exercised]
-getExercisedEvents txTree =
-  concatMap getExercisedFromTreeEvent txTree.rootEvents
 
 getExercisedFromTreeEvent : TreeEvent -> [Exercised]
 getExercisedFromTreeEvent (ExercisedEvent e) = e :: concatMap getExercisedFromTreeEvent e.childEvents
