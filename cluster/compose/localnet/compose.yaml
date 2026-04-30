@@ -98,7 +98,7 @@ services:
 
   canton:
     build:
-      context: ${LOCALNET_DIR}/docker/console
+      context: ${LOCALNET_DIR}/docker/canton
       args:
         BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
     env_file:
