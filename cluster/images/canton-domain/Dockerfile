@@ -17,4 +17,4 @@ EXPOSE 10013
 COPY app.conf bootstrap.sc /app/
 
 HEALTHCHECK --start-period=10m \
-  CMD exit 0
+  CMD grpc_health_probe -addr=localhost:5061 || exit 1
