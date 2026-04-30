@@ -34,8 +34,8 @@ class ActivityIngestionMetaCheck(
       verdictTimes: Seq[CantonTimestamp],
       summaryTimes: Set[CantonTimestamp],
   ): Seq[CantonTimestamp] = {
-    if (!checked.get()) Seq.empty
-    else verdictTimes.filterNot(summaryTimes.contains)
+    if (checked.get()) verdictTimes.filterNot(summaryTimes.contains)
+    else Seq.empty
   }
 
   /** Ensures the activity record meta row exists and versions are compatible.
