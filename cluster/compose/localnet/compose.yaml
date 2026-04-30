@@ -97,10 +97,7 @@ services:
       - sv
 
   canton:
-    build:
-      context: ${LOCALNET_DIR}/docker/canton
-      args:
-        BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
+    image: "${IMAGE_REPO}canton:${IMAGE_TAG}"
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env

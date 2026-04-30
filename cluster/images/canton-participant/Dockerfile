@@ -5,6 +5,7 @@ ARG canton_version
 ARG image_sha256
 
 FROM europe-docker.pkg.dev/da-images/public-all/docker/canton-participant:${canton_version}@${image_sha256}
+COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.38 /ko-app/grpc-health-probe /bin/grpc_health_probe
 
 COPY additional-config.conf /app/
 COPY target/logback.xml /app/
@@ -15,4 +16,4 @@ RUN chown -R nonroot:nonroot /app/additional-config.conf /app/repeatable-migrati
 USER nonroot
 
 HEALTHCHECK --start-period=10m \
-  CMD exit 0
+  CMD grpc_health_probe -addr=:5061 || exit 1
