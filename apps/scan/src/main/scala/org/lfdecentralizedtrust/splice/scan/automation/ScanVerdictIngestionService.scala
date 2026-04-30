@@ -281,7 +281,7 @@ class ScanVerdictIngestionService(
 
         // After ingestion has started (meta exists), every verdict must have
         // a traffic summary. Missing summaries before meta are expected
-        // during SV onboarding (#4457).
+        // during SV onboarding (#4060).
         // This fails the batch rather than silently dropping data. The
         // RetryingService framework will retry indefinitely with backoff,
         // stalling ingestion until the summaries become available or an
