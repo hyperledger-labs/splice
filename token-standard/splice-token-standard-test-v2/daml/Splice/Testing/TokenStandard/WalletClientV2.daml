@@ -62,16 +62,19 @@ module Splice.Testing.TokenStandard.WalletClientV2
     mkTransferFactory_TransferV2',
 
     -- * Tx history V2 checking utilities
-    checkTxHistoryV2,
 
+    -- FIXME: rename to 'extractAndCheckTxHistory'
+    checkTxHistoryV2,
+    expectTxHistoryReasons,
   ) where
 
 import DA.Action (unless, when)
 import DA.Foldable (forA_)
-import DA.List (dedupSort, unique)
+import DA.List (dedupSort, sort, unique)
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Time
+import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 import DA.Set qualified as Set
 
@@ -240,7 +243,7 @@ listAllocationRequestsV2 tradingAccount actor = do
 -- | Simulate a V2 wallet accepting an allocation request from a V1 app.
 acceptAllocationRequestV1
   :  MultiRegistry.MultiRegistry -> Party -> V1.AllocationRequestView
-  -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+  -> Script (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])
 acceptAllocationRequestV1 registries actor req = do
   batch <- mkAcceptAllocationRequestV1 registries actor req
   executeTSABatch registries actor batch
@@ -248,17 +251,22 @@ acceptAllocationRequestV1 registries actor req = do
 -- | Simulate a V2 wallet accepting an allocation request from a V2 app.
 acceptAllocationRequestV2
   :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView)
-  -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+  -> Script (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])
 acceptAllocationRequestV2 registries actor (reqCid, req) = do
   batch <- mkAcceptAllocationRequestV2 registries actor (reqCid, req)
   executeTSABatch registries actor batch
 
 -- | Execute a batch of token standard actions.
-executeTSABatch : MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script BatchingUtilityV2.BatchingUtility_ExecuteBatchResult
+executeTSABatch
+  : MultiRegistry.MultiRegistry -> Party -> TSABatch
+  -> Script (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])
 executeTSABatch registries actor batch
-  | null batch.actions = pure $ BatchingUtilityV2.BatchingUtility_ExecuteBatchResult with
-      actionResults = []
-      outputHoldingMap = mempty
+  | null batch.actions = pure
+    ( BatchingUtilityV2.BatchingUtility_ExecuteBatchResult with
+        actionResults = []
+        outputHoldingMap = mempty
+    , []
+    )
   | otherwise = do
     inputHoldingMap <- getHoldingMap actor (Set.toList batch.accountsAndInstruments)
     [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.user == actor)
@@ -535,13 +543,13 @@ mkTransferFactory_TransferV2' registries t = do
 type HoldingSnapshot = Map.Map (ContractId V2.Holding) V2.HoldingView
 
 -- FIXME: return extracted history and use it to check metadata
-checkTxHistoryV2 : [Party] -> Script (a, TransactionTree) -> Script a
+checkTxHistoryV2 : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
 checkTxHistoryV2 adminParties action = do
   holdingsBefore <- snapshotHoldings adminParties
   (result, txTree) <- action
   holdingsAfter <- snapshotHoldings adminParties
-  validateHoldingsChanges holdingsBefore txTree holdingsAfter
-  pure result
+  changes <- validateHoldingsChanges holdingsBefore txTree holdingsAfter
+  pure (result, changes)
 
 snapshotHoldings : [Party] -> Script HoldingSnapshot
 snapshotHoldings parties = do
@@ -550,7 +558,7 @@ snapshotHoldings parties = do
     pure $ Map.fromList [ (cid, holding) | (cid, Some holding) <- holdings ]
   pure $ mconcat holdingsByParty
 
-validateHoldingsChanges : HoldingSnapshot -> TransactionTree -> HoldingSnapshot -> Script ()
+validateHoldingsChanges : HoldingSnapshot -> TransactionTree -> HoldingSnapshot -> Script [TransferEventsV2.EventLog_HoldingsChange]
 validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
     -- check invariants of individual holding changes
     forA_ changes $ \change -> do
@@ -560,6 +568,7 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
     forA_ mergedChanges validateMergedHoldingsChange
     -- FIXME: separately: check that all transfer legs are reported
     -- FIXME: check overall holding changes are explained by the input output holdings
+    pure changes
   where
     changes = getHoldingsChangesFromTree txTree
     mergedChanges = mergeHoldingsChanges changes
@@ -599,8 +608,22 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
       -- compute balance changes
       -- compare against balance changes of the transfer legs in the change
 
+expectTxHistoryReasons : [TransferEventsV2.EventLog_HoldingsChange] -> [(V2.Account, [Text], Text)] -> Script ()
+expectTxHistoryReasons changes expectedReasons = do
+    unless (expectedReasons == actualReasons) $
+      fail $ T.unlines [
+        "tx history v2: expected reasons do not match actual reasons",
+        "expected: " <> show expectedReasons,
+        "actual:   " <> show actualReasons
+      ]
+  where
+    actualReasons = sort $ do
+      change <- mergeHoldingsChanges changes
+      let legReasons = [ TSU.reasonFromMeta leg.meta | leg <- change.transferLegs ]
+      pure (change.account, legReasons, TSU.reasonFromMeta change.extraArgs.meta)
 
 
+-- FIXME: name ByAccount
 mergeHoldingsChanges : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
 mergeHoldingsChanges events =
     Map.values eventsWithAccount

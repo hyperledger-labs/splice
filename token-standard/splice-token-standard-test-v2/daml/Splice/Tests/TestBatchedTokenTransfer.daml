@@ -156,13 +156,19 @@ genericTestTransfers TestSetup {..} = do
   -- charlie accepts their offer
   -- TODO(#4813): actually reject as part of a batch, once we have the support for that in the batching utility
   caccept <- acceptTransferOffers registries charlie instrY
-  result <- WalletClientV2.executeTSABatch registries charlie caccept
+  (result, changes) <- WalletClientV2.executeTSABatch registries charlie caccept
 
-  -- check V1 metadata on V2 transfers
+  -- check tx history on V2 transfers
   when checkMetadata $ do
+    let testTransferReason = "alice -> charlie - test transfer 2"
+    WalletClientV2.expectTxHistoryReasons changes
+      [ (basicAccount alice, [testTransferReason], "")
+      , (basicAccount charlie, [testTransferReason], "")
+      ]
+    -- V1 history metadata
     let expectedMeta = Metadata with
           values = TextMap.fromList
-            [ ("splice.lfdecentralizedtrust.org/reason", "alice -> charlie - test transfer 2")
+            [ ("splice.lfdecentralizedtrust.org/reason", testTransferReason)
             , ("splice.lfdecentralizedtrust.org/sender", "alice")
             , ("splice.lfdecentralizedtrust.org/tx-kind", "transfer")
             ]
