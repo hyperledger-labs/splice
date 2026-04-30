@@ -7,7 +7,6 @@
 module Splice.TokenStandard.Utils.Internal.Allocations (
 
   -- * Allocation utilities
-  allocationAdmin,
   netAllocationCreditAmounts,
   splitLegsByAdmin,
   splitLegsByAuthorizer,
@@ -94,12 +93,6 @@ import Splice.TokenStandard.Utils.Internal.Choices
 
 -- Allocation utilities
 ------------------------
-
-allocationAdmin : AllocationV2.AllocationSpecification -> Party
-allocationAdmin AllocationV2.AllocationSpecification{..} =
-  case transferLegs of
-    [] -> error "No transfer legs in allocation"
-    (leg ::_) -> leg.instrumentId.admin
 
 -- | Filter transfer legs to the ones affecting the given account.
 filterLegsForAccount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> [AllocationV2.TransferLeg]

@@ -18,7 +18,7 @@ import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletEventLog (logWithTempAmuletEventLog)
+import Splice.AmuletEventLog (withTempAmuletEventLog)
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
 import Splice.Fees
@@ -582,17 +582,18 @@ logAmuletBurn dso factoryCid sender amount reason burnedAmuletCid = do
 
 logAmuletUnlock : Party -> Text -> Party -> ContractId LockedAmulet -> ContractId Amulet -> Update ()
 logAmuletUnlock dso reason owner lockedAmuletCid unlockedAmuletCid = do
-  let unlockEvent = TransferEventsV2.EventLog_HoldingsChange with
-        admin = dso
-        account = basicAccount owner
-        inputHoldingCids = [toInterfaceContractId lockedAmuletCid]
-        transferLegs = []
-        outputHoldingCids = [toInterfaceContractId unlockedAmuletCid]
-        observers = [owner]
-        extraArgs = ExtraArgs with
-          context = emptyChoiceContext
-          meta = reasonToMeta reason emptyMetadata
-  logWithTempAmuletEventLog [unlockEvent]
+  withTempAmuletEventLog dso $ \eventLogCid -> do
+    void $ exercise eventLogCid $ TransferEventsV2.EventLog_HoldingsChange with
+      admin = dso
+      account = basicAccount owner
+      inputHoldingCids = [toInterfaceContractId lockedAmuletCid]
+      transferLegs = []
+      outputHoldingCids = [toInterfaceContractId unlockedAmuletCid]
+      observers = [owner]
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = reasonToMeta reason emptyMetadata
+
 
 -- instances
 ------------

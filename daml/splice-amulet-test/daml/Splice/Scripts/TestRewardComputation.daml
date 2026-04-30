@@ -25,6 +25,8 @@ testRewardComputation = do
       unfeaturedAppRewardCoupon = 3.3
       validatorRewardCoupon = 2.3
 
+  -- FIXME: test tx history
+
   -- bare-create all five kinds of rewards for Alice
   appCoupon1 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso

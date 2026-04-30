@@ -118,3 +118,10 @@ Cleanup performed so far:
 - Introduce `AllocationRequest.originalRequestId` and `Allocation.originalAllocationId` fields, which
   are used to track the same request or allocation across state updates,
   analogously to the `originalInstructionCid` of transfer and allocation instructions.
+
+
+FIXME: add key points from
+- Amulet: add meta to TransferOutput, reason to AmuletRules_Mint, meta to TransferPreapproval_SendV2
+- splice-wallet: add reason metadata for locking and payments steps of legacy TransferOffers
+- splice-amulet-wallet: add reason metadata for locking and payments steps of the
+  the legacy AppPayment and Subscription workflows

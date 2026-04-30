@@ -1048,7 +1048,7 @@ executeTransfer' config csum dso t = do
 
   -- record all holdings changes grouped by account
   forA_ csum.eventLogCid $ \eventLogCid ->
-    forA_ (mergeHoldingsChangeEvents (senderInputOutputEvent :: outputEvents)) $ \holdingChangeEvent ->
+    forA_ (mergeHoldingsChangeEventsByAccount (senderInputOutputEvent :: outputEvents)) $ \holdingChangeEvent ->
       exercise eventLogCid holdingChangeEvent
 
   return TransferResult with
@@ -1469,13 +1469,14 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
       createdAmulet <- case out.lock of
         None -> TransferResultAmulet <$> create amulet
         Some lock -> TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
+      -- compute tx history v2 events for this output
       let outputHoldingCid = case createdAmulet of
             TransferResultAmulet amuletCid -> toInterfaceContractId amuletCid
             TransferResultLockedAmulet lockedAmuletCid -> toInterfaceContractId lockedAmuletCid
             ExtCreatedAmulet _ -> error "unexpected: ExtCreatedAmulet used for transfer output"
       let senderAccount = basicAccount sender
       let receiverAccount
-            | out.owner == dso = burnAccount dso
+            | out.owner == dso = burnAccount dso  -- transfers to the DSO are always burns
             | otherwise = basicAccount out.owner
       let leg = TransferEventsV2.TransferLeg with
             transferLegId = "leg" <> show i
@@ -1503,7 +1504,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
             extraArgs = emptyExtraArgs
       let events
             | out.owner == sender = [receiverEvent] -- self-transfers are reported only once
-            | out.owner == dso = [senderEvent] -- no events need to be reported to the DSO party
+            | out.owner == dso = [senderEvent] -- the DSO party does not need holding change events
             | otherwise = [senderEvent, receiverEvent]
       pure (createdAmulet, events)
 
@@ -2130,8 +2131,8 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
   pure ()
 
 -- | Utility to combine multiple holding change events for Amulet.
-mergeHoldingsChangeEvents : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
-mergeHoldingsChangeEvents events =
+mergeHoldingsChangeEventsByAccount : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
+mergeHoldingsChangeEventsByAccount events =
     Map.values eventsWithAccount
   where
     eventsWithAccount = Map.fromListWithR mergeTwoHoldingChangeEvents [ (event.account, event) | event <- events ]
@@ -2144,5 +2145,3 @@ mergeHoldingsChangeEvents events =
         extraArgs = ExtraArgs with
           context = emptyChoiceContext -- we ignore merging choice-contexts, as it is always empty for Amulet holdings changes
           meta = e1.extraArgs.meta <> e2.extraArgs.meta
-
-

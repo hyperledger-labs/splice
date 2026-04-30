@@ -506,8 +506,8 @@ jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
 
 
--- Event log retrieval
-----------------------
+-- Event log factory retrieval
+------------------------------
 
 tokenRulesContextKey : Text
 tokenRulesContextKey = "token-rules"

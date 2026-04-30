@@ -3,8 +3,6 @@
 
 module Splice.AmuletEventLog where
 
-import DA.Foldable
-
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils
@@ -24,10 +22,9 @@ template AmuletEventLog with
 
 -- | Log the given events pertaining to Amulet holdings using a temporary AmuletEventLog contract.
 -- Use only when there's no already existing contract available that implements the `EventLog` interface.
-logWithTempAmuletEventLog : [TransferEventsV2.EventLog_HoldingsChange] -> Update ()
-logWithTempAmuletEventLog [] = error "logWithAmuletEventLog: empty list of changes"
-logWithTempAmuletEventLog changes@(change :: _) = do
-  eventLogCid <- create AmuletEventLog with
-    dso = change.admin
-  forA_ changes (exercise (toInterfaceContractId @TransferEventsV2.EventLog eventLogCid))
+withTempAmuletEventLog : Party -> (ContractId TransferEventsV2.EventLog -> Update a) -> Update a
+withTempAmuletEventLog dso f = do
+  eventLogCid <- create AmuletEventLog with dso
+  result <- f (toInterfaceContractId @TransferEventsV2.EventLog eventLogCid)
   archive eventLogCid
+  pure result

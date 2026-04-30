@@ -9,11 +9,10 @@ import Splice.Api.Token.HoldingV2
 
 -- Note: the TransferLeg type below is identical to Allocation.TransferLeg, but
 -- defined separately to avoid a tight coupling between how to specify
--- allocations and how to report transfers. We want to have the flexibility to
--- evolve these two APIs independently.
+-- allocations and how to report transfers. This allows evolving these two APIs
+-- independently.
 
--- | A specification of a transfer of holdings between two parties for the
--- purpose of a settlement, which often requires the atomic execution of multiple legs.
+-- | A specification of a transfer of holdings between two parties.
 data TransferLeg = TransferLeg with
     transferLegId : Text
       -- ^ An identifier for the transfer leg.
@@ -31,9 +30,9 @@ data TransferLeg = TransferLeg with
 
 -- | An interface for templates that can be used to report token standard v2 events.
 --
--- The non-consuming choices of this interface are used by the instrument admin
--- to report token transfers. Make sure to only consider events from the instrument admin
--- as token transfer events for a token.
+-- The non-consuming choice of this interface is used by the instrument admin to
+-- report token transfers. Make sure to only consider events from the instrument
+-- admin as token transfer events for a token.
 interface EventLog where
   viewtype EventLogView
 
@@ -43,9 +42,17 @@ interface EventLog where
     -- ^ Signal a change in the holdings of an account to the observers.
     --
     -- Asset admins MUST ensure that these events explain:
-    --   1. all changes to the holdings of all accounts
+    --   1. all changes to the holdings of all accounts, including holdings that
+    --      were created and archived within a single transaction.
     --   2. all incoming and outgoing transfers for all accounts
     --      that are not owned by the instrument admin.
+    --
+    -- Note that even temporarily
+    --
+    -- Reporting holdings changes for accounts owned by the instrument admin is
+    -- not required, as the instrument admin has full visibility into all
+    -- holdings, and full knowledge of the actual workflows used to change these
+    -- holdings.
     with
       admin : Party
         -- ^ Instrument admin reporting the change in holdings.
@@ -53,6 +60,13 @@ interface EventLog where
         -- ^ The account for which the change in holdings occurred.
       inputHoldingCids : [ContractId Holding]
         -- ^ The holdings of the account that were consumed.
+        --
+        -- They MUST be archived in the same transaction and they MUST be owned
+        -- by the `account` specified in this change.
+        --
+        -- Note that these MAY include holdings that were created and archived
+        -- within the same transaction. Such holding contracts-ids will occur
+        -- in both the input and output list of holdings.
       transferLegs : [TransferLeg]
         -- ^ The transfers that caused the change in holdings.
         --
