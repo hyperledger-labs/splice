@@ -88,20 +88,34 @@ class DbAppActivityRecordStore(
       tc: TraceContext
   ): Future[Option[Long]] = {
 
+    // The inner `where exists` is used to make sure we only consider activity records for the correct history
+    // `order by ... limit 1` is used instead of min/max to force the query planner to use the index on round_number
     runQuerySingle(
       sql"""select min_round + 1
             from (
-              select min(a.round_number) as min_round
+              select a.round_number as min_round
               from #${Tables.appActivityRecords} a
-              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
-              where v.history_id = $historyId
+              where exists (
+                select 1
+                from #${Tables.verdicts} v
+                where v.row_id = a.verdict_row_id
+                and v.history_id = $historyId
+              )
+              order by a.round_number asc
+              limit 1
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where a.round_number = sub.min_round + 1
+              and exists (
+                select 1
+                from #${Tables.verdicts} v
+                where v.row_id = a.verdict_row_id
                 and v.history_id = $historyId
+              )
+              order by a.round_number asc
+              limit 1
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.earliestRoundWithCompleteAppActivity",
@@ -118,20 +132,34 @@ class DbAppActivityRecordStore(
       tc: TraceContext
   ): Future[Option[Long]] = {
 
+    // The inner `where exists` is used to make sure we only consider activity records for the correct history
+    // `order by ... limit 1` is used instead of min/max to force the query planner to use the index on round_number
     runQuerySingle(
       sql"""select max_round - 1
             from (
-              select max(a.round_number) as max_round
+              select a.round_number as max_round
               from #${Tables.appActivityRecords} a
-              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
-              where v.history_id = $historyId
+              where exists (
+                select 1
+                from #${Tables.verdicts} v
+                where v.row_id = a.verdict_row_id
+                and v.history_id = $historyId
+              )
+              order by a.round_number desc
+              limit 1
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where a.round_number = sub.max_round - 1
+              and exists (
+                select 1
+                from #${Tables.verdicts} v
+                where v.row_id = a.verdict_row_id
                 and v.history_id = $historyId
+              )
+              order by a.round_number desc
+              limit 1
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.latestRoundWithCompleteAppActivity",
