@@ -115,18 +115,18 @@ case class ScanStorageConfig(
   def getStartAndEndTimestampsForFolder(
       folder: String
   ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
-    val parts = folder.stripSuffix("/").split("~")
-    if (parts.length != 2) {
-      Left(
-        s"Cannot parse folder name: $folder (wrong number of parts after splitting by '~': ${parts.length})"
-      )
-    } else {
-      for {
-        folderStart <- CantonTimestamp.fromInstant(Instant.parse(parts(0)))
-        folderEnd <- CantonTimestamp.fromInstant(Instant.parse(parts(1)))
-      } yield {
-        (folderStart, folderEnd)
-      }
+    folder.stripSuffix("/").split("~") match {
+      case Array(folderStartStr, folderEndStr) =>
+        for {
+          folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
+          folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
+        } yield {
+          (folderStart, folderEnd)
+        }
+        case _ =>
+          Left(
+            s"Cannot parse folder name: $folder (wrong format, expected 'startTimestamp~endTimestamp')"
+          )
     }
   }
 
