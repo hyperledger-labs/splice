@@ -72,6 +72,8 @@ module Splice.TokenStandard.Utils (
   burnAccount,
   mintAccount,
 
+  allocationToTransferEventLeg,
+
   logMint,
   logBurn,
   logNonEmptyChange,

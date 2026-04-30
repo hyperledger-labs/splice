@@ -7,8 +7,27 @@ module Splice.Api.Token.TransferEventsV2 where
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
--- FIXME: reconsider whether to import transfer leg from here
-import Splice.Api.Token.AllocationV2 (TransferLeg)
+-- Note: the TransferLeg type below is identical to Allocation.TransferLeg, but
+-- defined separately to avoid a tight coupling between how to specify
+-- allocations and how to report transfers. We want to have the flexibility to
+-- evolve these two APIs independently.
+
+-- | A specification of a transfer of holdings between two parties for the
+-- purpose of a settlement, which often requires the atomic execution of multiple legs.
+data TransferLeg = TransferLeg with
+    transferLegId : Text
+      -- ^ An identifier for the transfer leg.
+    sender : Account
+      -- ^ The sender of the transfer.
+    receiver : Account
+      -- ^ The receiver of the transfer.
+    amount : Decimal
+      -- ^ The amount to transfer.
+    instrumentId : InstrumentId
+      -- ^ The instrument identifier.
+    meta : Metadata
+      -- ^ Additional metadata about the transfer leg, used for extensibility.
+  deriving (Eq, Ord, Show)
 
 -- | An interface for templates that can be used to report token standard v2 events.
 --

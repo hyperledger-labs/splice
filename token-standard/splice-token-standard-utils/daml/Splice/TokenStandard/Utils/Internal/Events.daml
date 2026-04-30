@@ -13,10 +13,11 @@ module Splice.TokenStandard.Utils.Internal.Events (
   burnAccount,
   mintAccount,
 
+  -- * Utilities to log events
+  allocationToTransferEventLeg,
+
   logMint,
   logBurn,
-
-  -- * Utilities to log events
   logNonEmptyChange,
   logTransfer,
   logAllocationSettlement,
@@ -66,6 +67,10 @@ burnAccount p = V2.Account with
   provider = None
   id = burnAccountId
 
+allocationToTransferEventLeg : AllocationV2.TransferLeg -> TransferEventsV2.TransferLeg
+allocationToTransferEventLeg (AllocationV2.TransferLeg with transferLegId, sender, receiver, amount, instrumentId, meta) =
+  TransferEventsV2.TransferLeg with transferLegId, sender, receiver, amount, instrumentId, meta
+
 -- | Convenience function to avoid logging change events that report neither a holdings change nor a transfer leg.
 logNonEmptyChange : ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_HoldingsChange -> Update ()
 logNonEmptyChange eventLogCid arg = do
@@ -76,7 +81,7 @@ logMint
   : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
   -> Update TransferEventsV2.EventLog_HoldingsChangeResult
 logMint factoryCid receiver amount instrumentId meta outputHoldingCids = do
-  let leg = AllocationV2.TransferLeg with
+  let leg = TransferEventsV2.TransferLeg with
         transferLegId = "mint"
         sender = V2.Account with
           owner = instrumentId.admin
@@ -99,7 +104,7 @@ logBurn
   : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> [ContractId V2.Holding]
   -> Update TransferEventsV2.EventLog_HoldingsChangeResult
 logBurn factoryCid sender amount instrumentId meta inputHoldingCids = do
-  let leg = AllocationV2.TransferLeg with
+  let leg = TransferEventsV2.TransferLeg with
         transferLegId = "burn"
         sender
         receiver = V2.Account with
@@ -136,7 +141,7 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
     admin
     account = allocation.authorizer
     inputHoldingCids
-    transferLegs = allocation.transferLegs
+    transferLegs = map allocationToTransferEventLeg allocation.transferLegs
     outputHoldingCids
     observers = accountParties allocation.authorizer
     extraArgs = ExtraArgs with
@@ -152,7 +157,7 @@ logTransfer
   -> Update ()
 logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCids = do
   let admin = transfer.instrumentId.admin
-  let leg = AllocationV2.TransferLeg with
+  let leg = TransferEventsV2.TransferLeg with
         transferLegId = "leg0"
         sender = transfer.sender
         receiver = transfer.receiver

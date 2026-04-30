@@ -649,7 +649,7 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
           let (credits, outputHoldings) = unzip (catOptionals creditsAndOutputs)
           let ignoreZeroChanges = Map.filter (/= 0.0)
           let holdingAmountChanges = ignoreZeroChanges $ Map.fromListWithR (+) (catOptionals debits ++ credits)
-          let legAmountChanges = ignoreZeroChanges $ TSU.netAllocationCreditAmounts change.account change.transferLegs
+          let legAmountChanges = ignoreZeroChanges $ netAllocationCreditAmountsOfLegs change.account change.transferLegs
           unless (holdingAmountChanges == legAmountChanges || change.account.owner == change.admin) $
             fail $ T.unlines
               [ "holding amount changes do not match leg amount changes for account " <> show change.account
@@ -658,6 +658,16 @@ validateHoldingsChanges holdingsBefore txTree holdingsAfter = do
               , "change: " <> show change
               ]
           pure outputHoldings
+
+netAllocationCreditAmountsOfLegs : V2.Account -> [TransferEventsV2.TransferLeg] -> Map.Map V2.InstrumentId Decimal
+netAllocationCreditAmountsOfLegs authorizer transferLegs =
+    Map.fromListWithR (+) $ map legAmount transferLegs
+  where
+    legAmount leg =
+      ( leg.instrumentId
+      , (if leg.sender == authorizer then negate leg.amount else 0.0) +
+        (if leg.receiver == authorizer then leg.amount else 0.0)
+      )
 
 mergeHoldingChangesByAdminAndAccount : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
 mergeHoldingChangesByAdminAndAccount events =

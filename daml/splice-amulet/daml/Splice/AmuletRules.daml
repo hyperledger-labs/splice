@@ -26,7 +26,6 @@ import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV2 qualified as Api.Token.AllocationV2
 import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 import Splice.TokenStandard.Utils
@@ -1026,7 +1025,7 @@ executeTransfer' config csum dso t = do
         fromOptional 0.0 summary.inputDevelopmentFundAmount
   let optMintLeg = do
         guard (mintAmount > 0.0)
-        pure $ Api.Token.AllocationV2.TransferLeg with
+        pure $ TransferEventsV2.TransferLeg with
           transferLegId = "mint"
           sender = mintAccount dso
           receiver = basicAccount t.sender
@@ -1478,7 +1477,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
       let receiverAccount
             | out.owner == dso = burnAccount dso
             | otherwise = basicAccount out.owner
-      let leg = Api.Token.AllocationV2.TransferLeg with
+      let leg = TransferEventsV2.TransferLeg with
             transferLegId = "leg" <> show i
             sender = senderAccount
             receiver = receiverAccount
