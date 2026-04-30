@@ -456,7 +456,7 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return updated values after update" in {
+    "return the latest version after inserting multiple rows" in {
       for {
         (store, _) <- newStore()
         _ <- store.insertActivityRecordMeta(
@@ -465,11 +465,11 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 1000000L,
           earliestIngestedRound = 0L,
         )
-        _ <- store.updateActivityRecordMeta(
+        _ <- store.insertActivityRecordMeta(
           codeVersion = 2,
           userVersion = 1,
           startedIngestingAt = 2000000L,
-          earliestIngestedRound = 0L,
+          earliestIngestedRound = 5L,
         )
         result <- store.getActivityRecordMeta()
       } yield {
@@ -477,6 +477,7 @@ class DbAppActivityRecordStoreTest
         result.value.codeVersion shouldBe 2
         result.value.userVersion shouldBe 1
         result.value.startedIngestingAt shouldBe 2000000L
+        result.value.earliestIngestedRound shouldBe 5L
       }
     }
 
@@ -506,7 +507,7 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "not affect other history_id on update" in {
+    "not affect other history_id on insert" in {
       for {
         (store1, _) <- newStore()
         (store2, _) <- newStore()
@@ -522,7 +523,7 @@ class DbAppActivityRecordStoreTest
           startedIngestingAt = 1000000L,
           earliestIngestedRound = 0L,
         )
-        _ <- store1.updateActivityRecordMeta(
+        _ <- store1.insertActivityRecordMeta(
           codeVersion = 99,
           userVersion = 99,
           startedIngestingAt = 9999999L,
@@ -568,7 +569,7 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return UpgradeMeta and update the row on version bump" in {
+    "insert new row and return InsertMeta on version bump" in {
       for {
         (store, _) <- newStore()
         _ <- store.insertActivityRecordMeta(1, 0, 1000000L, 10L)
@@ -576,7 +577,7 @@ class DbAppActivityRecordStoreTest
         result <- check.ensure(2000000L, 20L)
         meta <- store.getActivityRecordMeta()
       } yield {
-        result shouldBe UpgradeMeta
+        result shouldBe InsertMeta
         meta.value.codeVersion shouldBe 2
         meta.value.startedIngestingAt shouldBe 2000000L
         meta.value.earliestIngestedRound shouldBe 20L

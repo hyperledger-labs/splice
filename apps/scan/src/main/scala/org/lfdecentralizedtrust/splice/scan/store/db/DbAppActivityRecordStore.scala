@@ -316,6 +316,9 @@ class DbAppActivityRecordStore(
                    earliest_ingested_round
             from #${Tables.activityRecordMeta}
             where history_id = $historyId
+            order by activity_ingestion_code_version desc,
+                     activity_ingestion_user_version desc
+            limit 1
       """.as[AppActivityRecordMetaT].headOption,
       "appActivity.getActivityRecordMeta",
     )
@@ -336,25 +339,6 @@ class DbAppActivityRecordStore(
                       $earliestIngestedRound)
         """.asUpdate,
         "appActivity.insertActivityRecordMeta",
-      )
-    )
-
-  def updateActivityRecordMeta(
-      codeVersion: Int,
-      userVersion: Int,
-      startedIngestingAt: Long,
-      earliestIngestedRound: Long,
-  )(implicit tc: TraceContext): Future[Unit] =
-    futureUnlessShutdownToFuture(
-      storage.update_(
-        sql"""update #${Tables.activityRecordMeta}
-              set activity_ingestion_code_version = $codeVersion,
-                  activity_ingestion_user_version = $userVersion,
-                  started_ingesting_at = $startedIngestingAt,
-                  earliest_ingested_round = $earliestIngestedRound
-              where history_id = $historyId
-        """.asUpdate,
-        "appActivity.updateActivityRecordMeta",
       )
     )
 

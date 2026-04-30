@@ -1,7 +1,8 @@
 -- Metadata for activity record ingestion runs.
 -- Tracks when ingestion started so we can determine the earliest round
 -- with complete activity data and detect config version downgrades.
--- One row per history_id, created when the first batch with activity records is ingested.
+-- One row per (history_id, version) pair. A new row is inserted on each
+-- version bump; previous rows are retained as an audit trail.
 create table app_activity_record_meta
 (
     -- History identifier for update history partitioning (same as update_history_id).
@@ -20,5 +21,7 @@ create table app_activity_record_meta
     -- min() aggregation over the activity records table.
     earliest_ingested_round           bigint not null,
 
-    constraint app_activity_record_meta_pkey primary key (history_id)
+    constraint app_activity_record_meta_pkey primary key (
+        history_id, activity_ingestion_code_version, activity_ingestion_user_version
+    )
 );

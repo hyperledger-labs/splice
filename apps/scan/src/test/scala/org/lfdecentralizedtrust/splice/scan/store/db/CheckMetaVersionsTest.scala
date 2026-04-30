@@ -31,16 +31,16 @@ class CheckMetaVersionsTest extends AnyWordSpec with BaseTest {
       checkMetaVersions(meta(1, 0), runningCode = 1, runningUser = 0) shouldBe Resume
     }
 
-    "return UpgradeMeta when code version is higher" in {
-      checkMetaVersions(meta(1, 0), runningCode = 2, runningUser = 0) shouldBe UpgradeMeta
+    "return InsertMeta when code version is higher" in {
+      checkMetaVersions(meta(1, 0), runningCode = 2, runningUser = 0) shouldBe InsertMeta
     }
 
-    "return UpgradeMeta when user version is higher" in {
-      checkMetaVersions(meta(1, 0), runningCode = 1, runningUser = 1) shouldBe UpgradeMeta
+    "return InsertMeta when user version is higher" in {
+      checkMetaVersions(meta(1, 0), runningCode = 1, runningUser = 1) shouldBe InsertMeta
     }
 
-    "return UpgradeMeta when both versions are higher" in {
-      checkMetaVersions(meta(1, 0), runningCode = 2, runningUser = 1) shouldBe UpgradeMeta
+    "return InsertMeta when both versions are higher" in {
+      checkMetaVersions(meta(1, 0), runningCode = 2, runningUser = 1) shouldBe InsertMeta
     }
 
     "return DowngradeDetected when code version is lower" in {
