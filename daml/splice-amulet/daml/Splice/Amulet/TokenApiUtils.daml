@@ -78,9 +78,6 @@ unclaimedActivityRecordAmountMetaKey = amuletPrefix <> "unclaimed-activity-recor
 validatorRewardAmountMetaKey : Text
 validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
 
-validatorFaucetAmountMetaKey : Text
-validatorFaucetAmountMetaKey = amuletPrefix <> "validator-faucet"
-
 appRewardBeneficiariesMetaKey : Text
 appRewardBeneficiariesMetaKey = amuletPrefix <> "app-reward-beneficiaries"
 

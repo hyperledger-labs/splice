@@ -1010,7 +1010,6 @@ executeTransfer' config csum dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
-          optionalNonZeroMetadata validatorFaucetAmountMetaKey summary.inputValidatorFaucetAmount $
           optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
           optionalNonZeroMetadata developmentFundAmountMetaKey summary.inputDevelopmentFundAmount $
           TextMap.empty
@@ -1021,7 +1020,6 @@ executeTransfer' config csum dso t = do
         summary.inputValidatorRewardAmount +
         summary.inputSvRewardAmount +
         fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount +
-        fromOptional 0.0 summary.inputValidatorFaucetAmount +
         fromOptional 0.0 summary.inputDevelopmentFundAmount
   let optMintLeg = do
         guard (mintAmount > 0.0)

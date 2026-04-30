@@ -19,6 +19,7 @@ import DA.Assert
 import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -37,6 +38,7 @@ import Splice.Testing.Registries.AmuletRegistry qualified as Registry
 import Splice.ValidatorLicense
 
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 import Splice.Util
 
 -- Bootstrapping Amulet
@@ -651,8 +653,14 @@ allocateDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reaso
 -- Metadata verification
 ------------------------
 
-checkTransferMetadata : AmuletApp -> TxKind -> Party -> Script TransferResult -> Script TransferResult
-checkTransferMetadata = genericCheckTxMetadata (.meta) (Some . (.summary))
+checkTransferMetadata
+  : AmuletApp -> TxKind -> Party -> Script (TransferResult, TransactionTree)
+  -> Script (TransferResult, [TransferEventsV2.EventLog_HoldingsChange])
+checkTransferMetadata app kind sender action = do
+  WalletClientV2.extractAndCheckTxHistory [app.dso] $
+    genericCheckTxMetadata (\(result, _) -> result.meta) (\(result, _) -> Some result.summary) app kind sender action
+
+-- FIXME: consider also altering the ones below here
 
 checkTxMetadata : HasField "meta" a (Optional Metadata) => AmuletApp -> TxKind -> Party -> Script a -> Script a
 checkTxMetadata = genericCheckTxMetadata (.meta) (const None)
