@@ -7,12 +7,12 @@
 This script *only detects* breaches; reporting is delegated to the existing
 `failure_notifications` GH action at the bottom of each job, which fires on
 `if: failure()`. So this script:
-  - read every metrics.json in the given dirs,
-  - compare each metric to its `max:` rule in `.github/perf-thresholds.yaml`,
-  - print a per-(test, metric) result to stdout,
-  - append a Markdown summary of breaches to GITHUB_STEP_SUMMARY (visible in
-    the GHA UI and linked to from the failure notification),
-  - exit 1 if any breach occurred.
+  - reads every metrics.json in the given dirs,
+  - compares each metric to its rule in `.github/perf-thresholds.json`,
+  - prints a per-(test, metric) result to stdout,
+  - appends a Markdown summary of breaches to GITHUB_STEP_SUMMARY (visible
+    in the GHA UI and linked from the failure notification),
+  - exits 1 if any breach occurred.
 
 Usage:
   python3 check_perf_thresholds.py <metrics_dir> [<metrics_dir> ...]
@@ -30,17 +30,16 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-import yaml
-
-DEFAULT_THRESHOLDS = Path(".github/perf-thresholds.yaml")
+DEFAULT_THRESHOLDS = Path(".github/perf-thresholds.json")
 
 
 def load_thresholds(path: Path) -> dict:
+    """Parse the JSON thresholds file, dropping `_*` comment keys."""
     with open(path) as f:
-        data = yaml.safe_load(f) or {}
+        data = json.load(f)
     if not isinstance(data, dict):
-        raise ValueError(f"thresholds file {path} must be a YAML mapping")
-    return data
+        raise ValueError(f"thresholds file {path} must be a JSON object at the top level")
+    return {k: v for k, v in data.items() if not k.startswith("_")}
 
 
 def iter_metric_files(dirs: Iterable[Path]) -> Iterable[Path]:
@@ -62,6 +61,8 @@ def metric_value(data: dict, name: str) -> float | None:
 
 
 def append_step_summary(lines: list[str]) -> None:
+    """Append a Markdown block to GitHub Actions' step summary, if available.
+    """
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         print(
@@ -74,8 +75,10 @@ def append_step_summary(lines: list[str]) -> None:
         with open(summary_path, "a") as f:
             f.write("\n".join(lines) + "\n")
     except OSError as e:
-        print(f"warning: could not write GITHUB_STEP_SUMMARY ({summary_path}): {e}",
-              file=sys.stderr)
+        print(
+            f"warning: could not write GITHUB_STEP_SUMMARY ({summary_path}): {e}",
+            file=sys.stderr,
+        )
 
 
 def evaluate_breaches(
@@ -103,14 +106,16 @@ def evaluate_breaches(
             print(f"info: no thresholds configured for '{test_name}', skipping ({f.name})")
             continue
 
-        for metric_name, rule in rules.items():
-            if "max" not in rule:
+        for metric_name, raw_limit in rules.items():
+            try:
+                limit = float(raw_limit)
+            except (TypeError, ValueError):
                 print(
-                    f"warning: rule {test_name}::{metric_name} missing 'max', skipping",
+                    f"warning: rule {test_name}::{metric_name} has non-numeric "
+                    f"value {raw_limit!r}, skipping",
                     file=sys.stderr,
                 )
                 continue
-            limit = float(rule["max"])
 
             observed = metric_value(data, metric_name)
             if observed is None:

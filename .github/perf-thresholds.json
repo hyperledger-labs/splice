@@ -1,0 +1,23 @@
+{
+  "_comment": "Per-test perf thresholds. Schema: <test_name>: { <metric_name>: <max value> }. A run is a regression iff metric value > max. Units match the metric (e.g. *_total_time_ns is in nanoseconds; 1 s = 1e9 ns).",
+
+  "SvDsoStoreIngestionPerformanceTest": {
+    "splice_perf_ingestion_total_time_ns": 60000000000
+  },
+
+  "ScanStoreIngestionPerformanceTest": {
+    "splice_perf_ingestion_total_time_ns": 600000000000
+  },
+
+  "UpdateHistoryIngestionPerformanceTest": {
+    "splice_perf_ingestion_total_time_ns": 1800000000000
+  },
+
+  "UpdateHistoryReadPerformanceTest-getUpdate": {
+    "splice_perf_read_total_time_ns": 5000000000
+  },
+
+  "UpdateHistoryReadPerformanceTest-encodeUpdate": {
+    "splice_perf_read_total_time_ns": 5000000000
+  }
+}
