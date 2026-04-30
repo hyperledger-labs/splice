@@ -319,12 +319,14 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return None when rounds are not consecutive" in {
+    // #5186: round with zero activity between non-zero rounds should not block progress
+    "treat a zero-activity round between non-zero rounds as complete" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
         rowId1 <- insertVerdictRow(historyId, baseTs, "update-gap-10")
         rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-gap-12")
+        // Round 10 and 12 have activity, round 11 has zero activity (no records)
         _ <- store.insertAppActivityRecords(
           Seq(
             mkRecord(rowId1, 10L, Seq("app1::provider"), Seq(100L)),
@@ -333,8 +335,10 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.earliestRoundWithCompleteAppActivity()
       } yield {
-        // No round has a prior round with records (11 is missing)
-        result shouldBe None
+        // Round 11 has zero activity but is bounded by 10 and 12, so 11 is complete.
+        // Round 12 is also complete (activity exists for a prior round: 10).
+        // Earliest complete should be 11.
+        result.value shouldBe 11L
       }
     }
 
@@ -447,12 +451,14 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return None when rounds are not consecutive" in {
+    // #5186: round with zero activity between non-zero rounds should not block progress
+    "treat a zero-activity round between non-zero rounds as complete" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
         rowId1 <- insertVerdictRow(historyId, baseTs, "update-gap-10")
         rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-gap-12")
+        // Round 10 and 12 have activity, round 11 has zero activity (no records)
         _ <- store.insertAppActivityRecords(
           Seq(
             mkRecord(rowId1, 10L, Seq("app1::provider"), Seq(100L)),
@@ -461,7 +467,10 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        result shouldBe None
+        // Round 12 is the max round. Round 11 has zero activity but is bounded
+        // by rounds with data, so it is complete. Latest complete should be 11
+        // (12 cannot be confirmed complete without seeing round 13).
+        result.value shouldBe 11L
       }
     }
 
