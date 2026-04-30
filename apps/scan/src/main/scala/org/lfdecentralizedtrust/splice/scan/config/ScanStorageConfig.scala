@@ -123,10 +123,10 @@ case class ScanStorageConfig(
         } yield {
           (folderStart, folderEnd)
         }
-        case _ =>
-          Left(
-            s"Cannot parse folder name: $folder (wrong format, expected 'startTimestamp~endTimestamp')"
-          )
+      case _ =>
+        Left(
+          s"Cannot parse folder name: $folder (wrong format, expected 'startTimestamp~endTimestamp')"
+        )
     }
   }
 
