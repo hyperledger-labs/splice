@@ -4,12 +4,44 @@
 package org.lfdecentralizedtrust.splice.scan.rewards
 
 import com.digitalasset.canton.BaseTest
-import org.lfdecentralizedtrust.splice.util.BigDecimalMatchers
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.RewardConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.RewardVersion.REWARDVERSION_TRAFFICBASEDAPPREWARDS
+import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.util.{BigDecimalMatchers, SpliceUtil}
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.Optional
 
 class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDecimalMatchers {
 
   import RewardComputationInputsTest.*
+
+  "RewardComputationInputs.fromOpenMiningRound" should {
+
+    "extract all fields from an OpenMiningRound with CIP-104 config" in {
+      RewardComputationInputs.fromOpenMiningRound(mainNetRound) shouldBe Some((mainNet, 100))
+    }
+
+    "use default developmentFundPercentage when optDevelopmentFundPercentage is None" in {
+      val round = mkOpenMiningRound(optDevelopmentFundPercentage = Optional.empty())
+      RewardComputationInputs.fromOpenMiningRound(round).map(_._1) shouldBe Some(mainNet)
+    }
+
+    "return None when rewardConfig is None" in {
+      val round = mkOpenMiningRound(rewardConfig = Optional.empty())
+      RewardComputationInputs.fromOpenMiningRound(round) shouldBe None
+    }
+
+    "return None when trafficPrice is None" in {
+      val round = mkOpenMiningRound(trafficPrice = Optional.empty())
+      RewardComputationInputs.fromOpenMiningRound(round) shouldBe None
+    }
+  }
 
   "RewardComputationInputs.deriveIssuanceParams" should {
 
@@ -37,6 +69,47 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDeci
 object RewardComputationInputsTest {
 
   import RewardComputationInputs.{fromBigDecimal as n}
+
+  private val defaultRewardConfig = new RewardConfig(
+    REWARDVERSION_TRAFFICBASEDAPPREWARDS,
+    Optional.empty(),
+    100L,
+    new RelTime(36L * 3600L * 1000000L),
+    SpliceUtil.damlDecimal(0.5),
+  )
+
+  private def mkOpenMiningRound(
+      trafficPrice: Optional[java.math.BigDecimal] = Optional.of(SpliceUtil.damlDecimal(60.0)),
+      rewardConfig: Optional[RewardConfig] = Optional.of(defaultRewardConfig),
+      optDevelopmentFundPercentage: Optional[java.math.BigDecimal] =
+        Optional.of(SpliceUtil.damlDecimal(0.05)),
+  ): OpenMiningRound = {
+    val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+    new OpenMiningRound(
+      "dso-party",
+      new Round(42L),
+      SpliceUtil.damlDecimal(0.14877),
+      now,
+      now.plusSeconds(600),
+      new RelTime(600L * 1000000L),
+      SpliceUtil.defaultTransferConfig(10, SpliceUtil.damlDecimal(1.0)),
+      new IssuanceConfig(
+        SpliceUtil.damlDecimal(10000000000.0),
+        SpliceUtil.damlDecimal(0.0),
+        SpliceUtil.damlDecimal(0.62),
+        SpliceUtil.damlDecimal(0.0),
+        SpliceUtil.damlDecimal(1.5),
+        SpliceUtil.damlDecimal(0.6),
+        Optional.empty(),
+        optDevelopmentFundPercentage,
+      ),
+      new RelTime(600L * 1000000L),
+      trafficPrice,
+      rewardConfig,
+    )
+  }
+
+  private val mainNetRound: OpenMiningRound = mkOpenMiningRound()
 
   // 600s tick → 52560 rounds/year
   private val tickDurationMicros: Long = 600L * 1000000L

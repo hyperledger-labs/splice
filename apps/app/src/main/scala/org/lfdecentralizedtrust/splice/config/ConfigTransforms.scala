@@ -806,6 +806,11 @@ object ConfigTransforms {
   def withDevelopmentFundManager(fundManager: PartyId): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundManager = Some(fundManager)))
 
+  def withRewardConfig(
+      rewardConfig: InitialRewardConfig
+  ): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(initialRewardConfig = Some(rewardConfig)))
+
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 

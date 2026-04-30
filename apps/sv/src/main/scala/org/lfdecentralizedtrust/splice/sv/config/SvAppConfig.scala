@@ -114,6 +114,7 @@ object SvOnboardingConfig {
       developmentFundManager: Option[PartyId] = None,
       initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
       optValidatorFaucetCap: Option[BigDecimal] = None,
+      initialRewardConfig: Option[InitialRewardConfig] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -241,6 +242,35 @@ object SvOnboardingConfig {
       // If unset, we assume there is an LsuAnnouncement.
       exportTimes: Option[RollForwardLsuTimestampConfig],
   ) extends SvOnboardingConfig
+}
+
+final case class InitialRewardConfig(
+    mintingVersion: String = "RewardVersion_FeaturedAppMarkers",
+    dryRunVersion: Option[String] = None,
+    batchSize: Long = 100,
+    rewardCouponTimeToLiveMicros: Long = 36L * 60 * 60 * 1000000, // 36 hours
+    appRewardCouponThreshold: BigDecimal = BigDecimal("0.5"),
+) {
+  def toRewardConfig: splice.amuletconfig.RewardConfig = {
+    def parseVersion(s: String): splice.amuletconfig.RewardVersion = s match {
+      case "RewardVersion_FeaturedAppMarkers" =>
+        splice.amuletconfig.RewardVersion.REWARDVERSION_FEATUREDAPPMARKERS
+      case "RewardVersion_TrafficBasedAppRewards" =>
+        splice.amuletconfig.RewardVersion.REWARDVERSION_TRAFFICBASEDAPPREWARDS
+      case other => throw new IllegalArgumentException(s"Unknown RewardVersion: $other")
+    }
+    new splice.amuletconfig.RewardConfig(
+      parseVersion(mintingVersion),
+      dryRunVersion
+        .map(parseVersion)
+        .fold(java.util.Optional.empty[splice.amuletconfig.RewardVersion]())(java.util.Optional.of),
+      batchSize,
+      new org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime(
+        rewardCouponTimeToLiveMicros
+      ),
+      appRewardCouponThreshold.bigDecimal,
+    )
+  }
 }
 
 final case class InitialAnsConfig(

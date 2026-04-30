@@ -80,17 +80,21 @@ class ScanAutomationService(
   registerTrigger(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
   )
-  for {
-    appRewardsStore <- appRewardsStoreO
-    appActivityStore <- appActivityStoreO
-  } registerTrigger(
-    new RewardComputationTrigger(
-      appRewardsStore,
-      appActivityStore,
-      updateHistory,
-      triggerContext,
+  def registerRewardComputationTrigger(
+      rewardsReferenceStore: ScanRewardsReferenceStore
+  ): Unit =
+    for {
+      appRewardsStore <- appRewardsStoreO
+      appActivityStore <- appActivityStoreO
+    } registerTrigger(
+      new RewardComputationTrigger(
+        appRewardsStore,
+        appActivityStore,
+        rewardsReferenceStore,
+        updateHistory,
+        triggerContext,
+      )
     )
-  )
 
   registerUpdateHistoryIngestion(updateHistory)
 

@@ -386,6 +386,7 @@ class ScanApp(
             config.parameters.defaultLimit,
           )
           automation.registerRewardsReferenceStoreIngestion(rewardsStore)
+          automation.registerRewardComputationTrigger(rewardsStore)
           Some(rewardsStore)
         } else None
       verdictAutomation = new ScanVerdictAutomationService(
