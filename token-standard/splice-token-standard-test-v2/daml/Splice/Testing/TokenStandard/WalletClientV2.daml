@@ -623,12 +623,13 @@ expectTxHistoryReasons changes expectedReasons = do
       pure (change.account, legReasons, TSU.reasonFromMeta change.extraArgs.meta)
 
 
--- FIXME: name ByAccount
+-- FIXME: name ByAdminAndAccount
 mergeHoldingsChanges : [TransferEventsV2.EventLog_HoldingsChange] -> [TransferEventsV2.EventLog_HoldingsChange]
 mergeHoldingsChanges events =
-    Map.values eventsWithAccount
+    Map.values eventsWithAdminAndAccount
   where
-    eventsWithAccount = Map.fromListWithR mergeTwoHoldingChangeEvents [ (event.account, event) | event <- events ]
+    eventsWithAdminAndAccount =
+      Map.fromListWithR mergeTwoHoldingChangeEvents [ ((event.admin, event.account), event) | event <- events ]
     mergeTwoHoldingChangeEvents e1 e2 =
       e1 with
         inputHoldingCids = e1.inputHoldingCids ++ e2.inputHoldingCids
