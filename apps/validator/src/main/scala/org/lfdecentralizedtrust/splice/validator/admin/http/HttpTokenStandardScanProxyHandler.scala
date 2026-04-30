@@ -114,13 +114,14 @@ class HttpTokenStandardScanProxyHandler(
   )(
       body: allocation.v2.definitions.GetFactoryRequest
   )(extracted: AuthenticatedRequest): Future[allocation.v2.Resource.GetSettlementFactoryResponse] =
-    ???
+    Future.failed(io.grpc.Status.UNIMPLEMENTED.withDescription("TODO #4915").asRuntimeException())
 
   override def getAllocationWithdrawContext(
       respond: allocation.v2.Resource.GetAllocationWithdrawContextResponse.type
   )(allocationId: String, body: allocation.v2.definitions.GetChoiceContextRequest)(
       extracted: AuthenticatedRequest
-  ): Future[allocation.v2.Resource.GetAllocationWithdrawContextResponse] = ???
+  ): Future[allocation.v2.Resource.GetAllocationWithdrawContextResponse] =
+    Future.failed(io.grpc.Status.UNIMPLEMENTED.withDescription("TODO #4915").asRuntimeException())
 
   override def getAllocationCancelContext(
       respond: allocation.v2.Resource.GetAllocationCancelContextResponse.type
