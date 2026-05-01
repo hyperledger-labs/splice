@@ -969,8 +969,8 @@ class DbScanAppRewardsStoreTest
       futureUnlessShutdownToFuture(
         storage.underlying.queryAndUpdate(
           sqlu"""insert into app_activity_record_store
-                 (verdict_row_id, round_number, app_provider_parties, app_activity_weights)
-                 values ($verdictId, $round,
+                 (history_id, verdict_row_id, round_number, app_provider_parties, app_activity_weights)
+                 values ($historyId, $verdictId, $round,
                          #${"'" + partiesArray + "'"},
                          #${"'" + weightsArray + "'"})""",
           "test.insertActivityRecord",
