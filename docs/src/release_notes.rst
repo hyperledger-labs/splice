@@ -226,10 +226,10 @@
           `CIP-104 incremental roll-out plan <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`_.
 
           The responses from the ``/v0/events`` and ``/v0/events/{update_id}``
-          `endpoints <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`_
+          `endpoints <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`_
           now include the
-          ``traffic_summary`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`_) and
-          ``app_activity_records`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`_)
+          ``traffic_summary`` (`schema <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`_) and
+          ``app_activity_records`` (`schema <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`_)
           fields.
 
           .. note::
@@ -617,7 +617,7 @@
 
     - Wallet backend
 
-      - Fix a bug (`#3970 <https://github.com/hyperledger-labs/splice/issues/3970>`__) that caused transaction history
+      - Fix a bug (`#3970 <https://github.com/canton-network/splice/issues/3970>`__) that caused transaction history
         for entries created by Splice versions prior to 0.5.11 to fail to decode in the backend and thus not show in the
         wallet UI.
         These entries are now shown again in the wallet UI.
@@ -898,7 +898,7 @@
           ``DevelopmentFundCoupon``, restoring its amount to an ``UnclaimedDevelopmentFundCoupon``.
 
       Note that the UI changes in the Wallet app required to allocate funds are not yet implemented and will be delivered in a later release. Please refer to
-      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/hyperledger-labs/splice/issues/3218>`.
+      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/canton-network/splice/issues/3218>`.
 
       These Daml changes require an upgrade to the following Daml versions **before**
       voting to set the transfer fees to zero:
@@ -1128,13 +1128,13 @@
 
     - Scan
 
-        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/canton-network/splice/pull/2860>`_
 
-        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/canton-network/splice/pull/2861>`_
 
   - Deployment
 
-    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/canton-network/splice/pull/2972>`_
 
 .. release-notes:: 0.4.22
 
@@ -1366,7 +1366,7 @@
 
     - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
       ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
-      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+      Thanks to Marcin Kocur for contributing this change in https://github.com/canton-network/splice/pull/2171
 
 - LocalNet
 
@@ -1375,7 +1375,7 @@
 - Community docs
 
   - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
-    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
+    Thanks to mikeProDev for contributing this change in https://github.com/canton-network/splice/pull/2247
 
 0.4.16
 ------
@@ -1506,13 +1506,13 @@
 
     - Add Vagrantfile as a convenient way to spin up a local development
       environment for Splice. See `README.vagrant.md
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+      <https://github.com/canton-network/splice/blob/0.4.12/README.vagrant.md>`_
       and `Vagrantfile
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+      <https://github.com/canton-network/splice/blob/0.4.12/Vagrantfile>`_ for
       details.
 
   - A subset of the tests now run on PRs from forks without approval from a maintainer
-    (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
+    (see `TESTING.md <https://github.com/canton-network/splice/blob/0.4.12/TESTING.md>` for details)
 
 - Performance improvements
 
@@ -1658,11 +1658,11 @@ which can happen in certain cases when the sequencer is down.
 
 - Scan
 
-  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+  - Fix `bug #1252 <https://github.com/canton-network/splice/issues/1252>`_:
     populate the token metadata total supply using the aggregates used for closed rounds.
     The data used corresponds to the data served by the ``/v0/total-amulet-balance``
     endpoint in :ref:`app_dev_scan_api` for the latest closed round.
-  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+  - Fix `bug #1280 <https://github.com/canton-network/splice/pull/1280>`_:
     ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
 
 - Validator
@@ -1747,7 +1747,7 @@ which can happen in certain cases when the sequencer is down.
             weight: 1000
 
     Thanks to Divam Narula for contributing this change
-    in https://github.com/hyperledger-labs/splice/pull/1371
+    in https://github.com/canton-network/splice/pull/1371
 
 - Daml
 
@@ -1904,7 +1904,7 @@ which can happen in certain cases when the sequencer is down.
 
 - Scan
 
-  - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
+  - Fix a `bug (#1254) <https://github.com/canton-network/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
     based on the ``splice-instance-names`` config.
 
 - Validator
@@ -1937,10 +1937,10 @@ which can happen in certain cases when the sequencer is down.
 
 - Validator
 
-  - Fix a `bug (#1216) <https://github.com/hyperledger-labs/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
+  - Fix a `bug (#1216) <https://github.com/canton-network/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
     if the receiver's provider party was featured.
   - Fix a bug where uploading dars would not immediately vet the dependencies that had a vetting entry effective in the future.
-  - Fix a `bug (#1215)  <https://github.com/hyperledger-labs/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
+  - Fix a `bug (#1215)  <https://github.com/canton-network/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
 
 - Synchronizer Migrations
 
@@ -1978,7 +1978,7 @@ which can happen in certain cases when the sequencer is down.
     specify path to `identities.json` and not directory containing it. This is
     consistent with the :ref:`documented
     <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
-    `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+    `#387 <https://github.com/canton-network/splice/pull/387>`_
 
 - Auth
 
@@ -2000,7 +2000,7 @@ which can happen in certain cases when the sequencer is down.
 - Define `standard k8s labels <https://helm.sh/docs/chart_best_practices/labels/#standard-labels>`_
   for most k8s resources deployed through Splice Helm charts.
   Thanks to Stephane Loeuillet for contributing an initial proposal for this change
-  in https://github.com/hyperledger-labs/splice/pull/296.
+  in https://github.com/canton-network/splice/pull/296.
 
 - Scan
 
@@ -2041,7 +2041,7 @@ which can happen in certain cases when the sequencer is down.
   - Add jemalloc into the docker images. This is not enabled by
     default but allows for easier testing. Thanks to Stanislav
     German-Evtushenko for contributing this in
-    https://github.com/hyperledger-labs/splice/pull/318
+    https://github.com/canton-network/splice/pull/318
 
 - Validator
 
@@ -2056,7 +2056,7 @@ which can happen in certain cases when the sequencer is down.
 
   - Improve the error message when trying to use the wallet outside of
     localhost or https. Thanks to Stephane Loeuillet for contributing
-    this in https://github.com/hyperledger-labs/splice/pull/322.
+    this in https://github.com/canton-network/splice/pull/322.
 
 - Scan
 
@@ -2252,7 +2252,7 @@ which can happen in certain cases when the sequencer is down.
 
   * Move ``topup`` section from the ``validator-values.yaml`` example file to the ``standalone-validator.yaml`` example file
     to make it more clear that configuring topups is a reasonable option only for non-SV validators.
-    See `hyperledger-labs/splice#255 <https://github.com/hyperledger-labs/splice/pull/255>`_
+    See `canton-network/splice#255 <https://github.com/canton-network/splice/pull/255>`_
 
   * Added the ``initialAmuletPrice`` helm option to set the initial amulet price vote (i.e., the price for which your SV node will vote when onboarded).
     See the :ref:`configuration instructions <helm-configure-global-domain>`.
@@ -2574,7 +2574,7 @@ Signatures required from these external parties can be collected via a crypto cu
 can involve multiple human confirmers. Transactions submitted in the name of these parties can thus take
 multiple hours from the creation of the transaction signing request to the final commit of the transaction on the network.
 This increased latency required several changes in the Daml models underlying Amulet.
-They can be reviewed in detail by diffing the ``daml`` directory in the https://github.com/hyperledger-labs/splice
+They can be reviewed in detail by diffing the ``daml`` directory in the https://github.com/canton-network/splice
 repo.
 
 The key changes are summarized below:

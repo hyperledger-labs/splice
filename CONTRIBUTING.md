@@ -36,9 +36,9 @@ TBD: futher contribution guidelines, s.a. [Canton's Contributing Guide](https://
 
 Splice maintainers may use the following GitHub issue labels to highlight issues suitable for newer contributors:
 
-- [`help wanted`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22):
+- [`help wanted`](https://github.com/canton-network/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22):
   tasks of various sizes and difficulty levels suitable for contributors outside of the maintainers team
-- [`good first issue`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22):
+- [`good first issue`](https://github.com/canton-network/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22):
   easier tasks that are well-suited for onboarding to the code base
 
 Note that not all `good first issue`s are also `help wanted`; some may require access to infrastructure (CI, test deployments) that is not openly available.
@@ -256,6 +256,6 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 ## Dev Docs
 
 We publish docs from each commit from `main` to
-https://hyperledger-labs.github.io/splice/. This can
+https://canton-network.github.io/splice/. This can
 often be useful to answer support requests with a docs link even if
 those docs are still very recent.
