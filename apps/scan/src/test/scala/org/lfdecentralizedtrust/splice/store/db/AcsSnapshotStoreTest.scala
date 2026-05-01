@@ -694,6 +694,12 @@ class AcsSnapshotStoreTest
               )
           }
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          summaryAtRound0 <- store.getHoldingsSummary(
+            DefaultMigrationId,
+            timestamp1,
+            NonEmptyVector.of(wantedParty1, wantedParty2),
+            asOfRound = 0L,
+          )
           summaryAtRound3 <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
@@ -713,6 +719,17 @@ class AcsSnapshotStoreTest
             asOfRound = 100L,
           )
         } yield {
+          // asOfRound=0: coin totals are round-independent (relied on by the v1 endpoint
+          // which hardcodes round 0). Fee-related fields become negative when
+          // asOfRound < createdAtRound, but the v1 response never exposes them.
+          summaryAtRound0.summaries.foreach { case (partyId, h0) =>
+            val h3 = summaryAtRound3.summaries(partyId)
+            h0.totalUnlockedCoin shouldBe h3.totalUnlockedCoin
+            h0.totalLockedCoin shouldBe h3.totalLockedCoin
+            h0.totalCoinHoldings shouldBe h3.totalCoinHoldings
+            h0.accumulatedHoldingFeesUnlocked should be < BigDecimal(0)
+            h0.accumulatedHoldingFeesLocked should be < BigDecimal(0)
+          }
           summaryAtRound3 should be(
             AcsSnapshotStore.HoldingsSummaryResult(
               DefaultMigrationId,
@@ -796,6 +813,31 @@ class AcsSnapshotStoreTest
               ),
             )
           )
+        }
+      }
+
+      "return empty summaries for a party with no holdings" in {
+        val partyWithHoldings = providerParty(1)
+        val partyWithNoHoldings = providerParty(4)
+        val amulet1 = amulet(partyWithHoldings, 10, 1L, 1.0)
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- ingestCreate(
+            updateHistory,
+            amulet1,
+            timestamp1.minusSeconds(10L),
+            Seq(partyWithHoldings),
+          )
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          summary <- store.getHoldingsSummary(
+            DefaultMigrationId,
+            timestamp1,
+            NonEmptyVector.of(partyWithNoHoldings),
+            asOfRound = 3L,
+          )
+        } yield {
+          summary.summaries shouldBe empty
         }
       }
 

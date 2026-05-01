@@ -31,7 +31,9 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  HoldingsSummaryRequestV1,
   HoldingsSummaryResponse,
+  HoldingsSummaryResponseV1,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
@@ -152,6 +154,23 @@ class SingleScanConnection private[client] (
         ownerPartyIds,
         recordTimeMatch,
         asOfRound,
+      ),
+    )
+  }
+
+  override def getHoldingsSummaryAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[HoldingsSummaryRequestV1.RecordTimeMatch],
+  )(implicit tc: TraceContext): Future[Option[HoldingsSummaryResponseV1]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetHoldingsSummaryAtV1(
+        at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        migrationId,
+        ownerPartyIds,
+        recordTimeMatch,
       ),
     )
   }

@@ -418,7 +418,7 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
-    val (aliceUserParty, _) = onboardAliceAndBob()
+    val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
 
     clue(
@@ -566,6 +566,50 @@ class ScanTimeBasedIntegrationTest
         res.summaries.map(_.partyId).distinct shouldBe (Vector(aliceUserParty.toProtoPrimitive))
       }
 
+      val holdingsSummaryV1 = sv1ScanBackend.getHoldingsSummaryAtV1(
+        snapshotAfterCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+      )
+
+      inside(holdingsSummaryV1) { case Some(res) =>
+        res.migrationId should be(migrationId)
+        res.recordTime should be(snapshotAfter.value)
+        res.summaries.map(_.partyId).distinct shouldBe (Vector(aliceUserParty.toProtoPrimitive))
+        forAll(res.summaries) { summary =>
+          // V1 response should contain non-zero coin totals
+          BigDecimal(summary.totalCoinHoldings) should be > BigDecimal(0)
+          BigDecimal(summary.totalCoinHoldings) shouldBe BigDecimal(
+            summary.totalUnlockedCoin
+          ) + BigDecimal(summary.totalLockedCoin)
+        }
+      }
+
+      // V1 coin totals should match V0 coin totals
+      inside((holdingsSummary, holdingsSummaryV1)) { case (Some(v0Res), Some(v1Res)) =>
+        v0Res.summaries.zip(v1Res.summaries).foreach { case (v0s, v1s) =>
+          v0s.totalUnlockedCoin shouldBe v1s.totalUnlockedCoin
+          v0s.totalLockedCoin shouldBe v1s.totalLockedCoin
+          v0s.totalCoinHoldings shouldBe v1s.totalCoinHoldings
+        }
+      }
+
+      // V1 multi-party query: querying with both alice and bob exercises
+      // multi-party support at the HTTP endpoint level
+      val holdingsSummaryV1MultiParty = sv1ScanBackend.getHoldingsSummaryAtV1(
+        snapshotAfterCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty, bobUserParty),
+      )
+      inside(holdingsSummaryV1MultiParty) { case Some(res) =>
+        // Alice should appear in the multi-party result with the same values
+        val aliceSummaries = res.summaries.filter(_.partyId == aliceUserParty.toProtoPrimitive)
+        aliceSummaries should not be empty
+        inside(holdingsSummaryV1) { case Some(singleRes) =>
+          aliceSummaries shouldBe singleRes.summaries
+        }
+      }
+
       // afOrBefore should return the same holdingsState and holdingsSummary as the exact time given by snapshotAfter
       advanceTime(java.time.Duration.ofMinutes(10))
       val atOrBefore = getLedgerTime
@@ -601,6 +645,21 @@ class ScanTimeBasedIntegrationTest
         migrationId,
         ownerPartyIds = Vector(aliceUserParty),
         recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
+      ) shouldBe None
+
+      val holdingsSummaryV1AtOrBefore = sv1ScanBackend.getHoldingsSummaryAtV1(
+        atOrBeforeCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsSummaryRequestV1.RecordTimeMatch.AtOrBefore),
+      )
+      holdingsSummaryV1AtOrBefore shouldBe holdingsSummaryV1
+
+      sv1ScanBackend.getHoldingsSummaryAtV1(
+        atOrBeforeCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsSummaryRequestV1.RecordTimeMatch.Exact),
       ) shouldBe None
     }
 

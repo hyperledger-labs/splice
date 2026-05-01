@@ -124,6 +124,16 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       Vector(aliceValidatorParty),
     )
 
+    aliceValidatorBackend.scanProxy.getHoldingsSummaryAtV1(
+      now,
+      0L,
+      Vector(aliceValidatorParty),
+    ) shouldBe sv1ScanBackend.getHoldingsSummaryAtV1(
+      now,
+      0L,
+      Vector(aliceValidatorParty),
+    )
+
     // check that the dsoGovernance are not vetted
     aliceValidatorBackend.participantClient.topology.vetted_packages
       .list(filterParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive)

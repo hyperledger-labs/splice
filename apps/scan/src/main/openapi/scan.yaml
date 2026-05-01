@@ -731,11 +731,12 @@ paths:
 
   /v0/holdings/summary:
     post:
-      tags: [external, scan]
+      deprecated: true
+      tags: [deprecated]
       x-jvm-package: scan
       operationId: "getHoldingsSummaryAt"
       description: |
-        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        Deprecated. Please use /v1/holdings/summary instead. Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
         This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
       requestBody:
         required: true
@@ -750,6 +751,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v1/holdings/summary:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsSummaryAtV1"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
+        Unlike /v0/holdings/summary, this version does not include holding fee fields
+        as they do not express a meaningful aggregate value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsSummaryRequestV1"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsSummaryResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -3229,6 +3260,43 @@ components:
           description: |
             Compute holding fees as of this round. Defaults to the earliest open mining round.
 
+    HoldingsSummaryRequestV1:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the summary.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active.
+            This needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp` if `record_time_match` is set to `exact` (which is the default).
+            If `record_time_match` is set to `at_or_before`, this can be any timestamp, and the most recent snapshot at or before the given `record_time` will be returned.
+        record_time_match:
+           type: string
+           description: |
+             How to match the record_time. "exact" requires the record_time to match exactly.
+             "at_or_before" finds the most recent snapshot at or before the given record_time.
+           enum:
+             - "exact"
+             - "at_or_before"
+           default: "exact"
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: |
+            The owners for which to compute the summary.
+
     ForceAcsSnapshotResponse:
       type: object
       required:
@@ -3377,6 +3445,53 @@ components:
         total_available_coin:
           description:
             Same as `total_unlocked_coin` - `accumulated_holding_fees_unlocked`.
+          type: string
+
+    HoldingsSummaryResponseV1:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - summaries
+      properties:
+        record_time:
+          description: The same `record_time` as in the request.
+          type: string
+          format: date-time
+        migration_id:
+          description: The same `migration_id` as in the request.
+          type: integer
+          format: int64
+        summaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsSummaryV1"
+    HoldingsSummaryV1:
+      description: Aggregate Amulet totals for a particular owner party ID.
+      type: object
+      required:
+        - party_id
+        - total_unlocked_coin
+        - total_locked_coin
+        - total_coin_holdings
+      properties:
+        party_id:
+          description: |
+            Owner party ID of the amulet. Guaranteed to be unique among `summaries`.
+          type: string
+        total_unlocked_coin:
+          description: |
+            Sum of unlocked amulet initial amounts, not counting holding
+            fees deducted since.
+          type: string
+        total_locked_coin:
+          description: |
+            Sum of locked amulet initial amounts, not
+            counting holding fees deducted since.
+          type: string
+        total_coin_holdings:
+          description: |
+            `total_unlocked_coin` + `total_locked_coin`.
           type: string
 
     ListActivityRequest:

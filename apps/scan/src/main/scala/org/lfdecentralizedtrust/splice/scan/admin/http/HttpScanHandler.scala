@@ -69,6 +69,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   EventHistoryRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
+  HoldingsSummaryRequestV1,
   ListBulkUpdateHistoryObjectsRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
@@ -2014,6 +2015,66 @@ class HttpScanHandler(
         case Right(response) => response
         case Left(errorMessage) =>
           ScanResource.GetHoldingsSummaryAtResponseNotFound(
+            ErrorResponse(errorMessage)
+          )
+      }
+    }
+  }
+
+  override def getHoldingsSummaryAtV1(
+      respond: ScanResource.GetHoldingsSummaryAtV1Response.type
+  )(
+      body: HoldingsSummaryRequestV1
+  )(extracted: TraceContext): Future[ScanResource.GetHoldingsSummaryAtV1Response] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getHoldingsSummaryAtV1") { _ => _ =>
+      val HoldingsSummaryRequestV1(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        partyIds,
+      ) = body
+
+      // The asOfRound parameter is only consumed by SpliceUtil.holdingFee, which feeds the
+      // accumulated*HoldingFees* and totalAvailableCoin fields on HoldingsSummary. The v1
+      // response only exposes totalUnlockedCoin, totalLockedCoin, and totalCoinHoldings, all
+      // of which are sums of amulet.amount.initialAmount and do not depend on the round.
+      // Any value for asOfRound therefore yields the same v1 result; we pass 0 as a sentinel.
+      def exactQuery(recordTimeTs: CantonTimestamp) =
+        snapshotStore
+          .getHoldingsSummary(
+            migrationId,
+            recordTimeTs,
+            nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
+            0L,
+          )
+
+      def toResponse(result: AcsSnapshotStore.HoldingsSummaryResult) =
+        ScanResource.GetHoldingsSummaryAtV1Response.OK(
+          definitions.HoldingsSummaryResponseV1(
+            Codec.encode(result.recordTime),
+            result.migrationId,
+            result.summaries.map { case (partyId, holdings) =>
+              definitions.HoldingsSummaryV1(
+                partyId = Codec.encode(partyId),
+                totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
+                totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
+                totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
+              )
+            }.toVector,
+          )
+        )
+
+      queryWithOptionalAtOrBefore(
+        migrationId,
+        recordTime,
+        recordTimeMatch.contains(HoldingsSummaryRequestV1.RecordTimeMatch.AtOrBefore),
+        exactQuery,
+        toResponse,
+      ).map {
+        case Right(response) => response
+        case Left(errorMessage) =>
+          ScanResource.GetHoldingsSummaryAtV1ResponseNotFound(
             ErrorResponse(errorMessage)
           )
       }

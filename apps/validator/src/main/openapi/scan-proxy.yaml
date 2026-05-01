@@ -225,11 +225,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/scan-proxy/holdings/summary:
     post:
-      tags: [ scan-proxy ]
+      deprecated: true
+      tags: [ deprecated ]
       x-jvm-package: scanproxy
       operationId: "getHoldingsSummaryAt"
       description: |
-        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        Deprecated. Please use /v1/scan-proxy/holdings/summary instead. Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
         This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
       requestBody:
         required: true
@@ -244,6 +245,35 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v1/scan-proxy/holdings/summary:
+    post:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getHoldingsSummaryAtV1"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
+        Unlike /v0/scan-proxy/holdings/summary, this version does not include holding fee fields
+        as they do not express a meaningful aggregate value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/HoldingsSummaryRequestV1"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/HoldingsSummaryResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
