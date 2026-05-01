@@ -9,9 +9,7 @@ import DA.Map qualified as Map
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
--- TODO(#4598): when switching to batch transfers attempt to share the adjusted Transfer type between events, transfer instructions, and allocations
-
--- | A specification of a transfer of holdings between two accounts.
+-- | A specification of a transfer of holdings to a receiver account.
 data Transfer = Transfer with
     receiver : Account
       -- ^ The receiver of the transfer.
@@ -97,7 +95,7 @@ data TransferInstructionView = TransferInstructionView with
       -- updates to its state.
       -- Only set if the registry evolved the transfer instruction in multiple steps.
     sender : Account
-      -- FIXME
+      -- ^ The sender of the funds.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
     requestedAt : Time
@@ -210,29 +208,43 @@ interface TransferFactory where
   transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferFactory_TransferResult
   transferFactory_publicFetchImpl : ContractId TransferFactory -> TransferFactory_PublicFetch -> Update TransferFactoryView
 
-  -- FIXME: consider adjusting to `_TransferMany`
   nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
-    -- ^ Instruct the registry to execute a transfer.
-    -- Implementations MUST ensure that this choice fails if `transfer.executeBefore` is in the past.
+    -- ^ Instruct the registry to execute one or more transfers.
+    --
+    -- Instructing multiple transfers in the same transaction is primarily a performance
+    -- and traffic cost optimization.
     with
       sender : Account
-        -- ^ The sender of the transfers
+        -- ^ The sender of the transfers.
       transfers : [Transfer]
-        -- ^ The transfers to execute.
+        -- ^ The transfers to execute. MUST be non-empty.
         --
-        -- Implementations MUST validate that the admin of the instrument matches the admin of the factory.
+        -- Each of them MAY be executed immediately or result in a `TransferInstruction`.
+        -- There is no guarantee that they all happen atomically in the same transaction.
+        -- Consider using allocations if guaranteed atomic execution of multiple
+        -- transfers is required.
+        --
+        -- Alternatively, for some assets, it MAY be possible to implement
+        -- atomic execution using preapprovals to enable immediate execution,
+        -- and checking the `TransferInstructionResult` to ensure that the
+        -- transaction only succeeds if all transfers were executed.
+        --
+        -- Implementations MUST validate that
+        --   - the instrument admin matches the admin of the factory
+        --   - the `executeBefore` timestamps are in the future
       requestedAt : Time
-        -- ^ The time at which the allocation was requested.
+        -- ^ The time at which the transfers were requested.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings that SHOULD be used to fund the allocation.
+        -- ^ The holdings that MUST be used to fund the transfer.
         --
-        -- FIXME adjust comment once we know what to do for allocations wrt inputHoldingCids
+        -- Implementations MUST archive these, so that the sender can rely on UTXO-based
+        -- deduplication when retrying the transfer instruction.
       actors : [Party]
-        -- ^ The parties instructing the transfer, if different from the owner of the source account
+        -- ^ The parties instructing the transfer.
         --
         -- Implementations MUST check these parties to avoid unauthorized transfer instructions.
         --
-        -- Implementations SHOULD allow the owner and the provider of the source
+        -- Implementations SHOULD allow the owner and the provider of the sender
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
