@@ -144,48 +144,39 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
       context = emptyChoiceContext
       meta = reasonToMeta "settle allocation" emptyMetadata
 
-logTransfer : a
-logTransfer = error "logTransfer is not implemented yet"
-
-{- FIXME
-
 -- | Log events for the execution a transfer.
-logTransfers
+logTransfer
   : ContractId TransferEventsV2.EventLog
-  -> Party
+  -> V2.InstrumentId
   -> V2.Account
   -> [ContractId V2.Holding] -- ^ Sender input holdings
-  -> [TransferInstructionV2.Transfer]
+  -> TransferInstructionV2.Transfer
   -> [ContractId V2.Holding] -- ^ Sender change output holdings
   -> [ContractId V2.Holding] -- ^ Receiver output holdings
   -> Update ()
-logTransfers eventLogCid admin sender senderInputHoldings transfers senderOutputHoldingCids receiverOutputHoldingCids = do
+logTransfer eventLogCid instrumentId sender senderInputHoldings transfer senderOutputHoldingCids receiverOutputHoldingCids = do
+  let admin = instrumentId.admin
   let leg = TransferEventsV2.TransferLeg with
         transferLegId = "leg0"
-        sender = transfer.sender
+        sender
         receiver = transfer.receiver
-        instrumentId = transfer.instrumentId
+        instrumentId
         amount = transfer.amount
         meta = transfer.meta
-  if transfer.sender == transfer.receiver
-    then do
-      void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+  let senderChange = TransferEventsV2.EventLog_HoldingsChange with
         admin
-        account = transfer.sender
-        inputHoldingCids = transfer.inputHoldingCids
-        transferLegs = [leg]
-        outputHoldingCids = senderOutputHoldingCids ++ receiverOutputHoldingCids
-        observers = accountParties transfer.sender
-        extraArgs = emptyExtraArgs
-    else do
-      void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
-        admin
-        account = transfer.sender
-        inputHoldingCids = transfer.inputHoldingCids
+        account = sender
+        inputHoldingCids = senderInputHoldings
         transferLegs = [leg]
         outputHoldingCids = senderOutputHoldingCids
-        observers = accountParties transfer.sender
+        observers = accountParties sender
         extraArgs = emptyExtraArgs
+  if sender == transfer.receiver
+    then do
+      void $ exercise eventLogCid senderChange with
+        outputHoldingCids = senderOutputHoldingCids ++ receiverOutputHoldingCids
+    else do
+      void $ exercise eventLogCid senderChange
       void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
         admin
         account = transfer.receiver
@@ -194,7 +185,6 @@ logTransfers eventLogCid admin sender senderInputHoldings transfers senderOutput
         outputHoldingCids = receiverOutputHoldingCids
         observers = accountParties transfer.receiver
         extraArgs = emptyExtraArgs
--}
 
 -- | Log an account-local holding change not associated with a transfer; e.g., the effect of unlocking a lock.
 logMergeSplit : ContractId TransferEventsV2.EventLog -> Party -> V2.Account -> [ContractId V2.Holding] -> Text -> [ContractId V2.Holding] -> Update ()

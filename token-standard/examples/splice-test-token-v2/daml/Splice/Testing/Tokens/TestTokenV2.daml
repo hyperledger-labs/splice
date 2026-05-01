@@ -6,6 +6,7 @@ module Splice.Testing.Tokens.TestTokenV2 where
 
 import DA.Action (when, unless)
 import DA.Assert
+import DA.Either
 import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Map qualified as Map
@@ -199,14 +200,16 @@ template TokenTransferOffer with
             instrumentId
             lock = None
             meta = emptyMetadata
-        {- FIXME:
         -- log v2 history event
         tokenRulesCid <- getEventLogFromContext arg.extraArgs.context
         logTransfer (toInterfaceContractId tokenRulesCid)
+          instrumentId
+          sender
+          [toInterfaceContractId cid | Some cid <- [lockedToken]]
           transfer
           []
           [tokenCid]
-        -}
+        -- return result
         pure V2.TransferInstructionResult with
           senderChangeCids = []
           output = V2.TransferInstructionResult_Completed with
@@ -295,99 +298,129 @@ data TokenRulesOfferMintResult = TokenRulesOfferMintResult with
     meta : Metadata
   deriving (Eq, Show)
 
-token_transferFactory_transferImpl = error "token_transferFactory_transferImpl not implemented"
 
-{-
 -- | Create a V2 transfer offer
 token_transferFactory_transferImpl
   : TokenRules
   -> ContractId V2.TransferFactory
   -> V2.TransferFactory_Transfer
-  -> Update V2.TransferInstructionResult
+  -> Update V2.TransferFactory_TransferResult
 token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
-  let transfer = arg.transfer
   let sender = arg.sender
-  checkActors arg.actors [jointAuthorizers transfer.sender]
-  let iid = transfer.instrumentId
-  require' ("transfer.instrumentId.admin", iid.admin) isEqualR ("transferFactory.admin", tokenRules.admin)
+  checkActors arg.actors [jointAuthorizers sender]
+  let iid = arg.instrumentId
+  require' ("arg.instrumentId.admin", iid.admin) isEqualR ("transferFactory.admin", tokenRules.admin)
 
   -- consume all inputs
-  inputAmounts <- forA transfer.inputHoldingCids $ \cid -> do
+  inputAmounts <- forA arg.inputHoldingCids $ \cid -> do
     let tokenCid = coerceContractId cid : ContractId Token
     token <- fetch tokenCid
     archive tokenCid
-    require' ("inputHolding.account", token.holding.account) isEqualR ("transfer.sender", transfer.sender)
-    require' ("inputHolding.instrumentId", token.holding.instrumentId) isEqualR ("transfer.instrumentId", iid)
+    require' ("inputHolding.account", token.holding.account) isEqualR ("transfer.sender", sender)
+    require' ("inputHolding.instrumentId", token.holding.instrumentId) isEqualR ("arg.instrumentId", iid)
     pure token.holding.amount
   let inputAmount = sum inputAmounts
-  require' ("inputAmount for " <> show transfer.instrumentId, inputAmount) isGreaterOrEqualR
-    ("transfer.amount", transfer.amount)
+  let totalTransferAmount = sum (map (.amount) arg.transfers)
+  require' ("inputAmount for " <> show iid, inputAmount) isGreaterOrEqualR
+    ("totalTransferAmount", totalTransferAmount)
 
   -- split off change
-  let remainder = inputAmount - transfer.amount
+  let remainder = inputAmount - totalTransferAmount
   senderChangeCids <-
       if remainder <= 0.0 then pure [] else do
         cid <- create Token with
-          holding = (senderHoldingFromTransfer transfer) with
+          holding = V2.HoldingView with
+            account = sender
             amount = remainder
+            instrumentId = iid
+            lock = None
+            meta = emptyMetadata
         pure [toInterfaceContractId cid]
 
+  -- execute transfers
+  results <- forA arg.transfers $ \transfer -> do
+    -- create holding for self-transfer, or transfer offer
+    if transfer.receiver == sender
+      then do
+        outputCid <- toInterfaceContractId <$> create Token with
+          holding = V2.HoldingView with
+            account = sender
+            amount = transfer.amount
+            instrumentId = iid
+            lock = None
+            meta = emptyMetadata
 
-  -- create holding for self-transfer, or transfer offer
-  if transfer.receiver == transfer.sender
-    then do
-      outputCid <- toInterfaceContractId <$> create Token with
-        holding = senderHoldingFromTransfer transfer
-      -- report v2 event
-      logTransfer (coerceContractId self)
-        transfer
-        senderChangeCids
-        [outputCid]
+        let holdingChange = Left (transfer, outputCid)
+        let instrResult = V2.TransferInstructionResult with
+              output = V2.TransferInstructionResult_Completed with
+                receiverHoldingCids = [outputCid]
+              senderChangeCids = []
+              meta = emptyMetadata
+        pure (holdingChange, instrResult)
+      else do
+        let reason = reasonFromMeta transfer.meta
+        let contextDesc
+              | T.isEmpty reason = "transfer to " <> show transfer.receiver
+              | otherwise = reason
+        -- lock the amount to be transferred
+        lockedCid <- create Token with
+          holding = V2.HoldingView with
+            account = sender
+            amount = transfer.amount
+            instrumentId = iid
+            lock = Some $ V2.Lock with
+              holders = iid.admin :: accountParties sender
+              expiresAt = Some transfer.executeBefore
+              expiresAfter = None
+              context = Some contextDesc
+            meta = emptyMetadata
+        -- create transfer offer
+        transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+          instrumentId = iid
+          sender = arg.sender
+          requestedAt = arg.requestedAt
+          lockedToken = Some lockedCid
+          transfer
 
-      pure V2.TransferInstructionResult with
-        output = V2.TransferInstructionResult_Completed with
-          receiverHoldingCids = [outputCid]
-        senderChangeCids
-        meta = emptyMetadata
-    else do
-      let reason = reasonFromMeta transfer.meta
-      let contextDesc
-            | T.isEmpty reason = "transfer to " <> show transfer.receiver
-            | otherwise = reason
-      -- lock the amount to be transferred
-      lockedCid <- toInterfaceContractId <$> create Token with
-        holding = (senderHoldingFromTransfer transfer) with
-          lock = Some $ V2.Lock with
-            holders = iid.admin :: accountParties transfer.sender
-            expiresAt = Some transfer.executeBefore
-            expiresAfter = None
-            context = Some contextDesc
-      -- create transfer offer
-      transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+        -- return result
+        let instrResult = V2.TransferInstructionResult with
+              senderChangeCids = []
+              -- Note: we skip over explaining the change in locked holdings to V1 history parsers,
+              -- as their fallback to just show the updated locked balance together with the instruction
+              -- should be sufficient for wallet users to understand what happened.
+              meta = emptyMetadata
+              output = V2.TransferInstructionResult_Pending with transferInstructionCid
+        pure (Right (toInterfaceContractId lockedCid), instrResult)
+  let (holdingChanges, instrResults) = unzip results
+  let (selfTransferResults, offerTokenCids) = partitionEithers holdingChanges
+  let (selfTransfers, selfTransferTokenCids) = unzip selfTransferResults
 
-        transfer = transfer with
-          inputHoldingCids = [lockedCid]
-      -- log the tx history v2 event
-      logNonEmptyChange (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
-        admin = tokenRules.admin
-        account = transfer.sender
-        inputHoldingCids = transfer.inputHoldingCids
-        transferLegs = []
-        outputHoldingCids = lockedCid :: senderChangeCids
-        observers = accountParties transfer.sender
-        extraArgs = ExtraArgs with
-          context = emptyChoiceContext
-          meta = reasonToMeta ("lock for " <> contextDesc) emptyMetadata
-      -- return result
-      pure V2.TransferInstructionResult with
-        senderChangeCids
-        -- Note: we skip over explaining the change in locked holdings to V1 history parsers,
-        -- as their fallback to just show the updated locked balance together with the instruction
-        -- should be sufficient for wallet users to understand what happened.
-        meta = emptyMetadata
-        output = V2.TransferInstructionResult_Pending with transferInstructionCid
--}
+  -- log tx history v2 event
+  logNonEmptyChange (coerceContractId self) TransferEventsV2.EventLog_HoldingsChange with
+    admin = tokenRules.admin
+    account = sender
+    inputHoldingCids = arg.inputHoldingCids
+    transferLegs = do
+      (i, transfer) <- zip [0 .. length selfTransfers - 1] selfTransfers
+      pure $ TransferEventsV2.TransferLeg with
+        transferLegId = "tf" <> show i
+        sender
+        receiver = transfer.receiver
+        instrumentId = iid
+        amount = transfer.amount
+        meta = transfer.meta
+    outputHoldingCids = senderChangeCids ++ selfTransferTokenCids ++ offerTokenCids
+    observers = accountParties sender
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = arg.extraArgs.meta
+
+  pure V2.TransferFactory_TransferResult with
+    instructionResults = instrResults
+    senderChangeCids = senderChangeCids
+    meta = emptyMetadata
+
 
 -- | Create a V2 allocation
 token_allocationFactoryV2_allocateImpl
@@ -518,16 +551,6 @@ mergeAmountMaps = Map.merge (\_ x -> Some (x, 0.0)) (\_ y -> Some (0.0, y)) (\_ 
 archiveLockedHoldingsForTransfer : TokenTransferOffer -> Update ()
 archiveLockedHoldingsForTransfer offer =
   forA_ offer.lockedToken archive
-
-{- FIXME:
-holdingFromTransfer : V2.Account -> V2.Transfer -> V2.HoldingView
-holdingFromTransfer account transfer = V2.HoldingView with
-  account
-  amount = transfer.amount
-  instrumentId = .instrumentId
-  lock = None
-  meta = emptyMetadata
--}
 
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
