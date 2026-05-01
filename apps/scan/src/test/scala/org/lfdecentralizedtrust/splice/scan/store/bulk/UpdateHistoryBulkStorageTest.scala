@@ -104,8 +104,8 @@ class UpdateHistoryBulkStorageTest
       ) {
         mockStore.mockIngestion(1000)
         probe.expectNext(20.seconds) should contain theSameElementsInOrderAs Seq(
-          "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
-          "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
+          "1970-01-01T00:00:00.100Z~1970-01-01T00:00:02.300Z/updates_0.zstd",
+          "1970-01-01T00:00:00.100Z~1970-01-01T00:00:02.300Z/updates_1.zstd",
         )
         probe.expectComplete()
         val objectCountMetrics = metricsFactory.metrics.counters
@@ -353,16 +353,16 @@ class UpdateHistoryBulkStorageTest
         loggerFactory,
       )
 
-      val d20u0 = "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/updates_0.zstd"
-      val d20u1 = "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/updates_1.zstd"
-      val d21u0 = "2015-10-21T00:00:00Z-Migration-1-2015-10-22T00:00:00Z/updates_0.zstd"
-      val d21u1 = "2015-10-21T00:00:00Z-Migration-1-2015-10-22T00:00:00Z/updates_1.zstd"
-      val d22u0 = "2015-10-22T00:00:00Z-Migration-1-2015-10-23T00:00:00Z/updates_0.zstd"
-      val d22u1 = "2015-10-22T00:00:00Z-Migration-1-2015-10-23T00:00:00Z/updates_1.zstd"
-      val d23u0 = "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_0.zstd"
-      val d23u1 = "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_1.zstd"
-      val d24u0 = "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_0.zstd"
-      val d24u1 = "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_1.zstd"
+      val d20u0 = "2015-10-20T00:00:00Z~2015-10-21T00:00:00Z/updates_0.zstd"
+      val d20u1 = "2015-10-20T00:00:00Z~2015-10-21T00:00:00Z/updates_1.zstd"
+      val d21u0 = "2015-10-21T00:00:00Z~2015-10-22T00:00:00Z/updates_0.zstd"
+      val d21u1 = "2015-10-21T00:00:00Z~2015-10-22T00:00:00Z/updates_1.zstd"
+      val d22u0 = "2015-10-22T00:00:00Z~2015-10-23T00:00:00Z/updates_0.zstd"
+      val d22u1 = "2015-10-22T00:00:00Z~2015-10-23T00:00:00Z/updates_1.zstd"
+      val d23u0 = "2015-10-23T00:00:00Z~2015-10-24T00:00:00Z/updates_0.zstd"
+      val d23u1 = "2015-10-23T00:00:00Z~2015-10-24T00:00:00Z/updates_1.zstd"
+      val d24u0 = "2015-10-24T00:00:00Z~2015-10-25T00:00:00Z/updates_0.zstd"
+      val d24u1 = "2015-10-24T00:00:00Z~2015-10-25T00:00:00Z/updates_1.zstd"
       val allObjs = Seq(
         d20u0,
         d20u1,
@@ -400,7 +400,7 @@ class UpdateHistoryBulkStorageTest
         d23u0,
         d23u1,
       )
-      res1.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
+      res1.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z~2015-10-24T00:00:00Z/")
       val res1b = svc
         .getUpdatesBetweenDates(
           CantonTimestamp.tryFromInstant(Instant.parse("2015-10-10T00:00:00Z")),
@@ -410,7 +410,7 @@ class UpdateHistoryBulkStorageTest
         )
         .futureValue
       res1b.objects.map(_.key) shouldBe empty
-      res1b.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
+      res1b.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z~2015-10-24T00:00:00Z/")
 
       // A smaller range within the data
       val res2 = svc
@@ -436,7 +436,7 @@ class UpdateHistoryBulkStorageTest
         )
         .futureValue
       res3.objects.map(_.key) should contain theSameElementsInOrderAs Seq(d20u0, d20u1)
-      res3.nextPageTokenO shouldBe Some("2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/")
+      res3.nextPageTokenO shouldBe Some("2015-10-20T00:00:00Z~2015-10-21T00:00:00Z/")
       val res3b = svc
         .getUpdatesBetweenDates(
           CantonTimestamp.tryFromInstant(Instant.parse("2015-10-01T12:00:00Z")),
@@ -477,10 +477,10 @@ class UpdateHistoryBulkStorageTest
         .getCode shouldBe io.grpc.Status.Code.INVALID_ARGUMENT
 
       // Test handling an empty segment: Simulate no updates in 2015-10-25 to 2015-10-26
-      val d26u0 = "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_0.zstd"
-      val d26u1 = "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_1.zstd"
+      val d26u0 = "2015-10-26T00:00:00Z~2015-10-27T00:00:00Z/updates_0.zstd"
+      val d26u1 = "2015-10-26T00:00:00Z~2015-10-27T00:00:00Z/updates_1.zstd"
       val moreObjs = Seq(
-        "2015-10-25T00:00:00Z-Migration-1-2015-10-26T00:00:00Z/ACS_0.zstd",
+        "2015-10-25T00:00:00Z~2015-10-26T00:00:00Z/ACS_0.zstd",
         d26u0,
         d26u1,
       )
@@ -527,7 +527,7 @@ class UpdateHistoryBulkStorageTest
         .futureValue
       // First response contains all data, but with a next page token
       res5.objects.map(_.key) should contain theSameElementsInOrderAs allObjs
-      res5.nextPageTokenO shouldBe Some("2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/")
+      res5.nextPageTokenO shouldBe Some("2015-10-24T00:00:00Z~2015-10-25T00:00:00Z/")
       val res5b = svc
         .getUpdatesBetweenDates(
           CantonTimestamp.tryFromInstant(Instant.parse("2015-10-21T00:00:00Z")),
