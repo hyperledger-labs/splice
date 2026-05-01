@@ -57,7 +57,7 @@ where the subject claim of the token is the user whose wallet the endpoint opera
 
 **Backwards compatibility:** External API with backwards compatibility guarantees.
 
-**Reference:** For details, see the `wallet-external.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/wallet/src/main/openapi/wallet-external.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `wallet-external.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/wallet/src/main/openapi/wallet-external.yaml>`__ OpenAPI spec.
 
 .. _validator-api-user-wallet-transfer-offers:
 
@@ -137,7 +137,7 @@ where the subject claim of the token is the user whose wallet the endpoint opera
 
 **Backwards compatibility:** Internal API with no guarantees.
 
-**Reference:** For details, see the `wallet-internal.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/wallet/src/main/openapi/wallet-internal.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `wallet-internal.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/wallet/src/main/openapi/wallet-internal.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10
@@ -203,7 +203,7 @@ are the same node and that party should hold and transfer Canton Coin, the valid
 
 **Backwards compatibility:** Internal API with no guarantees.
 
-**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10
@@ -239,7 +239,7 @@ or the user onboarding itself (for ``/v0/register``).
 
 **Backwards compatibility:** Internal API with no guarantees.
 
-**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10
@@ -266,7 +266,7 @@ where the subject claim of the token is the validator operator user.
 
 **Backwards compatibility:** Internal API with no guarantees.
 
-**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `validator-internal.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/validator/src/main/openapi/validator-internal.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10
@@ -292,7 +292,7 @@ where the subject claim of the token is the user who is requesting the new ANS e
 
 **Backwards compatibility:** External API with backwards compatibility guarantees.
 
-**Reference:** For details, see the `ans-external.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/validator/src/main/openapi/ans-external.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `ans-external.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/validator/src/main/openapi/ans-external.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10 30
@@ -325,7 +325,7 @@ then each call to one of these endpoints is simply forwarded to the scan service
 
 **Backwards compatibility:** See the corresponding endpoint in the :ref:`app_dev_scan_api`.
 
-**Reference:** For details, see the `scan-proxy.yaml <https://raw.githubusercontent.com/hyperledger-labs/splice/refs/heads/main/apps/validator/src/main/openapi/scan-proxy.yaml>`__ OpenAPI spec.
+**Reference:** For details, see the `scan-proxy.yaml <https://raw.githubusercontent.com/canton-network/splice/refs/heads/main/apps/validator/src/main/openapi/scan-proxy.yaml>`__ OpenAPI spec.
 
 .. list-table::
    :widths: 10

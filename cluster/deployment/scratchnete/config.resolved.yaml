@@ -1744,7 +1744,7 @@ synchronizerMigration:
       publicConfigsDir: 'cluster/configs/configs'
       pulumiBaseDir: 'splice/cluster/pulumi'
       pulumiStacksDir: 'cluster/stacks/prod'
-      repoUrl: 'https://github.com/hyperledger-labs/splice'
+      repoUrl: 'https://github.com/canton-network/splice'
       spliceRoot: 'splice'
     version: 'local'
 validator1:
