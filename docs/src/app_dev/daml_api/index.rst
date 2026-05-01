@@ -33,7 +33,7 @@ Featured App Activity Markers API (CIP-0047)
   for its background on its design and its specification.
 
 * See the reference docs below for the Daml interfaces that are part of the Featured App Activity Markers API;
-  or `read the source code <https://github.com/hyperledger-labs/splice/blob/main/daml/splice-api-featured-app-v2/daml/Splice/Api/FeaturedAppRightV2.daml>`__.
+  or `read the source code <https://github.com/canton-network/splice/blob/main/daml/splice-api-featured-app-v2/daml/Splice/Api/FeaturedAppRightV2.daml>`__.
 
    .. toctree::
       :maxdepth: 1
@@ -126,7 +126,7 @@ to get credit for the activity of your wallet users as follows.
         alongside the disclosed contracts received from the registry API
         when exercising the choice.
 
-        See this `Daml test script <https://github.com/hyperledger-labs/splice/blob/main/daml/splice-util-featured-app-proxies-test/daml/Splice/Util/FeaturedApp/IntegrationTests/TestWalletUserProxy.daml#L47>`__
+        See this `Daml test script <https://github.com/canton-network/splice/blob/main/daml/splice-util-featured-app-proxies-test/daml/Splice/Util/FeaturedApp/IntegrationTests/TestWalletUserProxy.daml#L47>`__
         for a complete example of how to construct the choice.
 
 

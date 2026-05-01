@@ -4,7 +4,7 @@ synchronizerMigration:
     version: "local"
     releaseReference:
       gitReference: "refs/heads/main"
-      repoUrl: https://github.com/hyperledger-labs/splice
+      repoUrl: https://github.com/canton-network/splice
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "cluster/deployment"

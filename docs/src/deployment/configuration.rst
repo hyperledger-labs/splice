@@ -26,9 +26,9 @@ All the environment variables passed to the apps, that start with `ADDITIONAL_CO
 The full configuration for each app can be observed in the scala code,
 with the configuration key being kebab case compared to the camel case in the scala code:
 
--  `ValidatorAppConfig.scala <https://github.com/hyperledger-labs/splice/blob/main/apps/validator/src/main/scala/org/lfdecentralizedtrust/splice/validator/config/ValidatorAppConfig.scala#L141>`__
--  `SvAppConfig.scala <https://github.com/hyperledger-labs/splice/blob/main/apps/sv/src/main/scala/org/lfdecentralizedtrust/splice/sv/config/SvAppConfig.scala#L199>`__
--  `ScanAppConfig.scala <https://github.com/hyperledger-labs/splice/blob/main/apps/scan/src/main/scala/org/lfdecentralizedtrust/splice/scan/config/ScanAppConfig.scala#L28>`__
+-  `ValidatorAppConfig.scala <https://github.com/canton-network/splice/blob/main/apps/validator/src/main/scala/org/lfdecentralizedtrust/splice/validator/config/ValidatorAppConfig.scala#L141>`__
+-  `SvAppConfig.scala <https://github.com/canton-network/splice/blob/main/apps/sv/src/main/scala/org/lfdecentralizedtrust/splice/sv/config/SvAppConfig.scala#L199>`__
+-  `ScanAppConfig.scala <https://github.com/canton-network/splice/blob/main/apps/scan/src/main/scala/org/lfdecentralizedtrust/splice/scan/config/ScanAppConfig.scala#L28>`__
 
 Furthermore, the participant and other synchronizer components can be configured independently as well. Further information on such configurations can be found in the `Canton docs <https://docs.digitalasset.com/operate/3.4/howtos/configure/general/conf_file.html>`__.
 

@@ -165,7 +165,7 @@ function installDatastream(
             datasetId: pulumi.interpolate`projects/${bigQueryDataset.project}/datasets/${bigQueryDataset.datasetId}`,
           },
           // editing dataFreshness does not alter existing BQ tables, see its
-          // docstring or https://github.com/hyperledger-labs/splice/issues/2011
+          // docstring or https://github.com/canton-network/splice/issues/2011
           dataFreshness: clusterProdLike ? '14400s' : '0s',
         },
         destinationConnectionProfile: destination.name,

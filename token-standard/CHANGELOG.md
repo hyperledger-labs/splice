@@ -146,7 +146,7 @@ Polishing changes:
 
 Major changes:
 
-* Move development https://github.com/hyperledger-labs/splice/tree/canton-3.3/token-standard.
+* Move development https://github.com/canton-network/splice/tree/canton-3.3/token-standard.
   to reflect that the API definitions of the token standard will be developed and open sourced as part of the splice project.
 * Rename modules as follows
   * `Canton.Network.RC1.TokenMetadata` -> `Splice.Api.Token.MetadataV1`
