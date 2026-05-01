@@ -392,11 +392,15 @@ token_transferFactory_transferImpl tokenRules self arg = do
               meta = emptyMetadata
               output = V2.TransferInstructionResult_Pending with transferInstructionCid
         pure (Right (toInterfaceContractId lockedCid), instrResult)
+
+  -- log tx history v2 event
   let (holdingChanges, instrResults) = unzip results
   let (selfTransferResults, offerTokenCids) = partitionEithers holdingChanges
   let (selfTransfers, selfTransferTokenCids) = unzip selfTransferResults
-
-  -- log tx history v2 event
+  let reason
+        | not (null offerTokenCids) = "lock holdings for " <> show (length offerTokenCids) <> " transfer offers"
+        | null selfTransfers = "merge holdings"
+        | otherwise = ""  -- no need to explain this case, as the self-transfer legs explain themselves
   logNonEmptyChange (coerceContractId self) TransferEventsV2.EventLog_HoldingsChange with
     admin = tokenRules.admin
     account = sender
@@ -414,7 +418,7 @@ token_transferFactory_transferImpl tokenRules self arg = do
     observers = accountParties sender
     extraArgs = ExtraArgs with
       context = emptyChoiceContext
-      meta = arg.extraArgs.meta
+      meta = reasonToMeta reason emptyMetadata
 
   pure V2.TransferFactory_TransferResult with
     instructionResults = instrResults

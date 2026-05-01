@@ -65,6 +65,8 @@ test_v1_transfers = do
       mkTransfer = WalletClientV2.mkTransferFactory_TransferV1' env.registries
       checkMetadata = False
 
+-- FIXME: actually test multiple transfers being executed
+
 test_v2_transfer : Script ()
 test_v2_transfer = do
   -- setup
