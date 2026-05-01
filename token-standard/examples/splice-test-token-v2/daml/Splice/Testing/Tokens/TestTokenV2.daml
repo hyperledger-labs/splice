@@ -143,19 +143,25 @@ template TokenAllocationV2 with
 --
 -- Its input holdings reference the locked tokens.
 template TokenTransferOffer with
+    sender : V2.Account
     transfer : V2.Transfer
+    requestedAt : Time
+    inputHoldingCids : Optional (ContractId Token)
   where
-    ensure isValidTransferV2 transfer
+    ensure isValidTransferV2 requestedAt transfer
 
-    signatory accountParties transfer.sender, transfer.instrumentId.admin
+    signatory accountParties sender, transfer.instrumentId.admin
     observer accountParties transfer.receiver
 
     interface instance V2.TransferInstruction for TokenTransferOffer where
       view = V2.TransferInstructionView with
         originalInstructionCid = None
+        sender
+        requestedAt
         transfer
+        holdingCids = [toInterfaceContractId cid | Some cid <- [lockedToken]]
         availableActions = Map.fromList
-          [ (jointAuthorizers transfer.sender, [V2.TIA_Withdraw])
+          [ (jointAuthorizers sender, [V2.TIA_Withdraw])
           , (jointAuthorizers transfer.receiver, [V2.TIA_Accept, V2.TIA_Reject])
           ]
           -- TODO(#4542): add support for joint authorization steps
@@ -166,8 +172,8 @@ template TokenTransferOffer with
       transferInstruction_withdrawExtraObservers = transferInstruction_withdrawDefaultExtraObservers this
 
       transferInstruction_withdrawImpl self arg = do
-        archiveAndCheckActors self arg.actors [jointAuthorizers transfer.sender]
-        tokenCid <- unlockTransferOffer "transfer offer withdrawn" transfer arg.extraArgs
+        archiveAndCheckActors self arg.actors [jointAuthorizers sender]
+        tokenCid <- unlockTransferOffer "transfer offer withdrawn" sender this arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
           senderChangeCids = [tokenCid]
@@ -175,7 +181,7 @@ template TokenTransferOffer with
 
       transferInstruction_rejectImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
-        tokenCid <- unlockTransferOffer "transfer offer rejected" transfer arg.extraArgs
+        tokenCid <- unlockTransferOffer "transfer offer rejected" sender this arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
           senderChangeCids = [tokenCid]
@@ -183,21 +189,22 @@ template TokenTransferOffer with
 
       transferInstruction_acceptImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
-        archiveLockedHoldingsForTransfer transfer
+        archiveLockedHoldingsForTransfer this
         tokenCid <- toInterfaceContractId <$> create Token with
-          holding = (senderHoldingFromTransfer transfer) with
-            account = transfer.receiver
+          holding = holdingFromTransfer transfer.receiver transfer
+        {- FIXME:
         -- log v2 history event
         tokenRulesCid <- getEventLogFromContext arg.extraArgs.context
         logTransfer (toInterfaceContractId tokenRulesCid)
           transfer
           []
           [tokenCid]
+        -}
         pure V2.TransferInstructionResult with
           senderChangeCids = []
           output = V2.TransferInstructionResult_Completed with
             receiverHoldingCids = [tokenCid]
-          meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
+          meta = mkMetaTransferFrom sender.owner (reasonFromMeta transfer.meta)
 
 
 -- | Template providing all the rules for how the tokens can be changed.
@@ -263,13 +270,13 @@ template TokenRules with
         requireMatchExpected ("instrumentId.admin", instrumentId.admin) admin
         assertDeadlineExceeded "offeredAt" offeredAt
         offerCid <- create TokenTransferOffer with
+          sender = mintAccount admin
+          requestedAt = offeredAt
+          lockedToken = None
           transfer = V2.Transfer with
-            sender = mintAccount admin
             receiver
             amount
             instrumentId
-            inputHoldingCids = []
-            requestedAt = offeredAt
             executeBefore = offeredAt `addRelTime` days 7
             meta = reasonToMeta "mint offer" emptyMetadata
         pure TokenRulesOfferMintResult with
@@ -281,6 +288,9 @@ data TokenRulesOfferMintResult = TokenRulesOfferMintResult with
     meta : Metadata
   deriving (Eq, Show)
 
+token_transferFactory_transferImpl = error "token_transferFactory_transferImpl not implemented"
+
+{-
 -- | Create a V2 transfer offer
 token_transferFactory_transferImpl
   : TokenRules
@@ -290,6 +300,7 @@ token_transferFactory_transferImpl
 token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
   let transfer = arg.transfer
+  let sender = arg.sender
   checkActors arg.actors [jointAuthorizers transfer.sender]
   let iid = transfer.instrumentId
   require' ("transfer.instrumentId.admin", iid.admin) isEqualR ("transferFactory.admin", tokenRules.admin)
@@ -347,6 +358,7 @@ token_transferFactory_transferImpl tokenRules self arg = do
             context = Some contextDesc
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
+
         transfer = transfer with
           inputHoldingCids = [lockedCid]
       -- log the tx history v2 event
@@ -368,6 +380,7 @@ token_transferFactory_transferImpl tokenRules self arg = do
         -- should be sufficient for wallet users to understand what happened.
         meta = emptyMetadata
         output = V2.TransferInstructionResult_Pending with transferInstructionCid
+-}
 
 -- | Create a V2 allocation
 token_allocationFactoryV2_allocateImpl
@@ -473,16 +486,16 @@ unlockTokenAllocationV2 reason tokenAllocation extraArgs = do
 
   pure $ TextMap.fromListWithR (++) holdingCids
 
-unlockTransferOffer : Text -> V2.Transfer -> ExtraArgs -> Update (ContractId V2.Holding)
-unlockTransferOffer reason transfer extraArgs = do
-  archiveLockedHoldingsForTransfer transfer
+unlockTransferOffer : Text -> V2.Account -> TokenTransferOffer -> ExtraArgs -> Update (ContractId V2.Holding)
+unlockTransferOffer reason sender offer extraArgs = do
+  archiveLockedHoldingsForTransfer offer
   tokenCid <- toInterfaceContractId <$> create Token with
-    holding = senderHoldingFromTransfer transfer
+    holding = holdingFromTransfer sender offer.transfer
   eventLogCid <- getEventLogFromContext extraArgs.context
   logMergeSplit eventLogCid
-    transfer.instrumentId.admin
-    transfer.sender
-    transfer.inputHoldingCids
+    offer.transfer.instrumentId.admin
+    sender
+    [toInterfaceContractId cid | Some cid <- [offer.lockedToken]]
     reason
       [tokenCid]
   pure tokenCid
@@ -490,13 +503,13 @@ unlockTransferOffer reason transfer extraArgs = do
 mergeAmountMaps : Ord k => Map.Map k Decimal -> Map.Map k Decimal -> Map.Map k (Decimal, Decimal)
 mergeAmountMaps = Map.merge (\_ x -> Some (x, 0.0)) (\_ y -> Some (0.0, y)) (\_ x y -> Some (x, y))
 
-archiveLockedHoldingsForTransfer : V2.Transfer -> Update ()
-archiveLockedHoldingsForTransfer transfer =
-  forA_ transfer.inputHoldingCids archive
+archiveLockedHoldingsForTransfer : TokenTransferOffer -> Update ()
+archiveLockedHoldingsForTransfer offer =
+  forA_ offer.lockedToken archive
 
-senderHoldingFromTransfer : V2.Transfer -> V2.HoldingView
-senderHoldingFromTransfer transfer = V2.HoldingView with
-  account = transfer.sender
+holdingFromTransfer : V2.Account -> V2.Transfer -> V2.HoldingView
+holdingFromTransfer account transfer = V2.HoldingView with
+  account
   amount = transfer.amount
   instrumentId = transfer.instrumentId
   lock = None

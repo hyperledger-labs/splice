@@ -144,15 +144,22 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
       context = emptyChoiceContext
       meta = reasonToMeta "settle allocation" emptyMetadata
 
+logTransfer : a
+logTransfer = error "logTransfer is not implemented yet"
+
+{- FIXME
+
 -- | Log events for the execution a transfer.
-logTransfer
+logTransfers
   : ContractId TransferEventsV2.EventLog
-  -> TransferInstructionV2.Transfer
+  -> Party
+  -> V2.Account
+  -> [ContractId V2.Holding] -- ^ Sender input holdings
+  -> [TransferInstructionV2.Transfer]
   -> [ContractId V2.Holding] -- ^ Sender change output holdings
   -> [ContractId V2.Holding] -- ^ Receiver output holdings
   -> Update ()
-logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCids = do
-  let admin = transfer.instrumentId.admin
+logTransfers eventLogCid admin sender senderInputHoldings transfers senderOutputHoldingCids receiverOutputHoldingCids = do
   let leg = TransferEventsV2.TransferLeg with
         transferLegId = "leg0"
         sender = transfer.sender
@@ -187,6 +194,7 @@ logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCi
         outputHoldingCids = receiverOutputHoldingCids
         observers = accountParties transfer.receiver
         extraArgs = emptyExtraArgs
+-}
 
 -- | Log an account-local holding change not associated with a transfer; e.g., the effect of unlocking a lock.
 logMergeSplit : ContractId TransferEventsV2.EventLog -> Party -> V2.Account -> [ContractId V2.Holding] -> Text -> [ContractId V2.Holding] -> Update ()

@@ -210,9 +210,6 @@ interface TransferFactory where
 
   nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
     -- ^ Instruct the registry to execute one or more transfers.
-    --
-    -- Instructing multiple transfers in the same transaction is primarily a performance
-    -- and traffic cost optimization.
     with
       sender : Account
         -- ^ The sender of the transfers.
