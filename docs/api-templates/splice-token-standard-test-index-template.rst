@@ -8,7 +8,7 @@
 splice-token-standard-test docs
 ===============================
 
-Copy the code of this package from https://github.com/hyperledger-labs/splice
+Copy the code of this package from https://github.com/canton-network/splice
 to gain access to test infrastructure for:
 
 - building apps that use the token standard

@@ -109,7 +109,7 @@ Validators
 
   Is there an API to get the validator party ID?
 
-    See `/v0/validator-user <https://github.com/hyperledger-labs/splice/blob/c712e75775a7d3229eff2a1837b06417a02b03f3/apps/validator/src/main/openapi/validator-internal.yaml#L14>`__.
+    See `/v0/validator-user <https://github.com/canton-network/splice/blob/c712e75775a7d3229eff2a1837b06417a02b03f3/apps/validator/src/main/openapi/validator-internal.yaml#L14>`__.
 
 
 Application Development
@@ -159,7 +159,7 @@ ________
     An example where this can occur is a transaction with one root for the marker creation and one root for the actual user command. This error message is indicative of
     trying a transaction with multiple roots:  ``Only single root transactions can currently be externally signed``.
 
-    The recommended approach is to wrap the two calls in a little helper contract. Here is `an example <https://github.com/hyperledger-labs/splice/pull/1907/files#diff-90d0ed0955b3e59b9edec55e5191d155335bae39a258dbd029b53a4e53e15db3>`__.
+    The recommended approach is to wrap the two calls in a little helper contract. Here is `an example <https://github.com/canton-network/splice/pull/1907/files#diff-90d0ed0955b3e59b9edec55e5191d155335bae39a258dbd029b53a4e53e15db3>`__.
 
   How can our application match registered public keys with their corresponding parties to identify the party associated with an onboarded user?
 
@@ -220,12 +220,12 @@ ______________
 
   What would be the best practice to including the ``DAR`` file of token standard into my `daml` project for data-dependencies  to point to?
 
-    * Copy the token standard dars from `the repo <https://github.com/hyperledger-labs/splice/tree/main/daml/dars>`__
+    * Copy the token standard dars from `the repo <https://github.com/canton-network/splice/tree/main/daml/dars>`__
       and check them into your own repo.
     * Make sure to only depend on ``splice-token-api-*`` packages for your main files. These are guaranteed to be stable.
     * Put your Daml script tests for your workflow into separate ``*-test`` daml
-      projects as done `in splice <https://github.com/hyperledger-labs/splice/tree/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test>`__.
-      See the `daml.yaml <https://github.com/hyperledger-labs/splice/blob/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test/daml.yaml>`__
+      projects as done `in splice <https://github.com/canton-network/splice/tree/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test>`__.
+      See the `daml.yaml <https://github.com/canton-network/splice/blob/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test/daml.yaml>`__
       for details.
 
   Is there any open-source wallet implementation for canton coins?

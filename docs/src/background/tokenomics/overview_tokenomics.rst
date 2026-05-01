@@ -20,7 +20,7 @@ the first phase, any fee values for that round are written to the ledger
 (the fees can be obtained from the :ref:`Scan State API <scan_current_state_api>`).
 The second phase is called the *activity recording* and it is when
 activity records are created; records created in this phase belong to that round. The next phase calculates
-a `CC-issuance-per-activity-weight <https://github.com/hyperledger-labs/splice/blob/332e06a7ae9e13fde5bba0bf7dcb059aa36f979e/daml/splice-amulet/daml/Splice/Issuance.daml#L67>`__
+a `CC-issuance-per-activity-weight <https://github.com/canton-network/splice/blob/332e06a7ae9e13fde5bba0bf7dcb059aa36f979e/daml/splice-amulet/daml/Splice/Issuance.daml#L67>`__
 for each kind of activity record which is the share of total CC
 that can be minted for this type of activity record.
 This is followed by

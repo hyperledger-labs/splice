@@ -25,7 +25,7 @@ The following versions of Canton and the Daml SDK were used to build this Splice
   `Github releases of the Daml SDK <https://github.com/digital-asset/daml/releases>`__,
   but instead refer to the artifact versions used inside a Daml SDK release.
   A potential source of confusion that we expect to resolve in the future,
-  https://github.com/hyperledger-labs/splice/issues/472.
+  https://github.com/canton-network/splice/issues/472.
 
 
 
