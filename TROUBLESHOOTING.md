@@ -11,7 +11,7 @@ This guide outlines steps to resolve common issues that a contributor might enco
 
 ### 1. Setup Environment
 
-- Clone the repository: `git clone https://github.com/hyperledger-labs/splice.git`.
+- Clone the repository: `git clone https://github.com/canton-network/splice.git`.
 - Navigate to the project directory: `cd splice`.
 - Enable **`direnv`** to load environment variables (e.g., `DAML_COMPILER_VERSION`):
 

@@ -108,7 +108,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
             setAmount(newValue);
 
             // TODO(#1520): Check that amount <=  amount of unclaimed rewards available.
-            // https://github.com/hyperledger-labs/splice/issues/1520
+            // https://github.com/canton-network/splice/issues/1520
             try {
               const decimal = new Decimal(newValue);
               if (decimal.lte(0)) {
