@@ -56,10 +56,10 @@ template AmuletTransferInstruction
         sender = basicAccount transfer.sender
         requestedAt = transfer.requestedAt
         holdingCids = map upcast transfer.inputHoldingCids
+        instrumentId = upcast transfer.instrumentId
         transfer = Api.TransferInstructionV2.Transfer with
           receiver = basicAccount transfer.receiver
           amount = transfer.amount
-          instrumentId = upcast transfer.instrumentId
           executeBefore = transfer.executeBefore
           meta = transfer.meta
         availableActions = Map.fromList

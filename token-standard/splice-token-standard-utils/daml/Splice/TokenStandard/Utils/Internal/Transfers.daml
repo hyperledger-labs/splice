@@ -30,7 +30,6 @@ module Splice.TokenStandard.Utils.Internal.Transfers (
 
 import DA.Action (foldlA)
 import DA.Map qualified as Map
-import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -63,35 +62,23 @@ instance ForwardCompatible (ContractId TransferInstructionV1.TransferInstruction
 instance BackwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
   upcast = coerceInterfaceContractId
 
-{-
-instance ForwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
-  downcast v2 = TransferInstructionV1.Transfer with
-    sender = v2.sender.owner
-    receiver = v2.receiver.owner
-    amount = v2.amount
-    instrumentId = downcast v2.instrumentId
-    requestedAt = v2.requestedAt
-    executeBefore = v2.executeBefore
-    inputHoldingCids = map coerceInterfaceContractId v2.inputHoldingCids
-    meta =
-      accountToMeta "sender" v2.sender $
-      accountToMeta "receiver" v2.receiver $
-      v2.meta
-
-instance BackwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
-  upcast v1 = TransferInstructionV2.Transfer with
-    sender = accountFromMeta v1.sender "sender" v1.meta
-    receiver = accountFromMeta v1.receiver "receiver" v1.meta
-    amount = v1.amount
-    instrumentId = upcast v1.instrumentId
-    requestedAt = v1.requestedAt
-    executeBefore = v1.executeBefore
-    inputHoldingCids = map coerceInterfaceContractId v1.inputHoldingCids
-    meta =
-      dropAccountMeta "sender" $
-      dropAccountMeta "receiver" $
-      v1.meta
--}
+instance BackwardCompatible TransferInstructionV1.TransferInstructionView TransferInstructionV2.TransferInstructionView where
+  upcast v1 = TransferInstructionV2.TransferInstructionView with
+    originalInstructionCid = upcast <$> v1.originalInstructionCid
+    sender = accountFromMeta v1.transfer.sender "sender" v1.transfer.meta
+    requestedAt = v1.transfer.requestedAt
+    holdingCids = map coerceInterfaceContractId v1.transfer.inputHoldingCids
+    instrumentId = upcast v1.transfer.instrumentId
+    transfer = TransferInstructionV2.Transfer with
+      receiver = accountFromMeta v1.transfer.receiver "receiver" v1.transfer.meta
+      amount = v1.transfer.amount
+      executeBefore = v1.transfer.executeBefore
+      meta = v1.transfer.meta
+    availableActions = Map.fromList
+      [ ([v1.transfer.sender], [TransferInstructionV2.TIA_Withdraw])
+      , ([v1.transfer.receiver], [TransferInstructionV2.TIA_Accept, TransferInstructionV2.TIA_Reject])
+      ]
+    meta = emptyMetadata
 
 instance ForwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
   downcast tio = case tio of
@@ -200,7 +187,7 @@ transferFactory_v2_senderActor_transferImpl self arg = do
               sender = arg.sender.owner
               receiver = transferV2.receiver.owner
               amount = transferV2.amount
-              instrumentId = downcast transferV2.instrumentId
+              instrumentId = downcast arg.instrumentId
               requestedAt = arg.requestedAt
               executeBefore = transferV2.executeBefore
               inputHoldingCids = map downcast holdingCids -- FIXME: filter to the ones of the right instrument
@@ -209,17 +196,17 @@ transferFactory_v2_senderActor_transferImpl self arg = do
                 accountToMeta "receiver" transferV2.receiver $
                 transferV2.meta
         result <- exercise v1FactoryCid TransferInstructionV1.TransferFactory_Transfer with
-          expectedAdmin = transferV2.instrumentId.admin
+          expectedAdmin = arg.instrumentId.admin
           transfer = transferV1
           extraArgs = arg.extraArgs
         let newHoldings = map upcast result.senderChangeCids
-        pure ((transferV2.instrumentId.id, newHoldings), result :: results)
+        pure (newHoldings, result :: results)
 
-  (outputHoldings, resultRev) <- foldlA executeTransfer (arg.inputHoldingCids, TextMap.empty) arg.transfers
+  (outputHoldings, resultRev) <- foldlA executeTransfer (arg.inputHoldingCids, []) arg.transfers
 
   pure TransferInstructionV2.TransferFactory_TransferResult with
     instructionResults = map upcast $ reverse resultRev
-    senderChangeCids = TextMap.fromListWithR (++) outputHoldings
+    senderChangeCids = outputHoldings
     meta = emptyMetadata
 
 

@@ -186,24 +186,24 @@ listTransferOffersV2 p instrumentId = do
   instrs <- queryInterface @V2.TransferInstruction p
   let pendingOffers = do
         (cid, Some instr) <- instrs
-        guard (instr.transfer.instrumentId == instrumentId)
+        guard (instr.instrumentId == instrumentId)
         guard ([p] `Map.member` instr.availableActions)
         pure (cid, instr)
   pure pendingOffers
 
 -- | List pending transfer offers.
-listTransferOffers : Party -> V2.InstrumentId -> Script [(ContractId V2.TransferInstruction, V2.Transfer)]
+listTransferOffers : Party -> V2.InstrumentId -> Script [(ContractId V2.TransferInstruction, V2.TransferInstructionView)]
 listTransferOffers p instrumentId = do
   offersV2 <- listTransferOffersV2 p instrumentId
   offersV1 <- WalletClientV1.listTransferOffers p (TSU.downcast instrumentId)
   let adjustedOffersV2 = do
         (cid, instrView) <- offersV2
-        pure (cid, instrView.transfer)
+        pure (cid, instrView)
   let trimmedOffersV1 = do
         (cidV1, instrView) <- offersV1
         let cid = TSU.upcast cidV1
         guard (all (\(cidV2, _) -> cidV2 /= cid) offersV2) -- filter out any offers that also exist in V2
-        pure (cid, TSU.upcast instrView.transfer)
+        pure (cid, TSU.upcast instrView)
   pure (adjustedOffersV2 <> trimmedOffersV1)
 
 -- | List all allocations requested from the actor for instruments by the admin.
@@ -329,7 +329,7 @@ mkTransferFactory_TransferV1 registries arg = do
 mkTransferFactory_TransferV2
   : MultiRegistry.MultiRegistry -> V2.TransferFactory_Transfer -> Script TSABatch
 mkTransferFactory_TransferV2 registries arg = do
-  registry <- MultiRegistry.getRegistryApiV2 registries arg.transfer.instrumentId.admin
+  registry <- MultiRegistry.getRegistryApiV2 registries arg.instrumentId.admin
   enrichedChoice <- V2.getTransferFactory registry arg
   pure $ TSABatch with
     actions =
@@ -338,7 +338,7 @@ mkTransferFactory_TransferV2 registries arg = do
           arg = enrichedChoice.arg
       ]
     disclosures = enrichedChoice.disclosures
-    accountsAndInstruments = Set.singleton (arg.transfer.sender, arg.transfer.instrumentId)
+    accountsAndInstruments = Set.singleton (arg.sender, arg.instrumentId)
 
 mkTransferInstruction_AcceptV1
   : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script TSABatch
@@ -362,7 +362,7 @@ mkTransferInstruction_AcceptV2
   : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script TSABatch
 mkTransferInstruction_AcceptV2 registries actor cid = do
   Some instrView <- queryInterfaceContractId @V2.TransferInstruction actor cid
-  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.transfer.instrumentId.admin)
+  registry <- MultiRegistry.getRegistryApiV2 registries (instrView.instrumentId.admin)
   context <- V2.getTransferInstruction_AcceptContext registry cid emptyMetadata
   pure $ TSABatch with
     actions =
@@ -476,9 +476,9 @@ mkAcceptAllocationRequestV2 registries actor (reqCid, req) = do
   pure (acceptRequestBatch <> mconcat batches)
 
 -- | Accept a transfer offer.
-mkAcceptTransferOffer : MultiRegistry.MultiRegistry -> Party -> (ContractId V2.TransferInstruction, V2.Transfer) -> Script TSABatch
-mkAcceptTransferOffer registries actor (instrCid, transfer) = do
-  supportsV2 <- MultiRegistry.supportsV2 registries transfer.instrumentId.admin
+mkAcceptTransferOffer : MultiRegistry.MultiRegistry -> Party -> (ContractId V2.TransferInstruction, V2.TransferInstructionView) -> Script TSABatch
+mkAcceptTransferOffer registries actor (instrCid, transferInstr) = do
+  supportsV2 <- MultiRegistry.supportsV2 registries transferInstr.instrumentId.admin
   if supportsV2
     then mkTransferInstruction_AcceptV2 registries actor instrCid
     else mkTransferInstruction_AcceptV1 registries actor (TSU.downcast instrCid)
@@ -520,15 +520,17 @@ mkTransferFactory_TransferV2' registries t = do
   now <- getTime
   mkTransferFactory_TransferV2 registries V2.TransferFactory_Transfer with
     actors = [t.sender]
-    transfer = V2.Transfer with
-      sender = TSU.basicAccount t.sender
-      receiver = TSU.basicAccount t.receiver
-      amount = t.amount
-      instrumentId = t.instrumentId
-      requestedAt = now
-      executeBefore = now `addRelTime` t.offerTime
-      inputHoldingCids = []
-      meta = TSU.reasonToMeta t.reason emptyMetadata
+    requestedAt = now
+    inputHoldingCids = []
+    sender = TSU.basicAccount t.sender
+    instrumentId = t.instrumentId
+    transfers =
+      [ V2.Transfer with
+          receiver = TSU.basicAccount t.receiver
+          amount = t.amount
+          executeBefore = now `addRelTime` t.offerTime
+          meta = TSU.reasonToMeta t.reason emptyMetadata
+      ]
     extraArgs = emptyExtraArgs
 
 -- TODO(#4823): add missing transfer instruction actions

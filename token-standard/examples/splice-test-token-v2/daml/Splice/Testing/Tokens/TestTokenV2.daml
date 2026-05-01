@@ -143,6 +143,7 @@ template TokenAllocationV2 with
 --
 -- Its input holdings reference the locked tokens.
 template TokenTransferOffer with
+    instrumentId : V2.InstrumentId
     sender : V2.Account
     transfer : V2.Transfer
     requestedAt : Time
@@ -150,12 +151,13 @@ template TokenTransferOffer with
   where
     ensure isValidTransferV2 requestedAt transfer
 
-    signatory accountParties sender, transfer.instrumentId.admin
+    signatory accountParties sender, instrumentId.admin
     observer accountParties transfer.receiver
 
     interface instance V2.TransferInstruction for TokenTransferOffer where
       view = V2.TransferInstructionView with
         originalInstructionCid = None
+        instrumentId
         sender
         requestedAt
         transfer
@@ -173,7 +175,7 @@ template TokenTransferOffer with
 
       transferInstruction_withdrawImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers sender]
-        tokenCid <- unlockTransferOffer "transfer offer withdrawn" sender this arg.extraArgs
+        tokenCid <- unlockTransferOffer "transfer offer withdrawn" this arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
           senderChangeCids = [tokenCid]
@@ -181,7 +183,7 @@ template TokenTransferOffer with
 
       transferInstruction_rejectImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
-        tokenCid <- unlockTransferOffer "transfer offer rejected" sender this arg.extraArgs
+        tokenCid <- unlockTransferOffer "transfer offer rejected" this arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
           senderChangeCids = [tokenCid]
@@ -191,7 +193,12 @@ template TokenTransferOffer with
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
         archiveLockedHoldingsForTransfer this
         tokenCid <- toInterfaceContractId <$> create Token with
-          holding = holdingFromTransfer transfer.receiver transfer
+          holding = V2.HoldingView with
+            account = transfer.receiver
+            amount = transfer.amount
+            instrumentId
+            lock = None
+            meta = emptyMetadata
         {- FIXME:
         -- log v2 history event
         tokenRulesCid <- getEventLogFromContext arg.extraArgs.context
@@ -270,13 +277,13 @@ template TokenRules with
         requireMatchExpected ("instrumentId.admin", instrumentId.admin) admin
         assertDeadlineExceeded "offeredAt" offeredAt
         offerCid <- create TokenTransferOffer with
+          instrumentId
           sender = mintAccount admin
           requestedAt = offeredAt
           lockedToken = None
           transfer = V2.Transfer with
             receiver
             amount
-            instrumentId
             executeBefore = offeredAt `addRelTime` days 7
             meta = reasonToMeta "mint offer" emptyMetadata
         pure TokenRulesOfferMintResult with
@@ -486,15 +493,20 @@ unlockTokenAllocationV2 reason tokenAllocation extraArgs = do
 
   pure $ TextMap.fromListWithR (++) holdingCids
 
-unlockTransferOffer : Text -> V2.Account -> TokenTransferOffer -> ExtraArgs -> Update (ContractId V2.Holding)
-unlockTransferOffer reason sender offer extraArgs = do
+unlockTransferOffer : Text -> TokenTransferOffer -> ExtraArgs -> Update (ContractId V2.Holding)
+unlockTransferOffer reason offer extraArgs = do
   archiveLockedHoldingsForTransfer offer
   tokenCid <- toInterfaceContractId <$> create Token with
-    holding = holdingFromTransfer sender offer.transfer
+    holding = V2.HoldingView with
+      account = offer.sender
+      amount = offer.transfer.amount
+      instrumentId = offer.instrumentId
+      lock = None
+      meta = emptyMetadata
   eventLogCid <- getEventLogFromContext extraArgs.context
   logMergeSplit eventLogCid
-    offer.transfer.instrumentId.admin
-    sender
+    offer.instrumentId.admin
+    offer.sender
     [toInterfaceContractId cid | Some cid <- [offer.lockedToken]]
     reason
       [tokenCid]
@@ -507,13 +519,15 @@ archiveLockedHoldingsForTransfer : TokenTransferOffer -> Update ()
 archiveLockedHoldingsForTransfer offer =
   forA_ offer.lockedToken archive
 
+{- FIXME:
 holdingFromTransfer : V2.Account -> V2.Transfer -> V2.HoldingView
 holdingFromTransfer account transfer = V2.HoldingView with
   account
   amount = transfer.amount
-  instrumentId = transfer.instrumentId
+  instrumentId = .instrumentId
   lock = None
   meta = emptyMetadata
+-}
 
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties

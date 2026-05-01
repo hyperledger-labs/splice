@@ -5,7 +5,6 @@
 module Splice.Api.Token.TransferInstructionV2 where
 
 import DA.Map qualified as Map
-import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -16,8 +15,6 @@ data Transfer = Transfer with
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
-    instrumentId : InstrumentId
-      -- ^ The instrument identifier.
     executeBefore : Time
       -- ^ Until when (exclusive) the transfer may be executed. MUST be in the
       -- future when instructing the transfer.
@@ -97,6 +94,8 @@ data TransferInstructionView = TransferInstructionView with
       -- Only set if the registry evolved the transfer instruction in multiple steps.
     sender : Account
       -- ^ The sender of the funds.
+    instrumentId : InstrumentId
+      -- ^ The instrument being transferred.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
     requestedAt : Time
@@ -214,6 +213,8 @@ interface TransferFactory where
     with
       sender : Account
         -- ^ The sender of the transfers.
+      instrumentId : InstrumentId
+        -- ^ The instrument being transferred.
       transfers : [Transfer]
         -- ^ The transfers to execute. MUST be non-empty.
         --
@@ -227,9 +228,8 @@ interface TransferFactory where
         -- and checking the `TransferInstructionResult` to ensure that the
         -- transaction only succeeds if all transfers were executed.
         --
-        -- Implementations MUST validate that
-        --   - the instrument admin matches the admin of the factory
-        --   - the `executeBefore` timestamps are in the future
+        -- Implementations MUST validate that the `executeBefore` timestamps are
+        -- in the future
       requestedAt : Time
         -- ^ The time at which the transfers were requested.
       inputHoldingCids : [ContractId Holding]
@@ -272,9 +272,8 @@ data TransferFactory_TransferResult = TransferFactory_TransferResult with
     instructionResults : [TransferInstructionResult]
       -- ^ The results of instructing the transfers.
       -- There is one result per transfer in the same order.
-    senderChangeCids : TextMap.TextMap [ContractId Holding]
-      -- ^ New holdings created for the sender as part of instructing the transfers
-      -- keyed by their `instrumentId.id`.
+    senderChangeCids : [ContractId Holding]
+      -- ^ New holdings created for the sender as part of instructing the transfers.
       --
       -- Implementations MAY decide to not return any holdings.
     meta : Metadata
