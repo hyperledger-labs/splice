@@ -58,7 +58,6 @@ class DbAppActivityRecordStore(
 
   object Tables {
     val appActivityRecords = "app_activity_record_store"
-    val verdicts = "scan_verdict_store"
   }
 
   private def historyId = updateHistory.historyId
@@ -88,32 +87,22 @@ class DbAppActivityRecordStore(
       tc: TraceContext
   ): Future[Option[Long]] = {
 
-    // The inner `where exists` is used to make sure we only consider activity records for the correct history
-    // `order by ... limit 1` is used instead of min/max to force the query planner to use the index on round_number
+    // `order by ... limit 1` is used instead of min/max to force the query planner
+    // to use the (history_id, round_number) index.
     runQuerySingle(
       sql"""select min_round + 1
             from (
               select a.round_number as min_round
               from #${Tables.appActivityRecords} a
-              where exists (
-                select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
-              )
+              where a.history_id = $historyId
               order by a.round_number asc
               limit 1
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              where a.round_number = sub.min_round + 1
-              and exists (
-                select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
-              )
+              where a.history_id = $historyId
+              and a.round_number = sub.min_round + 1
               order by a.round_number asc
               limit 1
             )
@@ -132,32 +121,22 @@ class DbAppActivityRecordStore(
       tc: TraceContext
   ): Future[Option[Long]] = {
 
-    // The inner `where exists` is used to make sure we only consider activity records for the correct history
-    // `order by ... limit 1` is used instead of min/max to force the query planner to use the index on round_number
+    // `order by ... limit 1` is used instead of min/max to force the query planner
+    // to use the (history_id, round_number) index.
     runQuerySingle(
       sql"""select max_round - 1
             from (
               select a.round_number as max_round
               from #${Tables.appActivityRecords} a
-              where exists (
-                select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
-              )
+              where a.history_id = $historyId
               order by a.round_number desc
               limit 1
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              where a.round_number = sub.max_round - 1
-              and exists (
-                select 1
-                from #${Tables.verdicts} v
-                where v.row_id = a.verdict_row_id
-                and v.history_id = $historyId
-              )
+              where a.history_id = $historyId
+              and a.round_number = sub.max_round - 1
               order by a.round_number desc
               limit 1
             )
@@ -179,15 +158,13 @@ class DbAppActivityRecordStore(
         for {
           hasPrev <- sql"""select exists(
                              select 1 from #${Tables.appActivityRecords} a
-                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
-                             where a.round_number = ${roundNumber - 1}
-                               and v.history_id = $historyId
+                             where a.history_id = $historyId
+                               and a.round_number = ${roundNumber - 1}
                            )""".as[Boolean].head
           hasNext <- sql"""select exists(
                              select 1 from #${Tables.appActivityRecords} a
-                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
-                             where a.round_number = ${roundNumber + 1}
-                               and v.history_id = $historyId
+                             where a.history_id = $historyId
+                               and a.round_number = ${roundNumber + 1}
                            )""".as[Boolean].head
           _ = if (!hasPrev || !hasNext)
             throw Status.FAILED_PRECONDITION
@@ -240,14 +217,14 @@ class DbAppActivityRecordStore(
     } else {
       val values = sqlCommaSeparated(
         items.map { row =>
-          sql"""(${row.verdictRowId},
+          sql"""($historyId, ${row.verdictRowId},
                 ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights})"""
         }
       )
 
       (sql"""
         insert into #${Tables.appActivityRecords}(
-          verdict_row_id, round_number, app_provider_parties, app_activity_weights
+          history_id, verdict_row_id, round_number, app_provider_parties, app_activity_weights
         ) values """ ++ values).asUpdate
     }
   }
