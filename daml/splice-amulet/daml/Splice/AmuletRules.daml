@@ -1474,7 +1474,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
             ExtCreatedAmulet _ -> error "unexpected: ExtCreatedAmulet used for transfer output"
       let senderAccount = basicAccount sender
       let receiverAccount
-            | out.owner == dso = burnAccount dso  -- transfers to the DSO are always burns
+            | out.owner == dso = burnAccount dso  -- transfers to the DSO party are always burns
             | otherwise = basicAccount out.owner
       let leg = TransferEventsV2.TransferLeg with
             transferLegId = "leg" <> show i
