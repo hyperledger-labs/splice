@@ -388,7 +388,7 @@ minting proposal.
 
 The script is part of the Splice repository:
 
-`unclaimed_sv_rewards.py <https://github.com/hyperledger-labs/splice/blob/main/scripts/scan-txlog/unclaimed_sv_rewards.py>`_
+`unclaimed_sv_rewards.py <https://github.com/canton-network/splice/blob/main/scripts/scan-txlog/unclaimed_sv_rewards.py>`_
 
 ``unclaimed_sv_rewards.py`` is intended for operational use by SV node operators. It does
 not modify on-ledger state; it reads from the Scan API and produces a deterministic and

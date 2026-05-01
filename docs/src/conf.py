@@ -115,7 +115,7 @@ html_theme_options = {
 # See https://docs.readthedocs.com/platform/latest/guides/edit-source-links-sphinx.html
 html_context = {
     "display_github": True,
-    "github_user": "hyperledger-labs",
+    "github_user": "canton-network",
     "github_repo": "splice",
     "github_version": "main",
     "conf_py_path": "/docs/src/",

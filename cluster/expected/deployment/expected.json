@@ -952,7 +952,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-active-base",
@@ -1040,7 +1040,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-active",
@@ -1070,7 +1070,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-1-base",
@@ -1123,7 +1123,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-1",
@@ -1153,7 +1153,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-2-base",
@@ -1206,7 +1206,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-2",
@@ -1236,7 +1236,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-3-base",
@@ -1289,7 +1289,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-3",
@@ -1319,7 +1319,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-4-base",
@@ -1372,7 +1372,7 @@
         "secretRef": {
           "name": "github"
         },
-        "url": "https://github.com/hyperledger-labs/splice"
+        "url": "https://github.com/canton-network/splice"
       }
     },
     "name": "splice-node-migration-4",
