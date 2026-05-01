@@ -30,6 +30,7 @@ module Splice.TokenStandard.Utils.Internal.Transfers (
 
 import DA.Action (foldlA)
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -212,15 +213,13 @@ transferFactory_v2_senderActor_transferImpl self arg = do
           transfer = transferV1
           extraArgs = arg.extraArgs
         let newHoldings = map upcast result.senderChangeCids
-        -- FIXME: consider accumulating metadata
-        -- FIXME: tx history v2
-        pure (newHoldings, result :: results)
+        pure ((transferV2.instrumentId.id, newHoldings), result :: results)
 
-  (outputHoldings, resultRev) <- foldlA executeTransfer (arg.inputHoldingCids, []) arg.transfers
+  (outputHoldings, resultRev) <- foldlA executeTransfer (arg.inputHoldingCids, TextMap.empty) arg.transfers
 
   pure TransferInstructionV2.TransferFactory_TransferResult with
     instructionResults = map upcast $ reverse resultRev
-    senderChangeCids = outputHoldings
+    senderChangeCids = TextMap.fromListWithR (++) outputHoldings
     meta = emptyMetadata
 
 

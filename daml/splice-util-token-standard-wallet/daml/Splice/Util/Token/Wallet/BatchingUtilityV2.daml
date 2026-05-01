@@ -248,9 +248,8 @@ executeTokenStandardAction actor (holdingMap, results) action = case action of
         let transfer = arg.transfer
         pure (Right transfer.instrumentId, transfer.sender))
       (\cid arg inputHoldingCids -> do
-         let transfer' = arg.transfer with inputHoldingCids
-         result <- exercise cid arg with transfer = transfer'
-         pure (holdingMapFromTransferV2 transfer' result, TSAR_TransferInstructionResultV2 result)
+         result <- exercise cid arg with inputHoldingCids
+         pure (holdingMapFromTransferV2 transfer' result, TSAR_TransferFactory_TransferResultV2 result)
       )
 
 {- FIXME

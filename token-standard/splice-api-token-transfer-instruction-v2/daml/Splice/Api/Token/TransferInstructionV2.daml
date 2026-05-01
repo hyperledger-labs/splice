@@ -5,6 +5,7 @@
 module Splice.Api.Token.TransferInstructionV2 where
 
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -271,12 +272,11 @@ data TransferFactory_TransferResult = TransferFactory_TransferResult with
     instructionResults : [TransferInstructionResult]
       -- ^ The results of instructing the transfers.
       -- There is one result per transfer in the same order.
-    senderChangeCids : [ContractId Holding]
-      -- ^ New holdings owned by the sender created to return "change". Can be used
-      -- by actors to batch creating or updating multiple transfer instructions
-      -- in a single Daml transaction.
+    senderChangeCids : TextMap.TextMap [ContractId Holding]
+      -- ^ New holdings created for the sender as part of instructing the transfers
+      -- keyed by their `instrumentId.id`.
       --
-      -- FIXME: align with decision on `TextMap [ContractId Holding]` for allocation
+      -- Implementations MAY decide to not return any holdings.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
   deriving (Show, Eq)

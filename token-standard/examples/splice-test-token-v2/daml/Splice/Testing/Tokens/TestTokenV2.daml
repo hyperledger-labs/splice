@@ -146,7 +146,7 @@ template TokenTransferOffer with
     sender : V2.Account
     transfer : V2.Transfer
     requestedAt : Time
-    inputHoldingCids : Optional (ContractId Token)
+    lockedToken : Optional (ContractId Token) -- FIXME: switch to Optional (ContractId Holding)
   where
     ensure isValidTransferV2 requestedAt transfer
 
