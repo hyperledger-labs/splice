@@ -487,6 +487,7 @@ template AmuletRules
             void $ create CalculateRewardsV2 with
               dso
               round = roundToArchive.round
+              roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = False
 
@@ -494,6 +495,7 @@ template AmuletRules
             void $ create CalculateRewardsV2 with
               dso
               round = roundToArchive.round
+              roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = True
 
@@ -696,6 +698,7 @@ template AmuletRules
         create ProcessRewardsV2 with
           dso
           round = calculateRewards.round
+          roundClosedAt = calculateRewards.roundClosedAt
           dryRun = calculateRewards.dryRun
           rewardCouponTimeToLive = calculateRewards.rewardCouponTimeToLive
           batchHash

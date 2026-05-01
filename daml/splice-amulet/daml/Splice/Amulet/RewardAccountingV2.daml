@@ -26,6 +26,11 @@ import Splice.Util
 template CalculateRewardsV2 with
     dso : Party
     round : Round
+    roundClosedAt : Time
+      -- ^ The time at which the round was closed.
+      --
+      -- This should be the creation time of this contract.
+      -- We store this for ease of doing debugging and gathering metrics.
     rewardCouponTimeToLive : RelTime
       -- ^ Time to live for reward coupons that are created.
       --
@@ -56,6 +61,11 @@ data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {
 template ProcessRewardsV2 with
     dso : Party
     round : Round
+    roundClosedAt : Time
+      -- ^ The time at which the round was closed.
+      --
+      -- Copied from the originating CalculateRewardsV2 contract.
+      -- We store this for ease of doing debugging and gathering metrics.
     dryRun : Bool -- ^ Whether to only simulate the processing without creating any RewardCouponV2 contracts.
     rewardCouponTimeToLive : RelTime
     batchHash : CryptoHash.Hash
@@ -78,6 +88,7 @@ template ProcessRewardsV2 with
               create ProcessRewardsV2 with
                 dso
                 round
+                roundClosedAt
                 rewardCouponTimeToLive
                 dryRun
                 batchHash = newBatchHash
