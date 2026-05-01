@@ -219,6 +219,7 @@ test_happy_path_self = script do
   result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- check holdings and rewards
+  -- FIXME: check tx history
   [instrResult1, instrResult2] <- pure result.instructionResults
   TransferInstructionResult_Completed [splitHoldingCid] <- pure instrResult2.output
   WalletClient.checkHolding bob splitHoldingCid 10.0

@@ -249,31 +249,15 @@ executeTokenStandardAction actor (holdingMap, results) action = case action of
       (\_cid arg -> do
         pure (Right arg.instrumentId, arg.sender))
       (\cid arg inputHoldingCids -> do
-          let arg' = arg with inputHoldingCids -- FIXME: inline
           let admin = arg.instrumentId.admin
           let iid = arg.instrumentId.id
-          result <- exercise cid arg'
+          result <- exercise cid arg with inputHoldingCids
           let holdingMaps = mconcat $ do
                 (transfer, instrResult) <- zip arg.transfers result.instructionResults
                 pure $ holdingMapFromTransferV2 arg.instrumentId arg.sender transfer instrResult
           let senderChangeMap = holdingMapFromList [(ScopedAccount admin arg.sender, textMapSingleton iid result.senderChangeCids)]
           pure (holdingMaps <> senderChangeMap, TSAR_TransferFactory_TransferResultV2 result)
       )
-
-{- FIXME
-              TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
-                require' ("arg.actors", arg.actors) isEqualR ("actor", [actor]) -- FIXME: actors pattern?
-                let account = arg.sender
-                let (inputHoldingCids, newHoldingMap) = getHoldingsFor (actor, account) holdingMap
-                let cid' = coerceContractId cid : ContractId V2.TransferFactory
-                let arg' = arg with inputHoldingCids
-                result <- exercise cid' arg'
-                let changeCids = result.senderChangeCids
-                let holdingMapWithOutputs = storeHoldingsFor (actor, account) changeCids newHoldingMap
-                let result' = TSAR_TransferFactory_TransferResultV2 result
-                pure (holdingMapWithOutputs, result' :: results)
-
--}
 
 
 callChoiceV1
