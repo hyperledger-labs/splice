@@ -809,6 +809,13 @@ trait SvDsoStore
     QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ]
 
+  def lookupValidatorPermissionWithOffset(validator: PartyId)(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[
+    splice.validatorpermission.ValidatorPermission.ContractId,
+    splice.validatorpermission.ValidatorPermission,
+  ]]]]
+
   def lookupValidatorLicenseWithOffset(validator: PartyId)(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]]]
@@ -1246,6 +1253,14 @@ object SvDsoStore {
           contract,
           rewardRound = Some(contract.payload.round.number),
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
+      mkFilter(splice.validatorpermission.ValidatorPermission.COMPANION)(vp =>
+        vp.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
       mkFilter(splice.validatorlicense.ValidatorLivenessActivityRecord.COMPANION)(co =>

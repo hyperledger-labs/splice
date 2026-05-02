@@ -64,6 +64,33 @@ object HttpSvOperatorAppClient {
     }
   }
 
+  case class GrantValidatorPermission(
+      validatorPartyId: com.digitalasset.canton.topology.PartyId,
+      validatorParticipantId: com.digitalasset.canton.topology.ParticipantId,
+  ) extends BaseCommand[http.GrantValidatorPermissionResponse, String] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantValidatorPermissionResponse] =
+      client.grantValidatorPermission(
+        body = definitions.GrantValidatorPermissionRequest(
+          validatorPartyId = validatorPartyId.toProtoPrimitive,
+          validatorParticipantId = validatorParticipantId.toProtoPrimitive,
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.GrantValidatorPermissionResponse.OK(
+            definitions.GrantValidatorPermissionResponse(contractId)
+          ) =>
+        Right(contractId)
+    }
+  }
+
   case class PrepareValidatorOnboarding(expiresIn: FiniteDuration, partyHint: Option[String])
       extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
 

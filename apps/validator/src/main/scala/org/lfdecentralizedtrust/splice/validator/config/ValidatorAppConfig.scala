@@ -217,6 +217,7 @@ case class ValidatorAppBackendConfig(
     latestPackagesOnly: Boolean = false,
     acsStoreDescriptorUserVersion: Option[Long] = None,
     additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
+    permissionedSynchronizer: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

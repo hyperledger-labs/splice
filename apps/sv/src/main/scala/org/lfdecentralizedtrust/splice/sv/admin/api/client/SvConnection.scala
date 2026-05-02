@@ -29,6 +29,16 @@ final class SvConnection private (
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
+  /** Ask the sponsoring SV to submit topology permissions using a signed onboarding token.
+    */
+  def grantSvOnboardingPermission(token: String)(implicit
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[String] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.GrantSvOnboardingPermission(token))
+
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */
   def startSvOnboarding(token: String)(implicit

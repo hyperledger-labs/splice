@@ -17,7 +17,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
@@ -36,9 +36,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
   DomainTimeAutomationService,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicenserequest.ValidatorLicenseRequest
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.definitions.GetDsoInfoResponse
 import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
@@ -55,6 +57,7 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.SynchronizerPermissionState
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   SingleScanConnection,
@@ -552,6 +555,11 @@ class ValidatorApp(
       store: ValidatorStore,
       validatorParty: PartyId,
       onboardingConfig: Option[ValidatorOnboardingConfig],
+      scanConnection: BftScanConnection,
+      ledgerConnection: SpliceLedgerConnection,
+      dedupDuration: DedupDuration,
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     store.lookupValidatorLicenseWithOffset().flatMap {
       case QueryResult(_, Some(_)) =>
@@ -560,13 +568,33 @@ class ValidatorApp(
       case _ =>
         onboardingConfig match {
           case Some(oc) =>
-            logger.info(
-              "ValidatorLicense not found, onboarding is configured. Requesting onboarding with configured secret"
-            )
-            for {
-              _ <- requestOnboarding(oc.svClient.adminApi, validatorParty, oc.secret)
-              _ <- waitForValidatorLicense(store)
-            } yield ()
+            if (config.permissionedSynchronizer) {
+              logger.info(
+                "ValidatorLicense not found, permissioned synchronizer is enabled. Submitting ValidatorLicenseRequest to the ledger."
+              )
+              for {
+                dsoInfo <- scanConnection.getDsoInfo()
+                sponsorPartyId = dsoInfo.svPartyId
+                _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
+                _ <- submitValidatorLicenceRequest(
+                  validatorParty,
+                  dsoInfo,
+                  sponsorPartyId,
+                  ledgerConnection,
+                  dedupDuration,
+                  synchronizerId,
+                )
+                _ <- waitForValidatorLicense(store)
+              } yield ()
+            } else {
+              logger.info(
+                "ValidatorLicense not found, onboarding is configured. Requesting onboarding with configured secret"
+              )
+              for {
+                _ <- requestOnboarding(oc.svClient.adminApi, validatorParty, oc.secret)
+                _ <- waitForValidatorLicense(store)
+              } yield ()
+            }
           case None =>
             logger.info(
               "ValidatorLicense not found, onboarding is not configured. Wait for the ValidatorLicense"
@@ -574,6 +602,77 @@ class ValidatorApp(
             waitForValidatorLicense(store)
         }
     }
+  }
+
+  private def waitForTopologyPermission(
+      scanConnection: BftScanConnection,
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "ParticipantSynchronizerPermission",
+      s"ParticipantSynchronizerPermission for $participantId is visible on scan and loginAfter barrier is passed",
+      scanConnection.getParticipantSynchronizerPermission(synchronizerId, participantId).flatMap {
+        case Some(SynchronizerPermissionState(Some(loginAfter))) =>
+          if (clock.now >= loginAfter) {
+            Future.successful(())
+          } else {
+            Future.failed(
+              Status.PERMISSION_DENIED
+                .withDescription(
+                  s"ParticipantSynchronizerPermission exists but waiting for loginAfter barrier: $loginAfter (current time: ${clock.now})"
+                )
+                .asRuntimeException()
+            )
+          }
+
+        case Some(SynchronizerPermissionState(None)) =>
+          Future.successful(())
+
+        case None =>
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(
+                s"ParticipantSynchronizerPermission for $participantId not yet found"
+              )
+              .asRuntimeException()
+          )
+      },
+      logger,
+    )
+  }
+
+  private def submitValidatorLicenceRequest(
+      validatorParty: PartyId,
+      dsoInfo: GetDsoInfoResponse,
+      sponsorPartyId: String,
+      connection: SpliceLedgerConnection,
+      dedupDuration: DedupDuration,
+      synchronizerId: SynchronizerId,
+  )(implicit traceContext: TraceContext) = {
+    connection
+      .submit(
+        actAs = Seq(validatorParty),
+        readAs = Seq.empty,
+        update = new ValidatorLicenseRequest(
+          validatorParty.toProtoPrimitive,
+          sponsorPartyId,
+          dsoInfo.dsoPartyId,
+          config.contactPoint,
+          "0.1.0",
+        ).create(),
+        priority = CommandPriority.High, // because validator still has no CC yet
+      )
+      .withSynchronizerId(synchronizerId)
+      .withDedup(
+        commandId = SpliceLedgerConnection.CommandId(
+          "org.lfdecentralizedtrust.splice.validator.createValidatorLicenseRequest",
+          Seq(validatorParty),
+        ),
+        deduplicationConfig = dedupDuration,
+      )
+      .yieldUnit()
   }
 
   private def waitForValidatorLicense(
@@ -947,7 +1046,16 @@ class ValidatorApp(
         }
       }
       _ <- appInitStep(s"Ensure validator is onboarded") {
-        ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
+        ensureValidatorIsOnboarded(
+          store,
+          validatorParty,
+          config.onboarding,
+          scanConnection,
+          automation.connection(SpliceLedgerConnectionPriority.High),
+          dedupDuration,
+          synchronizerId,
+          participantId,
+        )
       }
 
       userRightsProvider = new ParticipantUserRightsProvider(

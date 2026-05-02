@@ -88,6 +88,31 @@ object HttpSvPublicAppClient {
     }
   }
 
+  case class GrantSvOnboardingPermission(
+      token: String
+  ) extends BaseCommandPublic[http.GrantSvOnboardingPermissionResponse, String] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantSvOnboardingPermissionResponse] =
+      client.grantSvOnboardingPermission(
+        body = definitions.GrantSvOnboardingPermissionRequest(
+          token = token
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.GrantSvOnboardingPermissionResponse.OK(
+            definitions.GrantSvOnboardingPermissionResponse(contractId)
+          ) =>
+        Right(contractId)
+    }
+  }
+
   case class StartSvOnboarding(token: String)
       extends BaseCommandPublic[http.StartSvOnboardingResponse, Unit] {
 

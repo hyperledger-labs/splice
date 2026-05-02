@@ -93,6 +93,18 @@ abstract class SvAppReference(
       httpCommand(HttpSvPublicAppClient.GetDsoInfo)
     }
 
+  @Help.Summary(
+    "Grant SV candidate submission permission (via admin API)"
+  )
+  def grantSvOnboardingPermission(
+      token: String
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvPublicAppClient.GrantSvOnboardingPermission(token)
+      )
+    }
+
   @Help.Summary("Get the CometBFT node status")
   def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
     consoleEnvironment.run {
@@ -356,6 +368,19 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(
         HttpSvOperatorAppClient.ListOngoingValidatorOnboardings
+      )
+    }
+
+  @Help.Summary(
+    "Grant permission to a validator to join the permissioned synchronizer (via admin API)"
+  )
+  def grantValidatorPermission(
+      validatorParty: PartyId,
+      validatorParticipant: ParticipantId,
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvOperatorAppClient.GrantValidatorPermission(validatorParty, validatorParticipant)
       )
     }
 

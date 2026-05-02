@@ -87,10 +87,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
   AllocationSpecification,
+  Reference,
   SettlementInfo,
   TransferLeg,
-  Reference,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorpermission.ValidatorPermission
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
@@ -441,6 +442,30 @@ abstract class StoreTestBase
       AmuletAllocation.TEMPLATE_ID_WITH_PACKAGE_ID,
       new AmuletAllocation.ContractId(contractId),
       template,
+    )
+  }
+
+  protected def validatorPermission(
+      dso: PartyId,
+      sponsor: PartyId,
+      validator: PartyId,
+      participantId: String,
+  ): Contract[
+    ValidatorPermission.ContractId,
+    ValidatorPermission,
+  ] = {
+    val payload = new ValidatorPermission(
+      dso.toProtoPrimitive,
+      sponsor.toProtoPrimitive,
+      validator.toProtoPrimitive,
+      participantId,
+      java.util.Optional.empty(),
+      false,
+    )
+    contract(
+      identifier = ValidatorPermission.TEMPLATE_ID_WITH_PACKAGE_ID,
+      contractId = new ValidatorPermission.ContractId(nextCid()),
+      payload = payload,
     )
   }
 

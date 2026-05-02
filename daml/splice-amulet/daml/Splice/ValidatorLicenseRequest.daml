@@ -1,0 +1,62 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorLicenseRequest where
+
+import DA.Text as Text
+import Splice.Types
+import Splice.Util
+
+import Splice.ValidatorLicense (maxIdentifierLength)
+
+data ValidatorLicenseRequest_AcceptResult = ValidatorLicenseRequest_AcceptResult
+
+data ValidatorLicenseRequest_RejectResult = ValidatorLicenseRequest_RejectResult
+
+data ValidatorLicenseRequest_WithdrawResult = ValidatorLicenseRequest_WithdrawResult
+
+-- | A request submitted by a validator candidate to a sponsor SV, asking for a ValidatorLicense.
+
+template ValidatorLicenseRequest
+  with
+    validator : Party
+    sponsor : Party
+    dso : Party
+    contactPoint : Text
+    version : Text
+  where
+    signatory validator
+    observer sponsor
+
+    ensure
+      Text.length contactPoint <= maxIdentifierLength &&
+      Text.length version <= maxIdentifierLength
+
+    -- Exercised by the sponsor within a DsoRules choice to consume the ValidatorLicenseRequest
+
+    choice ValidatorLicenseRequest_Accept : ValidatorLicenseRequest_AcceptResult
+      controller sponsor
+      do 
+        pure ValidatorLicenseRequest_AcceptResult
+
+    -- Allows the sponsor to explicitly reject and archive an unwanted request.
+    
+    choice ValidatorLicenseRequest_Reject : ValidatorLicenseRequest_RejectResult
+      with
+        reason : Text
+      controller sponsor
+      do 
+        pure ValidatorLicenseRequest_RejectResult
+
+    -- Allows the validator to cancel their own request before it is processed.
+    
+    choice ValidatorLicenseRequest_Withdraw : ValidatorLicenseRequest_WithdrawResult
+      with
+        reason : Text
+      controller validator
+      do 
+        pure ValidatorLicenseRequest_WithdrawResult
+
+
+instance HasCheckedFetch ValidatorLicenseRequest ForDso where
+  contractGroupId ValidatorLicenseRequest{..} = ForDso with dso

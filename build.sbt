@@ -2092,6 +2092,8 @@ updateTestConfigForParallelRuns := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
+  def isPermissionedSynchronizerTest(name: String): Boolean =
+    name.contains("PermissionedSynchronizer")
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
       "IntegrationTest"
@@ -2171,6 +2173,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "permissioned synchronizer tests",
+      "test-full-class-names-permissioned.log",
+      (t: String) => isPermissionedSynchronizerTest(t),
+    ),
     (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
