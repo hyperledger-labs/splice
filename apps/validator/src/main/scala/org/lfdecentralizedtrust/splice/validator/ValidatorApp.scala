@@ -214,6 +214,7 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
+                Some(metrics.scanConnections),
                 ValidatorScanConnection.getPersistedScanList(configProvider),
                 ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
               )
@@ -710,6 +711,7 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
+          Some(metrics.scanConnections),
           ValidatorScanConnection.getPersistedScanList(configProvider),
           ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
         )
