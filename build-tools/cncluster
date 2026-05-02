@@ -2470,6 +2470,61 @@ function subcmd_psql() {
       --dbname="$DB_NAME"
 }
 
+subcommand_whitelist[ignore_for_eatit]=""
+function subcmd_ignore_for_eatit() {
+  N="${1:-10}"
+  echo "Extracting all unique parties mentioned in the last $N log entries from ExpiredAmuletTransferInstructionTrigger, where the trigger skipped expiry because not all parties have vetted the required Amulet package version."
+
+  # Fetch entries for the "Skipping expiry" pattern
+  local skipping_messages
+  skipping_messages=$(gcloud logging read "
+    resource.labels.cluster_name=\"$GCP_CLUSTER_NAME\"
+    jsonPayload.logger_name=\"o.l.s.s.a.d.ExpiredAmuletTransferInstructionTrigger:SV=sv\"
+    resource.labels.container_name=\"sv-app\"
+    resource.type=\"k8s_container\"
+    jsonPayload.message=~\"Skipping expiry of .* transfer instructions because not all parties have vetted the required Amulet package version.\"
+  " --limit="$N" --format=json | jq -r '.[].jsonPayload.message')
+
+  # Fetch entries for the "MEDIATOR_SAYS_TX_TIMED_OUT" pattern
+  local timeout_messages
+  timeout_messages=$(gcloud logging read "
+    resource.labels.cluster_name=\"$GCP_CLUSTER_NAME\"
+    jsonPayload.logger_name=\"o.l.s.s.a.d.ExpiredAmuletTransferInstructionTrigger:SV=sv\"
+    resource.labels.container_name=\"sv-app\"
+    resource.type=\"k8s_container\"
+    jsonPayload.message=~\"MEDIATOR_SAYS_TX_TIMED_OUT\"
+  " --limit=10 --format=json | jq -r '.[].jsonPayload.message')
+
+  # Extract parties from both sets, deduplicate, and format
+  local parties
+  parties=$(echo "$skipping_messages" \
+  | grep -oE '[^ ]+::[0-9a-f]+' \
+  | sort -u \
+  | paste -sd',' \
+  | sed 's/\(.*\)/"\1"/' \
+  | sed 's/,/", "/g')
+
+  echo ""
+  echo "Run the following script in the participant console to check which of these skipped parties did not vet the required package:"
+  echo ""
+  echo 'val syncId = participant.synchronizers.list_connected().head.synchronizerId'
+  echo 'val amuletPkg = com.digitalasset.daml.lf.data.Ref.IdString.PackageName.assertFromString("splice-amulet")'
+  echo "val parties = Seq($parties)"
+  echo 'val mappings = parties.map(p => p -> participant.topology.party_to_participant_mappings.list(syncId, filterParty=p).maxBy(_.context.serial)).toMap'
+  echo 'val preferredVersions = mappings.values.map(r => r.item.partyId).map(p => p -> participant.ledger_api.interactive_submission.preferred_package_version(parties=Set(p), packageName=amuletPkg, synchronizerId=syncId).flatMap(_.packageReference.map(_.packageVersion)))'
+  echo 'val preferredVersionsMap = preferredVersions.toList.groupMap(_._2)(_._1.toProtoPrimitive)'
+  # shellcheck disable=SC2028
+  echo 'preferredVersionsMap.map{case (k,v) => k -> v.mkString("[\n                \"","\",\n                \"","\",\n              ]")}'
+  echo ""
+  echo ""
+  echo "Additionally, the following parties are unresponsive according to the MEDIATOR_SAYS_TX_TIMED_OUT logs:"
+  echo "$timeout_messages" \
+    | grep -oE '[^ ]+::[0-9a-f]+' \
+    | sort -u \
+    | sed 's/.*/                "&",/'
+}
+
+
 ################################
 ### Main
 ################################
