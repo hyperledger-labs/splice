@@ -6,6 +6,7 @@ org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTes
 org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
 org.lfdecentralizedtrust.splice.config.SpliceConfigTest
 org.lfdecentralizedtrust.splice.config.ThresholdsTest
+org.lfdecentralizedtrust.splice.environment.ActiveContractsRestartTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
