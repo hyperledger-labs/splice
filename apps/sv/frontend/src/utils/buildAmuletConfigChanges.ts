@@ -231,7 +231,7 @@ function buildIssuanceCurveChanges(
     },
     {
       fieldName: 'issuanceCurveInitialValueOptValidatorFaucetCap',
-      label: 'Minting curve: Initial value: Validator faucet cap',
+      label: 'Minting curve: Initial value: Validator liveness reward cap',
       currentValue: before?.initialValue?.optValidatorFaucetCap || '',
       newValue: after?.initialValue?.optValidatorFaucetCap || '',
     },
@@ -291,7 +291,7 @@ function buildIssuanceCurveChanges(
           },
           {
             fieldName: `issuanceCurveFutureValues${idx}OptValidatorFaucetCap`,
-            label: `Minting curve: Step ${idx}: Validator faucet cap`,
+            label: `Minting curve: Step ${idx}: Validator liveness reward cap`,
             currentValue: fv._2.optValidatorFaucetCap || '',
             newValue: after?.futureValues[idx]._2.optValidatorFaucetCap || '',
           },
