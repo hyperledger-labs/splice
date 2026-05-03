@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.admin.api.client
 
 import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{HeaderName, TraceContext}
 
 object TraceContextPropagation {
   implicit class TraceContextExtension(tc: TraceContext) {
@@ -16,9 +16,9 @@ object TraceContextPropagation {
         .map { w3Ctx =>
           val headersMap = w3Ctx.asHeaders
           val w3CtxHeaders = headersMap.map { case (name, value) =>
-            RawHeader(name, value)
+            RawHeader(name.value, value)
           }
-          headers.filterNot(h => headersMap.contains(h.name)) ++ w3CtxHeaders.toSeq
+          headers.filterNot(h => headersMap.contains(HeaderName(h.name))) ++ w3CtxHeaders.toSeq
         }
         .getOrElse(headers)
     }

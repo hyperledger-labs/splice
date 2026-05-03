@@ -8,7 +8,7 @@ import com.daml.metrics.api.MetricQualification.Latency
 import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
+import com.digitalasset.canton.tracing.{HeaderName, TraceContext, W3CTraceContext}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.{ClientTransport, ConnectionContext, Http}
 import org.apache.pekko.http.scaladsl.model.{
@@ -281,7 +281,7 @@ object HttpClient {
 
   private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
     W3CTraceContext
-      .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
+      .fromHeaders(headers.map(h => HeaderName(h.name()) -> h.value()).toMap)
       .map(_.toTraceContext)
       .getOrElse(TraceContext.empty)
   }
