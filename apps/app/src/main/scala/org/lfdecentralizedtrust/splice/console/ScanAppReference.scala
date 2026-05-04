@@ -793,6 +793,14 @@ abstract class ScanAppReference(
     }
   }
 
+  def getAllocationV2CancelContext(
+      allocationId: allocationv2.Allocation.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetAllocationV2CancelContext(allocationId))
+    }
+  }
+
   def getAllocationWithdrawContext(
       allocationId: allocationv1.Allocation.ContractId
   ): ChoiceContextWithDisclosures = {

@@ -1,7 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocationv2 as amuletallocationV2Codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv2,
   allocationv2,
@@ -27,6 +29,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TransferTxLogEntry,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.da
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -327,6 +330,109 @@ class TokenStandardV2AllocationIntegrationTest
       bobAllocationRequest.contract.contractId,
       bobAllocation,
       otcTrade,
+    )
+  }
+
+  "Cancel a DvP and its allocations" in { implicit env =>
+    val allocatedOtcTrade = setupAllocatedOtcTrade()
+    actAndCheck(
+      "Settlement venue cancels the trade", {
+        val aliceContext = clue("Get choice context for alice's allocation") {
+          val scanResponse =
+            sv1ScanBackend.getAllocationV2CancelContext(allocatedOtcTrade.aliceAllocationId)
+          aliceValidatorBackend.scanProxy.getAllocationV2CancelContext(
+            allocatedOtcTrade.aliceAllocationId
+          ) shouldBe scanResponse
+          scanResponse
+        }
+        val bobContext = clue("Get choice context for bob's allocation") {
+          sv1ScanBackend.getAllocationV2CancelContext(allocatedOtcTrade.bobAllocationId)
+        }
+
+        def mkExtraArg(context: ChoiceContextWithDisclosures) =
+          new metadatav1.ExtraArgs(context.choiceContext, emptyMetadata)
+
+        val cancelChoice = new tradingappv2.OTCTrade_Cancel(
+          java.util.List.of(),
+          java.util.List.of(
+            new da.types.Tuple2(allocatedOtcTrade.aliceAllocationId, mkExtraArg(aliceContext)),
+            new da.types.Tuple2(allocatedOtcTrade.bobAllocationId, mkExtraArg(bobContext)),
+          ),
+          List(
+            allocatedOtcTrade.aliceAllocationRequestId,
+            allocatedOtcTrade.bobAllocationRequestId,
+          ).map(cid => new tradingappv2.OTCTradeAllocationRequest.ContractId(cid.contractId)).asJava,
+        )
+
+        splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitJava(
+            Seq(allocatedOtcTrade.venueParty),
+            commands = allocatedOtcTrade.otcTrade.id
+              .exerciseOTCTrade_Cancel(
+                cancelChoice
+              )
+              .commands()
+              .asScala
+              .toSeq,
+            disclosedContracts = aliceContext.disclosedContracts ++ bobContext.disclosedContracts,
+          )
+      },
+    )(
+      "Allocations are archived",
+      _ => {
+        aliceWalletClient
+          .listAmuletAllocations() shouldBe empty withClue "Alice's AmuletAllocations"
+        bobWalletClient.listAmuletAllocations() shouldBe empty withClue "Bob's AmuletAllocations"
+        splitwellValidatorBackend.participantClient.ledger_api.state.acs.of_party(
+          party = allocatedOtcTrade.venueParty,
+          filterInterfaces = Seq(allocationv2.Allocation.TEMPLATE_ID).map(templateId =>
+            TemplateId(
+              templateId.getPackageId,
+              templateId.getModuleName,
+              templateId.getEntityName,
+            )
+          ),
+        ) shouldBe empty withClue "Allocations"
+      },
+    )
+  }
+
+  "Withdraw an allocation" in { implicit env =>
+    val allocatedOtcTrade = setupAllocatedOtcTrade()
+    // sanity check
+    aliceWalletClient.listAmuletAllocations() should have size (1) withClue "AmuletAllocations"
+    actAndCheck(
+      "Settlement venue withdraw the trade", {
+        aliceWalletClient.withdrawAmuletAllocationV2(
+          new amuletallocationV2Codegen.AmuletAllocationV2.ContractId(
+            allocatedOtcTrade.aliceAllocationId.contractId
+          )
+        )
+      },
+    )(
+      "Allocation is archived",
+      _ => aliceWalletClient.listAmuletAllocations() shouldBe empty withClue "AmuletAllocations",
+    )
+  }
+
+  "Reject an allocation request" in { implicit env =>
+    val allocatedOtcTrade = setupAllocatedOtcTrade()
+    // sanity checks
+    aliceWalletClient
+      .listAllocationRequests() should have size (1) withClue "alice AllocationRequests"
+
+    actAndCheck(
+      "Alice rejects the allocation request", {
+        aliceWalletClient.rejectAllocationRequestV2(
+          allocatedOtcTrade.aliceAllocationRequestId
+        )
+      },
+    )(
+      "Allocation request is archived",
+      _ => {
+        val aliceRequests = aliceWalletClient.listAllocationRequests()
+        aliceRequests shouldBe empty withClue "alice Requests"
+      },
     )
   }
 }

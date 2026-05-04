@@ -1306,6 +1306,31 @@ object HttpWalletAppClient {
       }
     }
 
+    final case class WithdrawAmuletAllocationV2(
+        contractId: amuletallocationv2.AmuletAllocationV2.ContractId
+    ) extends InternalBaseCommand[
+          http.WithdrawAmuletAllocationV2Response,
+          definitions.AmuletAllocationV2WithdrawResult,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.WithdrawAmuletAllocationV2Response] =
+        client.withdrawAmuletAllocationV2(contractId.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.WithdrawAmuletAllocationV2Response, Either[
+        String,
+        definitions.AmuletAllocationV2WithdrawResult,
+      ]] = { case http.WithdrawAmuletAllocationV2Response.OK(value) =>
+        Right(value)
+      }
+    }
+
     sealed trait AmuletAllocationContract
     case class V1AmuletAllocation(
         contract: Contract[
@@ -1419,6 +1444,27 @@ object HttpWalletAppClient {
         String,
         Unit,
       ]] = { case http.RejectAllocationRequestResponse.OK(_) =>
+        Right(())
+      }
+    }
+
+    case class RejectAllocationRequestV2(id: allocationrequestv2.AllocationRequest.ContractId)
+        extends InternalBaseCommand[
+          http.RejectAllocationRequestV2Response,
+          Unit,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAllocationRequestV2Response] =
+        client.rejectAllocationRequestV2(id.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.RejectAllocationRequestV2Response, Either[
+        String,
+        Unit,
+      ]] = { case http.RejectAllocationRequestV2Response.OK(_) =>
         Right(())
       }
     }
