@@ -100,12 +100,13 @@ import Splice.Testing.Utils
 
 import Daml.Script
 
--- | List the holdings of a party of a specific instrument.
+-- | List all holdings  of a specific instrument owned by a party.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listHoldings p instrumentId = do
   filter (\(_, holding) -> holding.instrumentId == instrumentId) <$> listHoldings' p
 
--- | List the holdings of a party of a specific instrument.
+
+-- | List all holdings owned by a party.
 listHoldings' : Party -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listHoldings' p = do
   holdingsV2 <- queryInterface @V2.Holding p

@@ -123,3 +123,6 @@ Cleanup performed so far:
 - Introduce `AllocationRequest.originalRequestId` and `Allocation.originalAllocationId` fields, which
   can be used to track the same request or allocation across state updates,
   analogously to the `originalInstructionCid` of transfer and allocation instructions.
+- Improve commentary on `AllocationRequest_Accept` to call out that there is no guarantee that
+  wallets call the choice, and thus apps must clean up allocation requests independently
+- Add `Monoid` instance for `Splice.Testing.Utils.OpenApiChoiceContext` to simplify writing tests

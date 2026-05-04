@@ -165,9 +165,9 @@ transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 sender self arg = 
 ------------------
 
 instance ForwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
-  downcast v1 = TransferInstructionV1.TransferFactoryView with
-    admin = v1.admin
-    meta = v1.meta
+  downcast v2 = TransferInstructionV1.TransferFactoryView with
+    admin = v2.admin
+    meta = v2.meta
 
 instance BackwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
   upcast v1 = TransferInstructionV2.TransferFactoryView with

@@ -143,7 +143,7 @@ isValidSettlementInfoV2 : AllocationV2.SettlementInfo -> Bool
 isValidSettlementInfoV2 AllocationV2.SettlementInfo{..} =
   not (null executors) &&
   requestedAt <= settleAt &&
-  optional True  (settleAt <=) settlementDeadline &&
+  optional True (settleAt <=) settlementDeadline &&
   validateNoMeta extraExecutorsMetaField meta
 
 -- | Check basic invariants of a `V2.AllocationSpecification`.
@@ -283,7 +283,7 @@ settlementFactoryV2_settleBatchDefaultImpl
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_settleBatchDefaultImpl admin self arg= do
+settlementFactoryV2_settleBatchDefaultImpl admin self arg = do
   let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   checkActors actors [settlement.executors]
 

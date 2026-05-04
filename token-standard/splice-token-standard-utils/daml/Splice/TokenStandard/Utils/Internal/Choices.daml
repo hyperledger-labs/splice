@@ -110,7 +110,7 @@ isSubsetOfR = ("is not a subset of", \x y -> Set.fromList x `Set.isSubsetOf` Set
 isEqualSetR : Ord a => (Text, [a] -> [a] -> Bool)
 isEqualSetR = ("does not have the same elements as", \x y -> Set.fromList x == Set.fromList y)
 
--- | Predicte combinator that requires the given predicate to be true for one of
+-- | Predicate combinator that requires the given predicate to be true for one of
 -- the elements on the RHS.
 oneOfR : (Text, a -> b -> Bool) -> (Text, a -> [b] -> Bool)
 oneOfR (descFailure, predicate) = (descFailure <> " one of", \x ys -> any (predicate x) ys)
