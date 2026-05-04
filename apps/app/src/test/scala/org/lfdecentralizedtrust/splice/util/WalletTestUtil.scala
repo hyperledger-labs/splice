@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWall
 import org.scalatest.Assertion
 
 import java.time.Duration
-import java.util.UUID
+import java.util.{Optional, UUID}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -856,6 +856,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         receiver.toLf,
         amount.bigDecimal,
         tc.latestOpenMiningRound.contract.contractId,
+        Optional.empty(),
       ),
       synchronizerId = synchronizerId orElse (tc.amuletRules.state match {
         case ContractState.InFlight => None
@@ -1277,7 +1278,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
-      None.toJava,
+      None.toJava, // lock
+      None.toJava, // meta
     )
   }
 
@@ -1302,6 +1304,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           None.toJava,
         )
       ).toJava,
+      None.toJava, // meta
     )
   }
 

@@ -11,6 +11,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.Scripts.Util
+import Splice.TokenStandard.Utils qualified as TSU
 
 testLocking : Script ()
 testLocking = do
@@ -21,7 +22,7 @@ testLocking = do
 
   context <- getPaymentTransferContext app alice
 
-  let lockOutput = TransferOutput with
+  let lockOutput i = TransferOutput with
         receiver = alice.primaryParty
         receiverFeeRatio = 0.0
         amount = 100.0
@@ -29,19 +30,20 @@ testLocking = do
           expiresAt = addRelTime now (days 2)
           holders = [bob.primaryParty]
           optContext = None
+        meta = Some $ TSU.reasonToMeta ("mk-lock " <> show i) mempty
 
-
-  checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
-    exerciseCmd context.amuletRules AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = alice.primaryParty
-        provider = alice.primaryParty
-        inputs = [InputAmulet amuletCid]
-        outputs = [lockOutput, lockOutput]
-        beneficiaries = None
-      context = context.context
-      expectedDso = Some app.dso
+  checkTxHistoryV2Reasons [(alice.primaryParty, ["mk-lock 1", "mk-lock 2"])] $
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+      submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
+      exerciseCmd context.amuletRules AmuletRules_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputAmulet amuletCid]
+          outputs = [lockOutput 1, lockOutput 2]
+          beneficiaries = None
+        context = context.context
+        expectedDso = Some app.dso
 
   [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
 
@@ -51,14 +53,16 @@ testLocking = do
   submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
-  checkTxMetadata' app TxKind_Unlock alice.primaryParty $
-    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
-      exerciseCmd lockedCid1 LockedAmulet_UnlockV2
+  checkTxHistoryV2Reasons' [(alice.primaryParty, [], "holders released lock")] $
+    checkTxMetadata' app TxKind_Unlock alice.primaryParty $
+      submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
+        exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
   passTime (days 2)
 
-  checkTxMetadata' app TxKind_Unlock alice.primaryParty $
-    submit (actAs alice.primaryParty <> readAs app.dso) $
-      exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLockV2
+  checkTxHistoryV2Reasons' [(alice.primaryParty, [], "owner released expired lock")] $
+    checkTxMetadata' app TxKind_Unlock alice.primaryParty $
+      submitResultAndTree (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
+        exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLockV2
 
   pure ()

@@ -20,6 +20,7 @@ import DA.Optional (fromOptional, optionalToList)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
+import Splice.TokenStandard.Utils qualified as TSU
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
@@ -76,6 +77,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
                 expiresAt = transferBefore
                 holders = [dso]
                 optContext = Some lockContext
+              meta = Some (TSU.reasonToMeta ("lock for " <> lockContext) emptyMetadata)
           ]
         inputs = transferInputs
         beneficiaries = None
@@ -89,9 +91,9 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
     )
 
 executeTwoStepTransfer
-  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  : TwoStepTransfer -> ContractId LockedAmulet -> Metadata -> ExtraArgs
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
-executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid transferMeta extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
   (context, beneficiaries) <-
     if allowFeaturing
@@ -112,6 +114,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         amount = amount
         receiverFeeRatio = 0.0  -- all fees are paid by the sender
         lock = None
+        meta = Some transferMeta
   let amuletRulesTransfer = Splice.AmuletRules.Transfer with
         sender
         provider

@@ -87,7 +87,9 @@ testExpireLockedAmulet = do
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
   (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
-  _ <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
+  _ <-
+    checkTxHistoryV2Reasons [(alice.primaryParty, ["expire dust"])] $
+    checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
       exerciseCmd cid $ LockedAmulet_ExpireAmuletV2 with
         externalPartyConfigState0Cid
@@ -141,7 +143,9 @@ testExpireAmulet = do
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
   (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
-  _ <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
+  _ <-
+    checkTxHistoryV2Reasons [(alice.primaryParty, ["expire dust"])] $
+    checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
     exerciseCmd cid $ Amulet_ExpireV2 with
       externalPartyConfigState0Cid
@@ -179,9 +183,9 @@ addRelRoundN n t relTime
   | n <= 0 = t
   | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
 
-testChoice : [Party] -> [Party] -> Commands a -> Script a
+testChoice : [Party] -> [Party] -> Commands a -> Script (a, TransactionTree)
 testChoice actors readers buildCommand = do
-  submit (foldMap actAs actors <> foldMap readAs readers) buildCommand
+  submitResultAndTree (foldMap actAs actors <> foldMap readAs readers) buildCommand
 
 testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
 testChoiceFailed actAsArgs readAsArgs buildCommand = do
@@ -205,6 +209,7 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
                 expiresAt = now `addRelTime` lockDuration
                 optContext = None
               receiverFeeRatio = 0.0
+              meta = None
           ]
         beneficiaries = None -- test code, don't set beneficiaries
   (openRound, _) <- getLatestOpenRound app

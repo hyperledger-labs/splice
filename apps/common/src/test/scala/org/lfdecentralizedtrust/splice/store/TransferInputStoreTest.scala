@@ -130,6 +130,7 @@ abstract class TransferInputStoreTest extends StoreTestBase {
           receiver.toProtoPrimitive,
           amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
+          java.util.Optional.empty(),
         ).toValue,
         new amuletrulesCodegen.AmuletRules_MintResult(
           new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](

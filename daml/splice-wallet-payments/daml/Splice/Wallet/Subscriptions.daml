@@ -6,6 +6,9 @@ module Splice.Wallet.Subscriptions where
 import DA.Time
 import DA.List (dedupSort)
 
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils qualified as TSU
+
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry
@@ -391,6 +394,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
                expiresAt = expiresAt
                optContext = Some $ "amulet-subscription: " <> subscriptionData.description
              receiverFeeRatio = 0.0
+             meta = Some (TSU.reasonToMeta ("Locking amulet for subscription payment: " <> subscriptionData.description) emptyMetadata)
          ]
        beneficiaries = None -- no beneficiaries for locking step
 
@@ -406,11 +410,12 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
 
   -- unlock amulet and transfer the remainder to the receiver
   result <- exercise lockedAmulet LockedAmulet_UnlockV2
+  let reason = "subscription payment: " <> subscriptionData.description
   let transfer = Transfer with
         sender
         provider
         inputs = [InputAmulet result.amuletCid]
-        outputs = [mkTransferOutput receiver targetAmount]
+        outputs = [mkTransferOutput reason receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
   result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
@@ -418,10 +423,11 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
 
   pure amuletCid
 
-mkTransferOutput : Party -> Decimal -> TransferOutput
-mkTransferOutput receiver amount =
+mkTransferOutput : Text -> Party -> Decimal -> TransferOutput
+mkTransferOutput reason receiver amount =
   TransferOutput with
     receiver
     amount
     lock = None
     receiverFeeRatio = 0.0
+    meta = Some (TSU.reasonToMeta reason emptyMetadata)

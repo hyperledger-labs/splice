@@ -6,6 +6,9 @@ module Splice.Wallet.Payment where
 import DA.List (dedupSort)
 import DA.Time
 
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils qualified as TSU
+
 import Splice.Util
 import Splice.Amulet
 import Splice.AmuletRules
@@ -136,6 +139,7 @@ template AppPaymentRequest
                       expiresAt = expiresAt
                       optContext = Some $ "amulet-payment-request: " <> description
                     receiverFeeRatio = 0.0
+                    meta = Some (TSU.reasonToMeta ("Locking amulet for payment request: " <> description) emptyMetadata)
                 ]
               beneficiaries = None -- no beneficiaries for the locking step
          result <- exercisePaymentTransfer dso context transfer
@@ -190,6 +194,9 @@ mkReceiverOutput receiverAmount =
     amount = receiverAmount.amuletAmount
     receiverFeeRatio = 0.0
     lock = None
+    meta = Some (TSU.reasonToMeta reason emptyMetadata)
+  where
+    reason = "execute Amulet payment"
 
 data AcceptedAppPayment_CollectResult = AcceptedAppPayment_CollectResult with
   receiverAmulets: [(Party, ContractId Amulet)]

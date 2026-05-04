@@ -11,12 +11,14 @@ import DA.Map as Map
 import DA.TextMap as TextMap
 import DA.Optional (fromOptional)
 
-import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet.TokenApiUtils
+import Splice.AmuletEventLog (withTempAmuletEventLog)
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
 import Splice.Fees
@@ -145,6 +147,10 @@ template Amulet
       do  requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid this
           let expireSum = AmuletExpireV2Summary with
                 owner = owner
+          logAmuletBurn dso (toInterfaceContractId externalPartyConfigState0Cid) owner
+            amount.initialAmount
+            "expire dust"
+            (toInterfaceContractId self)
           return Amulet_ExpireV2Result with
             meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amount.initialAmount)
             ..
@@ -199,6 +205,7 @@ template LockedAmulet
     choice LockedAmulet_UnlockV2 : LockedAmulet_UnlockV2Result
       controller amulet.owner :: lock.holders
       do amuletCid <- create amulet
+         logAmuletUnlock amulet.dso "holders released lock" amulet.owner self amuletCid
          return LockedAmulet_UnlockV2Result with
            meta = simpleHoldingTxMeta TxKind_Unlock (Some "holders released lock") None, ..
 
@@ -212,6 +219,7 @@ template LockedAmulet
       controller amulet.owner
       do assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          amuletCid <- create amulet
+         logAmuletUnlock amulet.dso "owner released expired lock" amulet.owner self amuletCid
          return LockedAmulet_OwnerExpireLockV2Result with
           meta = simpleHoldingTxMeta TxKind_Unlock (Some "lock expired") None, ..
 
@@ -230,6 +238,10 @@ template LockedAmulet
          requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet
          let expireSum = AmuletExpireV2Summary with
                owner = amulet.owner
+         logAmuletBurn amulet.dso (toInterfaceContractId externalPartyConfigState0Cid) amulet.owner
+           amulet.amount.initialAmount
+           "expire dust"
+           (toInterfaceContractId self)
          return LockedAmulet_ExpireAmuletV2Result with
            meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amulet.amount.initialAmount)
            ..
@@ -553,6 +565,34 @@ requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfi
   let round = min config0.holdingFeesOpenRoundNumber config1.holdingFeesOpenRoundNumber
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
 
+
+-- tx history v2 logging
+------------------------
+
+logAmuletMint : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> ContractId Amulet -> Update ()
+logAmuletMint dso factoryCid receiver amount meta mintedAmuletCid = do
+  let instrumentId = Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta [toInterfaceContractId mintedAmuletCid]
+
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Text -> ContractId Api.Token.HoldingV2.Holding -> Update ()
+logAmuletBurn dso factoryCid sender amount reason burnedAmuletCid = do
+  let instrumentId = amuletInstrumentIdV2 dso
+  let meta = reasonToMeta reason emptyMetadata
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta [toInterfaceContractId burnedAmuletCid]
+
+logAmuletUnlock : Party -> Text -> Party -> ContractId LockedAmulet -> ContractId Amulet -> Update ()
+logAmuletUnlock dso reason owner lockedAmuletCid unlockedAmuletCid = do
+  withTempAmuletEventLog dso $ \eventLogCid -> do
+    void $ exercise eventLogCid $ TransferEventsV2.EventLog_HoldingsChange with
+      admin = dso
+      account = basicAccount owner
+      inputHoldingCids = [toInterfaceContractId lockedAmuletCid]
+      transferLegs = []
+      outputHoldingCids = [toInterfaceContractId unlockedAmuletCid]
+      observers = [owner]
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = reasonToMeta reason emptyMetadata
 
 
 -- instances

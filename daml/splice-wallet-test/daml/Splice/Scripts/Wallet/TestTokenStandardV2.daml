@@ -20,8 +20,8 @@ import Splice.Wallet.Install
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.Registries.TestRegistries qualified as TestRegistries
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
-import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.Apps.TradingAppV2 qualified as TradingAppV2
 import Splice.Testing.Apps.TradingAppV2_Backend qualified as TradingAppV2 (querySettleableTrades, settleWithTradeAgreements)
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
@@ -152,7 +152,7 @@ testTokenStandardAllocateV2 : Script ()
 testTokenStandardAllocateV2 = script do
   -- Note: we only use amulet in the test. We use the multi-registry setup only for convenience,
   -- as need to pass a multi-registry to the trading app backend.
-  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let registry = env.amuletV2
 
   venue <- allocateParty "venue"

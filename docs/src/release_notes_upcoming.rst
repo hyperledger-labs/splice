@@ -21,6 +21,11 @@
 
     - Token Standard V2 (CIP-112)
 
+      - Notable callouts for Amulet changes:
+          - add a ``meta : Optional Metadata`` field to the ``AmuletRules.TransferOutput`` type and
+            the ``TransferPreapproval_SendV2`` choice
+          - properly classify the burn of ANS in the V2 token standard transaction history
+
       - Add preview of the V2 token standard APIs and implement them for Amulet
 
       - Add support for creating Allocations V2 of Amulet in the Splice Amulet Wallet UI.

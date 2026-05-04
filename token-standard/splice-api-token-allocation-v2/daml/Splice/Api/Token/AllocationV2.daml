@@ -115,6 +115,13 @@ data AllocationAction
 
 -- | View of a contract representing a ready-to-settle allocation.
 data AllocationView = AllocationView with
+    originalAllocationCid : Optional (ContractId Allocation)
+      -- ^ The contract id of the original allocation contract, which is `None`
+      -- for the original allocation contract itself.
+      --
+      -- This SHOULD be used by wallets to correlate the same allocation across
+      -- updates to its state. It should not be used to correlate different allocations
+      -- for the same settlement. That can be done using the `allocation.settlement` field.
     allocation : AllocationSpecification
       -- ^ The specification of the allocation.
     holdingCids : [ContractId Holding]

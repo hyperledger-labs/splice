@@ -17,6 +17,9 @@ import Splice.Scripts.Util
 import Splice.ValidatorLicense
 import Splice.Util
 
+import Splice.TokenStandard.Utils qualified as TSU
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+
 testRewardComputation: Script ()
 testRewardComputation = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
@@ -119,8 +122,8 @@ testRewardComputation = do
 
   -- But bob can redeem the coupon himself
   context <- getPaymentTransferContext app provider2
-  transferResult <- checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
-    submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  (transferResult, changes) <- checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
+    submitResultAndTree (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bob.primaryParty
         provider = bob.primaryParty
@@ -131,11 +134,14 @@ testRewardComputation = do
       expectedDso = Some app.dso
   transferResult.summary.senderChangeAmount ===
     ( intToDecimal bob2Weight * issuingMiningRound0.issuancePerSvRewardCoupon - createFee)
+  WalletClientV2.expectTxHistoryReasons changes
+    [ (TSU.basicAccount bob.primaryParty, ["mint rewards"], "")
+    ]
 
   -- Alice can redeem her coupons and do so even in a single transfer to bob
   context <- getPaymentTransferContext app aliceValidator
-  transferResult <- checkTransferMetadata app TxKind_Transfer aliceValidator.primaryParty $
-    submit (actAs aliceValidator.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  (transferResult, changes) <- checkTransferMetadata app TxKind_Transfer aliceValidator.primaryParty $
+    submitResultAndTree (actAs aliceValidator.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = aliceValidator.primaryParty
         provider = aliceValidator.primaryParty
@@ -150,12 +156,18 @@ testRewardComputation = do
         outputs = [ TransferOutput with
                       receiver = bob.primaryParty
                       receiverFeeRatio = 0.0
-                      amount = 8.0
+                      amount = 2.0
                       lock = None
+                      meta = Some (TSU.reasonToMeta "Alice -> Bob: transfer 1" mempty)
                   ]
         beneficiaries = None -- test code, don't set beneficiaries
       context = context.context
       expectedDso = Some app.dso
+
+  WalletClientV2.expectTxHistoryReasons changes
+    [ (TSU.basicAccount aliceValidator.primaryParty, ["mint rewards", "Alice -> Bob: transfer 1"], "")
+    , (TSU.basicAccount bob.primaryParty, ["Alice -> Bob: transfer 1"], "")
+    ]
 
   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
   let aliceSvWeight = intToDecimal $ alice1Weight + alice2Weight
@@ -189,8 +201,8 @@ testRewardComputation = do
 
   -- Bob validator can redeem the coupons they are a beneficiary on
   context <- getPaymentTransferContext app bobValidator
-  transferResult <- checkTransferMetadata app TxKind_MergeSplit bobValidator.primaryParty $
-    submit (actAs bobValidator.primaryParty <> actAs bobValidator.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  (transferResult, changes) <- checkTransferMetadata app TxKind_MergeSplit bobValidator.primaryParty $
+    submitResultAndTree (actAs bobValidator.primaryParty <> actAs bobValidator.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bobValidator.primaryParty
         provider = bobValidator.primaryParty
@@ -207,5 +219,9 @@ testRewardComputation = do
   transferResult.summary.inputAppRewardAmount ===
     featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
     + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
+
+  WalletClientV2.expectTxHistoryReasons changes
+    [ (TSU.basicAccount bobValidator.primaryParty, ["mint rewards"], "")
+    ]
 
   return ()

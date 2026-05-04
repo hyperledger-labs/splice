@@ -13,6 +13,9 @@ import Splice.Scripts.Util
 import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Wallet.Subscriptions
+import Splice.TokenStandard.Utils qualified as TSU
+
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 
 testWithSubscription : Script ()
@@ -40,20 +43,39 @@ testWithSubscription = script do
   -- amulet wallet accepts subscription and first payment and locks amulet to DSO party
 
   paymentContext <- getPaymentTransferContext app alice
-  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputAmulet amulet]
-    context = paymentContext
-    walletProvider = app.dso
+  (result, changes) <-
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
+      submitResultAndTree (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+        inputs = [InputAmulet amulet]
+        context = paymentContext
+        walletProvider = app.dso
   let initialPaymentCid = result.subscriptionPayment
+
+  -- check tx history structure
+  let paymentDesc = "subscription payment: ANS entry: \"ans.darth.vader\""
+  let checkPaymentLockingHistory changes =
+        WalletClientV2.expectTxHistoryReasons changes [(TSU.basicAccount alice.primaryParty, ["Locking amulet for " <> paymentDesc], "")]
+  checkPaymentLockingHistory changes
 
   [] <- query @Splice.Amulet.AppRewardCoupon app.dso
 
   -- DSO party is used to transactionally unlock & transfer amulets and creates ans entry and a subscription in return.
   appContext <- getAppTransferContext app app.dsoUser
-  collectPaymentSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectInitialEntryPayment with
-    paymentCid = initialPaymentCid
-    transferContext = appContext
-    ansRulesCid
+  (collectPaymentSummary, changes) <-
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
+      submitResultAndTree app.dso $ exerciseCmd entryContext AnsEntryContext_CollectInitialEntryPayment with
+        paymentCid = initialPaymentCid
+        transferContext = appContext
+        ansRulesCid
+
+  -- check tx history structure
+  let checkPaymentCollectionHistory changes = do
+        [unlockChange, paymentChange] <- pure changes
+        WalletClientV2.expectTxHistoryReasons [unlockChange] [(TSU.basicAccount alice.primaryParty, [], "holders released lock")]
+        WalletClientV2.expectTxHistoryReasons [paymentChange] [(TSU.basicAccount alice.primaryParty, [paymentDesc], "")]
+        [paymentLeg] <- pure paymentChange.transferLegs
+        paymentLeg.receiver === TSU.burnAccount app.dso -- ANS entry payment is marked as burn
+  checkPaymentCollectionHistory changes
 
   -- the amulet received by sv is brunt
   dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
@@ -77,18 +99,25 @@ testWithSubscription = script do
   appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputAmulet amulet]
-    context = paymentContext
-    walletProvider = app.dso
+  (result, changes) <-
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
+      submitResultAndTree (actAs alice.primaryParty <> actAs app.dso) $
+        exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+          inputs = [InputAmulet amulet]
+          context = paymentContext
+          walletProvider = app.dso
   let paymentCid = result.subscriptionPayment
+  checkPaymentLockingHistory changes
 
   -- DSO party is used to transactionally unlock & transfer amulets and renews directory entry in return
-  renewalSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
-    paymentCid
-    entryCid = collectPaymentSummary.entryCid
-    transferContext = appContext
-    ansRulesCid
+  (renewalSummary, changes) <-
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
+      submitResultAndTree app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
+        paymentCid
+        entryCid = collectPaymentSummary.entryCid
+        transferContext = appContext
+        ansRulesCid
+  checkPaymentCollectionHistory changes
 
   -- the amulet received by sv is brunt
   dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
