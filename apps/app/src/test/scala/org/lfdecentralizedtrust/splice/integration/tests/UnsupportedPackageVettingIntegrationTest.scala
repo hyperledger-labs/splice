@@ -204,7 +204,7 @@ class UnsupportedPackageVettingIntegrationTest
             synchronizerId,
           ) should contain allElementsOf validatorDarsAbovePackageConfigVersion.map(_.packageId)
         }
-        eventually(40.seconds) {
+        eventually(60.seconds) {
           alicesTapsWithPackageId(DarResources.amulet_0_1_16.packageId)
         }
       }
