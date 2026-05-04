@@ -22,7 +22,7 @@ data TransferLeg = TransferLeg with
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
-    instrumentId : InstrumentId
+    instrumentId : InstrumentId -- FIXME: consider only storing the textual-id here, as the admin is already specified in the event
       -- ^ The instrument identifier.
     meta : Metadata
       -- ^ Additional metadata about the transfer leg, used for extensibility.

@@ -133,6 +133,7 @@ data TokenStandardActionResult
   | TSAR_TransferInstructionResultV1 V1.TransferInstructionResult
   | TSAR_TransferInstructionResultV2 V2.TransferInstructionResult
   | TSAR_AllocationRequestV2_AcceptResult V2.AllocationRequest_AcceptResult
+  | TSAR_TransferFactory_TransferResultV2 V2.TransferFactory_TransferResult
   deriving (Eq, Show)
 
 -- | The result of execution a batch of token standard actions.
@@ -218,9 +219,11 @@ executeTokenStandardAction actor (holdingMap, results) action = case action of
     callChoiceV2NoInput @V2.TransferInstruction (holdingMap, results) call
       (\cid arg -> do
           instr <- fetch cid
-          let transfer = (view instr).transfer
+          let instrView = view instr
+          let transfer = instrView.transfer
+          let sender = instrView.sender
           result <- exercise cid arg
-          let newHoldingCids = holdingMapFromTransferV2 transfer result
+          let newHoldingCids = holdingMapFromTransferV2 instrView.instrumentId sender transfer result
           pure (newHoldingCids, TSAR_TransferInstructionResultV2 result)
       )
 
@@ -244,12 +247,16 @@ executeTokenStandardAction actor (holdingMap, results) action = case action of
   TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
     callChoiceV2 @V2.TransferFactory (holdingMap, results) (ChoiceCall with cid; arg)
       (\_cid arg -> do
-        let transfer = arg.transfer
-        pure (Right transfer.instrumentId, transfer.sender))
+        pure (Right arg.instrumentId, arg.sender))
       (\cid arg inputHoldingCids -> do
-         let transfer' = arg.transfer with inputHoldingCids
-         result <- exercise cid arg with transfer = transfer'
-         pure (holdingMapFromTransferV2 transfer' result, TSAR_TransferInstructionResultV2 result)
+          let admin = arg.instrumentId.admin
+          let iid = arg.instrumentId.id
+          result <- exercise cid arg with inputHoldingCids
+          let holdingMaps = mconcat $ do
+                (transfer, instrResult) <- zip arg.transfers result.instructionResults
+                pure $ holdingMapFromTransferV2 arg.instrumentId arg.sender transfer instrResult
+          let senderChangeMap = holdingMapFromList [(ScopedAccount admin arg.sender, textMapSingleton iid result.senderChangeCids)]
+          pure (holdingMaps <> senderChangeMap, TSAR_TransferFactory_TransferResultV2 result)
       )
 
 
@@ -322,14 +329,15 @@ holdingMapFromTransferV1 transfer result =
         V1.TransferInstructionResult_Pending _instrCid -> []
         V1.TransferInstructionResult_Failed -> []
 
-holdingMapFromTransferV2 : V2.Transfer -> V2.TransferInstructionResult -> HoldingMap
-holdingMapFromTransferV2 transfer result =
+holdingMapFromTransferV2 : V2.InstrumentId -> V2.Account -> V2.Transfer -> V2.TransferInstructionResult -> HoldingMap
+holdingMapFromTransferV2 instrumentId sender transfer result =
   holdingMapFromList $
-    [ (ScopedAccount admin transfer.sender, TextMap.fromList [(transfer.instrumentId.id, result.senderChangeCids)])
-    , (ScopedAccount admin transfer.receiver, TextMap.fromList [(transfer.instrumentId.id, receiverCids)])
+    [ (ScopedAccount admin sender, TextMap.fromList [(iid, result.senderChangeCids)])
+    , (ScopedAccount admin transfer.receiver, TextMap.fromList [(iid, receiverCids)])
     ]
   where
-    admin = transfer.instrumentId.admin
+    admin = instrumentId.admin
+    iid = instrumentId.id
     receiverCids = case result.output of
         V2.TransferInstructionResult_Completed receiverHoldingCids -> receiverHoldingCids
         V2.TransferInstructionResult_Pending _instrCid -> []

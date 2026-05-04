@@ -65,7 +65,7 @@ instance HasCheckedFetch V2.HoldingView ForOwner where
 
 instance HasCheckedFetch V2.TransferInstructionView ForDso where
   contractGroupId V2.TransferInstructionView {..} = ForDso with
-    dso = transfer.instrumentId.admin
+    dso = instrumentId.admin
 
 instance HasCheckedFetch V2.AllocationView ForDso where
   contractGroupId V2.AllocationView {..} = ForDso with

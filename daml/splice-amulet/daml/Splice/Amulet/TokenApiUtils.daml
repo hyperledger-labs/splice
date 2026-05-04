@@ -161,6 +161,9 @@ featuredAppRightContextKey = "featured-app-right"
 transferPreapprovalContextKey : Text
 transferPreapprovalContextKey = "transfer-preapproval"
 
+perPartyTransferPreapprovalContextKey : Party -> Text
+perPartyTransferPreapprovalContextKey p = "transfer-preapproval/" <> partyToText p
+
 -- | The key used to embed all the lock specification in the choice context.
 lockContextKey : Text
 lockContextKey = "lock"

@@ -145,7 +145,7 @@ registryApi_getTransferOfferContext : TestTokenV2Registry -> ContractId V2.Trans
 registryApi_getTransferOfferContext registry instrCid _meta = do
   (_, tokenRulesContext, tokenRulesD) <- getTokenRulesC registry
   Some instrView <- queryInterfaceContractId @V2.TransferInstruction registry.admin instrCid
-  lockedDs <- forA instrView.transfer.inputHoldingCids $ \holdingCid -> do
+  lockedDs <- forA instrView.holdingCids $ \holdingCid -> do
     let tokenCid = coerceContractId holdingCid : ContractId Token
     queryDisclosure' @Token registry.admin tokenCid
   pure OpenApiChoiceContext with

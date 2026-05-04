@@ -123,3 +123,7 @@ Cleanup performed so far:
 - Introduce `AllocationRequest.originalRequestId` and `Allocation.originalAllocationId` fields, which
   can be used to track the same request or allocation across state updates,
   analogously to the `originalInstructionCid` of transfer and allocation instructions.
+
+
+FIXME: expand
+- intentionally not allowing batch transfers of different instruments as it has low ROI

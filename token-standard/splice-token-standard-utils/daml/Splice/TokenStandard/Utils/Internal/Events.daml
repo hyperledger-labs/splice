@@ -147,38 +147,36 @@ logAllocationSettlement eventLogCid inputHoldingCids allocation outputHoldingCid
 -- | Log events for the execution a transfer.
 logTransfer
   : ContractId TransferEventsV2.EventLog
+  -> V2.InstrumentId
+  -> V2.Account
+  -> [ContractId V2.Holding] -- ^ Sender input holdings
   -> TransferInstructionV2.Transfer
   -> [ContractId V2.Holding] -- ^ Sender change output holdings
   -> [ContractId V2.Holding] -- ^ Receiver output holdings
   -> Update ()
-logTransfer eventLogCid transfer senderOutputHoldingCids receiverOutputHoldingCids = do
-  let admin = transfer.instrumentId.admin
+logTransfer eventLogCid instrumentId sender senderInputHoldings transfer senderOutputHoldingCids receiverOutputHoldingCids = do
+  let admin = instrumentId.admin
   let leg = TransferEventsV2.TransferLeg with
         transferLegId = "leg0"
-        sender = transfer.sender
+        sender
         receiver = transfer.receiver
-        instrumentId = transfer.instrumentId
+        instrumentId
         amount = transfer.amount
         meta = transfer.meta
-  if transfer.sender == transfer.receiver
-    then do
-      void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
+  let senderChange = TransferEventsV2.EventLog_HoldingsChange with
         admin
-        account = transfer.sender
-        inputHoldingCids = transfer.inputHoldingCids
-        transferLegs = [leg]
-        outputHoldingCids = senderOutputHoldingCids ++ receiverOutputHoldingCids
-        observers = accountParties transfer.sender
-        extraArgs = emptyExtraArgs
-    else do
-      void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
-        admin
-        account = transfer.sender
-        inputHoldingCids = transfer.inputHoldingCids
+        account = sender
+        inputHoldingCids = senderInputHoldings
         transferLegs = [leg]
         outputHoldingCids = senderOutputHoldingCids
-        observers = accountParties transfer.sender
+        observers = accountParties sender
         extraArgs = emptyExtraArgs
+  if sender == transfer.receiver
+    then do
+      void $ exercise eventLogCid senderChange with
+        outputHoldingCids = senderOutputHoldingCids ++ receiverOutputHoldingCids
+    else do
+      void $ exercise eventLogCid senderChange
       void $ exercise eventLogCid TransferEventsV2.EventLog_HoldingsChange with
         admin
         account = transfer.receiver
