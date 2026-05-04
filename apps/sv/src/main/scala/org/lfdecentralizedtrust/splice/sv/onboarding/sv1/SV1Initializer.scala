@@ -353,6 +353,7 @@ class SV1Initializer(
           config.scan,
         ),
       )
+      _ = dsoAutomation.registerLsuTriggers()
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
       withDsoStore = new WithDsoStore(
         dsoAutomation,

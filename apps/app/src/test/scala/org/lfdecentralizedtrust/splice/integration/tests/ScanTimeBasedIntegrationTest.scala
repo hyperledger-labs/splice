@@ -608,7 +608,7 @@ class ScanTimeBasedIntegrationTest
     val endTime = getLedgerTime
     val lastMidnight = endTime.toInstant.truncatedTo(ChronoUnit.DAYS);
     val nextMidnight = lastMidnight.plus(1, ChronoUnit.DAYS)
-    val expectedAcsSnapshotKey = s"$lastMidnight-Migration-0-$nextMidnight/ACS_0.zstd"
+    val expectedAcsSnapshotKey = s"$lastMidnight~$nextMidnight/ACS_0.zstd"
 
     val bucketConnection = new S3BucketConnectionForTests(s3ConfigMock, loggerFactory)
     eventually() {
@@ -635,7 +635,7 @@ class ScanTimeBasedIntegrationTest
       // at last midnight
       allS3Objs
         .map(_.key())
-        .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
+        .filter(_.endsWith(s"~$lastMidnight/updates_0.zstd")) should not be empty
 
       // Compare bulk storage data to hot storage data from scan
       // TODO(#4788): for now, bulk storage still uses v0, so we use that here as well

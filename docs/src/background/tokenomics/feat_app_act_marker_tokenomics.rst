@@ -110,7 +110,7 @@ section. The second is to update the application code:
    ``templateId`` to the fully qualified interface ID above.
 
    4. For testing examples, please review the example DamlScript test
-   `here <https://github.com/hyperledger-labs/splice/blob/a32995a0df2d447b9e76d81b770a06c296295ab5/daml/splice-dso-governance-test/daml/Splice/Scripts/TestFeaturedAppActivityMarkers.daml#L4>`__.
+   `here <https://github.com/canton-network/splice/blob/a32995a0df2d447b9e76d81b770a06c296295ab5/daml/splice-dso-governance-test/daml/Splice/Scripts/TestFeaturedAppActivityMarkers.daml#L4>`__.
 
 Consider a single, simple transaction of a RWA which creates a single
 ``FeaturedAppActivityMarker`` activity record for one ``provider`` and

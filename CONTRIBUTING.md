@@ -1,6 +1,9 @@
 # Table of Contents
 
 - [Contributing to the Splice repository](#contributing-to-the-splice-repository)
+  - [Picking up issues](#picking-up-issues)
+  - [Opening PRs](opening-prs)
+  - [Opening new issues](#opening-new-issues)
   - [Testing](#testing)
   - [Git Hygiene](#git-hygiene)
   - [Branch Naming](#branch-naming)
@@ -30,20 +33,34 @@
 
 In order to setup your development environment, please see the [Development README](DEVELOPMENT.md).
 
-TBD: futher contribution guidelines, s.a. [Canton's Contributing Guide](https://github.com/DACH-NY/canton/blob/main/contributing/README.md)
-
 ## Picking up issues
 
 Splice maintainers may use the following GitHub issue labels to highlight issues suitable for newer contributors:
 
-- [`help wanted`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22):
+- [`help wanted`](https://github.com/canton-network/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22):
   tasks of various sizes and difficulty levels suitable for contributors outside of the maintainers team
-- [`good first issue`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22):
+- [`good first issue`](https://github.com/canton-network/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22):
   easier tasks that are well-suited for onboarding to the code base
 
 Note that not all `good first issue`s are also `help wanted`; some may require access to infrastructure (CI, test deployments) that is not openly available.
 
-If you are planning to work on an issue please assign yourself to it (if you are able to) or leave a comment, to avoid duplicate work across contributors.
+If you are planning to work on an issue please assign yourself to it (if you are able to) or leave a comment, to
+avoid duplicate work across contributors. If the issue is not new, it is also a good idea to reach out to the
+core contributors before working on it, to check how relevant it still is, and whether it is something worth
+working on.
+
+## Opening PRs
+
+- Keep patches small, focused, and clearly motivated. One logical change per PR.
+- Reference the issue that the PR addresses.
+- Keep the text in your PR concise, write only what is useful for the reviewers to read. Specifically,
+  avoid AI-generated text in PR descriptions. See our [AI contribution guidelines](AI_POLICY.md).
+
+## Opening new issues
+
+Please note that GH issues are not meant for Q&A, but rather for tracking future and current work items.
+Issues that are purely a question may be closed with no further comments.
+Please also consult our [AI contribution guidelines](AI_POLICY.md) for guidelines on AI-created issues.
 
 ## Testing
 
@@ -256,6 +273,6 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 ## Dev Docs
 
 We publish docs from each commit from `main` to
-https://hyperledger-labs.github.io/splice/. This can
+https://canton-network.github.io/splice/. This can
 often be useful to answer support requests with a docs link even if
 those docs are still very recent.

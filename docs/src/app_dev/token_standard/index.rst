@@ -15,7 +15,7 @@ Overview
 
 * See the `text of the CIP-0056 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md>`__
   for an overview of the APIs that are part of the Canton Network Token Standard.
-* See the `README in its source-code <https://github.com/hyperledger-labs/splice/tree/main/token-standard#readme>`__ for background on how to use the APIs.
+* See the `README in its source-code <https://github.com/canton-network/splice/tree/main/token-standard#readme>`__ for background on how to use the APIs.
 
 
 .. _holding_utxo_management:
@@ -151,10 +151,10 @@ There are five kinds of integration patterns:
   * :ref:`token_standard_usage_custom_daml_code`
 
 These integrations patterns have recently been nicely packaged in the wallet SDK
-maintained as part of `hyperledger-labs/splice-wallet-kernel <https://github.com/hyperledger-labs/splice-wallet-kernel/tree/main/sdk/wallet-sdk>`__
+maintained as part of `canton-network/splice-wallet-kernel <https://github.com/canton-network/splice-wallet-kernel/tree/main/sdk/wallet-sdk>`__
 and `documented here <https://docs.digitalasset.com/integrate/devnet/index.html>`__.
 
-All of these integration patterns are also demonstrated in the form of executable code as part of the `experimental command-line interface <https://github.com/hyperledger-labs/splice/tree/main/token-standard#cli>`_ for token standard assets.
+All of these integration patterns are also demonstrated in the form of executable code as part of the `experimental command-line interface <https://github.com/canton-network/splice/tree/main/token-standard#cli>`_ for token standard assets.
 The sections below explaining the patterns below thus all start with a link to the code.
 They then provide additional context for an implementor.
 
@@ -170,7 +170,7 @@ Check out the `Authentication docs <https://docs.digitalasset.com/operate/3.4/ho
 Reading contracts implementing a Token Standard interface for a party
 ---------------------------------------------------------------------
 
-Reference code from the Token Standard CLI  to `list contracts by interface <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listContractsByInterface.ts>`_
+Reference code from the Token Standard CLI  to `list contracts by interface <https://github.com/canton-network/splice/blob/main/token-standard/cli/src/commands/listContractsByInterface.ts>`_
 
 The Token Standard includes several interfaces that are implemented by Daml templates.
 To list all contracts implementing a particular interface,
@@ -218,7 +218,7 @@ Additionally, there's three flags that can be set:
 The response for such a query will contain the ``createdEvent`` of the contract, including the interface views requested (if any).
 The ``viewValue`` within it will be the JSON-serialized Daml interface view.
 If more than one interface is requested, you can distinguish them by checking the ``interfaceId`` field.
-You can find an `example response for Holdings here <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/__tests__/mocks/data/holdings.json>`_.
+You can find an `example response for Holdings here <https://github.com/canton-network/splice/blob/main/token-standard/cli/__tests__/mocks/data/holdings.json>`_.
 
 
 .. _token_standard_usage_reading_tx_history:
@@ -226,7 +226,7 @@ You can find an `example response for Holdings here <https://github.com/hyperled
 Reading and parsing transaction history involving Token Standard contracts
 --------------------------------------------------------------------------
 
-Example code: `Token Standard CLI's code to list transactions <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listHoldingTransactions.ts>`_
+Example code: `Token Standard CLI's code to list transactions <https://github.com/canton-network/splice/blob/main/token-standard/cli/src/commands/listHoldingTransactions.ts>`_
 
 The participant has an `endpoint to list all transactions <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L763>`_ involving the provided parties and interfaces.
 
@@ -281,7 +281,7 @@ and continue by passing the offset of the last transaction from the previous res
 Parsing the history
 ^^^^^^^^^^^^^^^^^^^
 
-Example code: `the parser here <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/txparse/parser.ts>`_.
+Example code: `the parser here <https://github.com/canton-network/splice/blob/main/token-standard/cli/src/txparse/parser.ts>`_.
 It extracts a user-readable wallet history by parsing transactions involving the ``Holding`` and ``TransferInstruction`` interfaces.
 
 The endpoint returns transaction trees as an array.
@@ -329,7 +329,7 @@ In each Token Standard exercise node, one can find:
 Executing a factory choice
 --------------------------
 
-Example code: `Token Standard CLI's code to create a transfer via TransferFactory <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/transfer.ts>`_
+Example code: `Token Standard CLI's code to create a transfer via TransferFactory <https://github.com/canton-network/splice/blob/main/token-standard/cli/src/commands/transfer.ts>`_
 
 To execute a choice via a Token Standard factory, first you need need to fetch the factory from the corresponding registry.
 
@@ -369,7 +369,7 @@ In both cases, you must include an ``ExerciseCommand`` in your payload with the 
 Executing a non-factory choice
 ------------------------------
 
-Example code: `Token Standard CLI's code to accept a transfer instruction <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/acceptTransferInstruction.ts>`_
+Example code: `Token Standard CLI's code to accept a transfer instruction <https://github.com/canton-network/splice/blob/main/token-standard/cli/src/commands/acceptTransferInstruction.ts>`_
 
 To execute a choice on a contract implementing a Token Standard interface for external parties,
 you must call the `prepare <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1553>`_

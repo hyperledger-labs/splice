@@ -282,7 +282,7 @@ trait AcsQueries extends AcsJdbcTypes {
   }
 
   /*
-   * TODO(#3900) move to use toInClause when canton fork has it: https://github.com/hyperledger-labs/splice/issues/3900
+   * TODO(#3900) move to use toInClause when canton fork has it: https://github.com/canton-network/splice/issues/3900
    */
   protected def inClause[V: ClassTag](
       field: String,

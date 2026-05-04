@@ -102,7 +102,10 @@ function installParticipantChart(
   db: Postgres,
   customOptions?: SpliceCustomResourceOptions
 ): InstalledHelmChart {
-  const defaultValues: ChartValues = loadDefaultParticipantValues(auth0);
+  const defaultValues: ChartValues = loadDefaultParticipantValues(
+    auth0,
+    DecentralizedSynchronizerUpgradeConfig.activeMigrationId
+  );
 
   const { kmsValues, kmsDependencies } = participant?.kms
     ? getParticipantKmsHelmResources(xns, participant.kms, migration?.id)
@@ -146,7 +149,7 @@ function installParticipantChart(
     resources: participant?.resources,
     pvc: spliceConfig.configuration.persistentHeapDumps
       ? {
-          size: '10Gi',
+          size: '35Gi',
           volumeStorageClass: standardStorageClassName,
         }
       : undefined,
@@ -167,7 +170,7 @@ function installParticipantChart(
 
 function loadDefaultParticipantValues(
   auth0: Auth0Config,
-  migrationId?: DomainMigrationIndex
+  migrationId: DomainMigrationIndex
 ): ChartValues {
   return loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,

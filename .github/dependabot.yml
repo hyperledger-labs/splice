@@ -93,7 +93,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "npm"
-    directory: "/token-standard"
+    directory: "/token-standard/cli"
     schedule:
       interval: "daily"
     assignees:
