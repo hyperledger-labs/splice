@@ -9,7 +9,7 @@
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "5.2.2",
     "@types/node": "22.14.0",
-    "eslint": "9.24.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "10.1.1",
     "nodemon": "^3.1.9",
     "prettier": "3.5.3",
@@ -25,5 +25,13 @@
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "start": "tsc --watch"
+  },
+  "dependencies": {
+    "dompurify": "3.4.2",
+    "jose": "4.15.9",
+    "jsondiffpatch": "0.7.3",
+    "msw": "2.14.2",
+    "uuid": "14.0.0",
+    "zod": "3.25.76"
   }
 }
