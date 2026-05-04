@@ -1,0 +1,84 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates for CIP-0105 Phase 2 locking positions.
+module Splice.DSO.Locking where
+
+import Splice.Types
+
+-- | A declared locking position by an SV.
+-- Created when an SV informs the DSO that they have locked CC in a disclosed wallet.
+-- Capability #1 of CIP-0105 Phase 2.
+data LockingInfo = LockingInfo with
+    svParty : Party
+    svName : Text
+    lockedAmount : Decimal
+    walletPartyId : Text
+    declaredRound : Round
+  deriving (Eq, Show)
+
+-- | On-ledger record of an SV's declared locking position.
+-- Signatory is dso (collective governance). Created via DsoRules choice.
+template LockingDeclaration with
+    dso : Party
+    info : LockingInfo
+  where
+    ensure
+      info.lockedAmount > 0.0
+        && isDefinedRound info.declaredRound
+        && info.walletPartyId /= ""
+        && info.svName /= ""
+
+    signatory dso
+
+-- | A proposal from a non-SV party (lender) to lock CC on behalf of an SV.
+-- Created by the lender directly via ledger API (NOT through DsoRules).
+-- The dso party is observer so DsoRules can fetch it during acceptance.
+-- Capability #4, step 1.
+template DelegatedLockProposal with
+    lender : Party
+    dso : Party
+    svParty : Party
+    svName : Text
+    lockedAmount : Decimal
+    walletPartyId : Text
+  where
+    ensure
+      lockedAmount > 0.0
+        && walletPartyId /= ""
+        && svName /= ""
+
+    signatory lender
+    observer dso, svParty
+
+    -- Lender can withdraw their proposal before acceptance
+    choice DelegatedLockProposal_Withdraw : ()
+      controller lender
+      do return ()
+
+    -- DSO accepts this proposal, consuming it
+    choice DelegatedLockProposal_Accept : ()
+      controller dso
+      do return ()
+
+-- | An accepted delegated locking position. Created when an SV accepts
+-- a lender's proposal via DsoRules choice. The lock is now active and
+-- contributes to the SV's aggregate locked position.
+-- Capability #4, step 2.
+template DelegatedLockingPosition with
+    dso : Party
+    lender : Party
+    svParty : Party
+    svName : Text
+    lockedAmount : Decimal
+    walletPartyId : Text
+    acceptedRound : Round
+  where
+    ensure
+      lockedAmount > 0.0
+        && isDefinedRound acceptedRound
+        && walletPartyId /= ""
+        && svName /= ""
+
+    signatory dso
+    observer lender
