@@ -47,20 +47,26 @@ spec:
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
-        - name: CANTON_PARTICIPANT_POSTGRES_SERVER
-          value: {{ .Values.persistence.host }}
-        - name: CANTON_PARTICIPANT_POSTGRES_PORT
-          value: {{ .Values.persistence.port | quote }}
-        - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
-          value: {{ .Values.persistence.schema }}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.participants.participant.storage {
+              config {
+                properties = {
+                  databaseName = "{{ .databaseName }}"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = ${CANTON_PARTICIPANT_POSTGRES_PASSWORD}
+                }
+              }
+            }
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ .Values.persistence.secretName }}
               key: postgresPassword
-        {{- if .Values.persistence.databaseName }}
-        - name: CANTON_PARTICIPANT_POSTGRES_DB
-          value: {{ .Values.persistence.databaseName }}
         {{- end }}
         {{- if .Values.jsonApiServerPathPrefix }}
         - name: CANTON_PARTICIPANT_JSON_API_SERVER_PATH_PREFIX
