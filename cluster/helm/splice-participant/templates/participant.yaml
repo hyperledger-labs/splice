@@ -191,6 +191,10 @@ spec:
       volumes:
         {{- range .Values.extraVolumes }}
         - name: {{ .name }}
+          {{- if .configMap }}
+          configMap:
+            name: {{ .configMap.name }}
+          {{- end }}
           {{- if .secret }}
           secret:
             secretName: {{ .secret.secretName }}
