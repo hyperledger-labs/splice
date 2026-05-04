@@ -6,10 +6,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}

@@ -485,7 +485,7 @@ class ValidatorApp(
       logger: TracedLogger,
       retryProvider: RetryProvider,
   )(implicit traceContext: TraceContext): Future[ByteString] =
-    // TODO (hyperledger-labs/splice#4026) use the standard BftScanConnection instead of creating a new SingleScanConnection.
+    // TODO (canton-network/splice#4026) use the standard BftScanConnection instead of creating a new SingleScanConnection.
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "get_acs_snapshot_from_single_scan",

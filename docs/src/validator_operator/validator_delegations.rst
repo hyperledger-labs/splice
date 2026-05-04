@@ -234,7 +234,7 @@ Then create the proposal using curl:
    "$LEDGER_API_URL/v2/commands"
 
 See the `MintingDelegationProposal template source code
-<https://github.com/hyperledger-labs/splice/blob/main/daml/splice-wallet/daml/Splice/Wallet/MintingDelegation.daml>`_
+<https://github.com/canton-network/splice/blob/main/daml/splice-wallet/daml/Splice/Wallet/MintingDelegation.daml>`_
 for the complete Daml definition.
 
 Monitoring Proposal Status

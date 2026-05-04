@@ -24,7 +24,7 @@ jobs:
             echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
             {
               echo "FOUND_DOCUMENT_CHANGES=true" ;
-              echo "GITHUB_COMMIT_URL=https://github.com/hyperledger-labs/splice/commit/${commit}"
+              echo "GITHUB_COMMIT_URL=https://github.com/canton-network/splice/commit/${commit}"
               echo "CHANGED_DOC_FILES=${changed_files_list}"
               echo "GIT_LOG=\\\"$(git log -1 --oneline --no-color | sed s/\"//g | sed s/\`//g | sed s/\'//g)\\\""
             } >> "$GITHUB_OUTPUT"
@@ -50,7 +50,7 @@ jobs:
 
       - name: Notify on document changes
         if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95  # v3.0.1
+        uses: slackapi/slack-github-action@03ea5433c137af7c0495bc0cad1af10403fc800c  # v3.0.2
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_ACCESS_TOKEN }}

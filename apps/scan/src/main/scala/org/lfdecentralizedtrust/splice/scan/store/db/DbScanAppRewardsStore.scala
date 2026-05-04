@@ -685,11 +685,10 @@ class DbScanAppRewardsStore(
     sql"""unnested as (
             select party, weight
             from app_activity_record_store a
-            join scan_verdict_store v on a.verdict_row_id = v.row_id
             cross join lateral unnest(a.app_provider_parties, a.app_activity_weights)
                  as party_and_weight(party, weight)
-            where a.round_number = $roundNumber
-              and v.history_id = $historyId
+            where a.history_id = $historyId
+              and a.round_number = $roundNumber
           ),
           aggregated as (
             select party, sum(weight) as total_weight,

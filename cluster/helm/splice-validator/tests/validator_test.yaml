@@ -82,6 +82,25 @@ tests:
           value:
             mock-annotation: still-an-annotation
 
+  - it: "renders Stakater Reloader annotation by default"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: metadata.annotations["reloader.stakater.com/auto"]
+          value: "true"
+
+  - it: "omits Stakater Reloader annotation when enableReloader is false"
+    set:
+      enableReloader: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: metadata.annotations
+
   - it: "always populates enable-wallet"
     set:
       enableWallet: false

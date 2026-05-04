@@ -115,7 +115,7 @@ abstract class InStackDecentralizedSynchronizerNode
     const decentralizedSynchronizerValues: ChartValues = loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
       {
-        MIGRATION_ID: this.migrationId.toString(),
+        SERIAL_ID: this.migrationId.toString(),
       }
     );
 
@@ -172,7 +172,7 @@ abstract class InStackDecentralizedSynchronizerNode
           additionalJvmOptions: getAdditionalJvmOptions(svConfig.sequencer?.additionalJvmOptions),
           pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
-                size: '10Gi',
+                size: '35Gi',
                 volumeStorageClass: standardStorageClassName,
               }
             : undefined,
