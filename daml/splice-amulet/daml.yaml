@@ -6,7 +6,7 @@
 sdk-version: 3.4.11
 name: splice-amulet
 source: daml
-version: 0.1.18
+version: 0.1.19
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -16,6 +16,11 @@ data-dependencies:
   - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
   - ../dars/splice-api-token-allocation-v1-1.0.0.dar
   - ../dars/splice-api-token-allocation-instruction-v1-1.0.0.dar
+  - ../../token-standard/splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
+  - ../../token-standard/splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
+  - ../../token-standard/splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../dars/splice-api-featured-app-v1-1.0.0.dar
   - ../dars/splice-api-featured-app-v2-1.0.0.dar

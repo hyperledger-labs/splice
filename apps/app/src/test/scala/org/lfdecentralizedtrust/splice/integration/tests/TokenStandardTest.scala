@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.console.{
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.{FactoryChoiceWithDisclosures, TokenStandardMetadata}
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.temporal.ChronoUnit
@@ -414,7 +415,12 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       walletClient: WalletAppClientReference
   ): Seq[AllocationRequestView] = {
     clue(s"Retrieves allocation requests for ${walletClient.name}") {
-      walletClient.listAllocationRequests().map(_.payload)
+      walletClient.listAllocationRequests().map {
+        case allocationRequest: HttpWalletAppClient.TokenStandard.V1AllocationRequest =>
+          allocationRequest.contract.payload
+        case v2 =>
+          fail(s"V2 Allocation Requests shouldn't be happening in a V1 test: $v2")
+      }
     }
   }
 

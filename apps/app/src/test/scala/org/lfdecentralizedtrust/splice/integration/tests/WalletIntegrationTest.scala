@@ -780,6 +780,7 @@ class WalletIntegrationTest
 
       darPaths
         .foreach { f =>
+          logger.info(s"Uploading dar path $f")
           aliceValidatorBackend.participantClientWithAdminToken.upload_dar_unless_exists(
             f.toString()
           )

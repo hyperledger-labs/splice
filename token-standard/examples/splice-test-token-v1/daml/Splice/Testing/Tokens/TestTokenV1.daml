@@ -1,0 +1,306 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | A mock implementation of a test token that only implements the V1 token standard APIs.
+-- Used to test V1 token standard workflows on their own, and mixed with V2 workflows.
+module Splice.Testing.Tokens.TestTokenV1 where
+
+import DA.Assert
+import DA.Optional
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.AllocationV1 qualified as V1
+import Splice.Api.Token.AllocationInstructionV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.TokenStandard.Utils
+
+
+-- | A token holding.
+template Token with
+     holding : V1.HoldingView
+     -- ^ Stores the holding data using the the type from the interface definition.
+     -- In production code, one might want to avoid that to have better control
+     -- over smart contract upgrading.
+  where
+    signatory holding.owner, holding.instrumentId.admin
+
+    ensure
+      holding.amount > 0.0 && -- positive amounts
+      isNone holding.lock -- no locked holdings
+
+    interface instance V1.Holding for Token where
+      view = holding
+
+-- | Transfer instruction representing a Token offer. Functions as both the offer and the holding for
+-- the offered amount.
+template TokenTransferOffer with
+    transfer : V1.Transfer
+  where
+    ensure transfer.amount > 0.0 && transfer.requestedAt <= transfer.executeBefore
+
+    signatory transfer.sender, transfer.instrumentId.admin
+    observer transfer.receiver
+
+    -- Here we use the shortcut to make the allocation itself a Holding. This is
+    -- not recommended for production code, as withdrawing the allocation will fail
+    -- if the counter-party unvets the token .dar file.
+    interface instance V1.Holding for TokenTransferOffer where
+      view = transferHoldingView transfer
+
+    interface instance V1.TransferInstruction for TokenTransferOffer where
+      view = V1.TransferInstructionView with
+        -- This highlights another shortcoming of making the transfer offer a
+        -- holding: wallets will have to understand this special construction to
+        -- properly correlate the allocation to the holding.
+        --
+        -- Furthermore, the wallets must ensure to filter the holdings they see to
+        -- only the ones where the wallet user party is the owner.
+        originalInstructionCid = None
+        transfer
+        status = V1.TransferPendingReceiverAcceptance
+        meta = emptyMetadata
+
+      transferInstruction_withdrawImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (transferHoldingView transfer) with lock = None
+        pure V1.TransferInstructionResult with
+          output = V1.TransferInstructionResult_Failed
+          senderChangeCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      transferInstruction_rejectImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (transferHoldingView transfer) with lock = None
+        pure V1.TransferInstructionResult with
+          output = V1.TransferInstructionResult_Failed
+          senderChangeCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      transferInstruction_updateImpl _self _arg =
+        fail "V1.TransferInstruction_Update: not supported by TokenTransferOffer"
+
+      transferInstruction_acceptImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (transferHoldingView transfer) with
+            owner = transfer.receiver
+            lock = None
+        pure V1.TransferInstructionResult with
+          senderChangeCids = []
+          output = V1.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+
+-- | Allocation of a Token. Functions as both the allocation and the holding for
+-- the allocated amount.
+template TokenAllocation with
+    allocation : V1.AllocationSpecification
+  where
+    signatory allocation.transferLeg.sender, allocation.transferLeg.instrumentId.admin
+    observer allocation.settlement.executor
+    ensure isValidAllocationSpecificationV1 allocation
+
+    -- Here we use the shortcut to make the allocation itself a Holding. This is
+    -- not recommended for production code, as withdrawing the allocation will fail
+    -- if the counter-party unvets the token .dar file.
+    interface instance V1.Holding for TokenAllocation where
+      view = allocationHoldingView allocation
+
+    interface instance V1.Allocation for TokenAllocation where
+      view = V1.AllocationView with
+        -- This highlights another shortcoming of making the allocation a
+        -- holding: wallets will have to understand this special construction to
+        -- properly correlate the allocation to the holding.
+        --
+        -- Furthermore, the wallets must ensure to filter the holdings they see to
+        -- only the ones where the wallet user party is the owner.
+        allocation
+        holdingCids = []
+        meta = emptyMetadata
+
+      allocation_withdrawImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with lock = None
+        pure V1.Allocation_WithdrawResult with
+          senderHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      allocation_cancelImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with lock = None
+        pure V1.Allocation_CancelResult with
+          senderHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      allocation_executeTransferImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with
+            owner = allocation.transferLeg.receiver
+            lock = None
+        pure V1.Allocation_ExecuteTransferResult with
+          senderHoldingCids = []
+          receiverHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+
+-- | Template providing all the rules for how the tokens can be changed; i.e.,
+-- the choices provided by the token standard V1 factories.
+template TokenRules with
+    admin : Party
+  where
+    signatory admin
+
+    interface instance V1.TransferFactory for TokenRules where
+      view = V1.TransferFactoryView with
+        admin
+        meta = emptyMetadata
+
+      transferFactory_publicFetchImpl _self _arg = pure V1.TransferFactoryView with
+        admin
+        meta = emptyMetadata
+
+      transferFactory_transferImpl _self arg = do
+        requireMatchExpected ("expectedAdmin", arg.expectedAdmin) admin
+        let transfer = arg.transfer
+
+        -- == validate each field of the transfer specification ==
+        -- sender: nothing to validate
+        -- receiver: nothing to validate
+        -- instrumentId:
+        require "Instrument-admin must match the factory" (transfer.instrumentId.admin == admin)
+        -- amount:
+        require "Amount must be positive" (transfer.amount > 0.0)
+        -- requestedAt:
+        assertDeadlineExceeded "Transfer.requestedAt" transfer.requestedAt
+        -- executeBefore:
+        assertWithinDeadline "Transfer.executeBefore" transfer.executeBefore
+
+        -- split off transfer amount and create self-transfer or offer
+        optSenderChangeCid <- consumeHoldingAmount transfer.sender transfer.inputHoldingCids transfer.amount transfer.instrumentId
+        let senderChangeCids = optionalToList (toInterfaceContractId <$> optSenderChangeCid)
+        if transfer.receiver == transfer.sender
+          then do
+            splitCid <- create Token with
+              holding = (transferHoldingView transfer) with lock = None
+            pure $ V1.TransferInstructionResult with
+              senderChangeCids
+              output = V1.TransferInstructionResult_Completed with
+                receiverHoldingCids = [toInterfaceContractId splitCid]
+              meta = emptyMetadata
+          else do
+            instrCid <- create TokenTransferOffer with
+              transfer
+            pure $ V1.TransferInstructionResult with
+              senderChangeCids
+              output = V1.TransferInstructionResult_Pending with
+                transferInstructionCid = toInterfaceContractId instrCid
+              meta = emptyMetadata
+
+
+    interface instance V1.AllocationFactory for TokenRules where
+      view = V1.AllocationFactoryView with
+        admin
+        meta = emptyMetadata
+
+      allocationFactory_publicFetchImpl _self _arg = pure V1.AllocationFactoryView with
+        admin
+        meta = emptyMetadata
+
+      allocationFactory_allocateImpl _self arg = do
+        requireMatchExpected ("expectedAdmin", arg.expectedAdmin) admin
+        let V1.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids} = arg
+
+        -- == validate each field of the requested allocation
+        let settlement = allocation.settlement
+        let transferLeg = allocation.transferLeg
+
+        -- settlement.executor: no check
+        -- settlement.settlementRef: no check
+        -- settlement.requestedAt:
+        assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
+        -- settlement.allocateBefore:
+        assertWithinDeadline "Allocation.settlement.allocateBefore" settlement.allocateBefore
+        -- settlement.settleBefore:
+        require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
+
+        -- transferLegId: no check
+
+        -- transferLeg.sender: no check
+        -- transferLeg.receiver: nothing to check
+        -- transferLeg.amount
+        require "Transfer amount must be positive" (transferLeg.amount > 0.0)
+        -- transferLeg.instrumentId
+        require "Instrument-admin must match the factory" (transferLeg.instrumentId.admin == admin)
+        -- transferLeg.meta: no check
+
+        -- requestedAt (of the allocation instruction itself):
+        assertDeadlineExceeded "requestedAt" requestedAt
+
+        -- inputHoldingCids:
+        require "At least one input holding must be provided" (not $ null inputHoldingCids)
+
+        -- split off the required amount and create allocation
+        optSenderChangeCid <- consumeHoldingAmount transferLeg.sender inputHoldingCids transferLeg.amount transferLeg.instrumentId
+        allocationCid <- toInterfaceContractId <$> create TokenAllocation with
+          allocation = arg.allocation
+
+        -- done: return the result
+        pure V1.AllocationInstructionResult with
+          senderChangeCids = optionalToList (toInterfaceContractId <$> optSenderChangeCid)
+          output = V1.AllocationInstructionResult_Completed with allocationCid
+          meta = emptyMetadata
+
+
+-- Utils
+--------
+
+consumeHoldingAmount : Party -> [ContractId V1.Holding] -> Decimal -> V1.InstrumentId -> Update (Optional (ContractId V1.Holding))
+consumeHoldingAmount sender inputCids amount instrumentId = do
+  inputAmounts <- forA inputCids $ \cid -> do
+    holding <- fetch cid
+    archive cid
+    let holdingView = view holding
+    require' ("holding owner", holdingView.owner) isEqualR ("transfer.sender", sender)
+    require' ("holding.instrumentId", holdingView.instrumentId) isEqualR ("transfer.instrumentId", instrumentId)
+    pure holdingView.amount
+  let totalAmount = sum inputAmounts
+  require' ("input amount", totalAmount) isGreaterOrEqualR ("transfer.amount", amount)
+  let remainder = totalAmount - amount
+  if remainder == 0.0
+    then pure None
+    else (Some . toInterfaceContractId)<$> create Token with
+      holding = V1.HoldingView with
+        owner = sender
+        amount = remainder
+        instrumentId
+        lock = None
+        meta = emptyMetadata
+
+-- | V1 view of the allocation as a holding.
+allocationHoldingView : V1.AllocationSpecification -> V1.HoldingView
+allocationHoldingView (V1.AllocationSpecification with settlement, transferLeg) =
+  V1.HoldingView with
+    owner = transferLeg.sender
+    amount = transferLeg.amount
+    instrumentId = transferLeg.instrumentId
+    lock = Some V1.Lock with
+      holders = [transferLeg.sender, transferLeg.instrumentId.admin]
+      expiresAt = Some settlement.settleBefore
+      expiresAfter = None
+      context = Some $ "allocation for settlement of " <> settlement.settlementRef.id
+    meta = emptyMetadata
+
+-- | V1 view of the transfer as a holding.
+transferHoldingView : V1.Transfer -> V1.HoldingView
+transferHoldingView transfer =
+  V1.HoldingView with
+    owner = transfer.sender
+    amount = transfer.amount
+    instrumentId = transfer.instrumentId
+    lock = Some V1.Lock with
+      holders = [transfer.sender, transfer.instrumentId.admin]
+      expiresAt = Some transfer.executeBefore
+      expiresAfter = None
+      context = Some $ "transfer to " <> show transfer.receiver
+    meta = emptyMetadata

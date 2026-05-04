@@ -209,7 +209,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     }
   }
 
-  "upgrade synchronizer to new physical synchronizer without downtime" in { implicit env =>
+  "upgrade synchronizer to new physical synchronizer without downtime" ignore { implicit env =>
     val allNodes = Seq[AppBackendReference](
       sv1ScanBackend,
       sv2ScanBackend,

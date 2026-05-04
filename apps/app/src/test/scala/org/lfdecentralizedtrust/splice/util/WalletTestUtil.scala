@@ -1520,13 +1520,15 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   def alicesTapsWithPackageId(
       packageId: String
   )(implicit env: SpliceTestConsoleEnvironment): Assertion = {
-    val tapContractId = aliceValidatorWalletClient.tap(10)
-    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .of_party(Amulet.COMPANION)(dsoParty)
-      .filter(_.contractId == tapContractId.contractId)
-      .loneElement
-      .getTemplateId
-      .packageId shouldBe packageId
+    eventuallySucceeds(2.minutes) {
+      val tapContractId = aliceValidatorWalletClient.tap(10)
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .of_party(Amulet.COMPANION)(dsoParty)
+        .filter(_.contractId == tapContractId.contractId)
+        .loneElement
+        .getTemplateId
+        .packageId shouldBe packageId
+    }
   }
 
 }

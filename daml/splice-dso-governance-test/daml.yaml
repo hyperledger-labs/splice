@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-dso-governance-test
 source: daml
-version: 0.1.30
+version: 0.1.31
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -16,7 +16,7 @@ data-dependencies:
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-dso-governance/.daml/dist/splice-dso-governance-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
-- ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+- ../../token-standard/splice-token-standard-test-v1/.daml/dist/splice-token-standard-test-v1-current.dar
 - ../dars/splice-api-token-holding-v1-1.0.0.dar
 - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
 - ../dars/splice-api-token-allocation-v1-1.0.0.dar

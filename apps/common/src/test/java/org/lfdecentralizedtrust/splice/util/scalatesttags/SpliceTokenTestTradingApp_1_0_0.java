@@ -8,7 +8,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 // Used to guard against running this test before the
-// splice-token-test-trading-app was factored out of splice-token-standard-test
+// splice-token-test-trading-app was factored out of splice-token-standard-test-v1
 @TagAnnotation
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})

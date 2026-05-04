@@ -35,7 +35,7 @@ NON_COMPILED_DAML_PROJECTS=(
 DAML_PROJECT_FILES="\
   $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" "$SPLICE_ROOT/token-standard/examples" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
-    -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' -not -ipath '*test-trading-app*' \)  \
+    -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test-v1*' -not -ipath '*test-trading-app*' \)  \
     -not -ipath '*splitwell*' \
     -not -ipath '*app-manager*' \
     -not -ipath '*dummy-holding*' \

@@ -37,6 +37,13 @@ trait ChoiceContextContractFetcher {
       traceContext: TraceContext,
   ): Future[Option[Contract[TCid, T]]]
 
+  def lookupContractsById[C, TCid <: ContractId[?], T](
+      companion: C
+  )(ids: Seq[ContractId[?]])(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[Contract[TCid, T]]]
+
 }
 
 object ChoiceContextContractFetcher {
@@ -50,6 +57,14 @@ object ChoiceContextContractFetcher {
         traceContext: TraceContext,
     ): Future[Option[Contract[TCid, T]]] =
       store.multiDomainAcsStore.lookupContractById(companion)(id).map(_.map(_.contract))
+
+    override def lookupContractsById[C, TCid <: ContractId[?], T](
+        companion: C
+    )(ids: Seq[ContractId[?]])(implicit
+        companionClass: ContractCompanion[C, TCid, T],
+        traceContext: TraceContext,
+    ): Future[Seq[Contract[TCid, T]]] =
+      store.multiDomainAcsStore.lookupContractsById(companion)(ids).map(_.map(_.contract))
   }
 
   private class StoreChoiceContextContractFetcherWithLedgerFallback(
@@ -70,27 +85,58 @@ object ChoiceContextContractFetcher {
     ): Future[Option[Contract[TCid, T]]] =
       OptionT(store.multiDomainAcsStore.lookupContractById(companion)(id))
         .map(_.contract)
-        .orElse(
-          OptionT(fallbackLedgerClient.getContract(id, Seq(store.multiDomainAcsStore.storeParty)))
-            // `getContract` will return archived contracts (and thus missing from the store) until they have been pruned.
-            // Thus, we verify that it was created not too long ago,
-            // such that it means that what happened is the store didn't see it yet, but the ledger did.
-            // (as opposed to the contract actually being archived)
-            // This will give a false-positive for a contract that was quickly archived after creation.
-            .filter { event =>
-              val createdAt =
-                event.createdAt.flatMap(CantonTimestamp.fromProtoTimestamp(_).toOption)
-              val ignoreBefore = clock.now.minus(getContractValidity.asJava)
-              createdAt.exists(_ > ignoreBefore)
-            }
-            .subflatMap { createdEvent =>
-              val javaCreatedEvent = CreatedEvent.fromProto(toJavaProto(createdEvent))
-              logger.debug(s"Falling back to ledger for contract $javaCreatedEvent")
-              companionClass
-                .fromCreatedEvent(companion)(javaCreatedEvent)
-            }
-        )
+        .orElse(fallbackToLedger(companion)(id))
         .value
+
+    private def fallbackToLedger[C, TCid <: ContractId[?], T](
+        companion: C
+    )(id: ContractId[?])(implicit
+        companionClass: ContractCompanion[C, TCid, T],
+        traceContext: TraceContext,
+    ): OptionT[Future, Contract[TCid, T]] = {
+      OptionT(fallbackLedgerClient.getContract(id, Seq(store.multiDomainAcsStore.storeParty)))
+        // `getContract` will return archived contracts (and thus missing from the store) until they have been pruned.
+        // Thus, we verify that it was created not too long ago,
+        // such that it means that what happened is the store didn't see it yet, but the ledger did.
+        // (as opposed to the contract actually being archived)
+        // This will give a false-positive for a contract that was quickly archived after creation.
+        .filter { event =>
+          val createdAt =
+            event.createdAt.flatMap(CantonTimestamp.fromProtoTimestamp(_).toOption)
+          val ignoreBefore = clock.now.minus(getContractValidity.asJava)
+          createdAt.exists(_ > ignoreBefore)
+        }
+        .subflatMap { createdEvent =>
+          val javaCreatedEvent = CreatedEvent.fromProto(toJavaProto(createdEvent))
+          logger.debug(s"Falling back to ledger for contract $javaCreatedEvent")
+          companionClass
+            .fromCreatedEvent(companion)(javaCreatedEvent)
+        }
+    }
+
+    override def lookupContractsById[C, TCid <: ContractId[?], T](
+        companion: C
+    )(ids: Seq[ContractId[?]])(implicit
+        companionClass: ContractCompanion[C, TCid, T],
+        traceContext: TraceContext,
+    ): Future[Seq[Contract[TCid, T]]] = {
+      val contractsSet = ids.toSet
+      store.multiDomainAcsStore.lookupContractsById(companion)(ids).map(_.map(_.contract)).flatMap {
+        contracts =>
+          val missingIds = contractsSet -- contracts.map(_.contractId)
+          if (missingIds.isEmpty) {
+            Future.successful(contracts)
+          } else {
+            Future
+              .traverse(missingIds.toSeq) { missingContract =>
+                fallbackToLedger(companion)(missingContract).value
+              }
+              .map { resolvedMissingContracts =>
+                contracts ++ resolvedMissingContracts.flatten
+              }
+          }
+      }
+    }
   }
 
   case class StoreContractFetcherWithLedgerFallbackConfig(

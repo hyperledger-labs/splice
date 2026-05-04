@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-wallet
 source: daml
-version: 0.1.19
+version: 0.1.20
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -11,6 +11,11 @@ data-dependencies:
 - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
 - ../dars/splice-api-token-allocation-instruction-v1-1.0.0.dar
 - ../dars/splice-api-token-allocation-v1-1.0.0.dar
+- ../../token-standard/splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
+- ../../token-standard/splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
+- ../../token-standard/splice-api-token-allocation-request-v2/.daml/dist/splice-api-token-allocation-request-v2-current.dar
+- ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+- ../../token-standard/splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar

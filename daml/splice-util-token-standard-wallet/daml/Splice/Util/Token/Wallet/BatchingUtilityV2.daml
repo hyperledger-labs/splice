@@ -1,0 +1,336 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utility template for token standard V2 wallets to execute multiple token
+-- standard actions in a single transaction with chaining of input holdings.
+--
+-- Long-term Canton will likely gain support for constructing transactions in
+-- multiple steps, where later steps can fetch contracts created in earlier
+-- steps. Right now that support does not exist, which is why we provide this
+-- batching utility.
+module Splice.Util.Token.Wallet.BatchingUtilityV2
+  (
+    -- * Holdings
+    HoldingMap(..),
+    ScopedAccount(..),
+    holdingMapFromList,
+
+    -- * Token standard actions
+    ChoiceCall(..),
+    TokenStandardAction(..),
+    TokenStandardActionResult(..),
+
+    -- * Batch execution
+    BatchingUtility(..),
+    BatchingUtility_ExecuteBatch(..),
+    BatchingUtility_ExecuteBatchResult(..),
+
+  ) where
+
+
+import DA.Action (foldlA, when)
+import DA.Map qualified as Map
+import DA.Optional (fromOptional)
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.Api.Token.AllocationInstructionV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.AllocationRequestV2 qualified as V2
+
+import Splice.TokenStandard.Utils hiding (require)
+
+
+-- Managing holdings
+--------------------
+
+-- | Account for assets of a particular admin.
+data ScopedAccount = ScopedAccount with
+    admin : Party
+    account : V2.Account
+  deriving (Eq, Show, Ord)
+
+-- | Map of holdings, keyed by admin, account, and instrument id.
+data HoldingMap = HoldingMap with
+    byAdminAndAccount : Map.Map ScopedAccount (TextMap.TextMap [ContractId V2.Holding])
+  deriving (Eq, Show)
+
+instance Monoid HoldingMap where
+  mempty = HoldingMap with byAdminAndAccount = Map.empty
+
+instance Semigroup HoldingMap where
+  (<>) = holdingMapMerge
+
+holdingMapFromList : [(ScopedAccount, TextMap.TextMap [ContractId V2.Holding])] -> HoldingMap
+holdingMapFromList entries =
+  HoldingMap with
+    byAdminAndAccount =
+      Map.filter (not . TextMap.null) $
+      Map.fromListWithR (textMapUnionWith (++)) entries
+
+holdingMapMerge : HoldingMap -> HoldingMap -> HoldingMap
+holdingMapMerge (HoldingMap m1) (HoldingMap m2) =
+  HoldingMap with
+    byAdminAndAccount =
+      Map.merge dropEmpty' dropEmpty' (\_k cids1 cids2 -> dropEmpty (textMapUnionWith (++) cids1 cids2)) m1 m2
+  where
+    dropEmpty' _k = dropEmpty
+    dropEmpty v  = if TextMap.null v then None else Some v
+
+-- | Retrieve all holdings of instruments by an admin held by an account.
+getHoldingsFor : ScopedAccount -> HoldingMap -> ([ContractId V2.Holding], HoldingMap)
+getHoldingsFor k (HoldingMap with byAdminAndAccount) =
+  case Map.lookup k byAdminAndAccount of
+    None -> ([], HoldingMap with byAdminAndAccount)
+    Some cids -> (concat (textMapValues cids), HoldingMap with byAdminAndAccount = Map.delete k byAdminAndAccount)
+
+-- | Retrieve all holdings of a particular instrument held in an account.
+getHoldingsForInstrument : V2.Account -> V2.InstrumentId -> HoldingMap -> ([ContractId V2.Holding], HoldingMap)
+getHoldingsForInstrument account instrumentId (HoldingMap inputHoldingMap) =
+  let scopedAccount = ScopedAccount instrumentId.admin account in
+  case Map.lookup scopedAccount inputHoldingMap of
+    None -> ([], HoldingMap inputHoldingMap)
+    Some holdingsById ->
+      let irrelevantHoldingsById = TextMap.delete instrumentId.id holdingsById in
+      let adjustedHoldingMap = HoldingMap $ Map.insert scopedAccount irrelevantHoldingsById inputHoldingMap in
+      (fromOptional [] (TextMap.lookup instrumentId.id holdingsById), adjustedHoldingMap)
+
+
+-- Representing token standard actions and their results
+--------------------------------------------------------
+
+-- | A call to a choice.
+data ChoiceCall arg = ChoiceCall with
+    cid : AnyContractId
+    arg : arg
+  deriving (Eq, Show)
+
+-- | A token standard action.
+--
+-- TODO(#4813): add missing transfer instruction actions
+-- TODO(#4838): add support for allocaiton instruction actions
+data TokenStandardAction
+  = TSA_TransferFactory_TransferV1 (ChoiceCall V1.TransferFactory_Transfer)
+  | TSA_TransferFactory_TransferV2 (ChoiceCall V2.TransferFactory_Transfer)
+
+  | TSA_TransferInstruction_AcceptV1 (ChoiceCall V1.TransferInstruction_Accept)
+  | TSA_TransferInstruction_AcceptV2 (ChoiceCall V2.TransferInstruction_Accept)
+
+  | TSA_AllocationFactory_AllocateV1 (ChoiceCall V1.AllocationFactory_Allocate)
+  | TSA_AllocationFactory_AllocateV2 (ChoiceCall V2.AllocationFactory_Allocate)
+
+  | TSA_AllocationRequestV2_Accept (ChoiceCall V2.AllocationRequest_Accept)
+  deriving (Eq, Show)
+
+-- | The result of a token standard action.
+data TokenStandardActionResult
+  = TSAR_AllocationInstructionResultV1 V1.AllocationInstructionResult
+  | TSAR_AllocationInstructionResultV2 V2.AllocationInstructionResult
+  | TSAR_TransferInstructionResultV1 V1.TransferInstructionResult
+  | TSAR_TransferInstructionResultV2 V2.TransferInstructionResult
+  | TSAR_AllocationRequestV2_AcceptResult V2.AllocationRequest_AcceptResult
+  deriving (Eq, Show)
+
+-- | The result of execution a batch of token standard actions.
+data BatchingUtility_ExecuteBatchResult = BatchingUtility_ExecuteBatchResult with
+    actionResults : [TokenStandardActionResult]
+      -- ^ Results are delivered in the same order as the actions.
+    outputHoldingMap : HoldingMap
+      -- ^ Map of holdings after executing the actions in th batch.
+  deriving (Eq, Show)
+
+
+-- Batching utility
+-------------------
+
+-- | This batching utility is intended to be used for V2 wallets to interact
+-- with both V1 and V2 apps and V1 and V2 assets.
+template BatchingUtility
+  with
+    user : Party
+  where
+    signatory user
+
+    nonconsuming choice BatchingUtility_ExecuteBatch : BatchingUtility_ExecuteBatchResult
+      with
+        inputHoldingMap : HoldingMap
+          -- ^ Holdings to use to fund the actions.
+        actions : [TokenStandardAction]
+          -- ^ Actions to execute. Holdings will be properly threaded through.
+        archiveAfterExecution : Bool
+          -- ^ Whether to archive the batching utility contract at the end of
+          -- execution. Use this for using the batching utility with `createAndExercise`.
+      controller user
+      do
+        (outputHoldingMap, actionResultsRev) <- foldlA (executeTokenStandardAction user) (inputHoldingMap, []) actions
+        when archiveAfterExecution (archive self)
+        pure BatchingUtility_ExecuteBatchResult with
+          actionResults = reverse actionResultsRev
+          outputHoldingMap
+
+
+executeTokenStandardAction
+  : Party -> (HoldingMap, [TokenStandardActionResult]) -> TokenStandardAction
+  -> Update (HoldingMap, [TokenStandardActionResult])
+executeTokenStandardAction actor (holdingMap, results) action = case action of
+  TSA_AllocationFactory_AllocateV1 call -> do
+    callChoiceV1 @V1.AllocationFactory actor (holdingMap, results) call
+      (\_cid arg -> do
+        let transferLeg = arg.allocation.transferLeg
+        pure (transferLeg.instrumentId, transferLeg))
+      (\cid arg inputHoldingCids leg -> do
+          result <- exercise cid arg with inputHoldingCids
+          let newHoldingMap = holdingMapForV1 actor leg.instrumentId result.senderChangeCids
+          pure (newHoldingMap, TSAR_AllocationInstructionResultV1 result)
+      )
+
+  TSA_TransferFactory_TransferV1 call -> do
+    callChoiceV1 @V1.TransferFactory actor (holdingMap, results) call
+      (\_cid arg -> do
+          let transfer = arg.transfer
+          pure (transfer.instrumentId, ()))
+      (\cid arg inputHoldingCids () -> do
+          let transfer' = arg.transfer with inputHoldingCids
+          result <- exercise cid arg with transfer = transfer'
+          let newHoldingCids = holdingMapFromTransferV1 transfer' result
+          pure (newHoldingCids, TSAR_TransferInstructionResultV1 result)
+      )
+
+  TSA_TransferInstruction_AcceptV1 call -> do
+    callChoiceV1 @V1.TransferInstruction actor (holdingMap, results) call
+      (\cid _arg -> do
+          instr <- fetch cid
+          let transfer = (view instr).transfer
+          pure (transfer.instrumentId, transfer))
+      (\cid arg inputHoldingCids transfer -> do
+          result <- exercise cid arg
+          let newHoldingCids =
+                holdingMapFromTransferV1 transfer result <>
+                holdingMapForV1 actor transfer.instrumentId inputHoldingCids
+          pure (newHoldingCids, TSAR_TransferInstructionResultV1 result)
+      )
+
+  TSA_TransferInstruction_AcceptV2 call -> do
+    callChoiceV2NoInput @V2.TransferInstruction (holdingMap, results) call
+      (\cid arg -> do
+          instr <- fetch cid
+          let transfer = (view instr).transfer
+          result <- exercise cid arg
+          let newHoldingCids = holdingMapFromTransferV2 transfer result
+          pure (newHoldingCids, TSAR_TransferInstructionResultV2 result)
+      )
+
+
+  TSA_AllocationRequestV2_Accept (ChoiceCall with cid; arg) -> do
+    result <- exercise (fromAnyContractId cid : ContractId V2.AllocationRequest) arg
+    pure (holdingMap, TSAR_AllocationRequestV2_AcceptResult result :: results)
+
+  TSA_AllocationFactory_AllocateV2 call -> do
+    callChoiceV2 @V2.AllocationFactory (holdingMap, results) call
+      (\_cid arg -> do
+        let alloc = arg.allocation
+        pure (Left (allocationAdmin alloc), alloc.authorizer))
+      (\cid arg inputHoldingCids -> do
+          result <- exercise cid arg with inputHoldingCids
+          let admin = allocationAdmin arg.allocation
+          let newHoldingMap = holdingMapFromList [(ScopedAccount admin arg.allocation.authorizer, result.authorizerChangeCids)]
+          pure (newHoldingMap, TSAR_AllocationInstructionResultV2 result)
+      )
+
+  TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
+    callChoiceV2 @V2.TransferFactory (holdingMap, results) (ChoiceCall with cid; arg)
+      (\_cid arg -> do
+        let transfer = arg.transfer
+        pure (Right transfer.instrumentId, transfer.sender))
+      (\cid arg inputHoldingCids -> do
+         let transfer' = arg.transfer with inputHoldingCids
+         result <- exercise cid arg with transfer = transfer'
+         pure (holdingMapFromTransferV2 transfer' result, TSAR_TransferInstructionResultV2 result)
+      )
+
+
+callChoiceV1
+  : forall i arg params r.
+     Party
+  -> (HoldingMap, [TokenStandardActionResult])
+  -> ChoiceCall arg
+  -> (ContractId i -> arg -> Update (V1.InstrumentId, params))
+  -> (ContractId i -> arg -> [ContractId V1.Holding] -> params -> Update (HoldingMap, TokenStandardActionResult))
+  -> Update (HoldingMap, [TokenStandardActionResult])
+callChoiceV1 actor (holdingMap, results) (ChoiceCall with cid; arg) getParams exerciseChoice = do
+  let account = basicAccount actor
+  let cid' = fromAnyContractId cid : ContractId i
+  (instrumentId, params) <- getParams cid' arg
+  let (inputHoldingCids, newHoldingMap) = getHoldingsForInstrument account (upcast instrumentId) holdingMap
+  (newHoldingCids, result) <- exerciseChoice cid' arg (map downcast inputHoldingCids) params
+  let holdingMapWithOutputs = newHoldingCids <> newHoldingMap
+  pure (holdingMapWithOutputs, result :: results)
+
+callChoiceV2
+  : forall i arg params r.
+     (HoldingMap, [TokenStandardActionResult])
+  -> ChoiceCall arg
+  -> (ContractId i -> arg -> Update (Either Party V2.InstrumentId, V2.Account))
+  -> (ContractId i -> arg -> [ContractId V2.Holding] -> Update (HoldingMap, TokenStandardActionResult))
+  -> Update (HoldingMap, [TokenStandardActionResult])
+callChoiceV2 (holdingMap, results) (ChoiceCall with cid; arg) getParams exerciseChoice = do
+  let cid' = fromAnyContractId cid : ContractId i
+  (adminOrInstrumentId, account) <- getParams cid' arg
+  -- Note: we're OK with passing in all holdings for instruments of the admin, as the token
+  -- implementation can ignore irrelevant holdings and return them unchanged in the outputHoldingMap.
+  let (inputHoldingCids, newHoldingMap) = case adminOrInstrumentId of
+        Left admin -> getHoldingsFor (ScopedAccount admin account) holdingMap
+        Right instrumentId -> getHoldingsForInstrument account instrumentId holdingMap
+  (outputHoldingMap, result) <- exerciseChoice cid' arg inputHoldingCids
+  pure (newHoldingMap <> outputHoldingMap, result :: results)
+
+callChoiceV2NoInput
+  : forall i arg params r.
+     (HoldingMap, [TokenStandardActionResult])
+  -> ChoiceCall arg
+  -> (ContractId i -> arg -> Update (HoldingMap, TokenStandardActionResult))
+  -> Update (HoldingMap, [TokenStandardActionResult])
+callChoiceV2NoInput (holdingMap, results) (ChoiceCall with cid; arg) exerciseChoice = do
+  let cid' = fromAnyContractId cid : ContractId i
+  (outputHoldingMap, result) <- exerciseChoice cid' arg
+  pure (holdingMap <> outputHoldingMap, result :: results)
+
+holdingMapForV1 : Party -> V1.InstrumentId -> [ContractId V1.Holding] -> HoldingMap
+holdingMapForV1 actor instrumentId cids =
+  holdingMapFromList [(account, holdingCids)]
+  where
+    account = ScopedAccount instrumentId.admin (basicAccount actor)
+    holdingCids = TextMap.fromList [(instrumentId.id, map upcast cids)]
+
+
+holdingMapFromTransferV1 : V1.Transfer -> V1.TransferInstructionResult -> HoldingMap
+holdingMapFromTransferV1 transfer result =
+  holdingMapFromList $
+    [ (mkAccount transfer.sender, TextMap.fromList [(transfer.instrumentId.id, senderCids)])
+    , (mkAccount transfer.receiver, TextMap.fromList [(transfer.instrumentId.id, receiverCids)])
+    ]
+  where
+    admin = transfer.instrumentId.admin
+    mkAccount party = ScopedAccount admin (basicAccount party)
+    senderCids = map upcast result.senderChangeCids
+    receiverCids = map upcast $ case result.output of
+        V1.TransferInstructionResult_Completed receiverHoldingCids -> receiverHoldingCids
+        V1.TransferInstructionResult_Pending _instrCid -> []
+        V1.TransferInstructionResult_Failed -> []
+
+holdingMapFromTransferV2 : V2.Transfer -> V2.TransferInstructionResult -> HoldingMap
+holdingMapFromTransferV2 transfer result =
+  holdingMapFromList $
+    [ (ScopedAccount admin transfer.sender, TextMap.fromList [(transfer.instrumentId.id, result.senderChangeCids)])
+    , (ScopedAccount admin transfer.receiver, TextMap.fromList [(transfer.instrumentId.id, receiverCids)])
+    ]
+  where
+    admin = transfer.instrumentId.admin
+    receiverCids = case result.output of
+        V2.TransferInstructionResult_Completed receiverHoldingCids -> receiverHoldingCids
+        V2.TransferInstructionResult_Pending _instrCid -> []
+        V2.TransferInstructionResult_Failed -> []
