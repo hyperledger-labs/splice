@@ -129,7 +129,6 @@ class HttpTokenStandardScanProxyHandler(
       user: AuthenticatedRequest
   ): Future[allocation.v2.Resource.GetAllocationCancelContextResponse] = {
     implicit val AuthenticatedRequest(_, tc) = user
-    logger.error(s"getting cancel context for ${allocationId} with body ${body}")
     withSpan(s"$workflowId.getAllocationCancelContext") { implicit tc => _ =>
       scanConnection
         .getAllocationV2CancelContextRaw(
