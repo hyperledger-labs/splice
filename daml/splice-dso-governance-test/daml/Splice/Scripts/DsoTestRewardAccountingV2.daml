@@ -81,7 +81,7 @@ initiate_reward_processing dryRun = do
         states <- query @ProcessRewardsV2 app.dso
         forA_ states $ \(processRewardsCid, processRewards) -> do
           let Some (b, badVettingState) = find (\(b, _) -> CryptoHash.hash b == processRewards.batchHash) batchesWithHiding
-          void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
+          void $ submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
             sv = sv1
             processRewardsCid
             choiceArg = ProcessRewardsV2_ProcessBatch with
@@ -124,7 +124,7 @@ test_reward_accounting_v2 = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.beneficiaryIsObserver)
-  void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_UnhideRewardCouponsV2 with
+  void $ submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_UnhideRewardCouponsV2 with
     sv = sv1
     amuletRulesCid
     choiceArg = AmuletRules_UnhideRewardCouponsV2 with
@@ -166,7 +166,7 @@ test_ClaimExpiredRewardsV2 = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   rewardCouponCids <- query @RewardCouponV2 app.dso
 
-  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ClaimExpiredRewardsV2 with
+  submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ClaimExpiredRewardsV2 with
     amuletRulesCid
     choiceArg = AmuletRules_ClaimExpiredRewardsV2 with
       rewardCouponCids = map fst rewardCouponCids
@@ -196,7 +196,7 @@ test_ArchiveDryRunRewardAccountingV2  = do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
-  void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ArchiveDryRunRewardAccountingV2 with
+  void $ submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ArchiveDryRunRewardAccountingV2 with
     sv = sv1
     amuletRulesCid
     choiceArg = AmuletRules_ArchiveDryRunRewardAccountingV2 with

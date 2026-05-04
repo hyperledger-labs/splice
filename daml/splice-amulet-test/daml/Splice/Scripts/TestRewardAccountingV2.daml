@@ -282,7 +282,7 @@ test_mint_of_hidden_coupon = do
   -- mint the coupons
   coupons <- query @RewardCouponV2 app.dso
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-  submitMulti [alice] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_Transfer with
+  submit (actAs alice <> readAs app.dso) $ exerciseCmd amuletRulesCid AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice
       provider = alice

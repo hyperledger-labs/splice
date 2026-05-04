@@ -306,7 +306,7 @@ confirmAndExecutionAction app action = do
   forA_ (Map.keys rules.svs) $ \sv -> do
     -- mallory does not act
     unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
-      submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
         action
         confirmer = sv
       pure ()
