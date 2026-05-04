@@ -19,6 +19,11 @@ There are three ways to recover from disasters:
    created, the balance of the validator can be :ref:`recovered <validator_reonboard>` on a new
    validator.
 
+#. If the global synchronizer breaks, the super validators will
+   initiate a roll-forward Logical Synchronizer Upgrade to roll
+   forward to a new physical synchronizer. Validators will need to
+   initiate the :ref:`procedure <validator_roll_forward_lsu>` on their
+   node based on the information communicated by the SVs.
 
 .. note :: A recovery of assets is **only** possible if at least **one** of the following holds:
 
@@ -456,3 +461,44 @@ for initial onboarding of the party, i.e.,
 ``/v0/admin/external-party/setup-proposal/prepare-accept`` and
 ``/v0/admin/external-party/setup-proposal/submit-accept``. For details
 refer to the :ref:`docs for the validator external signing API <validator-api-external-signing>`.
+
+.. _validator_roll_forward_lsu:
+
+Roll Forward Logical Synchronizer Upgrade
++++++++++++++++++++++++++++++++++++++++++
+
+In case the SVs communicate that they recover from a loss of the
+physical synchronizer, they will communicate the
+``newPhysicalSynchronizerId`` and the ``sequencerSuccessors``.
+
+Validators then need to:
+
+1. Wait for their node to finish catching up to the latest transaction
+   on the existing synchronizer. A good indicator for that is that you
+   don't see any new logs containing ``Processing event at`` in your
+   participant INFO logs.
+
+2. Initiate the roll forward LSU through a :ref:`Canton console <console_access>`:
+
+.. code::
+
+    val existingPhysicalSynchronizerId = participant.synchronizers.list_connected().find(_.synchronizerAlias == "global").head.physicalSynchronizerId
+    participant.synchronizers.perform_manual_lsu(
+      existingPhysicalSynchronizerId,
+      newPhysicalSynchronizerId,
+      upgradeTime = None,
+      sequencerSuccessors,
+    )
+
+.. _validator_acs_mismatches:
+
+Resolving ACS mismatches
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Note that depending on how exactly the old synchronizer failed,
+validators may desynchronize if some validators have observed a
+transaction before the failure while others have not.  In that case,
+the participant will produce ACS mismatches that should be resolved
+using the `standard ACS mismatch resolution process
+<https://docs.digitalasset.com/operate/3.4/howtos/troubleshoot/commitments.html>`_
+after migrating to the new physical synchronizer.

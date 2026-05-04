@@ -132,7 +132,7 @@ class NodeInitializer(
             //    b. a participant that is still bootstrapping, and not yet set its Id from the db
             // as a (temporary) work around, if participant has no id set, we retry getId for a maximum of 5s duration
             // we chose 5s, because, according to logs, 5s is enough for the participant to set its id, if it already has one
-            // TODO(hyperledger-labs/splice#4508): this shouldn't be required once we have a Canton fix
+            // TODO(canton-network/splice#4508): this shouldn't be required once we have a Canton fix
             val currentDeadlineOpt = emptyIdDeadline.updateAndGet {
               case None => Some(5.seconds.fromNow) // Start clock now
               case existing => existing

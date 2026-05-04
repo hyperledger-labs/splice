@@ -8,7 +8,6 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
   IncrementalAcsSnapshot,
 }
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import java.time.{Duration, Instant, ZoneOffset}
 import java.time.temporal.{ChronoField, ChronoUnit}
@@ -103,48 +102,31 @@ case class ScanStorageConfig(
       snapshotTimestamp.toInstant.atOffset(ZoneOffset.UTC).get(ChronoField.HOUR_OF_DAY)
     )
 
-  /* Note that we do not include the migration ID in the end timestamp, as it might not yet be known
-   * when we start collecting updates for the segment (e.g. if we are up-to-date, and a migration will
-   * happen soon). Once the end time will have passed, the migration ID will be
-   * deterministic given the update history, so we do not lose any information or risk
-   * inconsistency between instances of Scan.
-   * If end timestamp is not given, it will be computed from the start timestamp
-   * based on the bulkAcsSnapshotPeriodHours period
-   */
   def getSegmentFolder(
-      segmentStartTimestamp: TimestampWithMigrationId,
-      segmentEndTimestamp: Option[TimestampWithMigrationId],
+      segmentStartTimestamp: CantonTimestamp,
+      segmentEndTimestamp: Option[CantonTimestamp],
   ): String = {
-    val endTimestamp = segmentEndTimestamp.fold(
-      computeBulkSnapshotTimeAfter(segmentStartTimestamp.timestamp)
-    )(_.timestamp)
-    s"${segmentStartTimestamp.timestamp}-Migration-${segmentStartTimestamp.migrationId}-${endTimestamp}"
+    val endTimestamp = segmentEndTimestamp.getOrElse(
+      computeBulkSnapshotTimeAfter(segmentStartTimestamp)
+    )
+    s"$segmentStartTimestamp~$endTimestamp"
   }
 
   def getStartAndEndTimestampsForFolder(
       folder: String
   ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
-    val parts = folder.stripSuffix("/").split("-Migration-")
-    if (parts.length != 2) {
-      Left(
-        s"Cannot parse folder name: $folder (wrong number of parts after splitting by '-Migration-': ${parts.length})"
-      )
-    } else {
-      val folderStartStr = parts(0)
-      val parts2 = parts(1).split("-", 2)
-      if (parts2.length != 2) {
-        Left(
-          s"Cannot parse folder name: $folder (wrong number of parts when splitting ${parts(1)}: ${parts2.length})"
-        )
-      } else {
-        val folderEndStr = parts2(1)
+    folder.stripSuffix("/").split("~") match {
+      case Array(folderStartStr, folderEndStr) =>
         for {
           folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
           folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
         } yield {
           (folderStart, folderEnd)
         }
-      }
+      case _ =>
+        Left(
+          s"Cannot parse folder name: $folder (wrong format, expected 'startTimestamp~endTimestamp')"
+        )
     }
   }
 

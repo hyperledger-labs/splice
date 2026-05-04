@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splitwell-test
 source: daml
-version: 0.1.23
+version: 0.1.24
 dependencies:
   - daml-prim
   - daml-stdlib

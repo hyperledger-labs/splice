@@ -418,7 +418,7 @@ def migrate_todo_comments(all, public_repo_path, internal_repo_path, public_issu
         todo_refs.add(ref)
         if ref in all.public:
             # Referencing a public issue from code in the internal repo
-            new_ref = f"hyperledger-labs/splice#{public_issues_map[ref]}"
+            new_ref = f"canton-network/splice#{public_issues_map[ref]}"
         elif ref in all.internal:
             # Referencing an internal issue from code in the internal repo
             new_ref = f"#{internal_issues_map[ref]}"
@@ -518,7 +518,7 @@ def main():
     parser.add_argument("--dump-filename", type=str, default="issues-dump.json", help="Filename to read/write the issues dump (default: issues-dump.json).")
     parser.add_argument("--source-repo", type=str, default="DACH-NY/canton-network-node", help="GitHub repository to read issues from (default: DACH-NY/canton-network-node).")
     parser.add_argument("--dry-run", action="store_true", default=False, help="If set, the script will not modify any data, only print what it would do.")
-    parser.add_argument("--public-repo", type=str, default="hyperledger-labs/splice", help="Public GitHub repository to migrate issues to (default: hyperledger-labs/splice).")
+    parser.add_argument("--public-repo", type=str, default="canton-network/splice", help="Public GitHub repository to migrate issues to (default: canton-network/splice).")
     parser.add_argument("--public-repo-path", type=str, help= "Path to the public repo (used for TODO comments)")
     parser.add_argument("--internal-repo", type=str, default="DACH-NY/canton-network-internal", help="Internal GitHub repository to migrate issues to (default: DACH-NY/canton-network-internal).")
     parser.add_argument("--internal-repo-path", type=str, help= "Path to the internal repo (used for TODO comments)")

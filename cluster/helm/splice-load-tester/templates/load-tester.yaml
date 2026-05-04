@@ -6,10 +6,10 @@ kind: Deployment
 metadata:
   name: load-tester
   namespace: {{ .Release.Namespace }}
-  {{- $annotations := include "splice-util-lib.default-annotations" . }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
   {{- if $annotations }}
   annotations:
-    {{- $annotations .Values | nindent 4 }}
+    {{- $annotations | nindent 4 }}
   {{- end }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
