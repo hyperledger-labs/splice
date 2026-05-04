@@ -280,7 +280,7 @@ object ScanTables extends AcsTables {
       record match {
         case _: BalanceChangeTxLogEntry =>
           // the balance changes are no longer indexed, or written, to the tx log table,
-          // See https://github.com/hyperledger-labs/splice/pull/3734
+          // See https://github.com/canton-network/splice/pull/3734
           None
         case entry => Some(fromEntry(entry))
       }

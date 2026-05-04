@@ -44,7 +44,7 @@ synchronizerMigration:
       version: 0.3.18
       releaseReference:
         gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
-        repoUrl: https://github.com/hyperledger-labs/splice
+        repoUrl: https://github.com/canton-network/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
         deploymentDir: "cluster/deployment"
@@ -53,7 +53,7 @@ synchronizerMigration:
       version: 0.3.19
       releaseReference:
         gitReference: "refs/heads/release-line-0.3.19"
-        repoUrl: https://github.com/hyperledger-labs/splice
+        repoUrl: https://github.com/canton-network/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
         deploymentDir: "cluster/deployment"
@@ -63,7 +63,7 @@ synchronizerMigration:
     version: 0.3.20
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.20"
-      repoUrl: https://github.com/hyperledger-labs/splice
+      repoUrl: https://github.com/canton-network/splice
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "cluster/deployment"
@@ -78,7 +78,7 @@ synchronizerMigration:
       enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
-      repoUrl: https://github.com/hyperledger-labs/splice
+      repoUrl: https://github.com/canton-network/splice
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "cluster/deployment"
@@ -256,7 +256,7 @@ cluster:
       minNodes: 0
       maxNodes: 1
 gha:
-  githubRepo: "https://github.com/hyperledger-labs/splice"
+  githubRepo: "https://github.com/canton-network/splice"
   runnerVersion: "0.5.10"
   runnerHookVersion: "0.5.10"
   runnerScaleSetVersion: "0.13.1"

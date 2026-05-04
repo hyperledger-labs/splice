@@ -109,7 +109,7 @@ class AcsSnapshotBulkStorageTest
         val objectKeys = s3Objects.contents.asScala.map(_.key()).sorted
         objectKeys should have length 7
         objectKeys.foreach(
-          _ should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
+          _ should startWith("2026-01-02T00:00:00Z~2026-01-03T00:00:00Z/ACS_")
         )
         val objectCountMetrics = metricsFactory.metrics.counters.get(
           SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count"
@@ -204,7 +204,7 @@ class AcsSnapshotBulkStorageTest
         val getObjectsResult = bulkStorage.getAcsSnapshotAtOrBefore(queryTs).futureValue
         getObjectsResult.objects.map(_.key) should contain theSameElementsInOrderAs
           (0 until expectedNumObjects).map(i =>
-            s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd"
+            s"$expectedTs~${expectedTs.add(1.days)}/ACS_$i.zstd"
           )
         getObjectsResult.objects.map(_.checksum).foreach {
           // We test elsewhere that computed and persisted checksums are correct, so here we just check that they are present and not empty

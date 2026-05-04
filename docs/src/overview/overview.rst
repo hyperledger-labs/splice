@@ -23,7 +23,7 @@ Global Synchronizer
 The Global Synchronizer is a decentrally operated service, using a 2/3 majority Byzantine Fault Tolerant (:term:`BFT`) consensus protocol for message ordering and confirmation, and BFT majority voting on governance changes.
 
 Its infrastructure is operated by independently acting organizations, called Super Validators, that run components of the decentralized infrastructure, and coordinate activities via an on-chain governance application.
-Its open source code is maintained in `Splice <https://github.com/hyperledger-labs/splice>`__.
+Its open source code is maintained in `Splice <https://github.com/canton-network/splice>`__.
 
 The `Global Synchronizer Foundation ("GSF") <https://sync.global>`__ has been created in partnership with the Linux Foundation to coordinate the governance of the Global Synchronizer and lead efforts to grow the Global Synchronizer ecosystem.
 The GSF provides transparency into Super Validator governance and operations. The GSF also operates a Super Validator node, and takes part in governance votes on behalf of its members.

@@ -33,7 +33,7 @@ in the diagram below:
 The Ledger API is not part of Splice, and thus not documented here. See :ref:`app_dev_ledger_api` for details on how to use the Ledger API.
 
 Some of the Splice apps also define additional HTTP APIs that are considered internal and are subject to change without notice.
-If you do need some of them for your app, please create an issue on https://github.com/hyperledger-labs/splice,
+If you do need some of them for your app, please create an issue on https://github.com/canton-network/splice,
 so that you can align with the Splice team on the API, your needs, and the required stability guarantees.
 
 .. toctree::

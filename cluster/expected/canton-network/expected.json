@@ -297,7 +297,7 @@
             "publicConfigsDir": "cluster/configs/configs",
             "pulumiBaseDir": "splice/cluster/pulumi",
             "pulumiStacksDir": "cluster/stacks/prod",
-            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "repoUrl": "https://github.com/canton-network/splice",
             "spliceRoot": "splice"
           },
           "sequencer": {
@@ -318,7 +318,7 @@
               "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
               "pulumiBaseDir": "splice/cluster/pulumi",
               "pulumiStacksDir": "cluster/stacks/prod",
-              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "repoUrl": "https://github.com/canton-network/splice",
               "spliceRoot": "splice"
             },
             "sequencer": {
@@ -338,7 +338,7 @@
               "gitReference": "refs/heads/release-line-0.3.19",
               "pulumiBaseDir": "splice/cluster/pulumi",
               "pulumiStacksDir": "cluster/stacks/prod",
-              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "repoUrl": "https://github.com/canton-network/splice",
               "spliceRoot": "splice"
             },
             "sequencer": {
@@ -363,7 +363,7 @@
             "publicConfigsDir": "cluster/configs/configs",
             "pulumiBaseDir": "splice/cluster/pulumi",
             "pulumiStacksDir": "cluster/stacks/prod",
-            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "repoUrl": "https://github.com/canton-network/splice",
             "spliceRoot": "splice"
           },
           "sequencer": {
