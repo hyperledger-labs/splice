@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 
 import scala.collection.immutable
+import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
@@ -110,7 +111,8 @@ class ScanTxLogParser(
               outputs = Seq(output),
               result = node.result.value.result,
             )
-            state.setTransferPreapprovalSendFields(tree, exercised, node.argument.value.description)
+            val description = node.result.value.meta.values.asScala.get(TokenStandardMetadata.reasonMetaKey)
+            state.setTransferPreapprovalSendFields(tree, exercised, description.toJava)
           case CreateTokenStandardTransferInstruction(node) =>
             val cid: String = node.result.value.output match {
               case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>

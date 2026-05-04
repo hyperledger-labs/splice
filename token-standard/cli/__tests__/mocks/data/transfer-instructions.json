@@ -6,6 +6,7 @@
           "acsDelta" : true,
           "contractId" : "39",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "lockedAmulet" : "1",
             "transfer" : {
@@ -32,6 +33,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
               "viewStatus" : {
                 "code" : 0,
@@ -80,7 +82,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -94,6 +96,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgIIdxIE3vuz1w==",
     "workflowId" : ""
   },
   {
@@ -101,15 +104,16 @@
       "JsActiveContract" : {
         "createdEvent" : {
           "acsDelta" : true,
-          "contractId" : "51",
+          "contractId" : "54",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
-            "lockedAmulet" : "52",
+            "lockedAmulet" : "55",
             "transfer" : {
               "amount" : "200.0000000000",
               "executeBefore" : "2025-06-18T00:00:00.000000Z",
               "inputHoldingCids" : [
-                "52"
+                "55"
               ],
               "instrumentId" : {
                 "admin" : "dso::normalized",
@@ -129,6 +133,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
               "viewStatus" : {
                 "code" : 0,
@@ -153,7 +158,7 @@
                   "amount" : "200.0000000000",
                   "executeBefore" : "2025-06-18T00:00:00.000000Z",
                   "inputHoldingCids" : [
-                    "52"
+                    "55"
                   ],
                   "instrumentId" : {
                     "admin" : "dso::normalized",
@@ -177,7 +182,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "bob::normalized"
@@ -191,6 +196,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMIkgESBN77s9c=",
     "workflowId" : ""
   }
 ]
