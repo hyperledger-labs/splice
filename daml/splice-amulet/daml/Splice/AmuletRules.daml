@@ -487,6 +487,7 @@ template AmuletRules
             void $ create CalculateRewardsV2 with
               dso
               round = roundToArchive.round
+              roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = False
 
@@ -494,6 +495,7 @@ template AmuletRules
             void $ create CalculateRewardsV2 with
               dso
               round = roundToArchive.round
+              roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = True
 
@@ -677,7 +679,7 @@ template AmuletRules
           coupon <- fetchAndArchive (ForDso with dso) cid
           assertDeadlineExceeded "coupon.expiresAt" coupon.expiresAt
           return coupon
-        let actualBeneficiaries = [ coupon.beneficiary | coupon <- coupons ]
+        let actualBeneficiaries = [ fromOptional coupon.provider coupon.beneficiary | coupon <- coupons ]
         require "beneficiaries match coupons" (sort beneficiaries == dedupSort actualBeneficiaries)
 
         -- create unclaimed reward for the total
@@ -696,6 +698,7 @@ template AmuletRules
         create ProcessRewardsV2 with
           dso
           round = calculateRewards.round
+          roundClosedAt = calculateRewards.roundClosedAt
           dryRun = calculateRewards.dryRun
           rewardCouponTimeToLive = calculateRewards.rewardCouponTimeToLive
           batchHash
@@ -715,10 +718,10 @@ template AmuletRules
         -- unhide coupons
         actualBeneficiaries <- forA rewardCouponCids $ \cid -> do
           coupon <- fetchAndArchive (ForDso with dso) cid
-          require "beneficiary is no observer on the coupon" (not (coupon.beneficiaryIsObserver))
+          require "provider is no observer on the coupon" (not (coupon.providerIsObserver))
           assertWithinDeadline "coupon.expiresAt" coupon.expiresAt
-          create coupon with beneficiaryIsObserver = True
-          pure coupon.beneficiary
+          create coupon with providerIsObserver = True
+          pure coupon.provider
 
         -- check specified beneficiaries match actual beneficiaries of the coupons
         require "beneficiaries match coupons" (dedupSort beneficiaries == dedupSort actualBeneficiaries)
@@ -838,9 +841,12 @@ template AmuletRules
       controller dso
       do
         require "futureValues is empty" (null this.configSchedule.futureValues)
+        let patchedConfig = patch newConfig baseConfig this.configSchedule.initialValue
+        require "rewardConfig cannot be set to None once it has been set to Some"
+          (not (isSome this.configSchedule.initialValue.rewardConfig && isNone patchedConfig.rewardConfig))
         newAmuletRules <- create this with
           configSchedule = Schedule with
-            initialValue = patch newConfig baseConfig this.configSchedule.initialValue
+            initialValue = patchedConfig
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 

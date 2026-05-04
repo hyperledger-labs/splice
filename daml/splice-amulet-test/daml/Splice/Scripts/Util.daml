@@ -445,7 +445,7 @@ runAmuletDepositBots app = do
       c.round `elem` issuingRoundNumbers && c.beneficiary == user
 
     rewardCouponV2s <- queryFilter @RewardCouponV2 app.dso $ \c ->
-      c.beneficiary == user
+      fromOptional c.provider c.beneficiary == user
 
     -- get all amulets of this user
     amulets <- getAmuletInputs user

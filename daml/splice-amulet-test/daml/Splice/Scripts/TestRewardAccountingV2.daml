@@ -124,26 +124,26 @@ test_reward_accounting_v2 = do
         pure RewardCouponV2 with
           dso = app.dso
           provider
-          beneficiary = provider
           amount
           round = Round 0
           expiresAt = couponExpiryTime
-          beneficiaryIsObserver = provider `notElem` [bob, dora]
+          providerIsObserver = provider `notElem` [bob, dora]
+          beneficiary = None
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
-  let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
+  let actualCoupons = sortOn (.provider) $ fmap snd actualCoupons0
   actualCoupons === expectedCoupons
 
   -- make Bob and Dora observers of their coupons (simulates them changing their vetting state)
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-  unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.beneficiaryIsObserver)
+  unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.providerIsObserver)
   void $ submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_UnhideRewardCouponsV2 with
     rewardCouponCids = map fst unobservableCoupons
-    beneficiaries = map (._2.beneficiary) unobservableCoupons
+    beneficiaries = map (._2.provider) unobservableCoupons
 
   couponsAfterUnhiding <- query @RewardCouponV2 app.dso
-  sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
-    map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
+  sortOn (.provider) (map snd couponsAfterUnhiding) ===
+    map (\c -> c with providerIsObserver = True) expectedCoupons
 
   -- check that reward minting works
   forA_ expectedAmounts $ \(beneficiary, amount) -> do
@@ -253,11 +253,11 @@ setupAliceWithCoupon' config = do
   let coupon = RewardCouponV2 with
         dso = app.dso
         provider = alice
-        beneficiary = alice
         amount = 1000.0
         round = Round 0
         expiresAt = demoTime `addRelTime` hours 36
-        beneficiaryIsObserver = not config.hideCoupon
+        providerIsObserver = not config.hideCoupon
+        beneficiary = None
   submit app.dso $ createCmd coupon
   pure (app, alice, aliceUser)
 
@@ -312,11 +312,11 @@ test_claim_expired_coupons = do
   let extraCoupon = RewardCouponV2 with
         dso = app.dso
         provider = alice
-        beneficiary = bob
         amount = 500.0
         round = Round 0
         expiresAt = demoTime `addRelTime` hours 48
-        beneficiaryIsObserver = False
+        providerIsObserver = False
+        beneficiary = Some bob
   submit app.dso $ createCmd extraCoupon
 
   -- show that expiry doesn't work before expiry time

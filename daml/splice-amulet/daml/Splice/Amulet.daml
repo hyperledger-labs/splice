@@ -9,7 +9,7 @@ import DA.Action (void)
 import DA.Assert
 import DA.Map as Map
 import DA.TextMap as TextMap
-import DA.Optional (fromOptional)
+import DA.Optional (fromOptional, optionalToList)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
@@ -382,17 +382,19 @@ template RewardCouponV2
     dso : Party
     provider : Party -- ^ The party that provided the service for whose activity the minting right was granted.
     round : Round -- ^ The round in which the providers activity was recorded.
-    beneficiary : Party -- ^ The party that can mint the reward for the activity by the provider.
     amount : Decimal -- ^ The amount of reward that can be minted for this coupon. Denominated in Amulet.
     expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be minted.
-    beneficiaryIsObserver : Bool
-      -- ^ Whether the beneficiary should be an observer, which they are unless
+    providerIsObserver : Bool
+      -- ^ Whether the provider should be an observer, which they are unless
       -- their vetting state at the time of coupon creation does not allow it.
-      -- DSO automation will then attempt to make the beneficiary an observer when they
+      -- DSO automation will then attempt to make the provider an observer when they
       -- change their vetting state unless the coupon expired in the meantime.
+    beneficiary : Optional Party
+      -- ^ The party that can mint the reward for the activity by the provider.
+      -- If not set, this is the provider.
   where
     signatory dso
-    observer if beneficiaryIsObserver then [beneficiary] else []
+    observer if providerIsObserver then [provider] ++ optionalToList beneficiary else []
     ensure amount > 0.0
 
 
@@ -585,7 +587,7 @@ instance HasCheckedFetch AppRewardCoupon ForOwner where
   contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = fromOptional provider beneficiary
 
 instance HasCheckedFetch RewardCouponV2 ForOwner where
-  contractGroupId RewardCouponV2{..} = ForOwner with dso; owner = beneficiary
+  contractGroupId RewardCouponV2{..} = ForOwner with dso; owner = fromOptional provider beneficiary
 
 instance HasCheckedFetch RewardCouponV2 ForDso where
   contractGroupId RewardCouponV2{..} = ForDso with dso
