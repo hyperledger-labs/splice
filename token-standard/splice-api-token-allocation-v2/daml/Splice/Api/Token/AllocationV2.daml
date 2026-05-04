@@ -7,6 +7,7 @@
 --
 --  - authorizing multiple transfers in a single allocation
 --  - only allocating the net amount of funds transferred to the allocation
+--  - use the same allocation for multiple settlement iterations
 --  - specifying accounts directly in the transfer legs instead of using metadata
 --  - flexible actors for extensibility
 --  - implementation-defined choice observers for view compression where
@@ -21,7 +22,59 @@ import DA.Map qualified as Map
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
+import Splice.Api.Token.HoldingV2 (Holding, Account)
+
+ {-
+
+Design notes:
+
+- motivation: extend the allocation/settlement API to support
+    - prefunded trades
+    - billing in the style of the early MainNet billing apps
+    - committing funds to a liquidity pool
+    - etc.
+
+- key idea: allow for "iterated settlement" as follows:
+  - iterated settlement is an opt-in feature that authorizers can enable
+  - upon creating an allocation the funds to cover its future iterations are specified as well
+  - executors can adjust an allocation by adding additional transfer legs to it.
+    This adjustment changes the amount of funding for the next iteration, and
+    only succeeds if the allocation remains funded.
+  - settlement returns a reference to a new allocation with no transfer legs and
+    locked holdings covering the specified funding for the next iteration.
+    Batch settlement continues to work as-is and settles exactly the legs on the
+    allocations passed in provided they all match. The only change is that it
+    can also return new allocations for the next iteration.
+
+- intended use for prefunding trades:
+  - apps request an allocation with no transfer legs and funds for the next
+    iteration that cover the prefunding amount
+  - settling a matched trade is done in an atomic transaction that
+    - adjusts the allocation of buyer and seller by adding the actual transfer
+      legs for the trade
+    - settles the allocations in a batch
+    - cancels the next iteration allocations to release the remaining funds
+
+- intended use for billing (and like iterated processes):
+  - request an allocation with no transfer legs, but funds to cover the expected billing cycle
+  - execute billing by adjusting the allocation with the billing transfer leg, and settling it
+  - store a reference to the new allocation for the next billing cycle
+  - payouts can be implemented by adding and settling a self-transfer
+  - top-ups can be implemented by requesting an additional (non-iterated) allocation for top-up and
+    adding a self-transfer leg to the iterated allocation and settling it jointly with the top-up allocation
+
+- additionally
+  - introduce the notion of "committed allocations" which cannot be withdrawn until settlement or cancellation
+  - their intended use is for liquidity pools and the like, where the pool operators needs guaranteed
+    availability of the funds until settlement
+
+  - remove `requestedAt` and `settleAt` from the `SettlementInfo`, so that it is easy
+    to request multiple allocation for the same settlement. De-facto the `SettlementInfo` serves
+    as a kind of account for the delegation of control over funds.
+  - move the `admin` field out of `InstrumentIds` to the top-level to remove redundancy and
+    avoid partial functions.
+
+ -}
 
 
 -- Allocation View
@@ -50,12 +103,6 @@ data SettlementInfo = SettlementInfo
       --
       -- Executors MUST ensure that they use unique `settlementRef` values for
       -- different settlements to avoid ambiguity or settlement errors.
-    requestedAt : Time
-      -- ^ When the settlement was requested. Provided for display and debugging purposes,
-      -- but SHOULD be in the past.
-    settleAt : Time
-      -- ^ The earliest settlement time. Allocations should be made before this time. Settlement
-      -- happens at any point after this time.
     settlementDeadline : Optional Time
       -- ^ The latest point at which settlement will occur. This allows registries
       -- to set appropriate locks and expiries.
@@ -74,25 +121,41 @@ data TransferLeg = TransferLeg with
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
-    instrumentId : InstrumentId
+    instrumentId : Text
       -- ^ The instrument identifier.
     meta : Metadata
       -- ^ Additional metadata about the transfer leg, used for extensibility.
   deriving (Eq, Ord, Show)
 
 -- | An approval by the authorizer to execute the given transfers
--- as part of the settlement.
---
--- In contrast to an `AllocationView` this just specifies the authorized
--- transfers, but not the holdings that fund the transfers.
+-- as part of settlement.
 data AllocationSpecification = AllocationSpecification with
     settlement : SettlementInfo
       -- ^ The settlement for which this allocation is made.
+    admin : Party
+      -- ^ The asset admin of the instruments that are transferred as part of
+      -- the settlement.
     transferLegs : [TransferLeg]
       -- ^ The transfers whose send or receipt is authorized by this allocation.
       --
       -- There MUST be at least one transfer leg. All transfer legs MUST have the
       -- same instrument admin and involve the authorizer as sender or receiver.
+    nextIterationFunding : Optional (TextMap.TextMap Decimal)
+      -- ^ Funding amounts for the next settlement iteration.
+      --
+      -- Only set, if the authorizer allows the executors to perform iterated settlement.
+      -- Amounts are keyed by instrument id and MUST be positive.
+    committed : Bool
+      -- ^ Whether the authorizer commits to the allocation until either
+      --
+      --   - the executors settle allocation,
+      --   - the executors cancel the allocation, or
+      --   - the settlement deadline passed.
+      --
+      -- If set to `True`, then the authorizer cannot withdraw the allocation
+      -- until the settlement deadline. Use committed allocations for cases
+      -- where the executors need a guarantee that the allocation will be
+      -- available until settlement.
     authorizer : Account
       -- ^ The account authorizing the transfers to happen as part of the settlement.
   deriving (Show, Eq)
@@ -101,6 +164,7 @@ data AllocationSpecification = AllocationSpecification with
 data AllocationAction
     = AA_Settle
     | AA_Cancel
+    | AA_Adjust
     | AA_Withdraw
     | -- | Used to represent registry-specific actions on allocations.
       AA_Custom with
@@ -150,17 +214,20 @@ data AllocationView = AllocationView with
 -- Allocation
 -------------
 
+-- FIXME: revisit the construction wrt default controllers, now that they are only the settlement executors, we should be able to drop the definition of the default controllers
+
 -- | Default controllers for allocation settlement, which are the `executors`,
 -- and the instrument admin of the transfer legs.
 defaultAllocation_SettleControllers : AllocationView -> [Party]
-defaultAllocation_SettleControllers allocView =
-    allocView.allocation.settlement.executors <>
-      map (.instrumentId.admin) allocView.allocation.transferLegs
+defaultAllocation_SettleControllers allocView = allocView.allocation.admin :: allocView.allocation.settlement.executors
 
--- | Default controllers for allocation cancellation are the `executors` allocation.
+-- | Default controllers for allocation adjustment are the `executors` of the allocation.
+defaultAllocation_AdjustControllers : AllocationView -> [Party]
+defaultAllocation_AdjustControllers allocView = allocView.allocation.settlement.executors
+
+-- | Default controllers for allocation cancellation are the `executors` the allocation.
 defaultAllocation_CancelControllers : AllocationView -> [Party]
 defaultAllocation_CancelControllers allocView = allocView.allocation.settlement.executors
-
 
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
@@ -170,10 +237,12 @@ interface Allocation where
   viewtype AllocationView
 
   allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
+  allocation_adjustImpl : ContractId Allocation -> Allocation_Adjust -> Update Allocation_AdjustResult
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
 
   allocation_settleExtraObservers : Allocation_Settle -> [Party]
+  allocation_adjustExtraObservers : Allocation_Adjust -> [Party]
   allocation_cancelExtraObservers : Allocation_Cancel -> [Party]
   allocation_withdrawExtraObservers : Allocation_Withdraw -> [Party]
 
@@ -208,6 +277,46 @@ interface Allocation where
     observer allocation_settleExtraObservers this arg
     controller actors
     do allocation_settleImpl this self arg
+
+  nonconsuming choice Allocation_Adjust : Allocation_AdjustResult
+    -- ^ Adjust an allocation as part of iterated settlement.
+    --
+    -- Intended to be called by the executors to add transfer legs once they are
+    -- definitely known, e.g., after a trade was matched. Funds can be returned
+    -- to the authorizer using a self-transfer leg with the authorizer as
+    -- receiver.
+    --
+    -- The choice is nonconsuming to support alternative consumption patterns,
+    -- e.g., by calling a consuming choice for transaction parsing compatibility.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
+    -- the body of this choice.
+    with
+      actors : [Party]
+        -- ^ Parties executing the adjustment.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized adjustment execution.
+        --
+        -- They SHOULD do so by checking that the actors are equal to the
+        -- `defaultAllocation_AdjustControllers`, which ensures maximal
+        -- compatibility and proper implementation of the constraint:
+        --
+        -- - The actors MUST always include the settlement executors
+      additionalTransferLegs : [TransferLeg]
+        -- ^ The additional transfer legs to add to the allocation as part of the adjustment.
+        --
+        -- Implementations MUST ensure that the allocation remains funded after
+        -- the adjustment, i.e., that the net amount of the additional transfer
+        -- legs is covered by the current `nextIterationFunding` amounts.
+      allowFutureIterations : Bool
+        -- ^ Whether to allow future iterations.
+        --
+        -- If set to `False`, then settlement will pay out all remaining funds, and not
+        -- create a next iteration allocation. Futhermore, additional adjustments are disallowed.
+    observer allocation_adjustExtraObservers this arg
+    controller actors
+    do allocation_adjustImpl this self arg
+
 
   nonconsuming choice Allocation_Cancel : Allocation_CancelResult
     -- ^ Cancel the allocation to release the funds and invalidate the approval
@@ -279,9 +388,23 @@ data Allocation_SettleResult = Allocation_SettleResult with
       -- keyed by their `instrumentId.id`.
       --
       -- Implementations MAY decide to not return any holdings.
+    nextIterationAllocationCid : Optional (ContractId Allocation)
+      -- ^ The new allocation created for the next settlement iteration.
+      --
+      -- Only set if iterated settlement is allowed by the authorizer.
+      -- Executors are expected to call `Allocation_Cancel` in case they do not
+      -- expect another iteration to happen.
     meta : Metadata
       -- ^ Additional metadata specific to the settlement, used for extensibility.
   deriving (Eq, Show)
+
+-- | The result of adjusting an allocation by exercising the `Allocation_Adjust` choice.
+data Allocation_AdjustResult = Allocation_AdjustResult with
+    allocationCid : ContractId Allocation
+      -- ^ The new allocation created by the adjustment.
+    meta : Metadata
+      -- ^ Additional metadata specific to the adjustment, used for extensibility.
+  deriving (Show, Eq)
 
 -- | The result of the `Allocation_Cancel` choice.
 data Allocation_CancelResult = Allocation_CancelResult with
@@ -289,7 +412,7 @@ data Allocation_CancelResult = Allocation_CancelResult with
       -- ^ The holdings that were released back to the authorizer keyed by
       -- their `instrumentId.id`.
     meta : Metadata
-      -- ^ Additional metadata specific to the allocation, used for extensibility.
+      -- ^ Additional metadata specific to the cancellation, used for extensibility.
   deriving (Show, Eq)
 
 -- | The result of the `Allocation_Withdraw` choice.
@@ -298,7 +421,7 @@ data Allocation_WithdrawResult = Allocation_WithdrawResult with
       -- ^ The holdings that were released back to the authorizer keyed by
       -- their `instrumentId.id`.
     meta : Metadata
-      -- ^ Additional metadata specific to the allocation, used for extensibility.
+      -- ^ Additional metadata specific to the withdrawal, used for extensibility.
   deriving (Show, Eq)
 
 
@@ -385,10 +508,9 @@ interface SettlementFactory where
 
 -- | Result of settling a batch of allocations.
 data SettlementFactory_SettleBatchResult = SettlementFactory_SettleBatchResult with
-    newHoldingCids : Map.Map Account (TextMap.TextMap [ContractId Holding])
-      -- ^ New holdings created as part of the batch settlement, grouped by account and
-      -- keyed by their `instrumentId.id` to enable chaining of actions on holdings of
-      -- one or more accounts.
+    allocationSettleResults : [Allocation_SettleResult]
+      -- ^ The result of settling each allocation in the batch.
+      -- In the same order as the `allocationCids` in the choice arguments.
     meta : Metadata
       -- ^ Additional metadata specific to the batch settlement, used for extensibility.
   deriving (Eq, Show)
