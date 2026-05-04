@@ -5,12 +5,12 @@ ARG canton_version
 ARG image_sha256
 
 FROM europe-docker.pkg.dev/da-images/public-all/docker/canton-base:${canton_version}@${image_sha256}
-# TODO(https://github.com/hyperledger-labs/splice/issues/5141): remove this once base images have grpc_health_probe
+# TODO(https://github.com/canton-network/splice/issues/5141): remove this once base images have grpc_health_probe
 COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.38 /ko-app/grpc-health-probe /bin/grpc_health_probe
 
 COPY additional-config.conf /app/
 USER root
-# TODO(https://github.com/hyperledger-labs/splice/issues/5141): remove this once base images have grpc_health_probe
+# TODO(https://github.com/canton-network/splice/issues/5141): remove this once base images have grpc_health_probe
 RUN rm -f /bin/grpcurl
 RUN chown -R nonroot:nonroot /app/additional-config.conf
 USER nonroot
