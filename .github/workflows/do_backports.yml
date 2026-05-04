@@ -13,7 +13,7 @@ jobs:
     outputs:
       branches: ${{ steps.parse_backport_comments.outputs.backport_branches }}
     steps:
-      - uses: canton-network/splice-shared-gha/actions/parse_backport_comments@a78684a826be866b199ae7a05471a7fad2c9c76c
+      - uses: canton-network/splice-shared-gha/actions/parse_backport_comments@009fc4df6cc49c56067943d067d0b33489517a5d
         id: parse_backport_comments
         with:
           pr_number: ${{ github.event.pull_request.number }}
@@ -25,7 +25,7 @@ jobs:
       matrix:
         branch: ${{ fromJSON(needs.get_backport_branches.outputs.branches) }}
       fail-fast: false
-    uses: canton-network/splice-shared-gha/.github/workflows/backport.yml@a78684a826be866b199ae7a05471a7fad2c9c76c
+    uses: canton-network/splice-shared-gha/.github/workflows/backport.yml@009fc4df6cc49c56067943d067d0b33489517a5d
     secrets:
       strong_token: ${{ secrets.GH_CREATE_PRS_TOKEN }}
     with:
