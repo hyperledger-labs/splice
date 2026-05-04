@@ -76,6 +76,9 @@ module Splice.TokenStandard.Utils (
   splitLegsByAdmin,
   splitLegsByAuthorizer,
 
+  -- *** Auto-creation of receipt allocations
+  ensureIsReceiptAllocation,
+
   -- ** Allocation implementation
 
   -- *** Ensures clauses
@@ -100,15 +103,13 @@ module Splice.TokenStandard.Utils (
 
   -- ** Settlement factory implementation
   settlementFactoryV2_settleBatchDefaultImpl,
-  settlementFactoryV2_defaultCreateReceiptAllocation,
 
   -- *** Extra observers
   settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl,
   settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl,
 
   -- *** Support for custom batch settlement
-  PreparedAllocations(..),
-  validateAndPrepareAllocations,
+  fetchAndValidateAllocations,
 
   -- * Allocation request implementation
 

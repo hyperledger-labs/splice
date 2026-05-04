@@ -24,6 +24,8 @@ class HttpTokenStandardScanProxyHandler(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends allocation.v1.Handler[AuthenticatedRequest]
+    with allocation.v2.Handler[AuthenticatedRequest]
+    // TODO (#5326): implement remaining v2 endpoints
     with allocationinstruction.v1.Handler[AuthenticatedRequest]
     with metadata.v1.Handler[AuthenticatedRequest]
     with transferinstruction.v1.Handler[AuthenticatedRequest]
@@ -104,6 +106,36 @@ class HttpTokenStandardScanProxyHandler(
           body,
         )
         .map(allocation.v1.Resource.GetAllocationCancelContextResponse.OK(_))
+    }
+  }
+
+  override def getSettlementFactory(
+      respond: allocation.v2.Resource.GetSettlementFactoryResponse.type
+  )(
+      body: allocation.v2.definitions.GetFactoryRequest
+  )(extracted: AuthenticatedRequest): Future[allocation.v2.Resource.GetSettlementFactoryResponse] =
+    Future.failed(io.grpc.Status.UNIMPLEMENTED.withDescription("TODO #5326").asRuntimeException())
+
+  override def getAllocationWithdrawContext(
+      respond: allocation.v2.Resource.GetAllocationWithdrawContextResponse.type
+  )(allocationId: String, body: allocation.v2.definitions.GetChoiceContextRequest)(
+      extracted: AuthenticatedRequest
+  ): Future[allocation.v2.Resource.GetAllocationWithdrawContextResponse] =
+    Future.failed(io.grpc.Status.UNIMPLEMENTED.withDescription("TODO #5326").asRuntimeException())
+
+  override def getAllocationCancelContext(
+      respond: allocation.v2.Resource.GetAllocationCancelContextResponse.type
+  )(allocationId: String, body: allocation.v2.definitions.GetChoiceContextRequest)(
+      user: AuthenticatedRequest
+  ): Future[allocation.v2.Resource.GetAllocationCancelContextResponse] = {
+    implicit val AuthenticatedRequest(_, tc) = user
+    withSpan(s"$workflowId.getAllocationCancelContext") { implicit tc => _ =>
+      scanConnection
+        .getAllocationV2CancelContextRaw(
+          allocationId,
+          body,
+        )
+        .map(allocation.v2.Resource.GetAllocationCancelContextResponse.OK)
     }
   }
 

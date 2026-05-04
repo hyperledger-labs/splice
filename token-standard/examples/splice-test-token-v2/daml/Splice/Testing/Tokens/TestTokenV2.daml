@@ -56,8 +56,7 @@ template TokenAllocationV2 with
           -- for the `admin` to expire the allocation. We don't need it for testing though.
         allocation
         holdingCids = map toInterfaceContractId lockedTokens
-        extraSettlementAuthorizers = []
-        availableActions = allocationV2_availableActionsDefault allocation []
+        availableActions = allocationV2_availableActionsDefault allocation
         meta = emptyMetadata
 
       -- No extra observers required, as the choice bodies do not introduce further informees.
@@ -212,13 +211,7 @@ template TokenRules with
         meta = emptyMetadata
 
       settlementFactory_settleBatchImpl self arg =
-        let createReceiptAllocation =
-              settlementFactoryV2_defaultCreateReceiptAllocation
-                (coerceContractId self)
-                (\account -> [account.owner])
-                arg
-        in
-          settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
+        settlementFactoryV2_settleBatchDefaultImpl admin self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
       settlementFactory_settleBatchExtraObservers _arg = []

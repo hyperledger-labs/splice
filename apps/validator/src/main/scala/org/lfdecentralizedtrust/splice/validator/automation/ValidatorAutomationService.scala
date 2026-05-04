@@ -36,7 +36,6 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.lsu.RollForwardLsuTrigger
-import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.automation.{
@@ -47,7 +46,6 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 
-import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
@@ -71,7 +69,6 @@ class ValidatorAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,
     domainConnector: DomainConnector,
-    domainMigrationDumpPath: Option[Path],
     domainMigrationId: Long,
     retryProvider: RetryProvider,
     svValidator: Boolean,
@@ -271,26 +268,8 @@ class ValidatorAutomationService(
   )
 
   if (!svValidator) {
-    domainMigrationDumpPath.fold(
-      logger.info(
-        "Not starting SynchronizerUpgradeTrigger, as no domain migration dump path is configured."
-      )(TraceContext.empty)
-    ) { path =>
-      registerTrigger(
-        new DecentralizedSynchronizerMigrationTrigger(
-          domainMigrationId,
-          triggerContext,
-          connection(SpliceLedgerConnectionPriority.Medium),
-          participantAdminConnection,
-          path,
-          scanConnection,
-          enabledFeatures,
-        )
-      )
-    }
-
     registerTrigger(
-      new RollForwardLsuTrigger(
+      RollForwardLsuTrigger(
         participantAdminConnection,
         scanConnection,
         globalSynchronizerAlias,

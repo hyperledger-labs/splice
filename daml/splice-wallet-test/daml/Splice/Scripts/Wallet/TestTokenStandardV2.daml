@@ -36,7 +36,7 @@ setupInstall : Party -> Text -> Script (Party, Party, ContractId WalletAppInstal
 setupInstall dsoParty name = do
   validatorParty <- allocateParty (name <> "Validator")
   endUserParty <- allocateParty name
-  installCid <- submitMulti [endUserParty, validatorParty] [] $ createCmd WalletAppInstall with
+  installCid <- submit (actAs endUserParty <> actAs validatorParty) $ createCmd WalletAppInstall with
     endUserParty
     endUserName = name <> "_user"
     dsoParty
@@ -108,7 +108,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   let change3 = result.senderChangeCids
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $
     exerciseCmd bobInstall WalletAppInstall_TransferInstructionV2_Reject with
       transferInstructionCid = aliceInstrCid
       rejectArg = Api.Token.TransferInstructionV2.TransferInstruction_Reject with
@@ -126,7 +126,7 @@ testTokenStandardTransfer = script do
   Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
   context <- RegistryApiV2.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
 
-  result <- submitMulti [bobValidator] [bob, registry.dso] $
+  result <- submit (actAs bobValidator <> readAs bob <> readAs registry.dso) $
     exerciseCmd bobInstall WalletAppInstall_TransferInstructionV2_Accept with
       transferInstructionCid = aliceInstrCid
       acceptArg = Api.Token.TransferInstructionV2.TransferInstruction_Accept with
@@ -181,7 +181,6 @@ testTokenStandardAllocateV2 = script do
     createdAt = now
     settleAt = now `addRelTime` hours 1
     settlementDeadline = Some (now `addRelTime` hours 2)
-    autoReceiptAuthorizers = []
 
   -- venue creates allocation requests
   submit venue $ exerciseCmd otcTradeCid TradingAppV2.OTCTrade_RequestAllocations

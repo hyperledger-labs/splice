@@ -29,13 +29,15 @@ Requirements
 
   tar xzvf |version|\_splice-node.tar.gz
 
-5) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
-   If it has, please record the current migration ID of the synchronizer.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+5) Please inquire the migration id and serial id of the global synchronizer on your target network.
+   The migration ID is frozen at the value after the last major upgrade and is only used for ``migration.id`` in the helm chart values.
+   The serial ID is 0 for the initial synchronizer deployment and is incremented by 1 for each :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>`.
+   The serial ID is used for helm release names, DNS entries, database names, and deployment naming.
 
 .. code-block:: bash
 
    export MIGRATION_ID=0
+   export SERIAL_ID=0
 
 .. include:: ../common/backup_suggestion.rst
 
@@ -565,7 +567,7 @@ that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml
 
 - Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
 - Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
-- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
+- Replace all instances of ``SERIAL_ID`` with the serial ID of the global synchronizer on your target cluster. Note that ``SERIAL_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBFT node
 - Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
@@ -585,12 +587,13 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 
 Please modify the file ``splice-node/examples/sv-helm/global-domain-values.yaml`` as follows:
 
-- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``SERIAL_ID`` with the serial ID of the global synchronizer on your target cluster.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
 
 Please modify the file ``splice-node/examples/sv-helm/scan-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``SERIAL_ID`` with the serial ID of the global synchronizer on your target cluster.
 
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
@@ -609,6 +612,7 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/sv-validator
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``SERIAL_ID`` with the serial ID of the global synchronizer on your target cluster.
 
 The private and public key for your SV are defined in a K8s secret.
 If you haven't done so yet, please first follow the instructions in
@@ -628,6 +632,7 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``SERIAL_ID`` with the serial ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the ``auth.audience`` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
@@ -644,11 +649,6 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
 - Optionally, uncomment the line for ``initialAmuletPrice`` and set it to your desired amulet price.
   This will create an amulet price vote from your SV with the configured price when onboarded.
   If not set, no vote will be cast. This can always be done later manually from the SV app UI.
-
-If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, in your ``sv-values.yaml``:
-
-- set ``migrating`` to ``true``
-- set ``legacyId`` to the value of migration ID before incremented (``MIGRATION_ID`` - 1)
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
     :language: yaml
@@ -688,14 +688,19 @@ Install the Canton and CometBFT components:
 
 .. parsed-literal::
 
-    helm install global-domain-${MIGRATION_ID}-cometbft |helm_repo_prefix|/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
-    helm install global-domain-${MIGRATION_ID} |helm_repo_prefix|/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant-${MIGRATION_ID} |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
+    helm install global-domain-${SERIAL_ID}-cometbft |helm_repo_prefix|/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain-${SERIAL_ID} |helm_repo_prefix|/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
 
-Note that we use the migration ID when naming Canton components.
-This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
+Note that we use the serial ID when naming Canton synchronizer components.
+This is to support operating multiple instances of these components side by side as part of a :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>`.
 
-Install the SV node apps (replace ``helm install`` in these commands with ``helm upgrade`` if you are following :ref:`sv-upgrades-deploying-apps`):
+Install the participant:
+
+.. parsed-literal::
+
+    helm install participant |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
+
+Install the SV node apps:
 
 .. parsed-literal::
 
@@ -803,11 +808,11 @@ Each SV is required to configure their cluster ingress to allow traffic from the
 * ``https://scan.sv.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace.
 * ``https://scan.sv.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
 * ``https://scan.sv.<YOUR_HOSTNAME>/registry`` should be routed to ``/registry`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
-* ``global-domain-<MIGRATION_ID>-cometbft.sv.<YOUR_HOSTNAME>:26<MIGRATION_ID>56`` should be routed to port 26656 of service ``global-domain-<MIGRATION_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
+* ``global-domain-<SERIAL_ID>-cometbft.sv.<YOUR_HOSTNAME>:26<SERIAL_ID>56`` should be routed to port 26656 of service ``global-domain-<SERIAL_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
 * ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
-* ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
+* ``https://sequencer-<SERIAL_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<SERIAL_ID>-sequencer`` in the ``sv`` namespace.
 * ``https://info.sv.<YOUR_HOSTNAME>`` should be routed to service ``info`` in the ``sv`` namespace. This endpoint should be publicly accessible without any IP restrictions.
 
 .. warning::
@@ -829,8 +834,8 @@ To check whether the sequencer is accessible, we can use the command below with 
 
     grpcurl <sequencer host>:<sequencer port> grpc.health.v1.Health/Check
 
-If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME:443``
-Please replace ``YOUR_HOSTNAME`` with your host name and ``MIGRATION_ID`` with the migration ID of the synchronizer that the sequencer is part of.
+If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-SERIAL_ID.sv.YOUR_HOSTNAME:443``
+Please replace ``YOUR_HOSTNAME`` with your host name and ``SERIAL_ID`` with the serial ID of the synchronizer that the sequencer is part of.
 
 If you see the response below, it means the sequencer is up and accessible through the URL.
 
@@ -1006,7 +1011,7 @@ Configuring the Cluster Egress
 
 Below is a complete list of destinations for outbound traffic from the Super Validator node.
 This list is useful for an SV that wishes to limit egress to only allow the minimum necessary outbound traffic.
-``M`` will be used a shorthand for ``MIGRATION_ID``.
+``S`` will be used a shorthand for ``SERIAL_ID``.
 The tables below are wide - you might need to scroll vertically to see the rightmost columns.
 
 Connectivity to the following destinations is required throughout operation to ensure the robustness of the ordering layer and scan:
@@ -1014,7 +1019,7 @@ Connectivity to the following destinations is required throughout operation to e
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
-CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
+CometBft P2P           CometBft p2p IPs and ports 26<S>16, 26<S>26, 26<S>36, 26<S>46, 26<S>56                           TCP       global-domain-<S>-cometbft
 All SV Scans           all returned from https://scan.sv-1.<TARGET_HOSTNAME>/api/scan/v0/scans                          HTTPS     scan-app
 ====================== ================================================================================================ ========= ==============
 
@@ -1037,8 +1042,8 @@ the SV node must be able to reach its onboarding sponsor and all scan instances 
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
 Sponsor SV             sv.sv-1.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
-CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
-Sponsor SV Sequencer   sequencer-<M>.sv-1.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
+CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<S>-cometbft
+Sponsor SV Sequencer   sequencer-<S>.sv-1.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<S>
 Sponsor SV Scan        scan.sv-1.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
 ====================== ================================================================================================ ========= ==============
 

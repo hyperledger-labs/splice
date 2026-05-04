@@ -1443,7 +1443,8 @@ lazy val `apps-common-frontend` = {
           (`splitwell-daml` / Compile / damlBuild).value ++
           (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
           // not implemented by any daml code above
-          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
+          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-request-v2-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value ++ (`token-standard-cli` / Compile / npmInstall).value,
@@ -2272,8 +2273,6 @@ lazy val `apps-app`: Project =
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       libraryDependencies += kubernetes_client,
-      libraryDependencies +=
-        "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
@@ -2465,11 +2464,6 @@ updateTestConfigForParallelRuns := {
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
-    ),
-    (
-      "BigQuery-accessing tests",
-      "test-full-class-names-bigquery.log",
-      (t: String) => t contains "BigQuery",
     ),
     (
       "resource intensive tests",

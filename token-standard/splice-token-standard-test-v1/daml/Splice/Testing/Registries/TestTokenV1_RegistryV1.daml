@@ -66,7 +66,7 @@ initialize config = do
 -- | Mint test token instrument
 mint : TestTokenV1Registry -> Party -> Text -> Decimal -> Script (ContractId V1.Holding)
 mint registry user intrumentName amount = do
-  tokenCid <- submitMulti [user, registry.admin] [] $ createCmd TestTokenV1.Token with
+  tokenCid <- submit (actAs user <> actAs registry.admin) $ createCmd TestTokenV1.Token with
     holding = V1.HoldingView with
       owner = user
       amount = amount

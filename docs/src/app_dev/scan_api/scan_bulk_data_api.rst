@@ -73,7 +73,7 @@ The below table provides a quick overview of the endpoints that the Scan Bulk Da
      - Returns the ACS Snapshot for a given record time
 
 If you would rather read the yaml Open API specification file directly, this can be found in the Splice repository at
-`scan.yaml <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan.yaml>`_.
+`scan.yaml <https://github.com/canton-network/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan.yaml>`_.
 
 Example URLs for accessing the Scan Bulk Data API are:
 
@@ -145,7 +145,7 @@ and ``after_migration_id`` is the migration ID that was active at that time.
 
 Note that the record time ranges of different migrations may overlap,
 i.e., the record time can go back after a hard domain migration.
-Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/main/apps/scan/src/main/openapi/scan.yaml>`_
+Read the `OpenAPI documentation <https://github.com/canton-network/splice/blob/main/apps/scan/src/main/openapi/scan.yaml>`_
 to understand how the ``after_migration_id`` field affects the response.
 
 If you don't know what migration ID was active at the chosen time,
@@ -226,7 +226,7 @@ An exercised event has the following important fields:
   traverse events in preorder (process them recursively).
 * **consuming**: A boolean indicating whether the contract is archived by the exercise. If true, the contract is archived. This is important if you want to track the ACS.
 
-See the `ExercisedEvent <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/canton/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/event.proto#L166>`_ protobuf message definition for a complete description of the event.
+See the `ExercisedEvent <https://github.com/canton-network/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/canton/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/event.proto#L166>`_ protobuf message definition for a complete description of the event.
 
 An example of an exercised event in the ``events_by_id`` object is shown below:
 
@@ -351,7 +351,7 @@ A created event has the following important fields:
 * **contract_id**: The contract ID uniquely identifies the contract.
 * **create_arguments**: The arguments used to create the contract, encoded in JSON
 
-See the `CreatedEvent <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/canton/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/event.proto#L33>`_ protobuf message definition for a complete description of the event.
+See the `CreatedEvent <https://github.com/canton-network/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/canton/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/event.proto#L33>`_ protobuf message definition for a complete description of the event.
 
 In this case the ``create_arguments`` contains the fields that are used to create the contract, such as the round number, the price of the Amulet,
 the time the round opens and closes, and the configuration for Amulet transfers and issuance.

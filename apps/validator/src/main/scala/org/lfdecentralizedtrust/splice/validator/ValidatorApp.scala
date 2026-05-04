@@ -94,7 +94,8 @@ import org.lfdecentralizedtrust.splice.wallet.admin.http.{
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
-import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
+import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationV1Resource
+import org.lfdecentralizedtrust.tokenstandard.allocation.v2.Resource as TokenStandardAllocationV2Resource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
@@ -484,7 +485,7 @@ class ValidatorApp(
       logger: TracedLogger,
       retryProvider: RetryProvider,
   )(implicit traceContext: TraceContext): Future[ByteString] =
-    // TODO (hyperledger-labs/splice#4026) use the standard BftScanConnection instead of creating a new SingleScanConnection.
+    // TODO (canton-network/splice#4026) use the standard BftScanConnection instead of creating a new SingleScanConnection.
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "get_acs_snapshot_from_single_scan",
@@ -895,7 +896,6 @@ class ValidatorApp(
           retryProvider,
           loggerFactory,
         ),
-        config.domainMigrationDumpPath,
         config.domainMigrationId,
         retryProvider,
         config.svValidator,
@@ -1111,6 +1111,26 @@ class ValidatorApp(
                     },
                 ),
                 pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
+                  TokenStandardAllocationV2Resource.routes(
+                    tokenStandardScanProxyHandler,
+                    operation => {
+                      metrics.httpServerMetrics
+                        .withMetrics("tokenStandardAllocationV2")(operation)
+                        .tflatMap { _ =>
+                          AuthenticationOnlyAuthExtractor(
+                            verifier,
+                            loggerFactory,
+                            OAuthRealms.ScanProxy,
+                          )(
+                            traceContext
+                          )(
+                            operation
+                          )
+                        }
+                    },
+                  )
+                },
+                pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
                   concat(
                     TokenStandardMetadataResource.routes(
                       tokenStandardScanProxyHandler,
@@ -1164,7 +1184,7 @@ class ValidatorApp(
                             )
                           },
                     ),
-                    TokenStandardAllocationResource.routes(
+                    TokenStandardAllocationV1Resource.routes(
                       tokenStandardScanProxyHandler,
                       operation =>
                         metrics.httpServerMetrics

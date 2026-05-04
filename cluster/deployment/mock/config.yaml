@@ -44,7 +44,7 @@ synchronizerMigration:
       version: 0.3.18
       releaseReference:
         gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
-        repoUrl: https://github.com/hyperledger-labs/splice
+        repoUrl: https://github.com/canton-network/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
         deploymentDir: "cluster/deployment"
@@ -53,7 +53,7 @@ synchronizerMigration:
       version: 0.3.19
       releaseReference:
         gitReference: "refs/heads/release-line-0.3.19"
-        repoUrl: https://github.com/hyperledger-labs/splice
+        repoUrl: https://github.com/canton-network/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
         deploymentDir: "cluster/deployment"
@@ -63,7 +63,7 @@ synchronizerMigration:
     version: 0.3.20
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.20"
-      repoUrl: https://github.com/hyperledger-labs/splice
+      repoUrl: https://github.com/canton-network/splice
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "cluster/deployment"
@@ -78,7 +78,7 @@ synchronizerMigration:
       enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
-      repoUrl: https://github.com/hyperledger-labs/splice
+      repoUrl: https://github.com/canton-network/splice
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "cluster/deployment"
@@ -149,90 +149,10 @@ loadTester:
     windowStartUTC: "02:30"
     windowDurationMinutes: 150
 svs:
-  default:
-    appsPg:
-      cloudSql:
-        enabled: true
-        tier: "apps-pg-override-tier"
-    pruning:
-      cometbft:
-        retainBlocks: 5040000
-      sequencer:
-        enabled: true
-        pruningInterval: "1 hour"
-        retentionPeriod: "30 days"
-      mediator:
-        enabled: true
-        cron: "0 0 * * *"
-        maxDuration: "30m"
-        retentionPeriod: "7d"
-    cometbft:
-      mempool:
-        size: 4000
-    scanApp:
-      additionalEnvVars:
-        - name: CUSTOM_MOCK_ENV_VAR_NAME
-          value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomScanAppJvmFlag"
-      resources:
-        requests:
-          cpu: "0.5"
-          memory: '1536Mi'
-        limits:
-          memory: '2048Mi'
-    svApp:
-      additionalPackagesToUnvet:
-        splice-wallet-payments: [ "0.1.15", "0.1.16" ]
-        splice-amulet: [ "0.1.15" ]
-      permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
-      additionalEnvVars:
-        - name: CUSTOM_MOCK_ENV_VAR_NAME
-          value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomSvAppJvmFlag"
-      resources:
-        requests:
-          cpu: "1"
-          memory: '1Gi'
-        limits:
-          memory: '2Gi'
-    participant:
-      additionalEnvVars: !append
-        - name: CUSTOM_MOCK_ENV_VAR_NAME
-          value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomParticipantJvmFlag"
-    sequencer:
-      additionalEnvVars:
-        - name: CUSTOM_MOCK_ENV_VAR_NAME
-          value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomSequencerJvmFlag"
-      cloudSql:
-        tier: "sequencer-override-tier"
-      resources:
-        requests:
-          cpu: "1"
-          memory: '1Gi'
-        limits:
-          memory: '2Gi'
-    mediator:
-      additionalEnvVars:
-        - name: CUSTOM_MOCK_ENV_VAR_NAME
-          value: CUSTOM_MOCK_ENV_VAR_VALUE
-      additionalJvmOptions: "-DcustomMediatorJvmFlag"
-      resources:
-        requests:
-          cpu: "1"
-          memory: '1Gi'
-        limits:
-          memory: '2Gi'
-    logging:
-      appsLogLevel: WARN
-      cantonLogLevel: INFO
-      cantonStdoutLogLevel: DEBUG
-      apiRequestLogLevel: DEBUG
-  sv:
+  sv: !include(sv.yaml)
     participant:
       bftSequencerConnection: false
-  sv-1:
+  sv-1: !include(sv.yaml)
     appsPg:
       cloudSql:
         tier: "apps-pg-override-tier-sv-1"
@@ -255,7 +175,8 @@ svs:
     validatorApp:
       sweep:
         fromEnv: SV1
-  sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
+  sv-2: !include(sv.yaml) {}
+  sv-da-1: !include(sv.yaml) # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
     subdomain: sv-1
     pruning:
@@ -335,7 +256,7 @@ cluster:
       minNodes: 0
       maxNodes: 1
 gha:
-  githubRepo: "https://github.com/hyperledger-labs/splice"
+  githubRepo: "https://github.com/canton-network/splice"
   runnerVersion: "0.5.10"
   runnerHookVersion: "0.5.10"
   runnerScaleSetVersion: "0.13.1"

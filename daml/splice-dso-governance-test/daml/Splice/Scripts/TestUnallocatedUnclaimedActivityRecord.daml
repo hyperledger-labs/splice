@@ -51,7 +51,7 @@ test_UnclaimedActivityRecord_FullFlow = do
 
   -- Allocate UnallocatedUnclaimedActivityRecord
   [(unallocatedUnclaimedActivityRecordCid, _)] <- query @UnallocatedUnclaimedActivityRecord dso
-  submitMulti [sv2] [dso] $
+  submit (actAs sv2 <> readAs dso) $
     exerciseCmd dsoRulesCid
       DsoRules_AllocateUnallocatedUnclaimedActivityRecord with
         unallocatedUnclaimedActivityRecordCid
@@ -65,7 +65,7 @@ test_UnclaimedActivityRecord_FullFlow = do
   [(unclaimedActivityRecordCid, _)] <- query @UnclaimedActivityRecord alice
   context <- getPaymentTransferContext app AmuletUser with userId = aliceUserId; primaryParty = alice
   transferResult <-
-    submitMulti [alice] [dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs alice <> readAs dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice
         provider = alice
@@ -227,7 +227,7 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
       expiresAt
 
   -- Unhappy path - UnclaimedActivityRecordCid has not expired
-  submitMultiMustFail [sv2] [dso] $
+  submitMustFail (actAs sv2 <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with
       unclaimedActivityRecordCid
       sv = sv2
@@ -236,7 +236,7 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
   _ <- do
     setTime expiresAt
     DsoRules_ExpireUnclaimedActivityRecordResult unclaimedRewardCid <-
-      submitMulti [sv2] [dso] $
+      submit (actAs sv2 <> readAs dso) $
         exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with
           unclaimedActivityRecordCid
           sv = sv2
@@ -261,7 +261,7 @@ allocateMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
   -- Create UnclaimedRewards
   unclaimedRewardsToBurnCids <- forA unclaimedRewardAmounts (mkUnclaimedReward dso)
   -- Allocate the UnallocatedUnclaimedActivityRecord
-  submitMultiMustFail [sv] [dso] $
+  submitMustFail (actAs sv <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_AllocateUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
@@ -277,7 +277,7 @@ allocate unallocatedUnclaimedActivityRecordCid optExpectedLeftover TestContext{.
   -- Create UnclaimedRewards
   unclaimedRewardsToBurnCids <- forA unclaimedRewardAmounts (mkUnclaimedReward dso)
   -- Allocate the UnallocatedUnclaimedActivityRecord
-  optUnclaimedRewardCid <- (.optUnclaimedRewardCid) <$> submitMulti [sv] [dso] do
+  optUnclaimedRewardCid <- (.optUnclaimedRewardCid) <$> submit (actAs sv <> readAs dso) do
     exerciseCmd dsoRulesCid DsoRules_AllocateUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
@@ -290,14 +290,14 @@ allocate unallocatedUnclaimedActivityRecordCid optExpectedLeftover TestContext{.
 
 expireMustFail : ContractId UnallocatedUnclaimedActivityRecord -> TestContext -> Script ()
 expireMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
-  submitMultiMustFail [sv] [dso] $
+  submitMustFail (actAs sv <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_ExpireUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       sv
 
 expire : ContractId UnallocatedUnclaimedActivityRecord -> TestContext -> Script ()
 expire unallocatedUnclaimedActivityRecordCid TestContext{..} = do
-  void $ submitMulti [sv] [dso] $
+  void $ submit (actAs sv <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_ExpireUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       sv

@@ -26,7 +26,8 @@ class WalletMetricsTest
     "update when tapping coin" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      eventually() {
+      // metrics.get can throw non-test-failure exceptions
+      eventually(retryOnTestFailuresOnly = false) {
         aliceValidatorBackend.metrics
           .get(
             s"$MetricsPrefix.wallet.unlocked-amulet-balance",
@@ -89,7 +90,8 @@ class WalletMetricsTest
       aliceWalletClient.tap(100.0)
       p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 50.0)
 
-      eventually() {
+      // metrics.get can throw non-test-failure exceptions
+      eventually(retryOnTestFailuresOnly = false) {
         // Polling triggers
         // Not exhaustive, only triggers configured to run (e.g., no WalletSweepTrigger)
         Seq(

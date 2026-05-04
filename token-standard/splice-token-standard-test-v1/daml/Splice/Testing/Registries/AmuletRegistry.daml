@@ -156,7 +156,7 @@ createLockedAmulet : AmuletRegistry -> Party -> Decimal -> TimeLock -> Script (C
 createLockedAmulet registry user amount lock = do
   (_, openRound) <- getLatestOpenRound registry
   let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
-  lockedAmuletCid <- submitMulti [user, registry.dso] [] $ createCmd LockedAmulet with
+  lockedAmuletCid <- submit (actAs user <> actAs registry.dso) $ createCmd LockedAmulet with
     lock
     amulet = Amulet with
       dso = registry.dso
@@ -172,7 +172,7 @@ createLockedAmulet registry user amount lock = do
 createTransferPreapproval : AmuletRegistry -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
 createTransferPreapproval registry receiver provider expiresAt = do
   now <- getTime
-  submitMulti [receiver, provider, registry.dso] [] $ createCmd TransferPreapproval with
+  submit (actAs receiver <> actAs provider <> actAs registry.dso) $ createCmd TransferPreapproval with
       receiver
       provider
       dso = registry.dso
@@ -184,7 +184,7 @@ createTransferPreapproval registry receiver provider expiresAt = do
 featureApp : AmuletRegistry -> Party -> Script (ContractId FeaturedAppRight)
 featureApp registry provider = do
   (amuletRulesCid, _) <- getAmuletRules registry
-  result <- submitMulti [provider] [registry.dso] $ exerciseCmd amuletRulesCid AmuletRules_DevNet_FeatureApp with
+  result <- submit (actAs provider <> readAs registry.dso) $ exerciseCmd amuletRulesCid AmuletRules_DevNet_FeatureApp with
     provider
   return result.featuredAppRightCid
 

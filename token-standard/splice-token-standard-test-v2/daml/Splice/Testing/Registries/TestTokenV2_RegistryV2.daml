@@ -15,6 +15,8 @@ module Splice.Testing.Registries.TestTokenV2_RegistryV2
   ) where
 
 
+import DA.Foldable (foldMap)
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
@@ -71,7 +73,7 @@ initialize config = do
 mint : TestTokenV2Registry -> V2.Account -> Text -> Decimal -> Script (ContractId V2.Holding)
 mint registry account intrumentName amount = do
   -- TODO(#4813): perform the mint via a transfer from `Account admin "cip-112/mint` once we have transfer support
-  tokenCid <- submitMulti (registry.admin :: accountParties account) [] $ createCmd TestTokenV2.Token with
+  tokenCid <- submit (foldMap actAs (registry.admin :: accountParties account)) $ createCmd TestTokenV2.Token with
     holding = V2.HoldingView with
       account
       amount = amount

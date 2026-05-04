@@ -194,7 +194,7 @@ allocateDevelopmentFundCouponMustFail
   -> Script ()
 allocateDevelopmentFundCouponMustFail app fundManager beneficiary amount expiresAt reason unclaimedDevelopmentFundCouponCids = do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-  submitMultiMustFail [fundManager] [app.dso] do
+  submitMustFail (actAs fundManager <> readAs app.dso) do
     exerciseCmd amuletRulesCid AmuletRules_AllocateDevelopmentFundCoupon with
       unclaimedDevelopmentFundCouponCids
       beneficiary

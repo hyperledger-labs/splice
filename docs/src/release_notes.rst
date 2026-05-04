@@ -18,6 +18,63 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.6.2
+
+    Note: 0.6.1 and 0.6.0 were skipped on TestNet and MainNet due to regressions uncovered on DevNet.
+
+    - Scan app
+
+        - Note that the following endpoints that have been deprecated are planned for removal
+          in the next release (0.6.3), or the following one (0.6.4) at the latest:
+
+          - ``/v0/closed-rounds``
+          - ``/v0/top-validators-by-validator-faucets``
+          - ``/v0/synchronizer-identities/{domain_id_prefix}``
+          - ``/v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}``
+          - ``/v0/aggregated-rounds``
+          - ``/v0/round-totals``
+          - ``/v0/round-party-totals``
+          - ``/v0/amulet-config-for-round``
+          - ``/v0/round-of-latest-data``
+          - ``/v0/rewards-collected``
+          - ``/v0/top-providers-by-app-rewards``
+          - ``/v0/top-validators-by-validator-rewards``
+          - ``/v0/top-validators-by-purchased-traffic``
+          - ``/v0/activities``
+          - ``/v0/transactions``
+
+    - SV / Validator apps
+
+        - Hard Domain Migrations (HDMs) and HDM-based disaster recovery are no longer supported.
+          In particular:
+
+          - the validator configuration ``domain-migration-dump-path`` was removed,
+          - the SV onboarding mode ``domain-migration`` (``name`` / ``dump-file-path``) was removed.
+
+          Logical synchronizer upgrades (LSU) are now the only supported mechanism for
+          protocol upgrades and network-wide disaster recovery.
+
+        - Updated the documentation to clarify that the ``MIGRATION_ID`` will not change in the future and that all validators should keep the current value for the foreseeable future.
+        - Updated the Logical Synchronizer Upgrade documentation to include details for Roll Forward LSUs used for disaster recovery.
+
+    - Deployment
+
+        - SV only: Introduced the concept of **serial ID** alongside the existing **migration ID** for synchronizer deployment.
+          The migration ID is now frozen at its current value and configured only once, as the ``migration.id`` field in helm chart values.
+          The serial ID is incremented by 1 for each :ref:`logical synchronizer upgrade <sv-logical-synchronizer-upgrades>` and replaces the migration ID
+          in synchronizer (sequencer/mediator/CometBFT) release names, DNS entries, DB names, chain IDs and port numbers. Participant naming and the participant DB name continue to use MIGRATION_ID, which is now frozen.
+          All example YAML files and documentation have been updated to use ``SERIAL_ID`` for addressing and ``MIGRATION_ID`` for migration-specific configuration.
+          For existing networks, ``SERIAL_ID`` must initially be set to the current value of ``MIGRATION_ID``.
+          Newly initialized networks start with ``SERIAL_ID=0``.
+          This also changed the name of the participant helm installation in the documentation, along with the ``participantAddress`` in ``sv-values.yaml``. You can either reinstall the helm chart with the new name or ensure the ``participantAddress`` reflects the name of your helm chart installation.
+
+        - Fixed a regression introduced in 0.6.1 where the ``reloader.stakater.com/auto`` annotation was silently dropped from all Deployments rendered by the Splice helm charts, disabling the auto-reload behaviour regardless of the ``enableReloader`` value.
+
+    - Canton
+
+        - Bugfixes and stability improvements.
+          Among other things, fix a regression in 0.6.0/0.6.1 which causes participants to get stuck at random times, requiring a restart to recover.
+
 .. release-notes:: 0.6.1
 
     Note: 0.6.0 was skipped as it introduced a regression where the SV UI governance page can become unusable due to slow SQL query.
@@ -169,10 +226,10 @@
           `CIP-104 incremental roll-out plan <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`_.
 
           The responses from the ``/v0/events`` and ``/v0/events/{update_id}``
-          `endpoints <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`_
+          `endpoints <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`_
           now include the
-          ``traffic_summary`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`_) and
-          ``app_activity_records`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`_)
+          ``traffic_summary`` (`schema <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`_) and
+          ``app_activity_records`` (`schema <https://github.com/canton-network/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`_)
           fields.
 
           .. note::
@@ -560,7 +617,7 @@
 
     - Wallet backend
 
-      - Fix a bug (`#3970 <https://github.com/hyperledger-labs/splice/issues/3970>`__) that caused transaction history
+      - Fix a bug (`#3970 <https://github.com/canton-network/splice/issues/3970>`__) that caused transaction history
         for entries created by Splice versions prior to 0.5.11 to fail to decode in the backend and thus not show in the
         wallet UI.
         These entries are now shown again in the wallet UI.
@@ -841,7 +898,7 @@
           ``DevelopmentFundCoupon``, restoring its amount to an ``UnclaimedDevelopmentFundCoupon``.
 
       Note that the UI changes in the Wallet app required to allocate funds are not yet implemented and will be delivered in a later release. Please refer to
-      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/hyperledger-labs/splice/issues/3218>`.
+      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/canton-network/splice/issues/3218>`.
 
       These Daml changes require an upgrade to the following Daml versions **before**
       voting to set the transfer fees to zero:
@@ -993,7 +1050,7 @@
 
   - Docs
 
-    - Improvements to validator docs on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+    - Improvements to validator docs on Synchronizer Upgrades with Downtime.
 
 .. release-notes:: 0.5.1
 
@@ -1011,7 +1068,7 @@
 
       Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
       For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
-      as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
+      as well as the respective documentation pages for validators and SVs.
 
   - Deployment
 
@@ -1071,13 +1128,13 @@
 
     - Scan
 
-        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/canton-network/splice/pull/2860>`_
 
-        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/canton-network/splice/pull/2861>`_
 
   - Deployment
 
-    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/canton-network/splice/pull/2972>`_
 
 .. release-notes:: 0.4.22
 
@@ -1309,7 +1366,7 @@
 
     - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
       ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
-      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+      Thanks to Marcin Kocur for contributing this change in https://github.com/canton-network/splice/pull/2171
 
 - LocalNet
 
@@ -1318,7 +1375,7 @@
 - Community docs
 
   - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
-    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
+    Thanks to mikeProDev for contributing this change in https://github.com/canton-network/splice/pull/2247
 
 0.4.16
 ------
@@ -1449,13 +1506,13 @@
 
     - Add Vagrantfile as a convenient way to spin up a local development
       environment for Splice. See `README.vagrant.md
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+      <https://github.com/canton-network/splice/blob/0.4.12/README.vagrant.md>`_
       and `Vagrantfile
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+      <https://github.com/canton-network/splice/blob/0.4.12/Vagrantfile>`_ for
       details.
 
   - A subset of the tests now run on PRs from forks without approval from a maintainer
-    (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
+    (see `TESTING.md <https://github.com/canton-network/splice/blob/0.4.12/TESTING.md>` for details)
 
 - Performance improvements
 
@@ -1601,11 +1658,11 @@ which can happen in certain cases when the sequencer is down.
 
 - Scan
 
-  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+  - Fix `bug #1252 <https://github.com/canton-network/splice/issues/1252>`_:
     populate the token metadata total supply using the aggregates used for closed rounds.
     The data used corresponds to the data served by the ``/v0/total-amulet-balance``
     endpoint in :ref:`app_dev_scan_api` for the latest closed round.
-  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+  - Fix `bug #1280 <https://github.com/canton-network/splice/pull/1280>`_:
     ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
 
 - Validator
@@ -1690,7 +1747,7 @@ which can happen in certain cases when the sequencer is down.
             weight: 1000
 
     Thanks to Divam Narula for contributing this change
-    in https://github.com/hyperledger-labs/splice/pull/1371
+    in https://github.com/canton-network/splice/pull/1371
 
 - Daml
 
@@ -1847,7 +1904,7 @@ which can happen in certain cases when the sequencer is down.
 
 - Scan
 
-  - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
+  - Fix a `bug (#1254) <https://github.com/canton-network/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
     based on the ``splice-instance-names`` config.
 
 - Validator
@@ -1880,10 +1937,10 @@ which can happen in certain cases when the sequencer is down.
 
 - Validator
 
-  - Fix a `bug (#1216) <https://github.com/hyperledger-labs/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
+  - Fix a `bug (#1216) <https://github.com/canton-network/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
     if the receiver's provider party was featured.
   - Fix a bug where uploading dars would not immediately vet the dependencies that had a vetting entry effective in the future.
-  - Fix a `bug (#1215)  <https://github.com/hyperledger-labs/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
+  - Fix a `bug (#1215)  <https://github.com/canton-network/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
 
 - Synchronizer Migrations
 
@@ -1921,7 +1978,7 @@ which can happen in certain cases when the sequencer is down.
     specify path to `identities.json` and not directory containing it. This is
     consistent with the :ref:`documented
     <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
-    `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+    `#387 <https://github.com/canton-network/splice/pull/387>`_
 
 - Auth
 
@@ -1943,7 +2000,7 @@ which can happen in certain cases when the sequencer is down.
 - Define `standard k8s labels <https://helm.sh/docs/chart_best_practices/labels/#standard-labels>`_
   for most k8s resources deployed through Splice Helm charts.
   Thanks to Stephane Loeuillet for contributing an initial proposal for this change
-  in https://github.com/hyperledger-labs/splice/pull/296.
+  in https://github.com/canton-network/splice/pull/296.
 
 - Scan
 
@@ -1984,7 +2041,7 @@ which can happen in certain cases when the sequencer is down.
   - Add jemalloc into the docker images. This is not enabled by
     default but allows for easier testing. Thanks to Stanislav
     German-Evtushenko for contributing this in
-    https://github.com/hyperledger-labs/splice/pull/318
+    https://github.com/canton-network/splice/pull/318
 
 - Validator
 
@@ -1999,7 +2056,7 @@ which can happen in certain cases when the sequencer is down.
 
   - Improve the error message when trying to use the wallet outside of
     localhost or https. Thanks to Stephane Loeuillet for contributing
-    this in https://github.com/hyperledger-labs/splice/pull/322.
+    this in https://github.com/canton-network/splice/pull/322.
 
 - Scan
 
@@ -2195,7 +2252,7 @@ which can happen in certain cases when the sequencer is down.
 
   * Move ``topup`` section from the ``validator-values.yaml`` example file to the ``standalone-validator.yaml`` example file
     to make it more clear that configuring topups is a reasonable option only for non-SV validators.
-    See `hyperledger-labs/splice#255 <https://github.com/hyperledger-labs/splice/pull/255>`_
+    See `canton-network/splice#255 <https://github.com/canton-network/splice/pull/255>`_
 
   * Added the ``initialAmuletPrice`` helm option to set the initial amulet price vote (i.e., the price for which your SV node will vote when onboarded).
     See the :ref:`configuration instructions <helm-configure-global-domain>`.
@@ -2452,7 +2509,7 @@ which can happen in certain cases when the sequencer is down.
 .. important::
 
     * This release fixes an upgrading-related bug in 0.3.0.
-      Please skip 0.3.0 and upgrade directly to 0.3.1 through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
+      Please skip 0.3.0 and upgrade directly to 0.3.1 through the Synchronizer Upgrade with Downtime procedure.
 
 * Bugfixes
 
@@ -2472,7 +2529,7 @@ which can happen in certain cases when the sequencer is down.
       If your Daml code depends on ``splice-amulet`` < ``0.1.6``, then you **must
       recompile** and redeploy it after the network was upgraded to ``splice-amulet-0.1.6`` and
       before the SVs change this optional config value away from its default value.
-    * This release must be applied through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
+    * This release must be applied through the Synchronizer Upgrade with Downtime procedure.
 
 * Canton
 
@@ -2517,7 +2574,7 @@ Signatures required from these external parties can be collected via a crypto cu
 can involve multiple human confirmers. Transactions submitted in the name of these parties can thus take
 multiple hours from the creation of the transaction signing request to the final commit of the transaction on the network.
 This increased latency required several changes in the Daml models underlying Amulet.
-They can be reviewed in detail by diffing the ``daml`` directory in the https://github.com/hyperledger-labs/splice
+They can be reviewed in detail by diffing the ``daml`` directory in the https://github.com/canton-network/splice
 repo.
 
 The key changes are summarized below:
@@ -2824,7 +2881,7 @@ Note: This release must be applied through the `Synchronizer Upgrades with Downt
 
 * Documentation
 
-  * Updated recommendations for checking synchronizer health after a :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` to focus exclusively on monitoring signals.
+  * Updated recommendations for checking synchronizer health after a Synchronizer Upgrade with Downtime to focus exclusively on monitoring signals.
   * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
 
 * Metrics
@@ -3237,7 +3294,7 @@ Note: 0.1.11 was skipped as it contained some issues. Upgrade directly from 0.1.
 * Documentation
 
   * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
-    for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
+    for SVs and validators.
 
   * Updated ``Preparing for Validator Onboarding`` sections to describe the steps a validator operator needs to take
     to onboard a new node.
@@ -3420,16 +3477,16 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * ``participant-values.yaml`` and ``global-domain-values.yaml`` now require specifying your SV name as ``nodeIdentifier: YOUR_SV_NAME``.
     This is used to provide better names to Canton nodes.
   * Multiple changes to the way (non-SV) validator nodes are deployed,
-    to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+    to prepare for supporting Synchronizer Upgrades with Downtime.
     Please revisit the section on :ref:`Helm-based validator deployment <k8s_validator>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
 
 * Documentation
 
   * Added detailed instructions for (non-SV) validator node operators on participating in a synchronizer upgrade.
-    Please see the new validator operations section on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`,
+    Please see the new validator operations section on Synchronizer Upgrades with Downtime,
     as well as the updates in :ref:`k8s_validator`.
-  * :ref:`SV Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
+  * SV Synchronizer Upgrades: Added more detailed instructions on testing, as well as various clarifications.
   * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
   * Added :ref:`backup and restore documentation for (non-SV) validator nodes <validator-backups>`.
 
@@ -3447,7 +3504,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Deployment
 
-  * Multiple changes to the way SV nodes are deployed, to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+  * Multiple changes to the way SV nodes are deployed, to prepare for supporting Synchronizer Upgrades with Downtime.
     Please revisit the section on :ref:`Helm-based SV deployment <sv-helm>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
   * ``sv-values.yaml`` now also requires you to specify an ``internalUrl`` for your scan instance that the SV app
@@ -3463,7 +3520,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 * Documentation
 
   * Added more detailed instructions for SV node operators on participating in a synchronizer upgrade.
-    Please see the updated section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`,
+    Please see the updated section on Synchronizer Upgrades with Downtime,
     as well as the updates in :ref:`sv-helm`.
 
   * Added a section on how to configure the `extraBeneficiaries` to the SV rewards so that the SV can distribute its SV rewards to other parties.
@@ -3480,7 +3537,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Documentation
 
-  * Added section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+  * Added section on Synchronizer Upgrades with Downtime.
     This section only contains a high-level overview for now and will be expanded in the upcoming weeks.
   * Preliminary documentation of :ref:`restoring from backups <sv_restore>`.
     Note that for now, only the case of restoring a full SV node from a backup is fully covered.

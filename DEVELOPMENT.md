@@ -430,7 +430,7 @@ contains a list of additional arguments passed to scalatest which is
 then picked up when running the tests.
 
 To trigger the compat tests for a PR go to
-https://github.com/hyperledger-labs/splice/actions/workflows/build.yml
+https://github.com/canton-network/splice/actions/workflows/build.yml
 and click on `Run workflow`. Select the branch of your PR and the
 splice version you want to test compatibility against and input the
 commit sha of your branch.

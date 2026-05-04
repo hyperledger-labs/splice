@@ -159,5 +159,5 @@ To inspect a manifest locally, you can run e.g. `docker buildx imagetools inspec
 
 ## Bumping splice-shared-gha
 
-In order to bump [splice-shared-gha](https://github.com/hyperledger-labs/splice-shared-gha), please run [Bump splice-shared-gha version](https://github.com/hyperledger-labs/splice/actions/workflows/bump_splice_shared_gha.yml) job and merge the PR that will
+In order to bump [splice-shared-gha](https://github.com/canton-network/splice-shared-gha), please run [Bump splice-shared-gha version](https://github.com/canton-network/splice/actions/workflows/bump_splice_shared_gha.yml) job and merge the PR that will
 be created by the job.

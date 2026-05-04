@@ -83,6 +83,7 @@ Cleanup performed so far:
 - Extend `BatchingUtilityV2` with support for accepting V2 transfer instructions
 - Add utility functions to create metadata for [V1 transaction history parsing](https://docs.digitalasset.com/integrate/devnet/exchange-integration/txingestion.html#differences-between-1-step-deposits-and-withdrawals)
   to `Splice.TokenStandard.Utils`
+- Bump the Daml SDK for building the V2 API packages to 3.4.11
 - Change default implementation of `SettlementFactory_SettleBatch` to check uniqueness of transfer leg ids
   to provide better safety guarantees for code that identifies legs by their ids
 - add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets
@@ -90,3 +91,18 @@ Cleanup performed so far:
   two different kinds of defalt accounts (empty string vs None). Use "" as the default account identifier.
 - Change version numbers of `splice-api-token-*-v2` packages to `1.0.0` to be consistent with the existing
   `splice-api-featured-app-v2` package, which also has version `1.0.0`
+- *Drop the need for `extraSettlementAuthorizers` and `extraReceiptAuthorizers`* to use
+  allocations created using `V1.AllocationFactory_Allocate` in a V2 settlement.
+  - **motivation**: the extra actors on `SettlementFactory_SettleBatch` made it impossible to use V1 allocation with privacy,
+    which was discovered by app providers attempting to implement the compatibility mode.
+  - **key changes**:
+    - The `V2.Allocation_Settle` choice always only requires authorization from the `executors` and
+      the instrument `admin`. Apps can thus call `V2.SettlementFactory_SettleBatch` using `executors`
+      authority only.
+    - Apps need to create missing receipt allocations using their own delegation contracts from their
+      traders. See the `TradingAppV2` implementation for an example of how to do this. Also note the
+      use of `Splice.TokenStandard.Utils.ensureIsReceiptAllocation` to check
+      that the allocation factory call delegation is for a receipt allocation only.
+    - Asset owners must be aware that allocations created using `V1.AllocationFactory_Allocate` can
+      be settled with only `executor` authority. They must only create allocations for `executors`
+      that they trust to atomically settle trades involving their allocations.
