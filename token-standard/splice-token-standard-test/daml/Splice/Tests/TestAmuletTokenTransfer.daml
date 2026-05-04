@@ -192,9 +192,9 @@ test_happy_path_self = script do
   WalletClient.checkBalance bob registry.instrumentId 50.0
 
   -- advance 3 times to make sure all previously active (even if not yet open) mining round contracts are closed
-  AmuletRegistry.runNextIssuance registry.dso 1.0
-  AmuletRegistry.runNextIssuance registry.dso 1.0
-  AmuletRegistry.runNextIssuance registry.dso 1.0
+  AmuletRegistry.runNextIssuance registry.dso 1.0 None
+  AmuletRegistry.runNextIssuance registry.dso 1.0 None
+  AmuletRegistry.runNextIssuance registry.dso 1.0 None
 
   -- Trigger a self-transfer
   result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg

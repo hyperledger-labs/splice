@@ -282,6 +282,8 @@ abstract class StoreTestBase
       SpliceUtil.defaultTransferConfig(10, holdingFee),
       SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
       new RelTime(1_000_000),
+      Optional.empty(), // trafficPrice
+      Optional.empty(), // rewardConfig
     )
 
     contract(

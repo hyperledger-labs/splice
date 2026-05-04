@@ -16,7 +16,7 @@ import Daml.Script
 import DA.Time
 
 import Splice.Amulet
-import Splice.AmuletConfig (AmuletConfig(..), USD)
+import Splice.AmuletConfig (AmuletConfig(..), USD, useTrafficBasedAppRewards)
 import Splice.AmuletRules
 import Splice.Issuance
 import Splice.Round
@@ -132,11 +132,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"
-  let app = AmuletApp with
-        dso
-        dsoUser = AmuletUser with
-          userId = dsoUserId
-          primaryParty = dso
+  let app = mkAmuletApp dso (AmuletUser dsoUserId dso)
 
   -- add more sv nodes
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
@@ -177,7 +173,7 @@ generateUnclaimedReward app provider1 = do
     round = Round 0
     featured = True
 
-  runNextIssuanceD app 1.0
+  runNextIssuanceD app 1.0 None
 
   pure ()
 
@@ -207,8 +203,8 @@ onboardValidator app sponsor validatorName validator = do
 
 
 -- | Run the next issuance.
-runNextIssuanceD : AmuletApp -> Decimal -> Script ()
-runNextIssuanceD app amuletPrice = do
+runNextIssuanceD : AmuletApp -> Decimal -> Optional Decimal -> Script ()
+runNextIssuanceD app amuletPrice appActivityRoundTotal = do
     advanceToNextRoundChange app.dso
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.dso
@@ -262,6 +258,8 @@ runNextIssuanceD app amuletPrice = do
           sv = Some (head (Map.keys dsoRules.svs))
     let summarizingRoundCid = advanceResult.summarizingRound
 
+    Some summarizingRound <- queryContractId app.dso summarizingRoundCid
+
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
@@ -269,10 +267,27 @@ runNextIssuanceD app amuletPrice = do
     validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
 
+    let trafficBasedRewards = useTrafficBasedAppRewards ((.mintingVersion) <$> summarizingRound.rewardConfig)
+
+    -- compute app reward totals: for traffic-based rewards, convert activity (MB) to Amulet
+    -- via trafficPrice ($/MB) and amuletPrice ($/Amulet); otherwise use on-ledger coupons
+    (totalFeaturedCoupons, totalUnfeaturedCoupons) <-
+      if trafficBasedRewards then
+        case (appActivityRoundTotal, summarizingRound.trafficPrice) of
+          (Some activity, Some trafficPrice) ->
+            pure (activity * trafficPrice / summarizingRound.amuletPrice, 0.0)
+          (None, _) ->
+            fail "appActivityRoundTotal must be specified when using traffic-based app rewards"
+          (_, None) ->
+            fail "trafficPrice must be specified when using traffic-based app rewards"
+      else
+        pure (sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+             , sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)])
+
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
-          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
-          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalFeaturedAppRewardCoupons = totalFeaturedCoupons
+          totalUnfeaturedAppRewardCoupons = totalUnfeaturedCoupons
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
           optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
 
@@ -302,6 +317,19 @@ confirmAWC_MiningRound_Archive app = do
                 closedRoundCid = round._1
           confirmer = sv
         pure ()
+
+-- | Convenience function to confirm and execute an action requiring confirmation.
+confirmAndExecutionAction : AmuletApp -> ActionRequiringConfirmation -> Script ()
+confirmAndExecutionAction app action = do
+  [(dsoRulesCid, rules)] <- query @DsoRules app.dso
+  forA_ (Map.keys rules.svs) $ \sv -> do
+    -- mallory does not act
+    unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
+      submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+        action
+        confirmer = sv
+      pure ()
+  executeAllConfirmedActions app
 
 executeAllConfirmedActions : AmuletApp -> Script ()
 executeAllConfirmedActions app = do

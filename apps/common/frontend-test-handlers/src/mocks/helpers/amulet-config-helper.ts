@@ -227,6 +227,13 @@ export function getAmuletRulesConfig(
     featuredAppActivityMarkerAmount: null,
     optDevelopmentFundManager: null,
     externalPartyConfigStateTickDuration: null,
+    rewardConfig: {
+      mintingVersion: 'RewardVersion_FeaturedAppMarkers',
+      dryRunVersion: null,
+      batchSize: '100',
+      rewardCouponTimeToLive: { microseconds: '129600000000' },
+      appRewardCouponThreshold: '0.5',
+    },
   };
 }
 
@@ -394,6 +401,17 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
   "validatorLifecycle": "0.1.2",
   "wallet": "0.1.8",
   "walletPayments": "0.1.8"
+}</pre></div></li><li data-key="rewardConfig"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">rewardConfig</div><div
+      class="jsondiffpatch-value"><pre>{
+  "mintingVersion": "RewardVersion_FeaturedAppMarkers",
+  "dryRunVersion": null,
+  "batchSize": "100",
+  "rewardCouponTimeToLive": {
+    "microseconds": "129600000000"
+  },
+  "appRewardCouponThreshold": "0.5"
 }</pre></div></li><li data-key="tickDuration"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">tickDuration</div><div

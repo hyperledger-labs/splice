@@ -29,6 +29,16 @@ Refer to the :ref:`Token Standard documentation section <token_standard>`.
 Featured App Activity Markers API (CIP-0047)
 --------------------------------------------
 
+.. important::
+
+   On networks where traffic-based app rewards as described in `CIP-0104 <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md>`__ are enabled,
+   the Featured App Activity Markers API will become irrelevant.
+   On such networks, the API is still supported, but no rewards can be earned using it.
+   We recommend apps to stop creating featured app activity markers once CIP-0104 is enabled.
+
+   The documentation here is provided for apps that need to integrate with app rewards prior
+   to CIP-0104 being enabled to avoid unnecessary traffic costs.
+
 * See the `text of the CIP-0047 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__
   for its background on its design and its specification.
 
