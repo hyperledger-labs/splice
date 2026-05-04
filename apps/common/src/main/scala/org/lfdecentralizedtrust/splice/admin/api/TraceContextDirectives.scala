@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.admin.api
 import org.apache.pekko.http.scaladsl.server
 import org.apache.pekko.http.scaladsl.server.{Directive, Directive1, RequestContext, RouteResult}
 import org.lfdecentralizedtrust.splice.admin.api.client.TraceContextPropagation.*
+import com.digitalasset.canton.tracing.HeaderName
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.W3CTraceContext
 
@@ -21,7 +22,7 @@ object TraceContextDirectives {
   def withTraceContext: Directive1[TraceContext] = {
     Directive { inner => ctx =>
       val headersMap =
-        ctx.request.headers.map(h => h.name -> h.value).toMap
+        ctx.request.headers.map(h => HeaderName(h.name) -> h.value).toMap
 
       W3CTraceContext
         .fromHeaders(headersMap)
