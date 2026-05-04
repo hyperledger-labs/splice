@@ -1,0 +1,50 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Store Read Performance
+    folder: database
+    interval: 1h
+    rules:
+      # Single multi-dimensional rule: one alert instance per `test` label.
+      # To add a new read test/operation, append one `or label_replace(...)` line below with the test name and its threshold (in seconds).
+      - uid: store-read-total-time
+        title: Store Read Total Time Too High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: |
+                (splice_perf_read_total_time_ns / 1e9)
+                / on(test) group_left() (
+                    label_replace(vector(1), "test", "UpdateHistoryReadPerformanceTest-getUpdate", "", "")
+                 or label_replace(vector(1), "test", "UpdateHistoryReadPerformanceTest-encodeUpdate",  "", "")
+                )
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [ 1 ]
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: 'Store read total time for {{ $labels.test }} exceeded its threshold (ratio: {{ $values.B }})'
+        labels:
+          severity: warning

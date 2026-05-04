@@ -793,6 +793,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               }
             : {}),
           ...{
+            'store_ingestion_performance_alerts.yaml': readGrafanaAlertingFile(
+              'store_ingestion_performance_alerts.yaml'
+            ),
+            'store_read_performance_alerts.yaml': readGrafanaAlertingFile(
+              'store_read_performance_alerts.yaml'
+            ),
             'acs-stores_alerts.yaml': readGrafanaAlertingFile('acs-stores_alerts.yaml').replaceAll(
               '$NODATA',
               loadTesterConfig?.enable ? 'Alerting' : 'OK'
