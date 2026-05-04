@@ -841,9 +841,12 @@ template AmuletRules
       controller dso
       do
         require "futureValues is empty" (null this.configSchedule.futureValues)
+        let patchedConfig = patch newConfig baseConfig this.configSchedule.initialValue
+        require "rewardConfig cannot be set to None once it has been set to Some"
+          (not (isSome this.configSchedule.initialValue.rewardConfig && isNone patchedConfig.rewardConfig))
         newAmuletRules <- create this with
           configSchedule = Schedule with
-            initialValue = patch newConfig baseConfig this.configSchedule.initialValue
+            initialValue = patchedConfig
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 

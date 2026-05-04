@@ -213,3 +213,23 @@ test_ArchiveDryRunRewardAccountingV2  = do
   [] <- query @RewardCouponV2 app.dso
   pure ()
 
+
+-- | Test that once rewardConfig has been set, it cannot be cleared back to None.
+test_cannotClearRewardConfig : Script ()
+test_cannotClearRewardConfig = do
+  let rewardConfig = RewardConfig with
+        mintingVersion = RewardVersion_TrafficBasedAppRewards
+        dryRunVersion = None
+        batchSize = 100
+        rewardCouponTimeToLive = hours 36
+        appRewardCouponThreshold = 0.5
+  let amuletConfig = defaultAmuletConfig with rewardConfig = Some rewardConfig
+
+  (app, _, _) <- initDevNetWithAmuletConfig amuletConfig
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+    baseConfig = amuletConfig
+    newConfig = amuletConfig with rewardConfig = None
+
