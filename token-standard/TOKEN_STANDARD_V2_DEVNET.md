@@ -1,6 +1,6 @@
 # Token Standard V2 DevNet
 
-Splice version: `0.6.1-snapshot.20260427.2678.0.v86ff9ad5`
+Splice version: `0.6.3-snapshot.20260504.2741.0.v681c5054`
 
 Container image repository (compose `IMAGE_REPO`/ helm `imageRepo`): `ghcr.io/digital-asset/decentralized-canton-sync-dev/docker`
 So the docker pull command should look like `docker pull ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/SOME_IMAGE:THE_VERSION_ABOVE`
@@ -41,5 +41,4 @@ using the [guide for DevNet](https://hyperledger-labs.github.io/splice/validator
        canton.parameters.non-standard-config=true
        canton.participants.participant.parameters.alpha-version-support=true
        canton.participants.participant.parameters.initial-protocol-version=35
-       canton.participants.participant.parameters.engine.contract-state-mode=NUCK
      ```
