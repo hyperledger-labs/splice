@@ -12,3 +12,6 @@ COPY R__repeatable-migration.sql /app/repeatable-migrations/
 USER root
 RUN chown -R nonroot:nonroot /app/additional-config.conf /app/repeatable-migrations/R__repeatable-migration.sql
 USER nonroot
+
+HEALTHCHECK --start-period=10m \
+  CMD exit 0
