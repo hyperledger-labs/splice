@@ -200,7 +200,9 @@ object DarLockChecker {
       mismatches.foreach { case (pkg, currentHash, lastReleaseHash) =>
         System.err.println(s"Package $pkg changed hash from $currentHash to $lastReleaseHash")
       }
-      sys.error("Some packages changed their hash, did you forget to bump the package versions?")
+      sys.error(
+        "Some packages changed their hash, did you forget to bump the package versions? Or are you on a feature branch and your versions numbers are now being used by new actual release"
+      )
     }
     if (exhaustive) {
       lastReleaseDars.keys.foreach { case pkg @ (pkgName, _) =>
