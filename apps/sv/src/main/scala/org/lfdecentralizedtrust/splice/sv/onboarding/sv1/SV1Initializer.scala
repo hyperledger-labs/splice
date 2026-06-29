@@ -731,6 +731,9 @@ class SV1Initializer(
                           .asJava,
                         sv1Config.isDevNet,
                         java.util.Optional.of(initialRound),
+                        // FIXME: Make configurablze
+                        java.util.Optional.empty(),
+                        java.util.Optional.empty(),
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(

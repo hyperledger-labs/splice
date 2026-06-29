@@ -10,11 +10,12 @@ import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Foldable (forA_, all)
 import DA.List as List hiding (all)
-import DA.Optional (isNone, fromSome, fromOptional, isSome)
+import DA.Optional (isNone, fromOptional, isSome, fromSome)
 import qualified DA.Map as Map
 import DA.TextMap (TextMap)
 import qualified DA.Set as Set
 import qualified DA.Text as T
+import qualified DA.TextMap as TextMap
 import DA.Time
 
 import Splice.Amulet
@@ -39,6 +40,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.Instruction
+import Splice.DSO.SvRightOwner
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
@@ -130,6 +132,9 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Record that a featured app provider has been observed underlocked.
   | SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction
     -- ^ Voted action to change to a featured app right's config.
+  | SRARC_DsoRules_UpdateSvRightOwnerInfo DsoRules_UpdateSvRightOwnerInfo
+  | SRARC_DsoRules_AddSvRightOwner DsoRules_AddSvRightOwner
+  | SRARC_DsoRules_RemoveSvRightOwner DsoRules_RemoveSvRightOwner
   deriving (Eq, Show, Serializable)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -141,7 +146,7 @@ data AnsEntryContext_ActionRequiringConfirmation
 
 -- | Information about SVs relevant to DSO governance.
 data SvInfo = SvInfo with
-    name : Text -- ^ Human-readable name; must be unique.
+    name : Text -- ^ Human-readable sv operator name; must be unique.
     joinedAsOfRound : Round -- ^ Round in which the SV joined
     svRewardWeight : Int -- ^ Weight of the SV in the SV reward distribution.
     participantId : Text -- ^ Participant ID of the SV, stored here as PartyToParticipant mappings are tracked via state on the DsoRules + SvOnboardingConfirmed contracts.
@@ -160,6 +165,13 @@ data DsoSummary = DsoSummary with
     requiredNumVotes : Int
       -- ^ The number of votes required for considering a confirmation, or a request for a vote
   deriving (Eq, Show, Serializable)
+
+data DsoSummaryV2 = DsoSummaryV2
+  with
+    totalVoteWeight : Int
+    requiredVoteWeight : Int
+    votersWithWeight : TextMap.TextMap Int -- ^ Map from voter name (right owner or operator name depending on the vote type) to its vote weight
+  deriving (Eq, Show)
 
 -- | Choice return types
 -------------------------
@@ -527,6 +539,18 @@ template VoteRequest
     ensure all (voteBefore <=) targetEffectiveAt
     signatory dso
 
+-- FIXME: Placeholder, current implementation is arbitrary and just serves to be able to exercise both vote types in tests.
+voteType : ActionRequiringConfirmation -> VoteType
+voteType (ARC_DsoRules act) = case act of
+  SRARC_DsoRules_UpdateSvRightOwnerInfo{} -> RightOwnerVote
+  SRARC_DsoRules_AddSvRightOwner{} -> RightOwnerVote
+  SRARC_DsoRules_RemoveSvRightOwner{} -> RightOwnerVote
+  _ -> OperatorVote
+voteType (ARC_AmuletRules _) = OperatorVote
+voteType (ARC_AnsEntryContext _ _) = OperatorVote
+voteType (ExtActionRequiringConformation _) = OperatorVote
+
+
 data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
     request : VoteRequest -- ^ The original vote request.
     completedAt : Time -- ^ When the vote request was completed.
@@ -552,7 +576,7 @@ data VoteRequestOutcome
 --
 -- | A vote cast by an SV.
 data Vote = Vote with
-    sv : Party -- ^ The SV party used to submit the vote.
+    sv : Party -- ^ The SV party used to submit the vote. Can be a right owner party or an operator party depending on the vote type.
     accept : Bool
       -- ^ Whether the responder accepted the request to execute the action or not.
     reason : Reason
@@ -615,19 +639,53 @@ data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
   deriving (Eq, Show, Serializable)
 
+validSvRightOwnerInfo : DsoRules -> SvRightOwnerInfo -> Bool
+validSvRightOwnerInfo DsoRules{} SvRightOwnerInfo{..} =
+  voteWeight >= 0 &&
+  rewardWeight >= 0 &&
+  sum (map snd beneficiaries) <= 1.0 &&
+  all (\(_, beneficiaryWeight) -> beneficiaryWeight > 0.0) beneficiaries &&
+  all (\(beneficiary,_) -> beneficiary /= rightOwnerParty) beneficiaries &&
+  unique (map fst beneficiaries)
+  -- FIXME: Do we want this assertion? If so, we need to switch the node operator on offboarding.
+  -- && any (\info -> info.name == rewardNodeOperatorName) (Map.values svs)
+
+getSvRightOwners : DsoRules -> TextMap.TextMap SvRightOwnerInfo
+getSvRightOwners DsoRules{..} = fromOptional TextMap.empty svRightOwners
+
+onLedgerSvRightOwners : DsoRules -> Bool
+onLedgerSvRightOwners DsoRules{..} = isSome svRightOwners
+
+requireOnLedgerSvRightOwners : DsoRules -> Update ()
+requireOnLedgerSvRightOwners this =
+  require "svRightOwners are tracked on-ledger" (onLedgerSvRightOwners this)
+
+requireNoOnLedgerSvRightOwners : DsoRules -> Update ()
+requireNoOnLedgerSvRightOwners this =
+  require "svRightOwners are not tracked on-ledger" (not $ onLedgerSvRightOwners this)
+
 template DsoRules with
     dso : Party
     epoch : Int
     svs : Map.Map Party SvInfo
+      -- ^ Deprecated in favor of svRightOwners
     offboardedSvs : Map.Map Party OffboardedSvInfo
+      -- ^ Only set for sv node owners to handle DSO party offboarding
     dsoDelegate : Party
       -- ^ __Deprecated__ in favor of delegateless automation.
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
+    svRightOwners : Optional (TextMap.TextMap SvRightOwnerInfo) -- ^ Map from sv right owner name to info about the right owner
+
   where
     ensure
-      config.numUnclaimedRewardsThreshold > 0
+      config.numUnclaimedRewardsThreshold > 0 &&
+      all (\(_, v) -> validSvRightOwnerInfo this v) (TextMap.toList (getSvRightOwners this)) &&
+      -- when using on-ledger right owners they must be non-empty
+      optional True (\rightOwners -> TextMap.size rightOwners >= 1) svRightOwners &&
+      -- when using on-ledger right owners the weight in the operator info must be 0
+      (not (onLedgerSvRightOwners this) || all (\info -> info.svRewardWeight == 0) (Map.values svs))
 
     -- NOTE: the svs are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the svs are indirect signatories by being
@@ -651,20 +709,21 @@ template DsoRules with
 
     choice DsoRules_OffboardSv : DsoRules_OffboardSvResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller dso
       do
+        let svOperator = sv
         require "There is more than one sv" (Map.size svs > 1)
-        case Map.lookup sv svs of
+        case Map.lookup svOperator svs of
           None -> fail "Not a sv"
           Some info -> do
             -- NOTE: this immediate deletion will lead to the SV apps of the remaining svs
             -- revoking that sv's rights in the CometBFT network and the topology state.
-            let newSvs = Map.delete sv svs
+            let newSvs = Map.delete svOperator svs
             -- We optimize for prompt removal of a sv if the vote said so.
             -- and instead just choose the sv with the lexicographically smallest name.
             let (newDsoDelegate, newEpoch)
-                  | sv == dsoDelegate = (head (Map.keys newSvs), epoch + 1)
+                  | svOperator == dsoDelegate = (head (Map.keys newSvs), epoch + 1)
                   | otherwise        = (dsoDelegate, epoch)
             let offboardedSvInfo = OffboardedSvInfo with
                     name = info.name
@@ -675,7 +734,8 @@ template DsoRules with
               epoch = newEpoch
               dsoDelegate = newDsoDelegate
               svs = newSvs
-              offboardedSvs = Map.insert sv offboardedSvInfo offboardedSvs
+              svRightOwners
+              offboardedSvs = Map.insert svOperator offboardedSvInfo offboardedSvs
               config
               initialTrafficState
               isDevNet
@@ -685,21 +745,20 @@ template DsoRules with
     -- Update an SV's Status report
     nonconsuming choice DsoRules_SubmitStatusReport : DsoRules_SubmitStatusReportResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
         previousReportCid : ContractId SvStatusReport
         status : SvStatus
       controller sv
       do
-        newReport <- case Map.lookup sv svs of
-          None -> fail "SV is not an SV"
-          Some info -> do
-            previousReport <- fetchAndArchive (ForSvNode with dso; sv; svName = info.name) previousReportCid
-            create SvStatusReport with
-              dso
-              sv
-              svName = info.name
-              number = previousReport.number + 1
-              status = Some status
+        let svOperator = sv
+        name <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        previousReport <- fetchAndArchive (ForSvNode with dso; sv = svOperator; svName = name) previousReportCid
+        newReport <- create SvStatusReport with
+          dso
+          sv = svOperator
+          svName = name
+          number = previousReport.number + 1
+          status = Some status
         return DsoRules_SubmitStatusReportResult with ..
 
     -- Called by SV candidates to add themselves to the DsoRules once they are confirmed and ready.
@@ -707,7 +766,7 @@ template DsoRules with
     -- the first round in which the new SV will receive rewards.
     nonconsuming choice DsoRules_AddConfirmedSv : DsoRules_AddConfirmedSvResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
         svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
         earliestRoundCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
@@ -717,8 +776,8 @@ template DsoRules with
         -- (This was used when the current round number was tracked in the AmuletRules contract.)
       controller sv
       do
-
-        svOnboardingConfirmed <- fetchAndArchive (ForOwner with dso; owner = sv) svOnboardingConfirmedCid
+        let svOperator = sv
+        svOnboardingConfirmed <- fetchAndArchive (ForOwner with dso; owner = svOperator) svOnboardingConfirmedCid
         assertWithinDeadline "svOnboardingConfirmed.expiresAt" svOnboardingConfirmed.expiresAt
 
         let forDso = ForDso with dso
@@ -729,7 +788,7 @@ template DsoRules with
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
 
         addSvResult <- exercise self DsoRules_AddSv with
-          newSvParty = sv
+          newSvParty = svOperator
           newSvName = svOnboardingConfirmed.svName
           newSvRewardWeight = svOnboardingConfirmed.svRewardWeight
           newSvParticipantId = svOnboardingConfirmed.svParticipantId
@@ -745,12 +804,14 @@ template DsoRules with
     -- Every SV can change their own synchronizer node's config within the configured limits.
     nonconsuming choice DsoRules_SetSynchronizerNodeConfig : DsoRules_SetSynchronizerNodeConfigResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
         synchronizerId : Text
         newNodeConfig : SynchronizerNodeConfig
         nodeStateCid : ContractId SvNodeState
       controller sv
       do
+        let svOperator = sv
+        getAndValidateSvNodeOperatorParty this (Some svOperator)
         -- check that the synchronizer is known
         require "Synchronizer with this id is configured" (synchronizerId `Map.member` config.decentralizedSynchronizer.synchronizers)
         -- check validity of config and constraint on voting power
@@ -758,9 +819,8 @@ template DsoRules with
         unless isDevNet $
           require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
         -- update the SV operator node's state
-        info <- getSvInfo sv this
-        let svName = info.name
-        nodeState <- fetchAndArchive (ForSvNode with dso; sv; svName) nodeStateCid
+        (svName, _) <- getSvInfoByOperatorParty svOperator this
+        nodeState <- fetchAndArchive (ForSvNode with dso; sv = svOperator; svName) nodeStateCid
         let state = nodeState.state
         svNodeState <- create nodeState with
           state = state with
@@ -811,7 +871,7 @@ template DsoRules with
         action : ActionRequiringConfirmation
       controller confirmer
       do
-        require "Confirmer is an SV" (confirmer `Map.member` svs)
+        getAndValidateSvNodeOperatorParty this (Some confirmer)
         now <- getTime
         let expiresAt = now `addRelTime` config.actionConfirmationTimeout
         confirmation <- create Confirmation with
@@ -829,13 +889,14 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
-        let s = summarizeDso this
+        _ <- getAndValidateSvNodeOperatorParty this sv
+        let s = summarizeDso OperatorVote this
         let forDso = ForDso with dso
-        require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
+        -- there are no operator vote weights so just number of confirmations is sufficient.
+        require "Enough confirmations" (length confirmationCids >= s.requiredVoteWeight)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetchAndArchive forDso confirmationCid
-          require "Confirmer is an SV" (confirmation.confirmer `Map.member` svs)
+          getAndValidateSvNodeOperatorParty this (Some confirmation.confirmer)
           require "Confirmed action matches" (confirmation.action == action)
           assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
@@ -857,9 +918,7 @@ template DsoRules with
         targetEffectiveAt : Optional Time
       controller requester
       do
-        requesterName <- case requester `Map.lookup` svs of
-          None -> fail "Requester is not an SV"
-          Some info -> pure (info.name)
+        requesterName <- getAndValidateVotingParty this requester action
         requireWellformedReason config reason
         now <- getTime
         let voteBefore = case voteRequestTimeout of
@@ -894,11 +953,9 @@ template DsoRules with
       do
         -- validate vote parameters
         requireWellformedVote config vote
-        voterName <- case Map.lookup vote.sv svs of
-          None -> fail "Voter is not an SV"
-          Some info -> pure info.name
         -- validate and archive request
         request <- fetchAndArchive (ForDso with dso) requestCid
+        voterName <- getAndValidateVotingParty this vote.sv request.action
         -- rate limit casting of votes by the same SV to avoid them blocking others from making progress
         -- Note: we currently ignore the optional self-declared vote casting time
         -- `vote.optCastAt`. We'll use that in the future when adding support for larger
@@ -942,34 +999,33 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvNodeOperatorParty this sv
         now <- getTime
 
-        let s = summarizeDso this
         request <- fetchAndArchive (ForDso with dso) requestCid
+        let s = summarizeDso (voteType request.action) this
 
-        let activeSvs = map (.name) $ Map.values svs
-
-        let activeSvSet = Set.fromList activeSvs
         let (validVotes, offboardedVoters) = partitionEithers
-              [ if voterName `Set.member` activeSvSet then Left vote else Right voterName
+              [ case TextMap.lookup voterName s.votersWithWeight of
+                  None -> Right voterName
+                  Some weight -> Left (voterName, vote, weight)
               | (voterName, vote) <- Map.toList request.votes
               ]
-        let abstainingSvs = [ name | name <- activeSvs, not (name `Map.member` request.votes) ]
-        let (yays, nays) = partition (.accept) validVotes
-        let numYays = length yays
-        let numNays = length nays
-        let numVotes = numYays + numNays
+        let abstainingSvs = [ name | (name, _) <- TextMap.toList s.votersWithWeight, not (name `Map.member` request.votes) ]
+        let (yays, nays) = partition (\(_, v, _) -> v.accept) validVotes
+        let yayWeight = sum $ map (\(_, _, weight) -> weight) yays
+        let nayWeight = sum $ map (\(_, _, weight) -> weight) nays
+        let totalWeight = yayWeight + nayWeight
 
         outcome <- case request.targetEffectiveAt of
 
-                    Some _ | numNays >= s.requiredNumVotes ->
+                    Some _ | nayWeight >= s.requiredVoteWeight ->
                       pure $ VRO_Rejected
 
-                    Some _ | now >= request.voteBefore && numVotes < s.requiredNumVotes ->
+                    Some _ | now >= request.voteBefore && totalWeight < s.requiredVoteWeight ->
                       pure $ VRO_Expired
 
-                    Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
+                    Some effectiveTime | now >= effectiveTime && yayWeight >= s.requiredVoteWeight ->
                       do
                         executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         pure $ VRO_Accepted with
@@ -981,10 +1037,10 @@ template DsoRules with
                     Some _ ->
                       fail "no definitive outcome for voting request with effectivity"
 
-                    None | numNays >= s.requiredNumVotes ->
+                    None | nayWeight >= s.requiredVoteWeight ->
                       pure $ VRO_Rejected
 
-                    None | numYays >= s.requiredNumVotes ->
+                    None | yayWeight >= s.requiredVoteWeight ->
                       do
                         executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
@@ -1012,19 +1068,20 @@ template DsoRules with
 
     nonconsuming choice DsoRules_UpdateAmuletPriceVote : DsoRules_UpdateAmuletPriceVoteResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
         voteCid : ContractId AmuletPriceVote
         amuletPrice : Decimal
       controller sv
       do
-        pastVote <- fetchAndArchive (ForOwner with dso; owner = sv) voteCid
+        let svOperator = sv -- ^ for now we still tie amulet price votes to operators, it may make sense to change it to right owners eventually
+        pastVote <- fetchAndArchive (ForOwner with dso; owner = svOperator) voteCid
         -- rate limit, so that an SV cannot block round advancement by changing their price vote too often
-        enforceCooldown ("voteCooldownTime for " <> partyToText sv) (getVoteCooldownTime config) (Some pastVote.lastUpdatedAt)
+        enforceCooldown ("voteCooldownTime for " <> partyToText svOperator) (getVoteCooldownTime config) (Some pastVote.lastUpdatedAt)
         now <- getTime
         -- create new vote
         amuletPriceVote <- create AmuletPriceVote with
           dso
-          sv
+          sv = svOperator
           amuletPrice = Some amuletPrice
           lastUpdatedAt = now
         return DsoRules_UpdateAmuletPriceVoteResult with ..
@@ -1041,10 +1098,11 @@ template DsoRules with
       with
         nonSvVoteCids : [ContractId AmuletPriceVote]
         duplicateVoteCids : [[ContractId AmuletPriceVote]]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         let forDso = ForDso with dso
         -- validate and archive non-sv votes
         forA_ nonSvVoteCids $ \voteCid -> do
@@ -1063,7 +1121,7 @@ template DsoRules with
             [_] -> fail "singleton list of duplicate votes"
             ((_, vote)::duplicates) -> do
               require "matching DSO party" (vote.dso == dso)
-              require "SV is a sv" (vote.sv `Map.member` svs)
+              getAndValidateSvNodeOperatorParty this (Some vote.sv)
               forA_ duplicates $ \(duplicateCid, duplicate) -> do
                 -- safe, as we fetched it before and check the constraints below
                 potentiallyUnsafeArchive duplicateCid
@@ -1090,10 +1148,11 @@ template DsoRules with
 
     choice DsoRules_UpdateSvRewardWeight : DsoRules_UpdateSvRewardWeightResult
       with
-        svParty : Party
+        svParty : Party -- ^ sv operator party but will be replaced by DsoRules_UpdateSvRightOwnerInfo
         newRewardWeight : Int
       controller dso
       do
+        requireNoOnLedgerSvRightOwners this
         require "New reward weight is positive" (newRewardWeight >= 0)
         case Map.lookup svParty svs of
           None -> fail "SV party is not registered"
@@ -1208,13 +1267,13 @@ template DsoRules with
 
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
-        sponsor : Party
+        sponsor : Party -- ^ sv operator for now, will be replaced as part of public sequencer work
         validator : Party
         version : Optional Text
         contactPoint : Optional Text
       controller sponsor
       do
-        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        getAndValidateSvNodeOperatorParty this (Some sponsor)
         now <- getTime
         validatorLicense <- create ValidatorLicense with
           dso
@@ -1231,9 +1290,10 @@ template DsoRules with
       -- There should never be duplicates going forward.
       with
         validatorLicenseCids : [ContractId ValidatorLicense]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
-      do _ <- getAndValidateSvParty this sv
+      do let svOperator = sv
+         _ <- getAndValidateSvNodeOperatorParty this svOperator
          require "Number of validatorLicense contracts to merge is >= 2" (length validatorLicenseCids >= 2)
          validatorLicenses <- forA validatorLicenseCids $ fetchAndArchive (ForDso this.dso)
          require "All validatorLicenses map to the same validator" ( length (dedup (map (.validator) validatorLicenses)) == 1)
@@ -1256,10 +1316,11 @@ template DsoRules with
         candidateParty : Party
         candidateParticipantId: Text
         token : Text
-        sponsor : Party
+        sponsor : Party -- ^ sv operator
       controller sponsor
       do
-        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        -- node onboarding is controlled by existing nodes
+        getAndValidateSvNodeOperatorParty this (Some sponsor)
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
         onboardingRequest <- create SvOnboardingRequest with ..
@@ -1268,25 +1329,26 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireSvOnboardingRequest : DsoRules_ExpireSvOnboardingRequestResult
       with
         cid: ContractId SvOnboardingRequest
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         exercise cid SvOnboardingRequest_Expire
         return DsoRules_ExpireSvOnboardingRequestResult
 
     nonconsuming choice DsoRules_ArchiveSvOnboardingRequest : DsoRules_ArchiveSvOnboardingRequestResult
       with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         -- TODO(#3756) Enable archiving also before the sv is added, after a matching `SvOnboardingConfirmed` contract is created.
         svOnboardingRequest <- fetchAndArchive (ForDso with dso) svOnboardingRequestCid
-        let maybeSv = Map.lookup svOnboardingRequest.candidateParty svs
-        require "SV party is an SV" (isSome maybeSv)
-        require "SV name matches" ((fromSome maybeSv).name == svOnboardingRequest.candidateName)
+        name <- getAndValidateSvNodeOperatorParty this (Some svOnboardingRequest.candidateParty)
+        require "SV name matches" (name == svOnboardingRequest.candidateName)
         return DsoRules_ArchiveSvOnboardingRequestResult
 
     nonconsuming choice DsoRules_ConfirmSvOnboarding : DsoRules_ConfirmSvOnboardingResult
@@ -1301,7 +1363,7 @@ template DsoRules with
         ensureNeverOperatedNode newSvParty this
         if (not isDevNet)
           then
-            require "SV name is expected to be new unless in devnet" (newSvName `notElem` (map (.name) (Map.values svs)))
+            require "SV name is expected to be new unless in devnet" (isNone $ lookupSvOperatorInfoByName newSvName this)
           else pure ()
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
@@ -1318,10 +1380,11 @@ template DsoRules with
     choice DsoRules_ExpireSvOnboardingConfirmed : DsoRules_ExpireSvOnboardingConfirmedResult
       with
         cid: ContractId SvOnboardingConfirmed
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         svOnboardingConfirmed <- fetchButArchiveLater (ForDso with dso) cid
         exercise cid SvOnboardingConfirmed_Expire
         -- register the sv as offboarded so it's PartyToParticipant mapping for the DSO party gets removed
@@ -1341,10 +1404,11 @@ template DsoRules with
       with
         extAmuletRulesCid : ContractId ExternalPartyAmuletRules
         expireAllocations : ExternalPartyAmuletRules_ExpireAmuletAllocations
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         TSU.requireMatchExpected  ("expireAllocations.expectedDso", expireAllocations.expectedDso) dso
 
         res <- exercise extAmuletRulesCid (expireAllocations with expectedDso = dso)
@@ -1354,10 +1418,11 @@ template DsoRules with
       with
         extAmuletRulesCid : ContractId ExternalPartyAmuletRules
         choiceArg : ExternalPartyAmuletRules_ExpireAmuletAllocationsV2
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         _ <- fetchChecked (ForDso with dso) extAmuletRulesCid
         result <- exercise extAmuletRulesCid choiceArg
         pure DsoRules_ExpireAmuletAllocationsV2Result with result
@@ -1366,10 +1431,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         transferInsts : AmuletRules_Amulet_ExpireTransferInstructions
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         require ("expectedDso " <> show transferInsts.expectedDso <> " matches the actualDso " <> show dso) (transferInsts.expectedDso == dso)
         res <- exercise amuletRulesCid (transferInsts with expectedDso = dso)
         pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
@@ -1386,10 +1452,11 @@ template DsoRules with
       with
         cid : ContractId Amulet
         choiceArg : Amulet_ExpireV2
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise cid choiceArg
         return DsoRules_Amulet_ExpireV2Result with
           expireSum = result.expireSum
@@ -1398,10 +1465,11 @@ template DsoRules with
       with
         cid : ContractId LockedAmulet
         choiceArg : LockedAmulet_ExpireAmulet
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise cid choiceArg
         return DsoRules_LockedAmulet_ExpireAmuletResult with
           expireSum = result.expireSum
@@ -1410,10 +1478,11 @@ template DsoRules with
       with
         cid : ContractId LockedAmulet
         choiceArg : LockedAmulet_ExpireAmuletV2
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise cid choiceArg
         return DsoRules_LockedAmulet_ExpireAmuletV2Result with
           expireSum = result.expireSum
@@ -1429,11 +1498,12 @@ template DsoRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         amuletPriceVoteCids : [ContractId AmuletPriceVote]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
-        amuletPrice <- fetchMedianAmuletPrice dso (Map.keys svs) amuletPriceVoteCids
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
+        amuletPrice <- fetchMedianAmuletPrice dso (operatorParties this) amuletPriceVoteCids
         result <- exercise amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with ..
         return DsoRules_AdvanceOpenMiningRoundsResult with
           summarizingRound = result.summarizingRoundCid
@@ -1445,10 +1515,11 @@ template DsoRules with
         externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
         externalPartyConfigStateCid1 : ContractId ExternalPartyConfigState
         openMiningRoundTriple : OpenMiningRoundTriple
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise amuletRulesCid AmuletRules_UpdateExternalPartyConfigStates with ..
         return DsoRules_UpdateExternalPartyConfigStatesResult with
           newExternalPartyConfigStateCid = result.newExternalPartyConfigStateCid
@@ -1461,10 +1532,11 @@ template DsoRules with
       with
         ansEntryContextCid : ContractId AnsEntryContext
         choiceArg : AnsEntryContext_CollectEntryRenewalPayment
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         summary <- exercise ansEntryContextCid choiceArg
         return DsoRules_CollectEntryRenewalPaymentResult with
           ansEntry = summary.entryCid
@@ -1474,10 +1546,11 @@ template DsoRules with
       with
         ansEntryCid : ContractId AnsEntry
         choiceArg : AnsEntry_Expire
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         exercise ansEntryCid choiceArg
         pure DsoRules_ExpireAnsEntryResult
 
@@ -1486,10 +1559,11 @@ template DsoRules with
         ansEntryContextCid : ContractId AnsEntryContext
         subscriptionIdleStateCid: ContractId SubscriptionIdleState
         choiceArg : SubscriptionIdleState_ExpireSubscription
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise subscriptionIdleStateCid choiceArg
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso result.terminatedSubscription)
         pure DsoRules_ExpireSubscriptionResult
@@ -1498,27 +1572,29 @@ template DsoRules with
       with
         ansEntryContextCid : ContractId AnsEntryContext
         terminatedSubscriptionCid : ContractId TerminatedSubscription
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso terminatedSubscriptionCid)
         pure DsoRules_TerminateSubscriptionResult
 
 
     -- Reward management driven directly by the DSO delegates
     ---------------------------------------------------------
-
     nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
       with
-        sv : Party
+        sv : Party -- ^ sv operator party
         openRoundCid : ContractId OpenMiningRound
         rewardStateCid : ContractId SvRewardState
         beneficiaries : [(Party, Int)]
       controller sv
       do
-        case Map.lookup sv svs of
-          None -> fail "SV is not an SV"
+        requireNoOnLedgerSvRightOwners this
+        let svOperator = sv
+        case Map.lookup svOperator svs of
+          None -> fail "SV is not an SV operator"
           Some info -> do
             -- check round
             now <- getTime
@@ -1557,6 +1633,70 @@ template DsoRules with
                 svRewardState = newRewardStateCid
                 svRewardCoupons = couponCids
 
+    nonconsuming choice DsoRules_ReceiveSvRewardCouponV2 : ()
+      with
+        sv : Party -- ^ sv operator party
+        openRoundCid : ContractId OpenMiningRound
+        svRewardStates : TextMap.TextMap (ContractId SvRewardState)
+      controller sv
+      do
+        requireOnLedgerSvRightOwners this
+        let svOperator = sv
+        operatorName <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        let info = fromSome (TextMap.lookup operatorName (getSvRightOwners this))
+        now <- getTime
+        openRound <- fetchReferenceData (ForDso with dso) openRoundCid
+        require "OpenRound is open" (openRound.opensAt <= now)
+
+        -- FIXME: Do we want to enforce that the operator has to pass in all states that have configured them as a node operator?
+        -- given that you do rely on the operator anyway to mint rewards maybe not required.
+        -- if we do enforce it, we need to handle cases where the lastRoundCollected is out of sync which can happen on operator switches.
+        forA_ (TextMap.toList svRewardStates) $ \(svName, rewardStateCid) -> do
+          svInfo <- case TextMap.lookup svName (getSvRightOwners this) of
+            None -> fail ("SV " <> svName <> " is not an SV")
+            Some svInfo -> do
+              require ("SV " <> svName <> " is minting rewards through " <> show operatorName) (svInfo.rewardNodeOperatorName == operatorName)
+              pure svInfo
+          rewardState <- fetchAndArchive (ForSv with dso; svName = svName) rewardStateCid
+          let state = rewardState.state
+              beneficiaries = svInfo.beneficiaries
+          let (configuredBeneficiaryCouponWeights, remainingWeight) =
+                foldl
+                  (\(acc, remainingWeight) (beneficiary, weight) ->
+                     let beneficiaryWeight = floor (weight * intToDecimal info.rewardWeight)
+                     in ((beneficiary, beneficiaryWeight) :: acc, remainingWeight - beneficiaryWeight))
+                  ([], info.rewardWeight)
+                  beneficiaries
+              beneficiaryCouponWeights =
+                if remainingWeight > 0 then (svInfo.rightOwnerParty, remainingWeight) :: configuredBeneficiaryCouponWeights
+                else configuredBeneficiaryCouponWeights
+          require
+            ("Round " <> show openRound.round <> " is greater than the last round a reward has been received for " <> show state.lastRoundCollected)
+            (state.lastRoundCollected < openRound.round)
+
+          newRewardStateCid <- create rewardState with
+            state = RewardState with
+              lastRoundCollected = openRound.round
+              numRoundsCollected = state.numRoundsCollected + 1
+              numRoundsMissed =
+                state.numRoundsMissed + (openRound.round.number - state.lastRoundCollected.number - 1)
+              numCouponsIssued = state.numCouponsIssued + length beneficiaryCouponWeights
+
+          -- check weights and issue rewards
+          require "Sum of beneficiary weights matches" (info.rewardWeight == sum (map snd beneficiaryCouponWeights))
+
+          couponCids <- forA beneficiaryCouponWeights $ \(beneficiary, weight) ->
+            create SvRewardCoupon with
+              dso
+              sv = svInfo.rightOwnerParty
+              beneficiary
+              weight
+              round = openRound.round
+
+          return (svName, (newRewardStateCid, couponCids))
+
+        pure ()
+
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
     -----------------------------------------------------------------
@@ -1564,10 +1704,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_ClaimExpiredRewards
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
 
         -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
         -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
@@ -1626,10 +1767,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_ClaimExpiredRewardsV2
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_ClaimExpiredRewardsV2Result with
           result
@@ -1638,10 +1780,11 @@ template DsoRules with
       with
         processRewardsCid : ContractId RewardAccountingV2.ProcessRewardsV2
         choiceArg : RewardAccountingV2.ProcessRewardsV2_ProcessBatch
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise processRewardsCid choiceArg
         return DsoRules_ProcessRewardsV2_ProcessBatchResult with
           result
@@ -1650,10 +1793,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_UnhideRewardCouponsV2
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_UnhideRewardCouponsV2Result with
           result
@@ -1663,10 +1807,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_ArchiveDryRunRewardAccountingV2
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_ArchiveDryRunRewardAccountingV2Result with
           result
@@ -1677,10 +1822,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
         return DsoRules_MergeUnclaimedRewardsResult with
@@ -1691,10 +1837,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_MergeUnclaimedDevelopmentFundCoupons
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with result
 
@@ -1702,10 +1849,11 @@ template DsoRules with
       -- ^ Expires a DevelopmentFundCoupon and produces an UnclaimedDevelopmentFundCoupon with the same amount.
       with
         developmentFundCouponCid : ContractId DevelopmentFundCoupon
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         result <- exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
         pure $ DsoRules_ExpireDevelopmentFundCouponResult with result
 
@@ -1765,10 +1913,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         issuingRoundCid : ContractId IssuingMiningRound
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise amuletRulesCid AmuletRules_MiningRound_Close with ..
         return DsoRules_MiningRound_CloseResult with
           closedRound = result.closedRoundCid
@@ -1781,10 +1930,11 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireStaleConfirmation : DsoRules_ExpireStaleConfirmationResult
       with
         staleConfirmationCid : ContractId Confirmation
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         fetchChecked (ForDso with dso) staleConfirmationCid
         exercise staleConfirmationCid Confirmation_Expire
         return DsoRules_ExpireStaleConfirmationResult
@@ -1795,10 +1945,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         trafficCids : [ContractId MemberTraffic]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
         return DsoRules_MergeMemberTrafficContractsResult with
@@ -1810,9 +1961,10 @@ template DsoRules with
       with
         svName : Text
         rewardStateCids : [ContractId SvRewardState]
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
-      do _ <- getAndValidateSvParty this sv
+      do let svOperator = sv
+         _ <- getAndValidateSvNodeOperatorParty this svOperator
          require "Number of SvRewardState contracts to merge is >= 2" (length rewardStateCids >= 2)
          rewardStates <- forA rewardStateCids $ fetchAndArchive (ForSv this.dso svName)
          -- We don't attempt to merge the fields in the reward state since there is no good
@@ -1827,7 +1979,7 @@ template DsoRules with
         amuletRulesCid : ContractId AmuletRules
         sv : Optional Party
       controller sv
-      do _ <- getAndValidateSvParty this sv
+      do _ <- getAndValidateSvNodeOperatorParty this sv
          deprecatedChoice "splice-dso-governance" "0.1.16" "DsoRules_PruneAmuletConfigSchedule"
 
     -- external party
@@ -1850,10 +2002,11 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireTransferPreapproval : DsoRules_ExpireTransferPreapprovalResult
       with
         transferPreapprovalCid : ContractId TransferPreapproval
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         exercise transferPreapprovalCid TransferPreapproval_Expire
         pure DsoRules_ExpireTransferPreapprovalResult
 
@@ -1861,10 +2014,11 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         argument : AmuletRules_ConvertFeaturedAppActivityMarkers
-        sv : Optional Party
+        sv : Optional Party -- ^ sv operator
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this svOperator
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
 
@@ -1898,10 +2052,11 @@ template DsoRules with
         unclaimedRewardsToBurnCids : [ContractId UnclaimedReward]
           -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertWithinDeadline "UnallocatedUnclaimedActivityRecord.expiresAt" expiresAt
 
@@ -1926,10 +2081,11 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireUnallocatedUnclaimedActivityRecord : DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         unallocatedUnclaimedActivityRecord <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertDeadlineExceeded "UnallocatedUnclaimedActivityRecord.expiresAt" unallocatedUnclaimedActivityRecord.expiresAt
         pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
@@ -1937,10 +2093,11 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireUnclaimedActivityRecord : DsoRules_ExpireUnclaimedActivityRecordResult
       with
         unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
@@ -1956,16 +2113,199 @@ template DsoRules with
         amuletRulesCid : ContractId AmuletRules
         instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
         openMiningRoundTriple : OpenMiningRoundTriple
-        sv : Party
+        sv : Party -- ^ sv operator party
       controller sv
       do
-        _ <- getAndValidateSvParty this (Some sv)
+        let svOperator = sv
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         _ <- fetchAndArchive (ForDso dso) instructionCid
         _ <- exercise amuletRulesCid AmuletRules_BootstrapExternalPartyConfigState with
           openMiningRoundTriple
           expectedDso = dso
         pure DsoRules_BootstrapExternalPartyConfigStateResult
 
+    choice DsoRules_MigrateToOnLedgerSvRightOwners : ContractId DsoRules
+      with
+        svOperator : Party
+      controller svOperator
+      do
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        require "svRightOwners is not already on-ledger" (isNone this.svRightOwners)
+        let svRightOwnerFromOperator svOperator info = SvRightOwnerInfo with
+              rightOwnerParty = svOperator
+              rewardNodeOperatorName = info.name
+              rewardWeight = info.svRewardWeight
+              beneficiaries = []
+                -- ^ FIXME: Consider how we want the migration to work
+                -- option 1: Set it to empty here and then have automation in the sv app that sets it to the ones locally configured.
+                --           Then through two votes with same effectivity reduce weight & remove beneficiary + a separate vote to add new sv right owner
+                -- option 2: Switchover through a vote that sets beneficiaries for everyone
+                -- option 3: two-step process, first setup sv right owners through votes (probably a batched vote in some form) and then have a second vote to actually start using right owners (needs a new config flag to indicate whether right owners take effect)
+              voteWeight = 1
+        create this with
+          svs = Map.fromList ([(sv, info with svRewardWeight = 0) | (sv, info) <- Map.toList this.svs])
+          svRightOwners = Some (TextMap.fromList [(info.name, svRightOwnerFromOperator svOperator info) | (svOperator, info) <- Map.toList this.svs])
+
+    choice DsoRules_UpdateRightOwnerParty : ContractId DsoRules
+      with
+        name : Text
+        oldRightOwnerParty : Party
+        newRightOwnerParty : Party
+      controller oldRightOwnerParty
+      do
+        requireOnLedgerSvRightOwners this
+        case TextMap.lookup name (getSvRightOwners this) of
+          None -> abort ("No sv with name " <> show name)
+          Some info -> do
+            require "right owner parties match" (info.rightOwnerParty == oldRightOwnerParty)
+            create this with
+              svRightOwners = Some (TextMap.insert name (info with rightOwnerParty = newRightOwnerParty) (getSvRightOwners this))
+
+    choice DsoRules_UpdateBeneficiaries : ContractId DsoRules
+      with
+        name : Text
+        rightOwnerParty : Party
+        beneficiaries : [(Party, Decimal)]
+      controller rightOwnerParty
+      do
+        requireOnLedgerSvRightOwners this
+        case TextMap.lookup name (getSvRightOwners this) of
+          None -> abort ("No sv with name " <> show name)
+          Some info -> do
+            require "right owner parties match" (info.rightOwnerParty == rightOwnerParty)
+            create this with
+              svRightOwners = Some (TextMap.insert name (info with beneficiaries = beneficiaries) (getSvRightOwners this))
+
+    choice DsoRules_UpdateSvRightOwnerInfo : ContractId DsoRules
+      with
+        name : Text
+        baseInfo : SvRightOwnerInfo -- ^ The info the vote was created against
+        newInfo : SvRightOwnerInfo -- ^ The target info, only fields that are different from baseInfo will be updated
+      controller dso
+      do
+        requireOnLedgerSvRightOwners this
+        case TextMap.lookup name (getSvRightOwners this) of
+          None -> abort ("No SV with name " <> show name)
+          Some currentInfo -> do
+            create this with
+              svRightOwners = Some (TextMap.insert name (patch newInfo baseInfo currentInfo) (getSvRightOwners this))
+
+    nonconsuming choice DsoRules_AddSvRightOwner : ContractId AddSvRightOwnerInstruction
+      with
+        rightOwnerName : Text
+        info : SvRightOwnerInfo
+      controller dso
+      do
+        requireOnLedgerSvRightOwners this
+        now <- getTime
+        case TextMap.lookup rightOwnerName (getSvRightOwners this) of
+          Some _ -> abort ("SV with name " <> rightOwnerName <> " already exists")
+          None -> do
+            create AddSvRightOwnerInstruction with
+              dso
+              rightOwnerName
+              info
+              expiresAt = now `addRelTime` hours 1
+
+    choice DsoRules_ExecuteAddSvRightOwnerInstruction : ContractId DsoRules
+      with
+        instructionCid : ContractId AddSvRightOwnerInstruction
+        openMiningRoundCid : ContractId OpenMiningRound
+        svOperator : Party
+      controller svOperator
+      do
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        requireOnLedgerSvRightOwners this
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        openMiningRound <- fetchReferenceData (ForDso dso) openMiningRoundCid
+        case TextMap.lookup instruction.rightOwnerName (getSvRightOwners this) of
+          Some _ -> abort ("SV with name " <> instruction.rightOwnerName <> " already exists")
+          None -> do
+            createSvRightOwnerContracts this instruction.rightOwnerName openMiningRound.round
+            create this with
+              svRightOwners = Some (TextMap.insert instruction.rightOwnerName instruction.info (getSvRightOwners this))
+
+    nonconsuming choice DsoRules_RemoveSvRightOwner : ContractId RemoveSvRightOwnerInstruction
+      with
+        rightOwnerName : Text
+      controller dso
+      do
+        requireOnLedgerSvRightOwners this
+        case TextMap.lookup rightOwnerName (getSvRightOwners this) of
+          Some _ -> do
+            now <- getTime
+            create RemoveSvRightOwnerInstruction with
+              dso
+              rightOwnerName
+              expiresAt = now `addRelTime` hours 1
+          None -> abort ("No SV with name " <> show rightOwnerName)
+
+    choice DsoRules_ExecuteRemoveSvRightOwnerInstruction : ContractId DsoRules
+      with
+        instructionCid : ContractId RemoveSvRightOwnerInstruction
+        rewardStateCid : ContractId SvRewardState
+        svOperator : Party
+      controller svOperator
+      do
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        requireOnLedgerSvRightOwners this
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        case TextMap.lookup instruction.rightOwnerName (getSvRightOwners this) of
+          Some _ -> do
+            -- We archive the reward state as part of offboarding to avoid having to track offboardedSvs for non-operators.
+            -- In theory reonboarding an SV immediately could let it mint rewards twice for the same round.
+            -- In practice, reonboarding that quickly seems unrealistic in practice.
+            _ <- fetchAndArchive (ForSv with dso; svName = instruction.rightOwnerName) rewardStateCid
+            create this with svRightOwners = Some (TextMap.delete instruction.rightOwnerName (getSvRightOwners this))
+          None -> abort ("No SV with name " <> show instruction.rightOwnerName)
+
+    nonconsuming choice DsoRules_ExpireRemoveSvRightOwnerInstruction : ()
+      with
+        instructionCid : ContractId RemoveSvRightOwnerInstruction
+        svOperator : Party
+      controller svOperator
+      do
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        requireOnLedgerSvRightOwners this
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        assertDeadlineExceeded "RemoveSvRightOwnerInstruction.expiresAt" instruction.expiresAt
+        pure ()
+
+    nonconsuming choice DsoRules_ExpireAddSvRightOwnerInstruction : ()
+      with
+        instructionCid : ContractId AddSvRightOwnerInstruction
+        svOperator : Party
+      controller svOperator
+      do
+        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
+        requireOnLedgerSvRightOwners this
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        assertDeadlineExceeded "AddSvRightOwnerInstruction.expiresAt" instruction.expiresAt
+        pure ()
+
+
+template AddSvRightOwnerInstruction
+  with
+    dso : Party
+    rightOwnerName : Text
+    info : SvRightOwnerInfo
+    expiresAt : Time
+  where
+    signatory dso
+
+template RemoveSvRightOwnerInstruction
+  with
+    dso : Party
+    rightOwnerName : Text
+    expiresAt : Time
+  where
+    signatory dso
+
+instance HasCheckedFetch RemoveSvRightOwnerInstruction ForDso where
+  contractGroupId RemoveSvRightOwnerInstruction{..} = ForDso dso
+
+instance HasCheckedFetch AddSvRightOwnerInstruction ForDso where
+  contractGroupId AddSvRightOwnerInstruction{..} = ForDso dso
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1975,25 +2315,21 @@ pruneAtLeastOne now schedule =
    where
      (past, future) = span (\(t, _) -> t <= now) schedule.futureValues
 
-summarizeDso : DsoRules -> DsoSummary
-summarizeDso dsoRules = DsoSummary with
-    dsoDelegate = dsoRules.dsoDelegate
-    numSvs
-    requiredNumVotes =
-      -- NOTE:
-      --   For a vote with n svs and f = floor((n - 1) /3) byzantine svs, we want to have the following properties:
-      --     *availability*: f operators abstaining, won’t stop the vote
-      --        ⇒ numRequiredVotes <= n - f
-      --     *tolerate DSO delegate selecting the votes*: the threshold must be independent of the number of votes cast
-      --     *integrity*: f operators cannot boost their voting power for future votes by collaborating
-      --        ⇒ implies f < threshold-for-accepting-an-action
-      --     *result acceptance*: outcome is accepted by SV operators
-      --        ⇒ we can pick between requiring numYays >= n / 2 + 1 (simple majority) and requiring numYays >= numRequiredVotes (super-majority)
-      --   We favor the following threshold that agrees with our preference of having both integrity and availability.
-      ceiling ((intToDecimal (numSvs + f + 1)) / 2.0)
+data VoteType = OperatorVote | RightOwnerVote
+
+summarizeDso : VoteType -> DsoRules -> DsoSummaryV2
+summarizeDso voteType dsoRules = DsoSummaryV2 with
+    totalVoteWeight
+    requiredVoteWeight =
+      ceiling ((intToDecimal (totalVoteWeight + f + 1)) / 2.0)
+    votersWithWeight = TextMap.fromList votersWithWeight
   where
-    numSvs = Map.size dsoRules.svs
-    f = floor ((intToDecimal (numSvs - 1)) / 3.0)
+    votersWithWeight = case voteType of
+      RightOwnerVote -> [(name, info.voteWeight) | (name, info) <- TextMap.toList (getSvRightOwners dsoRules), info.voteWeight > 0]
+      OperatorVote -> [(info.name, 1) | (_, info) <- Map.toList dsoRules.svs] -- operators have weight 1
+    totalVoteWeight = sum (map snd votersWithWeight)
+
+    f = floor ((intToDecimal (totalVoteWeight - 1)) / 3.0)
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
@@ -2030,6 +2366,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateBootstrapExternalPartyConfigStateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateFeaturedAppUnderlockInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateFeaturedAppConfigUpdateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_DsoRules_UpdateSvRightOwnerInfo choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_DsoRules_AddSvRightOwner choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_DsoRules_RemoveSvRightOwner choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -2093,12 +2432,19 @@ actionRequiringConfirmationEffectiveAt action =
 -- On- and offboarding
 ----------------------
 
-getSvInfo : Party -> DsoRules -> Update SvInfo
-getSvInfo operator this =
-  optional (fail "Not a sv") pure $ Map.lookup operator this.svs
+getSvInfoByOperatorParty : ActionFail m => Party -> DsoRules -> m (Text, SvInfo)
+getSvInfoByOperatorParty operator this =
+  case Map.lookup operator this.svs of
+    None -> fail ("Not a sv operator: " <> show operator)
+    Some svInfo -> pure (svInfo.name, svInfo)
 
-lookupSvInfoByName : Text -> DsoRules -> Optional (Party, SvInfo)
-lookupSvInfoByName svName DsoRules{..} =
+lookupSvInfoByName : Text -> DsoRules -> Optional SvRightOwnerInfo
+lookupSvInfoByName svName this =
+  TextMap.lookup svName (getSvRightOwners this)
+
+
+lookupSvOperatorInfoByName : Text -> DsoRules -> Optional (Party, SvInfo)
+lookupSvOperatorInfoByName svName DsoRules{..} =
   find (\info -> info._2.name == svName) $ Map.toList svs
 
 -- | Returns True if an SV with that name is either currently onboarded
@@ -2112,34 +2458,37 @@ ensureNeverOperatedNode newSvParty this = do
   require "SV party has not yet operated a node" $
     not (newSvParty `Map.member` this.svs || newSvParty `Map.member` this.offboardedSvs)
 
+checkSvNotAlreadyOnboarded : DsoRules -> Text -> Update DsoRules
+checkSvNotAlreadyOnboarded this svOperatorName =
+  -- in DevNet we allow changing the operator of an existing sv, which we implement as a removal and re-addition
+  if this.isDevNet
+      then
+        case lookupSvOperatorInfoByName svOperatorName this of
+          Some (sv, SvInfo{participantId}) -> do
+            let offboardingInfo = OffboardedSvInfo with
+                  name = svOperatorName
+                  participantId
+            pure $ this with
+              offboardedSvs = Map.insert sv offboardingInfo this.offboardedSvs
+              svs = Map.delete sv this.svs
+          _ -> pure this
+      else do
+        require "SV is not currently onboarded" (isNone $ lookupSvOperatorInfoByName svOperatorName this)
+        pure this
+
 -- factored out from the choice to avoid mistakes from having the fields of DsoRules{..} in scope
 dsoRules_addSv : DsoRules -> DsoRules_AddSv -> Update (ContractId DsoRules)
-dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
+dsoRules_addSv this0 DsoRules_AddSv{..} = do
   ensureNeverOperatedNode newSvParty this0
-  -- in DevNet we allow changing the operator of an existing sv, which we implement as a removal and re-addition
-  this@DsoRules{..} <-
-    if this0.isDevNet
-      then
-        let DsoRules{..} = this0 in -- bring all DsoRules fields into scope
-        case lookupSvInfoByName newSvName this0 of
-          None -> pure this0
-          Some (sv, info) -> do
-            let offboardingInfo = OffboardedSvInfo with
-                  name = info.name
-                  participantId = info.participantId
-            pure $ this0 with
-              svs = Map.delete sv svs
-              offboardedSvs = Map.insert sv offboardingInfo offboardedSvs
-      else do
-        require "SV is not currently onboarded" (isNone $ lookupSvInfoByName newSvName this0)
-        pure this0
-
-  -- create per-sv contracts if they have never been onboarded
-  unless (svHasBeenOnboardedBefore newSvName this) $
-    createPerSvContracts this arg
+  this@DsoRules{..} <- checkSvNotAlreadyOnboarded this0 newSvName
+  if onLedgerSvRightOwners this
+    then require "rewardWeight must be 0 when onboarding a new SV operator with on-ledger right owners" (newSvRewardWeight == 0)
+    else
+      unless (svHasBeenOnboardedBefore newSvName this) $
+      createSvRightOwnerContracts this newSvName joinedAsOfRound
   -- create per SV party contracts
   let initialAmuletPriceVote = None
-  createPerSvPartyContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote (getVoteCooldownTime config)
+  createSvOperatorContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote (getVoteCooldownTime config)
   -- register the new operator in the DsoRules
   let svInfo = SvInfo with
         name = newSvName
@@ -2149,19 +2498,20 @@ dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
   create this with
     svs = Map.insert newSvParty svInfo svs
 
-createPerSvContracts : DsoRules -> DsoRules_AddSv -> Update ()
-createPerSvContracts DsoRules{..} DsoRules_AddSv{..} = do
+createSvRightOwnerContracts : DsoRules -> Text -> Round -> Update ()
+createSvRightOwnerContracts DsoRules{..} newSvName joinedAsOfRound = do
   void $ create SvRewardState with
     dso
     svName = newSvName
     state = RewardState with
       lastRoundCollected = Round (joinedAsOfRound.number - 1)
       numRoundsMissed = 0
+
       numRoundsCollected = 0
       numCouponsIssued = 0
 
-createPerSvPartyContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> RelTime -> Update ()
-createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice voteCooldownTime = do
+createSvOperatorContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> RelTime -> Update ()
+createSvOperatorContracts dso newSvParty newSvName synchronizerNodes amuletPrice voteCooldownTime = do
   -- Note: we currently track the amulet-price vote on a per operator basis.
   -- This implies it will be reset when an operator is offboarded and re-onboarded.
   now <- getTime
@@ -2185,12 +2535,25 @@ createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice
     state = NodeState with
       synchronizerNodes
 
-getAndValidateSvParty : DsoRules -> Optional Party -> Update Party
-getAndValidateSvParty _ None = fail "no SV party provided"
-getAndValidateSvParty rules (Some sv) = do
-  require "SV party is an actual SV" (sv `Map.member` rules.svs)
-  pure sv
+getAndValidateSvNodeOperatorParty : DsoRules -> Optional Party -> Update Text
+getAndValidateSvNodeOperatorParty _ None = fail "no SV operator party provided"
+getAndValidateSvNodeOperatorParty rules (Some sv) = do
+  case Map.lookup sv rules.svs of
+    None -> fail ("SV party " <> show sv <> " is not a registered SV node operator")
+    Some svInfo -> pure svInfo.name
 
+getAndValidateSvRightOwnerParty : DsoRules -> Optional Party -> Update Text
+getAndValidateSvRightOwnerParty _ None = fail "no SV right owner party provided"
+getAndValidateSvRightOwnerParty rules (Some sv) = do
+  case find (\(_, info) -> info.rightOwnerParty == sv) (TextMap.toList (getSvRightOwners rules)) of
+    None -> fail ("SV party " <> show sv <> " is not a right owner party")
+    Some (name, _) -> pure name
+
+getAndValidateVotingParty : DsoRules -> Party -> ActionRequiringConfirmation -> Update Text
+getAndValidateVotingParty dsoRules party action =
+  case voteType action of
+    RightOwnerVote -> getAndValidateSvRightOwnerParty dsoRules (Some party)
+    OperatorVote -> getAndValidateSvNodeOperatorParty dsoRules (Some party)
 
 -- Rate limiting
 ----------------
@@ -2281,3 +2644,10 @@ instance Patchable LogicalSynchronizerUpgradeSchedule where
         upgradeTime = patch new.upgradeTime base.upgradeTime current.upgradeTime
         newPhysicalSynchronizerSerial = patch new.newPhysicalSynchronizerSerial base.newPhysicalSynchronizerSerial current.newPhysicalSynchronizerSerial
         newPhysicalSynchronizerProtocolVersion = patch new.newPhysicalSynchronizerProtocolVersion base.newPhysicalSynchronizerProtocolVersion current.newPhysicalSynchronizerProtocolVersion
+
+operatorParties : DsoRules -> [Party]
+operatorParties DsoRules{svs} = Map.keys svs
+
+rightOwnerParties : DsoRules -> [Party]
+rightOwnerParties this =
+  map (\(_, v) -> v.rightOwnerParty) (TextMap.toList (getSvRightOwners this))

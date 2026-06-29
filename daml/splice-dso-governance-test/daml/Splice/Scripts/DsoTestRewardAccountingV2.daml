@@ -212,4 +212,3 @@ test_ArchiveDryRunRewardAccountingV2  = do
   -- check that no coupons were created
   [] <- query @RewardCouponV2 app.dso
   pure ()
-

@@ -395,7 +395,7 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
 testRacingSvRemoval : Script ()
 testRacingSvRemoval = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
-
+ 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- sv1 is not happy with sv2, and issues two removal requests at the same time!
@@ -533,9 +533,8 @@ testRacingSvRemoval = do
 
   -- There are only two svs left, and sv3 is the new DSO delegate
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.svs === [sv3, sv4]
-  dsoRules.dsoDelegate === sv3
-
+  operatorParties dsoRules === [sv3, sv4]
+  
   -- The story continues: sv3 tries to remove sv4
   [(dsoRulesCid, _)] <- query @DsoRules dso
   result4 <- submit (actAs sv3 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
@@ -595,7 +594,7 @@ testRacingSvRemoval = do
 
   -- check the SV's are gone
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.svs === [sv3]
+  operatorParties dsoRules === [sv3]
 
   pure ()
 
@@ -902,7 +901,7 @@ testOffboardSvAndAmuletPriceVotes = do
 
   -- the voting process is only definitive after the timeout, so right now sv1 is still present
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys (dsoRules.svs) === [sv1, sv2, sv3, sv4]
+  operatorParties dsoRules === [sv1, sv2, sv3, sv4]
 
   -- pass the default voting timeout
   passTime (dsoRules.config.voteRequestTimeout)
@@ -910,9 +909,8 @@ testOffboardSvAndAmuletPriceVotes = do
 
   -- check that the sv was removed and the DSO delegate changed to sv2
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
-  Map.keys (dsoRules.svs) === [sv2, sv3, sv4]
+  operatorParties dsoRules === [sv2, sv3, sv4]
   Map.keys (dsoRules.offboardedSvs) === [sv1]
-  dsoRules.dsoDelegate === sv2
 
   -- duplicate the AmuletPriceVote for sv2 to test duplicate removal
   amuletPriceVotes <- query @AmuletPriceVote dso

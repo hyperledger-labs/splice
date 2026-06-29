@@ -111,7 +111,7 @@ executeDsoRulesConfigChange : AmuletApp -> (DsoRulesConfig -> DsoRulesConfig) ->
 executeDsoRulesConfigChange app updateConfig = do
   [(_, dsoRules)] <- query @DsoRules app.dso
   let newConfig = updateConfig dsoRules.config
-  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+  initiateAndAcceptVote app (operatorParties dsoRules) $
     ARC_DsoRules with
       dsoAction = SRARC_SetConfig DsoRules_SetConfig with
                                       newConfig = newConfig
@@ -125,7 +125,7 @@ initiateAndCastAmuletRulesConfigChange app targetEffectiveAt updateConfig = do
   let
     baseConfig = amuletRules.configSchedule.initialValue
     newConfig = updateConfig baseConfig
-  initiateAndCastVote app (Map.keys dsoRules.svs) (Some targetEffectiveAt) $
+  initiateAndCastVote app (operatorParties dsoRules) (Some targetEffectiveAt) $
     ARC_AmuletRules with
       amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
         newConfig

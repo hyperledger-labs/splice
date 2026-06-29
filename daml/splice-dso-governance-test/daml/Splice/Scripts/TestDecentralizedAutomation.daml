@@ -177,7 +177,7 @@ testRequiredNumOfConfirmation = do
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
-  Map.size dsoRules.svs === 4
+  length (Map.toList dsoRules.svs) === 4
 
   svX <- allocateParty "svX"
 
@@ -186,7 +186,7 @@ testRequiredNumOfConfirmation = do
         dsoAction = SRARC_AddSv $ DsoRules_AddSv with
           newSvParty = svX
           newSvName = "svX"
-          newSvRewardWeight = 1
+          newSvRewardWeight = 0
           newSvParticipantId = "svX-participant-id"
           joinedAsOfRound = (Round 3)
 
@@ -219,7 +219,7 @@ testRequiredNumOfConfirmation = do
 
   -- check that the `action` was executed
   [(_, dsoRules)] <- query @DsoRules dso
-  require "svX is a sv" (svX `Map.member` dsoRules.svs)
+  require "svX is a sv" (svX `elem` operatorParties dsoRules)
 
   pure ()
 

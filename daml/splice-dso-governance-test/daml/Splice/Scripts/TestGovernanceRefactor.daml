@@ -1,0 +1,83 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestGovernanceRefactor where
+
+import DA.Action
+import DA.Assert
+import DA.Foldable
+import DA.List (sort)
+import Daml.Script
+import qualified DA.TextMap as TextMap
+import qualified DA.Map as Map
+
+import Splice.DSO.SvRightOwner
+import Splice.Issuance()
+
+
+import Splice.DsoRules
+import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Util
+
+
+testGovernanceRefactor : Script ()
+testGovernanceRefactor = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let nonOperatorName1 = "non-operator1"
+  let nonOperatorName2 = "non-operator2"
+  rightOwnerParty1 <- allocateParty "non-operator-governance1"
+  rightOwnerParty2 <- allocateParty "non-operator-governance2"
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $ ARC_DsoRules $ SRARC_DsoRules_AddSvRightOwner $ DsoRules_AddSvRightOwner nonOperatorName1 SvRightOwnerInfo with
+    rightOwnerParty = rightOwnerParty1
+    voteWeight = 4
+    rewardWeight = 1000
+    rewardNodeOperatorName = "sv1"
+    beneficiaries = []
+  executeAddSvRightOwnerInstructions sv1 app
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  TextMap.size (getSvRightOwners dsoRules) === 5
+  voteRequest <- initiateAndCastVote app [sv1, sv2, sv3, sv4] None $ ARC_DsoRules $ SRARC_DsoRules_AddSvRightOwner $ DsoRules_AddSvRightOwner nonOperatorName2 SvRightOwnerInfo with
+    rightOwnerParty = rightOwnerParty2
+    voteWeight = 1
+    rewardWeight = 1000
+    rewardNodeOperatorName = "sv1"
+    beneficiaries = []
+
+  executeAllDefinitiveVotes app
+
+  -- we have not yet reached the vote weight
+  Some _ <- queryContractId app.dso voteRequest
+
+  castVote app rightOwnerParty1 voteRequest True
+
+  executeAllDefinitiveVotes app
+  executeAddSvRightOwnerInstructions sv1 app
+  -- now we have reached the vote weight
+  None <- queryContractId app.dso voteRequest
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  TextMap.size (getSvRightOwners dsoRules) === 6
+  pure ()
+
+testGovernanceRefactorMigration : Script ()
+testGovernanceRefactorMigration = do
+  (app, _, (sv1, _sv2, _sv3, _sv4)) <- initMainNetNoOnLedgerSvRightOwners
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
+  dsoRules.svRightOwners === None
+  submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_MigrateToOnLedgerSvRightOwners with
+    svOperator = sv1
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  sort (map fst $ TextMap.toList $ getSvRightOwners dsoRules) === sort (map (.name) (Map.values dsoRules.svs))
+  TextMap.size (getSvRightOwners dsoRules) === 4
+  pure ()
+
+
+executeAddSvRightOwnerInstructions : Party -> AmuletApp -> Script ()
+executeAddSvRightOwnerInstructions sv1 app = do
+  instructions <- query @AddSvRightOwnerInstruction app.dso
+  forA_ instructions $ \(instructionCid, _) -> do
+    [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    (earliestOpenRoundCid, _) :: _ <- getOpenRoundsSorted app
+    void $ submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid $ DsoRules_ExecuteAddSvRightOwnerInstruction with
+      instructionCid = instructionCid
+      openMiningRoundCid = earliestOpenRoundCid
+      svOperator = sv1

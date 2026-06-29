@@ -5,7 +5,6 @@ module Splice.Scripts.TestOnboarding where
 
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
@@ -144,7 +143,7 @@ testSvOnboarding = do
           newSvName = "svX"
           newParticipantId = "svX-participant-id"
           reason = "because"
-          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+          newSvRewardWeight = 0 -- weight is not used for on-ledger sv right owners
   executeAllConfirmedActions app
 
   -- svX is now a confirmed SV
@@ -154,7 +153,7 @@ testSvOnboarding = do
     svName = "svX"
     svParticipantId = "svX-participant-id"
     reason = "because"
-    svRewardWeight = 19
+    svRewardWeight = 0 -- weight is not used for on-ledger sv right owners
     dso
     expiresAt = svOnboardingConfirmed.expiresAt
 
@@ -323,7 +322,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
   submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
     newSvParty = svX
     newSvName = "svX"
-    newSvRewardWeight = 19
+    newSvRewardWeight = 0 -- weight is not used for on-ledger sv right owners
     newSvParticipantId = "svX-participant-id"
     joinedAsOfRound = (Round 3)
 
@@ -352,7 +351,7 @@ testSvOnboardingConfirmedExpiry = do
           newSvParty = svX
           newSvName = "svX"
           newParticipantId = "svX-participant-id"
-          newSvRewardWeight = 19
+          newSvRewardWeight = 0 -- sv weight is not used for on-ledger sv right owners
           reason = "because"
 
   executeAllConfirmedActions app
@@ -375,6 +374,10 @@ testSvOnboardingConfirmedExpiry = do
   [(_, dsoRules)] <- query @DsoRules dso
   Map.keys (dsoRules.offboardedSvs) === [svX]
 
+lookupSvOperatorParty : Text -> DsoRules -> Optional Party
+lookupSvOperatorParty name dsoRules =
+  fmap fst (find (\(_, info) -> info.name == name) $ Map.toList dsoRules.svs)
+
 
 testSvNameUniquenessNotInDevNet : Script ()
 testSvNameUniquenessNotInDevNet = do
@@ -383,7 +386,7 @@ testSvNameUniquenessNotInDevNet = do
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
-  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
+  lookupSvOperatorParty "sv2" dsoRules === Some sv2
 
   svX <- allocateParty "svX"
   submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "sv2-participant-id" (Round 3)
@@ -395,12 +398,12 @@ testSvOverwriteInDevNet = do
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
-  (fromSome (Map.lookup sv1 dsoRules.svs)).name === "sv1"
-  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
+  lookupSvOperatorParty "sv1" dsoRules === Some sv1
+  lookupSvOperatorParty "sv2" dsoRules === Some sv2
   svX <- allocateParty "svX"
 
   -- overwriting existing sv successfully (using a new participant node)
-  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "svX-participant-id" (Round 3)
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 0 "svX-participant-id" (Round 3)
 
   [(_, dsoRules)] <- query @DsoRules app.dso
   dsoRules.offboardedSvs === Map.fromList [(sv2, OffboardedSvInfo "sv2" "sv2-participant-id")]
@@ -410,7 +413,7 @@ testSvOverwriteInDevNet = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
   -- overwriting existing sv again
-  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX2 "sv2" 19 "svX2-participant-id" (Round 3)
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX2 "sv2" 0 "svX2-participant-id" (Round 3)
 
   [(_, dsoRules)] <- query @DsoRules app.dso
   dsoRules.offboardedSvs === Map.fromList
@@ -429,7 +432,7 @@ testSvReonboarding = do
 
   [(_, dsoRules)] <- query @DsoRules dso
 
-  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4]
+  operatorParties dsoRules === [sv1, sv2, sv3, sv4]
 
   initiateAndAcceptVote app [sv1, sv2, sv3] $
     ARC_DsoRules with
@@ -439,14 +442,13 @@ testSvReonboarding = do
   executeAllDefinitiveVotes app
 
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.svs === [sv1, sv2, sv3]
+  operatorParties dsoRules === [sv1, sv2, sv3]
   Map.keys dsoRules.offboardedSvs === [sv4]
   checkSvContractInvariants app
 
   -- reonboard sv4
   let token = "mock-token"
   sv4New <- allocateParty "sv4New"
-
   svSubmits app sv1 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "sv4" sv4New "sv4New-participant-id" token sv1
   forA_ [sv1,sv2,sv3] $ \sv ->
@@ -458,7 +460,8 @@ testSvReonboarding = do
           newSvName = "sv4"
           newParticipantId = "sv4New-participant-id"
           reason = "because the sv4 owner still has the right to operate a node"
-          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+          newSvRewardWeight = 0 -- sv weight is not used for on-ledger sv right owners
+
   executeAllConfirmedActions app
   [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
 
@@ -466,7 +469,6 @@ testSvReonboarding = do
 
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, _)] <- query @DsoRules dso
-
   submit (actAs sv4New <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = sv4New
     svOnboardingConfirmedCid
@@ -477,7 +479,7 @@ testSvReonboarding = do
 
   [(_, dsoRules)] <- query @DsoRules dso
 
-  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4New]
+  operatorParties dsoRules === [sv1, sv2, sv3, sv4New]
   -- sv4 remaines offboarded
   Map.keys dsoRules.offboardedSvs === [sv4]
 
@@ -548,7 +550,7 @@ test_MergeValidatorLicense = do
 
 testBootstrapDevNetWithNonZeroRound : Script ()
 testBootstrapDevNetWithNonZeroRound = do
-  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound True 34
+  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound True 34 True
   [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app.dso
   earliestRound.round === Round 34
   middleRound.round === Round 35
@@ -557,7 +559,7 @@ testBootstrapDevNetWithNonZeroRound = do
 
 testBootstrapMainNetWithNonZeroRound : Script ()
 testBootstrapMainNetWithNonZeroRound = do
-  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound False 34
+  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound False 34 True
   [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app.dso
   earliestRound.round === Round 34
   middleRound.round === Round 35

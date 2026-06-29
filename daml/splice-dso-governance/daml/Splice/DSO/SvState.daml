@@ -43,7 +43,7 @@ data RewardState = RewardState with
 -- | State of reward collection for a sv identified by their sv name.
 template SvRewardState with
     dso : Party
-    svName : Text
+    svName : Text -- ^ sv right owner name
     state : RewardState
   where
     signatory dso

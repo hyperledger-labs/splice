@@ -12,6 +12,7 @@ import qualified DA.Map as Map
 import DA.Optional (fromOptional)
 import qualified DA.Set as Set
 import qualified DA.Text as T
+import qualified DA.TextMap as TextMap
 import Daml.Script
 import DA.Time
 
@@ -33,34 +34,38 @@ import Splice.DsoBootstrap
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.SvRightOwner
 import Splice.Scripts.AnsRulesParameters
-import Splice.Util
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
 bpsMultiplier : Int
 bpsMultiplier = 10000
 
 initMainNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNet = initDecentralizedSynchronizer False None
+initMainNet = initDecentralizedSynchronizer False None True
+
+
+initMainNetNoOnLedgerSvRightOwners : Script (AmuletApp, Party, (Party, Party, Party, Party))
+initMainNetNoOnLedgerSvRightOwners = initDecentralizedSynchronizer False None False
 
 
 initMainNetWithAmuletPrice : Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNetWithAmuletPrice amuletPrice = initDecentralizedSynchronizerWithAmuletPrice False 0 amuletPrice None
+initMainNetWithAmuletPrice amuletPrice = initDecentralizedSynchronizerWithAmuletPrice False 0 amuletPrice None True
 
 initDevNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDevNet = initDecentralizedSynchronizer True None
+initDevNet = initDecentralizedSynchronizer True None True
 
 initDevNetWithAmuletConfig : AmuletConfig USD -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDevNetWithAmuletConfig amuletConfig = initDecentralizedSynchronizer True (Some amuletConfig)
+initDevNetWithAmuletConfig amuletConfig = initDecentralizedSynchronizer True (Some amuletConfig) True
 
-initDecentralizedSynchronizer : Bool -> Optional (AmuletConfig USD) -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizer isDevNet optAmuletConfig = initDecentralizedSynchronizerWithAmuletPrice isDevNet 0 1.0 optAmuletConfig
+initDecentralizedSynchronizer : Bool -> Optional (AmuletConfig USD) -> Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizer isDevNet optAmuletConfig onLedgerSvRightOwners = initDecentralizedSynchronizerWithAmuletPrice isDevNet 0 1.0 optAmuletConfig onLedgerSvRightOwners
 
-initDecentralizedSynchronizerWithNonZeroRound : Bool -> Int -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithNonZeroRound isDevNet initialRound = initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound 1.0 None
+initDecentralizedSynchronizerWithNonZeroRound : Bool -> Int ->  Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizerWithNonZeroRound isDevNet initialRound onLedgerSvRightOwners = initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound 1.0 None onLedgerSvRightOwners
 
-initDecentralizedSynchronizerWithAmuletPrice : Bool -> Int -> Decimal -> Optional (AmuletConfig USD) -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice optAmuletConfig = do
+initDecentralizedSynchronizerWithAmuletPrice : Bool -> Int -> Decimal -> Optional (AmuletConfig USD) -> Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice optAmuletConfig onLedgerSvRightOwners = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
   dso <- allocateParty "dso-party"
@@ -130,6 +135,8 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
       initialTrafficState = Map.empty
       isDevNet
       initialRound = Some initialRound
+      sv1RightOwnerName = if onLedgerSvRightOwners then Some "sv1" else None
+      sv1VoteWeight = if onLedgerSvRightOwners then Some 1 else None
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"
@@ -137,32 +144,43 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
 
   -- add more sv nodes
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
+    let rewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
     [(dsoRulesCid, _)] <- query @DsoRules dso
     submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid $ DsoRules_OnboardValidator with
       sponsor = sv1
       validator = svParty
       version = Some "0.1.0"
       contactPoint = Some (svName <> "@example.com")
-    (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
-    submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
+    (earliestOpenRoundCid, earliestOpenRound) <- head <$> getOpenRoundsSorted app
+    result <- submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
       newSvParty = svParty
       newSvName = svName
-      newSvRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
+      newSvRewardWeight = if onLedgerSvRightOwners then 0 else rewardWeight
       newSvParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
-
+    when onLedgerSvRightOwners $  do
+      instructionCid <- submit dso $ exerciseCmd result.newDsoRules $ DsoRules_AddSvRightOwner with
+        rightOwnerName = svName
+        info = SvRightOwnerInfo with
+          rightOwnerParty = svParty
+          voteWeight = 1
+          rewardWeight = rewardWeight
+          rewardNodeOperatorName = svName
+          beneficiaries = []
+      void $ submit (actAs sv1 <> readAs dso) $ exerciseCmd result.newDsoRules DsoRules_ExecuteAddSvRightOwnerInstruction with
+        instructionCid
+        openMiningRoundCid = earliestOpenRoundCid
+        svOperator = sv1
   -- check that the SvStatusReports are present
   checkSvContractInvariants app
 
   pure (app, dso, (sv1, sv2, sv3, sv4))
 
 
-getSvInfoByParty : AmuletApp -> Party -> Script SvInfo
+getSvInfoByParty : AmuletApp -> Party -> Script (Text, SvInfo)
 getSvInfoByParty app sv = do
   [(_, rules)] <- query @DsoRules app.dso
-  case Map.lookup sv rules.svs of
-    None -> fail $ "Not a sv: " <> show sv
-    Some info -> pure info
+  getSvInfoByOperatorParty sv rules
 
 generateUnclaimedReward : AmuletApp -> AmuletUser -> Script ()
 generateUnclaimedReward app provider1 = do
@@ -182,13 +200,13 @@ generateUnclaimedReward app provider1 = do
 dsoDelegateSubmits : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script a
 dsoDelegateSubmits app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  let sv = head (Map.keys dsoRules.svs)
+  let sv = head (operatorParties dsoRules)
   submit (actAs sv <> readAs app.dso) $ mkCommands dsoRulesCid
 
 dsoDelegateSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script ()
 dsoDelegateSubmitsMustFail app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  let sv = head (Map.keys dsoRules.svs)
+  let sv = head (operatorParties dsoRules)
   submitMustFail (actAs sv <> readAs app.dso) $ mkCommands dsoRulesCid
 
 svSubmits : AmuletApp -> Party -> (ContractId DsoRules -> Commands a) -> Script a
@@ -229,7 +247,7 @@ runNextIssuanceD app amuletPrice appActivityRoundTotal = do
             svRewardCouponCids = map fst svRewards
             optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
             optValidatorLivenessActivityRecordCids = Some (map fst validatorLivenessActivityRecords)
-          sv = Some (head (Map.keys dsoRules.svs))
+          sv = Some (head (operatorParties dsoRules))
 
       -- the closed round
       confirmAWC_MiningRound_Archive app
@@ -256,7 +274,7 @@ runNextIssuanceD app amuletPrice appActivityRoundTotal = do
           middleRoundCid = r2Cid
           latestRoundCid = r3Cid
           amuletPriceVoteCids
-          sv = Some (head (Map.keys dsoRules.svs))
+          sv = Some (head (operatorParties dsoRules))
     let summarizingRoundCid = advanceResult.summarizingRound
 
     Some summarizingRound <- queryContractId app.dso summarizingRoundCid
@@ -323,7 +341,7 @@ confirmAWC_MiningRound_Archive app = do
 confirmAndExecutionAction : AmuletApp -> ActionRequiringConfirmation -> Script ()
 confirmAndExecutionAction app action = do
   [(dsoRulesCid, rules)] <- query @DsoRules app.dso
-  forA_ (Map.keys rules.svs) $ \sv -> do
+  forA_ (operatorParties rules) $ \sv -> do
     -- mallory does not act
     unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
       submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
@@ -336,37 +354,37 @@ executeAllConfirmedActions : AmuletApp -> Script ()
 executeAllConfirmedActions app = do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   [(dsoRulesCid, rules)] <- query @DsoRules app.dso
-  let s = summarizeDso rules
   -- query all confirmations visible to DSO party
   confirmations0 <- query @Confirmation app.dso
   -- execute the actions for which there are enough confirmations
   let executableConfirmations =
           filter (const True) -- (\cs -> s.requiredNumConfirmations <= length cs)
         $ groupEqualOn (\c -> c._2.action) confirmations0
+      submitter = head (operatorParties rules)
   forA_ executableConfirmations $ \cs -> do
-    submit (actAs s.dsoDelegate <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+    submit (actAs submitter <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
       action = (head cs)._2.action
       amuletRulesCid = Some amuletRulesCid
       confirmationCids = map fst cs
-      sv = Some s.dsoDelegate
+      sv = Some submitter
 
 executeAllDefinitiveVotes : AmuletApp -> Script ()
 executeAllDefinitiveVotes app = do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   [(dsoRulesCid, rules)] <- query @DsoRules app.dso
-  let s = summarizeDso rules
+  let submitter = head (operatorParties rules)
   -- query all voting requests visible to DSO party
   now <- getTime
   requests <- query @VoteRequest app.dso
   forA_ requests $ \(requestCid, request) -> do
-    let activeSvs = Set.fromList $ map (.name) $ Map.values rules.svs
+    let activeSvs = Set.fromList (map fst $ TextMap.toList (getSvRightOwners rules))
     let execute = request.voteBefore <= now ||
           (activeSvs == Set.fromList (Map.keys request.votes))
     when execute $ do
-      void $ submit (actAs s.dsoDelegate <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+      void $ submit (actAs submitter <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
         requestCid
         amuletRulesCid = Some amuletRulesCid
-        sv = Some s.dsoDelegate
+        sv = Some submitter
 
 initiateAndCastVote : AmuletApp -> [Party] -> Optional Time -> ActionRequiringConfirmation -> Script (ContractId VoteRequest)
 initiateAndCastVote _ [] _ _ = error "initiateVote: require at least one party"
@@ -448,27 +466,23 @@ checkSvRewardStates : AmuletApp -> Script ()
 checkSvRewardStates app = do
   rewardStates <- query @SvRewardState app.dso
   [(_, dsoRules)] <- query @DsoRules app.dso
-  forA_ (Map.values dsoRules.svs) $ \info ->
-    require "Each onboarded andSV name has one SvRewardState contract" $
-      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
-  forA_ (Map.values dsoRules.offboardedSvs) $ \info ->
-    require "Each offboarded and SV name has one SvRewardState contract" $
-      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
-  let offAndOnboardedSvs = Set.fromList (map (\info -> info.name) (Map.values dsoRules.svs) <> map (\info -> info.name) (Map.values dsoRules.offboardedSvs))
-  Set.fromList [state.svName | (_, state) <- rewardStates] === offAndOnboardedSvs
-  require "No duplicate SvRewardstate contracts" $
-    length rewardStates == Set.size offAndOnboardedSvs
+  if onLedgerSvRightOwners dsoRules then
+    Set.fromList [state.svName | (_, state) <- rewardStates] === Set.fromList (map fst (TextMap.toList (getSvRightOwners dsoRules)))
+  else
+    Set.fromList [state.svName | (_, state) <- rewardStates] === Set.fromList (map (.name) (Map.values dsoRules.svs))
+  
 
 -- | Check that there's exactly one status report per SV both off-boarded and onboarded.
 checkSvStatusReports : AmuletApp -> Script ()
 checkSvStatusReports app = do
   [(_, dsoRules)] <- query @DsoRules app.dso
-  let svParties = Map.keys dsoRules.svs
+  let svParties = operatorParties dsoRules
   let offboardedParties = Map.keys dsoRules.offboardedSvs
   let expectedSvParties = Set.fromList $ svParties ++ offboardedParties
   reports <- query @SvStatusReport app.dso
   let reportingParties = Set.fromList $ [ report.sv | (_, report) <- reports ]
   reportingParties === expectedSvParties
+  pure ()
 
 getSvNodeState : AmuletApp -> Party -> Script (ContractId SvNodeState, SvNodeState)
 getSvNodeState app sv = do
