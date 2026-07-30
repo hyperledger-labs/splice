@@ -1,6 +1,9 @@
 module Splice.DSO.SvRightOwner where
 
+import DA.List (unique)
+import Splice.DSO.SvState
 import Splice.Util
+import Splice.Types
 
 -- | Information about a super validator right owner.
 data SvRightOwnerInfo = SvRightOwnerInfo
@@ -15,10 +18,6 @@ data SvRightOwnerInfo = SvRightOwnerInfo
       -- For rewards to be minted both the node operator.
     beneficiaries : [(Party, Decimal)]
       -- ^ List of beneficiaries and their percentages for reward distribution. Must not include rightOwnerParty. Remainder goes to rightOwnerParty.
-      -- FIXME: probably want to move this to a separate contract
-      -- FIXME: Comment for reviewer: This is deliberately a percentage not a weight. With automatic weight adjustments absolutel weights don't work anymore.
-      -- Beneficiaries are also more of an exception than the rule now that all actual SVs are directly represented as SVs and beneficiaries
-      -- are only if an SV does not want to mint directly under their SV party.
   deriving (Eq, Show)
 
 instance Patchable SvRightOwnerInfo where
@@ -28,4 +27,36 @@ instance Patchable SvRightOwnerInfo where
       voteWeight = patch new.voteWeight base.voteWeight current.voteWeight
       rewardWeight = patch new.rewardWeight base.rewardWeight current.rewardWeight
       rewardNodeOperatorName = patch new.rewardNodeOperatorName base.rewardNodeOperatorName current.rewardNodeOperatorName
-      beneficiaries = patchScalar new.beneficiaries base.beneficiaries current.beneficiaries  
+      beneficiaries = patchScalar new.beneficiaries base.beneficiaries current.beneficiaries
+
+template SvRightOwner
+  with
+    dso : Party
+    rightOwnerName : Text
+    info : SvRightOwnerInfo
+  where
+    signatory dso
+    ensure validSvRightOwnerInfo info
+
+instance HasCheckedFetch SvRightOwner ForSv where
+  contractGroupId SvRightOwner{..} = 
+    ForSv
+      with
+        dso
+        svName = rightOwnerName
+
+instance HasCheckedFetch SvRightOwner ForDso where
+  contractGroupId SvRightOwner{..} = 
+    ForDso
+      with
+        dso
+
+validSvRightOwnerInfo : SvRightOwnerInfo -> Bool
+validSvRightOwnerInfo SvRightOwnerInfo{..} =
+  voteWeight >= 0 &&
+  rewardWeight >= 0 &&
+  sum (map snd beneficiaries) <= 1.0 &&
+  all (\(_, beneficiaryWeight) -> beneficiaryWeight > 0.0) beneficiaries &&
+  all (\(beneficiary,_) -> beneficiary /= rightOwnerParty) beneficiaries &&
+  unique (map fst beneficiaries) &&
+  length beneficiaries <= 20

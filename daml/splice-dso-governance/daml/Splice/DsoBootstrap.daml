@@ -3,6 +3,7 @@
 
 module Splice.DsoBootstrap where
 
+import DA.Functor
 import qualified DA.Map as Map
 import qualified DA.TextMap as TextMap
 import DA.Time
@@ -79,18 +80,15 @@ template DsoBootstrap with
               config
               initialTrafficState
               isDevNet
-              svRightOwners = flip fmap sv1RightOwnerName $ \rightOwnerName -> TextMap.fromList [
-                ( sv1Name
-                , SvRightOwnerInfo with
-                    rightOwnerParty = sv1Party
-                    voteWeight = fromOptional 0 sv1VoteWeight
-                    rewardWeight = sv1RewardWeight
-                    rewardNodeOperatorName = rightOwnerName
-                    beneficiaries = []
-                )
-                ]
+              svRightOwners = sv1RightOwnerName <&> \name -> TextMap.fromList [(name, ())]
+        let info = sv1RightOwnerName <&> \rightOwnerName -> SvRightOwnerInfo with
+                rightOwnerParty = sv1Party
+                voteWeight = fromOptional 0 sv1VoteWeight
+                rewardWeight = sv1RewardWeight
+                rewardNodeOperatorName = rightOwnerName
+                beneficiaries = []
         create dsoRules
         let joinedAsOfRound = fromOptional (Round 0) result.initialRound
-        createSvRightOwnerContracts dsoRules sv1Name joinedAsOfRound
+        createSvRightOwnerContracts dsoRules sv1Name info joinedAsOfRound
         createSvOperatorContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice) (getVoteCooldownTime config)
         return DsoBootstrap_BootstrapResult

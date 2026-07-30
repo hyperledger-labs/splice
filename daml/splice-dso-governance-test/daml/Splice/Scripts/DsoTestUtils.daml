@@ -380,25 +380,46 @@ executeAllDefinitiveVotes app = do
     let activeSvs = Set.fromList (map fst $ TextMap.toList (getSvRightOwners rules))
     let execute = request.voteBefore <= now ||
           (activeSvs == Set.fromList (Map.keys request.votes))
+    rightOwnerCids <- querySvRightOwners app
     when execute $ do
+      Some request <- queryContractId app.dso requestCid
       void $ submit (actAs submitter <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
         requestCid
         amuletRulesCid = Some amuletRulesCid
         sv = Some submitter
+        rightOwnerCids = if voteType request.action == RightOwnerVote then rightOwnerCids else None
+
+lookupRightOwner : AmuletApp -> Party -> Script (Optional (ContractId SvRightOwner))
+lookupRightOwner app rightOwnerParty = do
+  rightOwners <- queryFilter @SvRightOwner app.dso (\ro -> ro.info.rightOwnerParty == rightOwnerParty)
+  case rightOwners of
+    [] -> pure None
+    [(roCid, _)] -> pure (Some roCid)
+    _ -> abort "lookupRightOwner: multiple SvRightOwner contracts found for the same party"
+
+querySvRightOwners : AmuletApp -> Script (Optional (TextMap.TextMap (ContractId SvRightOwner)))
+querySvRightOwners app = do
+  rightOwners <- query @SvRightOwner app.dso
+  pure $ if null rightOwners 
+    then None
+    else Some (TextMap.fromList [(ro.rightOwnerName, roCid) | (roCid, ro) <- rightOwners])
 
 initiateAndCastVote : AmuletApp -> [Party] -> Optional Time -> ActionRequiringConfirmation -> Script (ContractId VoteRequest)
 initiateAndCastVote _ [] _ _ = error "initiateVote: require at least one party"
 initiateAndCastVote app (initiator::others) targetEffectiveAt action = do
     [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    rightOwnerCid <- lookupRightOwner app initiator
     requestCid <- submit (actAs initiator <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
       requester = initiator
       action
       reason = Reason with url = ""; body = "let's get it done"
       targetEffectiveAt
       voteRequestTimeout = None
+      rightOwnerCid = if voteType action == RightOwnerVote then rightOwnerCid else None
     foldlA (castVote dsoRulesCid) requestCid.voteRequest others
   where
     castVote dsoRulesCid requestCid sv = do
+      rightOwnerCid <- lookupRightOwner app sv
       result <- submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
           requestCid
           vote = Vote with
@@ -406,22 +427,26 @@ initiateAndCastVote app (initiator::others) targetEffectiveAt action = do
             accept = True
             reason = Reason with url = ""; body = "✓"
             optCastAt = None
+          rightOwnerCid = if voteType action == RightOwnerVote then rightOwnerCid else None
       return result.voteRequest
 
 initiateAndAcceptVote : AmuletApp -> [Party] -> ActionRequiringConfirmation -> Script ()
 initiateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
 initiateAndAcceptVote app (initiator::others) action = do
     [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    rightOwnerCid <- lookupRightOwner app initiator
     requestCid <- submit (actAs initiator <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
       requester = initiator
       action
       reason = Reason with url = ""; body = "let's get it done"
       targetEffectiveAt = None
       voteRequestTimeout = None
+      rightOwnerCid = if voteType action == RightOwnerVote then rightOwnerCid else None
     foldlA (castVote dsoRulesCid) requestCid.voteRequest others
     executeAllDefinitiveVotes app
   where
     castVote dsoRulesCid requestCid sv = do
+      rightOwnerCid <- lookupRightOwner app sv
       result <- submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
           requestCid
           vote = Vote with
@@ -429,13 +454,16 @@ initiateAndAcceptVote app (initiator::others) action = do
             accept = True
             reason = Reason with url = ""; body = "✓"
             optCastAt = None
+          rightOwnerCid = if voteType action == RightOwnerVote then rightOwnerCid else None
       return result.voteRequest
 
 -- cast a vote on a request
 castVote : AmuletApp -> Party -> ContractId VoteRequest -> Bool -> Script (ContractId VoteRequest)
 castVote app sv requestCid vote = do
     [(dsoRulesCid, _)] <- query @DsoRules app.dso
-    result <- submit (actAs sv <> actAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    rightOwnerCid <- lookupRightOwner app sv
+    Some request <- queryContractId app.dso requestCid
+    result <- submit (actAs sv <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
         requestCid = requestCid
         vote = Vote with
             sv = sv
@@ -444,6 +472,7 @@ castVote app sv requestCid vote = do
                 url = ""
                 body = ""
             optCastAt = None
+        rightOwnerCid = if voteType request.action == RightOwnerVote then rightOwnerCid else None
     return result.voteRequest
 
 -- | Update all currently desired prices to the target price

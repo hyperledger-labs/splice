@@ -10,7 +10,7 @@ import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Foldable (forA_, all)
 import DA.List as List hiding (all)
-import DA.Optional (isNone, fromOptional, isSome, fromSome)
+import DA.Optional (isNone, fromOptional, isSome)
 import qualified DA.Map as Map
 import DA.TextMap (TextMap)
 import qualified DA.Set as Set
@@ -639,18 +639,7 @@ data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
   deriving (Eq, Show, Serializable)
 
-validSvRightOwnerInfo : DsoRules -> SvRightOwnerInfo -> Bool
-validSvRightOwnerInfo DsoRules{} SvRightOwnerInfo{..} =
-  voteWeight >= 0 &&
-  rewardWeight >= 0 &&
-  sum (map snd beneficiaries) <= 1.0 &&
-  all (\(_, beneficiaryWeight) -> beneficiaryWeight > 0.0) beneficiaries &&
-  all (\(beneficiary,_) -> beneficiary /= rightOwnerParty) beneficiaries &&
-  unique (map fst beneficiaries)
-  -- FIXME: Do we want this assertion? If so, we need to switch the node operator on offboarding.
-  -- && any (\info -> info.name == rewardNodeOperatorName) (Map.values svs)
-
-getSvRightOwners : DsoRules -> TextMap.TextMap SvRightOwnerInfo
+getSvRightOwners : DsoRules -> TextMap.TextMap ()
 getSvRightOwners DsoRules{..} = fromOptional TextMap.empty svRightOwners
 
 onLedgerSvRightOwners : DsoRules -> Bool
@@ -668,7 +657,7 @@ template DsoRules with
     dso : Party
     epoch : Int
     svs : Map.Map Party SvInfo
-      -- ^ Deprecated in favor of svRightOwners
+      -- ^ SV Node Operators
     offboardedSvs : Map.Map Party OffboardedSvInfo
       -- ^ Only set for sv node owners to handle DSO party offboarding
     dsoDelegate : Party
@@ -676,12 +665,12 @@ template DsoRules with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
-    svRightOwners : Optional (TextMap.TextMap SvRightOwnerInfo) -- ^ Map from sv right owner name to info about the right owner
+    svRightOwners : Optional (TextMap.TextMap ()) -- ^ Set of sv right owner names
+      -- FIXME: Consider changing to [Text]
 
   where
     ensure
       config.numUnclaimedRewardsThreshold > 0 &&
-      all (\(_, v) -> validSvRightOwnerInfo this v) (TextMap.toList (getSvRightOwners this)) &&
       -- when using on-ledger right owners they must be non-empty
       optional True (\rightOwners -> TextMap.size rightOwners >= 1) svRightOwners &&
       -- when using on-ledger right owners the weight in the operator info must be 0
@@ -890,7 +879,7 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvNodeOperatorParty this sv
-        let s = summarizeDso OperatorVote this
+        s <- summarizeDso OperatorVote TextMap.empty this
         let forDso = ForDso with dso
         -- there are no operator vote weights so just number of confirmations is sufficient.
         require "Enough confirmations" (length confirmationCids >= s.requiredVoteWeight)
@@ -916,9 +905,10 @@ template DsoRules with
         reason : Reason
         voteRequestTimeout : Optional RelTime
         targetEffectiveAt : Optional Time
+        rightOwnerCid : Optional (ContractId SvRightOwner)
       controller requester
       do
-        requesterName <- getAndValidateVotingParty this requester action
+        requesterName <- getAndValidateVotingParty rightOwnerCid this requester action
         requireWellformedReason config reason
         now <- getTime
         let voteBefore = case voteRequestTimeout of
@@ -949,13 +939,14 @@ template DsoRules with
       with
         requestCid : ContractId VoteRequest
         vote : Vote
+        rightOwnerCid : Optional (ContractId SvRightOwner)
       controller vote.sv
       do
         -- validate vote parameters
         requireWellformedVote config vote
         -- validate and archive request
         request <- fetchAndArchive (ForDso with dso) requestCid
-        voterName <- getAndValidateVotingParty this vote.sv request.action
+        voterName <- getAndValidateVotingParty rightOwnerCid this vote.sv request.action
         -- rate limit casting of votes by the same SV to avoid them blocking others from making progress
         -- Note: we currently ignore the optional self-declared vote casting time
         -- `vote.optCastAt`. We'll use that in the future when adding support for larger
@@ -997,13 +988,14 @@ template DsoRules with
         requestCid : ContractId VoteRequest
         amuletRulesCid : Optional (ContractId AmuletRules)
         sv : Optional Party
+        rightOwnerCids : Optional (TextMap.TextMap (ContractId SvRightOwner))
       controller sv
       do
         _ <- getAndValidateSvNodeOperatorParty this sv
         now <- getTime
 
         request <- fetchAndArchive (ForDso with dso) requestCid
-        let s = summarizeDso (voteType request.action) this
+        s <- summarizeDso (voteType request.action) (fromOptional TextMap.empty rightOwnerCids) this
 
         let (validVotes, offboardedVoters) = partitionEithers
               [ case TextMap.lookup voterName s.votersWithWeight of
@@ -1637,35 +1629,29 @@ template DsoRules with
       with
         sv : Party -- ^ sv operator party
         openRoundCid : ContractId OpenMiningRound
-        svRewardStates : TextMap.TextMap (ContractId SvRewardState)
+        svRewardStates : TextMap.TextMap (ContractId SvRightOwner, ContractId SvRewardState)
       controller sv
       do
         requireOnLedgerSvRightOwners this
         let svOperator = sv
         operatorName <- getAndValidateSvNodeOperatorParty this (Some svOperator)
-        let info = fromSome (TextMap.lookup operatorName (getSvRightOwners this))
         now <- getTime
         openRound <- fetchReferenceData (ForDso with dso) openRoundCid
         require "OpenRound is open" (openRound.opensAt <= now)
 
-        -- FIXME: Do we want to enforce that the operator has to pass in all states that have configured them as a node operator?
-        -- given that you do rely on the operator anyway to mint rewards maybe not required.
-        -- if we do enforce it, we need to handle cases where the lastRoundCollected is out of sync which can happen on operator switches.
-        forA_ (TextMap.toList svRewardStates) $ \(svName, rewardStateCid) -> do
-          svInfo <- case TextMap.lookup svName (getSvRightOwners this) of
-            None -> fail ("SV " <> svName <> " is not an SV")
-            Some svInfo -> do
-              require ("SV " <> svName <> " is minting rewards through " <> show operatorName) (svInfo.rewardNodeOperatorName == operatorName)
-              pure svInfo
-          rewardState <- fetchAndArchive (ForSv with dso; svName = svName) rewardStateCid
+        forA_ (TextMap.toList svRewardStates) $ \(svName, (rightOwnerCid, rewardStateCid)) -> do
+          rewardState <- fetchAndArchive (ForSv with dso, svName) rewardStateCid
+          svRightOwner <- fetchChecked (ForSv with dso, svName) rightOwnerCid
+          require "Operator matches" (svRightOwner.info.rewardNodeOperatorName == operatorName)
+          let svInfo = svRightOwner.info
           let state = rewardState.state
               beneficiaries = svInfo.beneficiaries
           let (configuredBeneficiaryCouponWeights, remainingWeight) =
                 foldl
                   (\(acc, remainingWeight) (beneficiary, weight) ->
-                     let beneficiaryWeight = floor (weight * intToDecimal info.rewardWeight)
+                     let beneficiaryWeight = floor (weight * intToDecimal svInfo.rewardWeight)
                      in ((beneficiary, beneficiaryWeight) :: acc, remainingWeight - beneficiaryWeight))
-                  ([], info.rewardWeight)
+                  ([], svInfo.rewardWeight)
                   beneficiaries
               beneficiaryCouponWeights =
                 if remainingWeight > 0 then (svInfo.rightOwnerParty, remainingWeight) :: configuredBeneficiaryCouponWeights
@@ -1683,7 +1669,7 @@ template DsoRules with
               numCouponsIssued = state.numCouponsIssued + length beneficiaryCouponWeights
 
           -- check weights and issue rewards
-          require "Sum of beneficiary weights matches" (info.rewardWeight == sum (map snd beneficiaryCouponWeights))
+          require "Sum of beneficiary weights matches" (svInfo.rewardWeight == sum (map snd beneficiaryCouponWeights))
 
           couponCids <- forA beneficiaryCouponWeights $ \(beneficiary, weight) ->
             create SvRewardCoupon with
@@ -2142,53 +2128,55 @@ template DsoRules with
                 -- option 2: Switchover through a vote that sets beneficiaries for everyone
                 -- option 3: two-step process, first setup sv right owners through votes (probably a batched vote in some form) and then have a second vote to actually start using right owners (needs a new config flag to indicate whether right owners take effect)
               voteWeight = 1
+        forA_ (Map.toList this.svs) $ \(svOperator, info) -> do
+          create SvRightOwner with
+            dso
+            info = svRightOwnerFromOperator svOperator info
+            rightOwnerName = info.name
         create this with
           svs = Map.fromList ([(sv, info with svRewardWeight = 0) | (sv, info) <- Map.toList this.svs])
-          svRightOwners = Some (TextMap.fromList [(info.name, svRightOwnerFromOperator svOperator info) | (svOperator, info) <- Map.toList this.svs])
+          svRightOwners = Some (TextMap.fromList [(info.name, ()) | (_, info) <- Map.toList this.svs])
 
-    choice DsoRules_UpdateRightOwnerParty : ContractId DsoRules
+    nonconsuming choice DsoRules_UpdateRightOwnerParty : ContractId SvRightOwner
       with
         name : Text
+        svRightOwnerCid : ContractId SvRightOwner
         oldRightOwnerParty : Party
         newRightOwnerParty : Party
       controller oldRightOwnerParty
       do
         requireOnLedgerSvRightOwners this
-        case TextMap.lookup name (getSvRightOwners this) of
-          None -> abort ("No sv with name " <> show name)
-          Some info -> do
-            require "right owner parties match" (info.rightOwnerParty == oldRightOwnerParty)
-            create this with
-              svRightOwners = Some (TextMap.insert name (info with rightOwnerParty = newRightOwnerParty) (getSvRightOwners this))
+        svRightOwner <- fetchAndArchive (ForSv with dso; svName = name) svRightOwnerCid
+        require "right owner parties match" (svRightOwner.info.rightOwnerParty == oldRightOwnerParty)
+        create svRightOwner with
+          info.rightOwnerParty = newRightOwnerParty
 
-    choice DsoRules_UpdateBeneficiaries : ContractId DsoRules
+    choice DsoRules_UpdateBeneficiaries : ContractId SvRightOwner
       with
         name : Text
+        svRightOwnerCid : ContractId SvRightOwner
         rightOwnerParty : Party
         beneficiaries : [(Party, Decimal)]
       controller rightOwnerParty
       do
         requireOnLedgerSvRightOwners this
-        case TextMap.lookup name (getSvRightOwners this) of
-          None -> abort ("No sv with name " <> show name)
-          Some info -> do
-            require "right owner parties match" (info.rightOwnerParty == rightOwnerParty)
-            create this with
-              svRightOwners = Some (TextMap.insert name (info with beneficiaries = beneficiaries) (getSvRightOwners this))
+        svRightOwner <- fetchAndArchive (ForSv with dso; svName = name) svRightOwnerCid
+        require "right owner parties match" (svRightOwner.info.rightOwnerParty == rightOwnerParty)
+        create svRightOwner with
+          info.beneficiaries = beneficiaries
 
-    choice DsoRules_UpdateSvRightOwnerInfo : ContractId DsoRules
+    nonconsuming choice DsoRules_UpdateSvRightOwnerInfo : ContractId SvRightOwner
       with
         name : Text
+        rightOwnercid : ContractId SvRightOwner
         baseInfo : SvRightOwnerInfo -- ^ The info the vote was created against
         newInfo : SvRightOwnerInfo -- ^ The target info, only fields that are different from baseInfo will be updated
       controller dso
       do
         requireOnLedgerSvRightOwners this
-        case TextMap.lookup name (getSvRightOwners this) of
-          None -> abort ("No SV with name " <> show name)
-          Some currentInfo -> do
-            create this with
-              svRightOwners = Some (TextMap.insert name (patch newInfo baseInfo currentInfo) (getSvRightOwners this))
+        rightOwner <- fetchAndArchive (ForSv with dso; svName = name) rightOwnercid
+        create rightOwner with
+          info = patch newInfo baseInfo rightOwner.info
 
     nonconsuming choice DsoRules_AddSvRightOwner : ContractId AddSvRightOwnerInstruction
       with
@@ -2221,9 +2209,9 @@ template DsoRules with
         case TextMap.lookup instruction.rightOwnerName (getSvRightOwners this) of
           Some _ -> abort ("SV with name " <> instruction.rightOwnerName <> " already exists")
           None -> do
-            createSvRightOwnerContracts this instruction.rightOwnerName openMiningRound.round
+            createSvRightOwnerContracts this instruction.rightOwnerName (Some instruction.info) openMiningRound.round
             create this with
-              svRightOwners = Some (TextMap.insert instruction.rightOwnerName instruction.info (getSvRightOwners this))
+              svRightOwners = Some (TextMap.insert instruction.rightOwnerName () (getSvRightOwners this))
 
     nonconsuming choice DsoRules_RemoveSvRightOwner : ContractId RemoveSvRightOwnerInstruction
       with
@@ -2244,6 +2232,7 @@ template DsoRules with
       with
         instructionCid : ContractId RemoveSvRightOwnerInstruction
         rewardStateCid : ContractId SvRewardState
+        svRightOwnerCid : ContractId SvRightOwner
         svOperator : Party
       controller svOperator
       do
@@ -2256,6 +2245,7 @@ template DsoRules with
             -- In theory reonboarding an SV immediately could let it mint rewards twice for the same round.
             -- In practice, reonboarding that quickly seems unrealistic in practice.
             _ <- fetchAndArchive (ForSv with dso; svName = instruction.rightOwnerName) rewardStateCid
+            _ <- fetchAndArchive (ForSv with dso; svName = instruction.rightOwnerName) svRightOwnerCid
             create this with svRightOwners = Some (TextMap.delete instruction.rightOwnerName (getSvRightOwners this))
           None -> abort ("No SV with name " <> show instruction.rightOwnerName)
 
@@ -2315,21 +2305,26 @@ pruneAtLeastOne now schedule =
    where
      (past, future) = span (\(t, _) -> t <= now) schedule.futureValues
 
-data VoteType = OperatorVote | RightOwnerVote
+data VoteType = OperatorVote | RightOwnerVote deriving (Show, Eq)
 
-summarizeDso : VoteType -> DsoRules -> DsoSummaryV2
-summarizeDso voteType dsoRules = DsoSummaryV2 with
+summarizeDso : VoteType -> TextMap.TextMap (ContractId SvRightOwner) -> DsoRules -> Update DsoSummaryV2
+summarizeDso voteType svRightOwnerCids dsoRules = do
+  votersWithWeight <- case voteType of
+      RightOwnerVote -> do
+        require "set of right owner cids matches the list of right owners" (map fst (TextMap.toList svRightOwnerCids) == map fst (TextMap.toList (getSvRightOwners dsoRules)))
+        rightOwners <- forA (TextMap.toList svRightOwnerCids) $ \(name, rightOwnerCid) -> do
+          fetchChecked (ForSv with dso = dsoRules.dso; svName = name) rightOwnerCid
+        pure [(rightOwner.rightOwnerName, rightOwner.info.voteWeight) | rightOwner <- rightOwners, rightOwner.info.voteWeight > 0]
+      OperatorVote ->  do
+        require "operator votes should not specify any right owner cids" (TextMap.null svRightOwnerCids)
+        pure [(info.name, 1) | (_, info) <- Map.toList dsoRules.svs] -- operators have weight 1
+  let totalVoteWeight = sum (map snd votersWithWeight)
+  let f = floor ((intToDecimal (totalVoteWeight - 1)) / 3.0)
+  pure DsoSummaryV2 with
     totalVoteWeight
     requiredVoteWeight =
       ceiling ((intToDecimal (totalVoteWeight + f + 1)) / 2.0)
     votersWithWeight = TextMap.fromList votersWithWeight
-  where
-    votersWithWeight = case voteType of
-      RightOwnerVote -> [(name, info.voteWeight) | (name, info) <- TextMap.toList (getSvRightOwners dsoRules), info.voteWeight > 0]
-      OperatorVote -> [(info.name, 1) | (_, info) <- Map.toList dsoRules.svs] -- operators have weight 1
-    totalVoteWeight = sum (map snd votersWithWeight)
-
-    f = floor ((intToDecimal (totalVoteWeight - 1)) / 3.0)
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
@@ -2438,11 +2433,6 @@ getSvInfoByOperatorParty operator this =
     None -> fail ("Not a sv operator: " <> show operator)
     Some svInfo -> pure (svInfo.name, svInfo)
 
-lookupSvInfoByName : Text -> DsoRules -> Optional SvRightOwnerInfo
-lookupSvInfoByName svName this =
-  TextMap.lookup svName (getSvRightOwners this)
-
-
 lookupSvOperatorInfoByName : Text -> DsoRules -> Optional (Party, SvInfo)
 lookupSvOperatorInfoByName svName DsoRules{..} =
   find (\info -> info._2.name == svName) $ Map.toList svs
@@ -2451,7 +2441,7 @@ lookupSvOperatorInfoByName svName DsoRules{..} =
 -- or an SV with that name has been onboarded before and is now in offboardedSvs.
 svHasBeenOnboardedBefore : Text -> DsoRules -> Bool
 svHasBeenOnboardedBefore svName this =
-  isSome (lookupSvInfoByName svName this) || any (\info -> info.name == svName) (Map.values this.offboardedSvs)
+  isSome (lookupSvOperatorInfoByName svName this) || any (\info -> info.name == svName) (Map.values this.offboardedSvs)
 
 ensureNeverOperatedNode : Party -> DsoRules -> Update ()
 ensureNeverOperatedNode newSvParty this = do
@@ -2485,7 +2475,7 @@ dsoRules_addSv this0 DsoRules_AddSv{..} = do
     then require "rewardWeight must be 0 when onboarding a new SV operator with on-ledger right owners" (newSvRewardWeight == 0)
     else
       unless (svHasBeenOnboardedBefore newSvName this) $
-      createSvRightOwnerContracts this newSvName joinedAsOfRound
+      createSvRightOwnerContracts this newSvName None joinedAsOfRound
   -- create per SV party contracts
   let initialAmuletPriceVote = None
   createSvOperatorContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote (getVoteCooldownTime config)
@@ -2498,17 +2488,24 @@ dsoRules_addSv this0 DsoRules_AddSv{..} = do
   create this with
     svs = Map.insert newSvParty svInfo svs
 
-createSvRightOwnerContracts : DsoRules -> Text -> Round -> Update ()
-createSvRightOwnerContracts DsoRules{..} newSvName joinedAsOfRound = do
+createSvRightOwnerContracts : DsoRules -> Text -> Optional SvRightOwnerInfo -> Round -> Update ()
+createSvRightOwnerContracts rules@DsoRules{..} newSvName rightOwnerInfo joinedAsOfRound = do
   void $ create SvRewardState with
     dso
     svName = newSvName
     state = RewardState with
       lastRoundCollected = Round (joinedAsOfRound.number - 1)
       numRoundsMissed = 0
-
       numRoundsCollected = 0
       numCouponsIssued = 0
+  case rightOwnerInfo of
+    None -> requireNoOnLedgerSvRightOwners rules
+    Some info -> do
+      requireOnLedgerSvRightOwners rules
+      void $ create SvRightOwner with
+        dso
+        rightOwnerName = newSvName
+        info
 
 createSvOperatorContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> RelTime -> Update ()
 createSvOperatorContracts dso newSvParty newSvName synchronizerNodes amuletPrice voteCooldownTime = do
@@ -2542,18 +2539,30 @@ getAndValidateSvNodeOperatorParty rules (Some sv) = do
     None -> fail ("SV party " <> show sv <> " is not a registered SV node operator")
     Some svInfo -> pure svInfo.name
 
-getAndValidateSvRightOwnerParty : DsoRules -> Optional Party -> Update Text
-getAndValidateSvRightOwnerParty _ None = fail "no SV right owner party provided"
-getAndValidateSvRightOwnerParty rules (Some sv) = do
-  case find (\(_, info) -> info.rightOwnerParty == sv) (TextMap.toList (getSvRightOwners rules)) of
-    None -> fail ("SV party " <> show sv <> " is not a right owner party")
-    Some (name, _) -> pure name
+getAndValidateSvRightOwnerParty : Optional (ContractId SvRightOwner) -> DsoRules -> Optional Party -> Update Text
+getAndValidateSvRightOwnerParty _ _ None = fail "no SV right owner party provided"
+getAndValidateSvRightOwnerParty rightOwnerCid rules (Some sv) = do
+  if onLedgerSvRightOwners rules 
+    then
+      case rightOwnerCid of
+        None -> fail "no SV right owner contract id provided"
+        Some cid -> do
+          rightOwner <- fetchChecked (ForDso with dso = rules.dso) cid
+          require "SV right owner parties match" (rightOwner.info.rightOwnerParty == sv)
+          pure rightOwner.rightOwnerName
+    else do
+      require "Right owner cid is not specified when not using on-ledger right owners" (isNone rightOwnerCid)
+      case Map.lookup sv rules.svs of
+        None -> fail ("SV party " <> show sv <> " is not a right owner party")
+        Some info -> pure info.name
 
-getAndValidateVotingParty : DsoRules -> Party -> ActionRequiringConfirmation -> Update Text
-getAndValidateVotingParty dsoRules party action =
+getAndValidateVotingParty : Optional (ContractId SvRightOwner) -> DsoRules -> Party -> ActionRequiringConfirmation -> Update Text
+getAndValidateVotingParty rightOwnerCid dsoRules party action =
   case voteType action of
-    RightOwnerVote -> getAndValidateSvRightOwnerParty dsoRules (Some party)
-    OperatorVote -> getAndValidateSvNodeOperatorParty dsoRules (Some party)
+    RightOwnerVote -> getAndValidateSvRightOwnerParty rightOwnerCid dsoRules (Some party)
+    OperatorVote -> do
+      require "Right owner cid is not specified for operator vote" (isNone rightOwnerCid)
+      getAndValidateSvNodeOperatorParty dsoRules (Some party)
 
 -- Rate limiting
 ----------------
@@ -2647,7 +2656,3 @@ instance Patchable LogicalSynchronizerUpgradeSchedule where
 
 operatorParties : DsoRules -> [Party]
 operatorParties DsoRules{svs} = Map.keys svs
-
-rightOwnerParties : DsoRules -> [Party]
-rightOwnerParties this =
-  map (\(_, v) -> v.rightOwnerParty) (TextMap.toList (getSvRightOwners this))
