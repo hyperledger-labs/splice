@@ -665,7 +665,9 @@ template DsoRules with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
-    svRightOwners : Optional [Text] -- ^ Set of sv right owner names
+    svRightOwners : Optional [Text]
+      -- ^ Set of sv right owner names. we maintain the invariant that for each right owner here there is exactly one SvRightOwner contract
+      -- and the list of SvRightOwner contracts and the list of sv right owners here are kept in sync atomically.
 
   where
     ensure
