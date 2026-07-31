@@ -377,7 +377,7 @@ executeAllDefinitiveVotes app = do
   now <- getTime
   requests <- query @VoteRequest app.dso
   forA_ requests $ \(requestCid, request) -> do
-    let activeSvs = Set.fromList (map fst $ TextMap.toList (getSvRightOwners rules))
+    let activeSvs = Set.fromList (getSvRightOwners rules)
     let execute = request.voteBefore <= now ||
           (activeSvs == Set.fromList (Map.keys request.votes))
     rightOwnerCids <- querySvRightOwners app
@@ -496,7 +496,7 @@ checkSvRewardStates app = do
   rewardStates <- query @SvRewardState app.dso
   [(_, dsoRules)] <- query @DsoRules app.dso
   if onLedgerSvRightOwners dsoRules then
-    Set.fromList [state.svName | (_, state) <- rewardStates] === Set.fromList (map fst (TextMap.toList (getSvRightOwners dsoRules)))
+    Set.fromList [state.svName | (_, state) <- rewardStates] === Set.fromList (getSvRightOwners dsoRules)
   else
     Set.fromList [state.svName | (_, state) <- rewardStates] === Set.fromList (map (.name) (Map.values dsoRules.svs))
   

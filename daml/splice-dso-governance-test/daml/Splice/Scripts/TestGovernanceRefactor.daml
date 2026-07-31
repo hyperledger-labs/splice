@@ -5,10 +5,9 @@ module Splice.Scripts.TestGovernanceRefactor where
 
 import DA.Action
 import DA.Assert
-import DA.Foldable
+import DA.Foldable hiding (length)
 import DA.List (sort)
 import Daml.Script
-import qualified DA.TextMap as TextMap
 import qualified DA.Map as Map
 
 import Splice.DSO.SvRightOwner
@@ -35,7 +34,7 @@ testGovernanceRefactor = do
     beneficiaries = []
   executeAddSvRightOwnerInstructions sv1 app
   [(_, dsoRules)] <- query @DsoRules app.dso
-  TextMap.size (getSvRightOwners dsoRules) === 5
+  length (getSvRightOwners dsoRules) === 5
   voteRequest <- initiateAndCastVote app [sv1, sv2, sv3, sv4] None $ ARC_DsoRules $ SRARC_DsoRules_AddSvRightOwner $ DsoRules_AddSvRightOwner nonOperatorName2 SvRightOwnerInfo with
     rightOwnerParty = rightOwnerParty2
     voteWeight = 1
@@ -55,7 +54,7 @@ testGovernanceRefactor = do
   -- now we have reached the vote weight
   None <- queryContractId app.dso voteRequest
   [(_, dsoRules)] <- query @DsoRules app.dso
-  TextMap.size (getSvRightOwners dsoRules) === 6
+  length (getSvRightOwners dsoRules) === 6
   pure ()
 
 testGovernanceRefactorMigration : Script ()
@@ -66,8 +65,8 @@ testGovernanceRefactorMigration = do
   submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_MigrateToOnLedgerSvRightOwners with
     svOperator = sv1
   [(_, dsoRules)] <- query @DsoRules app.dso
-  sort (map fst $ TextMap.toList $ getSvRightOwners dsoRules) === sort (map (.name) (Map.values dsoRules.svs))
-  TextMap.size (getSvRightOwners dsoRules) === 4
+  sort (getSvRightOwners dsoRules) === sort (map (.name) (Map.values dsoRules.svs))
+  length (getSvRightOwners dsoRules) === 4
   pure ()
 
 

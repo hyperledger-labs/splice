@@ -639,8 +639,8 @@ data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
   deriving (Eq, Show, Serializable)
 
-getSvRightOwners : DsoRules -> TextMap.TextMap ()
-getSvRightOwners DsoRules{..} = fromOptional TextMap.empty svRightOwners
+getSvRightOwners : DsoRules -> [Text]
+getSvRightOwners DsoRules{..} = fromOptional [] svRightOwners
 
 onLedgerSvRightOwners : DsoRules -> Bool
 onLedgerSvRightOwners DsoRules{..} = isSome svRightOwners
@@ -665,14 +665,13 @@ template DsoRules with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
-    svRightOwners : Optional (TextMap.TextMap ()) -- ^ Set of sv right owner names
-      -- FIXME: Consider changing to [Text]
+    svRightOwners : Optional [Text] -- ^ Set of sv right owner names
 
   where
     ensure
       config.numUnclaimedRewardsThreshold > 0 &&
       -- when using on-ledger right owners they must be non-empty
-      optional True (\rightOwners -> TextMap.size rightOwners >= 1) svRightOwners &&
+      optional True (\rightOwners -> length rightOwners >= 1 && unique rightOwners) svRightOwners &&
       -- when using on-ledger right owners the weight in the operator info must be 0
       (not (onLedgerSvRightOwners this) || all (\info -> info.svRewardWeight == 0) (Map.values svs))
 
@@ -2135,7 +2134,7 @@ template DsoRules with
             rightOwnerName = info.name
         create this with
           svs = Map.fromList ([(sv, info with svRewardWeight = 0) | (sv, info) <- Map.toList this.svs])
-          svRightOwners = Some (TextMap.fromList [(info.name, ()) | (_, info) <- Map.toList this.svs])
+          svRightOwners = Some (map (.name) (Map.values this.svs))
 
     nonconsuming choice DsoRules_UpdateRightOwnerParty : ContractId SvRightOwner
       with
@@ -2186,9 +2185,9 @@ template DsoRules with
       do
         requireOnLedgerSvRightOwners this
         now <- getTime
-        case TextMap.lookup rightOwnerName (getSvRightOwners this) of
-          Some _ -> abort ("SV with name " <> rightOwnerName <> " already exists")
-          None -> do
+        if rightOwnerName `elem` getSvRightOwners this
+          then abort ("SV with name " <> rightOwnerName <> " already exists")
+          else
             create AddSvRightOwnerInstruction with
               dso
               rightOwnerName
@@ -2206,12 +2205,12 @@ template DsoRules with
         requireOnLedgerSvRightOwners this
         instruction <- fetchAndArchive (ForDso dso) instructionCid
         openMiningRound <- fetchReferenceData (ForDso dso) openMiningRoundCid
-        case TextMap.lookup instruction.rightOwnerName (getSvRightOwners this) of
-          Some _ -> abort ("SV with name " <> instruction.rightOwnerName <> " already exists")
-          None -> do
+        if instruction.rightOwnerName `elem` getSvRightOwners this
+          then abort ("SV with name " <> instruction.rightOwnerName <> " already exists")
+          else do
             createSvRightOwnerContracts this instruction.rightOwnerName (Some instruction.info) openMiningRound.round
             create this with
-              svRightOwners = Some (TextMap.insert instruction.rightOwnerName () (getSvRightOwners this))
+              svRightOwners = Some (instruction.rightOwnerName :: getSvRightOwners this)
 
     nonconsuming choice DsoRules_RemoveSvRightOwner : ContractId RemoveSvRightOwnerInstruction
       with
@@ -2219,14 +2218,14 @@ template DsoRules with
       controller dso
       do
         requireOnLedgerSvRightOwners this
-        case TextMap.lookup rightOwnerName (getSvRightOwners this) of
-          Some _ -> do
+        if rightOwnerName `elem` getSvRightOwners this
+          then do
             now <- getTime
             create RemoveSvRightOwnerInstruction with
               dso
               rightOwnerName
               expiresAt = now `addRelTime` hours 1
-          None -> abort ("No SV with name " <> show rightOwnerName)
+          else abort ("No SV with name " <> show rightOwnerName)
 
     choice DsoRules_ExecuteRemoveSvRightOwnerInstruction : ContractId DsoRules
       with
@@ -2239,15 +2238,15 @@ template DsoRules with
         _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         requireOnLedgerSvRightOwners this
         instruction <- fetchAndArchive (ForDso dso) instructionCid
-        case TextMap.lookup instruction.rightOwnerName (getSvRightOwners this) of
-          Some _ -> do
+        if instruction.rightOwnerName `elem` getSvRightOwners this
+          then do
             -- We archive the reward state as part of offboarding to avoid having to track offboardedSvs for non-operators.
             -- In theory reonboarding an SV immediately could let it mint rewards twice for the same round.
             -- In practice, reonboarding that quickly seems unrealistic in practice.
             _ <- fetchAndArchive (ForSv with dso; svName = instruction.rightOwnerName) rewardStateCid
             _ <- fetchAndArchive (ForSv with dso; svName = instruction.rightOwnerName) svRightOwnerCid
-            create this with svRightOwners = Some (TextMap.delete instruction.rightOwnerName (getSvRightOwners this))
-          None -> abort ("No SV with name " <> show instruction.rightOwnerName)
+            create this with svRightOwners = Some (filter (/= instruction.rightOwnerName) (getSvRightOwners this))
+          else abort ("No SV with name " <> show instruction.rightOwnerName)
 
     nonconsuming choice DsoRules_ExpireRemoveSvRightOwnerInstruction : ()
       with
@@ -2311,7 +2310,7 @@ summarizeDso : VoteType -> TextMap.TextMap (ContractId SvRightOwner) -> DsoRules
 summarizeDso voteType svRightOwnerCids dsoRules = do
   votersWithWeight <- case voteType of
       RightOwnerVote -> do
-        require "set of right owner cids matches the list of right owners" (map fst (TextMap.toList svRightOwnerCids) == map fst (TextMap.toList (getSvRightOwners dsoRules)))
+        require "set of right owner cids matches the list of right owners" (sort (map fst (TextMap.toList svRightOwnerCids)) == sort (getSvRightOwners dsoRules))
         rightOwners <- forA (TextMap.toList svRightOwnerCids) $ \(name, rightOwnerCid) -> do
           fetchChecked (ForSv with dso = dsoRules.dso; svName = name) rightOwnerCid
         pure [(rightOwner.rightOwnerName, rightOwner.info.voteWeight) | rightOwner <- rightOwners, rightOwner.info.voteWeight > 0]

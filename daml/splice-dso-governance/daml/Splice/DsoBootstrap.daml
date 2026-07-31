@@ -5,7 +5,6 @@ module Splice.DsoBootstrap where
 
 import DA.Functor
 import qualified DA.Map as Map
-import qualified DA.TextMap as TextMap
 import DA.Time
 import DA.Optional
 
@@ -80,7 +79,7 @@ template DsoBootstrap with
               config
               initialTrafficState
               isDevNet
-              svRightOwners = sv1RightOwnerName <&> \name -> TextMap.fromList [(name, ())]
+              svRightOwners = sv1RightOwnerName <&> \name -> [name]
         let info = sv1RightOwnerName <&> \rightOwnerName -> SvRightOwnerInfo with
                 rightOwnerParty = sv1Party
                 voteWeight = fromOptional 0 sv1VoteWeight
