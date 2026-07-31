@@ -135,6 +135,7 @@ data DsoRules_ActionRequiringConfirmation
   | SRARC_DsoRules_UpdateSvRightOwnerInfo DsoRules_UpdateSvRightOwnerInfo
   | SRARC_DsoRules_AddSvRightOwner DsoRules_AddSvRightOwner
   | SRARC_DsoRules_RemoveSvRightOwner DsoRules_RemoveSvRightOwner
+  | SRARC_DsoRules_MigrateToOnLedgerSvRightOwners DsoRules_MigrateToOnLedgerSvRightOwners
   deriving (Eq, Show, Serializable)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -2113,30 +2114,20 @@ template DsoRules with
 
     choice DsoRules_MigrateToOnLedgerSvRightOwners : ContractId DsoRules
       with
-        svOperator : Party
-      controller svOperator
+        rightOwners : TextMap.TextMap SvRightOwnerInfo
+      controller dso
       do
-        _ <- getAndValidateSvNodeOperatorParty this (Some svOperator)
         require "svRightOwners is not already on-ledger" (isNone this.svRightOwners)
-        let svRightOwnerFromOperator svOperator info = SvRightOwnerInfo with
-              rightOwnerParty = svOperator
-              rewardNodeOperatorName = info.name
-              rewardWeight = info.svRewardWeight
-              beneficiaries = []
-                -- ^ FIXME: Consider how we want the migration to work
-                -- option 1: Set it to empty here and then have automation in the sv app that sets it to the ones locally configured.
-                --           Then through two votes with same effectivity reduce weight & remove beneficiary + a separate vote to add new sv right owner
-                -- option 2: Switchover through a vote that sets beneficiaries for everyone
-                -- option 3: two-step process, first setup sv right owners through votes (probably a batched vote in some form) and then have a second vote to actually start using right owners (needs a new config flag to indicate whether right owners take effect)
-              voteWeight = 1
-        forA_ (Map.toList this.svs) $ \(svOperator, info) -> do
+        require "Sum of SV weights does not change"
+          (sum (map (.svRewardWeight) (Map.values this.svs)) == sum [info.rewardWeight | (_, info) <- TextMap.toList rightOwners])
+        forA_ (TextMap.toList rightOwners) $ \(rightOwnerName, info) -> do
           create SvRightOwner with
             dso
-            info = svRightOwnerFromOperator svOperator info
-            rightOwnerName = info.name
+            info
+            rightOwnerName
         create this with
           svs = Map.fromList ([(sv, info with svRewardWeight = 0) | (sv, info) <- Map.toList this.svs])
-          svRightOwners = Some (map (.name) (Map.values this.svs))
+          svRightOwners = Some (map fst $ TextMap.toList rightOwners)
 
     nonconsuming choice DsoRules_UpdateRightOwnerParty : ContractId SvRightOwner
       with
@@ -2365,6 +2356,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_DsoRules_UpdateSvRightOwnerInfo choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_DsoRules_AddSvRightOwner choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_DsoRules_RemoveSvRightOwner choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_DsoRules_MigrateToOnLedgerSvRightOwners choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -2543,7 +2535,7 @@ getAndValidateSvNodeOperatorParty rules (Some sv) = do
 getAndValidateSvRightOwnerParty : Optional (ContractId SvRightOwner) -> DsoRules -> Optional Party -> Update Text
 getAndValidateSvRightOwnerParty _ _ None = fail "no SV right owner party provided"
 getAndValidateSvRightOwnerParty rightOwnerCid rules (Some sv) = do
-  if onLedgerSvRightOwners rules 
+  if onLedgerSvRightOwners rules
     then
       case rightOwnerCid of
         None -> fail "no SV right owner contract id provided"

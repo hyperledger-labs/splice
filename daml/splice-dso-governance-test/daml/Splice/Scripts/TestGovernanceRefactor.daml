@@ -9,6 +9,7 @@ import DA.Foldable hiding (length)
 import DA.List (sort)
 import Daml.Script
 import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
 
 import Splice.DSO.SvRightOwner
 import Splice.Issuance()
@@ -59,14 +60,57 @@ testGovernanceRefactor = do
 
 testGovernanceRefactorMigration : Script ()
 testGovernanceRefactorMigration = do
-  (app, _, (sv1, _sv2, _sv3, _sv4)) <- initMainNetNoOnLedgerSvRightOwners
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  dsoRules.svRightOwners === None
-  submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_MigrateToOnLedgerSvRightOwners with
-    svOperator = sv1
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetNoOnLedgerSvRightOwners
   [(_, dsoRules)] <- query @DsoRules app.dso
-  sort (getSvRightOwners dsoRules) === sort (map (.name) (Map.values dsoRules.svs))
-  length (getSvRightOwners dsoRules) === 4
+  dsoRules.svRightOwners === None
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $ ARC_DsoRules $ SRARC_DsoRules_MigrateToOnLedgerSvRightOwners DsoRules_MigrateToOnLedgerSvRightOwners with
+    rightOwners = TextMap.fromList [
+        ( "sv1",
+          SvRightOwnerInfo with
+            rightOwnerParty = sv1
+            voteWeight = 1
+            rewardWeight = 100000
+            rewardNodeOperatorName = "sv1"
+            beneficiaries = []
+        ),
+        ( "sv2",
+          SvRightOwnerInfo with
+            rightOwnerParty = sv2
+            voteWeight = 1
+            rewardWeight = 30000
+            rewardNodeOperatorName = "sv2"
+            beneficiaries = []
+        ),
+        ( "sv3",
+          SvRightOwnerInfo with
+            rightOwnerParty = sv3
+            voteWeight = 1
+            rewardWeight = 30000
+            rewardNodeOperatorName = "sv3"
+            beneficiaries = []
+        ),
+        ( "sv4",
+          SvRightOwnerInfo with
+            rightOwnerParty = sv4
+            voteWeight = 1
+            rewardWeight = 10000
+            rewardNodeOperatorName = "sv4"
+            beneficiaries = []
+        ),
+        -- before the migration sv4 had weight 30_000 with 20_000 of this going to a beneficiary. The beneficiary is now represented as a dedicated right owner.
+        ( "rightOwnerFormerlyOnSv4",
+          SvRightOwnerInfo with
+            rightOwnerParty = sv4
+            voteWeight = 1
+            rewardWeight = 20000
+            rewardNodeOperatorName = "sv4"
+            beneficiaries = []
+        )
+      ]
+  executeAllDefinitiveVotes app
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  sort (getSvRightOwners dsoRules) === sort ("rightOwnerFormerlyOnSv4" :: map (.name) (Map.values dsoRules.svs))
+  length (getSvRightOwners dsoRules) === 5
   pure ()
 
 
