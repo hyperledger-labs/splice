@@ -10,7 +10,8 @@ import DA.Assert
 import DA.List (unique)
 import DA.Map as Map
 import DA.TextMap as TextMap
-import DA.Optional (fromOptional, isNone, optionalToList)
+import DA.Time (isLedgerTimeGE)
+import DA.Optional (fromOptional, isNone, isSome, optionalToList)
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
@@ -109,6 +110,10 @@ data FeaturedAppRight_UpdateResult = FeaturedAppRight_UpdateResult with
 
 data FeaturedAppRight_CancelResult = FeaturedAppRight_CancelResult
   deriving (Serializable)
+
+data FeaturedAppRight_UpdateConfigResult = FeaturedAppRight_UpdateConfigResult with
+  featuredAppRightCid : ContractId FeaturedAppRight
+    deriving (Serializable)
 
 data AppRewardCoupon_DsoExpireResult = AppRewardCoupon_DsoExpireResult with
   featured : Bool
@@ -299,22 +304,70 @@ template ValidatorRight with
 defaultAppActivityWeight : Decimal
 defaultAppActivityWeight = 1.0
 
+defaultAppKind : FeaturedAppKind
+defaultAppKind = FAK_General
+
+defaultOpsParties : [Party]
+defaultOpsParties = []
+
+defaultFeaturedAppConfigInternal : FeaturedAppConfigInternal
+defaultFeaturedAppConfigInternal = FeaturedAppConfigInternal with
+  appKind = defaultAppKind
+  opsParties = defaultOpsParties
+
+defaultFeaturedAppConfig : FeaturedAppConfig
+defaultFeaturedAppConfig = FeaturedAppConfig with
+  appKind = defaultAppKind
+  activityWeight = defaultAppActivityWeight
+  opsParties = defaultOpsParties
+
+data FeaturedAppKind
+  = FAK_General  -- ^ A normal featured app.
+  | FAK_AssetMoving  -- ^ A featured asset mover, e.g., a trading venue.
+  | FAK_Asset -- ^ A featured asset.
+  deriving (Eq, Show, Serializable)
+
+data FeaturedAppConfig = FeaturedAppConfig with
+    appKind : FeaturedAppKind
+      -- ^ The kind of the featured app.
+    activityWeight : Decimal
+      -- ^ Weight of the this provider's app activity in the computation of app activity
+      -- records in composed transactions.
+    opsParties : [Party]
+      -- ^ Operational parties for the featured app whose submissions should be considered
+      -- as submissions by this featured app.
+  deriving (Eq, Show, Serializable)
+
+-- | This holds those fields of FeaturedAppConfig which are not stored directly on the FeaturedAppRight contract.
+-- We would ideally move activityWeight here but SCU won't allow it.
+data FeaturedAppConfigInternal = FeaturedAppConfigInternal with
+    appKind : FeaturedAppKind
+    opsParties : [Party]
+  deriving (Eq, Show, Serializable)
+
 -- | The right for an application provider to earn featured app rewards.
 template FeaturedAppRight with
     dso : Party
     provider : Party
     activityWeight : Optional Decimal
-      -- ^ Weight of the this provider's app activity in the computation of traffic-based app rewards.
+      -- ^ Weight of the this provider's app activity in the computation app
+      -- activity records in composed transactions.
       --
-      -- If not set, the default weight of 1.0 is used.
+      -- If not set, use the default value of 1.0
+    config : Optional FeaturedAppConfigInternal
+      -- ^ Extra configuration for the featured app right. Called "internal", as the proper version
+      -- that can be modified via SV voting also includes the `activityWeight` field.
   where
     signatory dso
     observer provider
     ensure 0.0 <= fromOptional defaultAppActivityWeight activityWeight
+      -- FIXME: config validation
 
+    -- TODO(tech-debt): Remove this choice once the UI is fully switched over to FeaturedAppRight_UpdateConfig
     choice FeaturedAppRight_Update : FeaturedAppRight_UpdateResult
       with
         reason : Text
+          -- NB: This reason field is not used by the UI and deprecated. The votes themselves already have a reason.
         newActivityWeight : Decimal
       controller dso
       do
@@ -333,6 +386,19 @@ template FeaturedAppRight with
     choice FeaturedAppRight_Cancel : FeaturedAppRight_CancelResult
       controller provider
       do return FeaturedAppRight_CancelResult
+
+    -- NB: This choice is more general than, and a replacement for FeaturedAppRight_Update
+    -- since activityWeight is a field of FeaturedAppConfig
+    choice FeaturedAppRight_UpdateConfig : FeaturedAppRight_UpdateConfigResult
+      with
+        baseConfig : FeaturedAppConfig
+        newConfig : FeaturedAppConfig
+      controller dso
+      do
+        let configToSet = patch newConfig baseConfig (getFeaturedAppConfig this)
+        featuredAppRightCid <- create (setFeaturedAppConfig configToSet this)
+        return FeaturedAppRight_UpdateConfigResult with
+          featuredAppRightCid
 
     interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppRight for FeaturedAppRight where
       view = Splice.Api.FeaturedAppRightV1.FeaturedAppRightView with dso, provider
@@ -377,6 +443,19 @@ validateAppRewardBeneficiariesV2 beneficiaries = do
   require "Beneficiary weights are between 0.0 and 1.0" (all (\beneficiary -> 0.0 < beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
   require "Beneficiary weights add up to 1.0" (sum (map (.weight) beneficiaries) == 1.0)
   require "There are at most 20 beneficiaries" (length beneficiaries <= 20)
+
+getFeaturedAppConfig : FeaturedAppRight -> FeaturedAppConfig
+getFeaturedAppConfig right = FeaturedAppConfig with
+  activityWeight = fromOptional defaultAppActivityWeight right.activityWeight
+  appKind = optional defaultAppKind (.appKind) right.config
+  opsParties = optional defaultOpsParties (.opsParties) right.config
+
+setFeaturedAppConfig : FeaturedAppConfig -> FeaturedAppRight -> FeaturedAppRight
+setFeaturedAppConfig newConfig right = right with
+  activityWeight = Some newConfig.activityWeight
+  config = Some $ FeaturedAppConfigInternal with
+    appKind = newConfig.appKind
+    opsParties = newConfig.opsParties
 
 -- | A marker created by a featured application for activity generated from that app. This is used
 -- to record activity other than amulet transfers where regular AppRewardCoupons are not created directly.
@@ -742,10 +821,6 @@ instance HasCheckedFetch RewardCouponV2 ForOwner where
 instance HasCheckedFetch RewardCouponV2 ForDso where
   contractGroupId RewardCouponV2{..} = ForDso with dso
 
-instance HasCheckedFetch Api.RewardAssignmentV1.RewardCouponView ForOwner where
-  contractGroupId Api.RewardAssignmentV1.RewardCouponView{..} =
-    ForOwner with dso; owner = fromOptional provider beneficiary
-
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
 
@@ -780,3 +855,12 @@ instance HasCheckedFetch DevelopmentFundCoupon ForOwner where
 
 instance HasCheckedFetch DevelopmentFundCoupon ForDso where
   contractGroupId DevelopmentFundCoupon{..} = ForDso with dso
+
+instance Patchable FeaturedAppKind where
+  patch = patchScalar
+
+instance Patchable FeaturedAppConfig where
+  patch new base current = FeaturedAppConfig with
+    activityWeight = patch new.activityWeight base.activityWeight current.activityWeight
+    appKind = patch new.appKind base.appKind current.appKind
+    opsParties = patchListAsScalar new.opsParties base.opsParties current.opsParties
