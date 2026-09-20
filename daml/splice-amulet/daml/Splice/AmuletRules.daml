@@ -305,32 +305,27 @@ template AmuletRules
       controller provider
       do
         checkExpectedDso dso expectedDso
-        -- validate choice parameters
         configUsd <- getValueAsOfLedgerTime configSchedule
-        case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
-          Left failureStatus -> failWithStatus failureStatus
-          Right _ -> pure ()
-        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
-        (transferResult, meta) <- splitAndBurn (toInterfaceContractId self) provider trafficCostAmulet inputs context dso
-          (getDevelopmentFundManagerBlacklist configUsd) "traffic purchase"
-        -- create a new MemberTraffic contract for the purchased traffic
-        purchasedTraffic <- create MemberTraffic with
-          dso
-          memberId
-          synchronizerId
-          migrationId
-          totalPurchased = trafficAmount
-          numPurchases = 1
-          amuletSpent = trafficCostAmulet
-          usdSpent =  trafficCostUsd
-        -- return result
+        let eventLogCid = toInterfaceContractId self
+        contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch provider)
+        csum <- summarizeAndValidateContext eventLogCid context dso
+          (getDevelopmentFundManagerBlacklist configUsd) provider provider
+        result <- buyMemberTraffic eventLogCid csum
+          (trafficPurchaseConfigFromAmuletConfig configUsd contextMiningRound)
+          MemberTrafficPurchase with
+            provider
+            memberId
+            synchronizerId
+            migrationId
+            trafficAmount
+          inputs
         return AmuletRules_BuyMemberTrafficResult with
-          round = transferResult.round
-          summary = transferResult.summary
-          amuletPaid = trafficCostAmulet
-          purchasedTraffic
-          senderChangeAmulet = transferResult.senderChangeAmulet
-          meta = Some meta
+          round = result.transferResult.round
+          summary = result.transferResult.summary
+          amuletPaid = result.trafficCostAmulet
+          purchasedTraffic = result.purchasedTraffic
+          senderChangeAmulet = result.transferResult.senderChangeAmulet
+          meta = Some result.meta
 
 
     nonconsuming choice AmuletRules_MergeMemberTrafficContracts : AmuletRules_MergeMemberTrafficContractsResult
@@ -1774,26 +1769,79 @@ transferConfigAmuletFromExternalPartyConfigState : ExternalPartyConfigState -> T
 transferConfigAmuletFromExternalPartyConfigState externalPartyConfigState =
   scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) externalPartyConfigState.transferConfig
 
-validateBuyMemberTrafficInputs : AmuletConfig Unit.USD -> Text -> Int -> Either FailureStatus ()
-validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
-  | not (synchronizerId `Set.member` configUsd.decentralizedSynchronizer.requiredSynchronizers) =
-      Left $ mkUnknownSynchronizerFailure synchronizerId
-  | trafficAmount < configUsd.decentralizedSynchronizer.fees.minTopupAmount =
-      Left $ mkInsufficientTopupAmountFailure trafficAmount configUsd.decentralizedSynchronizer.fees.minTopupAmount
-  | otherwise = Right ()
+-- | The amulet config a traffic purchase depends on. Passed explicitly so that callers without
+-- access to the `AmuletConfig`, such as token v1 compatible mode, can supply it from a
+-- snapshot.
+data TrafficPurchaseConfig = TrafficPurchaseConfig with
+    trafficPrice : Decimal -- ^ Price in $/MB.
+    requiredSynchronizers : Set Text
+    minTopupAmount : Int
+  deriving (Eq, Show)
+
+trafficPurchaseConfigFromAmuletConfig : AmuletConfig Unit.USD -> OpenMiningRound -> TrafficPurchaseConfig
+trafficPurchaseConfigFromAmuletConfig configUsd round = TrafficPurchaseConfig with
+    trafficPrice = fromOptional configUsd.decentralizedSynchronizer.fees.extraTrafficPrice round.trafficPrice
+    requiredSynchronizers = configUsd.decentralizedSynchronizer.requiredSynchronizers
+    minTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
 
 -- | Computing synchronizer fees
 computeSynchronizerFees : Party -> Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
 computeSynchronizerFees dso validator trafficAmount amuletRules context = do
   contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch validator)
-  -- compute traffic cost in USD
   configUsd <- getValueAsOfLedgerTime amuletRules.configSchedule
-  let extraTrafficPrice =
-        fromOptional (configUsd.decentralizedSynchronizer.fees.extraTrafficPrice) contextMiningRound.trafficPrice
-  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
-  -- compute traffic cost in Amulet
-  let trafficCostAmulet = trafficCostUsd / contextMiningRound.amuletPrice
-  pure (trafficCostAmulet, trafficCostUsd)
+  let trafficConfig = trafficPurchaseConfigFromAmuletConfig configUsd contextMiningRound
+  pure (trafficCost trafficConfig contextMiningRound.amuletPrice trafficAmount)
+
+trafficCost : TrafficPurchaseConfig -> Decimal -> Int -> (Decimal, Decimal)
+trafficCost trafficConfig amuletPrice trafficAmount =
+  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * trafficConfig.trafficPrice
+  in (trafficCostUsd / amuletPrice, trafficCostUsd)
+
+data MemberTrafficPurchase = MemberTrafficPurchase with
+    provider : Party
+    memberId : Text
+    synchronizerId : Text
+    migrationId : Int
+    trafficAmount : Int
+  deriving (Eq, Show)
+
+data MemberTrafficPurchaseResult = MemberTrafficPurchaseResult with
+    transferResult : TransferResult
+    purchasedTraffic : ContractId MemberTraffic
+    trafficCostAmulet : Decimal
+    trafficCostUsd : Decimal
+    meta : Metadata
+
+validateBuyMemberTrafficInputs : TrafficPurchaseConfig -> Text -> Int -> Either FailureStatus ()
+validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
+  | not (synchronizerId `Set.member` trafficConfig.requiredSynchronizers) =
+      Left $ mkUnknownSynchronizerFailure synchronizerId
+  | trafficAmount < trafficConfig.minTopupAmount =
+      Left $ mkInsufficientTopupAmountFailure trafficAmount trafficConfig.minTopupAmount
+  | otherwise = Right ()
+
+-- | Burn amulet to buy extra traffic for a synchronizer member.
+buyMemberTraffic
+  : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> TrafficPurchaseConfig
+  -> MemberTrafficPurchase -> [TransferInput] -> Update MemberTrafficPurchaseResult
+buyMemberTraffic eventLogCid csum trafficConfig purchase inputs = do
+  case validateBuyMemberTrafficInputs trafficConfig purchase.synchronizerId purchase.trafficAmount of
+    Left failureStatus -> failWithStatus failureStatus
+    Right _ -> pure ()
+  let (trafficCostAmulet, trafficCostUsd) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
+  (transferResult, meta) <-
+    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase"
+  -- create a new MemberTraffic contract for the purchased traffic
+  purchasedTraffic <- create MemberTraffic with
+    dso = csum.dso
+    memberId = purchase.memberId
+    synchronizerId = purchase.synchronizerId
+    migrationId = purchase.migrationId
+    totalPurchased = purchase.trafficAmount
+    numPurchases = 1
+    amuletSpent = trafficCostAmulet
+    usdSpent = trafficCostUsd
+  pure MemberTrafficPurchaseResult with ..
 
 data AppTransferContext = AppTransferContext
   with
@@ -2277,13 +2325,8 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> Update (TransferResult, Metadata)
-splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage = do
--- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
-  let rewardsConfig = RewardsIssuanceConfig with
-        issueAppRewards = False
-        issueValidatorRewards = False
-  transferResult <- executeTransfer eventLogCid rewardsConfig context dso developmentFundManagerBlacklist Transfer with
+burnTransfer : Party -> Decimal -> [TransferInput] -> Text -> Transfer
+burnTransfer sender amount inputs usage = Transfer with
     sender
     provider = sender
     inputs
@@ -2296,6 +2339,20 @@ splitAndBurn eventLogCid sender amount inputs context dso developmentFundManager
           meta = Some (reasonToMeta ("split for " <> usage) emptyMetadata)
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
+
+splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> Update (TransferResult, Metadata)
+splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage = do
+  csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist sender sender
+  splitAndBurn' eventLogCid csum sender amount inputs usage
+
+splitAndBurn' : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> Party -> Decimal -> [TransferInput] -> Text -> Update (TransferResult, Metadata)
+splitAndBurn' eventLogCid csum sender amount inputs usage = do
+  let dso = csum.dso
+-- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
+  let rewardsConfig = RewardsIssuanceConfig with
+        issueAppRewards = False
+        issueValidatorRewards = False
+  transferResult <- executeTransfer' rewardsConfig csum dso (burnTransfer sender amount inputs usage)
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
