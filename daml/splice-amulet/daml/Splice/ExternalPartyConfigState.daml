@@ -30,6 +30,7 @@ template ExternalPartyConfigState
     targetArchiveAfter : Time -- ^ Lower bound on the time the contract gets archived, not enforced as a strict upper bound.
     rewardCalculationVersion : Optional RewardVersion -- ^ The reward calculation version to use for transactions relying on this config state.
     amuletSwitchOverTimes : Optional (TextMap Time) -- ^ Timepoints for synchronized switch-overs of amulet functionality both on and off-ledger.
+    trafficPrice : Optional Decimal -- ^ USD price per MB for traffic
   where
     signatory dso
 
