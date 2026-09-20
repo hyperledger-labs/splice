@@ -1166,13 +1166,13 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
 executeTransfer : ContractId TransferEventsV2.EventLog -> RewardsIssuanceConfig -> TransferContext -> Party -> [Party] -> Transfer -> Update TransferResult
 executeTransfer eventLogCid config context dso developmentFundManagerBlacklist t = do
   -- compute summaries
-  csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist t
+  csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist t.sender t.provider
   executeTransfer' config csum dso t
 
 -- | Execute a transfer for external parties so that the prepared tx remains valid for 24h
 executeExternalPartyTransfer : Party -> ExternalPartyTransferContext -> Transfer -> Update TransferResult
 executeExternalPartyTransfer dso context t = do
-  csum <- summarizeAndValidateExternalPartyContext context dso t
+  csum <- summarizeAndValidateExternalPartyContext context dso t.provider
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = True
         issueValidatorRewards = False -- doesn't matter with fees = 0
@@ -1304,8 +1304,8 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     meta : Optional Metadata -- ^ Metadata to attach to the output amulet
   deriving (Eq, Show, Serializable)
 
-summarizeAndValidateContext : ContractId TransferEventsV2.EventLog -> TransferContext -> Party -> [Party] -> Transfer -> Update TransferContextSummaryV2
-summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist tf = do
+summarizeAndValidateContext : ContractId TransferEventsV2.EventLog -> TransferContext -> Party -> [Party] -> Party -> Party -> Update TransferContextSummaryV2
+summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist sender provider = do
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
   assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
@@ -1315,8 +1315,8 @@ summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlackl
   featuredAppProvider <-
     if useFeaturedAppMarkers rewardVersion
       then forA context.featuredAppRight $ \featuredAppRightCid -> do
-        _ <- fetchReferenceData (ForOwner with dso; owner = tf.provider) featuredAppRightCid
-        pure tf.provider
+        _ <- fetchReferenceData (ForOwner with dso; owner = provider) featuredAppRightCid
+        pure provider
       else pure None
 
   -- pre-resolve issuing mining rounds
@@ -1327,7 +1327,7 @@ summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlackl
 
   -- pre-resolve validator rights
   validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
-      requireMatchingContract rightCid (ValidatorRight with dso; validator = tf.sender; user)
+      requireMatchingContract rightCid (ValidatorRight with dso; validator = sender; user)
       pure (user, rightCid)
 
   return TransferContextSummaryV2 with
@@ -1343,8 +1343,8 @@ summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlackl
     developmentFundManagerBlacklist = Some developmentFundManagerBlacklist
 
 
-summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
-summarizeAndValidateExternalPartyContext context dso tf = do
+summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Party -> Update TransferContextSummaryV2
+summarizeAndValidateExternalPartyContext context dso provider = do
   -- check the referenced ExternalPartyConfigState
   externalPartyConfigState <- fetchReferenceData (ForDso with dso) context.externalPartyConfigState
 
@@ -1352,8 +1352,8 @@ summarizeAndValidateExternalPartyContext context dso tf = do
   featuredAppProvider <-
     if useFeaturedAppMarkers externalPartyConfigState.rewardCalculationVersion
       then forA context.featuredAppRight $ \featuredAppRightCid -> do
-        _ <- fetchReferenceData (ForOwner with dso; owner = tf.provider) featuredAppRightCid
-        pure tf.provider
+        _ <- fetchReferenceData (ForOwner with dso; owner = provider) featuredAppRightCid
+        pure provider
       else pure None
 
   return TransferContextSummaryV2 with
