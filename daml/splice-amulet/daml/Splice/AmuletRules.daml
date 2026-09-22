@@ -1109,6 +1109,21 @@ mkInsufficientTopupAmountFailure requestedAmount minAmount =
       , ("minTopupAmount", show minAmount)
       ])
 
+mkTrafficCostExceedsAmountFailure : Decimal -> Decimal -> FailureStatus
+mkTrafficCostExceedsAmountFailure trafficCostAmulet maxAmount =
+  mkFailureStatus
+    (spliceErrorId "traffic-cost-exceeds-amount")
+    InvalidGivenCurrentSystemStateOther
+    ("The traffic costs "
+      <> show trafficCostAmulet
+      <> " amulet, which exceeds the maximum amount of "
+      <> show maxAmount
+      <> " amulet the transfer allows to be spent.")
+    (TextMap.fromList
+      [ ("trafficCostAmulet", show trafficCostAmulet)
+      , ("maxAmount", show maxAmount)
+      ])
+
 mkMaximumInputsExceededFailure : FailureStatus
 mkMaximumInputsExceededFailure =
   mkFailureStatus
