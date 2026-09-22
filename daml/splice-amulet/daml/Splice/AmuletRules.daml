@@ -319,6 +319,7 @@ template AmuletRules
             migrationId
             trafficAmount
           inputs
+          IssueValidatorRewardCoupon
         return AmuletRules_BuyMemberTrafficResult with
           round = result.transferResult.round
           summary = result.transferResult.summary
@@ -1847,14 +1848,14 @@ validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
 -- | Burn amulet to buy extra traffic for a synchronizer member.
 buyMemberTraffic
   : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> TrafficPurchaseConfig
-  -> MemberTrafficPurchase -> [TransferInput] -> Update MemberTrafficPurchaseResult
-buyMemberTraffic eventLogCid csum trafficConfig purchase inputs = do
+  -> MemberTrafficPurchase -> [TransferInput] -> BurnRewardPolicy -> Update MemberTrafficPurchaseResult
+buyMemberTraffic eventLogCid csum trafficConfig purchase inputs rewardPolicy = do
   case validateBuyMemberTrafficInputs trafficConfig purchase.synchronizerId purchase.trafficAmount of
     Left failureStatus -> failWithStatus failureStatus
     Right _ -> pure ()
   let (trafficCostAmulet, trafficCostUsd) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
   (transferResult, meta) <-
-    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase"
+    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase" rewardPolicy
   -- create a new MemberTraffic contract for the purchased traffic
   purchasedTraffic <- create MemberTraffic with
     dso = csum.dso
@@ -2364,13 +2365,19 @@ burnTransfer sender amount inputs usage = Transfer with
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
 
-splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> Update (TransferResult, Metadata)
-splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage = do
-  csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist sender sender
-  splitAndBurn' eventLogCid csum sender amount inputs usage
+-- | Use `SkipValidatorRewardCoupon` for burns done by external parties so it skips minting `ValidatorRewardCoupon`.
+data BurnRewardPolicy
+  = IssueValidatorRewardCoupon
+  | SkipValidatorRewardCoupon
+  deriving (Eq, Show)
 
-splitAndBurn' : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> Party -> Decimal -> [TransferInput] -> Text -> Update (TransferResult, Metadata)
-splitAndBurn' eventLogCid csum sender amount inputs usage = do
+splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
+splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage rewardPolicy = do
+  csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist sender sender
+  splitAndBurn' eventLogCid csum sender amount inputs usage rewardPolicy
+
+splitAndBurn' : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> Party -> Decimal -> [TransferInput] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
+splitAndBurn' eventLogCid csum sender amount inputs usage rewardPolicy = do
   let dso = csum.dso
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
@@ -2383,11 +2390,13 @@ splitAndBurn' eventLogCid csum sender amount inputs usage = do
   -- record event
   logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
   -- create validator activity rewards over the whole burn.
-  create ValidatorRewardCoupon with
-    dso
-    round = transferResult.round
-    user = sender
-    amount = amount + sum transferResult.summary.outputFees
+  case rewardPolicy of
+    IssueValidatorRewardCoupon -> void $ create ValidatorRewardCoupon with
+      dso
+      round = transferResult.round
+      user = sender
+      amount = amount + sum transferResult.summary.outputFees
+    SkipValidatorRewardCoupon -> pure ()
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
   let result = transferResult with
@@ -2443,7 +2452,7 @@ payForTransferPreapproval reason dso provider context inputs expiresAt newExpire
     else do
       (amuletPaid, _) <- computeTransferPreapprovalFee paidExtension configUsd context.context dso
       (transferResult, meta) <- splitAndBurn (toInterfaceContractId context.amuletRules) provider amuletPaid inputs context.context dso
-        (getDevelopmentFundManagerBlacklist configUsd) reason
+        (getDevelopmentFundManagerBlacklist configUsd) reason IssueValidatorRewardCoupon
       pure (amuletPaid, transferResult, meta)
 
 -- Token standard context parsing
