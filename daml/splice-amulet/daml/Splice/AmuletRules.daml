@@ -1027,6 +1027,8 @@ template AmuletRules
           amuletPrice = validatedRounds.latestUsableRound.amuletPrice
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
           trafficPrice = validatedRounds.latestUsableRound.trafficPrice
+          requiredSynchronizers = Some config.decentralizedSynchronizer.requiredSynchronizers
+          minTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
           rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig
           amuletSwitchOverTimes = config.amuletSwitchOverTimes
         pure AmuletRules_UpdateExternalPartyConfigStatesResult with ..
@@ -1778,6 +1780,13 @@ data TrafficPurchaseConfig = TrafficPurchaseConfig with
     minTopupAmount : Int
   deriving (Eq, Show)
 
+trafficPurchaseConfigFromConfigState : ExternalPartyConfigState -> Optional TrafficPurchaseConfig
+trafficPurchaseConfigFromConfigState state = do
+  trafficPrice <- state.trafficPrice
+  requiredSynchronizers <- state.requiredSynchronizers
+  minTopupAmount <- state.minTopupAmount
+  pure TrafficPurchaseConfig with ..
+
 trafficPurchaseConfigFromAmuletConfig : AmuletConfig Unit.USD -> OpenMiningRound -> TrafficPurchaseConfig
 trafficPurchaseConfigFromAmuletConfig configUsd round = TrafficPurchaseConfig with
     trafficPrice = fromOptional configUsd.decentralizedSynchronizer.fees.extraTrafficPrice round.trafficPrice
@@ -2459,6 +2468,8 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
         amuletPrice = validatedRounds.latestUsableRound.amuletPrice
         transferConfig = transferConfig
         trafficPrice = validatedRounds.latestUsableRound.trafficPrice
+        requiredSynchronizers = Some config.decentralizedSynchronizer.requiredSynchronizers
+        minTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
         rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig
         amuletSwitchOverTimes = config.amuletSwitchOverTimes
       configState1 = configState0 with
