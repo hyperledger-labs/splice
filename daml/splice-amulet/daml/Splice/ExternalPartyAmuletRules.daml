@@ -6,6 +6,7 @@ module Splice.ExternalPartyAmuletRules where
 
 import DA.Action
 import DA.Assert
+import DA.Fail (failWithStatus)
 import DA.Foldable (forA_)
 import DA.Optional
 import qualified DA.Text as T
@@ -142,7 +143,7 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+      transferFactory_transferExtraObservers = trafficPurchase_transferExtraObservers
 
       transferFactory_transferImpl =
         transferFactoryV2_transferDefaultImplUsingV1 $ amulet_transferFactoryV1_transferImpl this
@@ -374,6 +375,13 @@ parseTrafficPurchaseMemo provider memo = do
       Some parsed -> Right parsed
 
 
+-- | Choice observers are informees and no participant hosts the traffic purchase sentinel,
+-- so it must be dropped from the observers of a V2 transfer.
+trafficPurchase_transferExtraObservers : V2.TransferFactory_Transfer -> [Party]
+trafficPurchase_transferExtraObservers arg =
+  filter (/= trafficPurchaseReceiver) (transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl arg)
+
+
 -- Token standard transfer factory
 ----------------------------------
 
@@ -407,7 +415,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   assertDeadlineExceeded "transfer.requestedAt" transfer.requestedAt
   -- executeBefore: must be in the future, but not too far
   assertWithinDeadline "transfer.executeBefore" transfer.executeBefore
-  (_, configState) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
+  (configStateCid, configState) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
   let configAmulet = transferConfigAmuletFromExternalPartyConfigState configState
   let transferLifetime = transfer.executeBefore `subTime` transfer.requestedAt
   require' ("transferLifetime", transferLifetime) isLessOrEqualR
@@ -418,7 +426,28 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   ensureNoAccountMeta "transfer" "sender" transfer.meta
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
 
-  case optPreapprovalCid of
+  if transfer.receiver == trafficPurchaseReceiver then do
+    -- TODO(#7255): support buying traffic for synchronizers other than the global one.
+    purchase <- case parseTrafficPurchaseMemo transfer.sender (reasonFromMeta transfer.meta) of
+      Left err -> fail err
+      Right purchase -> pure purchase
+    trafficConfig <- case trafficPurchaseConfigFromConfigState configState of
+      None -> fail "The referenced ExternalPartyConfigState carries no traffic purchase configuration"
+      Some trafficConfig -> pure trafficConfig
+    paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context
+    csum <- summarizeAndValidateExternalPartyContext paymentContext dso transfer.sender
+    let (trafficCostAmulet, _) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
+    when (trafficCostAmulet > transfer.amount) $
+      failWithStatus $ mkTrafficCostExceedsAmountFailure trafficCostAmulet transfer.amount
+    inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+    result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase inputs
+      SkipValidatorRewardCoupon
+    pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+      senderChangeCids = toInterfaceContractId <$> optionalToList result.transferResult.senderChangeAmulet
+      output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+        receiverHoldingCids = []
+      meta = result.meta
+  else case optPreapprovalCid of
     _ | transfer.receiver `elem` actors -> do
       -- self-transfer or sender+receiver authorized
       paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context
