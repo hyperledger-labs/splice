@@ -1,0 +1,91 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Unit tests for the memo tag parser used by the token standard V1 compat mode.
+module Splice.Scripts.UnitTests.TrafficPurchaseMemo where
+
+import DA.Assert ((===))
+
+import Daml.Script
+
+import Splice.AmuletRules (MemberTrafficPurchase(..))
+import Splice.ExternalPartyAmuletRules (parseTrafficPurchaseMemo)
+
+sender : Party
+sender =
+  let Some p = partyFromText "alice::1220000000000000000000000000000000000000000000000000000000000000abcd"
+  in p
+
+testMemberId : Text
+testMemberId = "PAR::alice-participant::1220abcd"
+
+testSynchronizerId : Text
+testSynchronizerId = "decentralized-synchronizer-id-0"
+
+expectedPurchase : MemberTrafficPurchase
+expectedPurchase = MemberTrafficPurchase with
+  provider = sender
+  memberId = testMemberId
+  synchronizerId = testSynchronizerId
+  migrationId = 3
+  trafficAmount = 1_000_000
+
+completeMemo : Text
+completeMemo =
+  "memberId=" <> testMemberId <>
+  "&synchronizerId=" <> testSynchronizerId <>
+  "&migrationId=3" <>
+  "&trafficAmount=1000000"
+
+parse : Text -> Either Text MemberTrafficPurchase
+parse = parseTrafficPurchaseMemo sender
+
+isRejected : Either Text MemberTrafficPurchase -> Bool
+isRejected result = case result of
+  Left _ -> True
+  Right _ -> False
+
+test_parseMemo_complete : Script ()
+test_parseMemo_complete = script do
+  parse completeMemo === Right expectedPurchase
+
+test_parseMemo_keyOrderIrrelevant : Script ()
+test_parseMemo_keyOrderIrrelevant = script do
+  let reordered =
+        "trafficAmount=1000000" <>
+        "&migrationId=3" <>
+        "&synchronizerId=" <> testSynchronizerId <>
+        "&memberId=" <> testMemberId
+  parse reordered === Right expectedPurchase
+
+test_parseMemo_rejectsMissingKey : Script ()
+test_parseMemo_rejectsMissingKey = script do
+  assertMsg "missing trafficAmount is rejected" $
+    isRejected $ parse $
+      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=3"
+
+test_parseMemo_rejectsUnknownKey : Script ()
+test_parseMemo_rejectsUnknownKey = script do
+  assertMsg "unknown key is rejected" $ isRejected $ parse $ completeMemo <> "&trafficUnit=MB"
+
+test_parseMemo_rejectsDuplicateKey : Script ()
+test_parseMemo_rejectsDuplicateKey = script do
+  assertMsg "duplicate key is rejected" $ isRejected $ parse $ completeMemo <> "&migrationId=4"
+
+test_parseMemo_rejectsMalformedField : Script ()
+test_parseMemo_rejectsMalformedField = script do
+  assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
+  assertMsg "field with two separators is rejected" $
+    isRejected $ parse $ "memberId=a=b&synchronizerId=s&migrationId=0&trafficAmount=1"
+  assertMsg "empty memo is rejected" $ isRejected $ parse ""
+
+test_parseMemo_rejectsNonIntegerValues : Script ()
+test_parseMemo_rejectsNonIntegerValues = script do
+  assertMsg "non-integer trafficAmount is rejected" $
+    isRejected $ parse $
+      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
+      "&migrationId=3&trafficAmount=1MB"
+  assertMsg "non-integer migrationId is rejected" $
+    isRejected $ parse $
+      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
+      "&migrationId=latest&trafficAmount=1000000"

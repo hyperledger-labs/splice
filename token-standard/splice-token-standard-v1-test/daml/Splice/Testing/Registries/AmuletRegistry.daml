@@ -51,7 +51,7 @@ import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
-import Splice.AmuletConfig (useTrafficBasedAppRewards)
+import Splice.AmuletConfig (AmuletConfig, USD, useTrafficBasedAppRewards)
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
@@ -98,6 +98,7 @@ data AmuletRegistryConfig = AmuletRegistryConfig
     initialAmuletPrice : Decimal
     demoTime : Time
     dsoPartyName : Text
+    amuletConfig : AmuletConfig USD
   deriving (Eq, Show)
 
 -- | Recommended default configuration for setting up the mock amulet registry.
@@ -106,6 +107,7 @@ defaultAmuletRegistryConfig = AmuletRegistryConfig with
   initialAmuletPrice = 0.5 -- a non-zero price that still makes it easy to reason about fees and amounts
   demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
   dsoPartyName = "dso-party"
+  amuletConfig = defaultAmuletConfig
 
 -- | Initialize the mock amulet registry.
 initialize : AmuletRegistryConfig -> Script AmuletRegistry
@@ -119,7 +121,7 @@ initialize config = do
         instrumentId = amuletInstrumentId dso
 
   let defaultAmuletConfigSchedule = Schedule with
-        initialValue = defaultAmuletConfig
+        initialValue = config.amuletConfig
         futureValues = []
 
   _ <- submit dso $ createCmd AmuletRules with

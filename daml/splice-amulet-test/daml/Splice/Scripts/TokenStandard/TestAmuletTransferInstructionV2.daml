@@ -11,6 +11,7 @@ import DA.Assert
 import DA.Foldable (foldMap)
 import DA.List (sort)
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 import DA.Time
 
 import Daml.Script
@@ -19,12 +20,17 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
+import Splice.Amulet (ValidatorRewardCoupon)
+import Splice.AmuletConfig (RewardConfig(..), RewardVersion(..))
 import Splice.AmuletTransferInstruction
 import Splice.Amulet.TokenApiUtils
+import Splice.DecentralizedSynchronizer (MemberTraffic(..))
 import Splice.ExternalPartyAmuletRules
 import Splice.TokenStandard.Utils qualified as TSU
 
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.Registries.TestRegistries qualified as TestRegistries
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
@@ -134,6 +140,66 @@ test_transferFactory_TransferV2_extraObservers = do
   -- Note: alice being an extra observer is not strictly required, but doesn't hurt.
   checkEq "transferFactory.allocateExtraObservers" [alice, bob] $
     V2.transferFactory_transferExtraObservers transferFactory transferArgV2
+  -- No participant hosts the traffic purchase receiver, so it must not become an informee.
+  checkEq "transferFactory.trafficPurchaseExtraObservers" [alice] $
+    V2.transferFactory_transferExtraObservers transferFactory transferArgV2 with
+      transfer = transferV2 with receiver = TSU.basicAccount trafficPurchaseReceiver
+
+
+-- Traffic purchase 
+------------------------------------------------------------
+
+trafficRegistryConfig : AmuletRegistryV2.AmuletRegistryConfig
+trafficRegistryConfig = AmuletRegistryV2.defaultAmuletRegistryConfig with
+  amuletConfig = defaultAmuletConfig with
+    rewardConfig = Some RewardConfig with
+      mintingVersion = RewardVersion_FeaturedAppMarkers
+      dryRunVersion = None
+      batchSize = 100
+      rewardCouponTimeToLive = hours 36
+      appRewardCouponThreshold = 0.5
+
+test_transferFactory_TransferV2_trafficPurchase : Script ()
+test_transferFactory_TransferV2_trafficPurchase = do
+  env <- TestRegistries.initialize TestRegistries.defaultConfig with amulet = trafficRegistryConfig
+  let dso = env.amuletV2.dso
+  let instrId = env.amuletV2.instrumentId
+  registryV2 <- MultiRegistry.getRegistryApiV2 env.registries instrId.admin
+  alice <- allocatePartyExact "alice"
+  WalletClientV2.createBatchingUtility alice
+  AmuletRegistryV2.tapFaucet env.amuletV2 alice 50.0
+  inputHoldingCids <- WalletClientV2.listHoldingCids alice instrId
+
+  now <- getTime
+  let trafficAmount = 1_000_000
+  let memoTag =
+        "memberId=PAR::alice-participant::1220abcd" <>
+        "&synchronizerId=decentralized-synchronizer-id-0" <>
+        "&migrationId=0" <>
+        "&trafficAmount=" <> show trafficAmount
+  let purchaseArg = V2.TransferFactory_Transfer with
+        transfer = V2.Transfer with
+          sender = TSU.basicAccount alice
+          receiver = TSU.basicAccount trafficPurchaseReceiver
+          inputHoldingCids
+          amount = 10.0
+          instrumentId = instrId
+          requestedAt = now
+          executeBefore = now `addRelTime` days 1
+          meta = Metadata with values = TextMap.fromList [(reasonMetaKey, memoTag)]
+        actors = [alice]
+        extraArgs = emptyExtraArgs
+
+  enrichedChoice <- V2.getTransferFactory registryV2 purchaseArg
+  result <- submitWithDisclosures' alice enrichedChoice.disclosures $
+    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  V2.TransferInstructionResult_Completed [] <- pure result.output
+
+  [(_, traffic)] <- query @MemberTraffic dso
+  traffic.totalPurchased === trafficAmount
+  traffic.amuletSpent === 2.0
+  coupons <- query @ValidatorRewardCoupon dso
+  coupons === []
 
 test_transferFactory_PublicFetchV2 : Script ()
 test_transferFactory_PublicFetchV2  = do
