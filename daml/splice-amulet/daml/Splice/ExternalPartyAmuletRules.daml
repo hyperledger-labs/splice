@@ -340,7 +340,7 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 -- Traffic purchases in token standard V1 compatibility mode
 -------------------------------------------------------------
 
--- | Party used for V1 traffic purchase
+-- | Party used for traffic purchase via a V1 transfer
 -- TODO(#7255): replace `xxx` with the CIP number once it is assigned.
 trafficPurchaseReceiver : Party
 trafficPurchaseReceiver =
