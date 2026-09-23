@@ -33,7 +33,7 @@ template ExternalPartyConfigState
     amuletSwitchOverTimes : Optional (TextMap Time) -- ^ Timepoints for synchronized switch-overs of amulet functionality both on and off-ledger.
     trafficPrice : Optional Decimal -- ^ USD price per MB for traffic
     requiredSynchronizers : Optional (Set Text) -- ^ Synchronizers traffic can be bought for, at the time the config state was created.
-    minTopupAmount : Optional Int -- ^ Minimum traffic top-up amount at the time the config state was created.
+    minTrafficTopupAmount : Optional Int -- ^ Minimum traffic top-up amount at the time the config state was created.
   where
     signatory dso
 
