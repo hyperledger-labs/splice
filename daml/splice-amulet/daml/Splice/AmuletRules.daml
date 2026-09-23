@@ -1845,7 +1845,7 @@ validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
       Left $ mkInsufficientTopupAmountFailure trafficAmount trafficConfig.minTopupAmount
   | otherwise = Right ()
 
--- | Burn amulet to buy extra traffic for a synchronizer member.
+-- | Burn amulet to buy extra traffic on a synchronizer.
 buyMemberTraffic
   : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> TrafficPurchaseConfig
   -> MemberTrafficPurchase -> [TransferInput] -> BurnRewardPolicy -> Update MemberTrafficPurchaseResult

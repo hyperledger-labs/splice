@@ -427,7 +427,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
 
   if transfer.receiver == trafficPurchaseReceiver then do
-    -- TODO(#7255): support buying traffic for synchronizers other than the global one.
+    -- TODO(#7255): support buying traffic on dedicated synchronizers.
     purchase <- case parseTrafficPurchaseMemo transfer.sender (reasonFromMeta transfer.meta) of
       Left err -> fail err
       Right purchase -> pure purchase
