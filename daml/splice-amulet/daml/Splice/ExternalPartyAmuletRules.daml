@@ -9,7 +9,6 @@ import DA.Assert
 import DA.Fail (failWithStatus)
 import DA.Foldable (forA_)
 import DA.Optional
-import qualified DA.Text as T
 import qualified DA.TextMap as TextMap
 import DA.Time
 
@@ -31,6 +30,7 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.DecentralizedSynchronizer (parseTrafficPurchaseMemo)
 import Splice.Types
 import Splice.Util
 
@@ -346,33 +346,6 @@ trafficPurchaseReceiver : Party
 trafficPurchaseReceiver =
   fromSomeNote "trafficPurchaseReceiver: invalid party" $
   partyFromText "cip-xxx_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd"
-
--- | Parse the purchase arguments from memo tag using url query param style:
--- `memberId=...&synchronizerId=...&migrationId=...&trafficAmount=...`.
-parseTrafficPurchaseMemo : Party -> Text -> Either Text MemberTrafficPurchase
-parseTrafficPurchaseMemo provider memo = do
-  fields <- foldlA addField TextMap.empty (T.splitOn "&" memo)
-  memberId <- requiredField fields "memberId"
-  synchronizerId <- requiredField fields "synchronizerId"
-  migrationId <- requiredField fields "migrationId" >>= parseIntField "migrationId"
-  trafficAmount <- requiredField fields "trafficAmount" >>= parseIntField "trafficAmount"
-  pure MemberTrafficPurchase with ..
-  where
-    knownKeys = ["memberId", "synchronizerId", "migrationId", "trafficAmount"]
-    addField fields field = case T.splitOn "=" field of
-      [key, value]
-        | not (key `elem` knownKeys) ->
-            Left $ "Unknown key in traffic purchase memo: " <> key
-        | TextMap.member key fields ->
-            Left $ "Duplicate key in traffic purchase memo: " <> key
-        | otherwise -> Right (TextMap.insert key value fields)
-      _ -> Left $ "Expected key=value in traffic purchase memo, got: " <> field
-    requiredField fields key = case TextMap.lookup key fields of
-      None -> Left $ "Missing key in traffic purchase memo: " <> key
-      Some value -> Right value
-    parseIntField key value = case T.parseInt value of
-      None -> Left $ "Expected an integer for " <> key <> " in traffic purchase memo, got: " <> value
-      Some parsed -> Right parsed
 
 
 -- | Choice observers are informees and no participant hosts the traffic purchase sentinel,

@@ -1822,14 +1822,6 @@ trafficCost trafficConfig amuletPrice trafficAmount =
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * trafficConfig.trafficPrice
   in (trafficCostUsd / amuletPrice, trafficCostUsd)
 
-data MemberTrafficPurchase = MemberTrafficPurchase with
-    provider : Party
-    memberId : Text
-    synchronizerId : Text
-    migrationId : Int
-    trafficAmount : Int
-  deriving (Eq, Show)
-
 data MemberTrafficPurchaseResult = MemberTrafficPurchaseResult with
     transferResult : TransferResult
     purchasedTraffic : ContractId MemberTraffic

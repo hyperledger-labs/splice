@@ -8,8 +8,7 @@ import DA.Assert ((===))
 
 import Daml.Script
 
-import Splice.AmuletRules (MemberTrafficPurchase(..))
-import Splice.ExternalPartyAmuletRules (parseTrafficPurchaseMemo)
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
 
 sender : Party
 sender =

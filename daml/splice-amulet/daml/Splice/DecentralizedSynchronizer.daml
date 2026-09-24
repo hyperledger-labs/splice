@@ -4,8 +4,10 @@
 -- | Types and contracts for managing synchronizer fees
 module Splice.DecentralizedSynchronizer where
 
+import DA.Action (foldlA)
 import qualified DA.Set as Set
 import DA.Text as T
+import qualified DA.TextMap as TextMap
 import DA.Time
 
 import Splice.Types
@@ -86,6 +88,41 @@ initialMemberTraffic dso memberId synchronizerId migrationId = MemberTraffic wit
     numPurchases = 0
     amuletSpent = 0.0
     usdSpent = 0.0
+
+data MemberTrafficPurchase = MemberTrafficPurchase with
+    provider : Party
+    memberId : Text
+    synchronizerId : Text
+    migrationId : Int
+    trafficAmount : Int
+  deriving (Eq, Show)
+
+-- | Parse the purchase arguments from memo tag using url query param style:
+-- `memberId=...&synchronizerId=...&migrationId=...&trafficAmount=...`.
+parseTrafficPurchaseMemo : Party -> Text -> Either Text MemberTrafficPurchase
+parseTrafficPurchaseMemo provider memo = do
+  fields <- foldlA addField TextMap.empty (T.splitOn "&" memo)
+  memberId <- requiredField fields "memberId"
+  synchronizerId <- requiredField fields "synchronizerId"
+  migrationId <- requiredField fields "migrationId" >>= parseIntField "migrationId"
+  trafficAmount <- requiredField fields "trafficAmount" >>= parseIntField "trafficAmount"
+  pure MemberTrafficPurchase with ..
+  where
+    knownKeys = ["memberId", "synchronizerId", "migrationId", "trafficAmount"]
+    addField fields field = case T.splitOn "=" field of
+      [key, value]
+        | not (key `elem` knownKeys) ->
+            Left $ "Unknown key in traffic purchase memo: " <> key
+        | TextMap.member key fields ->
+            Left $ "Duplicate key in traffic purchase memo: " <> key
+        | otherwise -> Right (TextMap.insert key value fields)
+      _ -> Left $ "Expected key=value in traffic purchase memo, got: " <> field
+    requiredField fields key = case TextMap.lookup key fields of
+      None -> Left $ "Missing key in traffic purchase memo: " <> key
+      Some value -> Right value
+    parseIntField key value = case T.parseInt value of
+      None -> Left $ "Expected an integer for " <> key <> " in traffic purchase memo, got: " <> value
+      Some parsed -> Right parsed
 
 data ForMemberTraffic = ForMemberTraffic with
     dso : Party
