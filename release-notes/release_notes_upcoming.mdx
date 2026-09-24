@@ -33,6 +33,20 @@
        `canton.validator-apps.validator_backend.support-embedded-party-signing-keys = false` but it is recommended to instead make sure that the
        `ValidatorRight` contracts are [configured such that they won't start automation](https://docs.canton.network/global-synchronizer/production-operations/scalability#bypassing-the-limit).
 
+  - Daml
+
+    - A V1 or V2 transfer to the receiver party
+      `cip-xxx_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd`
+      with the memo set to `memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>&trafficAmount=<int>`
+      burns the traffic cost and creates the `MemberTraffic` contract instead of transferring amulet.
+      The transfer `amount` is the most amulet the sender is willing to burn; if the traffic costs more,
+      the transfer fails with `splice.lfdecentralizedtrust.org/traffic-cost-exceeds-amount`.
+
+    - Added three new fields: `trafficPrice`, `requiredSynchronizers` and
+      `minTrafficTopupAmount` to `ExternalPartyConfigState`.
+
+      **Action required from validator operators:** Upgrade to this release, which vets `splice-amulet 0.1.25` **before** the SVs vote to adopt it. After that vote, new `ExternalPartyConfigState` contracts will set the new fields and can no longer be downgraded to an older `splice-amulet` version. Validators that are not upgraded will no longer process Token Standard transfers and CC allocations.
+
 ## Upcoming for next minor release (template):
 
 {/* If you introduce any breaking changes in the next minor release,
