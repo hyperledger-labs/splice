@@ -685,6 +685,34 @@ class UserWalletTxLogParser(
                 )
             }
 
+          case DirectTokenStandardTransfer(node)
+              if node.argument.value.transfer.receiver == TokenStandardMetadata.trafficPurchaseReceiver =>
+            now(
+              State.fromTrafficPurchaseTransfer(
+                tree,
+                exercised,
+                sender = node.argument.value.transfer.sender,
+                dso = node.argument.value.transfer.instrumentId.admin,
+                transferMeta = node.argument.value.transfer.meta,
+                resultMeta = node.result.value.meta,
+              )
+            )
+
+          case DirectTokenStandardTransferV2(node)
+              if node.argument.value.transfer.receiver.owner.toScala
+                .contains(TokenStandardMetadata.trafficPurchaseReceiver) =>
+            val admin = node.argument.value.transfer.instrumentId.admin
+            now(
+              State.fromTrafficPurchaseTransfer(
+                tree,
+                exercised,
+                sender = node.argument.value.transfer.sender.owner.toScala.getOrElse(admin),
+                dso = admin,
+                transferMeta = node.argument.value.transfer.meta,
+                resultMeta = node.result.value.meta,
+              )
+            )
+
           case DirectTokenStandardTransfer(node) =>
             // TODO(tech-debt): deduplicate with the V2 version
             defer {
@@ -1944,6 +1972,31 @@ object UserWalletTxLogParser {
       State(
         entries = immutable.Queue(newEntry)
       )
+    }
+
+    def fromTrafficPurchaseTransfer(
+        tx: Transaction,
+        event: ExercisedEvent,
+        sender: String,
+        dso: String,
+        transferMeta: splice.api.token.metadatav1.Metadata,
+        resultMeta: splice.api.token.metadatav1.Metadata,
+    ): State = {
+      val burned = resultMeta.values.asScala
+        .get(TokenStandardMetadata.burnedMetaKey)
+        .fold(BigDecimal(0))(BigDecimal(_))
+      val newEntry = TransferTxLogEntry(
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
+        subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
+        date = Some(tx.getEffectiveAt),
+        sender = Some(PartyAndAmount(sender, -burned)),
+        receivers = Seq(PartyAndAmount(dso, BigDecimal(0))),
+        senderHoldingFees = BigDecimal(0),
+        appRewardsUsed = BigDecimal(0),
+        validatorRewardsUsed = BigDecimal(0),
+        description = transferMeta.values.asScala.getOrElse(TokenStandardMetadata.reasonMetaKey, ""),
+      )
+      State(entries = immutable.Queue(newEntry))
     }
 
     def fromCreateExternalPartySetupProposal(
