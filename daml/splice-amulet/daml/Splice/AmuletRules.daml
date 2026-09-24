@@ -1029,7 +1029,7 @@ template AmuletRules
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
           trafficPrice = validatedRounds.latestUsableRound.trafficPrice
           requiredSynchronizers = Some config.decentralizedSynchronizer.requiredSynchronizers
-          minTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
+          minTrafficTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
           rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig
           amuletSwitchOverTimes = config.amuletSwitchOverTimes
         pure AmuletRules_UpdateExternalPartyConfigStatesResult with ..
@@ -1793,21 +1793,21 @@ transferConfigAmuletFromExternalPartyConfigState externalPartyConfigState =
 data TrafficPurchaseConfig = TrafficPurchaseConfig with
     trafficPrice : Decimal -- ^ Price in $/MB.
     requiredSynchronizers : Set Text
-    minTopupAmount : Int
+    minTrafficTopupAmount : Int
   deriving (Eq, Show)
 
 trafficPurchaseConfigFromConfigState : ExternalPartyConfigState -> Optional TrafficPurchaseConfig
 trafficPurchaseConfigFromConfigState state = do
   trafficPrice <- state.trafficPrice
   requiredSynchronizers <- state.requiredSynchronizers
-  minTopupAmount <- state.minTopupAmount
+  minTrafficTopupAmount <- state.minTrafficTopupAmount
   pure TrafficPurchaseConfig with ..
 
 trafficPurchaseConfigFromAmuletConfig : AmuletConfig Unit.USD -> OpenMiningRound -> TrafficPurchaseConfig
 trafficPurchaseConfigFromAmuletConfig configUsd round = TrafficPurchaseConfig with
     trafficPrice = fromOptional configUsd.decentralizedSynchronizer.fees.extraTrafficPrice round.trafficPrice
     requiredSynchronizers = configUsd.decentralizedSynchronizer.requiredSynchronizers
-    minTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
+    minTrafficTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
 
 -- | Computing synchronizer fees
 computeSynchronizerFees : Party -> Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
@@ -1841,8 +1841,8 @@ validateBuyMemberTrafficInputs : TrafficPurchaseConfig -> Text -> Int -> Either 
 validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
   | not (synchronizerId `Set.member` trafficConfig.requiredSynchronizers) =
       Left $ mkUnknownSynchronizerFailure synchronizerId
-  | trafficAmount < trafficConfig.minTopupAmount =
-      Left $ mkInsufficientTopupAmountFailure trafficAmount trafficConfig.minTopupAmount
+  | trafficAmount < trafficConfig.minTrafficTopupAmount =
+      Left $ mkInsufficientTopupAmountFailure trafficAmount trafficConfig.minTrafficTopupAmount
   | otherwise = Right ()
 
 -- | Burn amulet to buy extra traffic on a synchronizer.
@@ -2493,7 +2493,7 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
         transferConfig = transferConfig
         trafficPrice = validatedRounds.latestUsableRound.trafficPrice
         requiredSynchronizers = Some config.decentralizedSynchronizer.requiredSynchronizers
-        minTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
+        minTrafficTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
         rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig
         amuletSwitchOverTimes = config.amuletSwitchOverTimes
       configState1 = configState0 with
