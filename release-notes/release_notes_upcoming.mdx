@@ -42,7 +42,7 @@
       The transfer `amount` is the most amulet the sender is willing to burn; if the traffic costs more,
       the transfer fails with `splice.lfdecentralizedtrust.org/traffic-cost-exceeds-amount`.
 
-    - Added three new fields: `trafficPrice`, `requiredSynchronizers` and
+    - Added three new fields: `trafficPrice`, `supportedSynchronizerIds` and
       `minTrafficTopupAmount` to `ExternalPartyConfigState`.
 
       **Action required from validator operators:** Upgrade to this release, which vets `splice-amulet 0.1.25` **before** the SVs vote to adopt it. After that vote, new `ExternalPartyConfigState` contracts will set the new fields and can no longer be downgraded to an older `splice-amulet` version. Validators that are not upgraded will no longer process Token Standard transfers and CC allocations.
