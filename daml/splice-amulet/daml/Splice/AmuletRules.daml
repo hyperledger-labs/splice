@@ -1841,13 +1841,13 @@ validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
 buyMemberTraffic
   : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> TrafficPurchaseConfig
   -> MemberTrafficPurchase -> [TransferInput] -> BurnRewardPolicy -> Update MemberTrafficPurchaseResult
-buyMemberTraffic eventLogCid csum trafficConfig purchase inputs rewardPolicy = do
+buyMemberTraffic eventLogCid csum trafficConfig purchase inputs burnRewardPolicy = do
   case validateBuyMemberTrafficInputs trafficConfig purchase.synchronizerId purchase.trafficAmount of
     Left failureStatus -> failWithStatus failureStatus
     Right _ -> pure ()
   let (trafficCostAmulet, trafficCostUsd) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
   (transferResult, meta) <-
-    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase" rewardPolicy
+    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase" burnRewardPolicy
   -- create a new MemberTraffic contract for the purchased traffic
   purchasedTraffic <- create MemberTraffic with
     dso = csum.dso
@@ -2364,9 +2364,9 @@ data BurnRewardPolicy
   deriving (Eq, Show)
 
 splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
-splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage rewardPolicy = do
+splitAndBurn eventLogCid sender amount inputs context dso developmentFundManagerBlacklist usage burnRewardPolicy = do
   csum <- summarizeAndValidateContext eventLogCid context dso developmentFundManagerBlacklist sender sender
-  splitAndBurn' eventLogCid csum sender amount inputs usage rewardPolicy
+  splitAndBurn' eventLogCid csum sender amount inputs usage burnRewardPolicy
 
 splitAndBurn' : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> Party -> Decimal -> [TransferInput] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
 splitAndBurn' eventLogCid csum sender amount inputs usage burnRewardPolicy = do
@@ -2382,7 +2382,7 @@ splitAndBurn' eventLogCid csum sender amount inputs usage burnRewardPolicy = do
   -- record event
   logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
   -- create validator activity rewards over the whole burn.
-  case rewardPolicy of
+  case burnRewardPolicy of
     IssueValidatorRewardCoupon -> void $ create ValidatorRewardCoupon with
       dso
       round = transferResult.round
