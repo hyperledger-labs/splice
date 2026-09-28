@@ -2369,7 +2369,7 @@ splitAndBurn eventLogCid sender amount inputs context dso developmentFundManager
   splitAndBurn' eventLogCid csum sender amount inputs usage rewardPolicy
 
 splitAndBurn' : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> Party -> Decimal -> [TransferInput] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
-splitAndBurn' eventLogCid csum sender amount inputs usage rewardPolicy = do
+splitAndBurn' eventLogCid csum sender amount inputs usage burnRewardPolicy = do
   let dso = csum.dso
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
