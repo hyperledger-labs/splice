@@ -1847,7 +1847,7 @@ buyMemberTraffic eventLogCid csum trafficConfig purchase inputs burnRewardPolicy
     Right _ -> pure ()
   let (trafficCostAmulet, trafficCostUsd) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
   (transferResult, meta) <-
-    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs "traffic purchase" burnRewardPolicy
+    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs ("traffic purchase: " <> trafficPurchaseMemo purchase) burnRewardPolicy
   -- create a new MemberTraffic contract for the purchased traffic
   purchasedTraffic <- create MemberTraffic with
     dso = csum.dso

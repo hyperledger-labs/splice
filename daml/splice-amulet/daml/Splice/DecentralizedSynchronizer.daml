@@ -124,6 +124,13 @@ parseTrafficPurchaseMemo provider memo = do
       None -> Left $ "Expected an integer for " <> key <> " in traffic purchase memo, got: " <> value
       Some parsed -> Right parsed
 
+trafficPurchaseMemo : MemberTrafficPurchase -> Text
+trafficPurchaseMemo purchase =
+  "memberId=" <> purchase.memberId <>
+  "&synchronizerId=" <> purchase.synchronizerId <>
+  "&migrationId=" <> show purchase.migrationId <>
+  "&trafficAmount=" <> show purchase.trafficAmount
+
 data ForMemberTraffic = ForMemberTraffic with
     dso : Party
     memberId : Text

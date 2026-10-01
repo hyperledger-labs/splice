@@ -42,6 +42,10 @@
       The transfer `amount` is the most amulet the sender is willing to burn; if the traffic costs more,
       the transfer fails with `splice.lfdecentralizedtrust.org/traffic-cost-exceeds-amount`.
 
+    - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the memo in the
+      `splice.lfdecentralizedtrust.org/reason` of their burn and transaction metadata:
+      `traffic purchase: memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>&trafficAmount=<int>`
+
     - Added three new fields: `trafficPrice`, `supportedSynchronizerIds` and
       `minTrafficTopupAmount` to `ExternalPartyConfigState`.
 

@@ -8,7 +8,7 @@ import DA.Assert ((===))
 
 import Daml.Script
 
-import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo, trafficPurchaseMemo)
 
 sender : Party
 sender =
@@ -47,6 +47,11 @@ isRejected result = case result of
 test_parseMemo_complete : Script ()
 test_parseMemo_complete = script do
   parse completeMemo === Right expectedPurchase
+
+test_formatMemo_isCanonicalAndRoundTrips : Script ()
+test_formatMemo_isCanonicalAndRoundTrips = script do
+  trafficPurchaseMemo expectedPurchase === completeMemo
+  parse (trafficPurchaseMemo expectedPurchase) === Right expectedPurchase
 
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do

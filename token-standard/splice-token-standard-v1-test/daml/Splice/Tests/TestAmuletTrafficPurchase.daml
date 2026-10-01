@@ -131,6 +131,7 @@ test_trafficPurchase_burnsCostAndCreatesMemberTraffic = script do
   result <- buyTraffic setup defaultTransfer
 
   TransferInstructionResult_Completed [] <- pure result.output
+  TextMap.lookup reasonMetaKey result.meta.values === Some ("traffic purchase: " <> defaultMemoTag)
   [changeHoldingCid] <- pure result.senderChangeCids
   WalletClient.checkHolding alice changeHoldingCid (initialTap - oneMegabyteCostAmulet)
   WalletClient.checkBalance alice registry.instrumentId (initialTap - oneMegabyteCostAmulet)
@@ -159,7 +160,8 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
         "&migrationId=0" <>
         "&synchronizerId=" <> testSynchronizerId <>
         "&memberId=" <> testMemberId
-  _ <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
+  result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
+  TextMap.lookup reasonMetaKey result.meta.values === Some ("traffic purchase: " <> defaultMemoTag)
 
   [(_, traffic)] <- query @MemberTraffic registry.dso
   traffic.memberId === testMemberId

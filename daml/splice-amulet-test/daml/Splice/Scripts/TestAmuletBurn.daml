@@ -5,13 +5,19 @@ module Splice.Scripts.TestAmuletBurn where
 
 import DA.Assert
 import DA.List (sort)
+import DA.Optional (fromSome)
+import qualified DA.TextMap as TextMap
 import Daml.Script
 
+import Splice.Amulet.TokenApiUtils (reasonMetaKey)
+import Splice.AmuletRules
+import Splice.Schedule (getValueAsOf)
 import Splice.ValidatorLicense
 
 import Splice.Scripts.Util
 
 import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 -- | Note to readers: try commenting suffixes of this script out to
 -- see the various steps in action.
@@ -84,3 +90,37 @@ testAmuletBurn = do
   runAmuletDepositBots app
 
   return ()
+
+-- Happy - the burn reports the traffic purchase reason using the same memo tag like in token standard traffic purchase
+testBuyMemberTraffic_burnReasonIsMemoTag : Script ()
+testBuyMemberTraffic_burnReasonIsMemoTag = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
+  let syncConfig = (getValueAsOf now amuletRules.configSchedule).decentralizedSynchronizer
+  let memberId = "PAR::alice-participant::1220abcd"
+  let trafficAmount = syncConfig.fees.minTopupAmount
+  let memoTag =
+        "memberId=" <> memberId <>
+        "&synchronizerId=" <> syncConfig.activeSynchronizer <>
+        "&migrationId=0" <>
+        "&trafficAmount=" <> show trafficAmount
+  let reason = "traffic purchase: " <> memoTag
+  context <- getTransferContext app alice None
+  amuletCid <- tap app alice 50.0
+
+  result <-
+    checkTxHistoryV2Reasons [(alice.primaryParty, ["split for " <> reason, reason])] $
+    WalletClientV2.extractAndCheckTxHistory [app.dso] $
+      submitResultAndTree (actAs alice.primaryParty <> readAs app.dso) $
+        exerciseCmd amuletRulesCid AmuletRules_BuyMemberTraffic with
+          inputs = [InputAmulet amuletCid]
+          context
+          provider = alice.primaryParty
+          memberId
+          synchronizerId = syncConfig.activeSynchronizer
+          migrationId = 0
+          trafficAmount
+          expectedDso = Some app.dso
+
+  TextMap.lookup reasonMetaKey (fromSome result.meta).values === Some reason
