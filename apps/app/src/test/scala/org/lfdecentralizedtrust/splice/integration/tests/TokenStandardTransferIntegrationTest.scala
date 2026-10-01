@@ -472,9 +472,7 @@ class TokenStandardTransferIntegrationTest
       inside(result.output) { case members.TransferInstructionCompleted(value) =>
         value.receiverHoldingCids shouldBe empty
       }
-      // Only the traffic cost is burned, plus holding fees.
-      balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe
-        (trafficCostAmulet +- BigDecimal(0.01))
+      balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe trafficCostAmulet
 
       checkTxHistory(
         aliceWalletClient,
@@ -485,7 +483,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.receivers.map(_.party) shouldBe Seq(
               sv1Backend.getDsoInfo().dsoParty.toProtoPrimitive
             )
-            logEntry.sender.value.amount shouldBe (-trafficCostAmulet +- BigDecimal(0.01))
+            logEntry.sender.value.amount shouldBe -trafficCostAmulet
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto

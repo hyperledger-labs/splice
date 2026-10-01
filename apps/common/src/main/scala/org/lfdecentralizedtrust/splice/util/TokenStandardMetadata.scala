@@ -10,7 +10,8 @@ object TokenStandardMetadata {
   val senderMetaKey = s"$splicePrefix/sender"
   val burnedMetaKey = s"$splicePrefix/burned"
 
-  // Mirrors "trafficPurchaseReceiver" in splice.ExternalPartyAmuletRules.daml
+  // Mirrors "trafficPurchaseReceiver" in splice.ExternalPartyAmuletRules.daml.
+  // TODO(#3596): replace `xxx` with the CIP number once it is assigned.
   val trafficPurchaseReceiver =
     "cip-xxx_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd"
 
