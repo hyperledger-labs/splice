@@ -692,7 +692,6 @@ class UserWalletTxLogParser(
                 tree,
                 exercised,
                 sender = node.argument.value.transfer.sender,
-                dso = node.argument.value.transfer.instrumentId.admin,
                 transferMeta = node.argument.value.transfer.meta,
                 resultMeta = node.result.value.meta,
               )
@@ -707,7 +706,6 @@ class UserWalletTxLogParser(
                 tree,
                 exercised,
                 sender = node.argument.value.transfer.sender.owner.toScala.getOrElse(admin),
-                dso = admin,
                 transferMeta = node.argument.value.transfer.meta,
                 resultMeta = node.result.value.meta,
               )
@@ -1948,29 +1946,20 @@ object UserWalletTxLogParser {
         event: ExercisedEvent,
     ): State = {
       val sender = node.argument.value.provider
-      // Hack to grab the DSO party-id from the balance changes, which list both sender and the DSO
-      val receivers = node.result.value.summary.balanceChanges.keySet().asScala.toSeq.collect {
-        case party if party != sender => PartyAndAmount(party, BigDecimal(0.0))
-      }
       val summary = node.result.value.summary
       val netSenderInput = summary.inputAmuletAmount - summary.holdingFees
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
-      val newEntry = TransferTxLogEntry(
-        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
-        subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
-        date = Some(tx.getEffectiveAt),
-        sender = Some(PartyAndAmount(sender, senderBalanceChange)),
-        receivers = receivers,
-        senderHoldingFees = node.result.value.summary.holdingFees,
-        appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
-        validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-        developmentFundCouponsUsed =
-          node.result.value.summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
-      )
-
-      State(
-        entries = immutable.Queue(newEntry)
+      trafficPurchaseEntry(
+        tx,
+        event,
+        sender,
+        senderBalanceChange,
+        summary.holdingFees,
+        BigDecimal(summary.inputAppRewardAmount),
+        BigDecimal(summary.inputValidatorRewardAmount),
+        summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
+        "",
       )
     }
 
@@ -1978,23 +1967,47 @@ object UserWalletTxLogParser {
         tx: Transaction,
         event: ExercisedEvent,
         sender: String,
-        dso: String,
         transferMeta: splice.api.token.metadatav1.Metadata,
         resultMeta: splice.api.token.metadatav1.Metadata,
     ): State = {
       val burned = resultMeta.values.asScala
         .get(TokenStandardMetadata.burnedMetaKey)
         .fold(BigDecimal(0))(BigDecimal(_))
+      trafficPurchaseEntry(
+        tx,
+        event,
+        sender,
+        -burned,
+        BigDecimal(0),
+        BigDecimal(0),
+        BigDecimal(0),
+        None,
+        transferMeta.values.asScala.getOrElse(TokenStandardMetadata.reasonMetaKey, ""),
+      )
+    }
+
+    private def trafficPurchaseEntry(
+        tx: Transaction,
+        event: ExercisedEvent,
+        sender: String,
+        senderAmount: BigDecimal,
+        holdingFees: BigDecimal,
+        appRewardsUsed: BigDecimal,
+        validatorRewardsUsed: BigDecimal,
+        developmentFundCouponsUsed: Option[BigDecimal],
+        description: String,
+    ): State = {
       val newEntry = TransferTxLogEntry(
         eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
         date = Some(tx.getEffectiveAt),
-        sender = Some(PartyAndAmount(sender, -burned)),
-        receivers = Seq(PartyAndAmount(dso, BigDecimal(0))),
-        senderHoldingFees = BigDecimal(0),
-        appRewardsUsed = BigDecimal(0),
-        validatorRewardsUsed = BigDecimal(0),
-        description = transferMeta.values.asScala.getOrElse(TokenStandardMetadata.reasonMetaKey, ""),
+        sender = Some(PartyAndAmount(sender, senderAmount)),
+        receivers = Seq.empty,
+        senderHoldingFees = holdingFees,
+        appRewardsUsed = appRewardsUsed,
+        validatorRewardsUsed = validatorRewardsUsed,
+        developmentFundCouponsUsed = developmentFundCouponsUsed,
+        description = description,
       )
       State(entries = immutable.Queue(newEntry))
     }

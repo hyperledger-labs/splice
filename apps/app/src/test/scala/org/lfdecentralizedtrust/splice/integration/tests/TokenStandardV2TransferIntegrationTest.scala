@@ -609,9 +609,7 @@ class TokenStandardV2TransferIntegrationTest
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
             logEntry.description shouldBe memo
-            logEntry.receivers.map(_.party) shouldBe Seq(
-              sv1Backend.getDsoInfo().dsoParty.toProtoPrimitive
-            )
+            logEntry.receivers shouldBe empty
             logEntry.sender.value.amount shouldBe -trafficCostAmulet
           },
           { case logEntry: BalanceChangeTxLogEntry =>
