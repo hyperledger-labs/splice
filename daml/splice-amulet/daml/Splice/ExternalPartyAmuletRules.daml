@@ -341,7 +341,7 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 -------------------------------------------------------------
 
 -- | Party used for traffic purchase via a V1 transfer
--- TODO(#7255): replace `xxx` with the CIP number once it is assigned.
+-- TODO(#3596): replace `xxx` with the CIP number once it is assigned.
 trafficPurchaseReceiver : Party
 trafficPurchaseReceiver =
   fromSomeNote "trafficPurchaseReceiver: invalid party" $
@@ -400,7 +400,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
 
   if transfer.receiver == trafficPurchaseReceiver then do
-    -- TODO(#7255): support buying traffic on dedicated synchronizers.
+    -- TODO(#7561): accept a RegisteredSynchronizer to support dedicated synchronizers.
     purchase <- case parseTrafficPurchaseMemo transfer.sender (reasonFromMeta transfer.meta) of
       Left err -> fail err
       Right purchase -> pure purchase
