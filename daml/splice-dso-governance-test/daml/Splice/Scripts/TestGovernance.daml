@@ -1275,6 +1275,18 @@ testFeaturedAppConfigUpdatePatch = do
     appKind = Some FAK_Asset
     activityWeight = Some 1.5
     opsParties = Some [ops]
+
+  -- an instruction that changes a field from `Some` to `None` resets it to the default
+  let resetBaseConfig = getFeaturedAppConfig finalRight
+  resetInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
+    resetBaseConfig (resetBaseConfig with activityWeight = None)
+  _ <- executeInstruction resetInstructionCid
+
+  [(_, resetRight)] <- query @FeaturedAppRight provider
+  getFeaturedAppConfig resetRight === FeaturedAppConfig with
+    appKind = Some FAK_Asset
+    activityWeight = None
+    opsParties = Some [ops]
   [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
   pure ()
 
