@@ -55,6 +55,7 @@ testVoteRequestAcceptanceWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = Some 11.0
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -130,6 +131,7 @@ testVoteRequestAcceptanceWithEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime) -- the right will be granted in 8 days
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote with the possibility to change their vote
@@ -245,6 +247,7 @@ testVoteRequestRejectionWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = Some 11.0
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -291,6 +294,7 @@ testVoteRequestRejectionWithEffectivityBeforeExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = Some (days 3) -- give everybody 3 days to vote
@@ -337,6 +341,7 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (addRelTime now (days 1))
     voteRequestTimeout = Some (days 2)
@@ -348,6 +353,7 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = Some (days 3) -- give everybody 3 days to vote
@@ -949,6 +955,7 @@ testVoteRequestExpireWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = None
@@ -992,6 +999,7 @@ testVoteRequestExpireWithEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        config = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = None
@@ -1163,6 +1171,7 @@ grantFeaturedAppRightForConfigTest app svs provider = do
     dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
       provider
       activityWeight = None
+      config = None
   [right] <- query @FeaturedAppRight provider
   pure right
 
@@ -1259,3 +1268,21 @@ testFeaturedAppConfigUpdatePatch = do
     opsParties = [ops]
   [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
   pure ()
+
+testGrantFeaturedAppRightWithConfig : Script ()
+testGrantFeaturedAppRightWithConfig = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  provider <- allocateParty "provider"
+  ops <- allocateParty "ops"
+  let config = FeaturedAppConfigInternal with appKind = FAK_AssetMoving; opsParties = [ops]
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $ ARC_DsoRules with
+    dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+      provider
+      activityWeight = Some 2.0
+      config = Some config
+  [(_, right)] <- query @FeaturedAppRight provider
+  right === FeaturedAppRight with dso; provider; activityWeight = Some 2.0; config = Some config
+  getFeaturedAppConfig right === FeaturedAppConfig with
+    appKind = FAK_AssetMoving
+    activityWeight = 2.0
+    opsParties = [ops]
