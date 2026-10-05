@@ -1207,13 +1207,13 @@ testFeaturedAppConfigUpdate = do
   (rightCid, right) <- grantFeaturedAppRightForConfigTest app svs provider
   (otherRightCid, _) <- grantFeaturedAppRightForConfigTest app svs otherProvider
 
-  getFeaturedAppConfig right === defaultFeaturedAppConfig
+  getFeaturedAppConfig right === FeaturedAppConfig with appKind = None; activityWeight = None; opsParties = None
 
   let baseConfig = getFeaturedAppConfig right
       newConfig = baseConfig with
-        appKind = FAK_AssetMoving
-        activityWeight = 2.5
-        opsParties = [ops1, ops2]
+        appKind = Some FAK_AssetMoving
+        activityWeight = Some 2.5
+        opsParties = Some [ops1, ops2]
   instructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider baseConfig newConfig
 
   -- accepting the vote only records the instruction, the right is unchanged
@@ -1250,9 +1250,9 @@ testFeaturedAppConfigUpdatePatch = do
   -- two instructions drafted against the same base config, each changing a different field
   let baseConfig = getFeaturedAppConfig right
   kindInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
-    baseConfig (baseConfig with appKind = FAK_Asset)
+    baseConfig (baseConfig with appKind = Some FAK_Asset)
   opsInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
-    baseConfig (baseConfig with opsParties = [ops])
+    baseConfig (baseConfig with opsParties = Some [ops])
 
   -- meanwhile the weight changes by another route, after the votes were drafted
   initiateAndAcceptVote app svs $ ARC_DsoRules with
@@ -1272,9 +1272,9 @@ testFeaturedAppConfigUpdatePatch = do
 
   [(_, finalRight)] <- query @FeaturedAppRight provider
   getFeaturedAppConfig finalRight === FeaturedAppConfig with
-    appKind = FAK_Asset
-    activityWeight = 1.5
-    opsParties = [ops]
+    appKind = Some FAK_Asset
+    activityWeight = Some 1.5
+    opsParties = Some [ops]
   [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
   pure ()
 
@@ -1297,6 +1297,6 @@ testGrantFeaturedAppRightWithConfig = do
     appKind = Some FAK_AssetMoving
     opsParties = Some [ops]
   getFeaturedAppConfig right === FeaturedAppConfig with
-    appKind = FAK_AssetMoving
-    activityWeight = 2.0
-    opsParties = [ops]
+    appKind = Some FAK_AssetMoving
+    activityWeight = Some 2.0
+    opsParties = Some [ops]
