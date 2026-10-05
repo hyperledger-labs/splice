@@ -1085,14 +1085,16 @@ template DsoRules with
       with
         provider : Party
         activityWeight : Optional Decimal
-        config : Optional FeaturedAppConfigInternal
+        appKind : Optional FeaturedAppKind
+        opsParties : Optional [Party]
       controller dso
       do
         featuredAppRight <- create FeaturedAppRight with
           dso
           provider
           activityWeight
-          config
+          appKind
+          opsParties
         return DsoRules_GrantFeaturedAppRightResult with ..
 
     nonconsuming choice DsoRules_RevokeFeaturedAppRight : DsoRules_RevokeFeaturedAppRightResult
