@@ -309,11 +309,6 @@ defaultAppKind = FAK_General
 defaultOpsParties : [Party]
 defaultOpsParties = []
 
-defaultFeaturedAppConfigInternal : FeaturedAppConfigInternal
-defaultFeaturedAppConfigInternal = FeaturedAppConfigInternal with
-  appKind = defaultAppKind
-  opsParties = defaultOpsParties
-
 defaultFeaturedAppConfig : FeaturedAppConfig
 defaultFeaturedAppConfig = FeaturedAppConfig with
   appKind = defaultAppKind
@@ -337,13 +332,6 @@ data FeaturedAppConfig = FeaturedAppConfig with
       -- as submissions by this featured app.
   deriving (Eq, Show, Serializable)
 
--- | This holds those fields of FeaturedAppConfig which are not stored directly on the FeaturedAppRight contract.
--- We would ideally move activityWeight here but SCU won't allow it.
-data FeaturedAppConfigInternal = FeaturedAppConfigInternal with
-    appKind : FeaturedAppKind
-    opsParties : [Party]
-  deriving (Eq, Show, Serializable)
-
 -- | The right for an application provider to earn featured app rewards.
 template FeaturedAppRight with
     dso : Party
@@ -353,9 +341,15 @@ template FeaturedAppRight with
       -- activity records in composed transactions.
       --
       -- If not set, use the default value of 1.0
-    config : Optional FeaturedAppConfigInternal
-      -- ^ Extra configuration for the featured app right. Called "internal", as the proper version
-      -- that can be modified via SV voting also includes the `activityWeight` field.
+    appKind : Optional FeaturedAppKind
+      -- ^ The kind of the featured app.
+      --
+      -- If not set, use the default value of FAK_General
+    opsParties : Optional [Party]
+      -- ^ Operational parties for the featured app whose submissions should be considered
+      -- as submissions by this featured app.
+      --
+      -- If not set, use the default value of []
   where
     signatory dso
     observer provider
@@ -446,15 +440,14 @@ validateAppRewardBeneficiariesV2 beneficiaries = do
 getFeaturedAppConfig : FeaturedAppRight -> FeaturedAppConfig
 getFeaturedAppConfig right = FeaturedAppConfig with
   activityWeight = fromOptional defaultAppActivityWeight right.activityWeight
-  appKind = optional defaultAppKind (.appKind) right.config
-  opsParties = optional defaultOpsParties (.opsParties) right.config
+  appKind = fromOptional defaultAppKind right.appKind
+  opsParties = fromOptional defaultOpsParties right.opsParties
 
 setFeaturedAppConfig : FeaturedAppConfig -> FeaturedAppRight -> FeaturedAppRight
 setFeaturedAppConfig newConfig right = right with
   activityWeight = Some newConfig.activityWeight
-  config = Some $ FeaturedAppConfigInternal with
-    appKind = newConfig.appKind
-    opsParties = newConfig.opsParties
+  appKind = Some newConfig.appKind
+  opsParties = Some newConfig.opsParties
 
 -- | A marker created by a featured application for activity generated from that app. This is used
 -- to record activity other than amulet transfers where regular AppRewardCoupons are not created directly.
