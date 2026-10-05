@@ -10,8 +10,7 @@ import DA.Assert
 import DA.List (unique)
 import DA.Map as Map
 import DA.TextMap as TextMap
-import DA.Time (isLedgerTimeGE)
-import DA.Optional (fromOptional, isNone, isSome, optionalToList)
+import DA.Optional (fromOptional, isNone, optionalToList)
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1

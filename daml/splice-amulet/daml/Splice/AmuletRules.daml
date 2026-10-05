@@ -424,7 +424,7 @@ template AmuletRules
       controller provider
       do
         require "isDevNet flag is true" isDevNet
-        featuredAppRightCid <- create FeaturedAppRight with dso; provider; activityWeight
+        featuredAppRightCid <- create FeaturedAppRight with dso; provider; activityWeight; config = None
         return AmuletRules_DevNet_FeatureAppResult with ..
 
     -- Bootstrap the open mining rounds by creating
