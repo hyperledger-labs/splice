@@ -353,17 +353,7 @@ class HttpWalletHandler(
         "accept_transfer",
         "accept transfer offer",
         for {
-          commandPriority <-
-            if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
-              Future.successful(CommandPriority.Low)
-            else
-              TopupUtil
-                .commandPriorityForTopupFunds(
-                  scanConnection,
-                  userWallet.store,
-                  validatorTopupConfig,
-                  walletManager.clock,
-                )
+          commandPriority <- commandPriorityFor(userWallet)
           outcome <-
             exerciseWalletAction((installCid, _) => {
               val requestCid =
@@ -388,6 +378,20 @@ class HttpWalletHandler(
       )
     }
   }
+
+  private def commandPriorityFor(
+      userWallet: UserWalletService
+  )(implicit tc: TraceContext): Future[CommandPriority] =
+    if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
+      Future.successful(CommandPriority.Low)
+    else
+      TopupUtil.highCommandPriorityWhenLowTraffic(
+        scanConnection,
+        userWallet.store,
+        validatorTopupConfig,
+        walletManager.clock,
+      )
+
   override def rejectTransferOffer(respond: r0.RejectTransferOfferResponse.type)(
       contractId: String
   )(tuser: WalletUserRequest): Future[r0.RejectTransferOfferResponse] = {
@@ -790,6 +794,7 @@ class HttpWalletHandler(
   )(implicit tc: TraceContext) = {
     val store = wallet.store
     for {
+      commandPriority <- commandPriorityFor(wallet)
       _ <- wallet.connection
         .submit(
           Seq(store.key.validatorParty, store.key.endUserParty),
@@ -799,6 +804,7 @@ class HttpWalletHandler(
             store.key.validatorParty.toProtoPrimitive,
             java.util.Optional.of(store.key.dsoParty.toProtoPrimitive),
           ).create,
+          priority = commandPriority,
         )
         .withDedup(
           SpliceLedgerConnection.CommandId(
@@ -978,16 +984,8 @@ class HttpWalletHandler(
         contractId
       )
       for {
-        commandPriority <-
-          if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
-            Future.successful(CommandPriority.Low)
-          else
-            TopupUtil.commandPriorityForTopupFunds(
-              scanConnection,
-              userWallet.store,
-              validatorTopupConfig,
-              walletManager.clock,
-            )
+        commandPriority <- commandPriorityFor(userWallet)
+
         choiceContext <- scanConnection.getTransferInstructionAcceptContextV2(requestCid)
         outcome <- exerciseWalletAction((installCid, _) => {
           Future.successful(
@@ -1118,16 +1116,7 @@ class HttpWalletHandler(
         contractId
       )
       for {
-        commandPriority <-
-          if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
-            Future.successful(CommandPriority.Low)
-          else
-            TopupUtil.commandPriorityForTopupFunds(
-              scanConnection,
-              userWallet.store,
-              validatorTopupConfig,
-              walletManager.clock,
-            )
+        commandPriority <- commandPriorityFor(userWallet)
         choiceContext <- scanConnection.getTransferInstructionAcceptContextV2(requestCid)
         outcome <- exerciseWalletAction((installCid, _) => {
           Future.successful(
