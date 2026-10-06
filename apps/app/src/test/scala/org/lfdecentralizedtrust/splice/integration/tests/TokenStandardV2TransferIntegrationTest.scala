@@ -563,7 +563,7 @@ class TokenStandardV2TransferIntegrationTest
 
       val memberId = aliceValidatorBackend.participantClient.id
       val synchronizerId = activeSynchronizerId
-      val purchasedTrafficAmount = Math.max(
+      val minimumTrafficAmount = Math.max(
         sv1ScanBackend
           .getAmuletConfigAsOf(env.environment.clock.now)
           .decentralizedSynchronizer
@@ -572,12 +572,13 @@ class TokenStandardV2TransferIntegrationTest
           .toLong,
         1_000_000L,
       )
-      val (_, trafficCostAmulet) = computeSynchronizerFees(purchasedTrafficAmount)
+      val (_, minimumCostAmulet) = computeSynchronizerFees(minimumTrafficAmount)
+      val spentAmuletAmount = minimumCostAmulet * 2
+      val purchasedTrafficAmount = computeTrafficForAmuletAmount(spentAmuletAmount)
       val memo =
-        s"memberId=${memberId.toProtoPrimitive}" +
+        s"cip-0128/memo:memberId=${memberId.toProtoPrimitive}" +
           s"&synchronizerId=${synchronizerId.toProtoPrimitive}" +
-          s"&migrationId=${sv1ScanBackend.getMigrationId()}" +
-          s"&trafficAmount=$purchasedTrafficAmount"
+          s"&migrationId=${sv1ScanBackend.getMigrationId()}"
       val purchasedTrafficBefore = getTotalPurchasedTraffic(memberId, synchronizerId)
       val balanceBefore = aliceWalletClient.balance().unlockedQty
 
@@ -585,7 +586,7 @@ class TokenStandardV2TransferIntegrationTest
         "Alice buys traffic via a V2 transfer to the traffic purchase receiver",
         aliceWalletClient.createTokenStandardTransferV2(
           PartyId.tryFromProtoPrimitive(TokenStandardMetadata.trafficPurchaseReceiver),
-          trafficCostAmulet + 1,
+          spentAmuletAmount,
           memo,
           CantonTimestamp.now().plusSeconds(3600L),
           UUID.randomUUID().toString,
@@ -601,7 +602,7 @@ class TokenStandardV2TransferIntegrationTest
       inside(result.output) { case members.TransferInstructionCompleted(value) =>
         value.receiverHoldingCids shouldBe empty
       }
-      balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe trafficCostAmulet
+      balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe spentAmuletAmount
 
       checkTxHistory(
         aliceWalletClient,
@@ -610,7 +611,7 @@ class TokenStandardV2TransferIntegrationTest
             logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
             logEntry.description shouldBe memo
             logEntry.receivers shouldBe empty
-            logEntry.sender.value.amount shouldBe -trafficCostAmulet
+            logEntry.sender.value.amount shouldBe -spentAmuletAmount
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto

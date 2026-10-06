@@ -27,11 +27,14 @@ expectedMemo = TrafficPurchaseMemo with
   synchronizerId = testSynchronizerId
   migrationId = 3
 
-completeMemo : Text
-completeMemo =
+memoParams : Text
+memoParams =
   "memberId=" <> testMemberId <>
   "&synchronizerId=" <> testSynchronizerId <>
   "&migrationId=3"
+
+completeMemo : Text
+completeMemo = "cip-0128/memo:" <> memoParams
 
 parse : Text -> Either Text TrafficPurchaseMemo
 parse = parseTrafficPurchaseMemo
@@ -54,19 +57,24 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
         migrationId = 3
         trafficAmount = 1_000_000
   trafficPurchaseReason purchase ===
-    "traffic purchase: " <> completeMemo <> ", purchased traffic amount: 1000000 bytes"
+    "traffic purchase: " <> memoParams <> ", purchased traffic amount: 1000000 bytes"
 
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
   let reordered =
-        "migrationId=3" <>
+        "cip-0128/memo:migrationId=3" <>
         "&synchronizerId=" <> testSynchronizerId <>
         "&memberId=" <> testMemberId
   parse reordered === Right expectedMemo
 
+test_parseMemo_rejectsMissingPrefix : Script ()
+test_parseMemo_rejectsMissingPrefix = script do
+  parse memoParams === Left "Traffic purchase memo must start with cip-0128/memo:"
+  parse (" " <> completeMemo) === Left "Traffic purchase memo must start with cip-0128/memo:"
+
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
-  parse ("memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
+  parse ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
     Left "Missing key in traffic purchase memo: migrationId"
 
 test_parseMemo_rejectsUnknownKey : Script ()
@@ -81,12 +89,13 @@ test_parseMemo_rejectsMalformedField : Script ()
 test_parseMemo_rejectsMalformedField = script do
   assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
   assertMsg "field with two separators is rejected" $
-    isRejected $ parse $ "memberId=a=b&synchronizerId=s&migrationId=0"
+    isRejected $ parse $ "cip-0128/memo:memberId=a=b&synchronizerId=s&migrationId=0"
   assertMsg "empty memo is rejected" $ isRejected $ parse ""
+  assertMsg "prefix without parameters is rejected" $ isRejected $ parse "cip-0128/memo:"
 
 test_parseMemo_rejectsNonIntegerValues : Script ()
 test_parseMemo_rejectsNonIntegerValues = script do
   assertMsg "non-integer migrationId is rejected" $
     isRejected $ parse $
-      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
+      "cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
       "&migrationId=latest"

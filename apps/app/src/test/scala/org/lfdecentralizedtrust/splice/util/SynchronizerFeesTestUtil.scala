@@ -240,6 +240,21 @@ trait SynchronizerFeesTestUtil extends TestCommon {
     SpliceUtil.synchronizerFees(trafficAmount, extraTrafficPrice, amuletPrice)
   }
 
+  def computeTrafficForAmuletAmount(amount: BigDecimal)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Long = {
+    val ts = env.environment.clock.now
+    val round = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload
+    val trafficPrice = round.trafficPrice.toScala.getOrElse(
+      sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees.extraTrafficPrice
+    )
+    (amount.bigDecimal
+      .multiply(round.amuletPrice)
+      .multiply(java.math.BigDecimal.valueOf(1_000_000L)))
+      .divide(trafficPrice, 0, java.math.RoundingMode.FLOOR)
+      .longValueExact()
+  }
+
   def getTrafficState(
       validatorApp: ValidatorAppBackendReference,
       synchronizerId: SynchronizerId,

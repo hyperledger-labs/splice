@@ -103,11 +103,17 @@ data TrafficPurchaseMemo = TrafficPurchaseMemo with
     migrationId : Int
   deriving (Eq, Show)
 
+trafficPurchaseMemoPrefix : Text
+trafficPurchaseMemoPrefix = "cip-0128/memo:"
+
 -- | Parse the purchase arguments from memo tag using url query param style:
--- `memberId=...&synchronizerId=...&migrationId=...`.
+-- `cip-0128/memo:memberId=...&synchronizerId=...&migrationId=...`.
 parseTrafficPurchaseMemo : Text -> Either Text TrafficPurchaseMemo
 parseTrafficPurchaseMemo memo = do
-  fields <- foldlA addField TextMap.empty (T.splitOn "&" memo)
+  params <- case T.stripPrefix trafficPurchaseMemoPrefix memo of
+    None -> Left $ "Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix
+    Some params -> Right params
+  fields <- foldlA addField TextMap.empty (T.splitOn "&" params)
   memberId <- requiredField fields "memberId"
   synchronizerId <- requiredField fields "synchronizerId"
   migrationId <- requiredField fields "migrationId" >>= parseIntField "migrationId"

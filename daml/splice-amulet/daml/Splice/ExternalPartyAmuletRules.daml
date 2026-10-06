@@ -340,11 +340,10 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 -------------------------------------------------------------
 
 -- | Party used for traffic purchase via a V1 transfer
--- TODO(#3596): replace `xxx` with the CIP number once it is assigned.
 trafficPurchaseReceiver : Party
 trafficPurchaseReceiver =
   fromSomeNote "trafficPurchaseReceiver: invalid party" $
-  partyFromText "cip-xxx_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd"
+  partyFromText "cip-0128_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd"
 
 
 -- | Choice observers are informees and no participant hosts the traffic purchase sentinel,

@@ -43,15 +43,13 @@ testMemberId = "PAR::alice-participant::1220abcd"
 testSynchronizerId : Text
 testSynchronizerId = "decentralized-synchronizer-id-0"
 
-memoTagFor : Text -> Text -> Text -> Text -> Text
-memoTagFor memberId synchronizerId migrationId trafficAmount =
-  "memberId=" <> memberId <>
-  "&synchronizerId=" <> synchronizerId <>
-  "&migrationId=" <> migrationId <>
-  "&trafficAmount=" <> trafficAmount
-
 defaultMemoTag : Text
-defaultMemoTag = memoTagFor testMemberId testSynchronizerId "0" (show oneMegabyte)
+defaultMemoTag =
+  "cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
+
+defaultReason : Text
+defaultReason =
+  "traffic purchase: memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0, purchased traffic amount: 1000000 bytes"
 
 trafficRegistryConfig : AmuletRegistry.AmuletRegistryConfig
 trafficRegistryConfig = AmuletRegistry.defaultAmuletRegistryConfig with
@@ -79,7 +77,7 @@ setupTestWith registryConfig = do
   let defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
         sender = alice
         receiver = trafficPurchaseReceiver
-        amount = 10.0
+        amount = oneMegabyteCostAmulet
         instrumentId = registry.instrumentId
         requestedAt = now
         executeBefore = now `addRelTime` days 1
@@ -124,14 +122,14 @@ transferFactoryChoice registry transfer =
 -- Happy
 --------
 
-test_trafficPurchase_burnsCostAndCreatesMemberTraffic : Script ()
-test_trafficPurchase_burnsCostAndCreatesMemberTraffic = script do
+test_trafficPurchase_burnsFullAmountAndCreatesMemberTraffic : Script ()
+test_trafficPurchase_burnsFullAmountAndCreatesMemberTraffic = script do
   setup@TestSetup{..} <- setupTest
 
   result <- buyTraffic setup defaultTransfer
 
   TransferInstructionResult_Completed [] <- pure result.output
-  TextMap.lookup reasonMetaKey result.meta.values === Some ("traffic purchase: " <> defaultMemoTag)
+  TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
   [changeHoldingCid] <- pure result.senderChangeCids
   WalletClient.checkHolding alice changeHoldingCid (initialTap - oneMegabyteCostAmulet)
   WalletClient.checkBalance alice registry.instrumentId (initialTap - oneMegabyteCostAmulet)
@@ -145,6 +143,17 @@ test_trafficPurchase_burnsCostAndCreatesMemberTraffic = script do
   traffic.usdSpent === oneMegabyteCostUsd
   traffic.amuletSpent === oneMegabyteCostAmulet
 
+test_trafficPurchase_spendsEntireInputWithoutChange : Script ()
+test_trafficPurchase_spendsEntireInputWithoutChange = script do
+  setup@TestSetup{..} <- setupTest
+  result <- buyTraffic setup defaultTransfer with amount = initialTap
+  result.senderChangeCids === []
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.totalPurchased === 25_000_000
+  traffic.amuletSpent === initialTap
+  traffic.usdSpent === 25.0
+
 test_trafficPurchase_mintsNoValidatorRewardCoupon : Script ()
 test_trafficPurchase_mintsNoValidatorRewardCoupon = script do
   setup@TestSetup{..} <- setupTest
@@ -156,12 +165,9 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
 test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
   setup@TestSetup{..} <- setupTest
   let memoTag =
-        "trafficAmount=" <> show oneMegabyte <>
-        "&migrationId=0" <>
-        "&synchronizerId=" <> testSynchronizerId <>
-        "&memberId=" <> testMemberId
+        "cip-0128/memo:migrationId=0&synchronizerId=" <> testSynchronizerId <> "&memberId=" <> testMemberId
   result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
-  TextMap.lookup reasonMetaKey result.meta.values === Some ("traffic purchase: " <> defaultMemoTag)
+  TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
 
   [(_, traffic)] <- query @MemberTraffic registry.dso
   traffic.memberId === testMemberId
@@ -176,7 +182,15 @@ test_trafficPurchase_rejectsIncompleteMemoTag = script do
   buyTrafficMustFailWith
     (expectMessageContains "Missing key in traffic purchase memo: synchronizerId")
     setup defaultTransfer with
-      meta = memoTagMeta ("memberId=" <> testMemberId)
+      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId)
+
+test_trafficPurchase_rejectsMemoTagWithoutPrefix : Script ()
+test_trafficPurchase_rejectsMemoTagWithoutPrefix = script do
+  setup@TestSetup{..} <- setupTest
+  buyTrafficMustFailWith
+    (expectMessageContains "Traffic purchase memo must start with cip-0128/memo:")
+    setup defaultTransfer with
+      meta = memoTagMeta ("memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0")
 
 test_trafficPurchase_rejectsUnknownMemoKey : Script ()
 test_trafficPurchase_rejectsUnknownMemoKey = script do
@@ -194,13 +208,13 @@ test_trafficPurchase_rejectsDuplicateMemoKey = script do
     setup defaultTransfer with
       meta = memoTagMeta (defaultMemoTag <> "&migrationId=1")
 
-test_trafficPurchase_rejectsNonIntegerTrafficAmount : Script ()
-test_trafficPurchase_rejectsNonIntegerTrafficAmount = script do
+test_trafficPurchase_rejectsNonIntegerMigrationId : Script ()
+test_trafficPurchase_rejectsNonIntegerMigrationId = script do
   setup@TestSetup{..} <- setupTest
   buyTrafficMustFailWith
-    (expectMessageContains "Expected an integer for trafficAmount")
+    (expectMessageContains "Expected an integer for migrationId")
     setup defaultTransfer with
-      meta = memoTagMeta (memoTagFor testMemberId testSynchronizerId "0" "1MB")
+      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=latest")
 
 test_trafficPurchase_rejectsUnknownSynchronizer : Script ()
 test_trafficPurchase_rejectsUnknownSynchronizer = script do
@@ -208,7 +222,7 @@ test_trafficPurchase_rejectsUnknownSynchronizer = script do
   buyTrafficMustFailWith
     (expectErrorId "splice.lfdecentralizedtrust.org/unknown-synchronizer")
     setup defaultTransfer with
-      meta = memoTagMeta (memoTagFor testMemberId "unknown-synchronizer" "0" (show oneMegabyte))
+      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=unknown-synchronizer&migrationId=0")
 
 test_trafficPurchase_rejectsAmountBelowMinTopup : Script ()
 test_trafficPurchase_rejectsAmountBelowMinTopup = script do
@@ -216,15 +230,25 @@ test_trafficPurchase_rejectsAmountBelowMinTopup = script do
   buyTrafficMustFailWith
     (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-topup-amount")
     setup defaultTransfer with
-      meta = memoTagMeta (memoTagFor testMemberId testSynchronizerId "0" (show (oneMegabyte - 1)))
+      amount = oneMegabyteCostAmulet - 0.000001
 
-test_trafficPurchase_rejectsCostAboveTransferAmount : Script ()
-test_trafficPurchase_rejectsCostAboveTransferAmount = script do
-  setup@TestSetup{..} <- setupTest
+rejectsNonPositiveTrafficPrice : Decimal -> Script ()
+rejectsNonPositiveTrafficPrice trafficPrice = script do
+  let config = trafficRegistryConfig with
+        amuletConfig = trafficRegistryConfig.amuletConfig with
+          decentralizedSynchronizer = trafficRegistryConfig.amuletConfig.decentralizedSynchronizer with
+            fees = trafficRegistryConfig.amuletConfig.decentralizedSynchronizer.fees with
+              extraTrafficPrice = trafficPrice
+  setup@TestSetup{..} <- setupTestWith config
   buyTrafficMustFailWith
-    (expectErrorId "splice.lfdecentralizedtrust.org/traffic-cost-exceeds-amount")
-    setup defaultTransfer with
-      amount = oneMegabyteCostAmulet - 0.0000000001
+    (expectMessageContains "Traffic price must be positive")
+    setup defaultTransfer
+
+test_trafficPurchase_rejectsZeroTrafficPrice : Script ()
+test_trafficPurchase_rejectsZeroTrafficPrice = rejectsNonPositiveTrafficPrice 0.0
+
+test_trafficPurchase_rejectsNegativeTrafficPrice : Script ()
+test_trafficPurchase_rejectsNegativeTrafficPrice = rejectsNonPositiveTrafficPrice (-1.0)
 
 test_trafficPurchase_rejectsExpiredTransfer : Script ()
 test_trafficPurchase_rejectsExpiredTransfer = script do
