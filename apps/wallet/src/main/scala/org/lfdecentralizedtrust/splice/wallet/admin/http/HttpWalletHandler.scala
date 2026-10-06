@@ -358,13 +358,12 @@ class HttpWalletHandler(
               Future.successful(CommandPriority.Low)
             else
               TopupUtil
-                .hasSufficientFundsForTopup(
+                .commandPriorityForTopupFunds(
                   scanConnection,
                   userWallet.store,
                   validatorTopupConfig,
                   walletManager.clock,
                 )
-                .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
           outcome <-
             exerciseWalletAction((installCid, _) => {
               val requestCid =
@@ -979,6 +978,16 @@ class HttpWalletHandler(
         contractId
       )
       for {
+        commandPriority <-
+          if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
+            Future.successful(CommandPriority.Low)
+          else
+            TopupUtil.commandPriorityForTopupFunds(
+              scanConnection,
+              userWallet.store,
+              validatorTopupConfig,
+              walletManager.clock,
+            )
         choiceContext <- scanConnection.getTransferInstructionAcceptContextV2(requestCid)
         outcome <- exerciseWalletAction((installCid, _) => {
           Future.successful(
@@ -991,6 +1000,7 @@ class HttpWalletHandler(
         })(
           userWallet,
           disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
+          priority = commandPriority,
         )
       } yield WalletResource.AcceptTokenStandardTransferResponseOK(
         transferInstructionResultToResponse(outcome.exerciseResult)
@@ -1108,6 +1118,16 @@ class HttpWalletHandler(
         contractId
       )
       for {
+        commandPriority <-
+          if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
+            Future.successful(CommandPriority.Low)
+          else
+            TopupUtil.commandPriorityForTopupFunds(
+              scanConnection,
+              userWallet.store,
+              validatorTopupConfig,
+              walletManager.clock,
+            )
         choiceContext <- scanConnection.getTransferInstructionAcceptContextV2(requestCid)
         outcome <- exerciseWalletAction((installCid, _) => {
           Future.successful(
@@ -1123,6 +1143,7 @@ class HttpWalletHandler(
         })(
           userWallet,
           disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
+          priority = commandPriority,
         )
       } yield WalletResource.AcceptTokenStandardTransferV2ResponseOK(
         transferInstructionResultToResponse(outcome.exerciseResult)

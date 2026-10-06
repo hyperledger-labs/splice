@@ -36,6 +36,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -47,6 +49,8 @@ class AcceptTransferPreapprovalProposalTrigger(
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     globalSynchronizerAlias: SynchronizerAlias,
+    scanConnection: BftScanConnection,
+    validatorTopupConfig: ValidatorTopupConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -109,6 +113,12 @@ class AcceptTransferPreapprovalProposalTrigger(
       )
       for {
         validatorWallet <- ValidatorUtil.getValidatorWallet(store, walletManager)
+        commandPriority <- TopupUtil.commandPriorityForTopupFunds( // new
+          scanConnection,
+          validatorWallet.store,
+          validatorTopupConfig,
+          clock,
+        )
         result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverParty) flatMap {
           // Expired pre-approvals are ignored: the receiver cannot be paid through them anymore
           // and they may stick around for a while until the SV automation archives them.
@@ -127,6 +137,7 @@ class AcceptTransferPreapprovalProposalTrigger(
             validatorWallet.treasury
               .enqueueAmuletOperation(
                 operation,
+                priority = commandPriority,
                 dedup = Some(AmuletOperationDedupConfig(commandId, DedupOffset(offset))).filter(_ =>
                   transferPreapprovalConfig.proposalAcceptanceDeduplication
                 ),
