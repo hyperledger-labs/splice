@@ -385,7 +385,7 @@ class HttpWalletHandler(
     if (userWallet.store.key.endUserParty != userWallet.store.key.validatorParty)
       Future.successful(CommandPriority.Low)
     else
-      TopupUtil.highCommandPriorityWhenLowTraffic(
+      TopupUtil.highPriorityIncreaseBalanceForTopup(
         scanConnection,
         userWallet.store,
         validatorTopupConfig,
