@@ -6,7 +6,6 @@ module Splice.ExternalPartyAmuletRules where
 
 import DA.Action
 import DA.Assert
-import DA.Fail (failWithStatus)
 import DA.Foldable (forA_)
 import DA.Optional
 import qualified DA.TextMap as TextMap
@@ -30,7 +29,7 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
-import Splice.DecentralizedSynchronizer (parseTrafficPurchaseMemo)
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
 import Splice.Types
 import Splice.Util
 
@@ -401,19 +400,25 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
 
   if transfer.receiver == trafficPurchaseReceiver then do
     -- TODO(#7561): accept a RegisteredSynchronizer to support dedicated synchronizers.
-    purchase <- case parseTrafficPurchaseMemo transfer.sender (reasonFromMeta transfer.meta) of
+    purchaseMemo <- case parseTrafficPurchaseMemo (reasonFromMeta transfer.meta) of
       Left err -> fail err
-      Right purchase -> pure purchase
+      Right memo -> pure memo
     trafficConfig <- case trafficPurchaseConfigFromConfigState configState of
       None -> fail "The referenced ExternalPartyConfigState carries no traffic purchase configuration"
       Some trafficConfig -> pure trafficConfig
     paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context
     csum <- summarizeAndValidateExternalPartyContext paymentContext dso transfer.sender
-    let (trafficCostAmulet, _) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
-    when (trafficCostAmulet > transfer.amount) $
-      failWithStatus $ mkTrafficCostExceedsAmountFailure trafficCostAmulet transfer.amount
+    require "Traffic price must be positive" (trafficConfig.trafficPrice > 0.0)
+    let trafficCostUsd = transfer.amount * csum.amuletPrice
+        purchase = MemberTrafficPurchase with
+          provider = transfer.sender
+          memberId = purchaseMemo.memberId
+          synchronizerId = purchaseMemo.synchronizerId
+          migrationId = purchaseMemo.migrationId
+          trafficAmount = floor (transfer.amount * csum.amuletPrice * 1e6 / trafficConfig.trafficPrice)
     inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
-    result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase inputs
+    result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase
+      (transfer.amount, trafficCostUsd) inputs
       SkipValidatorRewardCoupon
     pure Api.Token.TransferInstructionV1.TransferInstructionResult with
       senderChangeCids = toInterfaceContractId <$> optionalToList result.transferResult.senderChangeAmulet

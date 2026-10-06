@@ -310,14 +310,15 @@ template AmuletRules
         contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch provider)
         csum <- summarizeAndValidateContext eventLogCid context dso
           (getDevelopmentFundManagerBlacklist configUsd) provider provider
-        result <- buyMemberTraffic eventLogCid csum
-          (trafficPurchaseConfigFromAmuletConfig configUsd contextMiningRound)
+        let trafficConfig = trafficPurchaseConfigFromAmuletConfig configUsd contextMiningRound
+        result <- buyMemberTraffic eventLogCid csum trafficConfig
           MemberTrafficPurchase with
             provider
             memberId
             synchronizerId
             migrationId
             trafficAmount
+          (trafficCost trafficConfig csum.amuletPrice trafficAmount)
           inputs
           IssueValidatorRewardCoupon
         return AmuletRules_BuyMemberTrafficResult with
@@ -1110,21 +1111,6 @@ mkInsufficientTopupAmountFailure requestedAmount minAmount =
       , ("minTopupAmount", show minAmount)
       ])
 
-mkTrafficCostExceedsAmountFailure : Decimal -> Decimal -> FailureStatus
-mkTrafficCostExceedsAmountFailure trafficCostAmulet maxAmount =
-  mkFailureStatus
-    (spliceErrorId "traffic-cost-exceeds-amount")
-    InvalidGivenCurrentSystemStateOther
-    ("The traffic costs "
-      <> show trafficCostAmulet
-      <> " amulet, which exceeds the maximum amount of "
-      <> show maxAmount
-      <> " amulet the transfer allows to be spent.")
-    (TextMap.fromList
-      [ ("trafficCostAmulet", show trafficCostAmulet)
-      , ("maxAmount", show maxAmount)
-      ])
-
 mkMaximumInputsExceededFailure : FailureStatus
 mkMaximumInputsExceededFailure =
   mkFailureStatus
@@ -1840,14 +1826,13 @@ validateBuyMemberTrafficInputs trafficConfig synchronizerId trafficAmount
 -- | Burn amulet to buy extra traffic on a synchronizer.
 buyMemberTraffic
   : ContractId TransferEventsV2.EventLog -> TransferContextSummaryV2 -> TrafficPurchaseConfig
-  -> MemberTrafficPurchase -> [TransferInput] -> BurnRewardPolicy -> Update MemberTrafficPurchaseResult
-buyMemberTraffic eventLogCid csum trafficConfig purchase inputs burnRewardPolicy = do
+  -> MemberTrafficPurchase -> (Decimal, Decimal) -> [TransferInput] -> BurnRewardPolicy -> Update MemberTrafficPurchaseResult
+buyMemberTraffic eventLogCid csum trafficConfig purchase (trafficCostAmulet, trafficCostUsd) inputs burnRewardPolicy = do
   case validateBuyMemberTrafficInputs trafficConfig purchase.synchronizerId purchase.trafficAmount of
     Left failureStatus -> failWithStatus failureStatus
     Right _ -> pure ()
-  let (trafficCostAmulet, trafficCostUsd) = trafficCost trafficConfig csum.amuletPrice purchase.trafficAmount
   (transferResult, meta) <-
-    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs ("traffic purchase: " <> trafficPurchaseMemo purchase) burnRewardPolicy
+    splitAndBurn' eventLogCid csum purchase.provider trafficCostAmulet inputs (trafficPurchaseReason purchase) burnRewardPolicy
   -- create a new MemberTraffic contract for the purchased traffic
   purchasedTraffic <- create MemberTraffic with
     dso = csum.dso

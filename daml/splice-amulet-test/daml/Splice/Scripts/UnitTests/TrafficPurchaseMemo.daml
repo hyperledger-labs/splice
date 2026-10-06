@@ -8,7 +8,7 @@ import DA.Assert ((===))
 
 import Daml.Script
 
-import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo, trafficPurchaseMemo)
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), TrafficPurchaseMemo(..), parseTrafficPurchaseMemo, trafficPurchaseReason)
 
 sender : Party
 sender =
@@ -21,52 +21,53 @@ testMemberId = "PAR::alice-participant::1220abcd"
 testSynchronizerId : Text
 testSynchronizerId = "decentralized-synchronizer-id-0"
 
-expectedPurchase : MemberTrafficPurchase
-expectedPurchase = MemberTrafficPurchase with
-  provider = sender
+expectedMemo : TrafficPurchaseMemo
+expectedMemo = TrafficPurchaseMemo with
   memberId = testMemberId
   synchronizerId = testSynchronizerId
   migrationId = 3
-  trafficAmount = 1_000_000
 
 completeMemo : Text
 completeMemo =
   "memberId=" <> testMemberId <>
   "&synchronizerId=" <> testSynchronizerId <>
-  "&migrationId=3" <>
-  "&trafficAmount=1000000"
+  "&migrationId=3"
 
-parse : Text -> Either Text MemberTrafficPurchase
-parse = parseTrafficPurchaseMemo sender
+parse : Text -> Either Text TrafficPurchaseMemo
+parse = parseTrafficPurchaseMemo
 
-isRejected : Either Text MemberTrafficPurchase -> Bool
+isRejected : Either Text TrafficPurchaseMemo -> Bool
 isRejected result = case result of
   Left _ -> True
   Right _ -> False
 
 test_parseMemo_complete : Script ()
 test_parseMemo_complete = script do
-  parse completeMemo === Right expectedPurchase
+  parse completeMemo === Right expectedMemo
 
-test_formatMemo_isCanonicalAndRoundTrips : Script ()
-test_formatMemo_isCanonicalAndRoundTrips = script do
-  trafficPurchaseMemo expectedPurchase === completeMemo
-  parse (trafficPurchaseMemo expectedPurchase) === Right expectedPurchase
+test_trafficPurchaseReason_includesPurchasedTraffic : Script ()
+test_trafficPurchaseReason_includesPurchasedTraffic = script do
+  let purchase = MemberTrafficPurchase with
+        provider = sender
+        memberId = testMemberId
+        synchronizerId = testSynchronizerId
+        migrationId = 3
+        trafficAmount = 1_000_000
+  trafficPurchaseReason purchase ===
+    "traffic purchase: " <> completeMemo <> ", purchased traffic amount: 1000000 bytes"
 
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
   let reordered =
-        "trafficAmount=1000000" <>
-        "&migrationId=3" <>
+        "migrationId=3" <>
         "&synchronizerId=" <> testSynchronizerId <>
         "&memberId=" <> testMemberId
-  parse reordered === Right expectedPurchase
+  parse reordered === Right expectedMemo
 
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
-  assertMsg "missing trafficAmount is rejected" $
-    isRejected $ parse $
-      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=3"
+  parse ("memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
+    Left "Missing key in traffic purchase memo: migrationId"
 
 test_parseMemo_rejectsUnknownKey : Script ()
 test_parseMemo_rejectsUnknownKey = script do
@@ -80,16 +81,12 @@ test_parseMemo_rejectsMalformedField : Script ()
 test_parseMemo_rejectsMalformedField = script do
   assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
   assertMsg "field with two separators is rejected" $
-    isRejected $ parse $ "memberId=a=b&synchronizerId=s&migrationId=0&trafficAmount=1"
+    isRejected $ parse $ "memberId=a=b&synchronizerId=s&migrationId=0"
   assertMsg "empty memo is rejected" $ isRejected $ parse ""
 
 test_parseMemo_rejectsNonIntegerValues : Script ()
 test_parseMemo_rejectsNonIntegerValues = script do
-  assertMsg "non-integer trafficAmount is rejected" $
-    isRejected $ parse $
-      "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
-      "&migrationId=3&trafficAmount=1MB"
   assertMsg "non-integer migrationId is rejected" $
     isRejected $ parse $
       "memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
-      "&migrationId=latest&trafficAmount=1000000"
+      "&migrationId=latest"
