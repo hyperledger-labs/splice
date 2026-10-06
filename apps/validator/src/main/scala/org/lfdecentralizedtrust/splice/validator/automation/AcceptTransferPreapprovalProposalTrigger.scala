@@ -113,7 +113,7 @@ class AcceptTransferPreapprovalProposalTrigger(
       )
       for {
         validatorWallet <- ValidatorUtil.getValidatorWallet(store, walletManager)
-        commandPriority <- TopupUtil.commandPriorityForTopupFunds( // new
+        commandPriority <- TopupUtil.highCommandPriorityWhenLowTraffic( // new
           scanConnection,
           validatorWallet.store,
           validatorTopupConfig,

@@ -65,7 +65,7 @@ class AutoAcceptTransferOffersTrigger(
         commandPriority <- validatorTopupConfigO match {
           case None => Future.successful(CommandPriority.Low)
           case Some(validatorTopupConfig) =>
-            TopupUtil.commandPriorityForTopupFunds(
+            TopupUtil.highCommandPriorityWhenLowTraffic(
               scanConnection,
               store,
               validatorTopupConfig,

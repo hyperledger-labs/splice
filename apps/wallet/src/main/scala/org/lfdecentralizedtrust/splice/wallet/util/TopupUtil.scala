@@ -73,7 +73,7 @@ object TopupUtil {
     }
   }
 
-  def commandPriorityForTopupFunds(
+  def highCommandPriorityWhenLowTraffic(
       scanConnection: ScanConnection,
       validatorWalletStore: UserWalletStore,
       validatorTopupConfig: ValidatorTopupConfig,
