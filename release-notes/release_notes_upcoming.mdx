@@ -36,8 +36,8 @@
   - Daml
 
     - **Implement traffic purchases via token standard transfers:** a V1 or V2 token standard transfer to the receiver party
-      `cip-xxx_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd`
-      with the memo set to `memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>`
+      `cip-0128_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd`
+      with the memo set to `cip-0128/memo:memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>`
       burns the full transfer `amount` and creates a `MemberTraffic` contract instead of transferring amulet.
       The purchased traffic is calculated from the referenced configuration prices and rounded down to whole bytes.
       Any sub-byte remainder is also burned. Purchases below the minimum traffic top-up amount are rejected.
