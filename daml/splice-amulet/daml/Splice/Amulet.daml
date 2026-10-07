@@ -332,6 +332,13 @@ data FeaturedAppConfig = FeaturedAppConfig with
       -- If not set, use the default value of []
   deriving (Eq, Show, Serializable)
 
+validFeaturedAppRight : FeaturedAppRight -> Bool
+validFeaturedAppRight FeaturedAppRight{..} =
+  0.0 <= fromOptional defaultAppActivityWeight activityWeight
+  && unique ops
+  && provider `notElem` ops
+  where ops = fromOptional defaultOpsParties opsParties
+
 -- | The right for an application provider to earn featured app rewards.
 template FeaturedAppRight with
     dso : Party
@@ -353,8 +360,7 @@ template FeaturedAppRight with
   where
     signatory dso
     observer provider
-    ensure 0.0 <= fromOptional defaultAppActivityWeight activityWeight
-      -- FIXME: config validation
+    ensure validFeaturedAppRight this
 
     -- TODO(tech-debt): Remove this choice once the UI is fully switched over to FeaturedAppRight_UpdateConfig
     choice FeaturedAppRight_Update : FeaturedAppRight_UpdateResult
