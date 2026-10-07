@@ -1191,7 +1191,8 @@ voteFeaturedAppConfigUpdateInstruction app svs provider baseConfig newConfig = d
     dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
       provider
       update = FeaturedAppRight_UpdateConfig with baseConfig; newConfig
-  instructions <- queryFilter @FeaturedAppConfigUpdateInstruction app.dso (\i -> i.provider == provider)
+      additionalUpdates = []
+  instructions <-queryFilter @FeaturedAppConfigUpdateInstruction app.dso (\i -> i.provider == provider)
   [(instructionCid, instruction)] <- pure $ filter (\(cid, _) -> cid `notElem` existing) instructions
   instruction.update.newConfig === newConfig
   pure instructionCid
@@ -1237,6 +1238,47 @@ testFeaturedAppConfigUpdate = do
 
   -- the instruction is consumed
   [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
+  pure ()
+
+testFeaturedAppConfigUpdateMultiple : Script ()
+testFeaturedAppConfigUpdateMultiple = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  provider1 <- allocateParty "provider1"
+  provider2 <- allocateParty "provider2"
+  provider3 <- allocateParty "provider3"
+  (rightCid1, right1) <- grantFeaturedAppRightForConfigTest app svs provider1
+  (rightCid2, _) <- grantFeaturedAppRightForConfigTest app svs provider2
+  (rightCid3, _) <- grantFeaturedAppRightForConfigTest app svs provider3
+
+  -- a single vote creates one instruction per (provider, update) pair
+  let baseConfig = getFeaturedAppConfig right1
+      newConfig1 = baseConfig with appKind = Some FAK_Asset
+      newConfig2 = baseConfig with activityWeight = Some 2.0
+      newConfig3 = baseConfig with appKind = Some FAK_AssetMoving
+  initiateAndAcceptVote app svs $ ARC_DsoRules with
+    dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
+      provider = provider1
+      update = FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig1
+      additionalUpdates =
+        [ (provider2, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig2)
+        , (provider3, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig3)
+        ]
+
+  let executeFor provider rightCid expectedConfig = do
+        [(instructionCid, _)] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
+        _ <- svSubmits app sv1 $ \dsoRulesCid ->
+          exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppConfigUpdateInstruction with
+            instructionCid; rightCid; sv = sv1
+        [(_, updatedRight)] <- query @FeaturedAppRight provider
+        getFeaturedAppConfig updatedRight === expectedConfig
+
+  -- each instruction may be executed in any order
+  executeFor provider3 rightCid3 newConfig3
+  executeFor provider1 rightCid1 newConfig1
+  executeFor provider2 rightCid2 newConfig2
+
+  [] <- query @FeaturedAppConfigUpdateInstruction dso
   pure ()
 
 testFeaturedAppConfigUpdatePatch : Script ()
