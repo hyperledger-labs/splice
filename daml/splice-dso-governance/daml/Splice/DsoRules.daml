@@ -241,6 +241,7 @@ data DsoRules_UpdateFeaturedAppRightResult = DsoRules_UpdateFeaturedAppRightResu
 
 data DsoRules_CreateFeaturedAppConfigUpdateInstructionResult = DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
     instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+    additionalInstructionCids : [ContractId FeaturedAppConfigUpdateInstruction]
   deriving (Serializable)
 
 data DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult = DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with
@@ -1121,12 +1122,20 @@ template DsoRules with
       with
         provider : Party
         update : FeaturedAppRight_UpdateConfig
+        additionalUpdates : [(Party, FeaturedAppRight_UpdateConfig)]
       controller dso
       do
         instructionCid <- create FeaturedAppConfigUpdateInstruction with
           dso; provider; update
+        -- We don't check for duplicate provider here as that would prevent vote execution.
+        -- The sequence of execution of update instructions is not guaranteed,
+        -- and thus more than one update for a provider should be avoided.
+        additionalInstructionCids <- forA additionalUpdates $ \(provider, update) ->
+          create FeaturedAppConfigUpdateInstruction with
+            dso; provider; update
         pure DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
           instructionCid
+          additionalInstructionCids
 
     nonconsuming choice DsoRules_ExecuteFeaturedAppConfigUpdateInstruction : DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult
       with
