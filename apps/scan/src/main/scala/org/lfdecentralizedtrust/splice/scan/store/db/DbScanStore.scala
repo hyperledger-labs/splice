@@ -499,7 +499,7 @@ class DbScanStore(
   override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
-    NonEmpty.from(validators) match {
+    NonEmpty.from(validators.distinct) match {
       case None => Future.successful(Seq.empty)
       case Some(validators) =>
         val validatorPartyIds = DbStorage.toInClause("validator", validators)
@@ -512,11 +512,12 @@ class DbScanStore(
                 domainMigrationId,
                 ValidatorLicense.COMPANION,
                 where = validatorPartyIds,
+                orderLimit = sql"limit ${sqlLimit(defaultLimit)}",
               ),
               "getValidatorLicenseByValidator",
             )
         } yield {
-          rows
+          applyLimit("getValidatorLicenseByValidator", defaultLimit, rows)
             .map(
               contractFromRow(ValidatorLicense.COMPANION)(_)
             )

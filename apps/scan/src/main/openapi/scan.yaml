@@ -66,6 +66,7 @@ paths:
             type: array
             items:
               type: string
+            maxItems: 1000
       responses:
         "200":
           description: ok
