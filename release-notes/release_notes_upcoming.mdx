@@ -12,6 +12,8 @@
       - `/v0/holdings/summary`, `/v1/holdings/summary`: `owner_party_ids`
       - `/v0/voterequest`: `vote_request_contract_ids`
 
+    - The `validator_ids` query parameter of `/v0/validators/validator-faucets` now has a `maxItems` bound of 1000; requests exceeding it are rejected with 400.
+
   - SV App
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
