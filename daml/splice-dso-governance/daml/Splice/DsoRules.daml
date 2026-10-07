@@ -248,6 +248,9 @@ data DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult = DsoRules_Execute
     result : FeaturedAppRight_UpdateConfigResult
   deriving (Serializable)
 
+data DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult = DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
+  deriving (Serializable)
+
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
     validatorLicense : ContractId ValidatorLicense
   deriving (Serializable)
@@ -1125,14 +1128,16 @@ template DsoRules with
         additionalUpdates : [(Party, FeaturedAppRight_UpdateConfig)]
       controller dso
       do
+        now <- getTime
+        let expiresAt = now `addRelTime` config.voteRequestTimeout
         instructionCid <- create FeaturedAppConfigUpdateInstruction with
-          dso; provider; update
+          dso; provider; update; expiresAt
         -- We don't check for duplicate provider here as that would prevent vote execution.
         -- The sequence of execution of update instructions is not guaranteed,
         -- and thus more than one update for a provider should be avoided.
         additionalInstructionCids <- forA additionalUpdates $ \(provider, update) ->
           create FeaturedAppConfigUpdateInstruction with
-            dso; provider; update
+            dso; provider; update; expiresAt
         pure DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
           instructionCid
           additionalInstructionCids
@@ -1149,6 +1154,17 @@ template DsoRules with
         void $ fetchChecked (ForOwner with dso; owner = instruction.provider) rightCid
         result <- exercise rightCid instruction.update
         pure DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with result
+
+    nonconsuming choice DsoRules_ExpireFeaturedAppConfigUpdateInstruction : DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
+      with
+        instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso dso) instructionCid
+        void $ exercise instructionCid FeaturedAppConfigUpdateInstruction_Expire
+        pure DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
 
 
     -- Validator onboarding

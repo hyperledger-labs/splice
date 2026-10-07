@@ -1281,6 +1281,39 @@ testFeaturedAppConfigUpdateMultiple = do
   [] <- query @FeaturedAppConfigUpdateInstruction dso
   pure ()
 
+-- The instruction can be expired if SVs are not able to execute it
+testFeaturedAppConfigUpdateInstructionExpiry : Script ()
+testFeaturedAppConfigUpdateInstructionExpiry = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  -- Create wrong instruction where provider does not even have a featured app right
+  let baseConfig = FeaturedAppConfig with appKind = None; activityWeight = None; opsParties = None
+  instructionCid <- voteFeaturedAppConfigUpdateInstruction app svs dso
+    baseConfig (baseConfig with activityWeight = Some 2.0)
+  now <- getTime
+  Some instruction <- queryContractId dso instructionCid
+  instruction.expiresAt === now `addRelTime` dsoRules.config.voteRequestTimeout
+
+  -- cannot be expired before expiresAt
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = sv1
+
+  passTime dsoRules.config.voteRequestTimeout
+
+  -- only SVs can expire it
+  submitMustFail (actAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = dso
+  _ <- svSubmits app sv2 $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = sv2
+
+  [] <- query @FeaturedAppConfigUpdateInstruction dso
+  pure ()
+
 testFeaturedAppConfigUpdatePatch : Script ()
 testFeaturedAppConfigUpdatePatch = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
