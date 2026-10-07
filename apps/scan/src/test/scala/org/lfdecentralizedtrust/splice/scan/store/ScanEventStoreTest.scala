@@ -6,6 +6,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
   HistoryMetrics,
   PageLimit,
   StoreTestBase,
@@ -917,6 +918,43 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         latest <- ctx.eventStore.getLatestEventRecordTime(domainMigrationId)(traceContext)
       } yield {
         latest shouldBe None
+      }
+    }
+  }
+
+  "DbScanVerdictStore.listTransactionViews" should {
+
+    "return a verdict's views in view_id order, failing past the limit" in {
+      for {
+        ctx <- newEventStore()
+        verdictStore = ctx.verdictStore
+        _ <- verdictStore.insertVerdictAndTransactionViews(
+          Seq(
+            mkVerdict(verdictStore, "update1", CantonTimestamp.MinValue.plusSeconds(1L)) -> {
+              (rowId: Long) =>
+                Seq(2, 0, 1).map(viewId =>
+                  new verdictStore.TransactionViewT(
+                    verdictRowId = rowId,
+                    viewId = viewId,
+                    informees = Seq(dsoParty.toProtoPrimitive),
+                    confirmingParties = Json.arr(),
+                    subViews = Seq.empty,
+                  )
+                )
+            }
+          )
+        )
+        verdict <- verdictStore.getVerdictByUpdateId("update1")
+        rowId = verdict.value.rowId
+        all <- verdictStore.listTransactionViews(rowId)
+        atLimit <- verdictStore.listTransactionViews(rowId, HardLimit.tryCreate(3))
+        overLimit <- verdictStore.listTransactionViews(rowId, HardLimit.tryCreate(2)).failed
+      } yield {
+        all.map(_.viewId) shouldBe Seq(0, 1, 2)
+        atLimit shouldBe all
+        overLimit.getMessage should include(
+          "Size of the result exceeded the limit in scanVerdict.listTransactionViews"
+        ).and(include("Result size: 3. Limit: 2"))
       }
     }
   }

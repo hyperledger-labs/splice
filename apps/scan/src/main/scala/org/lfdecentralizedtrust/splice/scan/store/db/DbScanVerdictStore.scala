@@ -27,7 +27,13 @@ import slick.dbio.DBIO
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
-import org.lfdecentralizedtrust.splice.store.{TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  LimitHelpers,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 
 object DbScanVerdictStore {
@@ -238,6 +244,14 @@ object DbScanVerdictStore {
     (row, mkViews)
   }
 
+  /** Defensive cap on the views read back for a single verdict; exceeding it fails the read
+    * rather than returning incomplete views. Canton's view-count limits are not enforced on PV 35
+    * and are far higher on PV 36, but the mediator's informee tree takes at least 108 bytes per
+    * view, so the default 10 MiB request and decompression limits allow at most
+    * (10 MiB + 4) / 108 = 97,090 views. Revisit this if a synchronizer raises those limits.
+    */
+  val MaxTransactionViewsPerVerdict: HardLimit = HardLimit.tryCreate(100000, 100000)
+
   def apply(
       storage: com.digitalasset.canton.resource.DbStorage,
       updateHistory: UpdateHistory,
@@ -263,7 +277,8 @@ class DbScanVerdictStore(
     with org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
     with FlagCloseable
     with HasCloseContext
-    with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
+    with org.lfdecentralizedtrust.splice.store.db.AcsQueries
+    with LimitHelpers { self =>
 
   private implicit val dbProfile: DbStorage.Profile = storage.profile
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
@@ -672,11 +687,15 @@ class DbScanVerdictStore(
     storage.query(finalQuery, "scanVerdict.listVerdicts")
   }
 
-  def listTransactionViews(verdictRowId: Long)(implicit
+  def listTransactionViews(
+      verdictRowId: Long,
+      limit: Limit = DbScanVerdictStore.MaxTransactionViewsPerVerdict,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[TransactionViewT]] = {
-    storage.query(
-      sql"""
+    storage
+      .query(
+        sql"""
            select
              verdict_row_id,
              view_id,
@@ -686,9 +705,11 @@ class DbScanVerdictStore(
            from #${Tables.views}
            where verdict_row_id = $verdictRowId
            order by view_id asc
+           limit ${sqlLimit(limit)}
          """.as[TransactionViewT],
-      "scanVerdict.listTransactionViews",
-    )
+        "scanVerdict.listTransactionViews",
+      )
+      .map(applyLimitOrFail("scanVerdict.listTransactionViews", limit, _))
   }
 
   def maxVerdictRecordTime(migrationId: Long)(implicit
