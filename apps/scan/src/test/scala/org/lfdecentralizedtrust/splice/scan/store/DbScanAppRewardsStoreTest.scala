@@ -1074,6 +1074,23 @@ class DbScanAppRewardsStoreTest
         childHashes shouldBe level0Hashes
       }
     }
+
+    "internal batch with more children than maxChildBatches warns and truncates" in {
+      for {
+        // 4 parties / batchSize=2 -> 2 level-0 batches -> root is 1 level-1 batch
+        (store, batchHashes, rootHash) <- setupAndComputeHashes(partyCount = 4, batchSize = 2)
+        result <- loggerFactory.assertLogs(
+          store.lookupBatchByHash(roundNumber, rootHash, maxChildBatches = 1),
+          _.warningMessage should include(
+            "Size of the result exceeded the limit in appRewards.lookupBatchByHash.children"
+          ).and(include("Result size: 2. Limit: 1")),
+        )
+      } yield {
+        result.value shouldBe DbScanAppRewardsStore.BatchOfBatches(
+          batchHashes.filter(_.batchLevel == 0).map(_.batchHash).take(1)
+        )
+      }
+    }
   }
 
   "deleteRewardAccountingDataForRound" should {
