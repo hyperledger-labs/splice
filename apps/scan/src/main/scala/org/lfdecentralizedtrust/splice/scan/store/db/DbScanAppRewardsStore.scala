@@ -688,7 +688,9 @@ class DbScanAppRewardsStore(
         (for {
           _ <- aggregateActivityTotalsAction(roundNumber)
           totalWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
-          params = inputs.deriveIssuanceParams(totalWeight)
+          // Asset-side total is wired in once per-verdict aggregation is in place;
+          // zero is a safe placeholder (asset issuance arithmetic falls through to zero).
+          params = inputs.deriveIssuanceParams(totalWeight, BigDecimal(0))
           _ <- computeRewardTotalsAction(roundNumber, params)
           _ <- assertMintingAllowanceWithinMintingCurve(roundNumber, params)
           _ <- computeRewardHashesAction(roundNumber, batchSize)

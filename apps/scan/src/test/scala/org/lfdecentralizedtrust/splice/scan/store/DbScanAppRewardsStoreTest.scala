@@ -1471,6 +1471,9 @@ object DbScanAppRewardsStoreTest {
       amuletPrice = n(BigDecimal("1.0")),
       trafficPrice = n(BigDecimal("1.0")),
       appRewardCouponThreshold = n(BigDecimal("0.0")),
+      extraFeaturedAssetActivityWeight = n(BigDecimal("0.2")),
+      maxExtraFeaturedAssetActivityWeightPerAsset = n(BigDecimal("0.1")),
+      dsoAppActivityWeight = n(BigDecimal("0.1")),
     )
   }
 

@@ -47,7 +47,11 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDeci
 
     cases.foreach { tc =>
       tc.label in {
-        val result = tc.inputs.deriveIssuanceParams(tc.totalRoundAppActivityWeight)
+        val result =
+          tc.inputs.deriveIssuanceParams(
+            tc.totalRoundAppActivityWeight,
+            tc.totalFeaturedAssetBurnCc,
+          )
         result.issuancePerFeaturedAppTraffic_CCperMB should beEqualUpTo(
           tc.expected.issuancePerFeaturedAppTraffic_CCperMB,
           10,
@@ -59,6 +63,14 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDeci
         )
         result.unclaimedAppRewardAmount should beEqualUpTo(
           tc.expected.unclaimedAppRewardAmount,
+          10,
+        )
+        result.issuancePerFeaturedAssetBurnCC should beEqualUpTo(
+          tc.expected.issuancePerFeaturedAssetBurnCC,
+          10,
+        )
+        result.totalIssuanceForFeaturedAssetRewards should beEqualUpTo(
+          tc.expected.totalIssuanceForFeaturedAssetRewards,
           10,
         )
       }
@@ -141,6 +153,9 @@ object RewardComputationInputsTest {
     amuletPrice = n(BigDecimal("0.14877")),
     trafficPrice = n(BigDecimal("60")),
     appRewardCouponThreshold = n(BigDecimal("0.5")),
+    extraFeaturedAssetActivityWeight = n(BigDecimal("0.2")),
+    maxExtraFeaturedAssetActivityWeightPerAsset = n(BigDecimal("0.1")),
+    dsoAppActivityWeight = n(BigDecimal("0.1")),
   )
 
   /** Baseline inputs: simple round numbers for easy manual verification.
@@ -162,6 +177,9 @@ object RewardComputationInputsTest {
     amuletPrice = n(BigDecimal("1.0")),
     trafficPrice = n(BigDecimal("1.0")),
     appRewardCouponThreshold = n(BigDecimal("0.5")),
+    extraFeaturedAssetActivityWeight = n(BigDecimal("0.2")),
+    maxExtraFeaturedAssetActivityWeightPerAsset = n(BigDecimal("0.1")),
+    dsoAppActivityWeight = n(BigDecimal("0.1")),
   )
 
   case class TestCase(
@@ -169,6 +187,7 @@ object RewardComputationInputsTest {
       inputs: RewardComputationInputs,
       totalRoundAppActivityWeight: Long,
       expected: RewardIssuanceParams,
+      totalFeaturedAssetBurnCc: BigDecimal = BigDecimal(0),
   )
 
   // Test cases are grouped in pairs: MainNet-calibrated first (realistic values
@@ -348,6 +367,26 @@ object RewardComputationInputsTest {
         threshold_CC = BigDecimal("0.5"),
         totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
         unclaimedAppRewardAmount = BigDecimal("0.45"),
+      ),
+    ),
+
+    // --- 7. TBAR v1.1 asset side ---
+
+    // Simple + cap=0.1 binding, 1 MB app traffic, 0.1 CC asset burn fits within
+    // the leftover: app allocation = 0.1, leftover = 0.35, asset gets 0.1 at
+    // 1:1 CC burned → CC minted. Unclaimed = 0.45 - 0.1 - 0.1 = 0.25.
+    TestCase(
+      label = "simple+asset: cap binds, asset fits within leftover",
+      inputs = simpleArithmetic.copy(featuredAppRewardCap = n(BigDecimal("0.1"))),
+      totalRoundAppActivityWeight = 1000000L,
+      totalFeaturedAssetBurnCc = BigDecimal("0.1"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.1"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0.25"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("1"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0.1"),
       ),
     ),
   )

@@ -11,12 +11,19 @@ import scala.jdk.OptionConverters.RichOptional
 /** Derived parameters passed to computeRewardTotals.
   *
   * Fields are BigDecimal because they flow into SQL queries.
+  *
+  * Under TBAR v1.1 (CIP-104 amendment) `unclaimedAppRewardAmount` carries the
+  * round-wide unclaimed amount — app-side's unclaimed cascades into asset-side's
+  * budget before any asset allocation, so there is no separately-unclaimed
+  * app or asset portion.
   */
 final case class RewardIssuanceParams(
     issuancePerFeaturedAppTraffic_CCperMB: BigDecimal,
     threshold_CC: BigDecimal,
     totalIssuanceForFeaturedAppRewards: BigDecimal,
     unclaimedAppRewardAmount: BigDecimal,
+    issuancePerFeaturedAssetBurnCC: BigDecimal = BigDecimal(0),
+    totalIssuanceForFeaturedAssetRewards: BigDecimal = BigDecimal(0),
 )
 
 /** Raw contract inputs for app reward CC computation.
@@ -38,6 +45,9 @@ final case class RewardComputationInputs(
     amuletPrice: Numeric,
     trafficPrice: Numeric,
     appRewardCouponThreshold: Numeric,
+    extraFeaturedAssetActivityWeight: Numeric,
+    maxExtraFeaturedAssetActivityWeightPerAsset: Numeric,
+    dsoAppActivityWeight: Numeric,
 ) {
   import RewardComputationInputs.*
 
@@ -48,7 +58,10 @@ final case class RewardComputationInputs(
     sub(amuletsToIssueInRound, mul(amuletsToIssueInRound, developmentFundPercentage))
   private val trafficPriceInCCperMB: Numeric = div(trafficPrice, amuletPrice)
 
-  def deriveIssuanceParams(totalRoundAppActivityWeight: Long): RewardIssuanceParams = {
+  def deriveIssuanceParams(
+      totalRoundAppActivityWeight: Long,
+      totalFeaturedAssetBurnCc: BigDecimal,
+  ): RewardIssuanceParams = {
     val totalCoupons_CC = mul(
       div(fromLong(totalRoundAppActivityWeight), fromLong(1000000L)),
       trafficPriceInCCperMB,
@@ -59,7 +72,23 @@ final case class RewardComputationInputs(
       capPerCoupon = featuredAppRewardCap,
       totalCoupons = totalCoupons_CC,
     )
-    val unclaimed = sub(rewardsToIssue, mul(issuancePerCoupon, totalCoupons_CC))
+    val featuredAppMintingAllowanceCC = mul(issuancePerCoupon, totalCoupons_CC)
+
+    // Asset side (CIP-104 amendment): asset gets the leftover after app
+    // allocation, capped at the actual asset-side CC burn. Clamp the leftover
+    // to zero to guard against negative drift from the computeIssuanceTranche
+    // mul-then-div chain when the cap does not bind.
+    val totalFeaturedAssetBurnCC_num = fromBigDecimal(totalFeaturedAssetBurnCc)
+    val assetBudgetRaw = sub(rewardsToIssue, featuredAppMintingAllowanceCC)
+    val assetBudgetCC = if (assetBudgetRaw.compareTo(zero) < 0) zero else assetBudgetRaw
+    val featuredAssetMintingAllowanceCC =
+      if (totalFeaturedAssetBurnCC_num.compareTo(assetBudgetCC) < 0) totalFeaturedAssetBurnCC_num
+      else assetBudgetCC
+    val issuancePerFeaturedAssetBurnCC_num =
+      computeAssetIssuanceRate(featuredAssetMintingAllowanceCC, totalFeaturedAssetBurnCC_num)
+
+    val unclaimed =
+      sub(sub(rewardsToIssue, featuredAppMintingAllowanceCC), featuredAssetMintingAllowanceCC)
 
     // Convert Numeric → BigDecimal at the output boundary for SQL
     RewardIssuanceParams(
@@ -68,6 +97,8 @@ final case class RewardComputationInputs(
       threshold_CC = BigDecimal(div(appRewardCouponThreshold, amuletPrice)),
       totalIssuanceForFeaturedAppRewards = BigDecimal(rewardsToIssue),
       unclaimedAppRewardAmount = BigDecimal(if (unclaimed.compareTo(zero) < 0) zero else unclaimed),
+      issuancePerFeaturedAssetBurnCC = BigDecimal(issuancePerFeaturedAssetBurnCC_num),
+      totalIssuanceForFeaturedAssetRewards = BigDecimal(featuredAssetMintingAllowanceCC),
     )
   }
 
@@ -92,6 +123,16 @@ final case class RewardComputationInputs(
       div(mul(cappedRewardsToIssue, capPerCoupon), scaledTotalCoupons)
     }
   }
+
+  /** Zero-guarded CC-per-CC-burned rate for featured-asset issuance.
+    * Matches the inline zero-guard precedent of computeIssuanceTranche.
+    */
+  private def computeAssetIssuanceRate(
+      assetMintingAllowance: Numeric,
+      totalAssetBurn: Numeric,
+  ): Numeric =
+    if (totalAssetBurn.compareTo(zero) <= 0) zero
+    else div(assetMintingAllowance, totalAssetBurn)
 }
 
 object RewardComputationInputs {
@@ -131,6 +172,10 @@ object RewardComputationInputs {
         amuletPrice = fromBigDecimal(round.amuletPrice),
         trafficPrice = fromBigDecimal(trafficPrice),
         appRewardCouponThreshold = fromBigDecimal(rewardConfig.appRewardCouponThreshold),
+        // TODO(#7627): read from rewardConfig once the daml PR adds these fields.
+        extraFeaturedAssetActivityWeight = fromBigDecimal(BigDecimal("0.2")),
+        maxExtraFeaturedAssetActivityWeightPerAsset = fromBigDecimal(BigDecimal("0.1")),
+        dsoAppActivityWeight = fromBigDecimal(BigDecimal("0.1")),
       )
       (inputs, rewardConfig.batchSize.toInt)
     }
