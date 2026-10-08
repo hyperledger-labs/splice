@@ -3746,6 +3746,9 @@ components:
         app_activity_records:
           $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
+        asset_activity_records:
+          $ref: "#/components/schemas/EventHistoryAssetActivityRecords"
+          nullable: true
     EventLatestRecordTimeResponse:
       type: object
       required:
@@ -3948,6 +3951,42 @@ components:
         party:
           description: |
             The app provider party identifier.
+          type: string
+        weight:
+          description: |
+            Activity weight in bytes of traffic.
+          type: integer
+          format: int64
+    EventHistoryAssetActivityRecords:
+      type: object
+      description: |
+        Asset activity record computed from verdicts and traffic summaries.
+      required:
+        - round_number
+        - records
+      properties:
+        round_number:
+          description: |
+            The round number assigned to the activity records.
+          type: integer
+          format: int64
+        records:
+          description: |
+            Asset activity records, one per asset provider.
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetActivityRecord"
+    AssetActivityRecord:
+      type: object
+      description: |
+        ActivityRecord for an asset provider.
+      required:
+        - party
+        - weight
+      properties:
+        party:
+          description: |
+            The asset provider party identifier.
           type: string
         weight:
           description: |
