@@ -174,6 +174,23 @@ trait AcsJdbcTypes extends JdbcTypes {
   protected implicit lazy val stringSeqOptGetResult: GetResult[Option[Seq[String]]] =
     stringArrayOptGetResult.andThen(_.map(_.toSeq))
 
+  protected implicit lazy val longArrayOptGetResult: GetResult[Option[Array[Long]]] =
+    (r: PositionedResult) => {
+      Option(r.rs.getArray(r.skip.currentPos)).map {
+        _.getArray match {
+          case arr: Array[java.lang.Long] => arr.map(_.longValue())
+          case arr: Array[Long] => arr
+          case x =>
+            throw new IllegalStateException(
+              s"Expected an optional array of longs, but got $x. Are you sure you selected a bigint array column?"
+            )
+        }
+      }
+    }
+
+  protected implicit lazy val longSeqOptGetResult: GetResult[Option[Seq[Long]]] =
+    longArrayOptGetResult.andThen(_.map(_.toSeq))
+
   protected implicit lazy val intSeqSetParameter: SetParameter[Seq[Int]] =
     (ints: Seq[Int], pp: PositionedParameters) =>
       DbParameterUtils.setArrayIntOParameterDb(Some(ints.toArray), pp)

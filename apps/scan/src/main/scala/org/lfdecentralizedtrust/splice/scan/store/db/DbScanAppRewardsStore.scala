@@ -39,6 +39,8 @@ object DbScanAppRewardsStore {
       totalAppActivityWeight: Long,
       appProviderParty: String,
       numActivityRecords: Long,
+      totalAssetActivityWeightCc: BigDecimal = BigDecimal(0),
+      numAssetActivityRecords: Long = 0L,
   )
 
   final case class AppActivityRoundTotalT(
@@ -47,6 +49,8 @@ object DbScanAppRewardsStore {
       totalRoundAppActivityWeight: Long,
       activeAppProviderPartiesCount: Long,
       activityRecordsCount: Long,
+      activeAssetProviderPartiesCount: Long = 0L,
+      totalRoundAssetActivityWeight: Long = 0L,
   )
 
   final case class AppRewardPartyTotalT(
@@ -55,6 +59,7 @@ object DbScanAppRewardsStore {
       appProviderPartySeqNum: Int,
       appProviderParty: String,
       totalAppRewardAmount: BigDecimal,
+      totalAssetRewardAmount: BigDecimal = BigDecimal(0),
   )
 
   final case class AppRewardRoundTotalT(
@@ -64,6 +69,10 @@ object DbScanAppRewardsStore {
       totalAppRewardThresholded: BigDecimal,
       totalAppRewardUnclaimed: BigDecimal,
       rewardedAppProviderPartiesCount: Long,
+      totalAssetRewardMintingAllowance: BigDecimal = BigDecimal(0),
+      totalAssetRewardThresholded: BigDecimal = BigDecimal(0),
+      rewardedAssetProviderPartiesCount: Long = 0L,
+      totalRoundAssetActivityWeightCc: BigDecimal = BigDecimal(0),
   )
 
   final case class AppRewardBatchHashT(
@@ -166,6 +175,8 @@ class DbScanAppRewardsStore(
       totalAppActivityWeight = prs.<<[Long],
       appProviderParty = prs.<<[String],
       numActivityRecords = prs.<<[Long],
+      totalAssetActivityWeightCc = prs.<<[BigDecimal],
+      numAssetActivityRecords = prs.<<[Long],
     )
   }
 
@@ -177,6 +188,8 @@ class DbScanAppRewardsStore(
       totalRoundAppActivityWeight = prs.<<[Long],
       activeAppProviderPartiesCount = prs.<<[Long],
       activityRecordsCount = prs.<<[Long],
+      activeAssetProviderPartiesCount = prs.<<[Long],
+      totalRoundAssetActivityWeight = prs.<<[Long],
     )
   }
 
@@ -188,6 +201,7 @@ class DbScanAppRewardsStore(
       appProviderPartySeqNum = prs.<<[Int],
       appProviderParty = prs.<<[String],
       totalAppRewardAmount = prs.<<[BigDecimal],
+      totalAssetRewardAmount = prs.<<[BigDecimal],
     )
   }
 
@@ -200,6 +214,10 @@ class DbScanAppRewardsStore(
       totalAppRewardThresholded = prs.<<[BigDecimal],
       totalAppRewardUnclaimed = prs.<<[BigDecimal],
       rewardedAppProviderPartiesCount = prs.<<[Long],
+      totalAssetRewardMintingAllowance = prs.<<[BigDecimal],
+      totalAssetRewardThresholded = prs.<<[BigDecimal],
+      rewardedAssetProviderPartiesCount = prs.<<[Long],
+      totalRoundAssetActivityWeightCc = prs.<<[BigDecimal],
     )
   }
 
@@ -244,12 +262,14 @@ class DbScanAppRewardsStore(
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.totalAppActivityWeight},
               ${row.appProviderParty},
-              ${row.numActivityRecords})"""
+              ${row.numActivityRecords},
+              ${row.totalAssetActivityWeightCc}, ${row.numAssetActivityRecords})"""
       })
       (sql"""insert into #${Tables.appActivityPartyTotals}(
               history_id, round_number, total_app_activity_weight,
               app_provider_party,
-              num_activity_records
+              num_activity_records,
+              total_asset_activity_weight_cc, num_asset_activity_records
             ) values """ ++ values).asUpdate
     }
   }
@@ -276,7 +296,8 @@ class DbScanAppRewardsStore(
     runQuery(
       sql"""select history_id, round_number, total_app_activity_weight,
                    app_provider_party,
-                   num_activity_records
+                   num_activity_records,
+                   total_asset_activity_weight_cc, num_asset_activity_records
             from #${Tables.appActivityPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
             order by app_provider_party
@@ -294,11 +315,13 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.totalRoundAppActivityWeight},
-              ${row.activeAppProviderPartiesCount}, ${row.activityRecordsCount})"""
+              ${row.activeAppProviderPartiesCount}, ${row.activityRecordsCount},
+              ${row.activeAssetProviderPartiesCount}, ${row.totalRoundAssetActivityWeight})"""
       })
       (sql"""insert into #${Tables.appActivityRoundTotals}(
               history_id, round_number, total_round_app_activity_weight,
-              active_app_provider_parties_count, activity_records_count
+              active_app_provider_parties_count, activity_records_count,
+              active_asset_provider_parties_count, total_round_asset_activity_weight
             ) values """ ++ values).asUpdate
     }
   }
@@ -324,7 +347,8 @@ class DbScanAppRewardsStore(
 
     runQuerySingle(
       sql"""select history_id, round_number, total_round_app_activity_weight,
-                   active_app_provider_parties_count, activity_records_count
+                   active_app_provider_parties_count, activity_records_count,
+                   active_asset_provider_parties_count, total_round_asset_activity_weight
             from #${Tables.appActivityRoundTotals}
             where history_id = $historyId and round_number = $roundNumber
             limit 1
@@ -350,11 +374,13 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.appProviderPartySeqNum},
-              ${row.appProviderParty}, ${row.totalAppRewardAmount})"""
+              ${row.appProviderParty}, ${row.totalAppRewardAmount},
+              ${row.totalAssetRewardAmount})"""
       })
       (sql"""insert into #${Tables.appRewardPartyTotals}(
               history_id, round_number, app_provider_party_seq_num,
-              app_provider_party, total_app_reward_amount
+              app_provider_party, total_app_reward_amount,
+              total_asset_reward_amount
             ) values """ ++ values).asUpdate
     }
   }
@@ -380,7 +406,8 @@ class DbScanAppRewardsStore(
 
     runQuery(
       sql"""select history_id, round_number, app_provider_party_seq_num,
-                   app_provider_party, total_app_reward_amount
+                   app_provider_party, total_app_reward_amount,
+                   total_asset_reward_amount
             from #${Tables.appRewardPartyTotals}
             where history_id = $historyId and round_number = $roundNumber
             order by app_provider_party_seq_num
@@ -399,12 +426,16 @@ class DbScanAppRewardsStore(
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber},
               ${row.totalAppRewardMintingAllowance}, ${row.totalAppRewardThresholded},
-              ${row.totalAppRewardUnclaimed}, ${row.rewardedAppProviderPartiesCount})"""
+              ${row.totalAppRewardUnclaimed}, ${row.rewardedAppProviderPartiesCount},
+              ${row.totalAssetRewardMintingAllowance}, ${row.totalAssetRewardThresholded},
+              ${row.rewardedAssetProviderPartiesCount}, ${row.totalRoundAssetActivityWeightCc})"""
       })
       (sql"""insert into #${Tables.appRewardRoundTotals}(
               history_id, round_number,
               total_app_reward_minting_allowance, total_app_reward_thresholded,
-              total_app_reward_unclaimed, rewarded_app_provider_parties_count
+              total_app_reward_unclaimed, rewarded_app_provider_parties_count,
+              total_asset_reward_minting_allowance, total_asset_reward_thresholded,
+              rewarded_asset_provider_parties_count, total_round_asset_activity_weight_cc
             ) values """ ++ values).asUpdate
     }
   }
@@ -431,7 +462,9 @@ class DbScanAppRewardsStore(
     runQuerySingle(
       sql"""select history_id, round_number,
                    total_app_reward_minting_allowance, total_app_reward_thresholded,
-                   total_app_reward_unclaimed, rewarded_app_provider_parties_count
+                   total_app_reward_unclaimed, rewarded_app_provider_parties_count,
+                   total_asset_reward_minting_allowance, total_asset_reward_thresholded,
+                   rewarded_asset_provider_parties_count, total_round_asset_activity_weight_cc
             from #${Tables.appRewardRoundTotals}
             where history_id = $historyId and round_number = $roundNumber
             limit 1

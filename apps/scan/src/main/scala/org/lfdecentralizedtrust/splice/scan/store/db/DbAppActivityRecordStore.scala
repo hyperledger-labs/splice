@@ -151,6 +151,9 @@ class DbAppActivityRecordStore(
         roundNumber = prs.<<[Long],
         appProviderParties = stringArrayGetResult(prs).toSeq,
         appActivityWeights = longArrayGetResult(prs).toSeq,
+        submittingAppProvider = prs.<<[Option[String]],
+        assetActivityProviderParties = stringSeqOptGetResult(prs).getOrElse(Seq.empty),
+        assetActivityWeights = longSeqOptGetResult(prs).getOrElse(Seq.empty),
       )
   }
 
@@ -284,7 +287,8 @@ class DbAppActivityRecordStore(
   ): Future[Option[AppActivityRecordT]] = {
     runQuerySingle(
       sql"""
-        select verdict_row_id, round_number, app_provider_parties, app_activity_weights
+        select verdict_row_id, round_number, app_provider_parties, app_activity_weights,
+               submitting_app_provider, asset_activity_provider_parties, asset_activity_weights
         from #${Tables.appActivityRecords}
         where history_id = $historyId and verdict_row_id = $verdictRowId
         limit 1
@@ -305,7 +309,8 @@ class DbAppActivityRecordStore(
             storage
               .query(
                 (sql"""
-                select verdict_row_id, round_number, app_provider_parties, app_activity_weights
+                select verdict_row_id, round_number, app_provider_parties, app_activity_weights,
+                       submitting_app_provider, asset_activity_provider_parties, asset_activity_weights
                 from #${Tables.appActivityRecords}
                 where history_id = $historyId and """ ++ DbStorage
                   .toInClause("verdict_row_id", verdictRowIds))
@@ -325,13 +330,16 @@ class DbAppActivityRecordStore(
       val values = sqlCommaSeparated(
         items.map { row =>
           sql"""($historyId, ${row.verdictRowId},
-                ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights})"""
+                ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights},
+                ${row.submittingAppProvider},
+                ${row.assetActivityProviderParties}, ${row.assetActivityWeights})"""
         }
       )
 
       (sql"""
         insert into #${Tables.appActivityRecords}(
-          history_id, verdict_row_id, round_number, app_provider_parties, app_activity_weights
+          history_id, verdict_row_id, round_number, app_provider_parties, app_activity_weights,
+          submitting_app_provider, asset_activity_provider_parties, asset_activity_weights
         ) values """ ++ values ++ sql" ON CONFLICT DO NOTHING").asUpdate
     }
   }
