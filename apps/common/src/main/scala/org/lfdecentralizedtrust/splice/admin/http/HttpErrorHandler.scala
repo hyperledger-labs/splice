@@ -32,6 +32,7 @@ import io.circe.Printer
 import io.circe.syntax.*
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
+import org.lfdecentralizedtrust.splice.environment.BftCallFailed
 
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
@@ -144,6 +145,14 @@ final class HttpErrorHandler(
   private def completeErrorResponse(grpcStatus: Status, message: String): StandardRoute =
     completeErrorResponse(mapToStatusCode(grpcStatus), message)
 
+  private def bftFailureStatusCode(failed: BftCallFailed): StatusCode =
+    failed match {
+      case _: BftCallFailed.NotYetAvailable => StatusCodes.ServiceUnavailable
+      case _: BftCallFailed.NeverAvailable => StatusCodes.NotFound
+      case _: BftCallFailed.Disagreement | _: BftCallFailed.NotEnoughScans =>
+        StatusCodes.BadGateway
+    }
+
   def directive(implicit traceContext: TraceContext) = exceptionsDirective & timeoutDirective
 
   def exceptionsDirective(implicit traceContext: TraceContext) = {
@@ -157,6 +166,11 @@ final class HttpErrorHandler(
         extractUri { uri =>
           logger.info(s"Request to $uri resulted in an HTTP exception: ${message}")
           completeErrorResponse(code, message)
+        }
+      case failed: BftCallFailed =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri resulted in a failed BFT call: ${failed.getMessage}")
+          completeErrorResponse(bftFailureStatusCode(failed), failed.getMessage)
         }
       case HttpCommandException(request, status, responseBody) =>
         extractUri { uri =>
