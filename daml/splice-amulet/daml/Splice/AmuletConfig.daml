@@ -95,7 +95,7 @@ data RewardConfig = RewardConfig with
       -- ^ Maximum extra weight for featured asset activity per asset within a
       -- transaction by a featured asset moving app. Default: 0.1.
     dsoAppActivityWeight : Optional Decimal
-      -- ^ Weight for DSO app activity records attributed to the submitting
+      -- ^ Weight for DSO-level app activity records attributed to the submitting
       -- featured asset moving app. Default: 0.5.
   deriving (Eq, Show, Serializable)
 

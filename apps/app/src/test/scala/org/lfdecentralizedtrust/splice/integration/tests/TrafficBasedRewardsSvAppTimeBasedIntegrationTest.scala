@@ -991,6 +991,9 @@ class TrafficBasedRewardsSvAppTimeBasedIntegrationTest
       rc.batchSize,
       rc.rewardCouponTimeToLive,
       rc.appRewardCouponThreshold,
+      Optional.empty(),
+      Optional.empty(),
+      Optional.empty(),
     )
     val newConfig = new AmuletConfig[USD](
       existing.transferConfig,
