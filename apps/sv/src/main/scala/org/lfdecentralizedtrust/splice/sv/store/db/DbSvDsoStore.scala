@@ -2295,15 +2295,21 @@ class DbSvDsoStore(
       val arr = proposed.map(_.toProtoPrimitive).toArray
       val exclude = excludeRightCid.fold(sql"")(cid => sql" and acs.contract_id <> $cid ")
       val q = (sql"""
-      select acs.contract_id
-      from #${DsoTables.acsTableName} acs
+      select distinct e
+      from #${DsoTables.acsTableName} acs,
+            jsonb_array_elements_text(
+             case when jsonb_typeof(acs.create_arguments->'opsParties') = 'array'
+                  then acs.create_arguments->'opsParties'
+                  else '[]'::jsonb
+             end
+           ) e
       where acs.store_id = $acsStoreId
         and acs.migration_id = $domainMigrationId
         and acs.package_name = ${FeaturedAppRight.PACKAGE_NAME}
         and acs.template_id_qualified_name = ${QualifiedName(
           FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
         )}
-        and jsonb_exists_any(acs.create_arguments->'opsParties', $arr)
+        and e = any($arr)
       """ ++ exclude).toActionBuilder.as[String]
       waitUntilAcsIngested {
         storage.query(q, "findConflictingOpsParties").map(_.map(PartyId.tryFromProtoPrimitive))
