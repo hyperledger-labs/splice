@@ -69,16 +69,19 @@ class BulkStorageVerifiedObjectCopierTest
 
   private def peerUri(bucketName: String) = Uri(s"http://$bucketName")
 
-  private class BucketPeers(corrupt: Set[String]) extends PeerObjectSource {
+  private class BucketPeers(corrupt: Set[String], empty: Set[String] = Set.empty)
+      extends PeerObjectSource {
     val opens = new AtomicInteger(0)
     override def open(peer: Uri, key: String)(implicit
         tc: TraceContext
     ): Future[Source[ByteString, Any]] = {
       opens.incrementAndGet()
       val bucketName = peer.authority.host.address
-      localBucket(bucketName).readObject(key).map[Source[ByteString, Any]] { src =>
-        if (corrupt.contains(bucketName)) src.map(bs => bs ++ ByteString("x")) else src
-      }
+      if (empty.contains(bucketName)) Future.successful(Source.empty[ByteString])
+      else
+        localBucket(bucketName).readObject(key).map[Source[ByteString, Any]] { src =>
+          if (corrupt.contains(bucketName)) src.map(bs => bs ++ ByteString("x")) else src
+        }
     }
   }
 
@@ -191,6 +194,22 @@ class BulkStorageVerifiedObjectCopierTest
         checksums <- localBucket("staging").getChecksums(Seq(objectKey))
       } yield {
         checksums.map(_.checksum) shouldBe Seq(digest)
+        peers.opens.get() shouldBe 2
+      }
+    }
+
+    "fall back to the next peer when the first one serves zero bytes" in {
+      val peers = new BucketPeers(corrupt = Set.empty, empty = Set("peer1"))
+      for {
+        digest <- putOnPeers(objectKey, content)
+        _ <- loggerFactory.assertLogs(
+          copier(peers).copy(Seq(ObjectKeyAndChecksum(objectKey, digest))),
+          _.warningMessage should include("Checksum mismatch for object"),
+        )
+        onPeer <- storedBytes("peer2", objectKey)
+        staged <- storedBytes("staging", objectKey)
+      } yield {
+        staged shouldBe onPeer
         peers.opens.get() shouldBe 2
       }
     }
