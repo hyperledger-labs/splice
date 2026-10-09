@@ -10,10 +10,11 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
 import org.apache.pekko.pattern
 import org.apache.pekko.stream.scaladsl.Sink
 import org.slf4j.event.Level
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.scan.config.{
   BulkStorageBackfillingConfig,
   ScanStorageConfigs,
@@ -156,6 +157,24 @@ class BulkStorageBackfillingTest
         )
       }
     }
+  }
+
+  private class ListingWith(
+      updates: => Future[PeerListing[NonEmptyList[ObjectsOnPeers]]] =
+        Future.successful(PeerListing.NotAvailableYet),
+      snapshot: => Future[PeerListing[Option[SnapshotOnPeers]]] =
+        Future.successful(PeerListing.NotAvailableYet),
+  ) extends BulkObjectListing {
+    override def updateObjectsPage(
+        startRecordTime: CantonTimestamp,
+        endRecordTime: CantonTimestamp,
+        pageSize: Int,
+        availableAt: CantonTimestamp,
+    )(implicit tc: TraceContext): Future[PeerListing[NonEmptyList[ObjectsOnPeers]]] = updates
+
+    override def snapshotObjectsAtOrBefore(recordTime: CantonTimestamp)(implicit
+        tc: TraceContext
+    ): Future[PeerListing[Option[SnapshotOnPeers]]] = snapshot
   }
 
   private class RecordingCopier extends ObjectCopier {
@@ -301,6 +320,57 @@ class BulkStorageBackfillingTest
           steps.collect { case s: BulkStorageBackfilling.SnapshotSkipped => s.at } shouldBe
             Seq(ts(3))
           progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+      }
+    }
+
+    "advance the update cursor over an empty segment" in {
+      val progress = new InMemoryProgress
+      val copier = new RecordingCopier
+      val withEmptySegment = Seq(folders(0), folder(2, 3) -> Seq.empty, folders(2))
+      backfilling(progress, copier, new FakeListing(() => withEmptySegment, () => snapshots)).map {
+        steps =>
+          steps.collect { case s: BulkStorageBackfilling.SegmentCopied =>
+            (s.segment, s.objects)
+          } shouldBe
+            Seq(segment(1, 2) -> 2, segment(2, 3) -> 0, segment(3, 4) -> 1)
+          progress.updates.get() shouldBe Some(segment(3, 4))
+      }
+    }
+
+    "wait when the peers only have a snapshot this Scan already copied" in {
+      val progress = new InMemoryProgress
+      progress.updates.set(Some(segment(3, 4)))
+      progress.snapshots.set(Some(TimestampWithMigrationId(ts(3), migrationId)))
+      val copier = new RecordingCopier
+      val onlyOlderSnapshot = new ListingWith(
+        snapshot = Future.successful(
+          PeerListing.Available(
+            Some(SnapshotOnPeers(ts(3), NonEmptyList.one(ObjectsOnPeers(snapshotAt(3)._2, peers))))
+          )
+        )
+      )
+      service(
+        progress,
+        copier,
+        onlyOlderSnapshot,
+        new SequenceBound(BackfillEnd.CopyUpTo(ts(4))),
+        pageSize = 3,
+      ).mksrc().take(3).runWith(Sink.seq).map { steps =>
+        steps shouldBe Seq[BulkStorageBackfilling.Step](
+          BulkStorageBackfilling.UpdatesCopied(ts(4)),
+          BulkStorageBackfilling.WaitingForPeers(ts(4)),
+          BulkStorageBackfilling.WaitingForPeers(ts(4)),
+        )
+        copier.copied.get() shouldBe empty
+        progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+      }
+    }
+
+    "fail the stream when the peers disagree on a listing, so the service restarts" in {
+      val badGateway = HttpErrorWithHttpCode(StatusCodes.BadGateway, "peers disagree")
+      val disagreeing = new ListingWith(updates = Future.failed(badGateway))
+      backfilling(new InMemoryProgress, new RecordingCopier, disagreeing).failed.map {
+        _ shouldBe badGateway
       }
     }
 
