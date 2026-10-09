@@ -289,6 +289,21 @@ class BulkStorageBackfillingTest
       }
     }
 
+    "persist the snapshot cursor when it skips an empty snapshot" in {
+      val progress = new InMemoryProgress
+      val copier = new RecordingCopier
+      val listing = new FakeListing(
+        () => folders,
+        () => Seq(snapshotAt(2), ts(3) -> Seq.empty, snapshotAt(4)),
+      )
+      backfilling(progress, copier, listing, new SequenceBound(BackfillEnd.CopyUpTo(ts(3)))).map {
+        steps =>
+          steps.collect { case s: BulkStorageBackfilling.SnapshotSkipped => s.at } shouldBe
+            Seq(ts(3))
+          progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+      }
+    }
+
     "keep the service stream open after completion, so the retrying service does not restart it" in {
       val progress = new InMemoryProgress
       val copier = new RecordingCopier
