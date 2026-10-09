@@ -322,6 +322,29 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         )
 
+      def updateConfig(
+          baseOps: Seq[PartyId],
+          newOps: Seq[PartyId],
+      ): splice.amulet.FeaturedAppRight_UpdateConfig =
+        new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps))
+
+      // primary = (provider, baseOps, newOps); additional entries become additionalUpdates.
+      def amendActionMulti(
+          primary: (PartyId, Seq[PartyId], Seq[PartyId]),
+          additional: Seq[(PartyId, Seq[PartyId], Seq[PartyId])],
+      ): ARC_DsoRules =
+        new ARC_DsoRules(
+          new SRARC_CreateFeaturedAppConfigUpdateInstruction(
+            new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
+              primary._1.toProtoPrimitive,
+              updateConfig(primary._2, primary._3),
+              additional.map { case (p, b, n) =>
+                new Tuple2(p.toProtoPrimitive, updateConfig(b, n))
+              }.asJava,
+            )
+          )
+        )
+
       "reject a grant when the provider already has a right" in {
         for {
           store <- mkStore()
@@ -410,6 +433,49 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )(store.multiDomainAcsStore)
           result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
             amendAction(providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+            store,
+          )
+        } yield result shouldBe Right(())
+      }
+
+      "reject an amend whose additionalUpdates conflict with another right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq(userParty(2))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(3), opsParties = Some(Seq(userParty(3))))
+          )(store.multiDomainAcsStore)
+          // primary (provider1) keeps [u1]; additionalUpdates moves provider2 to [u3],
+          // which collides with provider3's existing [u3].
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendActionMulti(
+              (providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+              Seq((providerParty(2), Seq(userParty(2)), Seq(userParty(3)))),
+            ),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "accept an amend whose primary and additionalUpdates are all conflict-free" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq(userParty(2))))
+          )(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendActionMulti(
+              (providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+              Seq((providerParty(2), Seq(userParty(2)), Seq(userParty(2)))),
+            ),
             store,
           )
         } yield result shouldBe Right(())
