@@ -137,10 +137,9 @@ parseTrafficPurchaseMemo memo = do
 
 trafficPurchaseReason : MemberTrafficPurchase -> Text
 trafficPurchaseReason purchase =
-  "traffic purchase: memberId=" <> purchase.memberId <>
+  "purchased traffic: " <> show purchase.trafficAmount <> " bytes for memberId=" <> purchase.memberId <>
   "&synchronizerId=" <> purchase.synchronizerId <>
-  "&migrationId=" <> show purchase.migrationId <>
-  ", purchased traffic amount: " <> show purchase.trafficAmount <> " bytes"
+  "&migrationId=" <> show purchase.migrationId
 
 data ForMemberTraffic = ForMemberTraffic with
     dso : Party

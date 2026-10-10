@@ -49,7 +49,7 @@ defaultMemoTag =
 
 defaultReason : Text
 defaultReason =
-  "traffic purchase: memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0, purchased traffic amount: 1000000 bytes"
+  "purchased traffic: 1000000 bytes for memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
 
 trafficRegistryConfig : AmuletRegistry.AmuletRegistryConfig
 trafficRegistryConfig = AmuletRegistry.defaultAmuletRegistryConfig with

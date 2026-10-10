@@ -42,9 +42,9 @@
       The purchased traffic is calculated from the referenced configuration prices and rounded down to whole bytes.
       Any sub-byte remainder is also burned. Purchases below the minimum traffic top-up amount are rejected.
 
-    - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the memo and the
-      purchased traffic amount in bytes in the `splice.lfdecentralizedtrust.org/reason` of their burn and transaction metadata:
-      `traffic purchase: memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>, purchased traffic amount: <int> bytes`
+    - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the purchased
+      traffic in bytes and the memo in the `splice.lfdecentralizedtrust.org/reason` of their burn and transaction metadata:
+      `purchased traffic: <int> bytes for memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>`
 
     - Added three new fields: `trafficPrice`, `supportedSynchronizerIds` and
       `minTrafficTopupAmount` to `ExternalPartyConfigState`.

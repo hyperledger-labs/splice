@@ -24,7 +24,7 @@ import Splice.Amulet (ValidatorRewardCoupon)
 import Splice.AmuletConfig (RewardConfig(..), RewardVersion(..))
 import Splice.AmuletTransferInstruction
 import Splice.Amulet.TokenApiUtils
-import Splice.DecentralizedSynchronizer (MemberTraffic(..), trafficPurchaseMemoPrefix)
+import Splice.DecentralizedSynchronizer (MemberTraffic(..))
 import Splice.ExternalPartyAmuletRules
 import Splice.TokenStandard.Utils qualified as TSU
 
@@ -177,7 +177,7 @@ test_transferFactory_TransferV2_trafficPurchase = do
         "memberId=PAR::alice-participant::1220abcd" <>
         "&synchronizerId=decentralized-synchronizer-id-0" <>
         "&migrationId=0"
-  let memoTag = trafficPurchaseMemoPrefix <> memoParams
+  let memoTag = "cip-128/memo:" <> memoParams
   let purchaseArg = V2.TransferFactory_Transfer with
         transfer = V2.Transfer with
           sender = TSU.basicAccount alice
@@ -196,7 +196,7 @@ test_transferFactory_TransferV2_trafficPurchase = do
     submitResultAndTree (actAs alice <> discloseMany' enrichedChoice.disclosures) $
       exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
   V2.TransferInstructionResult_Completed [] <- pure result.output
-  let reason = "traffic purchase: " <> memoParams <> ", purchased traffic amount: " <> show trafficAmount <> " bytes"
+  let reason = "purchased traffic: " <> show trafficAmount <> " bytes for " <> memoParams
   TextMap.lookup reasonMetaKey result.meta.values === Some reason
   WalletClientV2.expectTxHistoryReasons changes
     [(TSU.basicAccount alice, ["split for " <> reason, reason], "")]

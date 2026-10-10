@@ -57,7 +57,7 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
         migrationId = 3
         trafficAmount = 1_000_000
   trafficPurchaseReason purchase ===
-    "traffic purchase: " <> memoParams <> ", purchased traffic amount: 1000000 bytes"
+    "purchased traffic: 1000000 bytes for " <> memoParams
 
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
@@ -69,8 +69,8 @@ test_parseMemo_keyOrderIrrelevant = script do
 
 test_parseMemo_rejectsMissingPrefix : Script ()
 test_parseMemo_rejectsMissingPrefix = script do
-  parse memoParams === Left "Traffic purchase memo must start with cip-0128/memo:"
-  parse (" " <> completeMemo) === Left "Traffic purchase memo must start with cip-0128/memo:"
+  parse memoParams === Left "Traffic purchase memo must start with cip-128/memo:"
+  parse (" " <> completeMemo) === Left "Traffic purchase memo must start with cip-128/memo:"
 
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
