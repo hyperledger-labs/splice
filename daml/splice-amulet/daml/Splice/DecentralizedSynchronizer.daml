@@ -104,10 +104,10 @@ data TrafficPurchaseMemo = TrafficPurchaseMemo with
   deriving (Eq, Show)
 
 trafficPurchaseMemoPrefix : Text
-trafficPurchaseMemoPrefix = "cip-0128/memo:"
+trafficPurchaseMemoPrefix = "cip-128/memo:"
 
 -- | Parse the purchase arguments from memo tag using url query param style:
--- `cip-0128/memo:memberId=...&synchronizerId=...&migrationId=...`.
+-- `cip-128/memo:memberId=...&synchronizerId=...&migrationId=...`.
 parseTrafficPurchaseMemo : Text -> Either Text TrafficPurchaseMemo
 parseTrafficPurchaseMemo memo = do
   params <- case T.stripPrefix trafficPurchaseMemoPrefix memo of

@@ -45,7 +45,7 @@ testSynchronizerId = "decentralized-synchronizer-id-0"
 
 defaultMemoTag : Text
 defaultMemoTag =
-  "cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
+  "cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
 
 defaultReason : Text
 defaultReason =
@@ -165,7 +165,7 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
 test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
   setup@TestSetup{..} <- setupTest
   let memoTag =
-        "cip-0128/memo:migrationId=0&synchronizerId=" <> testSynchronizerId <> "&memberId=" <> testMemberId
+        "cip-128/memo:migrationId=0&synchronizerId=" <> testSynchronizerId <> "&memberId=" <> testMemberId
   result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
   TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
 
@@ -182,13 +182,13 @@ test_trafficPurchase_rejectsIncompleteMemoTag = script do
   buyTrafficMustFailWith
     (expectMessageContains "Missing key in traffic purchase memo: synchronizerId")
     setup defaultTransfer with
-      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId)
+      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId)
 
 test_trafficPurchase_rejectsMemoTagWithoutPrefix : Script ()
 test_trafficPurchase_rejectsMemoTagWithoutPrefix = script do
   setup@TestSetup{..} <- setupTest
   buyTrafficMustFailWith
-    (expectMessageContains "Traffic purchase memo must start with cip-0128/memo:")
+    (expectMessageContains "Traffic purchase memo must start with cip-128/memo:")
     setup defaultTransfer with
       meta = memoTagMeta ("memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0")
 
@@ -214,7 +214,7 @@ test_trafficPurchase_rejectsNonIntegerMigrationId = script do
   buyTrafficMustFailWith
     (expectMessageContains "Expected an integer for migrationId")
     setup defaultTransfer with
-      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=latest")
+      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=latest")
 
 test_trafficPurchase_rejectsUnknownSynchronizer : Script ()
 test_trafficPurchase_rejectsUnknownSynchronizer = script do
@@ -222,7 +222,7 @@ test_trafficPurchase_rejectsUnknownSynchronizer = script do
   buyTrafficMustFailWith
     (expectErrorId "splice.lfdecentralizedtrust.org/unknown-synchronizer")
     setup defaultTransfer with
-      meta = memoTagMeta ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=unknown-synchronizer&migrationId=0")
+      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=unknown-synchronizer&migrationId=0")
 
 test_trafficPurchase_rejectsAmountBelowMinTopup : Script ()
 test_trafficPurchase_rejectsAmountBelowMinTopup = script do

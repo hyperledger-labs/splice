@@ -576,7 +576,7 @@ class TokenStandardV2TransferIntegrationTest
       val spentAmuletAmount = minimumCostAmulet * 2
       val purchasedTrafficAmount = computeTrafficForAmuletAmount(spentAmuletAmount)
       val memo =
-        s"cip-0128/memo:memberId=${memberId.toProtoPrimitive}" +
+        s"cip-128/memo:memberId=${memberId.toProtoPrimitive}" +
           s"&synchronizerId=${synchronizerId.toProtoPrimitive}" +
           s"&migrationId=${sv1ScanBackend.getMigrationId()}"
       val purchasedTrafficBefore = getTotalPurchasedTraffic(memberId, synchronizerId)

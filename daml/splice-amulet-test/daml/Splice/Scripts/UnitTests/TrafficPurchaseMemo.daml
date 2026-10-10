@@ -34,7 +34,7 @@ memoParams =
   "&migrationId=3"
 
 completeMemo : Text
-completeMemo = "cip-0128/memo:" <> memoParams
+completeMemo = "cip-128/memo:" <> memoParams
 
 parse : Text -> Either Text TrafficPurchaseMemo
 parse = parseTrafficPurchaseMemo
@@ -62,7 +62,7 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
   let reordered =
-        "cip-0128/memo:migrationId=3" <>
+        "cip-128/memo:migrationId=3" <>
         "&synchronizerId=" <> testSynchronizerId <>
         "&memberId=" <> testMemberId
   parse reordered === Right expectedMemo
@@ -74,7 +74,7 @@ test_parseMemo_rejectsMissingPrefix = script do
 
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
-  parse ("cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
+  parse ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
     Left "Missing key in traffic purchase memo: migrationId"
 
 test_parseMemo_rejectsUnknownKey : Script ()
@@ -89,13 +89,13 @@ test_parseMemo_rejectsMalformedField : Script ()
 test_parseMemo_rejectsMalformedField = script do
   assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
   assertMsg "field with two separators is rejected" $
-    isRejected $ parse $ "cip-0128/memo:memberId=a=b&synchronizerId=s&migrationId=0"
+    isRejected $ parse $ "cip-128/memo:memberId=a=b&synchronizerId=s&migrationId=0"
   assertMsg "empty memo is rejected" $ isRejected $ parse ""
-  assertMsg "prefix without parameters is rejected" $ isRejected $ parse "cip-0128/memo:"
+  assertMsg "prefix without parameters is rejected" $ isRejected $ parse "cip-128/memo:"
 
 test_parseMemo_rejectsNonIntegerValues : Script ()
 test_parseMemo_rejectsNonIntegerValues = script do
   assertMsg "non-integer migrationId is rejected" $
     isRejected $ parse $
-      "cip-0128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
+      "cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
       "&migrationId=latest"
