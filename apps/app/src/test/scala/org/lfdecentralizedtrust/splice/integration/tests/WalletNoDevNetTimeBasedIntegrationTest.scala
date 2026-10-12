@@ -74,7 +74,6 @@ class WalletNoDevNetTimeBasedIntegrationTest
   }
 
   "A validator wallet" should {
-
     "accept transfers with high priority when it cannot afford a top-up" in { implicit env =>
       actAndCheck(
         "Advance enough rounds for SV1 to claim rewards", {
