@@ -723,13 +723,13 @@ class DbScanVerdictStore(
   )(implicit
       tc: TraceContext
   ): Future[Map[Long, Seq[TransactionViewT]]] =
-    NonEmpty.from(verdictRowIds.distinct) match {
-      case None => Future.successful(Map.empty)
-      case Some(verdictRowIds) =>
+    verdictRowIds.distinct match {
+      case NonEmpty(verdictRowIds) =>
         // - 1 leaves room for the HardLimit's extra sqlLimit row
         val maxViews =
           (verdictRowIds.size.toLong * maxViewsPerVerdict.limit).min(Int.MaxValue - 1L).toInt
-        val limit = HardLimit.tryCreate(maxViews, maxViews)
+        val overallLimit = HardLimit.tryCreate(maxViews, maxViews)
+        val opName = "scanVerdict.listTransactionViewsByVerdictRowIds"
         storage
           .query(
             (sql"""
@@ -742,21 +742,21 @@ class DbScanVerdictStore(
                from #${Tables.views}
                where """ ++ DbStorage.toInClause("verdict_row_id", verdictRowIds) ++ sql"""
                order by verdict_row_id, view_id
-               limit ${sqlLimit(limit)}
+               limit ${sqlLimit(overallLimit)}
              """).toActionBuilder.as[TransactionViewT],
-            "scanVerdict.listTransactionViewsByVerdictRowIds",
+            opName,
           )
           .map { views =>
-            val name = "scanVerdict.listTransactionViewsByVerdictRowIds"
-            applyLimitOrFail(name, limit, views).groupBy(_.verdictRowId).map {
-              case (verdictRowId, verdictViews) =>
-                verdictRowId -> applyLimitOrFail(
-                  s"$name for verdict $verdictRowId",
+            applyLimitOrFail(opName, overallLimit, views).groupBy(_.verdictRowId).transform {
+              (verdictRowId, verdictViews) =>
+                applyLimitOrFail(
+                  s"$opName for verdict $verdictRowId",
                   maxViewsPerVerdict,
                   verdictViews,
                 )
             }
           }
+      case _ => Future.successful(Map.empty)
     }
 
   def maxVerdictRecordTime(migrationId: Long)(implicit
