@@ -117,7 +117,7 @@ class AcsSnapshotBulkStorage[Snapshot](
     writer: AcsSnapshotBulkStorageWriter[Snapshot],
     val persistentProgress: AcsSnapshotBulkStoragePersistentProgress,
     appConfig: BulkStorageConfig,
-    backfillingCompleteGate: Source[Boolean, Cancellable],
+    mayStart: Source[Boolean, Cancellable],
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, ec: ExecutionContext)
     extends NamedLogging
@@ -160,7 +160,7 @@ class AcsSnapshotBulkStorage[Snapshot](
     */
   private def mksrc()(implicit tc: TraceContext): Source[CantonTimestamp, Cancellable] = {
 
-    backfillingCompleteGate.flatMap { _ =>
+    mayStart.flatMap { _ =>
       Source
         .future(persistentProgress.readLatestProcessedSnapshotTimestamp.flatMap {
           case Some(start) =>

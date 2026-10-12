@@ -16,7 +16,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.{ActorSystem, Cancellable}
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, S3Config, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -30,7 +30,6 @@ import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import cats.implicits.*
-import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.PekkoRetryableService
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage.{
@@ -49,10 +48,11 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.{
   ScanPeerObjectSource,
   VerifiedObjectCopier,
 }
-import org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStart
+import org.lfdecentralizedtrust.splice.scan.store.historystart.{
+  ScanHistoryReadiness,
+  ScanHistoryStart,
+}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-
-import scala.concurrent.duration.*
 
 class BulkStorage(
     storageConfig: ScanStorageConfig,
@@ -98,21 +98,13 @@ class BulkStorage(
     loggerFactory,
   )
 
-  val backfillingCompleteGate: Source[Boolean, Cancellable] =
-    Source
-      .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
-      .mapAsync(1)(_ =>
-        if (updateHistory.isReady)
-          for {
-            historyBackfilled <- updateHistory.isHistoryBackfilled(currentMigrationId)
-            peerCopyComplete <-
-              if (appConfig.backfilling.enabled) backfillingProgress.isComplete
-              else Future.successful(true)
-          } yield historyBackfilled && peerCopyComplete
-        else Future.successful(false)
-      )
-      .filter(identity)
-      .take(1)
+  val writersGate = new BulkStorageWritersGate(
+    new ScanHistoryReadiness(updateHistory, historyStart),
+    currentMigrationId,
+    Option.when(appConfig.backfilling.enabled)(implicit tc => backfillingProgress.isComplete),
+    appConfig.updatesPollingInterval.underlying,
+    loggerFactory,
+  )
 
   val acsStagingProgress = new AcsSnapshotBulkStoragePersistentProgress(
     acsStagingKvStoreKey,
@@ -193,7 +185,7 @@ class BulkStorage(
     acsStagingWriter,
     acsStagingProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenSnapshotsMayStart("AcsSnapshotBulkStorageStaging"),
     loggerFactory,
   )
   val acsCommittedWriter = new AcsSnapshotBulkStorageCommitFromStaging(
@@ -219,7 +211,7 @@ class BulkStorage(
     acsCommittedWriter,
     acsCommittedProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("AcsSnapshotBulkStorageCommitted"),
     loggerFactory,
   )
   val updatesStagingWriter = new UpdateHistoryBulkStorageWriterFromDb(
@@ -235,7 +227,7 @@ class BulkStorage(
     updatesStagingWriter,
     updatesStagingProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("UpdateHistoryBulkStorageStaging"),
     loggerFactory,
   )
   val updatesCommittedWriter = new UpdateHistoryBulkStorageCommitFromStaging(
@@ -261,7 +253,7 @@ class BulkStorage(
     updatesCommittedWriter,
     updatesCommittedProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("UpdateHistoryBulkStorageCommitted"),
     loggerFactory,
   )
 
