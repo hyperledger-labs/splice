@@ -299,11 +299,11 @@ class BulkStorage(
 
 object BulkStorage {
 
-  val acsStagingKvStoreKey = "latest_acs_snapshot_in_bulk_storage_staging"
-  val acsCommittedKvStoreKey = "latest_acs_snapshot_in_bulk_storage_committed"
-  val updatesStagingKvStoreKey = "latest_updates_segment_in_bulk_storage_staging"
-  val updatesCommittedKvStoreKey = "latest_updates_segment_in_bulk_storage_committed"
-  val firstAcsSnapshotTimestampKvStoreKey = "first_acs_snapshot_timestamp_in_bulk_storage"
+  val acsStagingKvStoreKey = "latest_acs_snapshot_in_bulk_storage_staging_v2"
+  val acsCommittedKvStoreKey = "latest_acs_snapshot_in_bulk_storage_committed_v2"
+  val updatesStagingKvStoreKey = "latest_updates_segment_in_bulk_storage_staging_v2"
+  val updatesCommittedKvStoreKey = "latest_updates_segment_in_bulk_storage_committed_v2"
+  val firstAcsSnapshotTimestampKvStoreKey = "first_acs_snapshot_timestamp_in_bulk_storage_v2"
 
   def apply(
       storageConfig: ScanStorageConfig,

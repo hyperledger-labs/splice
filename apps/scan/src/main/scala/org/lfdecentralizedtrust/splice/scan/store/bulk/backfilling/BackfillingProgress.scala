@@ -90,5 +90,5 @@ class KvBackfillingProgress(
 }
 
 object KvBackfillingProgress {
-  val completeKvStoreKey = "bulk_storage_backfill_complete"
+  val completeKvStoreKey = "bulk_storage_backfill_complete_v2"
 }
