@@ -244,13 +244,13 @@ object DbScanVerdictStore {
     (row, mkViews)
   }
 
-  /** Defensive cap on the views read back for a single verdict; exceeding it fails the read
-    * rather than returning incomplete views. Canton's view-count limits are not enforced on PV 35
-    * and are far higher on PV 36, but the mediator's informee tree takes at least 108 bytes per
-    * view, so the default 10 MiB request and decompression limits allow at most
-    * (10 MiB + 4) / 108 = 97,090 views. Revisit this if a synchronizer raises those limits.
-    */
-  val MaxTransactionViewsPerVerdict: HardLimit = HardLimit.tryCreate(100000, 100000)
+  // Defensive cap on the views read back for a single verdict; exceeding it
+  // fails the read rather than returning incomplete views. Canton's view-count
+  // limits are not enforced on PV 35 and are far higher on PV 36, but the
+  // mediator's informee tree takes at least 108 bytes per view, so slightly
+  // less than 100k fit within 10 MiB. Revisit this if a well-behaved
+  // synchronizer might ever raises those limits.
+  private val MaxTransactionViewsPerVerdict: HardLimit = HardLimit.tryCreate(100000, 100000)
 
   def apply(
       storage: com.digitalasset.canton.resource.DbStorage,
