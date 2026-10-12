@@ -490,6 +490,24 @@ abstract class TopologyAdminConnection(
       filterNamespace = Some(id.namespace),
     ).map(_.map(_.transaction))
 
+  def generateOnboardingTopologyTransactions(protocolVersion: ProtocolVersion)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] =
+    runCmd(TopologyAdminCommands.Read.GenerateOnboardingTopologyTransactions(protocolVersion, None))
+
+  // Canton 3.7+ no longer stores the identity of sequencers and mediators in the authorized store
+  def getOrGenerateIdentityTransactions(member: Member, protocolVersion: ProtocolVersion)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] =
+    getIdentityTransactions(member.uid, TopologyStoreId.Authorized).flatMap { stored =>
+      val hasOwnerToKeyMapping = stored.exists(_.mapping match {
+        case otk: OwnerToKeyMapping => otk.member == member
+        case _ => false
+      })
+      if (hasOwnerToKeyMapping) Future.successful(stored)
+      else generateOnboardingTopologyTransactions(protocolVersion)
+    }
+
   def listAllTransactions(
       store: TopologyStoreId,
       timeQuery: TimeQuery = TimeQuery.HeadState,

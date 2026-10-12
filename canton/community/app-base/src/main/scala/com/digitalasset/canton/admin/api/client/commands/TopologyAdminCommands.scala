@@ -33,6 +33,7 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactions.Generic
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
+  SignedTopologyTransactions,
   TopologyChangeOp,
   TopologyMapping,
   TopologyTransaction,
@@ -715,6 +716,39 @@ object TopologyAdminCommands {
           ) { collection =>
             StoredTopologyTransactions.fromProtoV30(collection).leftMap(_.toString)
           }
+    }
+
+    final case class GenerateOnboardingTopologyTransactions(
+        protocolVersion: ProtocolVersion,
+        temporaryStore: Option[TopologyStoreId.Temporary],
+    ) extends BaseCommand[
+          v30.GenerateOnboardingTopologyTransactionsRequest,
+          v30.GenerateOnboardingTopologyTransactionsResponse,
+          Seq[GenericSignedTopologyTransaction],
+        ] {
+      override protected def createRequest()
+          : Either[String, v30.GenerateOnboardingTopologyTransactionsRequest] =
+        Right(
+          v30.GenerateOnboardingTopologyTransactionsRequest(
+            protocolVersion = protocolVersion.toProtoPrimitive,
+            temporaryStore = temporaryStore.map(s => v30.StoreId.Temporary(s.name.unwrap)),
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.GenerateOnboardingTopologyTransactionsRequest,
+      ): Future[v30.GenerateOnboardingTopologyTransactionsResponse] =
+        service.generateOnboardingTopologyTransactions(request)
+
+      override protected def handleResponse(
+          response: v30.GenerateOnboardingTopologyTransactionsResponse
+      ): Either[String, Seq[GenericSignedTopologyTransaction]] =
+        response.result
+          .traverse(
+            SignedTopologyTransactions.fromProtoV30(ProtocolVersionValidation.NoValidation, _)
+          )
+          .bimap(_.toString, _.fold(Seq.empty[GenericSignedTopologyTransaction])(_.transactions))
     }
 
     @deprecated(

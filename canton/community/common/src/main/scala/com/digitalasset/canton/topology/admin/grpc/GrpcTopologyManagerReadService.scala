@@ -1081,6 +1081,17 @@ class GrpcTopologyManagerReadService(
     )
   }
 
+  override def generateOnboardingTopologyTransactions(
+      request: adminProto.GenerateOnboardingTopologyTransactionsRequest
+  ): Future[adminProto.GenerateOnboardingTopologyTransactionsResponse] =
+    Future.failed(
+      io.grpc.Status.UNIMPLEMENTED
+        .withDescription(
+          "GenerateOnboardingTopologyTransactions is only served by Canton 3.7+ nodes"
+        )
+        .asRuntimeException()
+    )
+
   private def getLogicalUpgradeState(
       synchronizerStore: Option[StoreId],
       tsOverride: Option[Timestamp],
