@@ -894,9 +894,7 @@ export async function configureScanBigQuery({
     passwordSecret
   );
 
-  // The legacy dataset is kept even when the legacy Datastream is disabled, so
-  // that disabling it tears down only the stream path (stream, destination
-  // profile, publication and replication slot) and not the replicated data.
+  // legacy dataset is kept even when the legacy Datastream is disabled
   const legacyDataset = installBigqueryDataset(bigQueryConfig);
 
   if (enableLegacyDatastream && slots.slot1) {
