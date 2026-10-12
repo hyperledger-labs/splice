@@ -713,6 +713,52 @@ class DbScanVerdictStore(
     } yield applyLimitOrFail(opName, limit, views)
   }
 
+  /** Batched [[listTransactionViews]]: one query for the views of all `verdictRowIds`, each in
+    * view_id order. Verdicts without views are absent from the result. Fails if any verdict has
+    * more than `maxViewsPerVerdict` views.
+    */
+  def listTransactionViewsByVerdictRowIds(
+      verdictRowIds: Seq[Long],
+      maxViewsPerVerdict: HardLimit = DbScanVerdictStore.MaxTransactionViewsPerVerdict,
+  )(implicit
+      tc: TraceContext
+  ): Future[Map[Long, Seq[TransactionViewT]]] =
+    NonEmpty.from(verdictRowIds.distinct) match {
+      case None => Future.successful(Map.empty)
+      case Some(verdictRowIds) =>
+        // - 1 leaves room for the HardLimit's extra sqlLimit row
+        val maxViews =
+          (verdictRowIds.size.toLong * maxViewsPerVerdict.limit).min(Int.MaxValue - 1L).toInt
+        val limit = HardLimit.tryCreate(maxViews, maxViews)
+        storage
+          .query(
+            (sql"""
+               select
+                 verdict_row_id,
+                 view_id,
+                 informees,
+                 confirming_parties,
+                 sub_views
+               from #${Tables.views}
+               where """ ++ DbStorage.toInClause("verdict_row_id", verdictRowIds) ++ sql"""
+               order by verdict_row_id, view_id
+               limit ${sqlLimit(limit)}
+             """).toActionBuilder.as[TransactionViewT],
+            "scanVerdict.listTransactionViewsByVerdictRowIds",
+          )
+          .map { views =>
+            val name = "scanVerdict.listTransactionViewsByVerdictRowIds"
+            applyLimitOrFail(name, limit, views).groupBy(_.verdictRowId).map {
+              case (verdictRowId, verdictViews) =>
+                verdictRowId -> applyLimitOrFail(
+                  s"$name for verdict $verdictRowId",
+                  maxViewsPerVerdict,
+                  verdictViews,
+                )
+            }
+          }
+    }
+
   def maxVerdictRecordTime(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[CantonTimestamp]] = {
