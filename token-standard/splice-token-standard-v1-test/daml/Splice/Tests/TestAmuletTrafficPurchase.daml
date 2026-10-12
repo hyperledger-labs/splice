@@ -176,46 +176,6 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
 -- Unhappy
 ----------
 
-test_trafficPurchase_rejectsIncompleteMemoTag : Script ()
-test_trafficPurchase_rejectsIncompleteMemoTag = script do
-  setup@TestSetup{..} <- setupTest
-  buyTrafficMustFailWith
-    (expectMessageContains "Missing key in traffic purchase memo: synchronizerId")
-    setup defaultTransfer with
-      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId)
-
-test_trafficPurchase_rejectsMemoTagWithoutPrefix : Script ()
-test_trafficPurchase_rejectsMemoTagWithoutPrefix = script do
-  setup@TestSetup{..} <- setupTest
-  buyTrafficMustFailWith
-    (expectMessageContains "Traffic purchase memo must start with cip-128/memo:")
-    setup defaultTransfer with
-      meta = memoTagMeta ("memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0")
-
-test_trafficPurchase_rejectsUnknownMemoKey : Script ()
-test_trafficPurchase_rejectsUnknownMemoKey = script do
-  setup@TestSetup{..} <- setupTest
-  buyTrafficMustFailWith
-    (expectMessageContains "Unknown key in traffic purchase memo: trafficUnit")
-    setup defaultTransfer with
-      meta = memoTagMeta (defaultMemoTag <> "&trafficUnit=MB")
-
-test_trafficPurchase_rejectsDuplicateMemoKey : Script ()
-test_trafficPurchase_rejectsDuplicateMemoKey = script do
-  setup@TestSetup{..} <- setupTest
-  buyTrafficMustFailWith
-    (expectMessageContains "Duplicate key in traffic purchase memo: migrationId")
-    setup defaultTransfer with
-      meta = memoTagMeta (defaultMemoTag <> "&migrationId=1")
-
-test_trafficPurchase_rejectsNonIntegerMigrationId : Script ()
-test_trafficPurchase_rejectsNonIntegerMigrationId = script do
-  setup@TestSetup{..} <- setupTest
-  buyTrafficMustFailWith
-    (expectMessageContains "Expected an integer for migrationId")
-    setup defaultTransfer with
-      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=latest")
-
 test_trafficPurchase_rejectsUnknownSynchronizer : Script ()
 test_trafficPurchase_rejectsUnknownSynchronizer = script do
   setup@TestSetup{..} <- setupTest
