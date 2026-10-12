@@ -9,7 +9,6 @@ import qualified DA.Set as Set
 import DA.Text as T
 import DA.Time
 
-import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Types
 import Splice.Util
 
@@ -192,89 +191,6 @@ template RegisteredSynchronizer with
 -- DSO party, so reads are validated against the expected DSO party (mirrors `MemberTraffic`).
 instance HasCheckedFetch RegisteredSynchronizer ForDso where
     contractGroupId RegisteredSynchronizer{..} = ForDso with ..
-
-data DedicatedSynchronizerState_ReportActivityResult = DedicatedSynchronizerState_ReportActivityResult with
-    reportCid : ContractId ExtensionActivityReport
-    stateCid : ContractId DedicatedSynchronizerState
-  deriving (Show, Eq, Serializable)
-
--- PoC (extension reward reporting): per-synchronizer reporting state, created at registration.
--- The operator reports its synchronizer's activity per round as a commitment: a Merkle root hash
--- over its activity records plus the round total. The records themselves stay with the operator;
--- the root binds the later expansion (see `ProcessRewardsV2`) to what was committed here, and the
--- running total supports the reported-vs-purchased comparison done by the SV apps off-ledger.
---
--- Deliberately a separate template from `RegisteredSynchronizer`: reporting recreates this
--- contract every round (fresh contract id), while the registration must stay stable - the buy
--- path attaches it via explicit disclosure and governance votes pin it in their arguments, so
--- fusing the two would let a routine report contend with purchases and invalidate open votes.
-template DedicatedSynchronizerState with
-    dso : Party
-      -- ^ signatory; reports are visible to all SV nodes via the DSO party
-    synchronizerId : Text
-      -- ^ the registered synchronizer this state tracks (see `RegisteredSynchronizer`)
-    operator : Party
-      -- ^ the synchronizer's registered operator; sole reporter
-    lastReportedRound : Optional Round
-      -- ^ the most recently reported round; reports must use strictly increasing rounds
-    totalActivityReported : Decimal
-      -- ^ running total of all activity ever reported for this synchronizer
-  where
-    signatory dso
-    observer operator
-
-    ensure totalActivityReported >= 0.0
-      && not (T.isEmpty synchronizerId)
-
-    choice DedicatedSynchronizerState_ReportActivity : DedicatedSynchronizerState_ReportActivityResult
-      with
-        round : Round
-        activityRootHash : CryptoHash.Hash
-          -- ^ Merkle root over the round's activity records (weights per provider), computed and
-          -- stored by the operator; expansion must match it batch by batch
-        totalActivity : Decimal
-          -- ^ total activity weight in the round, the on-ledger summary of the committed records
-      controller operator
-      do
-        require "totalActivity is non-negative" (totalActivity >= 0.0)
-        require "round is later than the last reported round"
-          (optional True (< round) lastReportedRound)
-        let newTotalReported = totalActivityReported + totalActivity
-        reportCid <- create ExtensionActivityReport with
-          dso; synchronizerId; operator; round; activityRootHash; totalActivity
-          totalActivityReported = newTotalReported
-        stateCid <- create this with
-          lastReportedRound = Some round
-          totalActivityReported = newTotalReported
-        pure DedicatedSynchronizerState_ReportActivityResult with ..
-
--- PoC (extension reward reporting): one report per (synchronizer, round), created by
--- `DedicatedSynchronizerState_ReportActivity` and consumed when DSO governance starts reward
--- processing for it (`AmuletRules_StartProcessingExtensionRewardsV2`).
-template ExtensionActivityReport with
-    dso : Party
-    synchronizerId : Text
-    operator : Party
-      -- ^ the reporting operator; becomes the expander of the resulting `ProcessRewardsV2`
-    round : Round
-    activityRootHash : CryptoHash.Hash
-    totalActivity : Decimal
-    totalActivityReported : Decimal
-      -- ^ running total of all activity ever reported for this synchronizer, including this
-      -- round; start-processing checks it against the synchronizer's purchased traffic
-  where
-    signatory dso
-    observer operator
-
-    ensure totalActivity >= 0.0
-      && totalActivityReported >= totalActivity
-      && not (T.isEmpty synchronizerId)
-
-instance HasCheckedFetch DedicatedSynchronizerState ForDso where
-    contractGroupId DedicatedSynchronizerState{..} = ForDso with ..
-
-instance HasCheckedFetch ExtensionActivityReport ForDso where
-    contractGroupId ExtensionActivityReport{..} = ForDso with ..
 
 instance Patchable BaseRateTrafficLimits where
   patch new base current = BaseRateTrafficLimits with

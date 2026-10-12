@@ -191,9 +191,6 @@ abstract class CalculateRewardsTriggerBase(
         new AmuletRules_StartProcessingRewardsV2(
           calculateRewardsCid,
           rootHash,
-          // plain-format round: rate and budget arrive with the weighted-tree switch
-          java.util.Optional.empty(),
-          java.util.Optional.empty(),
         )
       )
     )

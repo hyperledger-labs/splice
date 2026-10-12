@@ -17,10 +17,7 @@ import Daml.Script
 import Splice.DsoRules
 -- The registry contract created by the vote. It lives in splice-amulet (AmuletRules must be
 -- able to fetch it), and this test package data-depends on splice-amulet.
-import Splice.Amulet.CryptoHash qualified as CryptoHash
-import Splice.Amulet.RewardAccountingV2 (Batch(..))
 import Splice.DecentralizedSynchronizer
-import Splice.Types (Round(..))
 
 -- Shared helpers that spin up a 4-SV network and drive a vote end-to-end.
 import Splice.Scripts.DsoTestUtils
@@ -57,15 +54,6 @@ test_RegisterSynchronizer_viaVote = do
   -- The operator is an observer, so it can see its own registration.
   operatorView <- query @RegisteredSynchronizer operator
   length operatorView === 1
-
-  -- Registration also created the synchronizer's reporting state (extension reward flow).
-  states <- query @DedicatedSynchronizerState operator
-  case states of
-    [(_cid, st)] -> do
-      st.synchronizerId === dedicatedSyncId
-      st.operator === operator
-      st.totalActivityReported === 0.0
-    _ -> abort $ "expected exactly one DedicatedSynchronizerState, got " <> show (length states)
 
 -- | Register with the governance parameters in the same vote: the registration is live at the
 --   agreed discount immediately, with no window at full price and no second vote to arrange.
@@ -136,14 +124,10 @@ onlyRegistration dso = do
     _ -> abort $ "expected exactly one RegisteredSynchronizer, got " <> show (length registrations)
 
 -- | Offboard a registered synchronizer via a supermajority vote: the registration is archived,
---   which closes both economic paths (the buy needs the disclosed registration; reward
---   processing requires the live registration - see test_StartProcessing_registrationGate in
---   splice-amulet-test). The reporting state deliberately survives the vote (its contract id
---   changes with every report, so a vote must not pin it); it is inert residue, cleaned up by a
---   separate archive by DSO automation, off the vote's critical path.
+--   which closes the purchase path (the buy needs the disclosed registration).
 test_ArchiveSynchronizerRegistration_viaVote : Script ()
 test_ArchiveSynchronizerRegistration_viaVote = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  (app, _dso, (sv1, sv2, sv3, sv4)) <- initMainNet
   operator <- allocateParty "dedicatedSyncOperator"
   let dedicatedSyncId = "dedicated-sync::1220acacacacacacacacacacacacacacacacacacacacacacacacacacacacacac"
 
@@ -154,24 +138,12 @@ test_ArchiveSynchronizerRegistration_viaVote = do
         operator
         governanceParameters = defaultGovernanceParameters
   [(regCid, _)] <- query @RegisteredSynchronizer operator
-  [(stateCid, _)] <- query @DedicatedSynchronizerState operator
 
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_DsoRules with
       dsoAction = SRARC_ArchiveSynchronizerRegistration DsoRules_ArchiveSynchronizerRegistration with
         registeredSynchronizerCid = regCid
 
-  -- the registration is gone: nothing to disclose to a buy, nothing to authorize processing
+  -- the registration is gone: nothing to disclose to a buy
   [] <- query @RegisteredSynchronizer operator
-
-  -- the state survives and reporting still runs, but the reports are inert: without a live
-  -- registration they can never be turned into minting (the start-processing gate)
-  result <- submit operator $ exerciseCmd stateCid DedicatedSynchronizerState_ReportActivity with
-    round = Round 1
-    activityRootHash = CryptoHash.hash (BatchOfMintingAllowances [])
-    totalActivity = 0.0
-
-  -- cleanup is a plain archive by DSO automation, retried freely against the current state cid
-  submit dso $ archiveCmd result.stateCid
-  [] <- query @DedicatedSynchronizerState operator
   pure ()

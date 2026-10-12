@@ -123,9 +123,6 @@ data AmuletRules_ClaimExpiredRewardsV2Result = AmuletRules_ClaimExpiredRewardsV2
 data AmuletRules_StartProcessingRewardsV2Result = AmuletRules_StartProcessingRewardsV2Result {}
   deriving (Serializable)
 
-data AmuletRules_StartProcessingExtensionRewardsV2Result = AmuletRules_StartProcessingExtensionRewardsV2Result {}
-  deriving (Serializable)
-
 data AmuletRules_UnhideRewardCouponsV2Result = AmuletRules_UnhideRewardCouponsV2Result {}
   deriving (Serializable)
 
@@ -770,19 +767,8 @@ template AmuletRules
       with
         calculateRewardsCid : ContractId CalculateRewardsV2
         batchHash : CryptoHash.Hash
-        issuancePerActivityUnit : Optional Decimal
-          -- ^ when set, the round's committed tree is weighted (`BatchOfWeightedBatches`): batch
-          -- amounts are activity weights and coupons mint at weight * rate. `None` is a round
-          -- committed in the plain format. Appended as Optional because released vote requests
-          -- carry the old shape of this action.
-        weightBudget : Optional Decimal
-          -- ^ the round's total activity, the root's exact-sum budget; set together with the rate
       controller dso
       do
-        require "issuance rate and weight budget are set together"
-          (isSome issuancePerActivityUnit == isSome weightBudget)
-        forA_ issuancePerActivityUnit $ \rate ->
-          require "issuance rate is positive" (rate > 0.0)
         calculateRewards <- fetchAndArchive (ForDso with dso) calculateRewardsCid
         create ProcessRewardsV2 with
           dso
@@ -791,56 +777,8 @@ template AmuletRules
           dryRun = calculateRewards.dryRun
           rewardCouponTimeToLive = calculateRewards.rewardCouponTimeToLive
           batchHash
-          expander = None
-          issuancePerActivityUnit
-          weightBudget
 
         return AmuletRules_StartProcessingRewardsV2Result {}
-
-    nonconsuming choice AmuletRules_StartProcessingExtensionRewardsV2 : AmuletRules_StartProcessingExtensionRewardsV2Result
-      -- ^ PoC (extension reward reporting): start reward processing for a registered synchronizer's
-      -- reported activity. Consumes the operator's report and creates the root ProcessRewardsV2
-      -- with the operator as expander and the issuance rate computed by DSO automation; the
-      -- operator then expands its committed batches into RewardCouponV2 contracts. The rate
-      -- computation (app-reward tranche split by burn share, the voted per-synchronizer weight,
-      -- and the reported-vs-purchased cap) happens off-ledger in the SV apps before this action
-      -- is confirmed.
-      with
-        reportCid : ContractId ExtensionActivityReport
-        registeredSynchronizerCid : ContractId RegisteredSynchronizer
-          -- ^ the live registration the report was filed under; processing requires it to match
-          -- the report's synchronizer id and operator, so offboarding (archiving the
-          -- registration) closes the reward path the same way it closes the buy path
-        issuancePerActivityUnit : Decimal -- ^ Amulet minted per unit of reported activity weight
-        purchasedTotal : Int
-          -- ^ total traffic ever purchased for the synchronizer (bytes), computed off-ledger
-          -- by DSO automation and attested by the confirming vote; bounds the synchronizer's
-          -- total reported activity
-        rewardCouponTimeToLive : RelTime
-        dryRun : Bool
-      controller dso
-      do
-        require "issuance rate is positive" (issuancePerActivityUnit > 0.0)
-        report <- fetchAndArchive (ForDso with dso) reportCid
-        registration <- fetchChecked (ForDso with dso) registeredSynchronizerCid
-        require "report is for the registered synchronizer and its operator"
-          (registration.synchronizerId == report.synchronizerId
-            && registration.operator == report.operator)
-        require "total reported activity does not exceed purchased traffic"
-          (report.totalActivityReported <= intToDecimal purchasedTotal)
-        now <- getTime
-        create ProcessRewardsV2 with
-          dso
-          round = report.round
-          roundClosedAt = now
-          dryRun
-          rewardCouponTimeToLive
-          batchHash = report.activityRootHash
-          expander = Some report.operator
-          issuancePerActivityUnit = Some issuancePerActivityUnit
-          weightBudget = Some report.totalActivity
-
-        return AmuletRules_StartProcessingExtensionRewardsV2Result {}
 
     -- batch conversion of coupons not yet observable by their providers
     nonconsuming choice AmuletRules_UnhideRewardCouponsV2 : AmuletRules_UnhideRewardCouponsV2Result

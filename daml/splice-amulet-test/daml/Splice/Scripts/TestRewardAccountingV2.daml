@@ -84,8 +84,6 @@ create_and_process_reward_batches dryRun = do
       AmuletRules_StartProcessingRewardsV2 with
         calculateRewardsCid
         batchHash = rootBatchHash
-        issuancePerActivityUnit = None
-        weightBudget = None
 
   let processBatches = do
         states <- query @ProcessRewardsV2 app.dso
@@ -571,60 +569,3 @@ test_switch_to_traffic_based_rewards = do
   checkSummarizingRounds rewardConfig
 
   pure ()
-
--- | The unified format on the decentralized synchronizer: a round committed as a weighted
---   tree, with the issuance rate and round total passed through start-processing, mints
---   weight * rate with exact sums at every level.
-test_reward_accounting_v2_weighted : Script ()
-test_reward_accounting_v2_weighted = do
-  app <- setupAppWithConfig $ defaultAmuletConfig with
-    rewardConfig = Some $ RewardConfig with
-      mintingVersion = RewardVersion_TrafficBasedAppRewards
-      dryRunVersion = None
-      batchSize = 100
-      rewardCouponTimeToLive = hours 36
-      appRewardCouponThreshold = 0.5
-  alice <- allocateParty "Alice"
-  bob <- allocateParty "Bob"
-  setTime demoTime
-  runNextIssuanceWithTrafficBasedAppRewards app 1.2
-
-  -- the round's tree in the weighted format: leaves are activity weights
-  let leaf = BatchOfMintingAllowances $ sortOn (.provider)
-        [ MintingAllowance alice 40.0
-        , MintingAllowance bob 10.0
-        ]
-      root = BatchOfWeightedBatches
-        [ WeightedBatchRef with batchHash = CryptoHash.hash leaf; weight = 50.0 ]
-  [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
-  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-
-  -- rate and budget must be set together
-  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_StartProcessingRewardsV2 with
-    calculateRewardsCid
-    batchHash = CryptoHash.hash root
-    issuancePerActivityUnit = Some 2.0
-    weightBudget = None
-
-  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_StartProcessingRewardsV2 with
-    calculateRewardsCid
-    batchHash = CryptoHash.hash root
-    issuancePerActivityUnit = Some 2.0
-    weightBudget = Some 50.0
-
-  -- the DSO party expands as today: no expander is set for the decentralized synchronizer
-  [(rootCid, rootState)] <- query @ProcessRewardsV2 app.dso
-  rootState.expander === None
-  rootState.issuancePerActivityUnit === Some 2.0
-  rootState.weightBudget === Some 50.0
-  void $ submit app.dso $ exerciseCmd rootCid ProcessRewardsV2_ProcessBatch with
-    batch = root
-    providersWithWrongVettingState = Set.empty
-  [(leafCid, _)] <- query @ProcessRewardsV2 app.dso
-  void $ submit app.dso $ exerciseCmd leafCid ProcessRewardsV2_ProcessBatch with
-    batch = leaf
-    providersWithWrongVettingState = Set.empty
-
-  -- coupons mint at weight * rate
-  coupons <- query @RewardCouponV2 app.dso
-  sort (map (\(_, c) -> (c.provider, c.amount)) coupons) === sort [(alice, 80.0), (bob, 20.0)]

@@ -76,8 +76,6 @@ initiate_reward_processing dryRun = do
       AmuletRules_StartProcessingRewardsV2 with
         calculateRewardsCid
         batchHash = rootBatchHash
-        issuancePerActivityUnit = None
-        weightBudget = None
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 

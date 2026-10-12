@@ -383,9 +383,6 @@ abstract class StoreTestBase
       dryRun,
       new RelTime(600_000_000L),
       new cryptoHashCodegen.Hash(batchHash),
-      java.util.Optional.empty(),
-      java.util.Optional.empty(),
-      java.util.Optional.empty(),
     )
     contract(
       rewardAccountingCodegen.ProcessRewardsV2.TEMPLATE_ID_WITH_PACKAGE_ID,
