@@ -125,12 +125,11 @@ object DbScanAppRewardsStore {
   case class BatchOfBatches(childHashes: Seq[RewardHash]) extends BatchContents
   case class BatchOfMintingAllowances(allowances: Seq[MintingAllowance]) extends BatchContents
 
-  // Defensive cap on the child hashes read for one batch of batches. A batch
-  // has at most as many children as the RewardConfig.batchSize in effect when
-  // it was computed, which is not recorded with the batch, and Daml only
-  // requires batchSize > 0. The SV default is 100, and every child becomes a
-  // ProcessRewardsV2 contract created by one ProcessRewardsV2_ProcessBatch
-  // transaction, so 10000 is far beyond any practical batchSize.
+  // Defensive cap on the hashes read for `lookupBatchByHash`. Actual limit is
+  // the RewardConfig.batchSize in effect when it was computed; Daml only
+  // requires batchSize > 0. The default is 100 (in DSO config), and
+  // Dev+Test+Mainnet still use this value at time of writing, so we assume 100x
+  // that as a practical upper limit.
   private val MaxChildBatches: Int = 10000
 }
 
@@ -630,7 +629,7 @@ class DbScanAppRewardsStore(
       beginIncl: Int,
       endExcl: Int,
   )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.MintingAllowance]] = {
-    // The primary key admits at most one row per party sequence number in the range.
+    // The primary key admits at most one row per number in the range
     val rangeSize = (endExcl - beginIncl).max(1)
     val limit = HardLimit.tryCreate(rangeSize, rangeSize)
     val opName = "appRewards.lookupBatchByHash.allowances"
@@ -644,7 +643,7 @@ class DbScanAppRewardsStore(
               and app_provider_party_seq_num < $endExcl
             order by app_provider_party_seq_num
             limit ${sqlLimit(limit)}
-      """.as[(String, BigDecimal)],
+        """.as[(String, BigDecimal)],
         opName,
       )
     } yield applyLimit(opName, limit, allowances).map { case (provider, amount) =>

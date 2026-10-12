@@ -1077,7 +1077,7 @@ class DbScanAppRewardsStoreTest
 
     "internal batch with more children than maxChildBatches warns and truncates" in {
       for {
-        // 4 parties / batchSize=2 -> 2 level-0 batches -> root is 1 level-1 batch
+        // 4 parties / batchSize=2 -> 2 batches + root
         (store, batchHashes, rootHash) <- setupAndComputeHashes(partyCount = 4, batchSize = 2)
         result <- loggerFactory.assertLogs(
           store.lookupBatchByHash(roundNumber, rootHash, maxChildBatches = 1),
