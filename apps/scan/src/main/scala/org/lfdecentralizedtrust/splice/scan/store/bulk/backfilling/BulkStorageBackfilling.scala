@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageBackfillingConfig
 import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdatesSegment
 import org.lfdecentralizedtrust.splice.scan.store.historystart.{HistoryStart, ScanHistoryStart}
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -30,7 +29,6 @@ import scala.util.{Failure, Success, Try}
 class BulkStorageBackfilling(
     config: BulkStorageBackfillingConfig,
     storageConfig: ScanStorageConfig,
-    currentMigrationId: Long,
     listing: BulkObjectListing,
     copier: ObjectCopier,
     progress: BackfillingProgress,
@@ -199,7 +197,7 @@ class BulkStorageBackfilling(
   )(implicit tc: TraceContext): Future[Emitted[Option[CantonTimestamp]]] =
     for {
       cursor <- progress.readSnapshotsCursor
-      requested <- lastRequested.orElse(cursor.map(_.timestamp)) match {
+      requested <- lastRequested.orElse(cursor) match {
         case Some(last) =>
           Future.successful[PeerListing[Option[CantonTimestamp]]](
             PeerListing.Available(Some(storageConfig.computeBulkSnapshotTimeAfter(last)))
@@ -231,27 +229,27 @@ class BulkStorageBackfilling(
               noPeerHolds(lastRequested, ts, s"the snapshot at $ts")
             case PeerListing.Available(None) =>
               nothingNewer(s"The peers have no committed snapshot at $ts")
-            case PeerListing.Available(Some(snapshot))
-                if cursor.exists(_.timestamp >= snapshot.recordTime) =>
+            case PeerListing.Available(Some(snapshot)) if cursor.exists(_ >= snapshot.recordTime) =>
               nothingNewer(s"The peers have no snapshot after ${snapshot.recordTime}")
             case PeerListing.Available(Some(snapshot))
                 if snapshot.perEncoding.forall(_.objects.isEmpty) =>
-              val skipped = TimestampWithMigrationId(snapshot.recordTime, currentMigrationId)
               for {
-                _ <- progress.persistSnapshotsCursor(skipped)
+                _ <- progress.persistSnapshotsCursor(snapshot.recordTime)
                 step <- continueWith(
                   Some(snapshot.recordTime),
                   SnapshotSkipped(snapshot.recordTime),
                 )
               } yield step
             case PeerListing.Available(Some(snapshot)) =>
-              val copied = TimestampWithMigrationId(snapshot.recordTime, currentMigrationId)
               for {
                 _ <- copyFromPeers(snapshot.perEncoding)
-                _ <- progress.persistSnapshotsCursor(copied)
+                _ <- progress.persistSnapshotsCursor(snapshot.recordTime)
                 step <- continueWith(
                   Some(snapshot.recordTime),
-                  SnapshotCopied(copied, ObjectsOnPeers.objectsIn(snapshot.perEncoding).size),
+                  SnapshotCopied(
+                    snapshot.recordTime,
+                    ObjectsOnPeers.objectsIn(snapshot.perEncoding).size,
+                  ),
                 )
               } yield step
           }
@@ -327,7 +325,7 @@ object BulkStorageBackfilling {
   final case class SegmentCopied(segment: UpdatesSegment, objects: Int) extends Step
   final case class UpdatesCopied(upTo: CantonTimestamp) extends Step
   final case class SnapshotSkipped(at: CantonTimestamp) extends Step
-  final case class SnapshotCopied(snapshot: TimestampWithMigrationId, objects: Int) extends Step
+  final case class SnapshotCopied(at: CantonTimestamp, objects: Int) extends Step
   case object SnapshotsCopied extends Step
   final case class WaitingForPeers(at: CantonTimestamp) extends Step
   final case class NoPeerHolds(at: CantonTimestamp) extends Step

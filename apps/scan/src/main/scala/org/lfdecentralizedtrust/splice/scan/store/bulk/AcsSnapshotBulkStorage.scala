@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -33,14 +32,14 @@ trait AcsSnapshotBulkStorageWriter {
     * processed or skipped (but will remember that it was skipped and update `last` for the future calls accordingly).
     */
   def getNextSnapshotTimestampAfter(
-      last: TimestampWithMigrationId
-  )(implicit tc: TraceContext): Future[Option[TimestampWithMigrationId]]
+      last: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]]
 
   /** This method should return true if the snapshot at the given timestamp should be processed,
     * or false if it should be skipped. This is used to skip snapshots that are not relevant for bulk storage
     * (e.g. because they are in the DB, but are more frequent than the frequency we need for bulk storage).
     */
-  def shouldProcessSnapshotAt(ts: TimestampWithMigrationId)(implicit
+  def shouldProcessSnapshotAt(ts: CantonTimestamp)(implicit
       tc: TraceContext
   ): Boolean
 
@@ -50,7 +49,7 @@ trait AcsSnapshotBulkStorageWriter {
   def processSnapshotsFlow(implicit
       tc: TraceContext,
       actorSystem: ActorSystem,
-  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed]
+  ): Flow[CantonTimestamp, CantonTimestamp, NotUsed]
 
 }
 
@@ -63,19 +62,19 @@ class AcsSnapshotBulkStoragePersistentProgress(
 ) extends NamedLogging
     with Spanning {
 
-  import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider.acsSnapshotTimestampMigrationCodec
+  import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider.timestampCodec
 
   def readLatestProcessedSnapshotTimestamp(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[TimestampWithMigrationId]] = {
+  ): Future[Option[CantonTimestamp]] = {
     kvProvider.store.readValueAndLogOnDecodingFailure(latestSnapshotKvStoreKey).value
   }
 
   def readFirstSnapshotTimestamp(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[TimestampWithMigrationId]] = {
+  ): Future[Option[CantonTimestamp]] = {
     kvProvider.store.readValueAndLogOnDecodingFailure(firstSnapshotKvStoreKey).value
   }
 
@@ -89,12 +88,12 @@ class AcsSnapshotBulkStoragePersistentProgress(
     } yield {}
   }
 
-  def persistLatestProcessedSnapshotTimestamp(ts: TimestampWithMigrationId)(implicit
+  def persistLatestProcessedSnapshotTimestamp(ts: CantonTimestamp)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Unit] = {
 
-    metric.updateValue(ts.timestamp)
+    metric.updateValue(ts)
     for {
       _ <- kvProvider.store
         .setValueIfNotExists(firstSnapshotKvStoreKey, ts)
@@ -102,7 +101,7 @@ class AcsSnapshotBulkStoragePersistentProgress(
         .setValue(latestSnapshotKvStoreKey, ts)
         .map(_ => {
           logger.info(
-            s"Successfully completed processing snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+            s"Successfully completed processing snapshots up to timestamp $ts"
           )
         })
     } yield {}
@@ -119,18 +118,16 @@ class AcsSnapshotBulkStorage(
 )(implicit actorSystem: ActorSystem, ec: ExecutionContext)
     extends NamedLogging
     with Spanning
-    with PekkoRetryableService[TimestampWithMigrationId] {
+    with PekkoRetryableService[CantonTimestamp] {
 
   private def getAcsSnapshotTimestampsAfter(
-      start: TimestampWithMigrationId
-  )(implicit tc: TraceContext): Source[TimestampWithMigrationId, NotUsed] = {
+      start: CantonTimestamp
+  )(implicit tc: TraceContext): Source[CantonTimestamp, NotUsed] = {
     Source
-      .unfoldAsync(start) { (last: TimestampWithMigrationId) =>
+      .unfoldAsync(start) { (last: CantonTimestamp) =>
         writer.getNextSnapshotTimestampAfter(last).flatMap {
           case Some(snapshot) =>
-            logger.info(
-              s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.timestamp}"
-            )
+            logger.info(s"next snapshot available, at record time $snapshot")
             Future.successful(
               Some(
                 (
@@ -157,20 +154,18 @@ class AcsSnapshotBulkStorage(
     *   is successfully dumped, it persists to the DB its timestamp, and emits that timestamp as an output.
     *   It is an infinite source that should never complete.
     */
-  private def mksrc()(implicit tc: TraceContext): Source[TimestampWithMigrationId, Cancellable] = {
+  private def mksrc()(implicit tc: TraceContext): Source[CantonTimestamp, Cancellable] = {
 
     backfillingCompleteGate.flatMap { _ =>
       Source
         .future(persistentProgress.readLatestProcessedSnapshotTimestamp)
         .flatMapConcat {
-          case Some(start: TimestampWithMigrationId) =>
-            logger.info(
-              s"Latest processed snapshot was from migration ${start.migrationId}, timestamp ${start.timestamp}"
-            )
+          case Some(start) =>
+            logger.info(s"Latest processed snapshot was at timestamp $start")
             getAcsSnapshotTimestampsAfter(start)
           case None =>
             logger.info("No processed snapshots yet, starting from genesis")
-            getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
+            getAcsSnapshotTimestampsAfter(CantonTimestamp.MinValue)
         }
         .filter { writer.shouldProcessSnapshotAt }
         .via(writer.processSnapshotsFlow)
@@ -184,7 +179,7 @@ class AcsSnapshotBulkStorage(
       automationConfig: AutomationConfig,
       backoffClock: Clock,
       retryProvider: RetryProvider,
-  )(implicit tracer: Tracer): PekkoRetryingService[TimestampWithMigrationId] = {
+  )(implicit tracer: Tracer): PekkoRetryingService[CantonTimestamp] = {
     withNewTrace(description) { implicit traceContext => _ =>
       val src = mksrc()
       new PekkoRetryingService(

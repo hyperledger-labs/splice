@@ -46,6 +46,7 @@ import org.lfdecentralizedtrust.splice.store.{
   S3BucketConnection,
   StoreTestBase,
   TimestampWithMigrationId,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
@@ -233,6 +234,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
         bulkStorageTestConfig,
         appConfig,
         store.store,
+        store.updateHistory,
         s3BucketConnection,
         historyMetrics,
         loggerFactory,
@@ -329,7 +331,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
         clue("Initially, a single snapshot is dumped") {
           eventually(4.minutes) {
             val persistedTs1 = progress.readLatestProcessedSnapshotTimestamp.futureValue
-            persistedTs1 shouldBe Some(TimestampWithMigrationId(ts1, 0))
+            persistedTs1 shouldBe Some(ts1)
           }
           assertLatestSnapshotInMetrics(ts1)
           assertGetObjects(ts1, ts1, ScanStorageConfig.Encoding.CompactJson, 12)
@@ -360,7 +362,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
 
           eventually(4.minutes) {
             val persistedTs3 = progress.readLatestProcessedSnapshotTimestamp.futureValue
-            persistedTs3.value shouldBe TimestampWithMigrationId(ts3, 0)
+            persistedTs3.value shouldBe ts3
           }
           assertLatestSnapshotInMetrics(ts3)
           assertGetObjects(ts3, ts3, ScanStorageConfig.Encoding.CompactJson, 12)
@@ -383,13 +385,60 @@ class AcsSnapshotBulkStorageWriterFromDbTest
 
       }
     }
+
+    "look up the next snapshot in the lowest migration with updates after the cursor" in {
+      val cursor = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
+      val next = cursor.plus(java.time.Duration.ofDays(1))
+      val store = mock[AcsSnapshotStore]
+      when(store.lookupSnapshotAfter(anyLong, any[CantonTimestamp])(any[TraceContext]))
+        .thenReturn(Future.successful(None))
+      when(store.lookupSnapshotAfter(eqTo(1L), eqTo(cursor))(any[TraceContext]))
+        .thenReturn(
+          Future.successful(
+            Some(
+              AcsSnapshotStore.LegacyAcsSnapshot(
+                snapshotRecordTime = next,
+                migrationId = 1L,
+                0L,
+                0L,
+                0L,
+                None,
+                None,
+                indexesCreated = true,
+              )
+            )
+          )
+        )
+      val updateHistory = mock[UpdateHistory]
+      when(updateHistory.getLowestMigrationForRecordTime(eqTo(cursor))(any[TraceContext]))
+        .thenReturn(Future.successful(Some(1L)))
+      val writer = new AcsSnapshotBulkStorageWriterFromDb(
+        bulkStorageTestConfig,
+        appConfig,
+        store,
+        updateHistory,
+        mock[S3BucketConnection],
+        new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
+        loggerFactory,
+      )
+      writer.getNextSnapshotTimestampAfter(cursor).map(_ shouldBe Some(next))
+    }
   }
 
   class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {
     private var snapshots = Seq(initialSnapshotTimestamp)
     val store = mockAcsSnapshotStore(acsSnapshotSize)
+    val updateHistory = mockUpdateHistory()
 
     def addSnapshot(timestamp: CantonTimestamp) = { snapshots = snapshots :+ timestamp }
+
+    private def mockUpdateHistory(): UpdateHistory = {
+      val updateHistory = mock[UpdateHistory]
+      when(
+        updateHistory.getLowestMigrationForRecordTime(any[CantonTimestamp])(any[TraceContext])
+      ).thenReturn(Future.successful(Some(0L)))
+      updateHistory
+    }
 
     def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
       val store = mock[AcsSnapshotStore]

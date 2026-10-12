@@ -41,11 +41,11 @@ class BulkStorageReader(
               throw Status.NOT_FOUND
                 .withDescription("no snapshot in committed bulk storage yet")
                 .asRuntimeException()
-            case Some(ts) if ts.timestamp < atOrBeforeTimestamp =>
+            case Some(ts) if ts < atOrBeforeTimestamp =>
               logger.trace(
-                s"Latest snapshot in committed bulk storage is at ${ts.timestamp}, which is before the requested timestamp $atOrBeforeTimestamp, returning that one"
+                s"Latest snapshot in committed bulk storage is at $ts, which is before the requested timestamp $atOrBeforeTimestamp, returning that one"
               )
-              ts.timestamp
+              ts
             case Some(ts) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
           }
       objects <- getAcsSnapshotObjects(
@@ -70,9 +70,9 @@ class BulkStorageReader(
             s"No snapshot in staging bulk storage yet"
           )
           Future.successful(None)
-        case Some(ts) if ts.timestamp <= afterTimestamp =>
+        case Some(ts) if ts <= afterTimestamp =>
           logger.debug(
-            s"Latest snapshot in staging bulk storage is at ${ts.timestamp}, which is not after the requested timestamp $afterTimestamp"
+            s"Latest snapshot in staging bulk storage is at $ts, which is not after the requested timestamp $afterTimestamp"
           )
           Future.successful(None)
         case Some(ts) if afterTimestamp == CantonTimestamp.MinValue =>
@@ -91,7 +91,7 @@ class BulkStorageReader(
             }
         case Some(ts) =>
           logger.trace(
-            s"Latest snapshot in staging bulk storage is at ${ts.timestamp}, which is after the requested timestamp $afterTimestamp, computing the next snapshot timestamp after $afterTimestamp (which is larger than min time of ${CantonTimestamp.MinValue})"
+            s"Latest snapshot in staging bulk storage is at $ts, which is after the requested timestamp $afterTimestamp, computing the next snapshot timestamp after $afterTimestamp (which is larger than min time of ${CantonTimestamp.MinValue})"
           )
           Future.successful(
             Some(
@@ -177,8 +177,8 @@ class BulkStorageReader(
     } yield {
       (updates, snapshots) match {
         case (Some(updatesSegment), Some(snapshotTs)) =>
-          if (updatesSegment.toTimestamp > snapshotTs.timestamp) {
-            snapshotTs.timestamp
+          if (updatesSegment.toTimestamp > snapshotTs) {
+            snapshotTs
           } else {
             updatesSegment.toTimestamp
           }
@@ -256,9 +256,7 @@ class BulkStorageReader(
   }
 
   private def getFirstAcsSnapshotTimestampAfterGenesis: Future[Option[CantonTimestamp]] =
-    acsSnapshotStagingProgress.readFirstSnapshotTimestamp.map(
-      _.map(_.timestamp)
-    )
+    acsSnapshotStagingProgress.readFirstSnapshotTimestamp
 
   private def getUpdatesBetweenDatesFromBucket(
       afterRecordTime: CantonTimestamp,
