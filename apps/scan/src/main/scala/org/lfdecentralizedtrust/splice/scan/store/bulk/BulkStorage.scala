@@ -13,6 +13,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
@@ -36,6 +37,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage.{
   acsCommittedKvStoreKey,
   acsStagingKvStoreKey,
   firstAcsSnapshotTimestampKvStoreKey,
+  legacyKvStoreKeys,
   updatesCommittedKvStoreKey,
   updatesStagingKvStoreKey,
 }
@@ -284,6 +286,7 @@ class BulkStorage(
           _ <- updatesStagingProgress.reset
           _ <- updatesCommittedProgress.reset
           _ <- backfillingProgress.resetCompletion()
+          _ <- deleteLegacyKeys()
         } yield ()
       } else Future.unit
     resetAll.map { _ =>
@@ -291,6 +294,9 @@ class BulkStorage(
       this
     }
   }
+
+  private def deleteLegacyKeys(): Future[Unit] =
+    MonadUtil.sequentialTraverse_(legacyKvStoreKeys)(kvProvider.store.deleteKey(_))
 
   final override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     services.flatMap(_.closeAsync()) :+
@@ -304,6 +310,15 @@ object BulkStorage {
   val updatesStagingKvStoreKey = "latest_updates_segment_in_bulk_storage_staging_v2"
   val updatesCommittedKvStoreKey = "latest_updates_segment_in_bulk_storage_committed_v2"
   val firstAcsSnapshotTimestampKvStoreKey = "first_acs_snapshot_timestamp_in_bulk_storage_v2"
+
+  val legacyKvStoreKeys: Seq[String] = Seq(
+    "latest_acs_snapshot_in_bulk_storage_staging",
+    "latest_acs_snapshot_in_bulk_storage_committed",
+    "latest_updates_segment_in_bulk_storage_staging",
+    "latest_updates_segment_in_bulk_storage_committed",
+    "first_acs_snapshot_timestamp_in_bulk_storage",
+    "bulk_storage_backfill_complete",
+  )
 
   def apply(
       storageConfig: ScanStorageConfig,
