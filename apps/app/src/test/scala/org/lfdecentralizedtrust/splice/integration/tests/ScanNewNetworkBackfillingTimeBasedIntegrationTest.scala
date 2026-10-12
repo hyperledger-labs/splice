@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageBackfillingConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryStart
 import org.lfdecentralizedtrust.splice.store.{HasS3Mock, S3BucketConnectionForTests}
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
+  LocalSequencerConnectionsTrigger,
+  ReceiveSvRewardCouponTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 
 import java.time.Duration
@@ -45,6 +48,7 @@ class ScanNewNetworkBackfillingTimeBasedIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[LocalSequencerConnectionsTrigger]
+            .withPausedTrigger[ReceiveSvRewardCouponTrigger]
         )(config)
       )
       .addConfigTransforms((_, config) =>
