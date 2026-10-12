@@ -36,6 +36,8 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   BulkObjectsAvailability,
+  BulkStorageBucket,
+  DamlValueEncoding,
   ErrorResponse,
   GetBulkObjectsProgressResponse,
   GetRewardAccountingActivityTotalsResponse,
@@ -50,13 +52,18 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   RewardAccountingRootHashUndetermined,
 }
 
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.DataAvailabilityResponse
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  DataAvailabilityResponse,
+  NoScanWillHaveData,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  BulkStorageObjects,
   DomainScans,
   DsoScan,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppClientConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -1039,6 +1046,82 @@ class BftScanConnectionTest
         code should be(StatusCodes.BadGateway)
         message should include("Failed to reach consensus from 5 Scan nodes")
       }
+    }
+  }
+
+  "BftScanConnection for bulk storage listing" should {
+    val availableAt = ctime(2)
+    val page = BulkStorageObjects.UpdateObjectsPage(
+      Seq(ObjectKeyAndChecksum("s/updates_compact_json_0.zstd", "checksum-0")),
+      None,
+    )
+
+    def makeMockReturnCommittedProgress(
+        mock: SingleScanConnection,
+        availability: BulkObjectsAvailability,
+    ): Unit =
+      when(
+        mock.getBulkObjectsProgress(eqTo(availableAt), eqTo(BulkStorageBucket.Committed))(
+          any[ExecutionContext],
+          any[TraceContext],
+        )
+      ).thenReturn(Future.successful(GetBulkObjectsProgressResponse(availability)))
+
+    def makeMockReturnUpdateObjects(mock: SingleScanConnection): Unit =
+      when(
+        mock.listBulkUpdateHistoryObjects(
+          any[CantonTimestamp],
+          any[CantonTimestamp],
+          any[Int],
+          any[Option[String]],
+          any[Option[DamlValueEncoding]],
+        )(any[ExecutionContext], any[TraceContext])
+      ).thenReturn(Future.successful(page))
+
+    def listUpdates(bft: BftScanConnection) =
+      bft.listBulkUpdateHistoryObjectsWithPeers(
+        ctime(1),
+        availableAt,
+        10,
+        availableAt,
+        ScanStorageConfig.Encoding.CompactJson,
+      )
+
+    "list from the scans that committed the objects up to the given time, and return them" in {
+      val connections = getMockedConnections(n = 4)
+      connections.foreach { connection =>
+        makeMockReturnCommittedProgress(connection, BulkObjectsAvailability.Available)
+        makeMockReturnUpdateObjects(connection)
+      }
+
+      listUpdates(getBft(connections)).map { case (listed, peers) =>
+        listed shouldBe page
+        peers should not be empty
+        connections.map(_.url) should contain allElementsOf peers
+      }
+    }
+
+    "list from the founder alone when every other scan is backfilling" in {
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnCommittedProgress(connections(0), BulkObjectsAvailability.Available)
+      makeMockReturnUpdateObjects(connections(0))
+      connections
+        .drop(1)
+        .foreach(
+          makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling)
+        )
+
+      listUpdates(getBft(connections)).map { case (listed, peers) =>
+        listed shouldBe page
+        peers shouldBe List(connections(0).url)
+      }
+    }
+
+    "report that no scan will have the objects when every scan is backfilling" in {
+      val connections = getMockedConnections(n = 4)
+      connections.foreach(makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling))
+
+      listUpdates(getBft(connections)).failed.map(_ shouldBe a[NoScanWillHaveData])
     }
   }
 

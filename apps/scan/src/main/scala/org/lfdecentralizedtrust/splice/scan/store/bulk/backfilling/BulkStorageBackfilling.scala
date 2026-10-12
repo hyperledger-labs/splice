@@ -239,7 +239,14 @@ class BulkStorageBackfilling(
               nothingNewer(s"The peers have no snapshot after ${snapshot.recordTime}")
             case PeerListing.Available(Some(snapshot))
                 if snapshot.perEncoding.forall(_.objects.isEmpty) =>
-              continueWith(Some(snapshot.recordTime), SnapshotSkipped(snapshot.recordTime))
+              val skipped = TimestampWithMigrationId(snapshot.recordTime, currentMigrationId)
+              for {
+                _ <- progress.persistSnapshotsCursor(skipped)
+                step <- continueWith(
+                  Some(snapshot.recordTime),
+                  SnapshotSkipped(snapshot.recordTime),
+                )
+              } yield step
             case PeerListing.Available(Some(snapshot)) =>
               val copied = TimestampWithMigrationId(snapshot.recordTime, currentMigrationId)
               for {
