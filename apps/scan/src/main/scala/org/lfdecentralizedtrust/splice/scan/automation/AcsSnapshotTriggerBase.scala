@@ -215,7 +215,7 @@ object AcsSnapshotTriggerBase {
   /** Determines the next task to perform in order to update the incremental snapshot for the given migration.
     *
     * @param migrationId the migration for which to retrieve the task
-    * @param isHistoryBackfilled check if the history backfilling is complete for a given migration
+    * @param mayStart check if snapshots may be taken for a given migration
     * @param getIncrementalSnapshot the current incremental snapshot, if it exists
     * @param getLatestSnapshot the latest full snapshot for a given migration
     * @param getMinRecordTime the record time of the first non-import update for a given migration
@@ -228,7 +228,7 @@ object AcsSnapshotTriggerBase {
     */
   def retrieveTaskForMigration(
       migrationId: Long,
-      isHistoryBackfilled: (Long) => Future[Boolean],
+      mayStart: (Long) => Future[Boolean],
       getIncrementalSnapshot: () => Future[Option[IncrementalAcsSnapshot]],
       getLatestSnapshot: (Long) => Future[Option[AcsSnapshot]],
       getMinRecordTime: (Long) => Future[Option[CantonTimestamp]],
@@ -241,7 +241,7 @@ object AcsSnapshotTriggerBase {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[RetrieveTaskForMigrationResult] = {
-    isHistoryBackfilled(migrationId).flatMap {
+    mayStart(migrationId).flatMap {
       case false =>
         // UpdateHistoryBackfillingTrigger is still running for this migration,
         // wait until it's done.
