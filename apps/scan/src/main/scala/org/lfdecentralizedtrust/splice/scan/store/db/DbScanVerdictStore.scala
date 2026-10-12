@@ -249,7 +249,7 @@ object DbScanVerdictStore {
   // limits are not enforced on PV 35 and are far higher on PV 36, but the
   // mediator's informee tree takes at least 108 bytes per view, so slightly
   // less than 100k fit within 10 MiB. Revisit this if a well-behaved
-  // synchronizer might ever raises those limits.
+  // synchronizer might ever raise those limits.
   private val MaxTransactionViewsPerVerdict: HardLimit = HardLimit.tryCreate(100000, 100000)
 
   def apply(
