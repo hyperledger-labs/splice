@@ -1,0 +1,374 @@
+# pg-partition-bq-test
+
+This is a throwaway CloudSQL → Datastream → BigQuery pipeline whose source is a
+range-partitioned Postgres table. It exists to validate the
+[#6312](https://github.com/canton-network/splice/issues/6312) cutover of the scan
+`update_history_*` tables to partitioned parents before the migration ships, in
+particular the `publish_via_partition_root = true` publication setting from
+[#6730](https://github.com/canton-network/splice/issues/6730).
+
+The stack mirrors the **stag-prod** stream in `common-sv/src/bigQuery.ts`:
+`appendOnly`, `backfillNone`, and HOUR ingestion-time partitioning. Because of
+`backfillNone`, Datastream backfill is not part of this test. The publication and
+replication slot are created by the real
+`cluster/pulumi/canton-network/bigquery-cloudsql.sh`.
+
+The stack is applied manually only. It is not part of any deploy flow or of `make update-expected`.
+
+## What gets deployed
+
+| Resource | Name |
+|---|---|
+| CloudSQL instance (private IP, `cloudsql.logical_decoding=on`) | `<cluster>-pgpart-db-<suffix>` |
+| Database and schema | `partition_test` |
+| Users | `cnadmin` (owns the tables), `bqdatastream` (Datastream) |
+| Tables | `partitioned_events` (partitioned from the start), `cutover_events` (plain, swapped in section 2) |
+| Publication and slot | `pgpart_stag_prod_pub` (`publish_via_partition_root = true`), `pgpart_stag_prod_r_slot` |
+| NAT VM, Datastream private connection, firewall | `<cluster>-pgpart-*`; peering /29 is `GCP_MASTER_IPV4_CIDR` + 24 |
+| BigQuery dataset | `pgpart_<cluster>` |
+| Datastream stream | `<cluster>-pgpart-stag-prod` |
+
+Datastream names the BigQuery tables `<schema>_<table>`, so the two tables
+expected in the dataset are `partition_test_partitioned_events` and
+`partition_test_cutover_events`.
+
+## Deploy
+
+You need the same GCP permissions as for deploying scan's BigQuery pipeline:
+Cloud SQL Editor, permission to create GCS buckets, and Datastream and BigQuery
+admin. The Datastream API must be enabled in the project; check with
+`gcloud services list --enabled | grep datastream`.
+
+```bash
+cd cluster/deployment/scratchnetd
+cncluster pulumi pg-partition-bq-test up
+cncluster pulumi pg-partition-bq-test stack output --show-secrets
+```
+
+The first `up` creates
+`cluster/stacks/scratchnets/pg-partition-bq-test/Pulumi.pg-partition-bq-test.scratchd.yaml`.
+Commit it alongside this project.
+
+Set these variables for the commands below, filled from the stack outputs:
+
+```bash
+PRIVATE_IP=...          # privateIp
+PGPASSWORD=...          # cnadminPassword
+BQ_DATASET=...          # bigQueryDataset, e.g. da-cn-scratchnet.pgpart_scratchd
+STREAM=...              # datastreamStreamId
+```
+
+### psql
+
+The instance has only a private IP. The scratchnet's GKE cluster is in the same
+VPC, so run a client pod there:
+
+```bash
+kubectl run pgpart-psql --rm -it --restart=Never --image=postgres:18 \
+  --env=PGPASSWORD="$PGPASSWORD" \
+  -- psql -h "$PRIVATE_IP" -U cnadmin -d partition_test
+```
+
+As a fallback, `gcloud compute ssh <natVmName> --zone <natVmZone>`, then
+`sudo apt-get install -y postgresql-client` and run the same `psql` command.
+
+Start every psql session with:
+
+```sql
+SET search_path TO partition_test;
+SET TIME ZONE 'UTC';
+```
+
+### BigQuery
+
+```bash
+bq query --use_legacy_sql=false "<query>"
+```
+
+Datastream writes with a delay of a few minutes, even with `dataFreshness: 0s`.
+Re-run BigQuery checks until the numbers stop changing before you conclude anything.
+To check the stream status and per-object errors:
+
+```bash
+gcloud datastream streams describe "$STREAM" --location=us-central1 --format='value(state,errors)'
+gcloud datastream objects list --stream="$STREAM" --location=us-central1
+```
+
+## 0. Publication sanity
+
+```sql
+SELECT pubname, pubviaroot FROM pg_publication;
+SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+```
+
+- **Expected:** `pgpart_stag_prod_pub` has `pubviaroot = t`. The table list shows
+  `partitioned_events` and `cutover_events` only, with no partitions such as
+  `partitioned_events_import`.
+
+## 1. Partitions and CDC
+
+Create daily partitions for yesterday, today and tomorrow, in the same shape the
+#6312 migration uses (`record_time` in microseconds since the epoch):
+
+```sql
+DO $$
+DECLARE d date;
+BEGIN
+  FOR d IN SELECT generate_series(current_date - 1, current_date + 1, interval '1 day')::date LOOP
+    EXECUTE format(
+      'CREATE TABLE IF NOT EXISTS %I PARTITION OF partitioned_events FOR VALUES FROM (%s) TO (%s)',
+      'partitioned_events_p' || to_char(d, 'YYYYMMDD'),
+      (extract(epoch FROM d::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint,
+      (extract(epoch FROM (d + 1)::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint);
+  END LOOP;
+END $$;
+```
+
+Confirm the partitions exist:
+
+```sql
+\d+ partitioned_events
+SELECT inhrelid::regclass AS partition, pg_get_expr(c.relpartbound, c.oid) AS bound
+  FROM pg_inherits JOIN pg_class c ON c.oid = inhrelid
+  WHERE inhparent = 'partitioned_events'::regclass ORDER BY 1;
+```
+
+Insert rows into every partition, including the import partition, and count them per partition:
+
+```sql
+INSERT INTO partitioned_events (record_time, payload)
+  SELECT (extract(epoch FROM t) * 1000000)::bigint, 'phase1 ' || t
+  FROM generate_series(current_date - 1 + interval '1 hour',
+                       current_date + 1 + interval '23 hours', interval '6 hours') AS t;
+INSERT INTO partitioned_events (record_time, payload) VALUES (-62135596800000000, 'phase1 import');
+
+SELECT tableoid::regclass, count(*) FROM partitioned_events GROUP BY 1 ORDER BY 1;
+SELECT count(*), min(row_id), max(row_id) FROM partitioned_events;
+```
+
+Check BigQuery:
+
+```sql
+SELECT table_name FROM `<BQ_DATASET>`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+
+SELECT count(*), min(row_id), max(row_id)
+  FROM `<BQ_DATASET>.partition_test_partitioned_events`;
+
+SELECT row_id, count(*) FROM `<BQ_DATASET>.partition_test_partitioned_events`
+  GROUP BY row_id HAVING count(*) > 1;
+```
+
+- **Expected:**
+  - The dataset has exactly one table per parent and nothing named after a
+    partition, such as `…_partitioned_events_p20261012` or `…_import`.
+  - Count, min and max equal the Postgres numbers.
+  - The duplicate query returns no rows.
+  - `datastream_metadata.change_type` is `INSERT` for every row.
+- **Failure signal:** the stream lists only the parents in `includeObjects`, so a
+  publication without `pubviaroot` would most likely **silently drop** the rows
+  rather than create per-partition tables. That is why this step compares counts
+  and not only table names.
+
+Then add a partition for the day after tomorrow, insert a row into it, and check
+that the row arrives in the same BigQuery table.
+
+## 2. Cutover simulation (#6312 rename swap)
+
+Seed the plain table and confirm the rows reach BigQuery:
+
+```sql
+INSERT INTO cutover_events (record_time, payload)
+  SELECT (extract(epoch FROM t) * 1000000)::bigint, 'pre-cutover ' || t
+  FROM generate_series(now() - interval '2 hours', now(), interval '30 minutes') AS t;
+SELECT count(*), max(row_id) FROM cutover_events;
+```
+
+```sql
+SELECT count(*), max(row_id) FROM `<BQ_DATASET>.partition_test_cutover_events`;
+```
+
+### 2a. Rename alone: what the publication does by default
+
+Publications track tables by OID, so a renamed table stays published under its new name:
+
+```sql
+BEGIN;
+ALTER TABLE cutover_events RENAME TO cutover_events_legacy;
+SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+ROLLBACK;
+```
+
+- **Expected:** `cutover_events_legacy` is listed. This is why the migration in 2b
+  needs a publication step. After the cutover the publication must **not**
+  contain the `*_legacy` tables.
+
+### 2b. Pseudo-Flyway migration
+
+This block is written to be copied into the #6312 migration for each of the five
+tables. The final `DO` block alters only the publications that contain the
+renamed table. It is a no-op on deployments without Datastream, where there is
+no publication.
+
+```sql
+BEGIN;
+
+ALTER TABLE cutover_events RENAME TO cutover_events_legacy;
+ALTER INDEX cutover_events_pkey RENAME TO cutover_events_legacy_pkey;
+
+CREATE TABLE cutover_events (
+  row_id bigint NOT NULL,
+  record_time bigint NOT NULL,
+  payload text,
+  PRIMARY KEY (record_time, row_id)
+) PARTITION BY RANGE (record_time);
+
+-- move the sequence to the new parent; the legacy table is immutable from here on
+ALTER TABLE cutover_events_legacy ALTER COLUMN row_id DROP DEFAULT;
+ALTER SEQUENCE cutover_events_row_id_seq OWNED BY cutover_events.row_id;
+ALTER TABLE cutover_events ALTER COLUMN row_id SET DEFAULT nextval('cutover_events_row_id_seq');
+
+CREATE TABLE cutover_events_import
+  PARTITION OF cutover_events FOR VALUES FROM (MINVALUE) TO (-62135596799999999);
+DO $$
+DECLARE d date;
+BEGIN
+  FOR d IN SELECT generate_series(current_date - 1, current_date + 1, interval '1 day')::date LOOP
+    EXECUTE format(
+      'CREATE TABLE %I PARTITION OF cutover_events FOR VALUES FROM (%s) TO (%s)',
+      'cutover_events_p' || to_char(d, 'YYYYMMDD'),
+      (extract(epoch FROM d::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint,
+      (extract(epoch FROM (d + 1)::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint);
+  END LOOP;
+END $$;
+
+-- Optional publication alteration: swap the renamed table for the new parent in
+-- every publication that (by OID) still publishes it.
+DO $$
+DECLARE pub record;
+BEGIN
+  FOR pub IN
+    SELECT p.pubname, p.pubviaroot
+      FROM pg_publication p
+      JOIN pg_publication_tables t ON t.pubname = p.pubname
+      WHERE NOT p.puballtables
+        AND t.schemaname = current_schema()
+        AND t.tablename = 'cutover_events_legacy'
+  LOOP
+    EXECUTE format('ALTER PUBLICATION %I DROP TABLE %I', pub.pubname, 'cutover_events_legacy');
+    IF pub.pubviaroot THEN
+      EXECUTE format('ALTER PUBLICATION %I ADD TABLE %I', pub.pubname, 'cutover_events');
+    ELSE
+      -- a partitioned parent in such a publication is published per partition
+      RAISE WARNING 'publication % does not publish_via_partition_root; not adding cutover_events',
+        pub.pubname;
+    END IF;
+  END LOOP;
+END $$;
+
+COMMIT;
+```
+
+```sql
+SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+```
+
+- **Expected:** `partitioned_events` and `cutover_events` are listed, and
+  `cutover_events_legacy` is **not**.
+- Re-running only the last `DO` block changes nothing.
+- **Robust without a publication:** in a scratch schema, create a plain
+  `cutover_events` with `row_id bigserial PRIMARY KEY`, then run the whole
+  migration block with `search_path` set to that schema. It must succeed without warnings:
+
+  ```sql
+  CREATE SCHEMA nopub_test; SET search_path TO nopub_test;
+  CREATE TABLE cutover_events (row_id bigserial PRIMARY KEY, record_time bigint NOT NULL, payload text);
+  -- run the 2b block, then
+  DROP SCHEMA nopub_test CASCADE; SET search_path TO partition_test;
+  ```
+
+Insert post-cutover rows across several partitions:
+
+```sql
+INSERT INTO cutover_events (record_time, payload)
+  SELECT (extract(epoch FROM t) * 1000000)::bigint, 'post-cutover ' || t
+  FROM generate_series(current_date - 1 + interval '3 hours',
+                       current_date + 1 + interval '21 hours', interval '6 hours') AS t;
+SELECT (SELECT count(*) FROM cutover_events_legacy) AS legacy,
+       (SELECT count(*) FROM cutover_events) AS new,
+       (SELECT min(row_id) FROM cutover_events) AS new_min_row_id;
+```
+
+Check BigQuery:
+
+```sql
+SELECT table_name FROM `<BQ_DATASET>`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+
+SELECT starts_with(payload, 'pre-cutover') AS pre, count(*), min(row_id), max(row_id)
+  FROM `<BQ_DATASET>.partition_test_cutover_events` GROUP BY 1;
+
+SELECT row_id, count(*) FROM `<BQ_DATASET>.partition_test_cutover_events`
+  GROUP BY row_id HAVING count(*) > 1;
+```
+
+- **Expected:**
+  - The same single `partition_test_cutover_events` table holds the pre-cutover
+    rows, unchanged, plus all the post-cutover rows.
+  - Post-cutover `row_id`s continue the sequence.
+  - The duplicate query returns no rows.
+  - There is no `…_cutover_events_legacy` table and no per-partition table.
+  - The stream stays `RUNNING`, with no errors in `gcloud datastream objects list`.
+- **Record:** how Datastream treats the new relation behind the same name, for
+  example a new object entry, a schema change, or object errors in the console.
+  The `includeObjects` filter matches by name, and the primary key changed from
+  `(row_id)` to `(record_time, row_id)`. With `backfillNone`, no backfill is expected.
+
+## 3. Pruning by DDL
+
+Dropping a partition, or the legacy table, is DDL. Logical replication emits
+nothing for it, so the append-only BigQuery tables must not change.
+
+```sql
+DROP TABLE partitioned_events_p<yesterday>;   -- e.g. partitioned_events_p20261011
+DROP TABLE cutover_events_p<yesterday>;
+DROP TABLE cutover_events_legacy;             -- already out of the publication
+SELECT count(*) FROM partitioned_events;
+```
+
+Wait a few minutes, then:
+
+```sql
+SELECT count(*) FROM `<BQ_DATASET>.partition_test_partitioned_events`;
+SELECT count(*) FROM `<BQ_DATASET>.partition_test_cutover_events`;
+SELECT datastream_metadata.change_type, count(*)
+  FROM `<BQ_DATASET>.partition_test_partitioned_events` GROUP BY 1;
+```
+
+- **Expected:** both BigQuery counts are unchanged from sections 1 and 2, even
+  though Postgres now has fewer rows. There are no `DELETE` change types, and the
+  stream is still `RUNNING`.
+
+## 4. Read-only check for real clusters
+
+Do **not** alter publications on real clusters; the legacy Datastreams run on them.
+On clusters with the stag-prod stream enabled, check only:
+
+```sql
+SELECT pubname, pubviaroot FROM pg_publication;
+```
+
+`bigquery-cloudsql.sh` sets `publish_via_partition_root` only when it **creates**
+a publication. Its `ALTER PUBLICATION … SET TABLE` branch leaves the existing
+setting alone. A `update_history_datastream_stag_prod_pub` created before
+f56f841ab therefore still has `pubviaroot = f`. Datastream does not support
+changing that setting on a publication a stream already uses; the stream fails
+permanently. Such a cluster needs a new publication, slot and stream before the
+cutover.
+
+## Teardown
+
+```bash
+cncluster pulumi pg-partition-bq-test down
+```
+
+Deleting the stack drops the replication slot and publication first, then the
+instance, and deletes the BigQuery dataset along with its contents.

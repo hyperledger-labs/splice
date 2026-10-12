@@ -54,6 +54,7 @@
         "splitwell",
         "circleci",
         "gha",
+        "pg-partition-bq-test",
         "policies",
         "sv"
     ],
