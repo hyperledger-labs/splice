@@ -12,6 +12,11 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.console.{
+  ValidatorAppBackendReference,
+  WalletAppClientReference,
+}
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -28,6 +33,7 @@ import org.lfdecentralizedtrust.splice.validator.automation.{
 }
 import org.lfdecentralizedtrust.splice.validator.config.AppInstance
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
+import org.lfdecentralizedtrust.splice.wallet.config.AutoAcceptTransfersConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 
 import java.time.Duration
@@ -45,28 +51,62 @@ class WalletNoDevNetTimeBasedIntegrationTest
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => ConfigTransforms.noDevNet(config))
+      // Top-ups on (targetThroughput > 0) for non-SV validators, which makes the reserved traffic apply.
       .withTrafficTopupsEnabled
+      // Stop validators from buying traffic or receiving CC on their own.
       .addConfigTransform((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[TopupMemberTrafficTrigger]
             .withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
+      // Read the traffic balance fresh on every command.
       .withTrafficBalanceCacheDisabled
       .addConfigTransforms((_, config) => {
+        // The user behind aliceWalletClient. The framework appends "_tc<testCaseId>" to wallet client
+        // users per test case, so this control user only matches in the FIRST (and only) test case ("_tc0").
         val aliceWalletUser =
           perTestCaseNameWithoutUnverified(
             config.walletAppClients(InstanceName.tryCreate("aliceWallet")).ledgerApiUser
           )
+
+        // Party ids must be known before the apps start, so we build them by hand:
+        // "<party name from the config>::<hex id of the participant it will live on>".
+        // (Same approach as WalletSweepToValidatorOperatorIntegrationTest.)
+        val bobParticipant =
+          ConfigTransforms.getParticipantIds(config.parameters.clock)("bob_validator_user")
+        val bobPartyHint =
+          config.validatorApps(InstanceName.tryCreate("bobValidator")).validatorPartyHint.value
+        val bobPartyId =
+          PartyId.tryFromProtoPrimitive(s"$bobPartyHint::${bobParticipant.split("::").last}")
+
+        val sv1Participant = ConfigTransforms.getParticipantIds(config.parameters.clock)("sv1")
+        val sv1PartyHint = config.svApps(InstanceName.tryCreate("sv1")).svPartyHint.value
+        val sv1PartyId = PartyId.tryFromProtoPrimitive(
+          s"${BaseLedgerConnection
+              .sanitizeUserIdToPartyString(sv1PartyHint)}::${sv1Participant.split("::").last}"
+        )
+
         ConfigTransforms.updateAllValidatorConfigs { case (name, c) =>
           if (name == "aliceValidator")
+            // Onboards a normal user (not the validator operator) on aliceValidator at start-up
+            // (with High priority), for the Low-priority control at the end of the test.
             c.copy(appInstances =
               c.appInstances +
                 ("lowPriorityControl" -> AppInstance(
                   serviceUser = aliceWalletUser,
-                  walletUser = None,
+                  walletUser = None, // None: the service user itself is onboarded to the wallet
                   dars = Seq.empty,
                 ))
+            )
+          else if (name == "bobValidator")
+            // bobValidator auto-accepts transfer offers from sv1. Only bob has this trigger,
+            // so aliceValidator's offers are never auto-accepted.
+            c.copy(autoAcceptTransfers =
+              Map(
+                bobPartyId.toProtoPrimitive ->
+                  AutoAcceptTransfersConfig(fromParties = Seq(sv1PartyId))
+              )
             )
           else c
         }(config)
@@ -74,7 +114,9 @@ class WalletNoDevNetTimeBasedIntegrationTest
   }
 
   "A validator wallet" should {
+
     "accept transfers with high priority when it cannot afford a top-up" in { implicit env =>
+      // There is no tap outside DevNet, so sv1 earns CC through SV rewards.
       actAndCheck(
         "Advance enough rounds for SV1 to claim rewards", {
           (0 to 3).foreach { _ =>
@@ -93,20 +135,25 @@ class WalletNoDevNetTimeBasedIntegrationTest
       val now = env.environment.clock.now
       val expiresAt = now.plus(Duration.ofMinutes(10))
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+      val bobValidatorParty = bobValidatorBackend.getValidatorPartyId()
+      // Keep each transfer small: every accepted transfer raises the receiver's balance,
+      // and it must stay below the cost of one top-up for the next accept to count.
       val amount = BigDecimal(10)
 
-      val (_, topupCostCc) =
-        computeSynchronizerFees(getTopupParameters(aliceValidatorBackend, now).topupAmount)
-
       // Fails the test if it does not hold, so that an accept can never pass with Low priority.
-      def checkCannotAffordTopupAndTrafficBelowReserve(): Unit =
+      def checkCannotAffordTopupAndTrafficBelowReserve(
+          validator: ValidatorAppBackendReference,
+          walletClient: WalletAppClientReference,
+      ): Unit =
         clue(
-          "Precondition: aliceValidator cannot afford one top-up and its traffic is at or below the reserve"
+          s"Precondition: ${validator.name} cannot afford one top-up and its traffic is at or below the reserve"
         ) {
-          aliceValidatorWalletClient.balance().unlockedQty should be < topupCostCc
-          val reserved = aliceValidatorBackend.config.domains.global.reservedTraffic.value
+          val (_, topupCostCc) =
+            computeSynchronizerFees(getTopupParameters(validator, now).topupAmount)
+          walletClient.balance().unlockedQty should be < topupCostCc
+          val reserved = validator.config.domains.global.reservedTraffic.value
           val remainder =
-            getTrafficState(aliceValidatorBackend, activeSynchronizerId).extraTrafficRemainder
+            getTrafficState(validator, activeSynchronizerId).extraTrafficRemainder
           remainder should be <= reserved
         }
 
@@ -129,7 +176,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
           ),
       )
 
-      checkCannotAffordTopupAndTrafficBelowReserve()
+      checkCannotAffordTopupAndTrafficBelowReserve(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+      )
       val balanceBeforeOffer = aliceValidatorWalletClient.balance().unlockedQty
       actAndCheck(
         "aliceValidator accepts the transfer offer (priority High)",
@@ -165,7 +215,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
         case _ => fail("The V1 transfer was expected to be pending.")
       }
 
-      checkCannotAffordTopupAndTrafficBelowReserve()
+      checkCannotAffordTopupAndTrafficBelowReserve(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+      )
       val balanceBeforeV1 = aliceValidatorWalletClient.balance().unlockedQty
       actAndCheck(
         "aliceValidator accepts the V1 transfer (priority High)",
@@ -179,7 +232,7 @@ class WalletNoDevNetTimeBasedIntegrationTest
         },
       )
 
-      // 3. acceptTokenStandardTransferV2 (needs the same priority logic in the V2 handler)
+      // 3. acceptTokenStandardTransferV2
       val (v2Response, _) = actAndCheck(
         "sv1 creates a token standard V2 transfer to aliceValidator",
         sv1WalletClient.createTokenStandardTransferV2(
@@ -199,7 +252,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
         case _ => fail("The V2 transfer was expected to be pending.")
       }
 
-      checkCannotAffordTopupAndTrafficBelowReserve()
+      checkCannotAffordTopupAndTrafficBelowReserve(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+      )
       val balanceBeforeV2 = aliceValidatorWalletClient.balance().unlockedQty
       actAndCheck(
         "aliceValidator accepts the V2 transfer (priority High)",
@@ -214,7 +270,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
       )
 
       // 4. createTransferPreapproval: the wallet's proposal and the validator trigger's accept
-      checkCannotAffordTopupAndTrafficBelowReserve()
+      checkCannotAffordTopupAndTrafficBelowReserve(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+      )
       aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceValidatorParty) shouldBe None
 
       actAndCheck(
@@ -224,13 +283,37 @@ class WalletNoDevNetTimeBasedIntegrationTest
         "the TransferPreapproval exists",
         response => {
           inside(response) { case CreateTransferPreapprovalResponse.Created(_) => () }
-          aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceValidatorParty) should be(
-            defined
-          )
+          aliceValidatorBackend
+            .lookupTransferPreapprovalByParty(aliceValidatorParty) should be(defined)
         },
       )
 
-      // Control: aliceWallet's user is a normal user, not the validator operator, so its priority is Low.
+      // 5. AutoAcceptTransferOffersTrigger: bobValidator accepts sv1's offer by itself
+      checkCannotAffordTopupAndTrafficBelowReserve(bobValidatorBackend, bobValidatorWalletClient)
+      val autoTrackingId = UUID.randomUUID.toString
+      val balanceBeforeAuto = bobValidatorWalletClient.balance().unlockedQty
+      actAndCheck(
+        "sv1 offers some CC to bobValidator, which auto-accepts it",
+        sv1WalletClient.createTransferOffer(
+          bobValidatorParty,
+          amount,
+          "auto accept test",
+          expiresAt,
+          autoTrackingId,
+        ),
+      )(
+        "the trigger accepts the offer (priority High) and the balance goes up",
+        _ => {
+          inside(sv1WalletClient.getTransferOfferStatus(autoTrackingId)) {
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(r) =>
+              r.status shouldBe TxLogEntry.Http.TransferOfferStatus.Completed
+          }
+          bobValidatorWalletClient.balance().unlockedQty should be > balanceBeforeAuto
+        },
+      )
+
+      // Control: aliceWallet's user is a normal user, not the validator operator, so its priority
+      // is Low. The traffic condition is the same as above, so its accept must be refused.
       waitForWalletUser(aliceWalletClient)
       val aliceUserParty = PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
 
@@ -253,7 +336,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
         case _ => fail("The transfer was expected to be pending.")
       }
 
-      checkCannotAffordTopupAndTrafficBelowReserve()
+      checkCannotAffordTopupAndTrafficBelowReserve(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+      )
       clue("alice, a normal user, cannot accept it: the handler uses Low priority") {
         assertThrowsAndLogsCommandFailures(
           aliceWalletClient.acceptTokenStandardTransfer(controlCid),
