@@ -149,7 +149,7 @@ class BulkStorageReader(
             s"No updates in staging bulk storage yet, returning None for segment starting at $minTs"
           )
           Future.successful(None)
-        case Some(latestStagingTs) if latestStagingTs.toTimestamp.timestamp <= minTs =>
+        case Some(latestStagingTs) if latestStagingTs.toTimestamp <= minTs =>
           logger.debug(
             s"Latest updates in staging bulk storage ending at $latestStagingTs, which is not after the requested timestamp $minTs, returning None for segment starting at $minTs"
           )
@@ -177,10 +177,10 @@ class BulkStorageReader(
     } yield {
       (updates, snapshots) match {
         case (Some(updatesSegment), Some(snapshotTs)) =>
-          if (updatesSegment.toTimestamp.timestamp > snapshotTs.timestamp) {
+          if (updatesSegment.toTimestamp > snapshotTs.timestamp) {
             snapshotTs.timestamp
           } else {
-            updatesSegment.toTimestamp.timestamp
+            updatesSegment.toTimestamp
           }
         case _ =>
           CantonTimestamp.MinValue
@@ -310,7 +310,7 @@ class BulkStorageReader(
         case Some(segment) =>
           isFolderInRange(folder) && paginationFilter(folder) && isFolderFullyDumped(
             folder,
-            segment.toTimestamp.timestamp,
+            segment.toTimestamp,
           )
       }
     }
@@ -331,7 +331,7 @@ class BulkStorageReader(
         storageCaughtUpTo match {
           case None => nextPageTokenO
           case Some(segment) =>
-            if (segment.toTimestamp.timestamp < atOrBeforeRecordTime) {
+            if (segment.toTimestamp < atOrBeforeRecordTime) {
               // We have dumped data up to a segment that ends before the requested end time, so return the current nextPageToken again, to be retried later
               nextPageTokenO
             } else {
@@ -408,8 +408,8 @@ class BulkStorageReader(
       storageEncodings: NonEmptyList[ScanStorageConfig.Encoding],
   ): Future[UpdateHistoryObjectsResponse] = {
     val folder = storageConfig.getSegmentFolder(
-      segment.fromTimestamp.timestamp,
-      Some(segment.toTimestamp.timestamp),
+      segment.fromTimestamp,
+      Some(segment.toTimestamp),
     )
     getUpdateObjectsInFolder(s3Connection, folder, storageEncodings)
       .flatMap(s3Connection.getChecksums)

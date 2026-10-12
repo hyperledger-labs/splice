@@ -226,7 +226,6 @@ class BulkStorage(
     updateHistory,
     stagingConnection,
     historyMetrics,
-    currentMigrationId,
     loggerFactory,
   )
   val updatesStaging = new UpdateHistoryBulkStorage(

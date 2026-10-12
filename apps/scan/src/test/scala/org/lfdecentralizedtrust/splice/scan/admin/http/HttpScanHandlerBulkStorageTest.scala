@@ -121,8 +121,8 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
 
   private def updateProgress(fromInstant: String, toInstant: String): UpdatesSegment =
     UpdatesSegment(
-      fromTimestamp = snapshotProgressAt(fromInstant),
-      toTimestamp = snapshotProgressAt(toInstant),
+      fromTimestamp = snapshotProgressAt(fromInstant).timestamp,
+      toTimestamp = snapshotProgressAt(toInstant).timestamp,
     )
 
   private def snapshotsProgress(

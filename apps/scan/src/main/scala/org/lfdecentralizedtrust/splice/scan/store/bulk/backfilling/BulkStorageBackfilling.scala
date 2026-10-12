@@ -111,8 +111,8 @@ class BulkStorageBackfilling(
       tc: TraceContext
   ): Future[Emitted[Unit]] =
     progress.readUpdatesCursor.flatMap {
-      case Some(copied) if copied.toTimestamp.timestamp >= copyUpTo =>
-        val upTo = copied.toTimestamp.timestamp
+      case Some(copied) if copied.toTimestamp >= copyUpTo =>
+        val upTo = copied.toTimestamp
         logger.info(s"Update objects are copied up to $upTo, where this Scan's own segments start")
         lastStep(UpdatesCopied(upTo))
       case Some(copied) => copySegment(nextSegment(copied))
@@ -142,10 +142,7 @@ class BulkStorageBackfilling(
   private def nextSegment(copied: UpdatesSegment): UpdatesSegment =
     UpdatesSegment(
       copied.toTimestamp,
-      TimestampWithMigrationId(
-        storageConfig.computeBulkSnapshotTimeAfter(copied.toTimestamp.timestamp),
-        currentMigrationId,
-      ),
+      storageConfig.computeBulkSnapshotTimeAfter(copied.toTimestamp),
     )
 
   private def firstSegment(copyUpTo: CantonTimestamp)(implicit
@@ -170,7 +167,7 @@ class BulkStorageBackfilling(
   private def copySegment(segment: UpdatesSegment)(implicit
       tc: TraceContext
   ): Future[Emitted[Unit]] = {
-    val (from, to) = (segment.fromTimestamp.timestamp, segment.toTimestamp.timestamp)
+    val (from, to) = (segment.fromTimestamp, segment.toTimestamp)
     listing.updateObjectsPage(from, to, config.pageSize, availableAt = to).flatMap {
       case PeerListing.NotAvailableYet =>
         logger.debug(s"Not enough peers hold the update segment $from - $to yet, waiting")
@@ -210,7 +207,7 @@ class BulkStorageBackfilling(
         case None =>
           firstSegment(copyUpTo).map[PeerListing[Option[CantonTimestamp]]] {
             case PeerListing.Available(first) =>
-              PeerListing.Available(first.map(_.toTimestamp.timestamp))
+              PeerListing.Available(first.map(_.toTimestamp))
             case PeerListing.NotAvailableYet => PeerListing.NotAvailableYet
             case PeerListing.NoPeerWillHold => PeerListing.NoPeerWillHold
           }
@@ -271,13 +268,7 @@ class BulkStorageBackfilling(
 
   private def segmentOfFolder(folder: String): Try[UpdatesSegment] =
     storageConfig.getStartAndEndTimestampsForFolder(folder) match {
-      case Right((from, to)) =>
-        Success(
-          UpdatesSegment(
-            TimestampWithMigrationId(from, currentMigrationId),
-            TimestampWithMigrationId(to, currentMigrationId),
-          )
-        )
+      case Right((from, to)) => Success(UpdatesSegment(from, to))
       case Left(err) => Failure(new IllegalStateException(err))
     }
 

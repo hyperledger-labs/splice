@@ -49,10 +49,7 @@ class BulkStorageBackfillingTest
     storageConfig.getSegmentFolder(ts(fromDay), Some(ts(toDay)))
 
   private def segment(fromDay: Int, toDay: Int): UpdatesSegment =
-    UpdatesSegment(
-      TimestampWithMigrationId(ts(fromDay), migrationId),
-      TimestampWithMigrationId(ts(toDay), migrationId),
-    )
+    UpdatesSegment(ts(fromDay), ts(toDay))
 
   private def objects(folderName: String, n: Int): Seq[ObjectKeyAndChecksum] =
     (0 until n).map(i => ObjectKeyAndChecksum(s"$folderName/updates_compact_json_$i.zstd", s"d-$i"))

@@ -78,10 +78,7 @@ class KvBackfillingProgressTest
     }
 
     "persist and read back both cursors" in {
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(ts(1), 0L),
-        TimestampWithMigrationId(ts(2), 0L),
-      )
+      val segment = UpdatesSegment(ts(1), ts(2))
       val snapshot = TimestampWithMigrationId(ts(2), 0L)
       for {
         progress <- mkProgress
