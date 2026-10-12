@@ -26,15 +26,21 @@ class AcsSnapshotBulkStorageCommitFromStaging(
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor
-) extends AcsSnapshotBulkStorageWriter
+) extends AcsSnapshotBulkStorageWriter[CantonTimestamp]
     with NamedLogging {
 
-  override def getNextSnapshotTimestampAfter(
+  override def positionAt(recordTime: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[CantonTimestamp] = Future.successful(recordTime)
+
+  override def recordTimeOf(snapshot: CantonTimestamp): CantonTimestamp = snapshot
+
+  override def getNextSnapshotAfter(
       last: CantonTimestamp
   )(implicit tc: TraceContext): Future[Option[CantonTimestamp]] =
     bulkStorageReader.getTimestampOfStagingAcsSnapshotAfter(last)
 
-  override def shouldProcessSnapshotAt(ts: CantonTimestamp)(implicit
+  override def shouldProcessSnapshot(snapshot: CantonTimestamp)(implicit
       tc: TraceContext
   ): Boolean = true // all objects in staging should be moved to committed
 

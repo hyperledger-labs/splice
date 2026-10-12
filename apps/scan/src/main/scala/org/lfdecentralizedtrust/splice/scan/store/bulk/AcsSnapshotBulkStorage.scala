@@ -23,33 +23,37 @@ import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
-trait AcsSnapshotBulkStorageWriter {
+trait AcsSnapshotBulkStorageWriter[Snapshot] {
 
-  /** This method should return the timestamp of the next snapshot available, after `last`, if any.
+  def positionAt(recordTime: CantonTimestamp)(implicit tc: TraceContext): Future[Snapshot]
+
+  def recordTimeOf(snapshot: Snapshot): CantonTimestamp
+
+  /** This method should return the next snapshot available, after `last`, if any.
     * The pipeline will poll this method until it returns a new snapshot, and then process that snapshot
     * before polling for the next one. It is ok for this method to return a snapshot that should not actually
-    * be processed, as the pipeline will call `shouldProcessSnapshotAt` to check if the snapshot should be
+    * be processed, as the pipeline will call `shouldProcessSnapshot` to check if the snapshot should be
     * processed or skipped (but will remember that it was skipped and update `last` for the future calls accordingly).
     */
-  def getNextSnapshotTimestampAfter(
-      last: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]]
+  def getNextSnapshotAfter(
+      last: Snapshot
+  )(implicit tc: TraceContext): Future[Option[Snapshot]]
 
-  /** This method should return true if the snapshot at the given timestamp should be processed,
+  /** This method should return true if the given snapshot should be processed,
     * or false if it should be skipped. This is used to skip snapshots that are not relevant for bulk storage
     * (e.g. because they are in the DB, but are more frequent than the frequency we need for bulk storage).
     */
-  def shouldProcessSnapshotAt(ts: CantonTimestamp)(implicit
+  def shouldProcessSnapshot(snapshot: Snapshot)(implicit
       tc: TraceContext
   ): Boolean
 
-  /** Return the main Flow that processes snapshots at given timestamps.
-    * The Flow must emit back the same timestamps as its output on every processed snapshot.
+  /** Return the main Flow that processes snapshots.
+    * The Flow must emit back the same snapshots as its output on every processed snapshot.
     */
   def processSnapshotsFlow(implicit
       tc: TraceContext,
       actorSystem: ActorSystem,
-  ): Flow[CantonTimestamp, CantonTimestamp, NotUsed]
+  ): Flow[Snapshot, Snapshot, NotUsed]
 
 }
 
@@ -108,9 +112,9 @@ class AcsSnapshotBulkStoragePersistentProgress(
   }
 }
 
-class AcsSnapshotBulkStorage(
+class AcsSnapshotBulkStorage[Snapshot](
     description: String,
-    writer: AcsSnapshotBulkStorageWriter,
+    writer: AcsSnapshotBulkStorageWriter[Snapshot],
     val persistentProgress: AcsSnapshotBulkStoragePersistentProgress,
     appConfig: BulkStorageConfig,
     backfillingCompleteGate: Source[Boolean, Cancellable],
@@ -120,14 +124,14 @@ class AcsSnapshotBulkStorage(
     with Spanning
     with PekkoRetryableService[CantonTimestamp] {
 
-  private def getAcsSnapshotTimestampsAfter(
-      start: CantonTimestamp
-  )(implicit tc: TraceContext): Source[CantonTimestamp, NotUsed] = {
+  private def getAcsSnapshotsAfter(
+      start: Snapshot
+  )(implicit tc: TraceContext): Source[Snapshot, NotUsed] = {
     Source
-      .unfoldAsync(start) { (last: CantonTimestamp) =>
-        writer.getNextSnapshotTimestampAfter(last).flatMap {
+      .unfoldAsync(start) { (last: Snapshot) =>
+        writer.getNextSnapshotAfter(last).flatMap {
           case Some(snapshot) =>
-            logger.info(s"next snapshot available, at record time $snapshot")
+            logger.info(s"next snapshot available: $snapshot")
             Future.successful(
               Some(
                 (
@@ -146,7 +150,7 @@ class AcsSnapshotBulkStorage(
             }
         }
       }
-      .collect { case Some(ts) => ts }
+      .collect { case Some(snapshot) => snapshot }
   }
 
   /**  This is the main implementation of the pipeline. It is a Pekko Source that reads a `start` timestamp
@@ -158,18 +162,19 @@ class AcsSnapshotBulkStorage(
 
     backfillingCompleteGate.flatMap { _ =>
       Source
-        .future(persistentProgress.readLatestProcessedSnapshotTimestamp)
-        .flatMapConcat {
+        .future(persistentProgress.readLatestProcessedSnapshotTimestamp.flatMap {
           case Some(start) =>
             logger.info(s"Latest processed snapshot was at timestamp $start")
-            getAcsSnapshotTimestampsAfter(start)
+            writer.positionAt(start)
           case None =>
             logger.info("No processed snapshots yet, starting from genesis")
-            getAcsSnapshotTimestampsAfter(CantonTimestamp.MinValue)
-        }
-        .filter { writer.shouldProcessSnapshotAt }
+            writer.positionAt(CantonTimestamp.MinValue)
+        })
+        .flatMapConcat(getAcsSnapshotsAfter)
+        .filter { writer.shouldProcessSnapshot }
         .via(writer.processSnapshotsFlow)
-        .mapAsync(1) { ts =>
+        .mapAsync(1) { snapshot =>
+          val ts = writer.recordTimeOf(snapshot)
           persistentProgress.persistLatestProcessedSnapshotTimestamp(ts).map(_ => ts)
         }
     }

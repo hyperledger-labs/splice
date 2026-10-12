@@ -31,42 +31,44 @@ class AcsSnapshotBulkStorageWriterFromDb(
     historyMetrics: HistoryMetrics,
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
-    extends AcsSnapshotBulkStorageWriter
+    extends AcsSnapshotBulkStorageWriter[TimestampWithMigrationId]
     with NamedLogging
     with Spanning {
 
-  private def snapshotMigrationAfter(
-      timestamp: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Long] =
+  override def positionAt(
+      recordTime: CantonTimestamp
+  )(implicit tc: TraceContext): Future[TimestampWithMigrationId] =
     updateHistory
-      .getLowestMigrationForRecordTime(timestamp)
-      .map(_.getOrElse(updateHistory.domainMigrationId))
+      .getLowestMigrationForRecordTime(recordTime)
+      .map(migrationId =>
+        TimestampWithMigrationId(recordTime, migrationId.getOrElse(updateHistory.domainMigrationId))
+      )
 
-  override def getNextSnapshotTimestampAfter(
-      last: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]] =
-    OptionT
-      .liftF(snapshotMigrationAfter(last))
-      .flatMapF(acsSnapshotStore.lookupSnapshotAfter(_, last))
-      .subflatMap { snapshot =>
+  override def recordTimeOf(snapshot: TimestampWithMigrationId): CantonTimestamp =
+    snapshot.timestamp
+
+  override def getNextSnapshotAfter(
+      last: TimestampWithMigrationId
+  )(implicit tc: TraceContext): Future[Option[TimestampWithMigrationId]] =
+    OptionT(acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp)).subflatMap {
+      snapshot =>
         if (snapshot.indexesCreated) {
-          Some(snapshot.snapshotRecordTime)
+          Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId))
         } else {
           logger.debug(s"Snapshot $snapshot is not yet indexed, so we cannot query it.")
           None
         }
-      }
-      .value
+    }.value
 
-  override def shouldProcessSnapshotAt(ts: CantonTimestamp)(implicit
+  override def shouldProcessSnapshot(snapshot: TimestampWithMigrationId)(implicit
       tc: TraceContext
   ): Boolean = {
-    val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+    val ret = storageConfig.shouldDumpSnapshotToBulkStorage(snapshot.timestamp)
     if (ret) {
-      logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+      logger.debug(s"Dumping snapshot at timestamp ${snapshot.timestamp} to bulk storage")
     } else {
       logger.info(
-        s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+        s"Skipping snapshot at timestamp ${snapshot.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
       )
     }
     ret
@@ -75,25 +77,21 @@ class AcsSnapshotBulkStorageWriterFromDb(
   override def processSnapshotsFlow(implicit
       tc: TraceContext,
       actorSystem: ActorSystem,
-  ): Flow[CantonTimestamp, CantonTimestamp, NotUsed] = {
-    Flow[CantonTimestamp]
-      .mapAsync(1)(ts => snapshotMigrationAfter(ts).map(TimestampWithMigrationId(ts, _)))
-      .via(
-        SingleAcsSnapshotBulkStorage
-          .asFlow(
-            storageConfig,
-            appConfig,
-            acsSnapshotStore,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
+  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] = {
+    SingleAcsSnapshotBulkStorage
+      .asFlow(
+        storageConfig,
+        appConfig,
+        acsSnapshotStore,
+        s3Connection,
+        historyMetrics,
+        loggerFactory,
       )
       .map { case (ts, keys) =>
         logger.debug(
           s"Successfully dumped snapshot from migration ${ts.migrationId}, timestamp ${ts.timestamp} to bulk storage, with object keys: $keys"
         )
-        ts.timestamp
+        ts
       }
   }
 
