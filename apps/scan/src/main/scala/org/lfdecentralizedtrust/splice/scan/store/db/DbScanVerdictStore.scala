@@ -693,8 +693,9 @@ class DbScanVerdictStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[TransactionViewT]] = {
-    storage
-      .query(
+    val opName = "scanVerdict.listTransactionViews"
+    for {
+      views <- storage.query(
         sql"""
            select
              verdict_row_id,
@@ -707,9 +708,9 @@ class DbScanVerdictStore(
            order by view_id asc
            limit ${sqlLimit(limit)}
          """.as[TransactionViewT],
-        "scanVerdict.listTransactionViews",
+        opName,
       )
-      .map(applyLimitOrFail("scanVerdict.listTransactionViews", limit, _))
+    } yield applyLimitOrFail(opName, limit, views)
   }
 
   def maxVerdictRecordTime(migrationId: Long)(implicit
