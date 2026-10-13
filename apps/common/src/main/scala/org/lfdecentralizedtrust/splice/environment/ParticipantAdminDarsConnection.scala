@@ -185,10 +185,10 @@ trait ParticipantAdminDarsConnection {
       dars: Seq[DarResource],
       currentVetting: VettedPackages,
   ): VettedPackages = {
-    val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
-    VettedPackages.tryCreate(
-      currentVetting.participantId,
-      currentVetting.packages.filterNot(pkg => packageIdsToRemove.contains(pkg.packageId)),
+    val packageIdsToRemove: Set[String] = dars.view.map(_.packageId).toSet
+    tryModifyVettedPackages(
+      currentVetting,
+      _.filterNot(pkg => packageIdsToRemove(pkg.packageId)),
     )
   }
 
@@ -206,42 +206,46 @@ trait ParticipantAdminDarsConnection {
       dar: DarResource,
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
-  ) = {
-    VettedPackages.tryCreate(
-      currentVetting.participantId, {
-        val packages = currentVetting.packages
-        def addVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
-          // while the main package is guaranteed to not exist the dependencies might already have been vetted, and they might have been vetted with a later date so we make sure that the dependencies are available as early as we need them
-          packages.find(_.packageId == packageId) match {
-            case Some(existingVettingState) =>
-              if (
-                existingVettingState.validFromInclusive
-                  .exists(existingValidFrom =>
-                    existingValidFrom.isAfter(CantonTimestamp.now()) &&
-                      packageValidFrom.forall(_ isBefore existingValidFrom)
-                  )
-              ) {
-                packages.filterNot(_.packageId == packageId) :+ VettedPackage(
-                  packageId,
-                  packageValidFrom,
-                  None,
+  ) = tryModifyVettedPackages(
+    currentVetting,
+    { packages =>
+      def addVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
+        // while the main package is guaranteed to not exist the dependencies might already have been vetted, and they might have been vetted with a later date so we make sure that the dependencies are available as early as we need them
+        packages.find(_.packageId == packageId) match {
+          case Some(existingVettingState) =>
+            if (
+              existingVettingState.validFromInclusive
+                .exists(existingValidFrom =>
+                  existingValidFrom.isAfter(CantonTimestamp.now()) &&
+                    packageValidFrom.forall(_ isBefore existingValidFrom)
                 )
-              } else {
-                packages
-              }
-            case None => packages :+ VettedPackage(packageId, packageValidFrom, None)
-          }
+            ) {
+              packages.filterNot(_.packageId == packageId) :+ VettedPackage(
+                packageId,
+                packageValidFrom,
+                None,
+              )
+            } else {
+              packages
+            }
+          case None => packages :+ VettedPackage(packageId, packageValidFrom, None)
         }
-        (dar.dependencyPackageIds.toSeq :+ dar.packageId)
-          .map(
-            PackageId.assertFromString
-          )
-          .foldLeft(packages) { case (vettingState, newPackage) =>
-            addVettingStateForPackage(newPackage, vettingState)
-          }
-      },
-    )
-  }
+      }
+      (dar.dependencyPackageIds.toSeq :+ dar.packageId)
+        .map(
+          PackageId.assertFromString
+        )
+        .foldLeft(packages) { case (vettingState, newPackage) =>
+          addVettingStateForPackage(newPackage, vettingState)
+        }
+    },
+  )
+
+  private[this] def tryModifyVettedPackages(
+      vetting: VettedPackages,
+      packages: Seq[VettedPackage] => Seq[VettedPackage],
+  ): VettedPackages =
+    VettedPackages.tryCreate(vetting.participantId, packages(vetting.packages))
 
   def listVettedPackages(
       participantId: ParticipantId,
