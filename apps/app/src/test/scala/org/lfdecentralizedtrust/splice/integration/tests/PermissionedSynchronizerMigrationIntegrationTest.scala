@@ -159,6 +159,7 @@ class PermissionedSynchronizerMigrationIntegrationTest
       bobValidatorBackend.waitForInitialization()
       bobValidatorBackend.onboardUser("bob-user")
     }
+
     clue("Secret based onboarding endpoint is disabled") {
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         {
