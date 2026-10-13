@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.{BaseTest, BaseTestExtensions}
 import com.digitalasset.canton.scalatest.ScalaFuturesWithPatience
 import com.typesafe.scalalogging.LazyLogging
 import org.scalatest.concurrent.PatienceConfiguration
@@ -39,7 +39,7 @@ trait TriggerTestUtil { self: BaseTest =>
       .trigger[UpdateExternalPartyConfigStateTrigger]
 
   def advanceRoundsByOneTickViaAutomation(
-      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess
+      timeUntilSuccess: FiniteDuration = BaseTestExtensions.DefaultEventuallyTimeUntilSuccess
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     eventually(timeUntilSuccess) {
       advanceOpenMiningRoundTrigger.runOnce().futureValue should be(true)
@@ -47,7 +47,7 @@ trait TriggerTestUtil { self: BaseTest =>
   }
 
   def updateExternalPartyConfigStatesViaAutomation(
-      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess
+      timeUntilSuccess: FiniteDuration = BaseTestExtensions.DefaultEventuallyTimeUntilSuccess
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     eventually(timeUntilSuccess) {
       updateExternalPartyConfigStateTrigger.runOnce().futureValue should be(true)

@@ -140,6 +140,7 @@ lazy val root: Project = (project in file("."))
     `canton-fork-app-base`,
     `canton-fork-base`,
     `canton-fork-common`,
+    `canton-fork-testing`,
     pulumi,
     `load-tester`,
     tools,
@@ -1213,6 +1214,15 @@ lazy val `canton-fork-common` =
     .in(file("canton-fork/common"))
     .dependsOn(`canton-community-common`)
     .settings(Headers.ApacheDAHeaderSettings)
+
+lazy val `canton-fork-testing` =
+  project
+    .in(file("canton-fork/testing"))
+    .dependsOn(`canton-community-testing`)
+    .settings(
+      scalacOptions --= JvmRulesPlugin.scalacOptionsToDisableForTests,
+      Headers.ApacheDAHeaderSettings,
+    )
 
 lazy val `canton-fork-app-base` =
   project
@@ -2459,6 +2469,7 @@ lazy val `apps-app`: Project =
       `canton-community-app`,
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
+      `canton-fork-testing` % "test",
       `splice-amulet-test-daml` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
       // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run

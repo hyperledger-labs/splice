@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.historystart
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.wordspec.AsyncWordSpec
 

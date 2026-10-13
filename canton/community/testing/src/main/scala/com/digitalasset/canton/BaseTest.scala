@@ -61,7 +61,6 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
-import org.slf4j.event.Level
 import org.typelevel.discipline.Laws
 
 import scala.annotation.{nowarn, tailrec}
@@ -178,11 +177,6 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
       optionTAssertion: OptionT[Future, Assertion]
   )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
     optionTAssertion.getOrElse(fail(s"Unexpected None value"))
-
-  implicit def futureUnlessShutdownAssertionOfOptionTAssertion(
-      optionTAssertion: OptionT[FutureUnlessShutdown, Assertion]
-  )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
-    optionTAssertion.getOrElse(fail(s"Unexpected None value")).failOnShutdown("shutdown")
 
   /** Converts an EitherT into a Future, failing in case of a [[scala.Left$]]. */
   def valueOrFail[F[_], A, B](e: EitherT[F, A, B])(
@@ -426,15 +420,6 @@ trait BaseTest
         throw ex
     }
   }
-
-  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
-  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
-      expr,
-      logEntries =>
-        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
-    )
-
   def clueFUS[T](
       message: String
   )(expr: => FutureUnlessShutdown[T])(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
@@ -477,23 +462,6 @@ trait BaseTest
       retryOnTestFailuresOnly,
       logElapsed.map(noTracingLogger -> _),
     )(testCode)
-
-  /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-    */
-  def eventuallySucceeds[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
-      suppressErrors: Boolean = true,
-  )(testCode: => T): T = {
-    eventually(timeUntilSuccess, maxPollInterval) {
-      try {
-        if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
-      } catch {
-        case e: TestFailedException => throw e
-        case NonFatal(e) => fail(e)
-      }
-    }
-  }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return
@@ -560,8 +528,6 @@ trait BaseTest
 }
 
 object BaseTest extends EitherValues {
-  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
-
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
       PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
@@ -611,7 +577,7 @@ object BaseTest extends EitherValues {
     */
   @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
   def eventually[T](
-      timeUntilSuccess: FiniteDuration = DefaultEventuallyTimeUntilSuccess,
+      timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
       retryOnTestFailuresOnly: Boolean = true,
       logElapsed: Option[(Logger, String)] = None,

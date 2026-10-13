@@ -25,9 +25,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * LogReporter logs location, message and throwable on TestFailed event.
 * Added an optional `darFile` parameter to `ParticipantAdminCommands.UploadDar` so we can more conveniently upload DARs from weird locations (like JARs).
 * `ParticipantAdminCommands.ImportPartyAcs` now takes an InputStream instead of a file for greater versatility.
-* Decreases the `maxPollInterval` to 100ms from 5s, in the `eventually` methods in `BaseTest`
-* Compute the minimum poll interval used in `eventually` to 10% of the `maxPollInterval`
-* Added `suppressFailedClues` to `BaseTest` trait.
+* Decreases the default `maxPollInterval` of `object BaseTest`'s `eventually` to 100ms from 5s
 * Support specifying `darData` on `upload.dars`.
 * Added support for passing trace-contexts via gRPC CallOptions to `TraceContextGrpc`
 * Added priority shutdown tasks in `OnShutdownRunner` that run before other tasks, and added `setAsClosing` method.
