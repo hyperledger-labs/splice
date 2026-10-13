@@ -436,6 +436,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
   /v0/onboard/sv/start:
     post:
       tags: [sv]
