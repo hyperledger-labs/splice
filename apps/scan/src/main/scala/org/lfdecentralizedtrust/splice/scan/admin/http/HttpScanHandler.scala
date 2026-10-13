@@ -2471,7 +2471,9 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getValidatorFaucetsByValidator") { _ => _ =>
       store
-        .getValidatorLicenseByValidator(validators.map(v => PartyId.tryFromProtoPrimitive(v)))
+        .getValidatorLicenseByValidator(
+          maxSizeOrFail("validator_ids", validators).map(v => PartyId.tryFromProtoPrimitive(v))
+        )
         .map(licenses =>
           ScanResource.GetValidatorFaucetsByValidatorResponse.OK(
             definitions
